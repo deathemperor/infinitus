@@ -162,10 +162,19 @@ const statsDay = (scale) => ({
   humanMessages: 40 * scale,
   phoneMessages: 6 * scale,
   agentMessages: 120 * scale,
+  nudges: 3 * scale,
+  subagents: 4 * scale,
   turns: 90 * scale,
   toolCalls: { Edit: 55 * scale, Bash: 70 * scale, Read: 140 * scale },
+  toolErrors: 5 * scale,
+  questions: 7 * scale,
+  denials: 1 * scale,
+  retries: 2 * scale,
   waitingSeconds: 1800 * scale,
   compactions: 2 * scale,
+  // A max across days on the Mac, not a sum, so it does not scale with the
+  // period — and the one tile that carries a unit ("34 tool calls").
+  longestUnattended: 34,
   inputTokens: 900_000 * scale,
   outputTokens: 120_000 * scale,
   usd: 18.4 * scale,
@@ -192,11 +201,18 @@ const statsDay = (scale) => ({
   linesRemoved: 210 * scale,
   filesTouched: 31 * scale,
   coAuthoredByClaude: 9 * scale,
+  reverts: 1 * scale,
   prsOpened: 3 * scale,
   prsMerged: 2 * scale,
+  // The compact form the Mac sends once the repo set is dropped, which the
+  // Repos tile only reads when `repos` is absent or empty.
+  repoTally: 3,
   switches: 1 * scale,
-  limitStops: 0,
-  minutesLostToLimits: 0,
+  limitStops: 2 * scale,
+  revivals: 2 * scale,
+  minutesLostToLimits: 11 * scale,
+  ignites: 1 * scale,
+  resumes: 3 * scale,
 });
 
 // #747: the Utilization page's history and run rate — one sample per

@@ -100,6 +100,15 @@ describe("routeFailures", () => {
     ]);
   });
 
+  it("fails a Stats tile that lost its figure and reads zero again (#1115)", () => {
+    const stats = FORK_VISUAL_ROUTES.find((route) => route.route === "/stats")!;
+    const capture = [stats.marker, ...stats.shows!].join(" ");
+    expect(routeFailures(stats, capture)).toEqual([]);
+    expect(routeFailures(stats, capture.replace("Nudges 21", "Nudges 0"))).toEqual([
+      'missing "Nudges 21"',
+    ]);
+  });
+
   it("fails a row humanised from a fork_ pref key the web has no copy for", () => {
     expect(routeFailures(lock, "Re-lock Fork tunnel enabled")).toEqual(['shows "Fork "']);
     expect(routeFailures(lock, "Re-lock Tunnel hostname")).toEqual([]);
@@ -107,10 +116,12 @@ describe("routeFailures", () => {
 });
 
 describe("checkVisualPass", () => {
+  const stats = FORK_VISUAL_ROUTES.find((route) => route.route === "/stats")!;
+
   it("reads one capture per route and reports every failure", () => {
     const captures = new Map<string, string>([
       ["settings-infinitus-lock", "Unlocking Re-lock Locked"],
-      ["stats", "Stats Session lengths"],
+      ["stats", `Stats ${[stats.marker, ...stats.shows!].join(" ")}`],
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,

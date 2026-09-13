@@ -82,7 +82,31 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     marker: "ada-fixture",
     absent: ["No projection yet"],
   },
-  { route: "/stats", label: "Stats", marker: "Session lengths" },
+  {
+    route: "/stats",
+    label: "Stats",
+    marker: "Session lengths",
+    // The tiles whose figure the fixture used to leave out, so each read zero
+    // and a tile that stopped reading its field looked the same as one that
+    // worked (#1115). Each phrase is a tile's name and the figure beside it —
+    // the capture joins a tile's spans with a space.
+    shows: [
+      "Reverts 7",
+      "Repos 3",
+      "Nudges 21",
+      "Sub-agents 28",
+      "Longest unattended 34 tool calls",
+      "Questions 49",
+      "Denied tools 7",
+      "Tool errors 35",
+      "API retries 14",
+      "Accounts hit a limit 14",
+      "Revivals 14",
+      "Minutes lost, all out 77",
+      "Ignites 7",
+      "Resumes 21",
+    ],
+  },
 ];
 
 /** The file stem `fork-visual-pass.mjs` gives a route: `/settings/infinitus`
