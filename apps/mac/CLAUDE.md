@@ -18,10 +18,6 @@ before that the `native` branch). Split out of
   Never read engine internals (`~/.claude-swap-backup/*`). Reading
   Claude Code's own files is fine: `~/.claude/settings.json`,
   `~/.claude/sessions/*.json` (+ `.key`), `~/.claude/projects/*/*.jsonl`.
-- **The resume-nudge mechanism lives HERE, not in the engine** (user
-  2026-08-30; upstream never merged PR #250's copy). InfinitusCore
-  ClaudeSessions/Transcript/PeerSocket/PtyHosts/PtyNudge/SessionResume
-  + ResumeService. Never rebuild it engine-side.
 - **Bundle id is `run.infinitus`**, the phone's `run.infinitus.mobile`
   (+`.widgets`, `.share`), every derived service id under the same
   prefix (user-approved explicit ask, 2026-09-05, with the paid Apple

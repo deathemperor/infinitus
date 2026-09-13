@@ -9,6 +9,8 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+- Resume nudges are gone: a terminal session a usage limit stopped is no longer typed a "continue" once an account works again (threads resume on their own in Infinitus desktop).
+- The Mac no longer nudges a terminal session after an AWS or gcloud sign-in from the phone; the sign-in itself is unchanged.
 
 ### Desktop
 - A thread whose provider re-sends the whole context uncached on every call (a proxy without prompt caching) gets one warning in its work log after five such calls in a row, since each step then costs full price and takes longer (#974).

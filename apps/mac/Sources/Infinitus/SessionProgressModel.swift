@@ -3,8 +3,8 @@ import InfinitusCore
 import InfinitusUI
 
 /// Feeds the sessions popover's mini progress rows (issue #13 step 2).
-/// Reads Claude Code's own session records + transcript tails — same
-/// engine-isolation rule as ResumeService (never touches the engine).
+/// Reads Claude Code's own session records + transcript tails — the same
+/// engine-isolation rule as everything else here (never touches the engine).
 @MainActor
 final class SessionProgressModel: SessionProgressSource {
     @Published private(set) var byPid: [Int: SessionProgress] = [:]

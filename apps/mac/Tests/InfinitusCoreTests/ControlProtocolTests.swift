@@ -50,7 +50,6 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("reorder")?.args, ["<fleet>", "<n>..."])
         XCTAssertEqual(ControlCommand.named("randomize-names")?.args, ["<fleet>", "[n]"])
         XCTAssertEqual(ControlCommand.named("past-sessions")?.options, ["--limit <n, default 50>", "--search <text>"])
-        XCTAssertEqual(ControlCommand.named("resume-session")?.args, ["<sessionId>"])
         XCTAssertEqual(ControlCommand.named("profile-set")?.args, ["<name>"])
         XCTAssertEqual(ControlCommand.named("profile-remove")?.effect, .write)
         XCTAssertTrue(ControlCommand.named("status")?.replyShape.contains("forkTunnel:{enabled, port, state, url?, hostname?}") ?? false)
@@ -69,7 +68,6 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("team-create")?.args, ["<name>"])
         XCTAssertEqual(ControlCommand.named("team-create")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("session-mode")?.effect, .write)
-        XCTAssertEqual(ControlCommand.named("resume-session")?.options, ["--fork"])
         XCTAssertEqual(ControlCommand.named("team-approve")?.args, ["<kid>"])
         XCTAssertEqual(ControlCommand.named("team-publish")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("team-code")?.effect, .write, "fetches the store and (--invite) writes the nonce book")
@@ -141,7 +139,7 @@ final class ControlProtocolTests: XCTestCase {
         let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
         XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "team-create", "team-join", "team-hostname", "proxy-key", "9router-password", "push-slack", "push-telegram", "desktop-credential"])
         let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
-        XCTAssertEqual(Set(payload), ["send", "approve", "event", "push", "permission"])
+        XCTAssertEqual(Set(payload), ["approve", "event", "push", "permission"])
         XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
     }
 
