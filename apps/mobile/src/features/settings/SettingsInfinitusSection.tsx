@@ -2,8 +2,8 @@ import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { MenuAction } from "@react-native-menu/menu";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useCallback, useMemo, useState, type ComponentProps } from "react";
-import { Alert, Platform } from "react-native";
+import { useMemo, type ComponentProps } from "react";
+import { Platform } from "react-native";
 
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
 import { ControlPillMenu } from "../../components/ControlPill";
@@ -18,9 +18,6 @@ import {
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { pusherMac } from "../infinitus/liveActivity.logic";
-import { noteLocalLiveActivityStart } from "../infinitus/liveActivityStarts";
-import { testCardLabel, toggleTestCard } from "../infinitus/testCard.logic";
-import InfinitusWorking from "../../widgets/InfinitusWorking";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
@@ -72,22 +69,10 @@ function PickerRow(props: {
   );
 }
 
-/** The working cards live on this phone right now, none off iOS or when
-    the widgets module is not there. */
-function countLiveCards(): number {
-  if (Platform.OS !== "ios") return 0;
-  try {
-    return InfinitusWorking.getInstances().length;
-  } catch {
-    return 0;
-  }
-}
-
-/** Settings › Infinitus (fork, #572): the Live Activity toggle, the Mac
-    alerts toggle (#702) and the reset / swap alarms toggle (both ask for the
-    notification permission) and, with several Macs, which one drives the
-    cards and sends the alerts. Absent until a paired Mac runs
-    Infinitus, so plain T3 users never see it. */
+/** Settings › Infinitus (fork, #572): the Mac alerts toggle (#702) and the
+    reset / swap alarms toggle (both ask for the notification permission)
+    and, with several Macs, which one sends the alerts. Absent until a
+    paired Mac runs Infinitus, so plain T3 users never see it. */
 export function SettingsInfinitusSection() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
@@ -95,7 +80,6 @@ export function SettingsInfinitusSection() {
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const macs = useMemo(() => infinitusMacs(configs, presentations), [configs, presentations]);
   const loaded = AsyncResult.isSuccess(preferences);
-  const enabled = loaded && preferences.value.infinitusLiveActivityEnabled !== false;
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
   const pushAlertsEnabled = loaded && preferences.value.infinitusPushAlertsEnabled === true;
   const pusher = pusherMac(loaded ? preferences.value.infinitusLiveActivityMac : undefined, macs);
@@ -110,18 +94,6 @@ export function SettingsInfinitusSection() {
       })),
     [sendMode],
   );
-  // The test-card row (#845): how many working cards are live, re-read
-  // after every press; the count is what the row offers to end.
-  const [liveCards, setLiveCards] = useState(countLiveCards);
-  const pressTestCard = useCallback(async () => {
-    const outcome = await toggleTestCard(InfinitusWorking);
-    setLiveCards(countLiveCards());
-    // The bridge re-scans and files the new card's update token with the Mac.
-    if (outcome.action === "started") noteLocalLiveActivityStart();
-    if (outcome.action === "failed") {
-      Alert.alert("No card", `iOS refused the Live Activity: ${outcome.message}`);
-    }
-  }, []);
   const macActions = useMemo<MenuAction[]>(
     () =>
       macs.map((mac) => ({
@@ -136,27 +108,6 @@ export function SettingsInfinitusSection() {
   return (
     <SettingsSection title="Infinitus">
       <SettingsRow icon="person.2" label="Accounts" target="SettingsAccounts" />
-      <SettingsSwitchRow
-        icon="bolt.badge.clock"
-        label="Live Activity from Mac"
-        subtitle={
-          Platform.OS === "ios"
-            ? "The Mac keeps the lock-screen card moving over push, app closed."
-            : "Live Activities are an iOS feature."
-        }
-        disabled={Platform.OS !== "ios" || !loaded}
-        value={enabled}
-        onValueChange={(value) => savePreferences({ infinitusLiveActivityEnabled: value })}
-      />
-      {Platform.OS === "ios" ? (
-        <SettingsRow
-          icon="rectangle.badge.checkmark"
-          label={testCardLabel(liveCards)}
-          value={liveCards === 0 ? "No push involved" : `${liveCards} live`}
-          disabled={!enabled}
-          onPress={() => void pressTestCard()}
-        />
-      ) : null}
       <SettingsSwitchRow
         icon="bell.badge"
         label="Alerts from Mac"
@@ -200,7 +151,7 @@ export function SettingsInfinitusSection() {
       />
       {macs.length > 1 && pusher ? (
         <PickerRow
-          title="Mac that drives the card and sends alerts"
+          title="Mac that sends the alerts"
           actions={macActions}
           onPressAction={({ nativeEvent }) =>
             savePreferences({ infinitusLiveActivityMac: nativeEvent.event })

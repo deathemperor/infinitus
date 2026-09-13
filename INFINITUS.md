@@ -873,8 +873,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts row, Live Activity / Mac alerts /
-  reset alarms toggles, pusher Mac) after General.
+  `SettingsInfinitusSection` (Accounts row, Mac alerts / reset alarms
+  toggles, sending mode, the alerting Mac) after General.
 - `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
   link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
   `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
@@ -882,18 +882,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   Mac's origin travels in the fragment the site never sees, `to` is taken as
   a bare http(s) origin only, and the sheet fills Host and code like a
   scanned QR (#746) — the same rewrite runs on the in-app scanner's payload
-  and on the route's `pairingUrl`. Mounts `InfinitusLiveActivityBridge` (Live
-  Activity token registration with the Mac), `InfinitusAlarmsBridge`
+  and on the route's `pairingUrl`. Mounts `InfinitusAlarmsBridge`
   (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
-  token, so the Mac's pushes reach the phone as banners; both bridges
-  withdraw their kinds with `activities-token --forget <deviceId>/<kind>`
-  through `pushForget.ts` / `pushForget.logic.ts` when their switch goes off,
-  #702) and
+  token, so the Mac's pushes reach the phone as banners; it withdraws the
+  kind with `activities-token --forget <deviceId>/<kind>` through
+  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702) and
   `InfinitusNotificationPresenter` (the app's one foreground notification
   handler: Infinitus notifications show as banners in-app, T3's keep the
   no-handler default).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
-  `infinitusLiveActivityEnabled` / `infinitusLiveActivityMac` /
+  `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
   `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
   `"queue" | "steer"`) keys (interface and sanitizer).
@@ -1001,8 +999,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
-  (active account + fullest window of the Mac the list follows, plus its
-  waiting-session count) before the filter button, in the Android header; its
+  (active account + fullest window of the Mac the list follows) before the
+  filter button, in the Android header; its
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
@@ -1449,8 +1447,8 @@ configured}` and drawn as the configured row with Forget token, which is
   "T3 Code"; identifiers stay (`t3` binary and package, `T3CODE_*` env vars,
   the `t3-code` MCP server id, the `t3code/<version>` UA token, upstream URLs,
   "T3 Connect").
-- `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels, the
-  Live Activity title, the auth device label and the `infinitus` variant's
+- `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
+  the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
   `production` variants keep their upstream names (they build the real T3 Code
   app side by side), the `t3code` URL scheme and bundle ids stay, and the
@@ -1749,8 +1747,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `@t3tools/client-runtime/state/infinitusAccounts`). The per-Mac Sessions
   card it carried (rows from `@t3tools/client-runtime/state/infinitusSessions`,
   "Move to a thread" over `agentSessions.import`) was dropped on the #941
-  walk — the phone's surface is threads; only `sessions.logic.ts`'s
-  `attentionSessionCount` (the home chip's badge) remains.
+  walk, and the home chip's waiting-session badge (`sessions.logic.ts`)
+  with the #1041 sweep — the phone's surface is threads, and nothing on it
+  reads `@t3tools/client-runtime/state/infinitusSessions` any more.
 - `packages/client-runtime/src/connection/roaming.ts`,
   `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
   `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
@@ -1885,23 +1884,16 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure (the held banner still offers Pin).
-- `apps/mobile/src/features/infinitus/`, `apps/mobile/src/widgets/InfinitusWorking.tsx`,
-  `apps/mobile/src/widgets/InfinitusRevival.tsx`,
-  `apps/mobile/src/features/settings/SettingsInfinitusSection.tsx` — the
-  Mac-driven Live Activity: layouts (content = native's activity states),
-  token registration, settings. `testCard.logic.ts` (#845) backs the
-  section's "Show a test card" row (iOS, under the Live Activity switch):
-  one press starts `InfinitusWorking` locally with a fabricated state, no
-  APNs in the loop, so a blank card blames the widget and a refusal
-  (ActivityKit's message in an alert) blames the phone's settings; with
-  working cards live the same row reads "End the working card(s)" and ends
-  them all — the Mac cannot end a card it never got an update token for.
-  A started test card bumps `liveActivityStarts.ts`'s atom, which
-  `InfinitusLiveActivityBridge` watches to re-scan the live cards and file
-  the new card's `working` update token with the Mac (the bridge otherwise
-  scans only at mount and on foreground); `pushRegistration.ts` logs a
-  refused `activities-token` (`[infinitus-push]`) since the bridges send
-  with `reportFailure: false`.
+- `apps/mobile/src/features/infinitus/liveActivity.logic.ts`,
+  `pushRegistration.ts`, `pushForget.ts` — the phone's `activities-token`
+  registration with the Mac, now for the `alert` kind alone: the Mac-driven
+  Live Activity (the `InfinitusWorking` / `InfinitusRevival` cards, their
+  bridge, the Settings switch and the #845 test card) went with the #1041
+  sweep — its content was the Mac's terminal-session states; a card drawn
+  from thread phases is the follow-up filed there. `pusherMac` still picks
+  the Mac the alerts come from (`infinitusLiveActivityMac`).
+  `pushRegistration.ts` logs a refused `activities-token`
+  (`[infinitus-push]`) since the bridge sends with `reportFailure: false`.
 
 - `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
   `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.

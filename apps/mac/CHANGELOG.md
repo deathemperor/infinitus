@@ -14,6 +14,8 @@ publishes the matching section as the GitHub release body.
 
 ### Phone
 - A connection switched off no longer shows "Connected via <host>" above its Off status; the roaming line comes back with the switch (#663).
+- The home chip no longer counts terminal sessions waiting on a person; the phone is for threads (#1041).
+- The Mac-driven Live Activity is gone with its Settings switch and test card; a card drawn from thread phases is a follow-up (#1041).
 
 ## 0.5.0-alpha.6
 
