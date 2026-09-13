@@ -63,6 +63,37 @@ const lightEnvironment = {
   isLuminanceReduced: false,
 } as const;
 
+describe("AgentActivity elapsed timer (#1047)", () => {
+  const startedAt = "2026-05-25T13:05:00.000Z";
+  const capUpper = new Date(Date.parse(startedAt) + 24 * 60 * 60 * 1000).toISOString();
+
+  const bannerFor = (row: AgentActivityRowProps) =>
+    JSON.stringify(
+      AgentActivity({ ...props, activeCount: 1, activities: [row] }, environment as never).banner,
+    );
+
+  it("counts a working row up from its turn's startedAt, capped a day on", () => {
+    for (const phase of ["starting", "running"] as const) {
+      const banner = bannerFor(makeRow({ phase, startedAt }));
+      expect(banner).toContain(`"timerInterval":{"lower":"${startedAt}","upper":"${capUpper}"}`);
+      expect(banner).toContain('"countsDown":false');
+    }
+  });
+
+  it("leaves an idle or finished row without a timer, startedAt or not", () => {
+    for (const phase of ["completed", "failed", "stale", "waiting_for_approval"] as const) {
+      expect(bannerFor(makeRow({ phase, status: "Done", startedAt }))).not.toContain(
+        "timerInterval",
+      );
+    }
+  });
+
+  it("draws no timer when the row carries no startedAt or an unreadable one", () => {
+    expect(bannerFor(makeRow({}))).not.toContain("timerInterval");
+    expect(bannerFor(makeRow({ startedAt: "not a date" }))).not.toContain("timerInterval");
+  });
+});
+
 describe("AgentActivity widget layout", () => {
   it("tints each row by its own phase using the web sidebar's dark palette", () => {
     const layout = AgentActivity(

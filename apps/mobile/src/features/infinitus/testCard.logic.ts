@@ -48,6 +48,23 @@ export const TEST_CARD_STATE: AgentActivityProps = {
 /** A test card goes stale this long after it starts; iOS dims it then. */
 export const TEST_CARD_STALE_MS = 2 * 60_000;
 
+/** How long the test card's working row claims to have been running, so its
+    elapsed timer starts at a plausible figure and ticks up from there (#1047). */
+const TEST_CARD_ELAPSED_MS = 90_000;
+
+/** The test card as it is shown: the base rows with the working one's
+    `startedAt` set against the moment of the press, since a fixed instant
+    would have the row's timer read in days. */
+export function testCardState(now: Date): AgentActivityProps {
+  const startedAt = new Date(now.getTime() - TEST_CARD_ELAPSED_MS).toISOString();
+  return {
+    ...TEST_CARD_STATE,
+    activities: TEST_CARD_STATE.activities.map((row) =>
+      row.phase === "running" ? { ...row, startedAt } : row,
+    ),
+  };
+}
+
 /** The slice of expo-widgets' `LiveActivityFactory` the row uses. */
 export interface TestCardFactory {
   start(props: AgentActivityProps, url?: string, staleDate?: Date): unknown;
@@ -80,7 +97,7 @@ export async function toggleTestCard(
       await Promise.all(live.map((activity) => activity.end("immediate")));
       return { action: "ended", count: live.length };
     }
-    factory.start(TEST_CARD_STATE, undefined, new Date(now.getTime() + TEST_CARD_STALE_MS));
+    factory.start(testCardState(now), undefined, new Date(now.getTime() + TEST_CARD_STALE_MS));
     return { action: "started" };
   } catch (error) {
     return { action: "failed", message: error instanceof Error ? error.message : String(error) };

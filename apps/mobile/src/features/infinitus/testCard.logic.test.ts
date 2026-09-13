@@ -5,6 +5,7 @@ import {
   TEST_CARD_STATE,
   type TestCardFactory,
   testCardLabel,
+  testCardState,
   toggleTestCard,
 } from "./testCard.logic";
 
@@ -19,6 +20,19 @@ describe("TEST_CARD_STATE", () => {
     for (const row of TEST_CARD_STATE.activities) {
       expect(row.threadTitle.length).toBeGreaterThan(0);
       expect(row.deepLink.startsWith("/")).toBe(true);
+    }
+  });
+});
+
+describe("testCardState", () => {
+  it("dates the working row against the press so its timer starts near zero", () => {
+    const now = new Date("2026-09-12T00:00:00Z");
+    const rows = testCardState(now).activities;
+
+    const working = rows.find((row) => row.phase === "running");
+    expect(working?.startedAt).toBe("2026-09-11T23:58:30.000Z");
+    for (const row of rows.filter((candidate) => candidate.phase !== "running")) {
+      expect(row.startedAt).toBeUndefined();
     }
   });
 });
@@ -40,7 +54,7 @@ describe("toggleTestCard", () => {
 
     await expect(toggleTestCard(factory, now)).resolves.toEqual({ action: "started" });
     expect(start).toHaveBeenCalledWith(
-      TEST_CARD_STATE,
+      testCardState(now),
       undefined,
       new Date(now.getTime() + TEST_CARD_STALE_MS),
     );
