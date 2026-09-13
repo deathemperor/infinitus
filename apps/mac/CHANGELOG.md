@@ -8,6 +8,7 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- The Best-of card shows each member's turns, tool calls and wall time beside its status, off the thread's own counters (#269).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
 
 ### Phone
