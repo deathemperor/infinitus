@@ -227,6 +227,27 @@ describe("searchSettings", () => {
     ]);
   });
 
+  it("finds the priority page by what it holds back — threads (#1069)", () => {
+    const available = filterAvailableSettingsSearchItems({
+      hasCloudPublicConfig: false,
+      hasEnvironment: false,
+      hasProviderSettingsEnvironment: false,
+      canManageLocalBackend: false,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: false,
+      hasInfinitusEnvironment: true,
+    });
+
+    expect(searchSettings("thread priority", available).map((item) => item.id)).toContain(
+      "infinitus-sessions",
+    );
+    // The page holds back this server's threads (#1041), but the mode row on
+    // screen still reads "Session priority" until the Mac's pane is retitled.
+    expect(searchSettings("session priority", available).map((item) => item.id)).toContain(
+      "infinitus-sessions",
+    );
+  });
+
   it("lights up the deepest Infinitus nav item only", () => {
     expect(isSettingsSectionActive("/settings/infinitus", "/settings/infinitus")).toBe(true);
     expect(isSettingsSectionActive("/settings/infinitus/devices", "/settings/infinitus")).toBe(
