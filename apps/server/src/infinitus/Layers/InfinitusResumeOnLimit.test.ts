@@ -94,13 +94,14 @@ const runtimeEvent = (
   type: ProviderRuntimeEvent["type"],
   payload: unknown,
   turn: TurnId = turnId,
+  thread: ThreadId = threadId,
 ): ProviderRuntimeEvent =>
   ({
     type,
     eventId: EventId.make(`evt-${(eventCount += 1)}`),
     provider: claude,
     createdAt: "2026-09-11T10:00:00Z",
-    threadId,
+    threadId: thread,
     turnId: turn,
     payload,
   }) as ProviderRuntimeEvent;
@@ -123,6 +124,7 @@ const shell = {
 } as unknown as OrchestrationThreadShell;
 
 /** A thread on an instance that routes through a proxy (#1088). */
+const proxiedThreadId = ThreadId.make("thread-proxied");
 const proxiedShell = {
   ...shell,
   modelSelection: { instanceId: ProviderInstanceId.make("claudeAgent_router"), model: "cc/opus" },
@@ -207,7 +209,9 @@ const makeHarnessWith = (
               ),
           }),
           Layer.mock(ProjectionSnapshotQuery)({
-            getThreadShellById: () => Effect.succeed(Option.some(threadShell)),
+            // The harness's thread, or the second, proxied one (#1088).
+            getThreadShellById: (id) =>
+              Effect.succeed(Option.some(id === threadId ? threadShell : { ...proxiedShell, id })),
             getThreadRuntimeContext: () =>
               Effect.succeed(
                 Option.some({ id: threadId, projectId: shell.projectId, title: "Thread", session }),
@@ -536,6 +540,43 @@ describe("InfinitusResumeOnLimitLive", () => {
           expect(yield* h.turns).toEqual([]);
           expect(yield* h.interrupts).toEqual([]);
           expect((yield* h.dispatched).length).toBe(1);
+        }),
+      ),
+  );
+
+  effectIt.effect(
+    "a lingering proxy stop keeps no poll alive once a swapd stop resumed (#1088)",
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const h = yield* makeHarness;
+          yield* TestClock.adjust(Duration.seconds(100));
+          yield* h.emit(
+            runtimeEvent(
+              "turn.completed",
+              {
+                state: "failed",
+                errorMessage: "Claude stopped: a usage limit blocked the request.",
+              },
+              TurnId.make("turn-proxied"),
+              proxiedThreadId,
+            ),
+          );
+          yield* settle(h.dispatched, (list) => list.length === 1);
+          expect(yield* h.watchers).toBe(0);
+          yield* h.emit(parkedWarning());
+          yield* settle(h.watchers, (n) => n === 1);
+
+          yield* h.poll(swapped(at(150)));
+          const turns = yield* settle(h.turns, (list) => list.length === 1);
+          expect(turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+          // The swapd stop is gone; the proxy's stays listed and nothing polls for it.
+          yield* settle(h.watchers, (n) => n === 0);
+          expect(yield* h.watchers).toBe(0);
+          const stopped = yield* Stream.runHead(h.stopped);
+          expect(Option.getOrUndefined(stopped)?.map((entry) => entry.threadId)).toEqual([
+            proxiedThreadId,
+          ]);
         }),
       ),
   );

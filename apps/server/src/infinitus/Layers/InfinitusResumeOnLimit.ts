@@ -177,7 +177,8 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
       Effect.gen(function* () {
         stops.delete(threadId);
         if (marks.delete(threadId)) yield* publish;
-        if (stops.size === 0) yield* stopWatching;
+        // A proxy's stop (#1088) waits for nothing here: it keeps no poll alive.
+        if (![...stops.values()].some((stop) => stop.proxy === null)) yield* stopWatching;
       });
 
     /** The row and the sidebar entry a stop leaves the moment it lands. */
