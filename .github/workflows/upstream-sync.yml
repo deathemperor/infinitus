@@ -5,7 +5,10 @@
 name: Upstream sync
 on:
   schedule:
-    - cron: "30 1 * * *" # 01:30 UTC = 08:30 GMT+7, before the day's work
+    # 01:17 UTC = 08:17 GMT+7, before the day's work. An off-peak minute:
+    # GitHub delays scheduled runs under load, and at :30 the fork's runs
+    # landed ~5 h late two days running (2026-09-11/12) or not at all.
+    - cron: "17 1 * * *"
   workflow_dispatch:
 permissions:
   contents: write
