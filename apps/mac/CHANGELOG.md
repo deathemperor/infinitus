@@ -7,6 +7,10 @@ publishes the matching section as the GitHub release body.
 
 ## Unreleased
 
+### Mac
+- A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
+- A thread phase alert sent from the desktop always reaches every channel again: the switches to skip the Mac's own banner or its Slack post are gone.
+
 ### Desktop
 - Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
