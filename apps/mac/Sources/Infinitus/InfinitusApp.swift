@@ -559,7 +559,7 @@ struct MenuContent: View {
                             // a modifier, the action buttons below are
                             // mac-only.
                             FooterChips(
-                                model: model, progress: model.sessionProgress,
+                                model: model,
                                 status: ServiceStatusSummary(indicator: status.indicator),
                                 onStatusTap: { status.openPage() },
                                 serviceChrome: StatusHoverCard(status: status))

@@ -2,49 +2,6 @@ import XCTest
 @testable import InfinitusCore
 
 final class GcloudLoginTests: XCTestCase {
-    func testDetectsTheLapsedSignInFromGcloudsOwnErrors() {
-        // gcloud's refresh failure, exactly as the CLI prints it (store.py / exceptions.py).
-        let refresh = """
-        ERROR: (gcloud.storage.ls) There was a problem refreshing your current auth tokens: ('invalid_grant: Token has been expired or revoked.', {'error': 'invalid_grant'})
-        Please run:
-
-          $ gcloud auth login
-
-        to obtain new credentials.
-        """
-        XCTAssertEqual(GcloudLogin.profile(in: refresh), "default")
-        // No account at all (captured 2026-09-09 from an empty CLOUDSDK_CONFIG).
-        let none = "ERROR: (gcloud.auth.print-access-token) You do not currently have an active account selected.\nPlease run:\n\n  $ gcloud auth login\n\nto obtain new credentials."
-        XCTAssertEqual(GcloudLogin.profile(in: none), "default")
-        // Reauth (google-auth's reauth module, through gcloud).
-        XCTAssertEqual(GcloudLogin.profile(in: "ERROR: (gcloud.compute.instances.list) Reauthentication failed. cannot prompt during non-interactive execution."), "default")
-        // Application Default Credentials — its own remediation, its own "profile".
-        let adc = "ERROR: (gcloud.auth.application-default.print-access-token) Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information."
-        XCTAssertEqual(GcloudLogin.profile(in: adc), GcloudLogin.adcProfile)
-        // The google-auth library, from a Python script the session ran.
-        let library = "Traceback (most recent call last):\n  File \"x.py\", line 3, in <module>\ngoogle.auth.exceptions.DefaultCredentialsError: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information."
-        XCTAssertEqual(GcloudLogin.profile(in: library), GcloudLogin.adcProfile)
-        let reauthADC = "google.auth.exceptions.RefreshError: Reauthentication is needed. Please run `gcloud auth application-default login` to reauthenticate."
-        XCTAssertEqual(GcloudLogin.profile(in: reauthADC), GcloudLogin.adcProfile)
-    }
-
-    func testTheSignatureMustOpenALineSoQuotedCopiesDoNotCount() {
-        // A Read of this very test file: line-numbered, indented.
-        XCTAssertNil(GcloudLogin.profile(in: "    12\t  ERROR: (gcloud.storage.ls) There was a problem refreshing your current auth tokens\n    13\t  $ gcloud auth login"))
-        // A grep hit.
-        XCTAssertNil(GcloudLogin.profile(in: "Sources/X.swift:4: \"please run: $ gcloud auth login\""))
-        // Ordinary output that mentions the command.
-        XCTAssertNil(GcloudLogin.profile(in: "Run gcloud auth login first if you have not."))
-        XCTAssertNil(GcloudLogin.profile(in: "all good"))
-    }
-
-    func testTheAccountComesFromTheFailedCommand() {
-        XCTAssertEqual(GcloudLogin.profile(inCommand: "gcloud storage ls --account=me@example.com"), "me@example.com")
-        XCTAssertEqual(GcloudLogin.profile(inCommand: "gcloud storage ls --account me@example.com --project p"), "me@example.com")
-        XCTAssertEqual(GcloudLogin.profile(inCommand: "CLOUDSDK_CORE_ACCOUNT=ops@example.com gcloud compute instances list"), "ops@example.com")
-        XCTAssertNil(GcloudLogin.profile(inCommand: "gcloud storage ls"))
-    }
-
     func testArgumentsPerProfileAndFlow() {
         XCTAssertEqual(GcloudLogin.arguments(profile: "default", flow: .remote), ["auth", "login", "--no-launch-browser"])
         XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .remote), ["auth", "login", "me@example.com", "--no-launch-browser"])
@@ -55,9 +12,6 @@ final class GcloudLoginTests: XCTestCase {
         XCTAssertEqual(AwsLogin.Provider.gcloud.flow(profile: "me@example.com", configText: ""), .relay)
         XCTAssertEqual(GcloudLogin.arguments(profile: GcloudLogin.adcProfile, flow: .remote),
                        ["auth", "application-default", "login", "--no-launch-browser"])
-        // Never a token on stdout the runner could capture: the probe is exit-status only.
-        XCTAssertEqual(GcloudLogin.probeArguments(profile: "me@example.com"), ["auth", "print-access-token", "--account", "me@example.com"])
-        XCTAssertEqual(GcloudLogin.probeArguments(profile: GcloudLogin.adcProfile), ["auth", "application-default", "print-access-token"])
     }
 
     func testParsesThePasteBackPrompt() {
@@ -131,46 +85,4 @@ final class GcloudLoginTests: XCTestCase {
         XCTAssertEqual(AwsLogin.inferProvider(profile: "unknown", pid: nil, items: items), .aws)
     }
 
-    func testContinueMessageNamesTheProviderAndTheCredential() {
-        XCTAssertTrue(GcloudLogin.continueMessage(profile: "me@example.com", fromPhone: true).contains("gcloud login for me@example.com completed from the phone"))
-        XCTAssertTrue(GcloudLogin.continueMessage(profile: GcloudLogin.adcProfile, fromPhone: false).contains("application default credentials"))
-    }
-
-    func testSessionProgressReadsTheLapsedCredentialOffTheNewestToolResults() {
-        let use = #"{"type":"assistant","timestamp":"2026-09-09T08:00:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"gcloud storage ls --account=me@example.com"}}]}}"#
-        let failed = #"{"type":"user","timestamp":"2026-09-09T08:00:01.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ERROR: (gcloud.storage.ls) There was a problem refreshing your current auth tokens: invalid_grant\nPlease run:\n\n  $ gcloud auth login\n\nto obtain new credentials."}]}}"#
-        let fine = #"{"type":"user","timestamp":"2026-09-09T08:01:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"text","text":"ok"}]}]}}"#
-        let progress = SessionProgress.parse(lines: [use, failed, fine])
-        XCTAssertEqual(progress.gcloudLoginProfile, "me@example.com")
-        XCTAssertEqual(progress.gcloudLoginFailedAt, UsageHistory.parseISO("2026-09-09T08:00:01.000Z"))
-        XCTAssertNil(progress.awsLoginProfile)
-        XCTAssertNil(SessionProgress.parse(lines: [fine]).gcloudLoginProfile)
-        let adc = #"{"type":"user","timestamp":"2026-09-09T08:02:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":"google.auth.exceptions.DefaultCredentialsError: Your default credentials were not found."}]}}"#
-        XCTAssertEqual(SessionProgress.parse(lines: [adc]).gcloudLoginProfile, GcloudLogin.adcProfile)
-        let later = Array(repeating: fine, count: SessionProgress.awsLoginScanEntries * 2)
-        XCTAssertNil(SessionProgress.parse(lines: [use, failed] + later).gcloudLoginProfile)
-        // Both providers can lapse in one session; each keeps its own need.
-        let awsFailed = #"{"type":"user","timestamp":"2026-09-09T08:03:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t4","content":"aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n  Fix: aws login --profile papaya"}]}}"#
-        let both = SessionProgress.parse(lines: [use, failed, awsFailed])
-        XCTAssertEqual(both.gcloudLoginProfile, "me@example.com")
-        XCTAssertEqual(both.awsLoginProfile, "papaya")
-        let row = SessionPanelRow.make(record: ClaudeSessionRecord(pid: 1, sessionId: "s", cwd: "/p"), progress: both)
-        XCTAssertEqual(row.gcloudLoginProfile, "me@example.com")
-    }
-
-    func testASubagentsLapsedGcloudSignInIsAttributedToTheParent() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("infinitus-gcloud-sub-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let transcript = Transcript.path(cwd: "/p", sessionId: "s1", claudeDir: dir)
-        try FileManager.default.createDirectory(at: transcript.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try #"{"type":"user","timestamp":"2026-09-09T08:01:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"ok"}]}}"#.write(to: transcript, atomically: true, encoding: .utf8)
-        let subagents = transcript.deletingPathExtension().appendingPathComponent("subagents")
-        try FileManager.default.createDirectory(at: subagents, withIntermediateDirectories: true)
-        try #"{"type":"user","timestamp":"2026-09-09T08:00:00.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ERROR: (gcloud.auth.print-access-token) You do not currently have an active account selected.\nPlease run:\n\n  $ gcloud auth login\n\nto obtain new credentials."}]}}"#
-            .write(to: subagents.appendingPathComponent("agent-a.jsonl"), atomically: true, encoding: .utf8)
-        let progress = SessionProgress.read(sessionId: "s1", cwd: "/p", claudeDir: dir)
-        XCTAssertEqual(progress.gcloudLoginProfile, "default")
-        XCTAssertEqual(progress.gcloudLoginFailedAt, UsageHistory.parseISO("2026-09-09T08:00:00.000Z"))
-    }
 }

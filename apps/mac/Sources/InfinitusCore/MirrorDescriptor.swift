@@ -20,19 +20,11 @@ public enum MachineIdentity {
 /// phone hides a feature on version skew instead of failing to decode.
 public struct MirrorDescriptor: Codable, Sendable, Equatable {
     public struct Capabilities: Codable, Sendable, Equatable {
-        public var timeline: Bool?
-        public var sequence: Bool?
-        public var attention: Bool?
         public var leases: Bool?
-        public var images: Bool?
-        public var files: Bool?
         /// `GET /prefs` (#558): the preference catalog with values.
         public var prefs: Bool?
-        public init(timeline: Bool? = nil, sequence: Bool? = nil, attention: Bool? = nil, leases: Bool? = nil,
-                    images: Bool? = nil, files: Bool? = nil,
-                    prefs: Bool? = nil) {
-            self.timeline = timeline; self.sequence = sequence; self.attention = attention; self.leases = leases
-            self.images = images; self.files = files
+        public init(leases: Bool? = nil, prefs: Bool? = nil) {
+            self.leases = leases
             self.prefs = prefs
         }
     }
@@ -57,24 +49,15 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         let platform = "other"
         #endif
         return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
-                                capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: true,
-                                                           images: true, files: true,
-                                                           prefs: true))
+                                capabilities: Capabilities(leases: true, prefs: true))
     }
 
     /// The Linux tray's truth (#486 slice 2, `infinitus-tray serve`):
-    /// everything `.current()` claims for the Mac, minus what the tray
-    /// doesn't answer yet — `files`, `timeline` and `sequence` are true
-    /// (slice 1 gave the tray Files; slice 2 the timeline/sequence route).
-    /// `attention` and `images` are true since slice 4:
-    /// the tray answers both routes through the same Core deciders.
-    /// Explicit `false` for the rest, not the nil the
+    /// explicit `false` for what the tray doesn't answer, not the nil the
     /// struct also accepts as "unknown", so a phone comparing builds sees a
     /// considered no rather than an older tray that predates the field.
     public static func tray(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
         MirrorDescriptor(machineId: machineId, label: label, platform: "linux", appVersion: appVersion,
-                         capabilities: Capabilities(timeline: true, sequence: true, attention: true, leases: false,
-                                                    images: true, files: true,
-                                                    prefs: false))
+                         capabilities: Capabilities(leases: false, prefs: false))
     }
 }

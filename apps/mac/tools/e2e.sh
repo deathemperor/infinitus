@@ -63,7 +63,6 @@ cleanup() {
     pkill -f "aws-own-login-listener" 2>/dev/null || true
     pkill -f "profile e2e-orphan" 2>/dev/null || true
     [ -z "${SESSION_PID:-}" ] || kill "$SESSION_PID" 2>/dev/null || true
-    [ -z "${SEED_PID:-}" ] || kill "$SEED_PID" 2>/dev/null || true
     [ -z "${DESK_PID:-}" ] || kill "$DESK_PID" 2>/dev/null || true
     rm -rf "$SOCKDIR"
     "$INFINITUS_SWAPD_CLI" reset >/dev/null 2>&1 || true
@@ -128,12 +127,6 @@ defaults write "$DOMAIN" mock_mode -bool true   # demo fleet: the swapd engine i
 # session" question (answered n → failed, never rebound).
 cat >"$SOCKDIR/aws" <<'STUB'
 #!/bin/sh
-# `sts get-caller-identity`: the app's probe (#313) — signed in only
-# once the gate says so with a flag file next to this stub.
-if [ "$1" = "sts" ]; then
-    [ -f "$(dirname "$0")/aws-probe-ok" ] && exit 0
-    echo "aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'."; exit 255
-fi
 profile=""; remote=""
 while [ $# -gt 0 ]; do [ "$1" = "--profile" ] && profile="$2"; [ "$1" = "--remote" ] && remote=1; shift; done
 # The orphan fixture (#274): a login that never finishes.
@@ -196,16 +189,10 @@ chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
 export INFINITUS_MIRROR_SNAPSHOT="$SOCKDIR/mirror-snapshot.json"
-export INFINITUS_AWS_PROBE_S=2
 # A stub `gcloud` (#367): `auth login --no-launch-browser` prints the
-# SDK's paste-back prompt and reads the code; `auth print-access-token`
-# is the app's probe — signed in only once the gate says so.
+# SDK's paste-back prompt and reads the code.
 cat >"$SOCKDIR/gcloud" <<'STUB'
 #!/bin/sh
-if [ "$2" = "print-access-token" ]; then
-    [ -f "$(dirname "$0")/gcloud-probe-ok" ] && exit 0
-    echo "ERROR: (gcloud.auth.print-access-token) You do not currently have an active account selected."; exit 1
-fi
 echo "Go to the following link in your browser, and complete the sign-in prompts:"
 echo ""
 echo "    https://e2e.invalid/o/oauth2/auth?client_id=e2e"
@@ -217,68 +204,22 @@ echo "You are now logged in as [e2e@example.com]."
 STUB
 chmod +x "$SOCKDIR/gcloud"
 export INFINITUS_GCLOUD_CLI="$SOCKDIR/gcloud"
-# The fake Claude session: a process with no tty (setsid, so the nudge
-# can't fall back to typing into THIS terminal) listening on the record's
-# messaging socket, writing every frame it receives to an inbox file.
+# A live Claude session record (#612): the `sessions` verb and the
+# snapshot's session count need a pid on disk. The transcript-based
+# AWS/gcloud need scan and its messaging-socket delivery left with the
+# session sweep (#1041) — sign-ins now start from a verb, never a scan.
 export CLAUDE_CONFIG_DIR="$SOCKDIR/claude"
-PEER_SOCK="$SOCKDIR/peer.sock"; INBOX="$SOCKDIR/inbox.ndjson"
-python3 - "$PEER_SOCK" "$INBOX" <<'PEER' &
-import os, socket, subprocess, sys
-os.setsid()
-# The session's own `aws login`, stuck on its callback (#275): a child of
-# this process, so the app finds it under the session's pid.
-subprocess.Popen([os.environ["INFINITUS_AWS_CLI"], "login", "--profile", "e2e-login"],
-                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.bind(sys.argv[1]); s.listen(4)
-while True:
-    c, _ = s.accept(); c.settimeout(3); data = b""
-    try:
-        while True:
-            chunk = c.recv(65536)
-            if not chunk: break
-            data += chunk
-    except socket.timeout: pass
-    with open(sys.argv[2], "ab") as f: f.write(data)
-    c.close()
-PEER
+sleep 3600 &
 SESSION_PID=$!
 SESSION_CWD="$SOCKDIR/proj"
-export DEMO_SESSION_PID="$SESSION_PID" DEMO_SESSION_CWD="$SESSION_CWD"
 mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
 # A session record lands whole (#1002): `cat >` truncates first, and the
 # app lists the records the moment a hook's refresh fires — one second
-# after the Stop event, exactly when the #79 rounds rewrite this file —
-# so an empty file read in that window dropped the session, its AWS
-# need and the aws-logins row until the next poll, a minute away.
+# after the Stop event.
 write_record() { cat >"$1.tmp" && mv -f "$1.tmp" "$1"; }
 write_record "$CLAUDE_CONFIG_DIR/sessions/$SESSION_PID.json" <<EOF
 {"pid":$SESSION_PID,"sessionId":"e2e-aws","cwd":"$SESSION_CWD","kind":"interactive","status":"idle",
- "peerProtocol":1,"messagingSocketPath":"$PEER_SOCK","name":"e2e-aws","startedAt":1700000000000}
-EOF
-# Its transcript: an aws call that died on the expired session, stamped a
-# minute back so it is unmistakably older than any login started below.
-SLUG="$(printf '%s' "$SESSION_CWD" | sed 's/[^A-Za-z0-9]/-/g')"
-mkdir -p "$CLAUDE_CONFIG_DIR/projects/$SLUG"
-TS="$(python3 -c "import datetime;print((datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")"
-cat >"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
-{"type":"assistant","timestamp":"$TS","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_e2e","name":"Bash","input":{"command":"aws sts get-caller-identity --profile e2e-login"}}]}}
-{"type":"user","timestamp":"$TS","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_e2e","content":"\naws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n"}]}}
-EOF
-# A second session with the same lapse, met by a login that finished
-# before this app instance started: the ledger is the only place the
-# app can learn that, and it only did once a login was asked for — so
-# every relaunch showed the met need as "Log in here" (2026-09-07).
-sleep 3600 &
-SEED_PID=$!
-write_record "$CLAUDE_CONFIG_DIR/sessions/$SEED_PID.json" <<EOF
-{"pid":$SEED_PID,"sessionId":"e2e-seed","cwd":"$SESSION_CWD","kind":"interactive","status":"idle","name":"e2e-seed"}
-EOF
-cat >"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-seed.jsonl" <<EOF
-{"type":"assistant","timestamp":"$TS","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_seed","name":"Bash","input":{"command":"aws sts get-caller-identity --profile e2e-seeded"}}]}}
-{"type":"user","timestamp":"$TS","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_seed","content":"\naws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n"}]}}
-EOF
-cat >"$INFINITUS_AWS_LEDGER" <<EOF
-[{"phase":"done","flow":"remote","message":"signed in","startedAt":$(date +%s),"pid":$SEED_PID,"profile":"e2e-seeded"}]
+ "name":"e2e-aws","startedAt":1700000000000}
 EOF
 # A login wrapper an earlier instance left behind (#274): spawned from a
 # subshell that exits, so it is launchd's child like the real leftover.
@@ -538,28 +479,23 @@ until "$CTL" status >/dev/null 2>&1; do
 done
 echo "control: ok (dead socket path re-bound after ${i}s)"
 
-# --- AWS sign-in from the phone -------------------------------------------
-# The transcript scan surfaces the expired profile against the session.
-aws_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e-login' and l['pid']==$SESSION_PID and not l.get('provider') for l in d['logins'])"; }
+# --- sessions verb (#612, snapshot count survivor) ------------------------
+# The session tracker is gone (#1041); what's left is the one row the
+# `sessions` verb and the fleet's session count still read off disk.
+"$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['cwd']=='$SESSION_CWD' and s['startedAt']=='2023-11-14T22:13:20Z' for s in d)" || fail "sessions row fields (#612)"
+echo "sessions: ok (one live record, #612)"
+
+# --- AWS sign-in, started by the verb (#1041: no more transcript scan) ----
+aws_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e-login' and not l.get('provider') for l in d['logins'])"; }
 aws_phase() { "$CTL" aws-logins | json "next((l.get('state') or {}).get('phase') for l in d['logins'] if l['profile']=='$1' and not l.get('provider'))"; }
-i=0
-until aws_login_item; do
-    i=$((i + 1)); [ "$i" -lt 60 ] || fail "expired AWS session never surfaced in aws-logins"
-    sleep 1
-done
-echo "aws: need surfaced after ${i}s"
-# The session's own stuck login (#275) must still be waiting on its
-# callback here, or the release round below passes for the wrong reason.
-pgrep -f "aws login --profile e2e-login" >/dev/null || fail "the session's own aws login is not running before the sign-in (#1007)"
-# #612: the row carries the id, the start and the need the fork's list shows.
-"$CTL" sessions | expect "any(s['pid']==$SESSION_PID and s['sessionId']=='e2e-aws' and s['startedAt']=='2023-11-14T22:13:20Z' and 'aws-login:e2e-login' in s['needs'] for s in d)" || fail "sessions row fields (#612)"
-"$CTL" aws-logins | expect "not any(l['profile']=='e2e-seeded' for l in d['logins'])" || fail "a need met before launch (ledger) still shows"
+aws_login_item && fail "aws-logins must be empty before any login starts"
 # The phone's flag-less poll reports and never starts (it re-opened the
 # sign-in on every poll, 2026-09-03).
 "$CTL" aws-login e2e-login --status >/dev/null 2>&1 && fail "--status started a login"
 "$CTL" aws-logins | expect "all(l.get('state') is None for l in d['logins'])" || fail "--status left a login in flight"
 # Code flow: URL for the phone's browser, then the pasted code.
-"$CTL" aws-login e2e-login --remote --pid "$SESSION_PID" | expect "d['state']['flow']=='remote'" || fail "aws-login --remote"
+"$CTL" aws-login e2e-login --remote | expect "d['state']['flow']=='remote'" || fail "aws-login --remote"
+aws_login_item || fail "aws-login did not surface the run in aws-logins"
 i=0
 until [ "$(aws_phase e2e-login)" = "waitingForCode" ]; do
     i=$((i + 1)); [ "$i" -lt 20 ] || fail "login never asked for the code (phase $(aws_phase e2e-login))"
@@ -568,38 +504,20 @@ done
 "$CTL" aws-logins | expect "next(l['state']['url'] for l in d['logins'] if l['profile']=='e2e-login').startswith('https://e2e.invalid/')" || fail "no URL for the phone"
 "$CTL" aws-login e2e-login --status | expect "d['state']['phase']=='waitingForCode'" || fail "--status did not report the login in flight"
 printf 'E2E-CODE-OK' | "$CTL" aws-login-code e2e-login >/dev/null || fail "aws-login-code"
-# Signed in: the item drops (the failure predates the login).
 i=0
 while aws_login_item; do
-    i=$((i + 1)); [ "$i" -lt 20 ] || fail "need did not clear after the login (phase $(aws_phase e2e-login))"
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "login did not clear after signing in (phase $(aws_phase e2e-login))"
     sleep 1
 done
-echo "aws: code flow signed in, need cleared"
-# The session's own stuck login (#275) is released once the phone sign-in lands.
-i=0
-while pgrep -f "aws login --profile e2e-login" >/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 10 ] || fail "the session's own aws login was not released (still running: $(ps -axo pid=,ppid=,stat=,command= | grep 'aws login --profile e2e-login\|aws-own-login-listener' | grep -v grep | head -4 | tr '\n' ';'))"
-    sleep 1
-done
-echo "aws: the session's own stuck login released"
-# --- gcloud sign-in from the phone (#367) --------------------------------
-# The same session's gcloud call dies on lapsed credentials: the need
-# surfaces as a gcloud item against the pid, the paste-back flow signs
-# in, and the item clears.
-TS2="$(python3 -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")"
-cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
-{"type":"assistant","timestamp":"$TS2","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_gc","name":"Bash","input":{"command":"gcloud storage ls --account=e2e@example.com"}}]}}
-{"type":"user","timestamp":"$TS2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_gc","content":"ERROR: (gcloud.storage.ls) There was a problem refreshing your current auth tokens: invalid_grant\nPlease run:\n\n  $ gcloud auth login\n\nto obtain new credentials."}]}}
-EOF
-gcloud_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e@example.com' and l['pid']==$SESSION_PID and l.get('provider')=='gcloud' for l in d['logins'])"; }
+pgrep -f "$SOCKDIR/aws" >/dev/null && fail "stub aws CLI still running"
+echo "aws: code flow signed in from the verb, no --pid"
+
+# --- gcloud sign-in, started by the verb (#367) ----------------------------
+gcloud_login_item() { "$CTL" aws-logins | expect "any(l['profile']=='e2e@example.com' and l.get('provider')=='gcloud' for l in d['logins'])"; }
 gcloud_phase() { "$CTL" aws-logins | json "next((l.get('state') or {}).get('phase') for l in d['logins'] if l['profile']=='e2e@example.com' and l.get('provider')=='gcloud')"; }
-i=0
-until gcloud_login_item; do
-    i=$((i + 1)); [ "$i" -lt 60 ] || fail "lapsed gcloud credentials never surfaced in aws-logins"
-    sleep 1
-done
-echo "gcloud: need surfaced after ${i}s"
-"$CTL" gcloud-login e2e@example.com --remote --pid "$SESSION_PID" | expect "d['state']['flow']=='remote' and d['state']['provider']=='gcloud'" || fail "gcloud-login --remote"
+gcloud_login_item && fail "aws-logins must not already carry a gcloud login"
+"$CTL" gcloud-login e2e@example.com --remote | expect "d['state']['flow']=='remote' and d['state']['provider']=='gcloud'" || fail "gcloud-login --remote"
+gcloud_login_item || fail "gcloud-login did not surface the run in aws-logins"
 i=0
 until [ "$(gcloud_phase)" = "waitingForCode" ]; do
     i=$((i + 1)); [ "$i" -lt 20 ] || fail "gcloud login never asked for the code (phase $(gcloud_phase))"
@@ -609,10 +527,11 @@ done
 printf 'E2E-GCLOUD-OK' | "$CTL" gcloud-login-code e2e@example.com >/dev/null || fail "gcloud-login-code"
 i=0
 while gcloud_login_item; do
-    i=$((i + 1)); [ "$i" -lt 20 ] || fail "gcloud need did not clear after the login (phase $(gcloud_phase))"
+    i=$((i + 1)); [ "$i" -lt 20 ] || fail "gcloud login did not clear after signing in (phase $(gcloud_phase))"
     sleep 1
 done
-echo "gcloud: code flow signed in, need cleared"
+echo "gcloud: code flow signed in from the verb, no --pid"
+
 # Rebind refusal: the CLI asks to overwrite the profile's session; the
 # app answers n and reports which account it was bound to.
 "$CTL" aws-login e2e-rebind --remote >/dev/null || fail "aws-login e2e-rebind"
@@ -630,26 +549,6 @@ done
 "$CTL" aws-logins | expect "'bound to account 1 but you signed in to 2' in next(l['state']['message'] for l in d['logins'] if l['profile']=='e2e-rebind')" || fail "rebind message"
 pgrep -f "$SOCKDIR/aws" >/dev/null && fail "stub aws CLI still running"
 echo "aws: rebind refused"
-# A second lapse after the login, met outside the app (#313): the ledger
-# can't clear it, the probe does once the CLI says the profile works.
-TS2="$(python3 -c "import datetime;print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=1)).strftime('%Y-%m-%dT%H:%M:%S.000Z'))")"
-cat >>"$CLAUDE_CONFIG_DIR/projects/$SLUG/e2e-aws.jsonl" <<EOF
-{"type":"assistant","timestamp":"$TS2","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_e2e2","name":"Bash","input":{"command":"aws sts get-caller-identity --profile e2e-login"}}]}}
-{"type":"user","timestamp":"$TS2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_e2e2","content":"\naws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.\n"}]}}
-EOF
-i=0
-until aws_login_item; do
-    i=$((i + 1)); [ "$i" -lt 60 ] || fail "second lapse never surfaced in aws-logins"
-    sleep 1
-done
-touch "$SOCKDIR/aws-probe-ok"
-i=0
-while aws_login_item; do
-    i=$((i + 1)); [ "$i" -lt 30 ] || fail "need did not clear once the CLI said the profile works"
-    sleep 1
-done
-"$CTL" aws-login e2e-login --status | expect "'outside the app' in d['state']['message']" || fail "probe outcome not recorded"
-echo "aws: lapse met outside the app cleared by the probe"
 
 # #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
 # credential comes on stdin like every secret and stays in this run's own

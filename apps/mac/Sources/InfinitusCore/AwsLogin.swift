@@ -236,72 +236,6 @@ public enum AwsLogin {
     /// A login that hasn't finished in this long is abandoned.
     public static let timeout: TimeInterval = 600
 
-    // MARK: detection
-
-    /// Signatures the CLI (and the cred broker in front of it) print when
-    /// the sign-in has lapsed. Any match means "needs aws login".
-    static let expiredMarkers = [
-        "please reauthenticate using 'aws login'",
-        "error when retrieving token from sso",
-        "the sso session associated with this profile has expired",
-        "the sso session has expired",
-        "fix: aws login",
-        "run: aws login",
-        "please run: aws login",
-        // A login attempt that lapsed before it finished, and a login-
-        // session token past its life (past transcripts, 2026-09-03).
-        "pending authorization to retrieve an sso token has expired",
-        "the security token included in the request is expired",
-        // The cred broker's refresh lock is held past its 30 s wait only
-        // while the holder sits in the interactive login; every other
-        // caller then fails with this line (peon-wave-16, 2026-09-05).
-        "waiting for the refresh lock held by pid",
-    ]
-
-    /// The failure must OPEN an output line: the CLI and the broker print
-    /// theirs at column 0, while the same words quoted from a source file,
-    /// a grep hit or a Read (line-numbered, indented) don't — the sessions
-    /// working on this very feature lit up as needing a login (2026-09-03).
-    static let expiredLineStarts = [
-        "aws: [error]",
-        "[aws-cred-broker]",
-        "error when retrieving token from sso",
-        "the sso session",
-        // The broker's advisory line is indented by exactly two spaces;
-        // it is all that survives a `| tail -1` (2026-09-05).
-        "  fix: aws login",
-    ]
-
-    private static let expiredMarkerBytes = expiredMarkers.map { Array($0.utf8) }
-    private static let expiredLineStartBytes = expiredLineStarts.map { Array($0.utf8) }
-
-    /// The profile a transcript excerpt says needs a login, or nil when
-    /// the text carries no expired-session signature. `default` when the
-    /// signature names no profile.
-    public static func profile(in text: String) -> String? {
-        let lower = ASCIIScan.lowered(text)
-        guard expiredMarkerBytes.contains(where: { ASCIIScan.contains(lower, $0) }),
-              ASCIIScan.anyLineStarts(lower, with: expiredLineStartBytes) else { return nil }
-        let pattern = #"aws (?:sso )?login(?: --remote)?(?: --profile[ =]([A-Za-z0-9._-]+))"#
-        if let re = try? NSRegularExpression(pattern: pattern),
-           let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-           let r = Range(m.range(at: 1), in: text) {
-            return String(text[r])
-        }
-        return "default"
-    }
-
-    /// The profile the FAILED command addressed — `--profile X` or
-    /// `AWS_PROFILE=X` in the Bash command — for the CLI's own error,
-    /// which names no profile. Nil when the command names none.
-    public static func profile(inCommand command: String) -> String? {
-        let pattern = #"(?:--profile[ =]|AWS_PROFILE=)["']?([A-Za-z0-9._-]+)"#
-        guard let re = try? NSRegularExpression(pattern: pattern),
-              let m = re.firstMatch(in: command, range: NSRange(command.startIndex..., in: command)),
-              let r = Range(m.range(at: 1), in: command) else { return nil }
-        return String(command[r])
-    }
-
     /// Which flow signs a profile in from the phone, from the user's own
     /// `~/.aws/config` text: an SSO profile (`sso_session` /
     /// `sso_start_url`) takes the device-code flow, everything else the
@@ -507,18 +441,6 @@ public enum AwsLogin {
             && code.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "-_+/=".contains($0)) }
     }
 
-    /// The message the session gets once the login lands (SessionInput
-    /// message path, same as the phone's replies).
-    /// `released`: the session's own `aws login` was ended by the app
-    /// (#275) — say so, or the session reads its state error, runs
-    /// `aws login` again and blocks another tool timeout.
-    public static func continueMessage(profile: String, fromPhone: Bool, released: Bool = false) -> String {
-        "[Infinitus] AWS login for profile \(profile) completed\(fromPhone ? " from the phone" : ""). "
-            + (released ? "Your own `aws login` was stopped because the sign-in had already completed; "
-                          + "the credentials are in place. " : "")
-            + "Retry the command that needed it and continue" + (released ? " — do not run `aws login` again." : ".")
-    }
-
     /// Pids of login wrappers an earlier app instance left behind (#274):
     /// the runner's own `script -q /dev/null <aws> login …`, reparented to
     /// launchd (ppid 1) once that instance died — a relaunch by SIGTERM
@@ -542,49 +464,4 @@ public enum AwsLogin {
         }
     }
 
-    /// The `aws login` a session started itself and is still waiting on
-    /// (#275): every `… aws login …` in `ps -axo pid=,ppid=,command=`
-    /// output whose parent chain reaches `sessionPid` and that addresses
-    /// `profile` (none named = the CLI's `default`), plus their
-    /// descendants — a wrapped login holds its callback port on a child.
-    public static func sessionLogins(ps: String, sessionPid: Int32, profile: String) -> [Int32] {
-        var parent: [Int32: Int32] = [:], command: [Int32: String] = [:]
-        for line in ps.split(separator: "\n") {
-            let fields = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
-            guard fields.count == 3, let pid = Int32(fields[0]), let ppid = Int32(fields[1]) else { continue }
-            parent[pid] = ppid
-            command[pid] = String(fields[2])
-        }
-        func under(_ pid: Int32, _ root: Int32) -> Bool {
-            var current = pid, hops = 0
-            while let p = parent[current], hops < 32 {
-                if p == root { return true }
-                current = p
-                hops += 1
-            }
-            return false
-        }
-        let logins = command.filter { under($0.key, sessionPid) && isLogin($0.value, profile: profile) }.map(\.key)
-        let subtree = command.keys.filter { pid in logins.contains { under(pid, $0) } }
-        return Array(Set(logins + subtree)).sorted()
-    }
-
-    static func isLogin(_ command: String, profile: String) -> Bool {
-        guard command.range(of: #"(?:^|[ /])aws login(?:\s|$)"#, options: .regularExpression) != nil else { return false }
-        return (self.profile(inCommand: command) ?? "default") == profile
-    }
-
-    /// `lsof -nP -iTCP -sTCP:LISTEN -a -p <pids> -Fpn` output → pid → ports.
-    public static func listeningPorts(lsof: String) -> [Int32: [Int]] {
-        var out: [Int32: [Int]] = [:]
-        var pid: Int32?
-        for line in lsof.split(separator: "\n") {
-            if line.hasPrefix("p") {
-                pid = Int32(line.dropFirst())
-            } else if line.hasPrefix("n"), let pid, let port = Int(line.split(separator: ":").last ?? "") {
-                out[pid, default: []].append(port)
-            }
-        }
-        return out
-    }
 }

@@ -128,8 +128,8 @@ actor AwsLoginRunner {
     }
 
     /// Starts the flow, or returns the login already in flight for that
-    /// profile. `pid` is the session to nudge when it lands.
-    func start(provider: AwsLogin.Provider = .aws, profile: String, flow: AwsLogin.Flow, pid: Int?) -> AwsLogin.Reply {
+    /// profile.
+    func start(provider: AwsLogin.Provider = .aws, profile: String, flow: AwsLogin.Flow) -> AwsLogin.Reply {
         let key = AwsLogin.runKey(provider: provider, profile: profile)
         if let run = runs[key] {
             // Same flow: the login already in flight. Another flow (the
@@ -160,7 +160,7 @@ actor AwsLoginRunner {
         process.standardInput = stdin
         process.standardOutput = out
         process.standardError = out
-        let state = AwsLogin.State(profile: profile, flow: flow, startedAt: Date().timeIntervalSince1970, pid: pid,
+        let state = AwsLogin.State(profile: profile, flow: flow, startedAt: Date().timeIntervalSince1970, pid: nil,
                                    provider: provider == .aws ? nil : provider)
         out.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
@@ -311,86 +311,6 @@ actor AwsLoginRunner {
         }
     }
 
-    /// Records a profile as signed in without a run of its own — its need
-    /// was met by another profile's login — so the need clears and the
-    /// sessions on it get their nudge.
-    func markDone(provider: AwsLogin.Provider = .aws, profile: String, via: String) {
-        let key = AwsLogin.runKey(provider: provider, profile: profile)
-        guard runs[key] == nil else { return }
-        finished[key] = AwsLogin.State(profile: profile, flow: .local, phase: .done,
-                                       message: "signed in with \(via)",
-                                       startedAt: Date().timeIntervalSince1970, pid: nil,
-                                       provider: provider == .aws ? nil : provider)
-        publish()
-    }
-
-    /// Whether the profile's credentials work right now: `aws sts
-    /// get-caller-identity` / `gcloud auth print-access-token`, nothing
-    /// interactive (no browser, no stdin, no prompts), by exit status
-    /// only — gcloud's prints the token, so stdout stays on the null
-    /// device. 30 s at most. Off the actor — a broker profile can take
-    /// a while.
-    nonisolated static func signedIn(provider: AwsLogin.Provider = .aws, profile: String) async -> Bool {
-        guard let cli = cli(provider) else { return false }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: cli)
-        process.arguments = provider == .aws ? ["sts", "get-caller-identity", "--profile", profile]
-                                             : GcloudLogin.probeArguments(profile: profile)
-        var env = ProcessInfo.processInfo.environment
-        env["AWS_PAGER"] = ""
-        env["BROWSER"] = "/usr/bin/true"
-        env["CLOUDSDK_CORE_DISABLE_PROMPTS"] = "1"
-        env["NO_GCE_CHECK"] = "true"
-        process.environment = env
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        return await withCheckedContinuation { continuation in
-            process.terminationHandler = { continuation.resume(returning: $0.terminationStatus == 0) }
-            do { try process.run() } catch {
-                process.terminationHandler = nil
-                continuation.resume(returning: false)
-                return
-            }
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 30) {
-                if process.isRunning { process.terminate() }
-                // A broker that ignores SIGTERM would hold the continuation
-                // forever; SIGKILL is what actually fires terminationHandler.
-                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) {
-                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                }
-            }
-        }
-    }
-
-    /// Drops a finished entry (after the session has moved on).
-    /// #275: a login the session started itself is still waiting on its
-    /// callback — its Bash sits there until the tool timeout, and the
-    /// continue nudge only drains after that. Any callback ends the wait
-    /// (the CLI checks the OAuth state and exits), so once the sign-in
-    /// landed, poke every such listener under the session and let its
-    /// command return now. Returns how many answered.
-    nonisolated static func releaseSessionLogins(profile: String, sessionPid: Int) async -> Int {
-        guard let ps = try? Subprocess.run("/bin/ps", ["-axo", "pid=,ppid=,command="]) else { return 0 }
-        let pids = AwsLogin.sessionLogins(ps: ps, sessionPid: Int32(sessionPid), profile: profile)
-        // lsof exits 1 when nothing is listed — a throw is "no listener".
-        guard !pids.isEmpty, let lsof = try? Subprocess.run("/usr/sbin/lsof", [
-            "-nP", "-iTCP", "-sTCP:LISTEN", "-a", "-p", pids.map(String.init).joined(separator: ","), "-Fpn",
-        ]) else { return 0 }
-        var released = 0
-        for port in AwsLogin.listeningPorts(lsof: lsof).values.flatMap({ $0 }) {
-            guard let url = URL(string: "http://127.0.0.1:\(port)/oauth/callback?code=infinitus&state=infinitus") else { continue }
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 5
-            if (try? await URLSession.shared.data(for: request)) != nil { released += 1 }
-        }
-        return released
-    }
-
-    func forget(provider: AwsLogin.Provider = .aws, profile: String) {
-        finished[AwsLogin.runKey(provider: provider, profile: profile)] = nil
-        publish()
-    }
 
     private func publish() {
         onChange(states())

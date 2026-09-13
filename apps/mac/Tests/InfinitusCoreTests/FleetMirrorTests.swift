@@ -14,14 +14,12 @@ final class FleetMirrorTests: XCTestCase {
         let snapshot = MirrorSnapshot(
             capturedAt: Date(),
             machineName: "Test Mac",
-            listJSON: Data("{\"accounts\":[]}".utf8),
-            sessions: [SessionPanelRow(repo: "limitless", status: "busy")])
+            listJSON: Data("{\"accounts\":[]}".utf8))
         try MirrorWriter.write(snapshot, to: url)
         let read = try await FileFleetMirror(url: url).latest()
         let got = try XCTUnwrap(read)
         XCTAssertEqual(got.machineName, snapshot.machineName)
         XCTAssertEqual(got.listJSON, snapshot.listJSON)
-        XCTAssertEqual(got.sessions, snapshot.sessions)
         XCTAssertEqual(got.capturedAt.timeIntervalSince1970,
                        snapshot.capturedAt.timeIntervalSince1970, accuracy: 1)
     }
@@ -39,7 +37,6 @@ final class FleetMirrorTests: XCTestCase {
             capturedAt: Date(),
             machineName: "Test Mac",
             listJSON: Data("{\"accounts\":[]}".utf8),
-            sessions: [],
             prefs: prefs,
             usageJSON: usageJSON)
         try MirrorWriter.write(snapshot, to: url)
@@ -104,27 +101,20 @@ final class FleetMirrorTests: XCTestCase {
         XCTAssertEqual(FleetPrefs().popupSort, "headroom")
     }
 
-    func testRoundTripWithFooterChipStateAndProgress() async throws {
+    func testRoundTripWithFooterChipState() async throws {
         let url = tempURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
-        let progress = SessionProgress(nowDoing: "Edit FleetMirror.swift",
-                                       todos: .init(done: 1, total: 3, activeForm: "wiring"),
-                                       retrying: false)
         let snapshot = MirrorSnapshot(
             capturedAt: Date(),
             machineName: "Test Mac",
             listJSON: Data("{\"accounts\":[]}".utf8),
-            sessions: [],
             serviceStatus: ServiceStatusSummary(indicator: "minor"),
-            engine: .backingOff(seconds: 12),
-            progressByPid: [4242: progress])
+            engine: .backingOff(seconds: 12))
         try MirrorWriter.write(snapshot, to: url)
         let read = try await FileFleetMirror(url: url).latest()
         let got = try XCTUnwrap(read)
         XCTAssertEqual(got.serviceStatus, ServiceStatusSummary(indicator: "minor"))
         XCTAssertEqual(got.engine, .backingOff(seconds: 12))
-        XCTAssertEqual(got.progressByPid?[4242]?.nowDoing, progress.nowDoing)
-        XCTAssertEqual(got.progressByPid?[4242]?.todos, progress.todos)
     }
 
     func testMissingFooterChipStateDecodesToNil() async throws {
@@ -143,7 +133,6 @@ final class FleetMirrorTests: XCTestCase {
         let got = try XCTUnwrap(read)
         XCTAssertNil(got.serviceStatus)
         XCTAssertNil(got.engine)
-        XCTAssertNil(got.progressByPid)
     }
 
     func testRoundTripWithEveryFleet() async throws {
@@ -155,7 +144,7 @@ final class FleetMirrorTests: XCTestCase {
                                 activeNumber: 1)
         let snapshot = MirrorSnapshot(
             capturedAt: Date(), machineName: "Test Mac",
-            listJSON: Data("{\"accounts\":[]}".utf8), sessions: [], fleets: [fleet])
+            listJSON: Data("{\"accounts\":[]}".utf8), fleets: [fleet])
         try MirrorWriter.write(snapshot, to: url)
         let read = try await FileFleetMirror(url: url).latest()
         let got = try XCTUnwrap(read)
@@ -187,7 +176,7 @@ final class FleetMirrorTests: XCTestCase {
                           updateChannel: "stable", phoneLatest: "0.4.5")
         let snapshot = MirrorSnapshot(
             capturedAt: Date(), machineName: "Test Mac",
-            listJSON: Data("{\"accounts\":[]}".utf8), sessions: [], app: app)
+            listJSON: Data("{\"accounts\":[]}".utf8), app: app)
         try MirrorWriter.write(snapshot, to: url)
         let read = try await FileFleetMirror(url: url).latest()
         let got = try XCTUnwrap(read)
@@ -261,24 +250,4 @@ final class FleetMirrorTests: XCTestCase {
         }
     }
 
-    func testSnapshotCarriesFactsByPidAndOlderSnapshotsDecodeWithoutIt() throws {
-        let facts = SessionFacts.derive(timeline: .init(), status: "idle", attention: .init())
-        let snap = MirrorSnapshot(capturedAt: Date(timeIntervalSince1970: 1), machineName: "m", listJSON: Data("{}".utf8),
-                                  sessions: [], factsByPid: [7: facts])
-        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
-        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        let back = try dec.decode(MirrorSnapshot.self, from: try enc.encode(snap))
-        XCTAssertEqual(back.factsByPid?[7], facts)
-        let older = try dec.decode(MirrorSnapshot.self, from: Data(
-            #"{"capturedAt":"2026-01-01T00:00:00Z","machineName":"m","listJSON":"e30=","sessions":[]}"#.utf8))
-        XCTAssertNil(older.factsByPid)
-    }
-
-    func testSnapshotCarriesEpochAndSequence() throws {
-        let snap = MirrorSnapshot(capturedAt: Date(timeIntervalSince1970: 1), machineName: "m", listJSON: Data("{}".utf8),
-                                  sessions: [], epoch: "e1", sequence: 42)
-        let back = try JSONDecoder().decode(MirrorSnapshot.self, from: try JSONEncoder().encode(snap))
-        XCTAssertEqual(back.epoch, "e1")
-        XCTAssertEqual(back.sequence, 42)
-    }
 }

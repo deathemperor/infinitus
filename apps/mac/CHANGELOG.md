@@ -16,6 +16,11 @@ publishes the matching section as the GitHub release body.
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
 - A 5-hour reset that lands after midnight shows the time alone — the date only appears past a day out.
+- The session tracker is gone: no live session list beyond the snapshot's count, no feed, chat, timeline, attention, names or input from the Mac, the phone or `infinitusctl`.
+- The browser page ("Copy Browser Link") is gone.
+- Keep awake is gone (Settings › Display's two switches and the `keep_awake` prefs).
+- Expired `aws login` / `gcloud auth login` are no longer detected from terminal sessions; `aws-login` / `gcloud-login` lose `--pid`, and sign-ins started from the desktop app or the phone work as before.
+- The old native phone client's sources (`apps/mac/ios`) are removed.
 
 
 ## 0.5.0-alpha.8

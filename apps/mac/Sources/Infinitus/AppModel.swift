@@ -124,23 +124,6 @@ final class AppModel: ObservableObject {
         let event = StatsEvent(at: Date(), kind: kind, icon: icon, text: text)
         Task.detached(priority: .utility) { [eventStore] in await eventStore.append(event) }
     }
-    /// Sessions popover's mini progress rows (SessionProgressModel.swift).
-    let sessionProgress = SessionProgressModel()
-    /// What Infinitus started each live session as (#163/#165), by pid;
-    /// kept across launches, pruned to the roster on every export.
-    @Published private(set) var sessionBirths: [Int: SessionBirth] = SessionBirths.load(from: AppModel.birthsURL)
-    static let birthsURL = AppSupport.root().appendingPathComponent("session-births.json")
-    func recordBirth(pid: Int, _ birth: SessionBirth) {
-        let live = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-        let alive = Set(live.map { Int($0.pid) })
-        sessionBirths = SessionBirths.pruned(sessionBirths, alive: alive.union([pid]))
-        // Pinned to the session id whenever the roster has it, so a
-        // reused pid after a reboot can never inherit a grant.
-        let id = live.first { Int($0.pid) == pid }?.sessionId
-        sessionBirths[pid] = id.map { birth.identified(as: $0) } ?? birth
-        try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
-    }
-
     /// The phone's star/pause verbs (`POST /accounts/action`), with the
     /// popup's own semantics: the same capability guards the control
     /// server runs, and a star lands on the account right away when it
@@ -199,20 +182,9 @@ final class AppModel: ObservableObject {
     /// Mac's own diagnostic reports; newest first (CrashReport.swift).
     @Published private(set) var crashReports: [CrashReport] = []
     let crashStore = CrashStore(directory: CrashStore.defaultDirectory())
-    /// True once `awsLogins` reflects a finished transcript scan. The
-    /// push trigger seeds off it, not off the scanner's own flag: the
-    /// list rebuilds one run-loop hop after the scan lands, and a poll
-    /// in that gap would seed on the stale (empty) list and push every
-    /// pre-existing need on the next one.
-    private var awsLoginsScanned = false
     private var awsLoginStates: [AwsLogin.State] = []
-    private var awsLoginNeedsWatch: AnyCancellable?
+    private var awsAnnouncedRunKeys: Set<String> = []
     private var awsLoginQuitWatch: AnyCancellable?
-    /// How often an unmet session need is put to the CLI (#313); the
-    /// e2e gate shortens it.
-    static let awsProbeInterval: TimeInterval =
-        Double(ProcessInfo.processInfo.environment["INFINITUS_AWS_PROBE_S"] ?? "") ?? 300
-    private var awsProbeTask: Task<Void, Never>?
     private(set) lazy var awsLoginRunner: AwsLoginRunner = {
         let runner = AwsLoginRunner(
             onChange: { [weak self] states in Task { @MainActor in self?.awsLoginStates = states; self?.rebuildAwsLogins() } },
@@ -489,7 +461,6 @@ final class AppModel: ObservableObject {
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
-    /// Hold a power assertion while any session is mid-turn (KeepAwake).
     /// Display-only row order (PopupSort): the engine's slots, headroom
     /// with active + next pinned (todo 2026-09-01), or the engine's own
     /// candidate ranking (#542). Engine slots never move — nothing is
@@ -504,20 +475,6 @@ final class AppModel: ObservableObject {
             return sort
         }
         return PopupSort(legacyHeadroom: defaults.object(forKey: "sort_headroom") as? Bool ?? true)
-    }
-    @Published var keepAwake: Bool {
-        didSet {
-            defaults.set(keepAwake, forKey: "keep_awake")
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
-        }
-    }
-    /// With `keepAwake`: the screen stays on too, the way a caffeine app
-    /// keeps it (#455). Off, only system sleep is held.
-    @Published var keepAwakeDisplay: Bool {
-        didSet {
-            defaults.set(keepAwakeDisplay, forKey: "keep_awake_display")
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay, busyCount: liveSessions?.busy ?? 0)
-        }
     }
     // Away-push triggers beyond switches (PushTriggers has the rules).
     @Published var pushAllDead: Bool { didSet { defaults.set(pushAllDead, forKey: "push_all_dead") } }
@@ -629,10 +586,6 @@ final class AppModel: ObservableObject {
     let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
     let mirrorExporter = MirrorExporter()
-    /// T3 attention flags and the per-session timeline cache (#223 phase 3).
-    let attentionStore = AttentionStore(url: AttentionStore.defaultURL)
-    /// Numbers every timeline change for `/timeline` resumes (#223 phase 4).
-    let sequenceLog = SequenceLog()
 
     /// The Mac's own popup / pop-out / chat window is a client too (#223
     /// phase 5): while one is open, nothing the user sees here depends on
@@ -644,33 +597,12 @@ final class AppModel: ObservableObject {
     /// popup over an open chat window drops nothing.
     private var visibleSurfaces = Set<String>()
     private var localUIVisible: Bool { !visibleSurfaces.isEmpty }
-    /// The pass a surface's very first appearance starts (below).
-    private var localSurfaceRefresh: Task<Void, Never>?
     func uiSurface(_ id: String, visible: Bool) {
-        let was = localUIVisible
         if visible { visibleSurfaces.insert(id) } else { visibleSurfaces.remove(id) }
         // Every change re-reports: the scopes follow WHICH surfaces show,
         // not only whether any does (the stats pane closing while the
         // popup stays must drop `.stats`, #499).
         reportLocalActivity(visible: localUIVisible)
-        // The exporter's one unthrottled pass (launch) can land before this
-        // lease does — a startup race between StatusItemController's
-        // delayed pop-out/workspace restore and refreshSnapshot's first,
-        // faster turnaround. That pass then writes an empty factsByPid,
-        // and the 30 s throttle after it starves every thread's row
-        // (`guard let f = inputs.facts[...]`) for the rest of the window
-        // (#468). A surface's first appearance forces the next export
-        // through, the same bypass an AWS-login need uses below — but only
-        // while facts are actually empty: a reopen soon after a good
-        // export has real facts already and must not fight the 30 s
-        // throttle #346 relies on to keep a busy fleet cheap.
-        if !was, localUIVisible, !isPlayground, sessionProgress.facts.isEmpty, localSurfaceRefresh == nil {
-            mirrorExportDue = true
-            localSurfaceRefresh = Task { [weak self] in
-                await self?.refreshSnapshot()
-                self?.localSurfaceRefresh = nil
-            }
-        }
     }
     /// The popup and pop-out watch sessions and fleets; only the Stats
     /// pane watches stats. Holding `.stats` from every local surface kept
@@ -690,7 +622,6 @@ final class AppModel: ObservableObject {
     }
     /// `uiSurface` id the Stats pane reports while it shows.
     static let statsSurface = "stats"
-    private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
@@ -734,12 +665,8 @@ final class AppModel: ObservableObject {
     /// record plus the name the popup shows.
     func sessionRows() -> [SessionRow] {
         return ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()).map { record in
-            let pid = Int(record.pid)
-            let progress = sessionProgress.byPid[pid]
-            let shown = SessionNaming.displayName(name: progress?.name ?? record.name,
-                                                  autoName: progress?.autoName, cwd: record.cwd)
-            return SessionRow(pid: pid, name: shown, cwd: record.cwd, status: record.status, kind: record.kind,
-                              sessionId: record.sessionId, startedAt: record.startedAt)
+            SessionRow(pid: Int(record.pid), name: record.name, cwd: record.cwd, status: record.status,
+                      kind: record.kind, sessionId: record.sessionId, startedAt: record.startedAt)
         }
     }
 
@@ -789,7 +716,6 @@ final class AppModel: ObservableObject {
         Notifier.post(title: "Infinitus", body: body)
         liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
-    private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
     /// (#98, #231): the last-alive warning.
     private lazy var pushTriggers = PushTriggers(memory: persistedPushMemory)
@@ -898,8 +824,6 @@ final class AppModel: ObservableObject {
         swapdEnabled = defaults.object(forKey: "engine_swapd_enabled") as? Bool ?? true
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
-        keepAwake = defaults.object(forKey: "keep_awake") as? Bool ?? false
-        keepAwakeDisplay = defaults.object(forKey: "keep_awake_display") as? Bool ?? true
         popupSort = Self.popupSort(defaults)
         mirrorLANEnabled = defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false
         mirrorTunnelEnabled = defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false
@@ -1022,7 +946,7 @@ final class AppModel: ObservableObject {
     /// engine toggles go through their own setters, whose `didSet`
     /// relaunches the app, with the `engine` command's guards; every
     /// other key is stored and re-read by `reloadPrefs`, so its `didSet`
-    /// side effects (the LAN listener, keep-awake, the title) run as
+    /// side effects (the LAN listener, the title) run as
     /// they do from the panes. Returns the updated pref and whether the
     /// app is relaunching behind the reply.
     func setPref(key: String, value: JSONValue) throws -> (pref: PrefCatalog.Pref, restarting: Bool) {
@@ -1097,8 +1021,6 @@ final class AppModel: ObservableObject {
         set(\.popupLayout, defaults.string(forKey: "popup_layout") ?? "wide")
         set(\.popupTextSize, defaults.string(forKey: "popup_text_size") ?? "default")
         set(\.glassFocused, defaults.object(forKey: "glass_focused") as? Double ?? 0.7)
-        set(\.keepAwake, defaults.object(forKey: "keep_awake") as? Bool ?? false)
-        set(\.keepAwakeDisplay, defaults.object(forKey: "keep_awake_display") as? Bool ?? true)
         set(\.popupSort, Self.popupSort(defaults))
         set(\.pushAllDead, defaults.object(forKey: "push_all_dead") as? Bool ?? true)
         set(\.pushLastAlive, defaults.object(forKey: "push_last_alive") as? Bool ?? true)
@@ -1173,7 +1095,6 @@ final class AppModel: ObservableObject {
         let relay = LiveForecastRelay.shared
         relay.forecast = forecast
         relay.plan = battlePlan
-        relay.tokenRate = sessionProgress.tokenRate
         if relay.theme.id != rowTheme.id { relay.theme = rowTheme }
     }
 
@@ -1383,18 +1304,6 @@ final class AppModel: ObservableObject {
             self?.applyNamedTunnel()
         }
         applyMirrorLAN()
-        // The Mac's own "Needs AWS login" line follows the transcripts
-        // whether or not the phone's mirror is on (it lived inside the
-        // mirror setup, so a LAN-off or mock-mode instance never rebuilt
-        // the list — caught by the e2e gate, 2026-09-03).
-        awsLoginNeedsWatch = sessionProgress.$byPid
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.rebuildAwsLogins() }
-        // The ledger's finished logins reach that list only once the
-        // runner exists, and nothing else touches it until a login is
-        // asked for — so after every relaunch a met need came back as
-        // "Log in here" for as long as the failing result stayed in the
-        // transcript's window (Overlord, for hours, 2026-09-07).
         _ = awsLoginRunner
         // The playground gets a socket only where INFINITUS_CONTROL_SOCKET
         // points — never the real app's path.
@@ -1454,25 +1363,6 @@ final class AppModel: ObservableObject {
         Task { [mirrorExporter] in await mirrorExporter.attach(payload: payload) }
         mirrorServer.start(machineName: machineName,
                            token: mirrorPairToken)
-        let feedTails = FeedTails()
-        mirrorServer.sessionFeed.set { pid, limit, since, wait, rows in
-            let claudeDir = ClaudeSessions.configHome()
-            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: wait)
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
-            else { return nil }
-            guard let feed = feedTails.read(record: record, claudeDir: claudeDir, limit: limit)
-            else { return nil }
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            guard rows, let timeline = feed.timeline,
-                  let data = try? encoder.encode(feed),
-                  var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rowData = try? encoder.encode(ThreadFeedPresentation.deriveExpanded(timeline)),
-                  let rowJSON = try? JSONSerialization.jsonObject(with: rowData)
-            else { return try? encoder.encode(feed) }
-            object["rows"] = rowJSON
-            return try? JSONSerialization.data(withJSONObject: object)
-        }
         mirrorServer.awsLogin.set(
             start: { [weak self] request in
                 guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
@@ -1493,235 +1383,43 @@ final class AppModel: ObservableObject {
                 let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, pid: nil, items: items)
                 return await self.awsLoginRunner.relay(provider: provider, profile: request.profile, url: request.url)
             })
-        let thumbnails = ThumbnailCache()
-        mirrorServer.sessionImage.set { pid, id in
-            let key = "\(pid)/\(id)"
-            if let hit = thumbnails[key] { return (hit, "image/jpeg") }
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
-                  let image = SessionFeedReader.imageData(record: record, id: id, claudeDir: claudeDir,
-                                                          attachmentsDir: SessionInput.defaultAttachmentsDir),
-                  let thumb = ImageThumbnail.jpeg(image.data, maxPixels: 640) else { return nil }
-            thumbnails[key] = thumb
-            return (thumb, "image/jpeg")
-        }
-        // T3 attention (#223 phase 3): settle / snooze / pin one session —
-        // the mirror's attention route and the workspace window share
-        // `Self.applyAttention` (a static func: `timelineCache` is a
-        // `lazy var`, main-actor-isolated, so it must be captured here
-        // on the actor rather than touched from the nonisolated closure).
-        let timelineCache = timelineCache, attentionStore = attentionStore
-        mirrorServer.attention.set { pid, request in
-            Self.applyAttention(pid: pid, request, timelineCache: timelineCache, attentionStore: attentionStore)
-        }
-        // `GET /sessions/<pid>/commands` (#223, the phone's `/` popover): the
-        // session's cwd decides the list; the reply is cached per cwd for a
-        // few seconds in the handler.
-        let commandsCache = MirrorCommandsCache()
-        mirrorServer.commands.set { pid in
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }) else { return nil }
-            return commandsCache.data(cwd: record.cwd) {
-                try? JSONEncoder().encode(SlashCommands.discover(cwd: record.cwd, claudeDir: claudeDir))
-            }
-        }
-        // The phone's file browser (#223, spec E): the session's cwd is the
-        // workspace, and `T3ProjectFiles` decides every refusal — the route
-        // only maps its status.
-        mirrorServer.files.set(.init(
-            list: { pid in
-                T3ProjectFiles.list(pid: pid, sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
-            },
-            read: { pid, path in
-                T3ProjectFiles.answer(pid: pid, path: path,
-                                      sessions: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome()))
-            }))
-        // Sequence-resumable timeline and the pre-pairing descriptor (#223 phase 4).
-        let sequenceLog = sequenceLog
-        mirrorServer.timeline.set { pid, after, epoch, wait in
-            let claudeDir = ClaudeSessions.configHome()
-            guard var record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
-                  var timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
-            // Rebuilt first, so a change since the client's last reply
-            // answers at once; the long-poll only when THIS pid has
-            // nothing after the cursor (a gap snapshots without waiting).
-            // Same wait rule as /tail: the record stamp.
-            if wait > 0, let after, sequenceLog.events(pid: pid, after: after)?.isEmpty == true {
-                SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir,
-                                                since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir),
-                                                wait: wait)
-                if let fresh = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
-                   let rebuilt = timelineCache.timeline(record: fresh, claudeDir: claudeDir) {
-                    record = fresh; timeline = rebuilt
-                }
-            }
-            let facts = SessionFacts.derive(timeline: timeline, status: record.status,
-                                            attention: attentionStore.entry(sessionId: record.sessionId))
-            _ = sequenceLog.record(pid: pid, facts: facts)
-            let reply = TimelineSync.reply(log: sequenceLog, pid: pid, afterSequence: after, epoch: epoch,
-                                           timeline: timeline, facts: facts)
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            return try? encoder.encode(reply)
-        }
         mirrorServer.descriptor.set {
             MirrorDescriptor.current(machineId: MachineIdentity.current(), label: MachineName.current(),
                                      appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")
-        }
-        mirrorServer.sessionInput.set { [weak self] pid, request in
-            self?.deliverSessionInput(pid: pid, request, from: "phone")
-                ?? SessionInput.Reply(outcome: "rejected", detail: "app is shutting down")
         }
         applyNamedTunnel()  // ends by applying the quick tunnel (#697)
         applyForkTunnel()
     }
 
-    /// One request into a live session, the way the phone's
-    /// `POST /sessions/<pid>/input` lands it — and the Mac's own chat
-    /// window (#151): a mode change is decided here, "allow for this
-    /// session" records the rule then answers Yes, everything else goes
-    /// through `SessionInput.deliver`. Off the main actor; hops in for
-    /// the log and the births.
-    /// Settle / snooze / pin one session (#223 phase 3) — the mirror's
-    /// attention route and the workspace window (`T3WindowModel.attention`)
-    /// share it. A static func, not an instance method: `timelineCache` is
-    /// a `lazy var` (main-actor-isolated), so callers capture the three
-    /// pieces on the actor and pass them in, rather than this touching
-    /// `self` from whatever thread the caller runs on.
-    nonisolated static func applyAttention(pid: Int32, _ request: SessionAttention.Request,
-                                           timelineCache: TimelineCache, attentionStore: AttentionStore) -> SessionAttention.Outcome? {
-        let claudeDir = ClaudeSessions.configHome()
-        guard let record = ClaudeSessions.record(pid: pid, sessionId: request.sessionId, in: ClaudeSessions.list(claudeDir: claudeDir)),
-              let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
-        return SessionAttention.apply(request, sessionId: record.sessionId,
-                                      timeline: timeline,
-                                      status: record.status, store: attentionStore)
-    }
-
-    nonisolated func deliverSessionInput(pid: Int32, _ request: SessionInput.Request,
-                                         from source: String) -> SessionInput.Reply {
-            let claudeDir = ClaudeSessions.configHome()
-            let records = ClaudeSessions.list(claudeDir: claudeDir)
-            // #168: a queued request may name a pid from before a reboot —
-            // the session lives on under a new one; its id does not change.
-            guard let record = records.first(where: { $0.pid == pid })
-                    ?? request.sessionId.flatMap({ id in records.first { $0.sessionId == id } })
-            else {
-                Task { @MainActor in self.logMirrorInput("⚠️", "\(source) input not delivered: unknown session") }
-                return SessionInput.Reply(outcome: "rejected", detail: "session ended")
-            }
-            let reply = SessionInput.deliver(request: request, record: record,
-                                             hosts: PtyHosts.available(), claudeDir: claudeDir)
-            let label = URL(fileURLWithPath: record.cwd).lastPathComponent
-            Task { @MainActor in
-                if reply.outcome == "delivered" {
-                    let preview = String(request.text.prefix(60))
-                    self.logMirrorInput("📲", "\(source) → \(label): \"\(preview)\" (\(reply.channel ?? "?"))")
-                } else {
-                    let why = reply.detail.map { "\(reply.outcome) — \($0)" } ?? reply.outcome
-                    self.logMirrorInput("⚠️", "\(source) input not delivered: \(why)")
-                }
-                if source == "phone", request.queuedAt != nil, ["delivered", "running", "captured"].contains(reply.outcome) {
-                    // The phone queued this while the Mac was away; the
-                    // push reaches it even when the app is closed.
-                    self.liveActivityPusher.pushAlert(title: "Delivered to \(label)",
-                                                       body: String(request.text.prefix(80)))
-                }
-            }
-            return reply
-    }
-
     /// Every phone-injected input is logged, per #17 — success or not.
     // MARK: AWS sign-in from the phone (AwsLogin.swift)
 
-    /// Needs come from the sessions' transcript tails (SessionProgress
-    /// .awsLoginProfile); a finished login for a profile that no session
-    /// needs any more is dropped so the line clears itself.
+    /// Items are the logins the verbs started (aws-login / gcloud-login):
+    /// they show while running and after a failure, and clear once the
+    /// runner reports them done.
     private func rebuildAwsLogins() {
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
-        let byKey = Dictionary(awsLoginStates.map { ($0.runKey, $0) }, uniquingKeysWith: { a, _ in a })
-        var items: [AwsLogin.Item] = []
-        var needed = Set<String>()
-        typealias Need = (pid: Int, provider: AwsLogin.Provider, profile: String, failedAt: Date?, name: String?)
-        var needs: [Need] = []
-        for (pid, progress) in sessionProgress.byPid {
-            // Both CLIs can lapse under one session (#367); each need is its own item.
-            for provider in AwsLogin.Provider.allCases {
-                guard let profile = progress.loginProfile(provider) else { continue }
-                needs.append((pid, provider, profile, progress.loginFailedAt(provider), progress.name))
-            }
+        let items: [AwsLogin.Item] = awsLoginStates.filter { $0.phase != .done }.map { state in
+            AwsLogin.Item(profile: state.profile, flow: state.flow, pid: nil, sessionLabel: nil, state: state,
+                         account: state.providerOrAws == .aws ? AwsLogin.account(profile: state.profile, configText: configText) : nil,
+                         provider: state.provider)
         }
-        needs.sort { ($0.pid, $0.provider.rawValue) < ($1.pid, $1.provider.rawValue) }
-        for (pid, provider, profile, failedAt, name) in needs {
-            let key = AwsLogin.runKey(provider: provider, profile: profile)
-            // Signed in since the failure: the failing result stays in the
-            // transcript's window until the session moves on, but the
-            // need is met (the key badge outlived the login, 2026-09-03).
-            if let done = byKey[key], done.phase == .done,
-               let failedAt, failedAt.timeIntervalSince1970 < done.startedAt { continue }
-            needed.insert(key)
-            let label = name ?? liveSessions?.sessions?.first { $0.pid == pid }
-                .map { URL(fileURLWithPath: $0.cwd).lastPathComponent }
-            items.append(AwsLogin.Item(profile: profile,
-                                       flow: provider.flow(profile: profile, configText: configText),
-                                       pid: pid, sessionLabel: label,
-                                       state: AwsLogin.current(byKey[key], needFailedAt: failedAt),
-                                       failedAt: failedAt,
-                                       account: provider == .aws ? AwsLogin.account(profile: profile, configText: configText) : nil,
-                                       provider: provider == .aws ? nil : provider))
-        }
-        // Logins started by hand (no session asked) still show while they
-        // run or after they fail; one a session asked for belongs with
-        // that session's need and goes when the need does.
-        for state in awsLoginStates where !needed.contains(state.runKey) && state.phase != .done
-            && state.pid == nil {
-            items.append(AwsLogin.Item(profile: state.profile, flow: state.flow, pid: state.pid,
-                                       sessionLabel: nil, state: state,
-                                       account: state.providerOrAws == .aws ? AwsLogin.account(profile: state.profile, configText: configText) : nil,
-                                       provider: state.provider))
-        }
-        // A need that just appeared goes out now: the mirror snapshot and
-        // the phone's alert ride the fleet poll, up to a minute away. The
-        // first scan after launch only seeds (its needs are old news).
-        func key(_ item: AwsLogin.Item) -> String { "\(item.id)|\(Int(item.failedAt?.timeIntervalSince1970 ?? 0))" }
-        let known = Set(awsLogins.map(key)), seeded = awsLoginsScanned
-        let news = items.contains { $0.pid != nil && !known.contains(key($0)) }
         if items != awsLogins { awsLogins = items }
-        if sessionProgress.scanned { awsLoginsScanned = true }
-        if news, seeded, !isPlayground, awsNeedRefresh == nil {
+        // A run that just reached a phase with something to show (a URL
+        // or a user code) goes out now — the mirror snapshot and the
+        // phone's alert otherwise ride the fleet poll, up to a minute
+        // away. Re-keyed per run (not per item), so moving from
+        // `starting` to `waitingForCode` still counts as new: `key()`
+        // does not change across that move.
+        let waiting = Set(awsLoginStates.filter { $0.phase == .waitingForBrowser || $0.phase == .waitingForCode }.map(\.runKey))
+        awsAnnouncedRunKeys.formIntersection(Set(awsLoginStates.filter { $0.phase != .done }.map(\.runKey)))
+        let fresh = waiting.subtracting(awsAnnouncedRunKeys)
+        awsAnnouncedRunKeys.formUnion(waiting)
+        if !fresh.isEmpty, !isPlayground, awsNeedRefresh == nil {
             mirrorExportDue = true
             awsNeedRefresh = Task { [weak self] in
                 await self?.refreshSnapshot()
                 self?.awsNeedRefresh = nil
-            }
-        }
-        probeAwsNeeds()
-    }
-
-    /// A need met outside the app — `aws login` in a terminal, or the
-    /// ledger's done login past its day (#313) — has no login of the
-    /// app's to clear it, and an idle session never scrolls the failing
-    /// result out of its transcript (Overlord, 2026-09-07). So while a
-    /// session need shows unmet, the CLI is asked whether the profile
-    /// works: on the need's arrival and every `awsProbeInterval` after.
-    /// No nudge on a hit — the session may have moved on hours ago.
-    private var unmetAwsNeeds: [AwsLogin.Item] {
-        var seen = Set<String>()
-        return awsLogins.filter { $0.pid != nil && ($0.state == nil || $0.state?.phase == .failed) && seen.insert($0.runKey).inserted }
-    }
-    private func probeAwsNeeds() {
-        if unmetAwsNeeds.isEmpty { awsProbeTask?.cancel(); awsProbeTask = nil; return }
-        guard awsProbeTask == nil else { return }
-        awsProbeTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                for item in self.unmetAwsNeeds {
-                    let provider = item.providerOrAws, profile = item.profile
-                    guard await AwsLoginRunner.signedIn(provider: provider, profile: profile), !Task.isCancelled else { continue }
-                    await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: "a sign-in outside the app")
-                    self.logMirrorInput("🔐", "\(provider.cliName) login for \(profile) done outside the app")
-                }
-                try? await Task.sleep(for: .seconds(Self.awsProbeInterval))
             }
         }
     }
@@ -1746,7 +1444,7 @@ final class AppModel: ObservableObject {
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
         var flow: AwsLogin.Flow = local ? .local : provider.flow(profile: profile, configText: configText)
         if remote == true, flow == .relay { flow = .remote }
-        let reply = await awsLoginRunner.start(provider: provider, profile: profile, flow: flow, pid: pid)
+        let reply = await awsLoginRunner.start(provider: provider, profile: profile, flow: flow)
         logMirrorInput(reply.ok ? "🔐" : "⚠️",
                        reply.ok ? "\(provider.cliName) login started for \(profile) (\(flow.rawValue))"
                                 : "\(provider.cliName) login for \(profile): \(reply.error ?? "failed")")
@@ -1766,33 +1464,9 @@ final class AppModel: ObservableObject {
         await awsLoginRunner.submit(provider: provider, profile: profile, code: code)
     }
 
-    /// The login landed: clear whatever of the session's own logins were
-    /// waiting on it and log the sign-in — the terminal is no longer
-    /// nudged to continue (#1041).
+    /// The login landed: log the sign-in.
     private func awsLoginLanded(_ state: AwsLogin.State) {
-        let provider = state.providerOrAws
-        logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) signed in")
-        // Every session that needed this profile, not only the one the
-        // login was started for (two sessions, one sign-in, 2026-09-04).
-        var pids = Set(sessionProgress.byPid.filter { $0.value.loginProfile(provider) == state.profile }.map(\.key))
-        if let pid = state.pid { pids.insert(pid) }
-        for pid in pids { releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: state.profile) }
-        // A login often signs other profiles in underneath — a broker
-        // profile over its anchor `aws login` profile, an SSO session
-        // several profiles share, gcloud's active account under a named
-        // one — and the config can't say which. Ask the CLI: whichever
-        // other outstanding profile works now is met.
-        let others = Set(sessionProgress.byPid.values.compactMap { $0.loginProfile(provider) }).subtracting([state.profile])
-        for profile in others {
-            Task { [weak self] in
-                guard await AwsLoginRunner.signedIn(provider: provider, profile: profile), let self else { return }
-                await self.awsLoginRunner.markDone(provider: provider, profile: profile, via: state.profile)
-                self.logMirrorInput("🔐", "\(provider.cliName) login for \(state.profile) also signed \(profile) in")
-                for (pid, progress) in self.sessionProgress.byPid where progress.loginProfile(provider) == profile {
-                    self.releaseAwsLoginAfterSignIn(pid: pid, provider: provider, profile: profile)
-                }
-            }
-        }
+        logMirrorInput("🔐", "\(state.providerOrAws.cliName) login for \(state.profile) signed in")
     }
 
     // MARK: crash reports (built-in, no third party — user 2026-09-04)
@@ -1831,48 +1505,6 @@ final class AppModel: ObservableObject {
                   let text = try? String(contentsOf: url, encoding: .utf8),
                   let report = CrashReport.fromIPS(text, device: machineName) else { continue }
             ingestCrash(report, announce: false)
-        }
-    }
-
-    /// Hands a report to a session as a message with the report attached
-    /// (text), the way the phone sends attachments — the session reads
-    /// the stack and triages it.
-    func sendCrash(_ report: CrashReport, toPid pid: Int) {
-        let text = "The Infinitus \(report.platform == "ios" ? "phone app" : "Mac app") had a \(report.kind) on "
-            + "\(report.device) (\(report.reason)). The report is attached — please triage it and propose a fix."
-        let attachment = SessionInput.Attachment(name: "crash-\(report.id.prefix(8)).txt", mime: "text/plain",
-                                                 data: Data(report.transcript.utf8))
-        let request = SessionInput.Request(kind: .message, text: text, attachments: [attachment])
-        Task { await send(request, toPid: pid, icon: "💥", what: "crash report") }
-    }
-
-    /// A message from this Mac into a session — a crash report, a
-    /// desktop capture (#69) — over the route phone messages take,
-    /// logged in Settings › Sync like them.
-    @discardableResult
-    func send(_ request: SessionInput.Request, toPid pid: Int, icon: String, what: String) async -> SessionInput.Reply {
-        let reply = await Task.detached(priority: .utility) { () -> SessionInput.Reply in
-            let claudeDir = ClaudeSessions.configHome()
-            guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { Int($0.pid) == pid }) else {
-                return SessionInput.Reply(outcome: "noSurface", detail: "that session is gone")
-            }
-            return SessionInput.deliver(request: request, record: record,
-                                        hosts: PtyHosts.available(), claudeDir: claudeDir)
-        }.value
-        logMirrorInput(reply.outcome == "delivered" ? icon : "⚠️", "\(what) → session \(pid): \(reply.outcome)")
-        return reply
-    }
-
-    private func releaseAwsLoginAfterSignIn(pid: Int, provider: AwsLogin.Provider = .aws, profile: String) {
-        guard provider == .aws else { return }
-        Task.detached(priority: .utility) { [weak self] in
-            // The session's own stuck `aws login` (#275) — gcloud's
-            // paste-back login has no callback to poke.
-            let released = await AwsLoginRunner.releaseSessionLogins(profile: profile, sessionPid: pid)
-            guard released > 0 else { return }
-            await MainActor.run { [weak self] in
-                self?.logMirrorInput("🔐", "session \(pid)'s own aws login for \(profile) released")
-            }
         }
     }
 
@@ -2430,19 +2062,6 @@ final class AppModel: ObservableObject {
         if !isPlayground {
             updateBattlePlan(list)
         }
-        // The footer's ⚡ tokens/minute needs the transcripts read even
-        // with the sessions card closed (user 2026-09-03 "display
-        // toks/m on bottom right status"). Every listed session, not
-        // just the busy ones: a session that hit the expired AWS
-        // sign-in has STOPPED on it and is idle by the time the scan
-        // runs (the aws-login sim never surfaced, 2026-09-03). Idle
-        // ones cost a stat each — the model skips any transcript
-        // whose size+mtime held still. Transcripts are Claude Code's
-        // own files, not the engine's: a mock-mode instance reads them
-        // too, so the e2e gate drives the AWS sign-in need off a fixture.
-        if !isPlayground, let live = primary.lastFleet?.liveSessions?.sessions {
-            sessionProgress.refresh(sessions: live)
-        }
         // Utilization history (todo 2026-09-01): every real snapshot
         // feeds the per-machine JSONL; the playground's fabricated
         // fleet must never pollute it — nor a mock-mode dev instance's
@@ -2474,7 +2093,6 @@ final class AppModel: ObservableObject {
             let forecast = forecast
             let plan = battlePlan
             let awsLogins = awsLogins
-            let progress = sessionProgress.byPid
             statsModel.refreshIfStale()
             let stats = statsModel.bundle
             // This Mac's own version, mirrored for the phone's Settings
@@ -2486,8 +2104,6 @@ final class AppModel: ObservableObject {
                 updateVersion: appUpdateVersion,
                 updateChannel: BrewUpdater.channel.rawValue,
                 phoneLatest: appReleaseLatest)
-            let timelineCache = timelineCache, attentionStore = attentionStore
-            let sequenceLog = sequenceLog, leases = mirrorServer.leases
             let mirrorNow = mirrorExportDue
             mirrorExportDue = false
             // A living UI keeps its lease; the cap only catches one that died.
@@ -2497,25 +2113,12 @@ final class AppModel: ObservableObject {
                                             serviceStatus: serviceStatus,
                                             engine: engine, fleets: allFleets,
                                             forecast: forecast, plan: plan,
-                                            awsLogins: awsLogins, progress: progress,
+                                            awsLogins: awsLogins,
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
                                             app: appInfo,
                                             projects: { self.projectSummaries() },
-                                            births: self.sessionBirths,
-                                            facts: { records in
-                                                // Only leased sessions get a timeline rebuild (#223
-                                                // phase 5); an unleased pid is absent from factsByPid
-                                                // and the phone falls back to today's rows.
-                                                let wanted = leases.leasedPids().map { pids in records.filter { pids.contains($0.pid) } } ?? records
-                                                let facts = timelineCache.facts(records: wanted, claudeDir: ClaudeSessions.configHome(),
-                                                                                attention: attentionStore, roster: records,
-                                                                                watched: leases.watchedPids()) { _ in [] }
-                                                // The Mac's own sessions card reads the same facts (phase 3).
-                                                Task { @MainActor [weak self] in self?.sessionProgress.setFacts(facts) }
-                                                return facts
-                                            },
-                                            sequence: sequenceLog, now: mirrorNow)
+                                            now: mirrorNow)
             }
         }
         // Death/revive ticks fired inside FleetState.apply.
@@ -2548,10 +2151,6 @@ final class AppModel: ObservableObject {
             let name = accounts.first(where: { $0.number == current })
                 .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(current)"
             notify("switched to account \(current) (\(name))")
-        }
-        if !isPlayground {
-            awake.update(wanted: keepAwake, display: keepAwakeDisplay,
-                         busyCount: list.liveSessions?.busy ?? 0)
         }
         controlServer.heal()
         // Same display-feed vantage as the switch diff above: these
@@ -2640,10 +2239,9 @@ final class AppModel: ObservableObject {
 
     /// The primary fleet's live sessions are the app's own scan when the
     /// engine reports none (#756: cswap's list carried them, swapd's does
-    /// not) — the keep-awake busy count, the token-rate/AWS-login scan,
-    /// the mirror's sessions block and the session→account attribution
-    /// all read this block off the primary fleet. Never in the playground
-    /// (demo data only).
+    /// not) — the mirror's sessions block and the session→account
+    /// attribution read this block off the primary fleet. Never in the
+    /// playground (demo data only).
     func withLocalSessions(_ fleet: EngineFleet, primary: Bool) -> EngineFleet {
         guard primary, fleet.liveSessions == nil, !isPlayground else { return fleet }
         return fleet.with(liveSessions: LiveSessions(records: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())))

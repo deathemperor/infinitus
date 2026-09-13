@@ -179,9 +179,9 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(StatsScanner.classifyUser(entry(#"{"type":"user","origin":{"kind":"task-notification"},"message":{"role":"user","content":"done"}}"#)), .machinery)
         XCTAssertEqual(StatsScanner.classifyUser(entry(#"{"type":"user","promptSource":"queued","message":{"role":"user","content":[{"type":"text","text":"also this"}]}}"#)), .human)
         XCTAssertEqual(StatsScanner.classifyUser(entry(#"{"type":"user","origin":{"kind":"human"},"message":{"role":"user","content":[{"type":"image","source":{}}]}}"#)), .human)
-        // Phone messages now carry the socket preface (PeerSocket.phonePreface);
+        // Phone messages now carry the socket preface (StatsScanner.peerPhonePreface);
         // sender is "Infinitus app". Bare "[Infinitus] ..." stays a nudge.
-        let phoneBody = PeerSocket.phonePreface.replacingOccurrences(of: "\n", with: "\\n") + "fix it"
+        let phoneBody = StatsScanner.peerPhonePreface.replacingOccurrences(of: "\n", with: "\\n") + "fix it"
         XCTAssertEqual(StatsScanner.classifyUser(entry(#"{"type":"user","origin":{"kind":"peer","from":"uds:/tmp/infinitus-1.sock"},"message":{"role":"user","content":"<cross-session-message from=\"uds:/tmp/infinitus-1.sock\" from-name=\"Infinitus\" from-mode=\"bypass\">\#(phoneBody)</cross-session-message>"}}"#)), .phone)
         XCTAssertEqual(StatsScanner.classifyUser(entry(#"{"type":"user","message":{"role":"user","content":"<cross-session-message from=\"uds:/tmp/infinitus-9.sock\" from-name=\"Infinitus app\" from-mode=\"bypass\">\nhello\n</cross-session-message>"}}"#)), .phone)
         XCTAssertEqual(StatsScanner.classifyUser(entry(#"{"type":"user","message":{"role":"user","content":"<cross-session-message from=\"uds:/tmp/cc-socks/2.sock\" from-name=\"Infinitus2\" from-mode=\"bypass\">\n[Infinitus] x\n</cross-session-message>"}}"#)), .agent)
@@ -988,10 +988,6 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(d.minutesLostToLimits, 30, accuracy: 0.01)
     }
 
-    func testAwsDoneNudgeCarriesThePrefix() {
-        XCTAssertTrue(AwsLogin.continueMessage(profile: "p", fromPhone: true).hasPrefix("[Infinitus] "))
-    }
-
     // MARK: fix wave 2026-09-04
 
     /// The shape Claude Code actually writes for a relayed message: a
@@ -1023,7 +1019,7 @@ final class StatsTests: XCTestCase {
         // (2) same, but the body carries the phone preface.
         XCTAssertEqual(StatsScanner.classifyUser(peerEntry(
             from: "uds:/tmp/infinitus-1.sock", name: "Infinitus",
-            body: PeerSocket.phonePreface + "look at the build",
+            body: StatsScanner.peerPhonePreface + "look at the build",
             origin: true)), .phone)
         // (3) no origin: the wrapper sits inside the preamble.
         XCTAssertEqual(StatsScanner.classifyUser(peerEntry(

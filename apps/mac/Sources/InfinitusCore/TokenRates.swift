@@ -229,3 +229,35 @@ public enum TokenRateScanner {
         return Double(days * 86_400 + hh * 3600 + mm * 60 + ss) + frac
     }
 }
+
+/// The fleet-wide output-token rate (user 2026-09-03 "display
+/// tokens/minute gauge on live activities, popup"). The live scan that
+/// fed this (a session's own transcript tail) is gone (#1041 d5); the
+/// type stays because `FleetMirror.tokenRate` and
+/// `UtilizationModel.Snapshot.liveRate` still carry it, always nil now.
+public struct TokenRate: Codable, Sendable, Equatable {
+    public let perMinute: Int
+    public let peakPerMinute: Int
+
+    public init(perMinute: Int, peakPerMinute: Int) {
+        self.perMinute = perMinute
+        self.peakPerMinute = max(peakPerMinute, perMinute)
+    }
+
+    /// 0…1 of peak for the gauge; a quiet fleet reads empty, not full.
+    public var fraction: Double {
+        peakPerMinute > 0 ? min(1, Double(perMinute) / Double(peakPerMinute)) : 0
+    }
+
+    /// "1.2k/min", "340/min".
+    public var label: String { count + "/min" }
+
+    /// The chip under a theme (#218): "1.2k mana/min", "340 baud".
+    public func label(theme: RowTheme) -> String {
+        theme.rateUnit.map { count + " " + $0 } ?? label
+    }
+
+    private var count: String {
+        perMinute >= 1000 ? String(format: "%.1fk", Double(perMinute) / 1000) : "\(perMinute)"
+    }
+}

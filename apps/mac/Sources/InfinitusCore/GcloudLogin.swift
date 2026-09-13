@@ -26,71 +26,6 @@ public enum GcloudLogin {
     /// account the failed command named).
     public static let adcProfile = "application-default"
 
-    // MARK: detection
-
-    /// What gcloud (core/credentials/exceptions.py, store.py) and the
-    /// google-auth library print when the credentials have lapsed or
-    /// were never there. Any match means "needs gcloud auth login".
-    static let expiredMarkers = [
-        "$ gcloud auth login",
-        "gcloud auth application-default login",
-        "there was a problem refreshing your current auth tokens",
-        "reauthentication required",
-        "reauthentication is needed",
-        "reauthentication failed",
-        "you do not currently have an active account selected",
-        "your default credentials were not found",
-        "could not automatically determine credentials",
-    ]
-
-    /// The failure must OPEN an output line (the AWS rule, 2026-09-03):
-    /// gcloud's errors and a Python traceback's last line sit at column
-    /// 0, the remediation line is indented by exactly two spaces; the
-    /// same words quoted from a source file, a grep hit or a Read
-    /// (line-numbered, indented) don't match.
-    static let expiredLineStarts = [
-        "error: (gcloud.",
-        "google.auth.exceptions.",
-        "reauthentication required",
-        "reauthentication is needed",
-        "  $ gcloud auth login",
-        "  $ gcloud auth application-default login",
-    ]
-
-    /// Which needs are about Application Default Credentials rather
-    /// than the CLI's user account.
-    static let adcMarkers = [
-        "application-default login",
-        "your default credentials were not found",
-        "could not automatically determine credentials",
-    ]
-
-    /// The credential a transcript excerpt says needs a login, or nil
-    /// when the text carries no lapsed-credentials signature:
-    /// `adcProfile`, or "default" — the caller swaps in the account the
-    /// failed command named (`profile(inCommand:)`).
-    public static func profile(in text: String) -> String? {
-        let lower = ASCIIScan.lowered(text)
-        guard expiredMarkerBytes.contains(where: { ASCIIScan.contains(lower, $0) }),
-              ASCIIScan.anyLineStarts(lower, with: expiredLineStartBytes) else { return nil }
-        return adcMarkerBytes.contains(where: { ASCIIScan.contains(lower, $0) }) ? adcProfile : "default"
-    }
-
-    private static let expiredMarkerBytes = expiredMarkers.map { Array($0.utf8) }
-    private static let expiredLineStartBytes = expiredLineStarts.map { Array($0.utf8) }
-    private static let adcMarkerBytes = adcMarkers.map { Array($0.utf8) }
-
-    /// The account the FAILED command addressed — `--account X` or
-    /// `CLOUDSDK_CORE_ACCOUNT=X` — for an error that names none. Nil
-    /// when the command names none (the CLI's active account, then).
-    public static func profile(inCommand command: String) -> String? {
-        let pattern = #"(?:--account[ =]|CLOUDSDK_CORE_ACCOUNT=)["']?([A-Za-z0-9._%+@-]+)"#
-        guard let re = try? NSRegularExpression(pattern: pattern),
-              let m = re.firstMatch(in: command, range: NSRange(command.startIndex..., in: command)),
-              let r = Range(m.range(at: 1), in: command) else { return nil }
-        return String(command[r])
-    }
-
     // MARK: running
 
     /// The CLI invocation. `.remote` is the paste-back prompt; `.relay`
@@ -106,15 +41,6 @@ public enum GcloudLogin {
         case .relay, .local: break
         }
         return args
-    }
-
-    /// Whether the credential works right now, by exit status only —
-    /// the command prints a token on success, so the runner keeps its
-    /// stdout on the null device.
-    public static func probeArguments(profile: String) -> [String] {
-        profile == adcProfile
-            ? ["auth", "application-default", "print-access-token"]
-            : ["auth", "print-access-token"] + (profile == "default" ? [] : ["--account", profile])
     }
 
     /// The paste-back prompt (SDK 552, 2026-09-09):
@@ -139,13 +65,6 @@ public enum GcloudLogin {
 
     public static func label(profile: String) -> String {
         profile == adcProfile ? "application default credentials" : profile
-    }
-
-    /// The message the session gets once the login lands (same path as
-    /// the AWS one).
-    public static func continueMessage(profile: String, fromPhone: Bool) -> String {
-        "[Infinitus] gcloud login for \(label(profile: profile)) completed\(fromPhone ? " from the phone" : ""). "
-            + "Retry the command that needed it and continue."
     }
 }
 
@@ -185,10 +104,5 @@ public extension AwsLogin.Provider {
     /// phone still starts the paste-back by default, `remote: true`).
     func flow(profile: String, configText: String) -> AwsLogin.Flow {
         self == .aws ? AwsLogin.flow(profile: profile, configText: configText) : .relay
-    }
-
-    func continueMessage(profile: String, fromPhone: Bool, released: Bool = false) -> String {
-        self == .aws ? AwsLogin.continueMessage(profile: profile, fromPhone: fromPhone, released: released)
-                     : GcloudLogin.continueMessage(profile: profile, fromPhone: fromPhone)
     }
 }

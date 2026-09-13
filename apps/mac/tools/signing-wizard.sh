@@ -316,34 +316,6 @@ else
   SKIPPED+=("GitHub secrets DEVELOPER_ID_P12_BASE64, DEVELOPER_ID_P12_PASSWORD, NOTARY_KEY_ID, NOTARY_ISSUER_ID, NOTARY_KEY_BASE64")
 fi
 
-# ── 5 ─────────────────────────────────────────────────────────────────────
-stage "Phone — device build on the team"
-say "ios/project.yml carries DEVELOPMENT_TEAM $TEAM_ID; the first build with"
-say "-allowProvisioningUpdates registers the bundle ids and mints one profile"
-say "per target (app, widgets, share extension). Xcode must be signed in to"
-say "the team (Settings → Accounts) — nothing to click otherwise."
-xcrun devicectl list devices 2>/dev/null | grep -E "physical|Identifier" || true
-ask DEVICE_UDID "Phone UDID to install on (blank = build only):"
-if [[ -n "$DEVICE_UDID" ]]; then write_env DEVICE_UDID "$DEVICE_UDID"; fi
-if confirm "Build the phone app now?"; then
-  # A named device as the destination is what registers a new phone on
-  # the team; generic/platform=iOS only signs for devices already there.
-  DEST="generic/platform=iOS"
-  [[ -n "$DEVICE_UDID" ]] && DEST="id=$DEVICE_UDID"
-  (cd ios && xcodegen generate >/dev/null && xcodebuild -quiet -skipPackagePluginValidation \
-      -project InfinitusMobile.xcodeproj -scheme InfinitusMobile \
-      -destination "$DEST" -derivedDataPath build \
-      -allowProvisioningUpdates build)
-  APP="ios/build/Build/Products/Debug-iphoneos/InfinitusMobile.app"
-  codesign -dvv "$APP" 2>&1 | grep TeamIdentifier || warn "the build is not team-signed"
-  if [[ -n "$DEVICE_UDID" ]]; then
-    xcrun devicectl device install app --device "$DEVICE_UDID" "$APP" \
-      && printf '  %s✓ installed%s on %s\n' "$GREEN" "$RESET" "$DEVICE_UDID"
-  fi
-else
-  SKIPPED+=("phone device build (cd ios && xcodebuild … -allowProvisioningUpdates build)")
-fi
-
 # ── 6 ─────────────────────────────────────────────────────────────────────
 stage "Push — APNs key for the phone's alerts (#70)"
 say "The Mac pushes its alerts to the phone with an APNs auth key. This is a"

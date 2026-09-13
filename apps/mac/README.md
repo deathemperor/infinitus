@@ -110,18 +110,16 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Themed menu bar** — the loop in the theme's color with its icon, a glow on switch, death and revival, an ember breath while burning ahead of pace.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
-- **Sessions & status chips** — the live Claude Code session count with its busy/idle split, engine status, auto-mode.
+- **Sessions & status chips** — the live Claude Code session count, engine status, auto-mode.
 - **Revival probes** — when a countdown ends the Mac asks the engine again at once, and "<account> is back" says so, flagged when Anthropic reset early.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
 - **Push notifications** — switch and limit events in Notification Center and on the phone.
 - **Pop-out window, compact mode, three layouts, popup scaling** — the pop-out remembers its spot.
-- **Sessions by name** — `/rename` names label the rows on the Mac and the phone, with branch, model, kind and output size.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
 - **Versions on the phone** — Settings shows both apps' versions, updates the Mac with one tap (brew builds), and says when a newer phone build is out.
-- **Session chat from the phone** — each transcript as a chat with markdown, tool chips and sub-agent cards; reply, attach photos and files, answer prompts.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
-- **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
+- **AWS and gcloud sign-in from the desktop app or the phone** — start `aws login` or `gcloud auth login` from the Accounts page or the phone (passkeys for AWS, a paste-back code for gcloud).
 - **Three engines** — swapd, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs. swapd is multi-provider: one fleet per provider it holds (Claude, Gemini CLI…), and igniting an account refreshes it at once.
 - **Priority mode** — `hold` or `interrupt` gives every fleet a headroom verdict (abundant / low / critical, with hysteresis on the active account's fullest window), so a client can pause background work before a window binds.
 - **Preferences over the socket** — `infinitusctl prefs` lists every setting with its type, choices, range and effect; `prefs set` changes one live, from the CLI, the phone or the desktop app.
@@ -131,22 +129,14 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Stats**, on the desktop app's Stats page — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
-- **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back, with the sessions waiting to resume.
-- **Share → Infinitus from any app** — images, files, a link or text into a session on any paired Mac with a note; your sessions sit in the share sheet's suggestions.
+- **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back.
 - **Chat headers in three styles** — compact, a stat strip, or Game HUD with a ringed portrait and HP/MP-style bars in the theme's colors.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
-- **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
+- **Crash reports, on-device** — both apps record their own crashes.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
 - **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
-- **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
-- **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
-- **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
-- **A browser page for machines without the app** — sessions list, chat with a session, at the "Copy Browser Link" address in Settings › Devices.
-- **Chat with a session** — from the desktop app (the sidebar's Sessions group, "Move to a thread") or the phone: the live transcript, a composer, its prompts answered.
-- **A feed that folds** — tool runs as one line to open, finished turns folded behind "Worked for 13s", one live row while Claude works; the same rows on the Mac, the phone and the browser page.
-- **New phone screens (preview)** — Settings › Appearance › "New session screens": a flat thread list with shelves and search, a session as a chat thread with a task sheet under +, thread settings and a git pill.
 - **Ignite says what it did** — the plan line reports the window it started or why it failed, and the desktop app's Activity page keeps the log across relaunches.
-- **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, send, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf, and Infinitus desktop's projects and threads (`threads`, `thread show|send|new|interrupt|release`, `desktop status`); plus an agent-setup guide.
+- **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf, and Infinitus desktop's projects and threads (`threads`, `thread show|send|new|interrupt|release`, `desktop status`); plus an agent-setup guide.
 
 ## Privacy
 
