@@ -8,8 +8,14 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The sessions popover is gone: the footer chip, the live session list and the Start-a-session form left the menu bar app.
+- Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
+- Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
+- Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
+- `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.
+- A 5-hour reset that lands after midnight shows the time alone — the date only appears past a day out.
 - Rows an engine could not refresh say how old their numbers are instead of reading as current, on every engine rather than swapd alone.
 
 
@@ -41,6 +47,7 @@ publishes the matching section as the GitHub release body.
 
 ### Mac
 - An account that is out on one window (the 5h session, the week, or a model such as Fable) now shows that window's reset in its own place and keeps every other gauge visible, in the popup and on the cards.
+- The lock-screen Live Activity cards (the working card and the revival countdown) are gone; the phone's alert banners stay, and the revival time still arrives as one.
 - Resume nudges are gone: a terminal session a usage limit stopped is no longer typed a "continue" once an account works again (threads resume on their own in Infinitus desktop).
 - The Mac no longer nudges a terminal session after an AWS or gcloud sign-in from the phone; the sign-in itself is unchanged.
 

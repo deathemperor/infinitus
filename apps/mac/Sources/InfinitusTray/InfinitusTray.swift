@@ -194,8 +194,8 @@ struct InfinitusTray {
                                            over HTTP (Linux only); also ticks the
                                            away-push triggers (#13 parity) every S
                                            seconds (default 30) — env vars
-                                           INFINITUS_PUSH_SESSIONS_DONE/ALL_DEAD/
-                                           LAST_ALIVE/WAITING (default on) gate them
+                                           INFINITUS_PUSH_ALL_DEAD/LAST_ALIVE
+                                           (default on) gate them
       pair [--port N]                     print the pair URL (+ QR if qrencode is on PATH)
 
     Wire-up (packaging/omarchy/waybar-infinitus.jsonc):
@@ -351,26 +351,14 @@ struct InfinitusTray {
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
         let selectedSessions = Array(sessionRecords.prefix(6))
-        var progressCache = SessionProgressCache.load()
         var progressByPid: [Int: SessionProgress] = [:]
         let sessions = selectedSessions.map { record -> SessionPanelRow in
-            let stamp = SessionProgressCache.stamp(sessionId: record.sessionId,
-                                                   cwd: record.cwd, claudeDir: claudeDir)
-            let progress: SessionProgress
-            if let entry = progressCache[record.sessionId],
-               entry.size == stamp.size, entry.mtime == stamp.mtime {
-                progress = entry.progress
-            } else {
-                progress = SessionProgress.read(sessionId: record.sessionId,
+            let progress = SessionProgress.read(sessionId: record.sessionId,
                                                 cwd: record.cwd, claudeDir: claudeDir,
                                                 name: record.name)
-                progressCache[record.sessionId] = .init(size: stamp.size, mtime: stamp.mtime,
-                                                        progress: progress)
-            }
             progressByPid[Int(record.pid)] = progress
             return SessionPanelRow.make(record: record, progress: progress, now: now)
         }
-        SessionProgressCache.save(progressCache)
         return (sessions, progressByPid)
     }
 
@@ -594,10 +582,8 @@ struct InfinitusTray {
             guard let v = env[name] else { return true }
             return !["0", "false", "off"].contains(v.lowercased())
         }
-        return .init(sessionsDone: on("INFINITUS_PUSH_SESSIONS_DONE"),
-                     allDead: on("INFINITUS_PUSH_ALL_DEAD"),
-                     lastAlive: on("INFINITUS_PUSH_LAST_ALIVE"),
-                     waiting: on("INFINITUS_PUSH_WAITING"))
+        return .init(allDead: on("INFINITUS_PUSH_ALL_DEAD"),
+                     lastAlive: on("INFINITUS_PUSH_LAST_ALIVE"))
     }
 
     /// One `PushTriggers` tick off a freshly-collected list — mirrors
@@ -616,9 +602,7 @@ struct InfinitusTray {
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
                 worstPct: PushTriggers.worstPlanPct(a.usage)) }
-        let pushes = box.with { $0.tick(
-            busy: list?.liveSessions?.busy, total: list?.liveSessions?.total,
-            accounts: health, flags: flags, sessions: list?.liveSessions?.sessions) }
+        let pushes = box.with { $0.tick(accounts: health, flags: flags) }
         for msg in pushes { await deliverPush(msg) }
     }
 

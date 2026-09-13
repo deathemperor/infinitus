@@ -3,9 +3,9 @@ import InfinitusCore
 
 /// The browser client (#151): Linux and Windows have no Infinitus app,
 /// so the mirror serves one page at `GET /` — the sessions list, a chat
-/// with one session, Start a session — built on the same routes the
-/// phone uses (`/snapshot`, `/sessions/<pid>/tail` long-poll,
-/// `POST /sessions/<pid>/input`, `POST /sessions/start`). The pairing
+/// with one session — built on the same routes the phone uses
+/// (`/snapshot`, `/sessions/<pid>/tail` long-poll,
+/// `POST /sessions/<pid>/input`). The pairing
 /// token rides in `?t=` on the page's own URL and as a Bearer header
 /// on every call after that. Nothing external is loaded.
 enum MirrorWebClient {
@@ -47,8 +47,7 @@ h1 small { color: var(--muted); font-weight: normal; font-size: 12px; }
 .session .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .session .sub { grid-column: 2 / 4; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .session .st { color: var(--muted); font-size: 12px; }
-#start { border-top: 1px solid var(--line); padding: 10px 14px; display: grid; gap: 6px; }
-#start input, #compose textarea { width: 100%; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+#compose textarea { width: 100%; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
 button.primary { background: var(--accent); color: white; border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
@@ -89,12 +88,6 @@ button:disabled { opacity: .5; cursor: default; }
 <aside>
   <h1><span id="mac">Infinitus</span><small id="count"></small></h1>
   <div id="sessions"></div>
-  <form id="start">
-    <input id="cwd" list="cwds" placeholder="Folder for a new session (~/repo)" autocomplete="off">
-    <datalist id="cwds"></datalist>
-    <button class="primary" type="submit">Start a session</button>
-    <div id="startNote" style="color:var(--muted);font-size:12px"></div>
-  </form>
 </aside>
 <main>
   <div id="head"><button id="back">‹</button><span class="dot" id="hdot"></span><span class="name" id="hname">Pick a session</span><span class="sub" id="hsub"></span><button id="stop" hidden>Interrupt</button></div>
@@ -147,9 +140,8 @@ button:disabled { opacity: .5; cursor: default; }
       const snap = await r.json();
       const list = JSON.parse(atob(snap.listJSON));
       progress = snap.progressByPid || {};
-      snapshot = { machine: snap.machineName, sessions: (list.liveSessions && list.liveSessions.sessions) || [], cwds: snap.recentCwds || [] };
+      snapshot = { machine: snap.machineName, sessions: (list.liveSessions && list.liveSessions.sessions) || [] };
       $("mac").textContent = snapshot.machine || "Infinitus";
-      $("cwds").innerHTML = snapshot.cwds.map(c => `<option value="${esc(c)}">`).join("");
       renderSessions();
       if (pid) renderHead();
       if (wantPid !== null) { const p = wantPid; wantPid = null; open(p); }
@@ -307,16 +299,6 @@ button:disabled { opacity: .5; cursor: default; }
   };
   $("stop").onclick = () => send({ kind: "key", text: "esc" });
   $("back").onclick = () => { document.body.className = "list"; };
-  $("start").onsubmit = async e => {
-    e.preventDefault(); const cwd = $("cwd").value.trim(); if (!cwd) return;
-    $("startNote").textContent = "Starting…";
-    try {
-      const r = await fetch("/sessions/start", { method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: JSON.stringify({ cwd }) });
-      const reply = await r.json();
-      $("startNote").textContent = reply.outcome === "started" ? "Started (pid " + reply.pid + ")" : reply.outcome + (reply.detail ? " — " + reply.detail : "");
-      if (reply.outcome === "started") { $("cwd").value = ""; setTimeout(loadSnapshot, 1500); if (reply.pid) setTimeout(() => open(reply.pid), 1600); }
-    } catch (err) { $("startNote").textContent = "Start failed: " + err.message; }
-  };
   loadSnapshot(); setInterval(loadSnapshot, 5000);
 })();
 </script>

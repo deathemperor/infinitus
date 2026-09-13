@@ -7,15 +7,14 @@ final class ProjectSummaryTests: XCTestCase {
         let new = Date(timeIntervalSince1970: 2_000)
         let live = [ClaudeSessionRecord.fixture(pid: 1, cwd: "/Users/x/death/limitless/", startedAt: new),
                     ClaudeSessionRecord.fixture(pid: 2, cwd: "/Users/x/death/limitless", startedAt: old)]
-        let past = [PastSession.fixture(cwd: "/Users/x/death/banyan", lastActivityAt: old)]
-        let out = ProjectSummary.derive(live: live, past: past, profiles: [], recentCwds: ["/tmp/scratch"],
+        let out = ProjectSummary.derive(live: live, recentCwds: ["/tmp/scratch"],
                                         branch: { $0.hasSuffix("limitless") ? "main" : nil })
-        XCTAssertEqual(out.map(\.name), ["limitless", "banyan", "scratch"])
+        XCTAssertEqual(out.map(\.name), ["limitless", "scratch"])
         XCTAssertEqual(out[0].cwd, "/Users/x/death/limitless")
         XCTAssertEqual(out[0].liveCount, 2)
         XCTAssertEqual(out[0].branch, "main")
         XCTAssertEqual(out[0].lastActivityAt, new)
-        XCTAssertNil(out[2].lastActivityAt)
+        XCTAssertNil(out[1].lastActivityAt)
         XCTAssertEqual(out[0].id, ProjectSummary.projectId(cwd: "/Users/x/death/limitless/"))
     }
 
@@ -40,12 +39,5 @@ extension ClaudeSessionRecord {
         ClaudeSessionRecord(pid: pid, sessionId: "s\(pid)", cwd: cwd, kind: "interactive",
                             status: "idle", messagingSocketPath: "", peerProtocol: 0,
                             name: nil, statusUpdatedAt: startedAt, entrypoint: nil)
-    }
-}
-
-extension PastSession {
-    static func fixture(cwd: String, lastActivityAt: Date) -> PastSession {
-        PastSession(sessionId: "s", cwd: cwd, repo: URL(fileURLWithPath: cwd).lastPathComponent,
-                    firstMessage: "", lastActivityAt: lastActivityAt, bytes: 0, live: false)
     }
 }

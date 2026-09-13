@@ -35,8 +35,7 @@ public struct ProjectSummary: Codable, Sendable, Equatable, Identifiable {
     /// `live`'s date is `ClaudeSessionRecord.statusUpdatedAt` — the record
     /// carries no session-start timestamp, so the most recent status
     /// change is the closest available "last touched" for a live cwd.
-    public static func derive(live: [ClaudeSessionRecord], past: [PastSession],
-                              profiles: [SessionProfile], recentCwds: [String],
+    public static func derive(live: [ClaudeSessionRecord], recentCwds: [String],
                               branch: (String) -> String? = { _ in nil }) -> [ProjectSummary] {
         struct Acc { var live = 0; var last: Date? }
         var byCwd: [String: Acc] = [:]
@@ -49,8 +48,6 @@ public struct ProjectSummary: Codable, Sendable, Equatable, Identifiable {
             byCwd[key] = a
         }
         for r in live { touch(r.cwd, r.statusUpdatedAt, live: true) }
-        for p in past { touch(p.cwd, p.lastActivityAt, live: false) }
-        for p in profiles { if let c = p.cwd { touch(c, nil, live: false) } }
         for c in recentCwds { touch(c, nil, live: false) }
         return byCwd.map { cwd, a in
             ProjectSummary(id: projectId(cwd: cwd), name: URL(fileURLWithPath: cwd).lastPathComponent,

@@ -11,41 +11,11 @@ final class SessionBirthTests: XCTestCase {
         XCTAssertEqual(moved.permissionMode, "acceptEdits")
         XCTAssertEqual(moved.identified(as: "sid").moved(to: nil).sessionId, "sid")
         XCTAssertEqual(moved.moved(to: nil).chip, "Review · Auto-accept edits")
-        XCTAssertLessThan(SessionStart.modeRank(nil), SessionStart.modeRank("acceptEdits"))
-        XCTAssertLessThan(SessionStart.modeRank("auto"), SessionStart.modeRank("bypassPermissions"))
+        XCTAssertLessThan(SessionModes.modeRank(nil), SessionModes.modeRank("acceptEdits"))
+        XCTAssertLessThan(SessionModes.modeRank("auto"), SessionModes.modeRank("bypassPermissions"))
         // A record written before hookMode existed still decodes.
         let old = try JSONDecoder().decode(SessionBirth.self, from: Data(#"{"permissionMode":"auto"}"#.utf8))
         XCTAssertEqual(old.effectiveMode, "auto")
-    }
-
-    func testBirthComesFromTheStartRequest() {
-        XCTAssertNil(SessionBirth(request: .init(cwd: "/r")))
-        XCTAssertNil(SessionBirth(request: .init(cwd: "/r", permissionMode: "nonsense")))
-        let born = SessionBirth(request: .init(cwd: "/r", permissionMode: "bypassPermissions", profile: "Review"))
-        XCTAssertEqual(born?.chip, "Review · Full access")
-        XCTAssertEqual(born?.isUnrestricted, true)
-        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", resume: "abc"))?.chip, "resumed")
-        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", resume: "abc", fork: true))?.chip, "forked")
-        XCTAssertNil(SessionBirth(request: .init(cwd: "/r", fork: true)), "a fork flag alone is not a birth worth a chip")
-        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", resume: "abc", permissionMode: "acceptEdits"))?.chip,
-                       "Auto-accept edits")
-    }
-
-    /// #151 follow-up: an owned session is worth a chip on its own, and the
-    /// host in the reply counts when the request left `headless` unset.
-    func testAHeadlessStartIsAChipOfItsOwn() throws {
-        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r", headless: true))?.chip, "headless")
-        XCTAssertEqual(SessionBirth(request: .init(cwd: "/r"), host: "owned")?.chip, "headless")
-        XCTAssertNil(SessionBirth(request: .init(cwd: "/r"), host: "terminal"))
-        let supervised = SessionBirth(request: .init(cwd: "/r", permissionMode: "manual", headless: true))
-        XCTAssertEqual(supervised?.chip, "Ask every time · headless")
-        XCTAssertEqual(supervised?.moved(to: "acceptEdits").chip, "Auto-accept edits · headless")
-        XCTAssertEqual(supervised?.identified(as: "s").headless, true)
-        // A record written before `headless` existed still decodes, chip unchanged.
-        let old = try JSONDecoder().decode(SessionBirth.self, from: Data(#"{"permissionMode":"auto"}"#.utf8))
-        XCTAssertEqual(old.chip, "Auto")
-        XCTAssertEqual(SessionStart.modeRank("manual"), 0)
-        XCTAssertTrue(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: nil, permissionMode: "manual").contains("--permission-mode manual"))
     }
 
     func testStoreRoundTripsAndPrunesDeadPids() throws {

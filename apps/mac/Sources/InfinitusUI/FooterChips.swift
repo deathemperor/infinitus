@@ -19,28 +19,20 @@ public struct FooterChips<M: FleetModel, P: SessionProgressSource,
     let status: ServiceStatusSummary?
     let onStatusTap: () -> Void
     let serviceChrome: Service
-    /// What the agent chip's popover shows. nil ⇒ the plain session list
-    /// (the phone); the mac hands in MacSessionsPopover so a row opens
-    /// its chat window and the past-sessions / driving lines appear —
-    /// without it a tap on a row did nothing (2026-09-07).
-    let sessionsCard: ((LiveSessions) -> AnyView)?
 
     public init(model: M, progress: P, status: ServiceStatusSummary?,
                 onStatusTap: @escaping () -> Void = {},
-                serviceChrome: Service,
-                sessionsCard: ((LiveSessions) -> AnyView)? = nil) {
+                serviceChrome: Service) {
         self.model = model
         self.progress = progress
         self.status = status
         self.onStatusTap = onStatusTap
         self.serviceChrome = serviceChrome
-        self.sessionsCard = sessionsCard
     }
 
     public var body: some View {
         HStack(spacing: 6) {
             serviceChip
-            agentChip
             tokenChip
             engineBadge
             Spacer().frame(width: 6)
@@ -76,34 +68,6 @@ public struct FooterChips<M: FleetModel, P: SessionProgressSource,
         }
         .buttonStyle(.plain)
         .modifier(serviceChrome)
-    }
-
-    /// Live Claude Code sessions on the host machine — they all ride the
-    /// active account's credential.
-    @ViewBuilder private var agentChip: some View {
-        if let live = model.liveSessions {
-            HStack(spacing: 3) {
-                Image(systemName: "brain")
-                    .font(PopupFont.caption)
-                    .foregroundStyle(live.busy > 0 ? Color.orange : Color.secondary)
-                Text(live.busy > 0 ? "\(live.busy) working · \(live.total)"
-                                   : "\(live.total)")
-                    .font(PopupFont.caption).monospacedDigit()
-                    .foregroundStyle(live.busy > 0 ? Color.orange : Color.secondary)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { model.sessionsShown.toggle() }
-            .popover(isPresented: Binding(get: { model.sessionsShown },
-                                          set: { model.sessionsShown = $0 }),
-                     arrowEdge: .bottom) {
-                if let sessionsCard {
-                    sessionsCard(live)
-                } else {
-                    SessionListCard(live: live, progress: progress)
-                }
-            }
-            .instantTip(SessionSummary.tooltip(live), edge: .above)
-        }
     }
 
     /// Output tokens per minute across the live sessions (user

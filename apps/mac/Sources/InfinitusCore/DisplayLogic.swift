@@ -289,13 +289,21 @@ public enum ResetLabel {
         return "\(Self.countdown(reset, now: now))·\(shortClock(reset, now: now, calendar: calendar))"
     }
 
-    /// "22:10" today, "Sep 4" on another day.
+    /// "22:10" within the day ahead, "Sep 4" further out.
     static func shortClock(_ reset: Date, now: Date, calendar: Calendar) -> String {
         let f = DateFormatter()
         f.calendar = calendar
         f.timeZone = calendar.timeZone
-        f.dateFormat = calendar.isDate(reset, inSameDayAs: now) ? "HH:mm" : "MMM d"
+        f.dateFormat = showsDate(reset, now: now) ? "MMM d" : "HH:mm"
         return f.string(from: reset)
+    }
+
+    /// A date earns its width only past 24 hours out. A 5h window that
+    /// crosses midnight resets on another calendar day but is still hours
+    /// away — its countdown already says which one, so "(Sep 14 03:00)"
+    /// was noise (user 2026-09-13, "5h reset: don't show date").
+    static func showsDate(_ reset: Date, now: Date) -> Bool {
+        reset.timeIntervalSince(now) >= 86400
     }
 
     /// De-spaced countdown: "5d7h", "1h44m", "12m".
@@ -313,11 +321,7 @@ public enum ResetLabel {
         let f = DateFormatter()
         f.calendar = calendar
         f.timeZone = calendar.timeZone
-        if calendar.isDate(reset, inSameDayAs: now) {
-            f.dateFormat = "HH:mm"
-        } else {
-            f.dateFormat = "MMM d HH:mm"
-        }
+        f.dateFormat = showsDate(reset, now: now) ? "MMM d HH:mm" : "HH:mm"
         return f.string(from: reset)
     }
 }

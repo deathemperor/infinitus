@@ -57,17 +57,8 @@ public enum PairedPhones {
         list.filter { $0.id != id }
     }
 
-    /// What a phone holds on this Mac, from its push registrations:
-    /// lock-screen cards (an update or push-to-start token of either
-    /// kind) and alerts.
+    /// What a phone holds on this Mac, from its push registrations.
     public static func pushSummary(_ kinds: Set<ActivityPushRegistration.Kind>) -> String {
-        let cards = !kinds.isDisjoint(with: [.working, .revival, .workingStart, .revivalStart])
-        let alerts = kinds.contains(.alert)
-        switch (cards, alerts) {
-        case (true, true): return "lock-screen cards + alerts"
-        case (true, false): return "lock-screen cards"
-        case (false, true): return "alerts"
-        case (false, false): return "no push tokens"
-        }
+        kinds.contains(.alert) ? "alerts" : "no push tokens"
     }
 }

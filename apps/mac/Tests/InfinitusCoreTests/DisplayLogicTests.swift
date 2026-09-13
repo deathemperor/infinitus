@@ -220,6 +220,15 @@ final class ResetLabelTests: XCTestCase {
         XCTAssertEqual(ResetLabel.label(w, now: now, calendar: utc), "2d 0h (Jan 3 08:00)")
     }
 
+    /// A 5h window that crosses midnight resets tomorrow but is hours
+    /// away — the countdown says which day, so no date.
+    func testCrossMidnightWithinADayKeepsTheClockAlone() throws {
+        let w = try window(#"{"pct": 98, "resetsAt": "2026-01-02T03:00:00Z"}"#)
+        let now = WeeklyRoll.parse("2026-01-01T22:04:00Z")!
+        XCTAssertEqual(ResetLabel.label(w, now: now, calendar: utc), "4h 56m (03:00)")
+        XCTAssertEqual(ResetLabel.compact(w, now: now, calendar: utc), "4h56m·03:00")
+    }
+
     func testMinutesOnly() throws {
         let w = try window(#"{"pct": 10, "resetsAt": "2026-01-01T12:59:30Z"}"#)
         let now = WeeklyRoll.parse("2026-01-01T12:15:00Z")!

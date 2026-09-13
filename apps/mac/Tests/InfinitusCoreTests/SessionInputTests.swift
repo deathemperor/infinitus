@@ -276,43 +276,4 @@ final class SessionInputTests: XCTestCase {
         XCTAssertEqual(reply.outcome, "rejected")
     }
 
-    func testSessionStartShellCommandQuotesEverything() {
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/Users/x/my repo", engine: nil, prompt: nil),
-                       "cd '/Users/x/my repo' && exec claude")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: "fix it's bug"),
-                       "cd '/r' && exec codex 'fix it'\\''s bug'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: "   "),
-                       "cd '/r' && exec claude")
-    }
-
-    func testSessionStartResumeNamesTheSessionForClaudeOnly() throws {
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1"),
-                       "cd '/r' && exec claude --resume 'abc-1'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "claude", prompt: "go on", resume: "abc-1"),
-                       "cd '/r' && exec claude --resume 'abc-1' 'go on'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, resume: "abc-1"),
-                       "cd '/r' && exec codex")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", fork: true),
-                       "cd '/r' && exec claude --resume 'abc-1' --fork-session")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, fork: true),
-                       "cd '/r' && exec claude", "a fork without a resume is a plain start")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: "go", permissionMode: "acceptEdits"),
-                       "cd '/r' && exec claude --permission-mode acceptEdits 'go'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, resume: "abc-1", permissionMode: "bypassPermissions"),
-                       "cd '/r' && exec claude --resume 'abc-1' --permission-mode bypassPermissions")
-        // Unknown modes never reach the command line; Codex has no such flag.
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: nil, permissionMode: "yolo; rm -rf /"),
-                       "cd '/r' && exec claude")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, permissionMode: "auto"),
-                       "cd '/r' && exec codex")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: nil, prompt: "go", model: "opus",
-                                                 systemPrompt: "Be terse. Don't say 'ok'."),
-                       "cd '/r' && exec claude --model 'opus' --append-system-prompt 'Be terse. Don'\\''t say '\\''ok'\\''.' 'go'")
-        XCTAssertEqual(SessionStart.shellCommand(cwd: "/r", engine: "codex", prompt: nil, model: "opus", systemPrompt: "x"),
-                       "cd '/r' && exec codex")
-        // A phone from before resume existed sends no such field.
-        let old = try JSONDecoder().decode(SessionStart.Request.self, from: Data(#"{"cwd":"/r"}"#.utf8))
-        XCTAssertEqual(old, SessionStart.Request(cwd: "/r"))
-        XCTAssertNil(old.resume)
-    }
 }

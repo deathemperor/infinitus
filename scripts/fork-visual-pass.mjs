@@ -6,7 +6,9 @@
  *   node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> [/route …]
  *
  *   --base-url <origin>   where routes are opened (default: the pair URL's origin)
- *   --cdp-port <n>        Chrome's remote-debugging port (default 9345)
+ *   --cdp-port <n>        Chrome's remote-debugging port (default 9345; a port
+ *                         another Chrome holds is fine — the browser we spawned
+ *                         is found by its own endpoint, never by the port)
  *   --profile <dir>       Chrome user-data dir (default: a temp dir, removed on exit)
  *   --settle-ms <n>       wait after a route mounts before the shot (default 15000)
  *   --mount-timeout-ms <n> give up waiting for a route to mount (default 90000; a
@@ -71,27 +73,49 @@ async function launchChrome({ cdpPort, profile }) {
     ],
     { stdio: ["ignore", "ignore", "pipe"] },
   );
-  // Chrome's last lines of stderr, for the error when the port never opens.
+  // Chrome's last lines of stderr, for the error when the port never opens —
+  // and for the endpoint it actually listens on, which is the only way to know
+  // the browser answering the port is ours. A second Chrome asked for a port
+  // another one already holds does not fail: it binds the same number on the
+  // other address family (IPv4 vs IPv6) and logs `bind() failed`, so probing
+  // `127.0.0.1:<port>` can hand us a concurrent run's browser and both passes
+  // then drive one page, shifting every capture onto the wrong route.
   let stderr = "";
-  child.stderr.on("data", (chunk) => {
-    stderr = (stderr + chunk).slice(-2000);
+  const endpoint = new Promise((resolve) => {
+    child.stderr.on("data", (chunk) => {
+      stderr = (stderr + chunk).slice(-2000);
+      const match = /DevTools listening on (ws:\/\/\S+)/.exec(stderr);
+      if (match) resolve(match[1]);
+    });
   });
   // A cold CI runner can take well over 10 s to bring the port up.
+  const exited = new Promise((resolve) => child.once("exit", () => resolve(null)));
+  const browserWsUrl = await Promise.race([endpoint, exited, sleep(30_000)]);
+  if (typeof browserWsUrl !== "string") {
+    child.kill();
+    throw new Error(
+      child.exitCode === null
+        ? `Chrome did not open its debugging port in 30 s\n${stderr}`
+        : `Chrome exited with ${child.exitCode}\n${stderr}`,
+    );
+  }
+  // Ask this browser for its own targets, over its own endpoint's origin.
+  const origin = new URL(browserWsUrl.replace(/^ws:/, "http:")).origin;
   for (let i = 0; i < 150; i++) {
     if (child.exitCode !== null) {
       throw new Error(`Chrome exited with ${child.exitCode}\n${stderr}`);
     }
     try {
-      const list = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
+      const list = await (await fetch(`${origin}/json/list`)).json();
       const page = list.find((target) => target.type === "page");
       if (page) return { child, wsUrl: page.webSocketDebuggerUrl };
     } catch {
-      // not listening yet
+      // not serving targets yet
     }
     await sleep(200);
   }
   child.kill();
-  throw new Error(`Chrome did not open its debugging port in 30 s\n${stderr}`);
+  throw new Error(`Chrome opened ${origin} but served no page target\n${stderr}`);
 }
 
 function connect(wsUrl) {
