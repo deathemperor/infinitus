@@ -340,9 +340,49 @@ const events = () => [
     icon: "arrow.triangle.2.circlepath",
     text: "Switched to ada-fixture",
   },
-  { id: "evt-2", at: isoIn(-1200), kind: "team", icon: "person.3", text: "Grace's Mac published" },
+  // One row of every kind the Mac logs, worded the way it words them
+  // (`AppModel.logEvent`'s call sites; `all exhausted` is `EngineEvent`'s
+  // default summary), so the Activity route's chips are all on screen and
+  // the visual pass can assert them (#1111).
   {
-    id: "evt-3",
+    id: "evt-2",
+    at: isoIn(-2700),
+    kind: "death",
+    icon: "heart.slash",
+    text: "grace-fixture hit a limit",
+  },
+  { id: "evt-3", at: isoIn(-2400), kind: "limit", icon: "battery.0percent", text: "all exhausted" },
+  {
+    id: "evt-4",
+    at: isoIn(-2100),
+    kind: "revival",
+    icon: "heart.fill",
+    text: "grace-fixture is back — reset early",
+  },
+  {
+    id: "evt-5",
+    at: isoIn(-1800),
+    kind: "ignite",
+    icon: "flag.checkered",
+    text: "ignited linus-fixture — window started, resets 11:17 PM",
+  },
+  {
+    id: "evt-6",
+    at: isoIn(-1500),
+    kind: "desktop",
+    icon: "key",
+    text: "desktop credential stored for http://127.0.0.1:3773",
+  },
+  {
+    id: "evt-7",
+    at: isoIn(-1350),
+    kind: "pairing",
+    icon: "🔑",
+    text: "phone pairing token regenerated",
+  },
+  { id: "evt-8", at: isoIn(-1200), kind: "team", icon: "person.3", text: "Grace's Mac published" },
+  {
+    id: "evt-9",
     at: isoIn(-300),
     kind: "other",
     icon: "sparkles",

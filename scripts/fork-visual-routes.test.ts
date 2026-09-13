@@ -51,8 +51,10 @@ describe("FORK_VISUAL_ROUTES", () => {
 
   it("uses markers a not-answering page cannot show", () => {
     for (const route of FORK_VISUAL_ROUTES) {
-      for (const shown of ALWAYS_ON_SCREEN) {
-        expect(shown.includes(route.marker), `${route.route}: "${route.marker}"`).toBe(false);
+      for (const phrase of [route.marker, ...(route.shows ?? [])]) {
+        for (const shown of ALWAYS_ON_SCREEN) {
+          expect(shown.includes(phrase), `${route.route}: "${phrase}"`).toBe(false);
+        }
       }
     }
   });
@@ -82,6 +84,20 @@ describe("routeFailures", () => {
       `shows "${ALWAYS_ABSENT[0]}"`,
     ]);
     expect(routeFailures(lock, "Re-lock · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
+  });
+
+  it("names each `shows` phrase the capture is missing, beside the marker", () => {
+    const activity = FORK_VISUAL_ROUTES.find((route) => route.route === "/activity")!;
+    expect(
+      routeFailures(activity, "Activity 8:46 PM ignite ignited linus-fixture — window"),
+    ).toEqual([
+      'missing "all out all exhausted"',
+      'missing "limit grace-fixture hit a limit"',
+      'missing "revival grace-fixture is back"',
+      'missing "desktop desktop credential stored"',
+      'missing "pairing phone pairing token"',
+      'missing "switch Switched to ada-fixture"',
+    ]);
   });
 
   it("fails a row humanised from a fork_ pref key the web has no copy for", () => {

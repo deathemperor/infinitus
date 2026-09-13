@@ -17,6 +17,9 @@ export interface ForkVisualRoute {
   readonly label: string;
   /** Text only the populated page shows. */
   readonly marker: string;
+  /** Further text the populated page must show, for a page whose render is
+      worth proving in more than one place; each is checked like `marker`. */
+  readonly shows?: ReadonlyArray<string>;
   /** Empty-state copy this page must not show, on top of `ALWAYS_ABSENT`. */
   readonly absent?: ReadonlyArray<string>;
 }
@@ -55,9 +58,22 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     absent: ["no engine reports accounts"],
   },
   {
+    // The fixture's log carries one row of every kind the Mac logs, so every
+    // chip is on screen. Each phrase here is a chip followed by the start of
+    // its own row's text — the capture joins a row's spans with a space — so
+    // a kind that lost its chip fails here, on the exact row, instead of
+    // reaching a screen unlabelled (#1111).
     route: "/activity",
     label: "Activity",
-    marker: "Every account change Infinitus made, newest first.",
+    marker: "all out all exhausted",
+    shows: [
+      "limit grace-fixture hit a limit",
+      "revival grace-fixture is back",
+      "ignite ignited linus-fixture",
+      "desktop desktop credential stored",
+      "pairing phone pairing token",
+      "switch Switched to ada-fixture",
+    ],
     absent: ["Nothing logged yet.", "Only polls so far"],
   },
   {
@@ -79,7 +95,9 @@ export function captureName(route: string): string {
 export function routeFailures(route: ForkVisualRoute, text: string | null): ReadonlyArray<string> {
   if (text === null) return ["no text capture"];
   const failures: string[] = [];
-  if (!text.includes(route.marker)) failures.push(`missing "${route.marker}"`);
+  for (const phrase of [route.marker, ...(route.shows ?? [])]) {
+    if (!text.includes(phrase)) failures.push(`missing "${phrase}"`);
+  }
   for (const phrase of [...ALWAYS_ABSENT, ...(route.absent ?? [])]) {
     if (text.includes(phrase)) failures.push(`shows "${phrase}"`);
   }
