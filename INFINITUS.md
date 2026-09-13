@@ -1475,7 +1475,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   is logged and answers no turns, which draws no line, rather than failing a
   cosmetic call. Client: `infinitus.ts`'s `liveTokenRate` query atom on the
   Utilization page's own cadence, and `infinitusUtilization.ts`'s
-  `liveRateText(u, server?)` — the server's rate wins whenever it has turns
+  `liveRateText(u, server?)` — the line reads "Live: ≈ N output tokens/min …
+  across N turns on this server" (the #834 "≈" rule: a five-minute
+  extrapolation is an estimate; the Mac's own line is left as it is, being
+  transitional). The server's rate wins whenever it has turns
   behind it, since the Mac's `liveRate` tails the terminal transcripts the
   session sweep (#1041) retires and goes permanently null. Zero turns is
   unknown, not zero, so it stands aside for a Mac that still reports one.

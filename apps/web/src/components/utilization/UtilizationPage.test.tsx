@@ -263,7 +263,7 @@ describe("UtilizationPage", () => {
 
     const markup = renderToStaticMarkup(<UtilizationPage />);
 
-    expect(markup).toContain("Live: 900 output tokens/min over the last 5 minutes");
+    expect(markup).toContain("Live: ≈ 900 output tokens/min over the last 5 minutes");
     expect(markup).toContain("across 3 turns on this server");
     expect(markup).not.toContain("Live: 1.5k output tokens/min");
   });

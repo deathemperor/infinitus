@@ -244,11 +244,11 @@ describe("run rate", () => {
 
     expect(
       liveRateText(mac, { windowMinutes: 5, turns: 3, outputPerMinute: 900, totalPerMinute: 4200 }),
-    ).toBe("Live: 900 output tokens/min over the last 5 minutes, across 3 turns on this server.");
+    ).toBe("Live: ≈ 900 output tokens/min over the last 5 minutes, across 3 turns on this server.");
     // One turn is not "1 turns".
     expect(
       liveRateText(mac, { windowMinutes: 5, turns: 1, outputPerMinute: 120, totalPerMinute: 800 }),
-    ).toBe("Live: 120 output tokens/min over the last 5 minutes, across 1 turn on this server.");
+    ).toBe("Live: ≈ 120 output tokens/min over the last 5 minutes, across 1 turn on this server.");
     // No turn in the window is unknown, not zero: the Mac still speaks while
     // it has a figure, and once its own field empties there is no line at all.
     expect(

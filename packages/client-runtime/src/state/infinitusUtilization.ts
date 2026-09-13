@@ -309,7 +309,10 @@ export function liveRateText(
 ): string | null {
   if (server !== undefined && server !== null && server.turns > 0) {
     const turns = server.turns === 1 ? "1 turn" : `${formatCount(server.turns)} turns`;
-    return `Live: ${compactTokens(server.outputPerMinute)} output tokens/min over the last ${server.windowMinutes} minutes, across ${turns} on this server.`;
+    // "≈" is the #834 rule for every usage figure on screen, and this one is a
+    // five-minute extrapolation, so it earns the mark more than most. The turn
+    // count rides along: it is what makes a small number readable.
+    return `Live: ≈ ${compactTokens(server.outputPerMinute)} output tokens/min over the last ${server.windowMinutes} minutes, across ${turns} on this server.`;
   }
   const live = u.liveRate;
   if (live === undefined || live === null) return null;
