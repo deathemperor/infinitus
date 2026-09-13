@@ -1,7 +1,7 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { forgetCommand, LIVE_ACTIVITY_TOKEN_KINDS } from "./liveActivity.logic";
+import { forgetCommand } from "./liveActivity.logic";
 import { forgetTokens, macToForget } from "./pushForget.logic";
 
 const mac = EnvironmentId.make("mac-1");
@@ -40,23 +40,18 @@ describe("macToForget", () => {
 });
 
 describe("forgetTokens", () => {
-  it("withdraws every kind under the phone's device id", async () => {
+  it("withdraws the kind under the phone's device id", async () => {
     const sent: string[] = [];
     await forgetTokens({
       environmentId: mac,
-      kinds: LIVE_ACTIVITY_TOKEN_KINDS,
+      kinds: ["alert"],
       run: async (input) => {
         sent.push(`${input.environmentId}:${input.input.options.forget}`);
         return { _tag: "Success" };
       },
       loadDeviceId: async () => "dev-1",
     });
-    expect(sent.sort()).toEqual([
-      "mac-1:dev-1/revival",
-      "mac-1:dev-1/revival-start",
-      "mac-1:dev-1/working",
-      "mac-1:dev-1/working-start",
-    ]);
+    expect(sent).toEqual(["mac-1:dev-1/alert"]);
   });
 
   it("swallows a refusing Mac and a missing device id", async () => {

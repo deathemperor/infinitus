@@ -7,21 +7,17 @@ import * as Schema from "effect/Schema";
 
 import type { InfinitusMac } from "../accounts/accountsRoute.logic";
 
-/** The token kinds this app registers: the four Live Activity ones and the
-    plain notification token (`alert`, #702), all through the same verb. */
-export type LiveActivityTokenKind =
-  | "working-start"
-  | "working"
-  | "revival-start"
-  | "revival"
-  | "alert";
+/** The token kind this app registers through the Mac's `activities-token`
+    verb: the plain notification token (`alert`, #702). The four Live Activity
+    kinds left with the Mac-driven cards (#1041). */
+export type LiveActivityTokenKind = "alert";
 
 /** Tokens are re-sent no more often than this unless they change. */
 export const TOKEN_RESEND_INTERVAL_MS = 60_000;
 
 const encodeRegistration = Schema.encodeSync(InfinitusActivityPushRegistration);
 
-/** The Mac that drives this phone's cards: the one the preference names when
+/** The Mac that sends this phone's alerts: the one the preference names when
     it is still paired and runs Infinitus, else the first such Mac. */
 export function pusherMac(
   preferredEnvironmentId: string | undefined,
@@ -69,14 +65,6 @@ export function registrationCommand(
     options: { body: JSON.stringify(encodeRegistration(body)) },
   };
 }
-
-/** The kinds the Live Activity switch owns; `alert` belongs to the Alerts switch. */
-export const LIVE_ACTIVITY_TOKEN_KINDS: ReadonlyArray<LiveActivityTokenKind> = [
-  "working-start",
-  "working",
-  "revival-start",
-  "revival",
-];
 
 /** The control command withdrawing one registration (#702): the Mac drops
     `<deviceId>/<kind>`, idempotently. A bundle before the verb (#712) refuses

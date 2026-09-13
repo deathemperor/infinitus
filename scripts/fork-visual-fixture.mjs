@@ -10,8 +10,8 @@
  *
  * The manifest and the preference catalog in `fork-visual-fixture.data.json`
  * are `infinitusctl manifest --json` / `prefs --json` captures with every
- * pref value reset to its default; accounts, sessions, the team, the profiles,
- * the forecast and the stats are made up. Secrets: none — every write verb
+ * pref value reset to its default; accounts, the profiles, the forecast and
+ * the stats are made up. Secrets: none — every write verb
  * and every unknown verb is refused with `ok: false`, and only verb names are
  * logged. No dependencies; node ≥ 22.
  */
@@ -133,22 +133,6 @@ const forecast = () => ({
   },
 });
 
-const sessions = () => [
-  {
-    pid: 4242,
-    name: "visual pass",
-    cwd: "/home/runner/work/app",
-    status: "idle",
-    kind: "interactive",
-    permissionMode: null,
-    profile: null,
-    sessionId: "00000000-0000-4000-8000-000000004242",
-    account: "ada-fixture",
-    startedAt: isoIn(-1800),
-    needs: [],
-  },
-];
-
 const profiles = () => ({
   profiles: [
     {
@@ -162,62 +146,6 @@ const profiles = () => ({
     { name: "docs-sweep", engine: "codex", prompt: "Read the docs folder and list what is stale." },
   ],
 });
-
-const teamStatus = () => {
-  const now = nowSeconds();
-  return {
-    id: "team-fixture",
-    name: "Lighthouse",
-    remote: "github.com/example/••••••",
-    kid: "kid-fixture-me",
-    role: "leader",
-    rev: 3,
-    members: [
-      {
-        kid: "kid-fixture-me",
-        name: "Ada's Mac",
-        role: "leader",
-        isMe: true,
-        founder: true,
-        lastPublished: now - 120,
-        kinds: ["fleet", "sessions"],
-        sessionsNow: 1,
-        blockers: [],
-        crashes: 0,
-        todayUSD: 12.5,
-        todayMessages: 40,
-        todayCommits: 3,
-      },
-      {
-        kid: "kid-fixture-grace",
-        name: "Grace's Mac",
-        role: "member",
-        isMe: false,
-        founder: false,
-        lastPublished: now - 900,
-        kinds: ["fleet"],
-        sessionsNow: 2,
-        blockers: ["waiting on a review"],
-        crashes: 0,
-        todayUSD: 4.25,
-        todayMessages: 12,
-        todayCommits: 1,
-      },
-    ],
-    requests: [
-      {
-        kid: "kid-fixture-linus",
-        name: "Linus's Mac",
-        platform: "macOS",
-        devices: ["iPhone"],
-        at: now - 600,
-      },
-    ],
-    lastFetch: now - 60,
-    lastPublish: now - 30,
-    lastError: null,
-  };
-};
 
 const tally = (n, usd) => ({
   n,
@@ -404,8 +332,6 @@ function answer(request, socketPath) {
       return fleets();
     case "forecast":
       return forecast();
-    case "sessions":
-      return sessions();
     case "prefs":
       // One verb for reads and writes; the fixture holds no state to write.
       return args[0] === "set" ? undefined : data.prefs;
@@ -425,24 +351,6 @@ function answer(request, socketPath) {
       return { clientId: "fixture" };
     case "lock-status":
       return { enabled: true, locked: false, relock: "5 min" };
-    case "team-status":
-      return teamStatus();
-    case "team-grants":
-      // One grant (#220) so the Team page's Session control section renders
-      // populated; team-grant / team-revoke are writes the fixture refuses.
-      return {
-        schema: 1,
-        grants: [
-          {
-            id: "g-fixture1",
-            audience: "leaders",
-            sessions: "all",
-            capabilities: ["send", "stop", "view"],
-            preauthorized: ["stop"],
-            since: Math.floor(Date.now() / 1000) - 3600,
-          },
-        ],
-      };
     default:
       return undefined;
   }

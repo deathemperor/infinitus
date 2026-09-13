@@ -176,11 +176,9 @@ describe("searchSettings", () => {
       "infinitus-animations",
       "infinitus-sessions",
       "infinitus-lock",
-      "infinitus-team",
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
-      "infinitus-profiles",
     ]);
     expect(available.map((item) => item.id).filter((id) => gatedIds.has(id))).toEqual([]);
   });
@@ -220,11 +218,9 @@ describe("searchSettings", () => {
       "infinitus-animations",
       "infinitus-sessions",
       "infinitus-lock",
-      "infinitus-team",
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
-      "infinitus-profiles",
     ]);
   });
 

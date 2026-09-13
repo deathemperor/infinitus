@@ -165,6 +165,21 @@ describe("ClaudeSettings auto-compaction", () => {
 });
 
 describe("ClientSettings notifications", () => {
+  it("keeps the fork's old banner toggles as optional inputs the patch never carries (#1032)", () => {
+    expect(decodeClientSettings({})).not.toHaveProperty("desktopNotifyOnApproval");
+    expect(decodeClientSettings({ desktopNotifyOnInput: false }).desktopNotifyOnInput).toBe(false);
+    expect(decodeClientSettings({ desktopNotifyOnCompletion: true })).not.toHaveProperty(
+      "desktopNotifyOnCompletion",
+    );
+    expect(decodeClientSettings({}).desktopBadgeAttention).toBe(true);
+    expect(decodeClientSettingsPatch({ desktopNotifyOnHeld: false })).not.toHaveProperty(
+      "desktopNotifyOnHeld",
+    );
+    expect(decodeClientSettingsPatch({ desktopBadgeAttention: false }).desktopBadgeAttention).toBe(
+      false,
+    );
+  });
+
   it("requires opt-in when existing settings omit notification preferences", () => {
     expect(decodeClientSettings({}).notificationMode).toBe("off");
     expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationMode");

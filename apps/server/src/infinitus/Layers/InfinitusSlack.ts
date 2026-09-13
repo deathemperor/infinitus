@@ -44,7 +44,6 @@ import {
   type SlackInbound,
   type SlackPost,
 } from "../Services/InfinitusSlackClient.ts";
-import { InfinitusSlackBindings } from "../Services/InfinitusSlackBindings.ts";
 import { OFFLINE_TEXT } from "./infinitusSlackSocket.logic.ts";
 import {
   activityLine,
@@ -82,7 +81,7 @@ const BindingsJson = fromJsonStringPretty(SlackThreadBindings);
 const decodeBindings = Schema.decodeUnknownEffect(BindingsJson);
 const encodeBindings = Schema.encodeEffect(BindingsJson);
 
-export const InfinitusSlackLive = Layer.effect(InfinitusSlackBindings)(
+export const InfinitusSlackLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const settings = yield* ServerSettingsService;
     const orchestrationEngine = yield* OrchestrationEngineService;
@@ -638,16 +637,5 @@ export const InfinitusSlackLive = Layer.effect(InfinitusSlackBindings)(
         yield* Deferred.succeed(loaded, undefined);
       }),
     );
-
-    // For the push bridge (#1020): a bound thread of an armed bridge reports
-    // in its own Slack thread, so the Mac's webhook post would be a second
-    // copy. Reads after the file has loaded, like every handler.
-    return InfinitusSlackBindings.of({
-      isBound: (threadId) =>
-        afterLoad(gate).pipe(
-          Effect.map(({ armed }) => armed && byThread.has(threadId)),
-          Effect.orElseSucceed(() => false),
-        ),
-    });
   }),
 );

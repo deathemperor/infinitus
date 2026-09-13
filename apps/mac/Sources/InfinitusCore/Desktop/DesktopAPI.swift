@@ -92,6 +92,17 @@ public struct DesktopAPI {
         public var interactionMode: String?
         public var messages: [Message]
     }
+    /// The thread route's reply: `{snapshotSequence, thread}` since upstream
+    /// paged the detail (#1048); a bare thread, what the route answered
+    /// before, still decodes so an older desktop keeps working.
+    private struct ThreadDetail: Decodable {
+        var thread: Thread
+        private enum CodingKeys: String, CodingKey { case thread }
+        init(from decoder: Decoder) throws {
+            let keyed = try decoder.container(keyedBy: CodingKeys.self)
+            thread = keyed.contains(.thread) ? try keyed.decode(Thread.self, forKey: .thread) : try Thread(from: decoder)
+        }
+    }
     public struct Hold: Decodable, Equatable {
         public var threadId: String
         public var since: String?
@@ -111,7 +122,8 @@ public struct DesktopAPI {
     public func shell() throws -> Shell { try decode(get("/api/orchestration/shell")) }
     /// `GET /api/orchestration/threads/:id?turnLimit=n`: one thread with its last `turnLimit` turns of messages.
     public func thread(_ id: String, turnLimit: Int) throws -> Thread {
-        try decode(get("/api/orchestration/threads/\(Self.segment(id))?turnLimit=\(max(1, turnLimit))"))
+        let detail: ThreadDetail = try decode(get("/api/orchestration/threads/\(Self.segment(id))?turnLimit=\(max(1, turnLimit))"))
+        return detail.thread
     }
     /// `GET /api/infinitus/holds`: the threads the desktop holds (#616); a desktop without the route holds nothing.
     public func holds() throws -> [Hold] {

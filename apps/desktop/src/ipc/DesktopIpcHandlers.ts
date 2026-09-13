@@ -74,7 +74,7 @@ import {
   setInfinitusQuitWithApp,
   submitInfinitusSignInCode,
 } from "./methods/infinitus.ts";
-import { postNotification, setBadgeCount } from "./methods/notifications.ts";
+import { setBadgeCount } from "./methods/notifications.ts";
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
@@ -134,7 +134,6 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(closeInfinitusSignIn);
   yield* ipc.handle(submitInfinitusSignInCode);
   yield* ipc.handle(consumeInfinitusDeepLink);
-  yield* ipc.handle(postNotification);
   yield* ipc.handle(setBadgeCount);
 
   yield* ipc.handle(pickFolder);

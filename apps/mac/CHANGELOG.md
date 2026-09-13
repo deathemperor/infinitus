@@ -8,11 +8,18 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Desktop
+- Thread alerts are no longer pushed through the Mac to Slack and Telegram; the "Push thread alerts through Infinitus" switch is gone (#1041).
+- Terminal sessions are gone from the app — no Sessions group, session prompts, waiting-session toasts or "Move to a thread"; the Settings › Infinitus › Team page is gone too. Infinitus is about threads.
+- Settings › Infinitus › Profiles is gone with the terminal sessions it started; the Sessions page is now "Priority", at the same place (#1041).
+- Thread notifications and sounds are one set of settings again: Settings › General › Thread notifications covers approvals, questions, held and failed sessions and finished turns, the Dock badge keeps its own switch, and the old desktop toggles and completion sound are carried over once (#1032).
 - A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
 - "Install when they finish" now carries over to a newer release that arrives while it waits, instead of being dropped without a word (#1037).
+- `infinitusctl thread show` and `thread send --wait` read a thread again instead of failing with "unreadable reply" (#1048).
 
 ### Phone
 - A connection switched off no longer shows "Connected via <host>" above its Off status; the roaming line comes back with the switch (#663).
+- The home chip no longer counts terminal sessions waiting on a person; the phone is for threads (#1041).
+- The Mac-driven Live Activity is gone with its Settings switch and test card; a card drawn from thread phases is a follow-up (#1041).
 
 ## 0.5.0-alpha.6
 
