@@ -216,6 +216,48 @@ export const InfinitusUtilizationSample = Schema.Struct({
 });
 export type InfinitusUtilizationSample = typeof InfinitusUtilizationSample.Type;
 
+/** One closed weekly window generation (native's `WindowGeneration`): what the
+    account had used when its 7d — or per-model — window rolled over, and how
+    long before the reset that was last observed. The headroom that expired
+    with it is `100 - finalPct`. */
+export const InfinitusUtilizationGeneration = Schema.Struct({
+  email: Schema.String,
+  window: Schema.String,
+  resetAt: Schema.Finite,
+  finalPct: Schema.Finite,
+  observationGap: Schema.optionalKey(Schema.Finite),
+});
+export type InfinitusUtilizationGeneration = typeof InfinitusUtilizationGeneration.Type;
+
+/** One reconstructed 5h window (native's `FiveHourWindow`): a window starts on
+    the first request after the previous one expired, so `start` is derived
+    (`resetsAt - 18000`) and `peakPct` — not a final percentage — is what was
+    used, since a window's headroom idles rather than leaking. */
+export const InfinitusUtilizationFiveHourWindow = Schema.Struct({
+  email: Schema.String,
+  number: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+  start: Schema.Finite,
+  resetsAt: Schema.Finite,
+  peakPct: Schema.Finite,
+  samples: Schema.Finite,
+  closed: Schema.Boolean,
+});
+export type InfinitusUtilizationFiveHourWindow = typeof InfinitusUtilizationFiveHourWindow.Type;
+
+/** What the fleet actually did over the range (native's
+    `WindowPlanner.ReplayReport`), read back off the recorded samples.
+    `sawActiveFlag` is false for history written before the flag, where no
+    switch can be seen at all. */
+export const InfinitusUtilizationReplay = Schema.Struct({
+  from: Schema.Finite,
+  to: Schema.Finite,
+  switches: Schema.Finite,
+  coldSwitches: Schema.Finite,
+  stalledSeconds: Schema.Finite,
+  sawActiveFlag: Schema.optionalKey(Schema.Boolean),
+});
+export type InfinitusUtilizationReplay = typeof InfinitusUtilizationReplay.Type;
+
 /** Token totals of one run-rate period (native's `TokenRates.Totals`). */
 export const InfinitusUtilizationTotals = Schema.Struct({
   input: Schema.optionalKey(Schema.Finite),
@@ -229,9 +271,15 @@ export type InfinitusUtilizationTotals = typeof InfinitusUtilizationTotals.Type;
 
 /** The `utilization --days n` reply (#747): the recorded usage samples of the
     range, downsampled to `bucketSeconds`, the window names and accounts they
-    carry, the transcript run rate (`rates`, absent until the Mac has scanned)
-    and the popup's live output rate. The waste generations, five-hour windows,
-    replay and dry-run plan travel opaque: the page does not draw them yet.
+    carry, the window telemetry the Mac reconstructs (the weekly waste
+    generations and the five-hour windows, both off the FULL history since a
+    reset may predate the range; the replay of what the fleet did over the
+    range), the transcript run rate (`rates`, absent until the Mac has scanned)
+    and the popup's live output rate. The rows are each decoded on their own
+    (`Schema.Unknown` arrays folded by `infinitusUtilization.ts`), so a build
+    that words one of them differently loses that row, not the page. The
+    planner's dry run travels opaque: it proposes steps only the Mac can take,
+    and its action enum carries a Swift-shaped payload.
     Estimates read off the Mac, never billing truth. */
 export const InfinitusUtilization = Schema.Struct({
   days: Schema.Finite,
@@ -239,8 +287,8 @@ export const InfinitusUtilization = Schema.Struct({
   samples: Schema.Array(InfinitusUtilizationSample),
   windows: Schema.optionalKey(Schema.Array(Schema.String)),
   emails: Schema.optionalKey(Schema.Array(Schema.String)),
-  generations: Schema.optionalKey(Schema.Unknown),
-  fiveHourWindows: Schema.optionalKey(Schema.Unknown),
+  generations: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.Unknown))),
+  fiveHourWindows: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.Unknown))),
   replay: Schema.optionalKey(Schema.Unknown),
   dryRunPlan: Schema.optionalKey(Schema.Unknown),
   rates: Schema.optionalKey(

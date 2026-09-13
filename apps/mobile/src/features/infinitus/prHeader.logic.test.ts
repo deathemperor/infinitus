@@ -153,6 +153,13 @@ describe("prHeaderMenuItems", () => {
 
   it("labels a babysat thread by its rounds", () => {
     expect(babysitLabel({ since: "2026-09-12T00:00:00.000Z", rounds: 2 })).toBe("Babysitting 2/10");
+    expect(
+      babysitLabel({
+        since: "2026-09-12T00:00:00.000Z",
+        rounds: 10,
+        stoppedAt: "2026-09-12T01:00:00.000Z",
+      }),
+    ).toBe("Babysit stopped 10/10");
     expect(babysitLabel(null)).toBeNull();
     expect(babysitLabel(undefined)).toBeNull();
   });

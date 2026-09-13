@@ -34,6 +34,8 @@ export interface UpdatesHarnessOptions {
   readonly env?: Record<string, string | undefined>;
   readonly settings?: Partial<DesktopAppSettings.DesktopSettings>;
   readonly appVersion?: string;
+  /** Where a packaged build's `app-update.yml` is read from; missing by default. */
+  readonly resourcesPath?: string;
 }
 
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
@@ -160,7 +162,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     appVersion: options.appVersion ?? "1.2.3",
     appPath: "/repo",
     isPackaged: true,
-    resourcesPath: "/missing/resources",
+    resourcesPath: options.resourcesPath ?? "/missing/resources",
     runningUnderArm64Translation: false,
   }).pipe(
     Layer.provide(

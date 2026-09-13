@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { ThreadId, TurnId, type OrchestrationThreadShell } from "@t3tools/contracts";
 
 import {
+  bestOfMemberChanges,
   bestOfMemberStats,
   bestOfMemberStatus,
   bestOfMemberTitle,
@@ -147,5 +148,43 @@ describe("bestOfMemberStats (#269 B)", () => {
     expect(bestOfMemberStats(bare)).toBe("3 turns");
     expect(bestOfMemberStats({ ...usage, turns: 0 })).toBeNull();
     expect(bestOfMemberStats(undefined)).toBeNull();
+  });
+});
+
+describe("bestOfMemberChanges (#269 B)", () => {
+  it("sums the working tree into files and lines", () => {
+    expect(
+      bestOfMemberChanges({
+        hasWorkingTreeChanges: true,
+        workingTree: {
+          files: [
+            { path: "a.ts", insertions: 40, deletions: 7 },
+            { path: "b.ts", insertions: 2, deletions: 0 },
+          ],
+          insertions: 42,
+          deletions: 7,
+        },
+      }),
+    ).toBe("2 files, +42 −7");
+    expect(
+      bestOfMemberChanges({
+        hasWorkingTreeChanges: true,
+        workingTree: {
+          files: [{ path: "a.ts", insertions: 0, deletions: 1 }],
+          insertions: 0,
+          deletions: 1,
+        },
+      }),
+    ).toBe("1 file, +0 −1");
+  });
+
+  it("is null before the status arrives and while the tree is clean", () => {
+    expect(bestOfMemberChanges(null)).toBeNull();
+    expect(
+      bestOfMemberChanges({
+        hasWorkingTreeChanges: false,
+        workingTree: { files: [], insertions: 0, deletions: 0 },
+      }),
+    ).toBeNull();
   });
 });

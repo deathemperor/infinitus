@@ -37,9 +37,17 @@ public struct DesktopAPI {
     // MARK: wire shapes (the fields the verbs read; the rest is ignored)
 
     public struct Descriptor: Decodable, Equatable {
+        /// `platform` is an object (`packages/contracts/src/environment.ts`);
+        /// `environments` reports its `os`, which is what the field carried
+        /// when it was a bare string.
+        public struct Platform: Decodable, Equatable {
+            public var os: String?
+            public var arch: String?
+            public var machine: String?
+        }
         public var environmentId: String
         public var label: String
-        public var platform: String?
+        public var platform: Platform?
         public var serverVersion: String?
     }
     public struct Project: Decodable, Equatable {

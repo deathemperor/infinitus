@@ -490,19 +490,17 @@ export type SignInTool = "aws" | "gcloud";
     build adds. */
 export type SignInPhase = "idle" | "starting" | "waiting" | "done" | "failed";
 
-/** One lapsed profile. `sessions` are the labels of every session waiting on
-    it; `pid` is the most recently lapsed one, which the start command scopes
-    to. `deviceCode` says the flag-less flow finishes by itself once the code
-    is approved on any device; other flows need the Mac's own browser. `url`,
-    `userCode` and `message` are what the running login printed. */
+/** One lapsed profile. `deviceCode` says the flag-less flow finishes by
+    itself once the code is approved on any device; other flows need the Mac's
+    own browser. `url`, `userCode` and `message` are what the running login
+    printed. The Mac's terminal sessions are not read any more (#1041): which
+    session lapsed, and the `--pid` scope, left with them. */
 export interface SignInRowModel {
   readonly key: string;
   readonly tool: SignInTool;
   readonly toolLabel: string;
   readonly profile: string;
   readonly failedAt: string | null;
-  readonly sessions: ReadonlyArray<string>;
-  readonly pid: number | null;
   readonly deviceCode: boolean;
   readonly phase: SignInPhase;
   readonly url: string | null;
@@ -515,18 +513,6 @@ function signInPhase(state: InfinitusAwsLogin["state"]): SignInPhase {
   if (phase === undefined || phase === null) return "idle";
   if (phase === "starting" || phase === "done" || phase === "failed") return phase;
   return "waiting";
-}
-
-/** The session a lapsed item names, by the app's own label first and the
-    session list's name second; a session neither knows is its pid. */
-function waitingSessionLabel(snapshot: InfinitusSnapshot, item: InfinitusAwsLogin): string {
-  if (typeof item.sessionLabel === "string" && item.sessionLabel !== "") return item.sessionLabel;
-  const session =
-    item.pid === undefined || item.pid === null
-      ? undefined
-      : snapshot.sessions?.find((candidate) => candidate.pid === item.pid);
-  if (session?.name) return session.name;
-  return item.pid === undefined || item.pid === null ? "a session" : `pid ${item.pid}`;
 }
 
 function failedAtMs(item: InfinitusAwsLogin): number {
@@ -563,8 +549,6 @@ export function buildSignInRows(snapshot: InfinitusSnapshot): ReadonlyArray<Sign
       toolLabel: tool === "gcloud" ? "gcloud" : "AWS",
       profile: latest.profile,
       failedAt: typeof latest.failedAt === "string" ? latest.failedAt : null,
-      sessions: [...new Set(items.map((item) => waitingSessionLabel(snapshot, item)))],
-      pid: latest.pid ?? null,
       deviceCode: latest.flow === "deviceCode",
       phase: signInPhase(state),
       url: state?.url ?? null,
@@ -588,7 +572,6 @@ export function signInCommandArgs(row: SignInRowModel): {
 } {
   const options: Record<string, string> = {};
   if (!row.deviceCode) options.local = "true";
-  if (row.pid !== null) options.pid = String(row.pid);
   return {
     command: row.tool === "gcloud" ? "gcloud-login" : "aws-login",
     args: [row.profile],

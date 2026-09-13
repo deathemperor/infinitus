@@ -14,15 +14,6 @@ final class RowThemeLoadingTests: XCTestCase {
         }
     }
 
-    func testEveryBuiltInThemeNamesTheTeamTab() {
-        XCTAssertEqual(RowTheme.plainTabLabels["team"], "Team")
-        XCTAssertTrue(RowTheme.plainTabIcons["team"]?.hasPrefix("sf:") == true)
-        for theme in RowTheme.builtins where !theme.tabLabels.isEmpty {
-            XCTAssertNotNil(theme.tabLabels["team"], "\(theme.id) names sessions/fleet/settings but not team")
-            XCTAssertNotNil(theme.tabIcons["team"], "\(theme.id) lacks a team icon")
-        }
-    }
-
     func testOffAndUnthemedKeysFallBackToThePlainWords() {
         XCTAssertEqual(RowTheme.off.loadingWord("loading"), "Loading…")
         XCTAssertEqual(RowTheme.off.loadingWord("searching"), "Looking for the Mac…")

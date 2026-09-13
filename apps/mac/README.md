@@ -42,9 +42,9 @@ or flip the track in-app under About → Update channel):
 brew install --cask deathemperor/tap/infinitus@nightly
 ```
 
-Releases are Developer ID signed and notarized since 0.4.3, so they
-open like any other app. Nightly builds are ad-hoc signed: install
-those with `--no-quarantine` (or right-click → Open once).
+Releases are Developer ID signed and notarized since 0.4.3, and nightly
+builds are too since #1042 (they come out of the release workflow's own
+jobs), so both open like any other app.
 
 ### GitHub releases
 
@@ -68,8 +68,7 @@ one-click rotate — as a Waybar module or Quickshell plugin for
 [Omarchy](https://omarchy.org) and any Waybar desktop
 (see [`packaging/omarchy/`](packaging/omarchy/README.md)).
 The engine is the same `swapd` the Mac app drives (`swapd add`,
-`swapd auto`, `swapd list --json`); `serve`'s pushes post to the same
-Slack webhook / Telegram bot channels, from the env:
+`swapd auto`, `swapd list --json`):
 
 ```sh
 cargo install --git https://github.com/deathemperor/swapd swapd
@@ -112,17 +111,15 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
 - **Sessions & status chips** — the live Claude Code session count with its busy/idle split, engine status, auto-mode.
-- **Resume nudges** (opt-in) — sessions a limit stopped get a "continue" typed into their terminal or sent over the peer socket once an account works again; sub-agent limits get the same nudge once an account with headroom is active.
 - **Revival probes** — when a countdown ends the Mac asks the engine again at once, and "<account> is back" says so, flagged when Anthropic reset early.
 - **Cost estimates** — 7-day per-account API-list-price estimates, never billing truth.
 - **iCloud settings sync** and file export/import, never credentials.
-- **Push notifications** — switch and limit events to Slack, Discord, Telegram or a webhook; secrets over stdin, shown masked.
+- **Push notifications** — switch and limit events in Notification Center and on the phone.
 - **Pop-out window, compact mode, three layouts, popup scaling** — the pop-out remembers its spot.
 - **Sessions by name** — `/rename` names label the rows on the Mac and the phone, with branch, model, kind and output size.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
 - **Versions on the phone** — Settings shows both apps' versions, updates the Mac with one tap (brew builds), and says when a newer phone build is out.
 - **Session chat from the phone** — each transcript as a chat with markdown, tool chips and sub-agent cards; reply, attach photos and files, answer prompts.
-- **Allow for this session** — the phone's permission card can allow a tool for the rest of the session; with the plugin, that prompt never comes back.
 - **Start a session from the phone** — a repository, the engine, a first prompt; the Mac opens cmux or Terminal and the chat follows. Siri too.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the phone** — an expired `aws login` or `gcloud auth login` shows up on both, the phone runs it (passkeys for AWS, a paste-back code for gcloud), and the session is told to continue.
@@ -130,11 +127,10 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Priority mode** — `hold` or `interrupt` gives every fleet a headroom verdict (abundant / low / critical, with hysteresis on the active account's fullest window), so a client can pause background work before a window binds.
 - **Preferences over the socket** — `infinitusctl prefs` lists every setting with its type, choices, range and effect; `prefs set` changes one live, from the CLI, the phone or the desktop app.
 - **Devices** — every phone that has paired, with its route, when it was last seen and what it holds on this Mac, each with Forget.
-- **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`, `team-*`), and its server rides the companion's quick or named Cloudflare tunnel (`fork_tunnel_*`).
+- **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`), and its server rides the companion's quick or named Cloudflare tunnel (`fork_tunnel_*`).
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats**, on the desktop app's Stats page — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
 - **Sessions, named and narrated** — unnamed sessions get a Haiku title that follows the work; the phone opens on what's waiting, with Continue.
-- **A Claude Code plugin** — `infinitusctl plugin install`: hooks that reach the phone the moment a session needs you, an MCP server (`fleet_status`, `list_sessions`, `session_message`), `/infinitus:status` and `/infinitus:handoff`.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
 - **Capture the desktop into a session** — a region or window, a session, a note, delivered like a phone message.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
@@ -145,18 +141,10 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Crash reports, on-device** — both apps record their own crashes; any report can go into a session's chat for triage.
 - **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
 - **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
-- **Team (preview)** — a team on any git remote; members publish stats, sessions, chosen transcripts and their fleet — every account with tier, state and headroom — end-to-end encrypted to the people they pick, and leaders see who's on, who's blocked, who's about to run dry and what it costs per member, repo and model.
-- **Joining a team** — invite links and QR, team codes, `infinitus://join`, same-network discovery, and leader-initiated LAN invites accepted from Invitations; approve from the Mac; the phone's Team tab has its own Nearby (scan, request to join, invite, accept); Linux members use `infinitusctl team` alone.
-- **Share settings** — "off" per kind (stats, sessions, transcripts, crashes, fleet) keeps it on this machine entirely; a Mac picker chooses which recent sessions' transcripts go out; a publish shows its progress, and the plaintext copies it keeps are capped at 1 GB.
-- **Your team identity** — a local key behind Touch ID, a recovery key, a passphrase-sealed export.
-- **Team session control (preview)** — grant teammates the right to read, prompt, approve, switch modes or nudge chosen sessions on your Mac; every command is verified against the roster and the grant, audited, and shown as "<name> is driving" while it happens.
-- **Drive a granted session** — from a teammate's detail on the Mac or `infinitusctl team send|approve|mode|tail`; commands try LAN, then a tunnel, then wait in the team store for their next fetch, and each one reports its lane and outcome.
-- **Stable hostnames per member** — a leader with a Cloudflare API token mints `<name>.team.<zone>` for a member (Settings › Team › Hostnames or `infinitusctl team hostname give`); the tunnel token travels sealed in the team store, the member's Mac runs the tunnel, and removing them deletes the records.
 - **Parked** — the Mac asleep or away, the phone still shows the fleet and every transcript, and a message you send waits and goes out when it's back.
 - **Every Mac's chats** — a session under another paired Mac opens like any other; what you send goes to that Mac, and waits for it if it's away.
 - **Start on any Mac** — the "+" sheet, Past sessions and Siri's Start a session pick which paired Mac runs the session; a Mac that's away keeps its sessions on the phone, marked parked.
 - **Profiles** — the desktop app's Infinitus › Profiles settings save named ways to start a session (folder, engine, permissions, model, system prompt, first prompt, tools allowed without asking); the phone, Siri and the Mac's Start a session take one.
-- **Checkpoints** — every prompt checkpoints the repository as a hidden git ref (with the plugin); list them, diff one against now or restore it from `infinitusctl checkpoints`, the Mac or the phone.
 - **Review from the phone** — a turn's changes as hunks, a tap comments one, Approve or Request changes goes back to the session.
 - **Fork a session** — Past sessions on the Mac and the phone, or `infinitusctl resume-session --fork`, continue a transcript under a new session id.
 - **Start a session from the Mac** — the sessions popover takes a profile chip, folder, engine, permissions and a first prompt.
@@ -166,7 +154,6 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **A feed that folds** — tool runs as one line to open, finished turns folded behind "Worked for 13s", one live row while Claude works; the same rows on the Mac, the phone and the browser page.
 - **New phone screens (preview)** — Settings › Appearance › "New session screens": a flat thread list with shelves and search, a session as a chat thread with a task sheet under +, thread settings and a git pill.
 - **Ignite says what it did** — the plan line reports the window it started or why it failed, and the desktop app's Activity page keeps the log across relaunches.
-- **Nearby on its own** — a discoverable Mac or a team member keeps the LAN listener up without the phone switch.
 - **`infinitusctl`** — an agent-facing control CLI: status, fleets, sessions, send, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf, and Infinitus desktop's projects and threads (`threads`, `thread show|send|new|interrupt|release`, `desktop status`); plus an agent-setup guide.
 
 ## Privacy
@@ -175,107 +162,11 @@ Everything stays on your machine (the phone talks straight to your Mac
 over routes you enable; the only thing that ever touches infinitus.run
 is a quick tunnel's URL, keyed by a hash of the pairing token — never
 the token, never usage). The app talks to the engine through
-`swapd … --json` subprocesses and never reads its files (resume nudges
-read Claude Code's own session records and transcripts, nothing of the
-engine's); usage-cost
+`swapd … --json` subprocesses and never reads its files (sessions and
+transcripts read Claude Code's own records, nothing of the engine's);
+usage-cost
 figures are estimates, never billing truth; push-notification secrets
 travel over stdin and render masked.
-
-## Team (preview)
-
-A team lives on a git remote you already have — GitHub, GitLab, a bare
-repo on a NAS. The store is untrusted: everything a member publishes is
-end-to-end encrypted to the readers that member picked, and the host
-sees file names and sizes only.
-
-### Create a team
-
-Settings › Team › Create, on the Mac. It wants an empty git remote and a
-way to push to it — a token with write access, best a fine-grained PAT
-scoped to that one repo, or an ssh URL this machine can already push.
-That token is embedded in every invite link and team code you hand out,
-so treat those like passwords: whoever holds one can write to the store
-until you rotate it.
-
-### Join
-
-An invite link, its QR, a team code or `infinitus://join/…` — from the
-Mac's Settings › Team or the phone's Team tab. Nearby, on either, finds
-a discoverable leader on the same network to request from — or a leader
-invites a discoverable machine straight from their Nearby list, and the
-invitee accepts it from Invitations. Turn on the lock first (the Team
-tab or, on the phone, the whole app): creating, joining and approving
-stay disabled until biometric unlock is on. An invite link approves the one request it was minted for by itself
-while the pane's auto-approve switch is on (it is by default); a team
-code always waits for a leader's Approve.
-
-### Members on Linux and Windows
-
-`infinitusctl team` runs in-process — no app, no control socket — so the
-CLI alone is a full member. Build it from source:
-[`packaging/linux/`](packaging/linux/README.md) and
-[`packaging/windows/`](packaging/windows/README.md).
-
-Join with the team code on stdin (it carries the store credential, and
-argv is world-readable):
-
-```sh
-infinitusctl team request - --name "Your Name"   # paste the code, then Ctrl-D
-```
-
-On the same network you can skip the code: `infinitusctl team nearby`
-lists discoverable machines, a leader invites one with `infinitusctl
-team nearby invite <kid|name> [--days N]`, and the invitee checks
-`infinitusctl team invites`, joins with `infinitusctl team accept <kid>
---name "Your Name"`, or drops it with `infinitusctl team ignore <kid>`.
-Or skip the invite and ask directly: `infinitusctl team request
---nearby <kid> --name "Your Name"`.
-
-Then run `infinitusctl team fetch` and `infinitusctl team publish` on a
-timer — a systemd user timer on Linux, a Scheduled Task on Windows, both
-in `packaging/`. Fetch first: it pulls the store, publish only pushes.
-
-```
-usage: infinitusctl team <subcommand> [args] [--option value]
-
-  create <name> --remote <url> [--token -] [--as <your name>]     create a team on an empty git remote (token from stdin)
-  code [--days N]                              team code for joiners (default 7 days)
-  request - --name <n> [--devices a,b]         ask to join; the code on stdin (argv only if it carries no credential)
-  status [--team <id>]                         this machine's team(s)
-  requests                                     pending join requests (leaders)
-  approve <kid> | decline <kid>                answer a request (leaders)
-  remove <kid> | promote <kid>                 roster edits (leaders; the founder cannot be removed)
-  fetch                                        pull the store and accept the roster
-  members [--period <p>]              every member's period totals (spend is an estimate), online, blockers, and what they share with you
-  member <kid> [--period day|week|month|year]  one member's Stats summary (default week)
-  insights [--period <p>]             leaderboards, repo coverage, blockers board, cost by member/model/repo, who's on, hours
-  aggregates                          the leaders' published team picture
-  aggregates publish [--period all|<p>]   (leaders) publish the team picture to the whole team
-  policy [--requests code|off] [--members-see-each-other on|off]   (leaders) show or set the roster policy
-  share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|sessions|transcripts|crashes|fleet ("off" keeps it on this machine; new envelopes — see reshare)
-  exclude <project-dir> [--off]                keep a Claude Code project private (local, never sent)
-  identity [show]                    this machine's identity kid
-  identity recovery --show           the recovery key (base32, 8 groups) — keep it offline
-  identity export [--out <file>]     passphrase on stdin (≥ 8 chars); the sealed file to --out (0600) or stdout
-  identity import <file> | --recovery [--replace]   passphrase or recovery key on stdin
-  publish [--projects <dir>] [--days N]        publish stats, now, sessions, redacted transcripts, crashes (default 30 days)
-  reshare [--days N]                           re-wrap the last N days (default 30) to the current audiences
-  put --kind <k> --path <p> --file <f> [--audience leaders|team|<kid,kid>]   one opaque file (debugging)
-  list                                         envelopes addressed to me
-  read <path> [--out <file>]                   decrypt one envelope
-
-Narrowing an audience cannot recall ciphertext teammates already fetched.
-```
-
-`infinitusctl team share <kind> off|leaders|team|<kid>` picks who sees
-each kind (`stats`, `now`, `sessions`, `transcripts`, `crashes`, `fleet`); "off"
-(Nobody) keeps that kind on this machine entirely. Which recent
-sessions' transcripts get shared is a Mac-only picker — Settings › Team
-› "Which sessions". A publish shows its progress in Settings › Team,
-and the plaintext copies it keeps are capped at 1 GB, oldest transcripts
-first. `infinitusctl team exclude <project-dir>` keeps a repository out
-of every publish. Leaving a team is a Mac action today — Settings ›
-Team › Leave.
 
 ## Build from source
 

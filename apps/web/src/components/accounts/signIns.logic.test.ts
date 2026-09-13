@@ -1,7 +1,7 @@
 import type { SignInRowModel } from "@t3tools/client-runtime/state/infinitusAccounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { signInButtonLabel, signInStatus, waitingSessionsLabel } from "./signIns.logic";
+import { signInButtonLabel, signInStatus } from "./signIns.logic";
 
 const row = (overrides: Partial<SignInRowModel> = {}): SignInRowModel => ({
   key: "aws:dev",
@@ -9,8 +9,6 @@ const row = (overrides: Partial<SignInRowModel> = {}): SignInRowModel => ({
   toolLabel: "AWS",
   profile: "dev",
   failedAt: "2026-09-10T08:00:00Z",
-  sessions: [],
-  pid: 101,
   deviceCode: true,
   phase: "idle",
   url: null,
@@ -54,11 +52,6 @@ describe("signInStatus", () => {
 });
 
 describe("row text", () => {
-  it("lists the waiting sessions", () => {
-    expect(waitingSessionsLabel([])).toBe("");
-    expect(waitingSessionsLabel(["api", "web"])).toBe("Waiting: api, web");
-  });
-
   it("offers the button only when nothing is running", () => {
     expect(signInButtonLabel(row())).toBe("Sign in");
     expect(signInButtonLabel(row({ phase: "failed" }))).toBe("Try again");

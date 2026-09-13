@@ -137,7 +137,7 @@ private struct DesktopVerbs {
         let d = try api.descriptor()
         desktopEmit(.array([.object([
             "id": .string(d.environmentId), "name": .string(d.label), "kind": .string("local"), "status": .string("reachable"),
-            "origin": .string(api.origin.absoluteString), "platform": d.platform.map(JSONValue.string) ?? .null,
+            "origin": .string(api.origin.absoluteString), "platform": d.platform?.os.map(JSONValue.string) ?? .null,
             "version": d.serverVersion.map(JSONValue.string) ?? .null,
         ])]))
         return 0

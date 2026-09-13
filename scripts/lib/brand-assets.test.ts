@@ -83,6 +83,9 @@ describe("brand-assets", () => {
     expect(resolveWebAssetBrandForPackageVersion("0.5.0-alpha.1")).toBe("infinitus");
     expect(resolveWebAssetBrandForPackageVersion("0.0.29-nightly.20260723.882")).toBe("nightly");
     expect(resolveWebAssetBrandForPackageVersion("0.0.40-infinitus.20260911.8")).toBe("infinitus");
+    expect(
+      resolveWebAssetBrandForPackageVersion("0.5.0-alpha.7-infinitus-nightly.20260913.42"),
+    ).toBe("infinitus");
   });
 
   it("maps fork web assets to the Infinitus icons", () => {

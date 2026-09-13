@@ -190,6 +190,7 @@ describe("DesktopEnvironment", () => {
     assert.equal(branding(false, "0.5.0-alpha.1"), PRODUCT_NAME);
     assert.equal(branding(false, "0.0.40-infinitus.20260910.5"), PRODUCT_NAME);
     assert.equal(branding(false, "0.0.40"), PRODUCT_NAME);
+    assert.equal(branding(false, "0.5.0-alpha.7-infinitus-nightly.20260913.42"), PRODUCT_NAME);
     assert.equal(branding(true, "0.5.0-alpha.1"), `${PRODUCT_NAME} (Dev)`);
     assert.equal(branding(false, "0.0.40-nightly.20260910.5"), `${PRODUCT_NAME} (Nightly)`);
   });

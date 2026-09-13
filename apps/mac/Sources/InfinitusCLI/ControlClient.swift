@@ -8,8 +8,7 @@ import InfinitusCore
 // main.swift).
 #if canImport(Darwin)
 /// One JSON line to the running app's control socket, one back. Shared
-/// by the top-level commands (main.swift), the MCP server and the
-/// `team` subcommands that defer to the app on a Mac (#354).
+/// by the top-level commands (main.swift) and the MCP server.
 enum ControlClient {
     /// errno of the last failed connect — what "not running" gets to say.
     nonisolated(unsafe) static var lastConnectErrno: Int32 = 0

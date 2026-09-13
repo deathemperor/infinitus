@@ -89,6 +89,14 @@ const CATALOG = {
       section: "display",
       effect: "restart" as const,
     },
+    {
+      key: "fork_server_port",
+      type: "int" as const,
+      default: 3773,
+      value: 3773,
+      section: "display",
+      effect: "live" as const,
+    },
   ],
 };
 
@@ -203,6 +211,16 @@ describe("InfinitusPrefsPanel states", () => {
     fake.snapshot = snapshot({ prefs: undefined });
     await renderPanel();
     expect(rendered()).toContain("no preference catalog (needs ≥ a6a18a94d)");
+  });
+
+  it("writes a numeric pref without thousands grouping", async () => {
+    await renderPanel();
+    const input = renderer!.root
+      .findAllByType("input")
+      .find((node) => node.props["aria-label"] === "Server port");
+    // A port is an identifier, not a quantity: the locale's grouping would
+    // put "3,773" in a field the user has to read back and retype.
+    expect(input?.props.value).toBe("3773");
   });
 
   it("draws the catalog's own rows and marks the ones off their default", async () => {

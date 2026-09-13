@@ -79,7 +79,6 @@ struct PanelEngine: Encodable {
 struct PanelRecovery: Encodable {
     let number: Int
     let at: String
-    let waiting: Int
 }
 
 /// A phone on the mirror (#9 parity with the Mac's device list).
@@ -466,17 +465,11 @@ struct InfinitusTray {
                     note: note, deadLine: deadLine, critical: critical,
                     windows: windows)
             }
-            // All-limited: the engine names the first account to recover;
-            // the waiting count reuses the resume mechanism's own
-            // stopped-session detection (Claude Code's files only —
-            // never engine internals).
+            // All-limited: the engine names the first account to recover.
             let claudeDir = ClaudeSessions.configHome()
             var panelRecovery: PanelRecovery?
             if list.nextCandidate == nil, let rec = recovery {
-                let stopped = Transcript.findStopped(
-                    sessions: ClaudeSessions.list(claudeDir: claudeDir), claudeDir: claudeDir)
-                panelRecovery = PanelRecovery(number: rec.number, at: rec.at,
-                                              waiting: stopped.count)
+                panelRecovery = PanelRecovery(number: rec.number, at: rec.at)
             }
             // Session progress rows (issue #13 step 4): busy/waiting
             // first (same ordering as the macOS wall's session board),
@@ -617,25 +610,10 @@ struct InfinitusTray {
         for msg in pushes { await deliverPush(msg) }
     }
 
-    /// One push, every way this box can deliver it: the away channels
-    /// the Mac posts to as well (#756 — a Slack webhook and/or a
-    /// Telegram bot, from the env, the tray's config channel) and the
-    /// desktop's notify-send. A refused post is one stderr line; the
-    /// next tick's message is not held back by it.
+    /// One push, every way this box can deliver it: the desktop's
+    /// notify-send.
     static func deliverPush(_ msg: String) async {
         logPhoneInput("🔔 \(msg)")
-        for (channel, request) in AwayPushWire.requests(text: msg, env: ProcessInfo.processInfo.environment) {
-            do {
-                let (_, response) = try await URLSession.shared.data(for: request)
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if !(200..<300).contains(code) { logPhoneInput("push via \(channel): HTTP \(code)") }
-            } catch {
-                // The code, not the description: a transport error's text
-                // may quote the URL, and Telegram's carries the token.
-                let code = (error as? URLError).map { "URLError \($0.code.rawValue)" } ?? "no reply"
-                logPhoneInput("push via \(channel): \(code)")
-            }
-        }
         if let notifySend = which("notify-send") {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: notifySend)
@@ -674,44 +652,6 @@ struct InfinitusTray {
         guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
         return cache.data(cwd: record.cwd) {
             try? JSONEncoder().encode(SlashCommands.discover(cwd: record.cwd, claudeDir: claudeDir))
-        }
-    }
-
-    /// `GET /sessions/<pid>/checkpoints` — the ladder, exactly as the
-    /// Mac's `checkpoints.list` handler answers it (no `enabled`/`inGit`:
-    /// the tray has no Display toggle to report).
-    static func answerCheckpointsList(pid: Int32, sessions: [ClaudeSessionRecord]) -> Data? {
-        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
-        let list = (try? Checkpoints.list(cwd: record.cwd, sessionId: record.sessionId)) ?? []
-        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
-        return try? encoder.encode(Checkpoints.Reply(sessionId: record.sessionId, cwd: record.cwd, checkpoints: list))
-    }
-
-    /// `GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>]`.
-    static func answerCheckpointDiff(pid: Int32, n: Int, to: Int?, sessions: [ClaudeSessionRecord]) -> Data? {
-        guard let record = sessions.first(where: { $0.pid == pid }),
-              let diff = try? Checkpoints.diff(cwd: record.cwd, sessionId: record.sessionId, from: n, to: to)
-        else { return nil }
-        return try? JSONEncoder().encode(diff)
-    }
-
-    /// `POST /sessions/<pid>/checkpoints/<n>/restore` — the restore arm of
-    /// the Mac's checkpoints box (`AppModel`), byte for byte: the current
-    /// state is checkpointed first, so the restore is undoable, and the
-    /// reply names that backup. A restore that fails is still a reply
-    /// (`outcome: "failed"` with the git error), so only an unknown pid is
-    /// the `nil` the route turns into a 404 — the same mapping the Mac's
-    /// route makes. The tray serves this since #486 slice 3 writes the
-    /// checkpoints, so `capabilities.checkpoints` is a whole claim.
-    static func answerCheckpointRestore(pid: Int32, n: Int, sessions: [ClaudeSessionRecord]) -> Data? {
-        guard let record = sessions.first(where: { $0.pid == pid }) else { return nil }
-        do {
-            let (restored, backup) = try Checkpoints.restore(cwd: record.cwd, sessionId: record.sessionId, n: n)
-            logPhoneInput("🕐 phone restored \(URL(fileURLWithPath: record.cwd).lastPathComponent) "
-                + "to checkpoint \(restored.subject)")
-            return try? JSONEncoder().encode(Checkpoints.RestoreReply(outcome: "restored", backup: backup?.n))
-        } catch {
-            return try? JSONEncoder().encode(Checkpoints.RestoreReply(outcome: "failed", detail: "\(error)"))
         }
     }
 
@@ -792,26 +732,6 @@ struct InfinitusTray {
     // out here (type-checked by a Mac build too), `serve` only binds the
     // socket and hands `ControlDispatch` these handlers.
 
-    /// Sessions whose first checkpoint has been logged — touched only from
-    /// the serial checkpoint queue `controlHandlers` hands work to.
-    nonisolated(unsafe) static var checkpointedSessions: Set<String> = []
-
-    /// The tray's `AppModel.recordCheckpoint`: one `Checkpoints.snapshot`
-    /// per prompt, the first one per session announced, an error swallowed
-    /// to a log line — a hook must never be told a checkpoint failed.
-    /// Runs on the checkpoint queue, never on the accept thread: git in a
-    /// big repository takes its time.
-    static func recordCheckpoint(cwd: String, sessionId: String, subject: String) {
-        let first = checkpointedSessions.insert(sessionId).inserted
-        let repo = URL(fileURLWithPath: cwd).lastPathComponent
-        do {
-            guard let made = try Checkpoints.snapshot(cwd: cwd, sessionId: sessionId, subject: subject) else { return }
-            if first { logPhoneInput("🕐 checkpointing \(repo) — \(made.subject)") }
-        } catch {
-            if first { logPhoneInput("⚠️ checkpoint of \(repo) failed: \(error)") }
-        }
-    }
-
     /// `infinitusctl status` against the tray: enough to prove whose
     /// socket answered and that it can see this box's sessions.
     static func controlStatus(appVersion: String = BuiltVersion.string) -> JSONValue {
@@ -821,26 +741,8 @@ struct InfinitusTray {
                         "sessions": .number(Double(sessions))])
     }
 
-    static func controlHandlers(queue: DispatchQueue, pushes box: PushBox,
-                                flags: PushTriggers.Flags) -> ControlDispatch.Handlers {
-        ControlDispatch.Handlers(
-            checkpoint: { cwd, sessionId, subject in
-                queue.async { recordCheckpoint(cwd: cwd, sessionId: sessionId, subject: subject) }
-            },
-            status: { controlStatus() },
-            sessionPid: { sessionId in
-                ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                    .first { $0.sessionId == sessionId }.map { Int($0.pid) }
-            },
-            hook: { event, pid in
-                // A Notification that needs a human goes out now, not on
-                // the next tick — which then skips the same pid
-                // (announceWaiting, the Mac's rule). Detached: the hook
-                // gets its reply first, Claude Code times hooks out.
-                guard let line = event.pushLine, flags.waiting else { return }
-                if let pid { box.with { $0.announceWaiting(pid: pid) } }
-                Task { await deliverPush(line) }
-            })
+    static func controlHandlers() -> ControlDispatch.Handlers {
+        ControlDispatch.Handlers(status: { controlStatus() })
     }
 
     /// `serve`'s push state, shared between its tick and the control
@@ -884,7 +786,7 @@ struct InfinitusTray {
         // design, so it never changes and is built once up front. `files`,
         // `timeline`, `sequence`, `checkpoints`, `attention` and `images`
         // are true; the tray still answers nothing else the Mac's newer
-        // routes (leases, team, …) cover.
+        // routes (leases, …) cover.
         //
         let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
             machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: BuiltVersion.string)))
@@ -1022,31 +924,6 @@ struct InfinitusTray {
                                               cache: commandsCache)
                 return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
             }
-            // #486 slice 2: GET /sessions/<pid>/checkpoints — the ladder.
-            if request.method == "GET", let pid = MirrorTransport.sessionCheckpointsPid(request.path) {
-                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                let response = answerCheckpointsList(pid: pid, sessions: sessions)
-                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
-            }
-            // #486 slice 2: GET /sessions/<pid>/checkpoints/<n>/diff[?to=<m>]
-            // and, since slice 3 writes checkpoints on Linux, POST
-            // …/restore — the same one path shape, the method telling them
-            // apart exactly as the Mac's route does. Both take a while
-            // (trees read, a worktree rewritten); one thread per connection
-            // here, so blocking is fine.
-            if let ref = MirrorTransport.sessionCheckpointRef(request.path),
-               request.method == (ref.action == .diff ? "GET" : "POST") {
-                let sessions = ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                let response: Data?
-                switch ref.action {
-                case .diff:
-                    let to = request.query(MirrorTransport.checkpointToQueryName).flatMap(Int.init)
-                    response = answerCheckpointDiff(pid: ref.pid, n: ref.n, to: to, sessions: sessions)
-                case .restore:
-                    response = answerCheckpointRestore(pid: ref.pid, n: ref.n, sessions: sessions)
-                }
-                return response.map(MirrorTransport.jsonResponse) ?? MirrorTransport.notFoundResponse()
-            }
             return MirrorTransport.notFoundResponse()
         }
         let bound: UInt16
@@ -1057,14 +934,12 @@ struct InfinitusTray {
         }
         print("infinitus-tray serve: listening on 0.0.0.0:\(bound), "
             + "pairing token \(MirrorPairing.mask(resolved))")
-        // #486 slice 3: the control socket beside the HTTP listener, so the
-        // plugin's hooks reach this box (`infinitusctl event`) and a Linux
-        // session's prompts record checkpoints. `event` and `status` only —
+        // #486 slice 3: the control socket beside the HTTP listener, so
+        // `infinitusctl status` reaches this box. `status` only —
         // `ControlDispatch` answers everything else with a considered no.
         // A bind that fails is logged, never fatal: the phone's mirror is
         // this process's job, the socket is the extra.
-        let checkpointQueue = DispatchQueue(label: "infinitus.tray.checkpoints")
-        let handlers = controlHandlers(queue: checkpointQueue, pushes: pushes, flags: pushFlags)
+        let handlers = controlHandlers()
         let controlPath = ControlProtocol.socketURL().path
         let control = PosixControlSocket(path: controlPath) {
             ControlDispatch.replyLine(to: $0, handlers: handlers)
