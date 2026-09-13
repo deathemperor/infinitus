@@ -599,7 +599,9 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`).
   Web: `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`:
   the draft's id is the first member, the rest are minted, titles carry the
-  model; `bestOfSiblings`, `bestOfMemberStatus`); `BestOfPicker.tsx` — the
+  model; `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats` off the
+  usage rollup, `bestOfMemberChanges` — "5 files, +42 −7" — off the vcs
+  status stream the sidebar row for that worktree already holds); `BestOfPicker.tsx` — the
   "Best of" control beside the model picker, checkboxes for the active
   provider's models, "Run N"; `ChatView.tsx` `onSend(…, bestOf)` starts one
   bootstrap turn per member (text only, no `titleSeed`) and pins each;

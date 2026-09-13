@@ -12,6 +12,7 @@ publishes the matching section as the GitHub release body.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
 - A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
 
 ## 0.5.0-alpha.7
