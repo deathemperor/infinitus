@@ -12,6 +12,8 @@ publishes the matching section as the GitHub release body.
 - Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
 - Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
 - Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
+- An account whose usage swapd could not refresh no longer pulses "resetting…" forever against a reset its frozen reading has already passed (#1118).
+- An expired token reads "token expired — deferred" instead of "retrying", which promised a retry the row could not see coming (#1118).
 - A 9Router account whose last error the app could not read no longer freezes the whole 9Router fleet on stale rows (#1095).
 - `infinitusctl`'s desktop verbs — projects, threads, `thread new`/`send`/`show` — work again instead of failing with "unreadable reply".
 - `infinitusctl 9router` reads the 9Router base URL, whether a password is stored and the error its last refresh failed with.

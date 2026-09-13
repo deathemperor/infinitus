@@ -133,6 +133,31 @@ final class StaleAgeTests: XCTestCase {
         XCTAssertNil(Account(number: 1, email: "a@b.c", stale: true, staleReason: "timeout").staleTip,
                      "no age, no sentence — same rule as the label")
     }
+
+    /// The shape that pulsed "resetting…" for 86 minutes (#1118): slot 12
+    /// was an hour into an `http-429` backoff, and the frozen snapshot it
+    /// kept serving named a reset that had already gone by. A live
+    /// countdown against that instant narrates a window nothing is
+    /// watching, so the row stops claiming to know it.
+    func testStaleResetIsUnknowableOnceItHasPassed() {
+        let now = WeeklyRoll.parse("2026-09-13T16:16:00Z")!
+        let stale = Account(number: 12, email: "a@b.c", usageAgeSeconds: 5190,
+                            stale: true, staleReason: "http-429")
+
+        XCTAssertFalse(stale.resetIsKnowable("2026-09-13T14:50:00Z", now: now),
+                       "the snapshot's reset is 86 min behind us and no fetch has confirmed it")
+        XCTAssertTrue(stale.resetIsKnowable("2026-09-13T16:30:00Z", now: now),
+                      "still ahead — the engine will likely refresh before it lands")
+
+        // A fresh row is always knowable: its reset is a measurement, not a
+        // memory, even once it passes (that's the real "resetting…").
+        let fresh = Account(number: 1, email: "a@b.c")
+        XCTAssertTrue(fresh.resetIsKnowable("2026-09-13T14:50:00Z", now: now))
+
+        // Nothing to judge: no reset on record, or an unparseable one.
+        XCTAssertTrue(stale.resetIsKnowable(nil, now: now))
+        XCTAssertTrue(stale.resetIsKnowable("not a date", now: now))
+    }
 }
 
 /// A dead row draws its dead line in the blocking window's own place
@@ -189,7 +214,10 @@ final class SentinelNotesTests: XCTestCase {
 
     func testShortFormsStayOneLine() {
         XCTAssertEqual(SentinelNotes.short(for: "relogin_required"), "re-login needed")
-        XCTAssertEqual(SentinelNotes.short(for: "token_expired"), "token expired — retrying")
+        // "Deferred", not "retrying": the row cannot see whether a retry is
+        // due, and a credential the engine gave up on says relogin_required
+        // instead — "retrying" read as a hang for hours (#1118).
+        XCTAssertEqual(SentinelNotes.short(for: "token_expired"), "token expired — deferred")
         // Already-short notes fall through to the full text.
         XCTAssertEqual(SentinelNotes.short(for: "api_key"), "API key (no quota)")
         XCTAssertEqual(SentinelNotes.short(for: "no_credentials"), "no credentials")
