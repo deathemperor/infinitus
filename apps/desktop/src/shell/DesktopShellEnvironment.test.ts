@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as PlatformError from "effect/PlatformError";
@@ -69,7 +70,20 @@ function runShellEnvironment(input: {
   readonly platform: NodeJS.Platform;
   readonly handler: (command: ChildProcess.Command) => string;
   readonly failure?: PlatformError.PlatformError;
+  /** Fork (#1078): the paths the known-CLI-dirs fallback finds; none by default. */
+  readonly existingPaths?: ReadonlyArray<string>;
 }) {
+  const existingPaths = new Set(input.existingPaths ?? []);
+  const fileSystemLayer = FileSystem.layerNoop({
+    exists: (path) => Effect.succeed(existingPaths.has(path)),
+    readDirectory: (path) =>
+      Effect.succeed(
+        [...existingPaths]
+          .filter((entry) => entry.startsWith(`${path}/`))
+          .map((entry) => entry.slice(path.length + 1).split("/")[0] ?? "")
+          .filter((entry, index, all) => entry.length > 0 && all.indexOf(entry) === index),
+      ),
+  });
   const environmentLayer = Layer.succeed(
     DesktopEnvironment.DesktopEnvironment,
     DesktopEnvironment.DesktopEnvironment.of({
@@ -91,7 +105,9 @@ function runShellEnvironment(input: {
   }).pipe(
     Effect.provide(
       DesktopShellEnvironment.layer.pipe(
-        Layer.provide(Layer.mergeAll(environmentLayer, NodeServices.layer, spawnerLayer)),
+        Layer.provide(
+          Layer.mergeAll(environmentLayer, NodeServices.layer, spawnerLayer, fileSystemLayer),
+        ),
       ),
     ),
   );
@@ -296,6 +312,51 @@ describe("DesktopShellEnvironment", () => {
 
       assert.deepEqual(commands, ["/opt/homebrew/bin/nu", "/bin/zsh", "/bin/launchctl"]);
       assert.equal(env.PATH, "/opt/homebrew/bin:/usr/bin");
+    }),
+  );
+
+  it.effect(
+    "adds the known CLI dirs after a login-shell PATH with no claude on macOS (#1078)",
+    () =>
+      Effect.gen(function* () {
+        const env: NodeJS.ProcessEnv = {
+          SHELL: "/bin/zsh",
+          HOME: "/Users/me",
+          PATH: "/usr/bin:/bin",
+        };
+
+        yield* runShellEnvironment({
+          env,
+          platform: "darwin",
+          handler: () => envOutput({ PATH: "/opt/homebrew/bin:/usr/bin" }),
+          existingPaths: [
+            "/Users/me/.local/bin",
+            "/Users/me/.local/bin/claude",
+            "/opt/homebrew/bin",
+            "/Users/me/.nvm/versions/node/v22.4.0/bin",
+            "/Users/me/.nvm/versions/node/v25.2.1/bin",
+          ],
+        });
+
+        assert.equal(
+          env.PATH,
+          "/opt/homebrew/bin:/usr/bin:/Users/me/.local/bin:/Users/me/.nvm/versions/node/v25.2.1/bin:/Users/me/.nvm/versions/node/v22.4.0/bin:/bin",
+        );
+      }),
+  );
+
+  it.effect("leaves a login-shell PATH that reaches claude alone on macOS (#1078)", () =>
+    Effect.gen(function* () {
+      const env: NodeJS.ProcessEnv = { SHELL: "/bin/zsh", HOME: "/Users/me", PATH: "/usr/bin" };
+
+      yield* runShellEnvironment({
+        env,
+        platform: "darwin",
+        handler: () => envOutput({ PATH: "/Users/me/.local/bin:/usr/bin" }),
+        existingPaths: ["/Users/me/.local/bin/claude", "/opt/homebrew/bin", "/Users/me/.bun/bin"],
+      });
+
+      assert.equal(env.PATH, "/Users/me/.local/bin:/usr/bin");
     }),
   );
 

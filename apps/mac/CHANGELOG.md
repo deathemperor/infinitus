@@ -23,6 +23,7 @@ publishes the matching section as the GitHub release body.
 - The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
 - A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).
 - Settings › Updates has a Nightly track — last night's build of everything from main — beside Release, and you can switch between the two either way (#1042).
+- Coding agents are found even when your shell takes too long to start: the desktop now also looks in the usual install folders (`~/.local/bin`, Homebrew, nvm, Volta, Bun) when its login-shell check times out or finds no `claude` (#1078).
 
 ## 0.5.0-alpha.7
 

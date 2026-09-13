@@ -40,8 +40,9 @@ makes wrong, in its own PR.
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
   (upstream-channel tests start on a nightly feed via the harness `settings`
   option; the harness's `resourcesPath` option and the feed-swap test are
-  the fork's, #1042) are re-flipped to `infinitus` after each merge, never
-  the rule.
+  the fork's, #1042; `DesktopShellEnvironment.test.ts`'s harness takes an
+  `existingPaths` fake filesystem for the known-CLI-dirs fallback, #1078)
+  are re-flipped to `infinitus` after each merge, never the rule.
   An upstream migration whose number collides with the fork's own
   (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
@@ -789,6 +790,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `apps/desktop/src/app/DesktopPreReadyPlatform.ts` — `deepLinkIntake.attach`
   at the end of the pre-ready setup, and `DesktopEarlyElectronStartup.ts`
   exports `isDevelopmentEnvironment` for its scheme (#270 D).
+- `apps/desktop/src/shell/DesktopShellEnvironment.ts` — one block in
+  `installPosixEnvironment` (#1078): on darwin the merged PATH takes
+  `knownPosixCliPath` between the login-shell (or launchctl) PATH and the
+  process's own, so a `.zshrc` slower than the 5 s probe timeout, or a probe
+  PATH with no `claude`, still reaches the usual install dirs.
 - `apps/web/src/routes/__root.tsx` — `DeepLinkCoordinator` mounted beside
   `DesktopAppActivationCoordinator` (#270 D).
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
@@ -1732,6 +1738,15 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (`ipc/methods/infinitus.ts`), the events `onCaptureGestureEvent`
   (`preload.ts` guard). Both `osascript` scripts are spike-verified on the
   developer's Mac (the tests mock `spawn`).
+- `apps/desktop/src/shell/InfinitusPosixCliDirs.ts` (+ test) — the POSIX
+  sibling of upstream's `knownWindowsCliDirs` (#1078): `~/.claude/local`,
+  `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
+  `~/.nvm/versions/node/*/bin` newest first, `~/.volta/bin`, `~/.bun/bin`,
+  existing ones only, joined to PATH after the login-shell probe's own
+  entries and only when that probe answered nothing or a PATH without
+  `claude` (`resolvePosixCliDirFallback`, pure over `exists` /
+  `listDirectory`); one info line names the dirs added and the one holding
+  `claude`. darwin only; a probe that answers in time still wins.
 - `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links (#270 D):
   `<scheme>://thread/<environmentId>/<threadId>` and
   `<scheme>://new?project=<id|title|folder>&prompt=<text>` on the renderer's
