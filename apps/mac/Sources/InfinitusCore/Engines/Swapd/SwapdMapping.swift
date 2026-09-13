@@ -75,6 +75,9 @@ public struct SwapdAccountView: Decodable, Sendable {
     public let windows: [SwapdWindow]
     /// Only when the live fetch failed and an older good fetch exists.
     public let lastGood: SwapdLastGood?
+    /// The store's classified kind of the most recent failed fetch
+    /// (`http-429`, `timeout`, `locked`, …); absent once a fetch succeeds.
+    public let lastError: String?
 }
 
 public struct SwapdLastGood: Decodable, Sendable {
@@ -206,6 +209,12 @@ public enum SwapdMapping {
         // note IS the row, the way cswap's sentinel rows read.
         let shown = view.windows.isEmpty && view.usageStatus == "stale"
             ? (view.lastGood?.windows ?? []) : view.windows
+        // `stale` alone is age: the engine calls any reading past 300 s
+        // stale and polls an exhausted candidate every 600 s on purpose
+        // (`poll_policy.rs`), so half of every cycle reads stale with
+        // nothing wrong. `lastError` is set by a failed fetch and cleared
+        // by the next good one — that is the row it could not refresh.
+        let failed = view.usageStatus == "stale" ? view.lastError : nil
         return Account(number: view.slot, email: view.email,
                        organizationName: view.organizationName,
                        organizationUuid: view.organizationUuid,
@@ -232,7 +241,7 @@ public enum SwapdMapping {
                        lastGoodUsage: view.lastGood.map { usage($0.windows, now: now) } ?? nil,
                        lastGoodFetchedAt: view.lastGood?.fetchedAt,
                        lastGoodAgeSeconds: view.lastGood?.ageSeconds,
-                       stale: view.usageStatus == "stale" ? true : nil)
+                       stale: failed == nil ? nil : true, staleReason: failed)
     }
 
     /// The contract's window list as today's UI (and the phone's decoder)
