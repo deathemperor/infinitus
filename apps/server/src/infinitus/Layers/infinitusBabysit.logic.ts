@@ -141,7 +141,7 @@ export function babysitVerdict(
   },
 ): BabysitVerdict {
   const babysit = thread.babysit ?? null;
-  if (babysit === null) return { kind: "wait", reason: "off" };
+  if (babysit === null || babysit.stoppedAt !== undefined) return { kind: "wait", reason: "off" };
   if (thread.archivedAt !== null) return { kind: "wait", reason: "archived" };
   const links = visibleThreadPullRequests(thread.pullRequests).filter(
     (link) => link.snapshot !== null,

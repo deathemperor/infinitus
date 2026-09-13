@@ -88,4 +88,28 @@ describe("collectNeedsAttention (#269 D)", () => {
       "env-2:b",
     ]);
   });
+
+  it("lists a babysit stopped at its cap until the user sends again (#269 A)", () => {
+    const stoppedAt = "2026-09-12T09:30:00.000Z";
+    const babysit = { since: "2026-09-12T08:00:00.000Z", rounds: 10, stoppedAt };
+    const entries = collectNeedsAttention(
+      [
+        thread("stopped", { babysit, latestUserMessageAt: "2026-09-12T08:30:00.000Z" }),
+        thread("answered", { babysit, latestUserMessageAt: "2026-09-12T09:45:00.000Z" }),
+        thread("running", { babysit: { since: "2026-09-12T08:00:00.000Z", rounds: 3 } }),
+        thread("approval", { babysit, hasPendingApprovals: true }),
+        thread("input", { hasPendingUserInput: true }),
+      ],
+      new Map(),
+    );
+    expect(entries.map((entry) => [entry.thread.id, entry.status])).toEqual([
+      ["approval", "approval"],
+      ["input", "input"],
+      ["stopped", "stopped"],
+    ]);
+    expect(entries[2]?.since).toBe(stoppedAt);
+    expect(entries[2]?.summary).toBe(
+      "Babysit stopped after 10 rounds; the pull request still needs work",
+    );
+  });
 });

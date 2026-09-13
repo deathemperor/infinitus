@@ -431,9 +431,13 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   identifiers); `InfinitusBabysit.ts` — `InfinitusBabysitLive`: watches
   `thread.pull-request-synced`, `-turn-queue-removed`, `-session-set` (idle →
   `requestSync`), `-meta-updated`; queues a round via `thread.turn.queue`
-  and bumps `babysitRounds`; at the cap turns babysit off with an `error`
-  activity `babysit.stopped` (the sidebar's "failed" bucket keys on session
-  error only), on merge an `info` `babysit.done`; the boot sweep (parked
+  and bumps `babysitRounds`; at the cap sends `babysitStopped` — the record
+  keeps its rounds and gains `stoppedAt`, the verdict reads it as off, the
+  toggle reads "Babysit stopped" and the sidebar's Needs attention section
+  lists the thread as "Babysit" until the user sends again
+  (`collectNeedsAttention`, on `latestUserMessageAt`) — with an `error`
+  activity `babysit.stopped`; on merge clears the record with an `info`
+  `babysit.done`; the boot sweep (parked
   until activation) seeds what is red without acting, a thread the sweep
   missed seeds itself on first sight. `PullRequestSyncReactor.ts` — babysat
   threads' open PRs are due like unsettled ones, and a requested sync writes

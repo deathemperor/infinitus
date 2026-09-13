@@ -112,6 +112,15 @@ describe("babysitVerdict (#269 A)", () => {
         gates(),
       ),
     ).toEqual({ kind: "wait", reason: "off" });
+    // Stopped at the cap: the record stays (the sidebar reads it), the layer is off.
+    expect(
+      babysitVerdict(
+        thread([link(7, snapshot({ checksState: "failing" }))], {
+          babysit: { since: now, rounds: BABYSIT_MAX_ROUNDS, stoppedAt: now },
+        }),
+        gates(),
+      ),
+    ).toEqual({ kind: "wait", reason: "off" });
     expect(
       babysitVerdict(
         thread([link(7, snapshot({ checksState: "failing" }))], { archivedAt: now }),
