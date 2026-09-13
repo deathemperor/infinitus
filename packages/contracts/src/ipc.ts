@@ -1349,6 +1349,12 @@ export interface DesktopBridge {
    * user. Optional: a shell without it hides the switch.
    */
   setBadgeCount?: (count: number) => Promise<void>;
+  /**
+   * Fork (#1075): hold off sleep while a local thread's turn runs; the
+   * renderer sends the verdict, the shell holds one power-save blocker.
+   * Optional: a shell without it hides the switch.
+   */
+  setKeepAwake?: (active: boolean) => Promise<void>;
   openInfinitusSignIn?: (input: InfinitusSignInWindowInput) => Promise<void>;
   closeInfinitusSignIn?: (flowId: string) => Promise<void>;
   submitInfinitusSignInCode?: (

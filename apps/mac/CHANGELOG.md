@@ -19,6 +19,7 @@ publishes the matching section as the GitHub release body.
 - An account row is flagged stale only when swapd's last fetch for it actually failed, and the tooltip then names the error.
 
 ### Desktop
+- Infinitus desktop keeps the computer awake while a thread on it has a turn running; Settings › General › Keep awake turns that off (#1075).
 - Settings › Infinitus no longer describes terminal sessions or Team: the Lock page's team refusal is gone, the relaunch dialog and the Accounts sign-ins speak of threads and profiles, and the Priority page keeps its rows when the Mac renames that section (#1041).
 - The Best-of card shows what each member has written so far — files changed, lines added and removed — next to its turns and time (#269).
 - A babysit that stopped at its round cap now shows in the sidebar's Needs attention section as "Babysit" until you send again, and the composer's toggle reads "Babysit stopped" (#269).

@@ -1,6 +1,7 @@
 import { Spinner } from "~/components/ui/spinner";
 import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import { NotificationSettings } from "./NotificationSettings";
+import { DesktopKeepAwakeSettings } from "./DesktopKeepAwakeSettings";
 import { ArchiveIcon, ArchiveX, ChevronRightIcon, SettingsIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
@@ -606,6 +607,9 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Delete confirmation"]
         : []),
       ...(settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? ["Quit shortcut"] : []),
+      ...(settings.desktopKeepAwake !== DEFAULT_UNIFIED_SETTINGS.desktopKeepAwake
+        ? ["Keep awake"]
+        : []),
       ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
       ...getChangedBrowserSettingLabels(settings),
       ...(settings.enableAgentBrowserAccess !== DEFAULT_UNIFIED_SETTINGS.enableAgentBrowserAccess
@@ -625,6 +629,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.diffColorScheme,
       settings.enableAgentBrowserAccess,
       settings.confirmQuit,
+      settings.desktopKeepAwake,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
       settings.confirmThreadUnpin,
@@ -742,6 +747,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
       composerCollapseOnScroll: DEFAULT_UNIFIED_SETTINGS.composerCollapseOnScroll,
       composerSendMode: DEFAULT_UNIFIED_SETTINGS.composerSendMode,
+      desktopKeepAwake: DEFAULT_UNIFIED_SETTINGS.desktopKeepAwake,
       contextWindowMeterEnabled: DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled,
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
@@ -2694,6 +2700,7 @@ export function GeneralSettingsPanel() {
             </>
           }
         />
+        <DesktopKeepAwakeSettings />
       </SettingsSection>
 
       <SettingsSection id="projects-and-threads" title="Projects & threads">

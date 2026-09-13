@@ -27,6 +27,7 @@ import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAp
 import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
 import { DesktopBadgeCoordinator } from "../components/desktop/DesktopBadgeCoordinator";
+import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAwakeCoordinator";
 import { NotificationModeMigration } from "../components/desktop/NotificationModeMigration";
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
 import { ThreadNotificationCoordinator } from "../components/ThreadNotificationCoordinator";
@@ -208,6 +209,7 @@ function RootRouteView() {
           <SnapShotCoordinator />
           <NotificationModeMigration />
           {primaryEnvironmentAuthenticated ? <DesktopBadgeCoordinator /> : null}
+          {primaryEnvironmentAuthenticated ? <DesktopKeepAwakeCoordinator /> : null}
           <CaptureGestureCoordinator />
           <ThreadNotificationCoordinator />
           <ConfirmDialogHost />

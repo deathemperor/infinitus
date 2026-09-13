@@ -180,6 +180,11 @@ describe("ClientSettings notifications", () => {
     );
   });
 
+  it("keeps the desktop awake while a turn runs unless turned off (#1075)", () => {
+    expect(decodeClientSettings({}).desktopKeepAwake).toBe(true);
+    expect(decodeClientSettingsPatch({ desktopKeepAwake: false }).desktopKeepAwake).toBe(false);
+  });
+
   it("requires opt-in when existing settings omit notification preferences", () => {
     expect(decodeClientSettings({}).notificationMode).toBe("off");
     expect(decodeClientSettingsPatch({})).not.toHaveProperty("notificationMode");

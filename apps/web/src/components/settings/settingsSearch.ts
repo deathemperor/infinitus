@@ -387,6 +387,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["confirmation desktop app exit direct hold double click press twice"],
     desktopOnly: true,
   },
+  // Fork (#1075): sleep held off while a local thread's turn runs.
+  {
+    id: "desktop-keep-awake",
+    title: "Keep awake",
+    to: "/settings/general",
+    searchTerms: ["sleep power nap idle running turn thread mac caffeinate"],
+    desktopOnly: true,
+  },
   {
     id: "text-generation-model",
     title: "Text generation model",
