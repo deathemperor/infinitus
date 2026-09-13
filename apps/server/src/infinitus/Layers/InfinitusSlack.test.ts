@@ -235,12 +235,12 @@ describe("InfinitusSlack (#574)", () => {
           "thread.turn.start",
         ]);
         expect(commands[1]).toMatchObject({
-          branch: expect.stringMatching(/^t3code\/[0-9a-f]{8}$/),
+          branch: expect.stringMatching(/^infinitus\/[0-9a-f]{8}$/),
           worktreePath: "/w/limitless-wt",
         });
         const posts = yield* harness.posts;
         expect(posts).toHaveLength(1);
-        expect(posts[0]!.text).toMatch(/^Started in Limitless on t3code\/[0-9a-f]{8} \(build\)\.$/);
+        expect(posts[0]!.text).toMatch(/^Started in Limitless on infinitus\/[0-9a-f]{8} \(build\)\.$/);
       }),
   );
 
