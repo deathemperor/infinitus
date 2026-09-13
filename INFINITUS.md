@@ -2125,9 +2125,19 @@ agent-activity` (the session cards' kinds retired with #1041).
   `client-activity` and `lock-status` with canned data. The manifest and
   the pref catalog are `infinitusctl` captures (every value reset to its
   default), trimmed with the Mac: the session-profile and past-session
-  verbs and the three retired push prefs went with #1091. The accounts
+  verbs and the three retired push prefs went with #1091, the Team and
+  checkpoint blocks with #1139. The accounts
   (`ada-fixture`…) and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
   only verb names are logged. `--socket <short /tmp path>`.
+  `fork-visual-fixture.guard.test.ts` keeps the capture honest against
+  `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift`
+  (#1139, the `PREF_COPY` guard's sibling from #1122): a verb it claims or
+  a pref key it carries after the Mac dropped one hands every capability
+  gate in the web a `true` no real build gives, and the pages render in CI
+  what a user cannot see. Commands are checked one way — the fixture
+  answers only what the pass exercises, so a Mac verb it omits is fine —
+  and it may answer no verb it does not claim; prefs and sections must
+  match the catalog exactly.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
   asserts: every fork page with the one text marker only its populated render
   shows (a pref row label, the fixture's team or profile name, "Re-lock",
