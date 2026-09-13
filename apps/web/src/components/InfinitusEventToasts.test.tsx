@@ -69,7 +69,6 @@ const exhausted = (id: string) => event(id, "battery.0percent", "all exhausted")
 const snapshotWith = (events: ReadonlyArray<ReturnType<typeof event>>): InfinitusSnapshot => ({
   available: true,
   fleets: [],
-  sessions: [],
   commands: [],
   events,
 });

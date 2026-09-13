@@ -29,7 +29,6 @@ const snapshotWith = (
 ): InfinitusSnapshot => ({
   available: true,
   fleets,
-  sessions: [],
   commands: [],
   ...(prefs === undefined ? {} : { prefs }),
 });

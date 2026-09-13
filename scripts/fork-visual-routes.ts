@@ -53,7 +53,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     // failure `Fork ` guards above.
     absent: ["Intro style", "Intro title", "Intro speed", "Burn style"],
   },
-  { route: "/settings/infinitus/sessions", label: "Priority", marker: "Session priority" },
+  { route: "/settings/infinitus/sessions", label: "Priority", marker: "Thread priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
   {
     route: "/settings/infinitus/notifications",

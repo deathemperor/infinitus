@@ -70,8 +70,8 @@ public enum PrefCatalog {
     public static let devices = Section(slug: "devices", name: "Devices")
     public static let engines = Section(slug: "engines", name: "Engines")
     public static let about = Section(slug: "about", name: "About")
-    public static let sessions = Section(slug: "sessions", name: "Sessions")
-    public static let sections: [Section] = [display, themes, animations, push, devices, engines, about, sessions]
+    public static let priority = Section(slug: "priority", name: "Priority")
+    public static let sections: [Section] = [display, themes, animations, push, devices, engines, about, priority]
 
     public static let priorityModes = ["off", "hold", "interrupt"]
 
@@ -128,11 +128,11 @@ public enum PrefCatalog {
         Entry("engine_9router_enabled", .bool, .bool(false), engines, effect: .restart),
         // About: updates.
         Entry("update_channel", .string, .string("stable"), about, choices: strings(["stable", "nightly"])),
-        // Sessions: the headroom mode (#616) — `hold` publishes a per-fleet
-        // verdict on `fleets` that holds background sessions while low.
-        Entry("priority_mode", .string, .string("off"), sessions, choices: strings(priorityModes)),
-        Entry("priority_low_pct", .int, .number(80), sessions),
-        Entry("priority_abundant_pct", .int, .number(50), sessions),
+        // Priority: the headroom mode (#616) — `hold` publishes a per-fleet
+        // verdict on `fleets` that holds background threads while low.
+        Entry("priority_mode", .string, .string("off"), priority, choices: strings(priorityModes)),
+        Entry("priority_low_pct", .int, .number(80), priority),
+        Entry("priority_abundant_pct", .int, .number(50), priority),
     ]
 
     /// The popup intro (the desktop app's Animations settings): how the content enters,

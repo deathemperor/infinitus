@@ -771,10 +771,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "infinitus-sessions",
     title: "Infinitus priority",
     to: "/settings/infinitus/sessions",
-    targetId: "infinitus-sessions",
+    // The Mac files these keys under `priority` since #1069; a build older than
+    // that still answers `sessions`, and the anchor then only loses its scroll.
+    targetId: "infinitus-priority",
     infinitusOnly: true,
-    // "session" stays while the mode row still reads "Session priority": that
-    // label is retitled with the Mac's pane, not before (#1069).
+    // "session" stays as a search term for anyone who knew the row by its old
+    // name; the row itself reads "Thread priority" (#1069).
     searchTerms: [
       "thread session priority mode hold interrupt headroom low abundant pct background",
     ],

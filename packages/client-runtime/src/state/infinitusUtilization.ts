@@ -1,5 +1,6 @@
 import {
   InfinitusUtilization,
+  type InfinitusLiveTokenRate,
   InfinitusUtilizationFiveHourWindow,
   InfinitusUtilizationGeneration,
   InfinitusUtilizationReplay,
@@ -292,8 +293,27 @@ export function formatCount(value: number): string {
   return Math.round(value).toLocaleString("en-US");
 }
 
-/** The live line under the table: the popup's five-minute output rate. */
-export function liveRateText(u: InfinitusUtilization): string | null {
+/**
+ * The live line under the table: a five-minute output rate.
+ *
+ * This server's own rate (#1127) wins whenever it has turns behind it. It
+ * counts the threads running HERE, where the Mac's `liveRate` tails the
+ * terminal transcripts the session sweep (#1041) retires — after which the
+ * Mac's field is always null and only this one is left. A server rate with no
+ * turns in the window is not zero but unknown, so it stands aside and lets a
+ * Mac that still reports one speak.
+ */
+export function liveRateText(
+  u: InfinitusUtilization,
+  server?: InfinitusLiveTokenRate | null,
+): string | null {
+  if (server !== undefined && server !== null && server.turns > 0) {
+    const turns = server.turns === 1 ? "1 turn" : `${formatCount(server.turns)} turns`;
+    // "≈" is the #834 rule for every usage figure on screen, and this one is a
+    // five-minute extrapolation, so it earns the mark more than most. The turn
+    // count rides along: it is what makes a small number readable.
+    return `Live: ≈ ${compactTokens(server.outputPerMinute)} output tokens/min over the last ${server.windowMinutes} minutes, across ${turns} on this server.`;
+  }
   const live = u.liveRate;
   if (live === undefined || live === null) return null;
   const peak =

@@ -800,7 +800,7 @@
         "default": "off",
         "effect": "live",
         "key": "priority_mode",
-        "section": "sessions",
+        "section": "priority",
         "type": "string",
         "value": "off"
       },
@@ -808,7 +808,7 @@
         "default": 80,
         "effect": "live",
         "key": "priority_low_pct",
-        "section": "sessions",
+        "section": "priority",
         "type": "int",
         "value": 80
       },
@@ -816,7 +816,7 @@
         "default": 50,
         "effect": "live",
         "key": "priority_abundant_pct",
-        "section": "sessions",
+        "section": "priority",
         "type": "int",
         "value": 50
       }
@@ -851,8 +851,8 @@
         "slug": "about"
       },
       {
-        "name": "Sessions",
-        "slug": "sessions"
+        "name": "Priority",
+        "slug": "priority"
       }
     ]
   }

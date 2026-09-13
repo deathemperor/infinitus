@@ -60,7 +60,6 @@ import { StatsPage } from "./StatsPage";
 const readySnapshot: InfinitusSnapshot = {
   available: true,
   fleets: [],
-  sessions: [],
   commands: [
     { name: "stats", args: [], options: ["period"], effect: "read", summary: "", replyShape: "" },
   ],
@@ -127,7 +126,6 @@ describe("StatsPage", () => {
       available: false,
       unavailableReason: "socket gone",
       fleets: [],
-      sessions: [],
       commands: [],
     };
     expect(renderToStaticMarkup(<StatsPage />)).toContain("offline: socket gone");

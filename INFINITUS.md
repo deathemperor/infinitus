@@ -1149,11 +1149,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority
-  over its `sessions` section (#743: `priority_mode` with the `interrupt`
-  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`) —
+  over its `priority` section (#743: `priority_mode` with the `interrupt`
+  choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`,
+  the mode row labelled "Thread priority" since #1069) —
   the Menu bar page keeps `display` + `about`; the Priority page reads the
-  catalog's `priority` section and, on a build before the Mac's session
-  sweep (#1041), `sessions`; a section the build lacks
+  catalog's `priority` section and, on a build before that rename,
+  `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
@@ -1490,6 +1491,30 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   without the verb keeps the forecast and says what is missing; one whose
   reply carries no telemetry keeps the chart and the run rate, and the two
   sections are simply absent. Sidebar "Utilization" beside Activity.
+- Live token rate (#1127): the run-rate section's "Live:" line comes from this
+  server, not the Mac. `packages/contracts/src/infinitus.ts` —
+  `InfinitusLiveTokenRate` (`windowMinutes`, `turns`, `outputPerMinute`,
+  `totalPerMinute`); `rpc.ts` — `infinitus.liveTokenRate` (empty payload,
+  `AuthOrchestrationReadScope` in `RpcAuthorization.ts`: counts only, no thread
+  named). `apps/server/src/persistence/ProjectionTurnUsage.ts` —
+  `listCompletedSince` reads the window's rows whole (minutes wide, so the row
+  count is small); `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test)
+  is the fold — five minutes, and a `usageUnavailable` row skipped entirely,
+  since its zero tokens mean "not reported" and would read as a turn that
+  burned nothing. `ws.ts` pulls the repository and answers; a read that fails
+  is logged and answers no turns, which draws no line, rather than failing a
+  cosmetic call. Client: `infinitus.ts`'s `liveTokenRate` query atom on the
+  Utilization page's own cadence, and `infinitusUtilization.ts`'s
+  `liveRateText(u, server?)` — the line reads "Live: ≈ N output tokens/min …
+  across N turns on this server" (the #834 "≈" rule: a five-minute
+  extrapolation is an estimate; the Mac's own line is left as it is, being
+  transitional). The server's rate wins whenever it has turns
+  behind it, since the Mac's `liveRate` tails the terminal transcripts the
+  session sweep (#1041) retires and goes permanently null. Zero turns is
+  unknown, not zero, so it stands aside for a Mac that still reports one.
+  Limit: the line lives inside the run-rate section, which still needs the
+  Mac's `utilization` verb to have answered; the per-fleet split #1127 mentions
+  (#779's attribution) is not done.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:
@@ -1512,7 +1537,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
   credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
   nothing lapsed; one row per tool and profile, no session names and no
-  `--pid` scope since the Mac's session sweep, #1041); row/section/sign-in
+  `--pid` scope since the Mac's session sweep, #1041 — the phone's own
+  `apps/mobile/src/features/infinitus/signIns.logic.ts` folds and words its
+  rows the same way, and `InfinitusAwsLogin` carries neither `pid` nor
+  `sessionLabel` any more, so an older app still sending them has them
+  dropped at the boundary); row/section/sign-in
   models come from
   `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
   `infinitusPageState` gates Accounts, Stats and Activity alike (#693):

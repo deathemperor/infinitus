@@ -98,6 +98,12 @@ const fleets = () => [
   },
 ];
 
+/** The active account's 5h pace, in percent per hour: 34 % to full in the two
+    hours it has before the window resets, so the projection is one a real Mac
+    could produce (`UsageForecast.project` drops `hitsAt` when the reset comes
+    first, and the guard test holds the fixture to that). */
+const ACTIVE_FIVE_HOUR_RATE = (100 - ACCOUNTS[0].five) / 2;
+
 const forecastLine = (account) => ({
   number: account.number,
   email: account.email,
@@ -108,9 +114,9 @@ const forecastLine = (account) => ({
     {
       name: "5h",
       pct: account.five,
-      ratePctPerHour: account.active ? 12.5 : 0,
+      ratePctPerHour: account.active ? ACTIVE_FIVE_HOUR_RATE : 0,
       resetsAt: nowSeconds() + 2 * 3600 + 600,
-      hitsAt: account.active ? nowSeconds() + 5 * 3600 : null,
+      hitsAt: account.active ? nowSeconds() + 2 * 3600 : null,
     },
     {
       name: "7d",

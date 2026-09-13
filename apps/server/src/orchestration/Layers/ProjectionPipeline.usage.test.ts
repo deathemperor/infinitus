@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import { ServerConfig } from "../../config.ts";
+import { foldLiveTokenRate } from "../../infinitus/liveTokenRate.logic.ts";
 import { OrchestrationCommandReceiptRepositoryLive } from "../../persistence/Layers/OrchestrationCommandReceipts.ts";
 import { ProjectionTurnUsageRepository } from "../../persistence/ProjectionTurnUsage.ts";
 import { OrchestrationEventStoreLive } from "../../persistence/Layers/OrchestrationEventStore.ts";
@@ -369,6 +370,77 @@ engineLayer("turn usage on the thread projection (#834)", (it) => {
         createdAt: "2026-09-12T00:07:00.000Z",
       });
       assert.deepStrictEqual(yield* candidates(), []);
+    }),
+  );
+});
+
+engineLayer("the live token rate's window read (#1127)", (it) => {
+  it.effect("takes every thread's turns from the window's start on, and no earlier one", () =>
+    Effect.gen(function* () {
+      const engine = yield* OrchestrationEngineService;
+      const usageRows = yield* ProjectionTurnUsageRepository;
+      const createdAt = "2026-09-12T00:00:00.000Z";
+      const projectId = ProjectId.make("project-live-rate");
+      const modelSelection = { instanceId: ProviderInstanceId.make("claude"), model: "opus" };
+
+      yield* engine.dispatch({
+        type: "project.create",
+        commandId: CommandId.make("cmd-live-project"),
+        projectId,
+        title: "Live",
+        workspaceRoot: "/tmp/project-live-rate",
+        defaultModelSelection: modelSelection,
+        createdAt,
+      });
+      const thread = (id: string) =>
+        Effect.gen(function* () {
+          const threadId = ThreadId.make(id);
+          yield* engine.dispatch({
+            type: "thread.create",
+            commandId: CommandId.make(`cmd-live-${id}`),
+            threadId,
+            projectId,
+            title: id,
+            modelSelection,
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: null,
+            createdAt,
+          });
+          return threadId;
+        });
+      const first = yield* thread("thread-live-a");
+      const second = yield* thread("thread-live-b");
+      const record = (commandId: string, threadId: ThreadId, turnUsage: ThreadTurnUsage) =>
+        engine.dispatch({
+          type: "thread.turn.usage.record",
+          commandId: CommandId.make(commandId),
+          threadId,
+          turnUsage,
+          createdAt: turnUsage.completedAt,
+        });
+
+      // One turn a millisecond before the window, one exactly on its edge, one
+      // inside it, and the last on the other thread — the rate is the whole
+      // server's, not a thread's.
+      yield* record("cmd-live-1", first, turn("turn-old", "2026-09-12T00:54:59.999Z", null));
+      yield* record("cmd-live-2", first, turn("turn-edge", "2026-09-12T00:55:00.000Z", null));
+      yield* record("cmd-live-3", first, turn("turn-in", "2026-09-12T00:57:00.000Z", null));
+      yield* record("cmd-live-4", second, turn("turn-other", "2026-09-12T00:59:00.000Z", null));
+
+      const rows = yield* usageRows.listCompletedSince({ since: "2026-09-12T00:55:00.000Z" });
+
+      assert.deepStrictEqual(
+        rows.map((row) => row.turnUsage.turnId),
+        ["turn-edge", "turn-in", "turn-other"],
+      );
+      assert.deepStrictEqual(foldLiveTokenRate(rows.map((row) => row.turnUsage)), {
+        windowMinutes: 5,
+        turns: 3,
+        outputPerMinute: 60,
+        totalPerMinute: 660,
+      });
     }),
   );
 });
