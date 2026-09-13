@@ -79,7 +79,10 @@ function catalogSectionNames(source: string): ReadonlyMap<string, string> {
 /** Loose enough that a term matches a row's wording in any inflection, strict
     enough that a word no row carries at all stands out. */
 function stem(word: string): string {
-  return word.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/s$/, "");
+  return word
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/s$/, "");
 }
 
 function vocabularyOf(text: string): ReadonlySet<string> {
