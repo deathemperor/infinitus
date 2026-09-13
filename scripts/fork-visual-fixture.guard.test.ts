@@ -1,5 +1,10 @@
 // @effect-diagnostics nodeBuiltinImport:off -- A guard test reading the Mac app's own source files, not runtime code.
+import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
+import * as NodeNet from "node:net";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
+import * as NodeURL from "node:url";
 
 import { describe, expect, it } from "vite-plus/test";
 
@@ -57,6 +62,100 @@ function fixtureAnswered(): ReadonlyArray<string> {
   const source = read("./fork-visual-fixture.mjs");
   return [...source.matchAll(/^\s{4}case "([a-z0-9-]+)":/gm)].map((match) => match[1] as string);
 }
+
+const FIXTURE_SCRIPT = NodeURL.fileURLToPath(new URL("./fork-visual-fixture.mjs", import.meta.url));
+
+interface ForecastWindow {
+  readonly name: string;
+  readonly pct: number;
+  readonly ratePctPerHour: number | null;
+  readonly resetsAt: number | null;
+  readonly hitsAt: number | null;
+}
+interface ForecastReply {
+  readonly ok: boolean;
+  readonly result?: {
+    readonly forecast: {
+      readonly accounts: ReadonlyArray<{
+        readonly alias: string;
+        readonly windows: ReadonlyArray<ForecastWindow>;
+      }>;
+    };
+  };
+}
+
+/** Starts the fixture on a throwaway socket and asks it one verb the way the
+    server does: one JSON line out, one back. Reading the reply, rather than
+    the source that builds it, is what makes the rule below a check of what
+    the pass actually renders. */
+async function fixtureReply(command: string): Promise<ForecastReply> {
+  const socketPath = NodePath.join(NodeOS.tmpdir(), `inf-fixture-${process.pid}.sock`);
+  const fixture = NodeChildProcess.spawn(
+    process.execPath,
+    [FIXTURE_SCRIPT, "--socket", socketPath],
+    { stdio: ["ignore", "pipe", "ignore"] },
+  );
+  try {
+    // It prints one line once the socket is up; waiting for that beats polling
+    // the path, and a fixture that dies instead fails here with its exit code.
+    await new Promise<void>((resolve, reject) => {
+      fixture.stdout.setEncoding("utf8");
+      fixture.stdout.on("data", (chunk: string) => {
+        if (chunk.includes("listening")) resolve();
+      });
+      fixture.on("error", reject);
+      fixture.on("exit", (code) => reject(new Error(`fixture exited with ${String(code)}`)));
+    });
+    const line = await new Promise<string>((resolve, reject) => {
+      const socket = NodeNet.connect(socketPath);
+      let buffer = "";
+      socket.setEncoding("utf8");
+      socket.on("connect", () =>
+        socket.write(`${JSON.stringify({ command, args: [], options: {} })}\n`),
+      );
+      socket.on("data", (chunk: string) => {
+        buffer += chunk;
+      });
+      socket.on("end", () => resolve(buffer));
+      socket.on("error", reject);
+    });
+    return JSON.parse(line) as ForecastReply;
+  } finally {
+    // Its SIGTERM handler unlinks the socket.
+    fixture.kill();
+  }
+}
+
+describe("the visual-pass fixture's forecast", () => {
+  /**
+   * The Mac projects a window's `hitsAt` itself and drops it when the reset
+   * lands first (`UsageForecast.project`: `if let reset = w.resetsAt, reset
+   * <= at { hits = nil }`), which is what makes the web print "Resets before
+   * it fills". The fixture used to hand the active account a 5h window that
+   * fills three hours after it resets, so the visual pass photographed "Out
+   * 10:34 PM · Resets 7:44 PM" — a line no real build can produce.
+   */
+  it("projects nothing a real Mac would not", async () => {
+    const reply = await fixtureReply("forecast");
+    expect(reply.ok).toBe(true);
+    const accounts = reply.result?.forecast.accounts ?? [];
+    expect(accounts.length).toBeGreaterThan(0);
+    for (const account of accounts) {
+      for (const window of account.windows) {
+        if (window.hitsAt === null) continue;
+        const where = `${account.alias} ${window.name}`;
+        expect(window.resetsAt === null || window.hitsAt < window.resetsAt, where).toBe(true);
+        // A hit needs a measured pace, or a window already full.
+        expect((window.ratePctPerHour ?? 0) > 0 || window.pct >= 100, where).toBe(true);
+      }
+    }
+    // And one window still fills, so the pass keeps rendering "binds first"
+    // and "Out <time>" rather than only the resets-first branch.
+    expect(
+      accounts.some((account) => account.windows.some((window) => window.hitsAt !== null)),
+    ).toBe(true);
+  });
+});
 
 describe("the visual-pass fixture against the Mac's control protocol", () => {
   it("reads the Mac's sources", () => {
