@@ -13,6 +13,7 @@
 - Watches every Claude Code account's usage windows (5-hour, weekly, per-model / scoped) with live gauges and reset countdowns.
 - Rotates to the best candidate account automatically when a limit binds, via the `swapd` CLI. Infinitus never modifies Claude Code and never reads the engine's internal files; every engine touchpoint is a `swapd … --json` subprocess.
 - Thread resume: a thread a usage limit stopped carries on by itself in Infinitus desktop once an account is back, from the turn it was cut off on.
+- Infinitus desktop threads: every turn checkpoints the repository (restore a turn's files, rewind the chat, or fork the thread from that turn); Best of N sends one prompt to two to four models, each in its own worktree; a message typed while a turn runs queues on the server and goes when the thread is idle.
 - All-dead countdown: when every account is limited, the popup, the desktop app and the phone count down to the next recovery.
 - Usage history and utilization estimates (usage-cost figures are estimates, never billing truth).
 - 15 themes (Off, RPG, Cyber, MGS, Sci-fi, Cosmo, Ocean, Earth, Gothic, Hades, Movie, Musical, Agent, SWE, West) each renaming the windows and bringing its own intro, death and revival effects.
