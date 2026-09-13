@@ -147,8 +147,8 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             : theme.planLabel(plan, compact: compactText)
     }
 
-    /// "6 min ago" beside the plan, with its tooltip, when swapd could
-    /// not refresh this account (#965); nil for every other row.
+    /// "6 min ago" beside the plan, with its tooltip, when the engine
+    /// could not refresh this account (#965); nil for every other row.
     var staleAge: (label: String, tip: String)? {
         guard let label = account.staleAgeLabel, let tip = account.staleTip else { return nil }
         return (label, tip)
@@ -221,9 +221,16 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     /// cache ~2 MB/min for as long as it ticks (#18, measured
     /// 2026-09-03: with it 2.1 MB/min, without 0). Fine on the pct
     /// texts, which change once a minute at most.
+    /// The live path is also gated on the measurement being fresh enough
+    /// for its reset to still mean anything: a stale row whose reset has
+    /// already gone by is narrating a window it stopped watching, and the
+    /// countdown lands on a permanent pulse (#1118). Such a row falls
+    /// through to the static text, where `staleAge` beside the plan says
+    /// how old the reading is.
     @ViewBuilder func resetLabelView(resetsAt: String?, staticText: String?) -> some View {
         if let date = WeeklyRoll.parse(resetsAt),
-           date.timeIntervalSinceNow < model.reviveLead {
+           date.timeIntervalSinceNow < model.reviveLead,
+           account.resetIsKnowable(resetsAt) {
             let isReviver = model.reviver?.number == account.number
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 let left = date.timeIntervalSince(ctx.date)

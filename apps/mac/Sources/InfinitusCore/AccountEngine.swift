@@ -116,6 +116,15 @@ public struct EngineFleet: Codable, Sendable {
                     capabilities: capabilities)
     }
 
+    /// The same fleet with its account rows replaced (the stale
+    /// marking a failed refresh leaves behind, `StaleMarking`).
+    public func with(accounts: [Account]) -> EngineFleet {
+        EngineFleet(engineID: engineID, provider: provider, accounts: accounts,
+                    activeNumber: activeNumber, nextCandidate: nextCandidate,
+                    candidateOrder: candidateOrder, nextRecovery: nextRecovery, liveSessions: liveSessions, raw: raw,
+                    capabilities: capabilities)
+    }
+
     /// The same fleet with its live-session list replaced (the owned
     /// status overlay, #151).
     public func with(liveSessions: LiveSessions?) -> EngineFleet {

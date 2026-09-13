@@ -152,9 +152,6 @@ export const PREF_COPY: Readonly<
     },
   },
   // Push.
-  push_sessions_done: { label: "All sessions finish working" },
-  push_waiting: { label: "A session waits on you" },
-  push_aws_login: { label: "A session needs an AWS sign-in" },
   push_all_dead: { label: "All accounts are exhausted" },
   push_last_alive: { label: "The last alive account nears its limit" },
   push_revived: { label: "An account comes back" },

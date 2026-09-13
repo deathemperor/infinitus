@@ -24,6 +24,10 @@ final class AppModel: ObservableObject {
     var primary: FleetState? { registry.primary }
     /// Per-engine last error (the primary's also lands in lastError).
     @Published var engineErrors: [String: String] = [:]
+    /// When each engine last answered `snapshot()`. The age a failing
+    /// engine's retained rows report falls back to this when the engine
+    /// stamped no `usageFetchedAt` of its own (`FleetState.markStale`).
+    private var engineLastGood: [String: Date] = [:]
     /// Per-engine honesty note for the fleet header (proxy: routing
     /// strategy that ignores priority tiers).
     @Published var fleetCaveats: [String: String] = [:]
@@ -2327,11 +2331,20 @@ final class AppModel: ObservableObject {
                     NSLog("Infinitus engine %@: %@", r.id, message)
                     engineErrors[r.id] = message
                 }
+                // Keeping the rows is right — they are still the best
+                // numbers the app has — but they must stop reading as
+                // current: every countdown on them is recomputed live
+                // off stored reset times, so an hour-old reading looked
+                // exactly like a fresh one. Age them instead.
+                for state in registry.fleets where state.engineID == r.id {
+                    state.markStale(reason: message, lastGood: engineLastGood[r.id], now: Date())
+                }
                 continue
             }
             // Only publish a change: every @Published set re-runs each
             // observer's body, once per refresh, even for an identical value (#18).
             if engineErrors[r.id] != nil { engineErrors[r.id] = nil }
+            engineLastGood[r.id] = Date()
             for reported in fleets {
                 let state = registry.state(for: reported)
                 let fleet = withLocalSessions(reported, primary: state === primary)

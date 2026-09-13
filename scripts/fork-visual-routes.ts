@@ -48,7 +48,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   {
     route: "/settings/infinitus/notifications",
     label: "Notifications",
-    marker: "All sessions finish working",
+    marker: "All accounts are exhausted",
   },
   {
     route: "/settings/infinitus/devices",
