@@ -192,12 +192,12 @@ export function AgentActivity(
   // stale. Both bounds come from the row's `startedAt` — the widget reads no
   // clock of its own — and the upper one stops the display a day in, past which
   // a running row is a stuck turn rather than a long one.
-  const ELAPSED_CAP_MS = 24 * 60 * 60 * 1000;
+  const elapsedCapMs = 24 * 60 * 60 * 1000;
   const elapsedRange = (row: AgentActivityRowProps) => {
     if (row.phase !== "starting" && row.phase !== "running") return null;
     const startedMs = row.startedAt === undefined ? Number.NaN : Date.parse(row.startedAt);
     if (!Number.isFinite(startedMs)) return null;
-    return { lower: new Date(startedMs), upper: new Date(startedMs + ELAPSED_CAP_MS) };
+    return { lower: new Date(startedMs), upper: new Date(startedMs + elapsedCapMs) };
   };
 
   // Single-line row used by every presentation: glyph, title, inline project,
