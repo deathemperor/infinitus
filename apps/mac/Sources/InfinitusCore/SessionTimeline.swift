@@ -107,10 +107,9 @@ extension SessionTimeline {
 }
 
 extension SessionTimeline {
-    /// An owned session's parked prompts (#151) never reach its
-    /// transcript — they arrive as control requests over stdin — so they
-    /// join the timeline here, on the latest turn, id = `requestId`, the
-    /// same id `OwnedSessions.answer(pid:requestId:decision:)` takes.
+    /// A parked prompt never reaches the transcript — it arrives as a
+    /// control request over stdin — so it joins the timeline here, on the
+    /// latest turn, id = `requestId`.
     public func appending(pending: [PendingRequest]) -> SessionTimeline {
         guard !pending.isEmpty else { return self }
         var out = self
@@ -142,23 +141,6 @@ extension SessionTimeline {
             out.activities.append(Activity(id: p.requestId, tone: .approval, kind: kind, summary: summary,
                                            detail: p.planMarkdown, payload: payload, turnId: turnId,
                                            sequence: seq, createdAt: p.receivedAt))
-            seq += 1
-        }
-        return out
-    }
-
-    /// An owned session's rejected rate-limit events (#151), in the shape
-    /// the transcript's own limit stop takes (`runtime.warning`, code
-    /// "limit"), so the rows and facts treat them alike.
-    public func appending(limits: [LimitNote]) -> SessionTimeline {
-        guard !limits.isEmpty else { return self }
-        var out = self
-        let turnId = latestTurn?.id ?? "owned:limit"
-        var seq = (activities.last?.sequence ?? -1) + 1
-        for l in limits {
-            out.activities.append(Activity(id: "limit:" + l.key, tone: .info, kind: "runtime.warning", summary: l.text,
-                                           detail: nil, payload: ["code": .string("limit")], turnId: turnId,
-                                           sequence: seq, createdAt: l.receivedAt))
             seq += 1
         }
         return out

@@ -3,7 +3,7 @@ import Foundation
 /// The answer side of a parked `AskUserQuestion`: the questions as the
 /// activity payload carries them, and the wire text a client sends back.
 /// One encoder for the Mac workspace and the phone — the decoder is
-/// `OwnedWire.decision(answers:pending:)`.
+/// `SessionInput.Answers.decode`.
 public enum T3PendingAnswers {
     public struct Option: Equatable, Identifiable, Sendable {
         public let label: String
@@ -17,8 +17,8 @@ public enum T3PendingAnswers {
     public struct Question: Equatable, Identifiable, Sendable {
         /// Upstream's `question.id`; option rows key off it.
         public let id: String
-        /// The `answers` JSON KEY — `OwnedWire.decision(answers:pending:)`
-        /// looks each answer up by the question's text, never `id`.
+        /// The `answers` JSON KEY — a decoder looks each answer up by the
+        /// question's text, never `id`.
         public let question: String
         public let header: String
         public let multiSelect: Bool
@@ -89,10 +89,8 @@ public enum T3PendingAnswers {
         for q in questions {
             if let typed = typedAnswer(q, custom: custom) {
                 // `resolvePendingUserInputAnswer` (`pendingUserInput.ts:42-68`)
-                // returns the custom answer over the selection, and
-                // `OwnedWire.decision(answers:pending:)` takes one non-option
-                // string per question as Claude Code's "Other"
-                // (OwnedWire.swift:283-289).
+                // returns the custom answer over the selection: one
+                // non-option string per question is Claude Code's "Other".
                 out[q.question] = typed
                 continue
             }
@@ -105,7 +103,7 @@ public enum T3PendingAnswers {
 
     /// A terminal-hosted session's menu key: the first question's single
     /// pick as its 1-based option number, nil when unpicked or past 9
-    /// (`OwnedWire.decision(forKey:)`, `SessionInput.allowedKeys`).
+    /// (`SessionInput.allowedKeys`).
     public static func menuKey(_ questions: [Question], picks: [String: Set<String>]) -> String? {
         guard let q = questions.first, let label = picks[q.id]?.first,
               let i = q.options.firstIndex(where: { $0.label == label }), i < 9 else { return nil }

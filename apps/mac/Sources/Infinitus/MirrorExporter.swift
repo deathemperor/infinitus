@@ -40,7 +40,6 @@ actor MirrorExporter {
                 plan: WindowPlanner.Plan? = nil, awsLogins: [AwsLogin.Item] = [],
                 progress: [Int: SessionProgress] = [:], stats: Stats.Bundle? = nil,
                 pushesAlerts: Bool = false, app: AppInfo? = nil,
-                profiles: [SessionProfile] = [],
                 // A closure, not a value: T3's project list scans past
                 // sessions and shells out to git per cwd (T3 clone A, #337) —
                 // real work the throttle below must skip, the same
@@ -48,20 +47,16 @@ actor MirrorExporter {
                 projects: @Sendable () -> [ProjectSummary] = { [] },
                 births: [Int: SessionBirth] = [:],
                 facts: @Sendable ([ClaudeSessionRecord]) -> [Int: SessionFacts] = { _ in [:] },
-                sequence: SequenceLog? = nil, now: Bool = false,
-                overlay: @Sendable ([ClaudeSessionRecord]) -> [ClaudeSessionRecord] = { $0 }) {
+                sequence: SequenceLog? = nil, now: Bool = false) {
         // `now`: news the phone is waiting on (an AWS-login need that just
         // surfaced) skips the 30 s throttle.
         guard now || Date().timeIntervalSince(lastWrite) > minInterval else { return }
         lastWrite = Date()
         let claudeDir = ClaudeSessions.configHome()
-        // `overlay` folds an owned session's live state into the rows; the
-        // facts build below keeps the plain records — a "waiting" status
-        // there turns the open tool_use into a second approval.
         let plainRecords = ClaudeSessions.list(claudeDir: claudeDir)
         // Same selection as InfinitusTray.swift's panel rows: busy/waiting
         // first, busy before waiting, capped at 6.
-        let allRecords = overlay(plainRecords)
+        let allRecords = plainRecords
         let sessionRecords = allRecords
             .filter { $0.status == "busy" || $0.status == "waiting" }
             .sorted { a, _ in a.status == "busy" }
@@ -128,7 +123,6 @@ actor MirrorExporter {
             awsLogins: awsLogins.isEmpty ? nil : awsLogins, stats: stats,
             recentCwds: recentCwds.isEmpty ? nil : recentCwds,
             pushesAlerts: pushesAlerts, app: app,
-            profiles: profiles.isEmpty ? nil : profiles,
             projects: { let p = projects(); return p.isEmpty ? nil : p }(),
             births: births.isEmpty ? nil
                 : SessionBirths.pruned(births, alive: Set(allRecords.map { Int($0.pid) })),

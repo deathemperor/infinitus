@@ -135,7 +135,6 @@ final class AppModel: ObservableObject {
     let resume = ResumeService()
     /// Sessions popover's mini progress rows (SessionProgressModel.swift).
     let sessionProgress = SessionProgressModel()
-    let sessionProfiles = SessionProfilesModel()
     /// What Infinitus started each live session as (#163/#165), by pid;
     /// kept across launches, pruned to the roster on every export.
     @Published private(set) var sessionBirths: [Int: SessionBirth] = SessionBirths.load(from: AppModel.birthsURL)
@@ -148,26 +147,10 @@ final class AppModel: ObservableObject {
         // reused pid after a reboot can never inherit a grant.
         let id = live.first { Int($0.pid) == pid }?.sessionId
         sessionBirths[pid] = id.map { birth.identified(as: $0) } ?? birth
-        // The profile's allow-list (#165) becomes the session's hook rules.
-        if let id { seedAllowList(birth, sessionId: id) }
         try? SessionBirths.save(sessionBirths, to: Self.birthsURL)
     }
     /// "Allow for this session" rules from the phone (#79), per session id.
     let toolApprovals = ToolApprovals()
-
-    private func profileAllowRules(_ birth: SessionBirth) -> [ToolApproval.Rule] {
-        guard let name = birth.profile else { return [] }
-        return sessionProfiles.profiles.first { SessionProfiles.same($0.name, name) }?.allowRules ?? []
-    }
-
-    /// A session born from a profile runs its allow-list without asking:
-    /// the same rules the phone's "Allow for this session" adds.
-    private func seedAllowList(_ birth: SessionBirth, sessionId: String) {
-        let rules = profileAllowRules(birth)
-        guard !rules.isEmpty, let name = birth.profile else { return }
-        for rule in rules { toolApprovals.add(rule, sessionId: sessionId) }
-        logEvent("hook", icon: "checkmark.shield", "profile \(name) allows \(rules.map(\.label).joined(separator: ", ")) in session \(sessionId.prefix(8))")
-    }
 
     /// The phone's star/pause verbs (`POST /accounts/action`), with the
     /// popup's own semantics: the same capability guards the control
@@ -213,12 +196,12 @@ final class AppModel: ObservableObject {
     /// narrowing from here would only pretend.
     func setSessionMode(_ text: String, pid: Int, record: ClaudeSessionRecord) -> SessionInput.Reply {
         let mode = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let choice = SessionStart.hookModes.first(where: { $0.mode == mode }) else {
-            return SessionInput.Reply(outcome: "rejected", detail: "mode must be one of \(SessionStart.hookModes.map(\.mode).joined(separator: ", "))")
+        guard let choice = SessionModes.hookModes.first(where: { $0.mode == mode }) else {
+            return SessionInput.Reply(outcome: "rejected", detail: "mode must be one of \(SessionModes.hookModes.map(\.mode).joined(separator: ", "))")
         }
         let birth = sessionBirths[pid] ?? SessionBirth()
         let target: String? = choice.mode == "supervised" ? nil : choice.mode
-        if SessionStart.modeRank(target) < SessionStart.modeRank(birth.permissionMode) {
+        if SessionModes.modeRank(target) < SessionModes.modeRank(birth.permissionMode) {
             let started = birth.modeLabelForStart ?? "supervised"
             return SessionInput.Reply(outcome: "rejected", detail: "the session started as \(started); a start mode cannot be narrowed from here")
         }
@@ -538,14 +521,6 @@ final class AppModel: ObservableObject {
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
-    /// Haiku names unnamed sessions (SessionNamer). On by default; one
-    /// short Haiku turn per session on the active account.
-    @Published var sessionAutoNames: Bool {
-        didSet {
-            defaults.set(sessionAutoNames, forKey: "session_auto_names")
-            sessionProgress.namer?.enabled = sessionAutoNames
-        }
-    }
     /// Hold a power assertion while any session is mid-turn (KeepAwake).
     /// Display-only row order (PopupSort): the engine's slots, headroom
     /// with active + next pinned (todo 2026-09-01), or the engine's own
@@ -577,11 +552,8 @@ final class AppModel: ObservableObject {
         }
     }
     // Away-push triggers beyond switches (PushTriggers has the rules).
-    @Published var pushSessionsDone: Bool { didSet { defaults.set(pushSessionsDone, forKey: "push_sessions_done") } }
     @Published var pushAllDead: Bool { didSet { defaults.set(pushAllDead, forKey: "push_all_dead") } }
     @Published var pushLastAlive: Bool { didSet { defaults.set(pushLastAlive, forKey: "push_last_alive") } }
-    @Published var pushWaiting: Bool { didSet { defaults.set(pushWaiting, forKey: "push_waiting") } }
-    @Published var pushAwsLogin: Bool { didSet { defaults.set(pushAwsLogin, forKey: "push_aws_login") } }
     /// "<name> is back" (and "all accounts are back — reset early") pushes (2026-09-05).
     @Published var pushRevived: Bool { didSet { defaults.set(pushRevived, forKey: "push_revived") } }
     /// Minutes before a reset that the row's countdown goes live and the
@@ -610,9 +582,6 @@ final class AppModel: ObservableObject {
         }
     }
     var machineName: String { MachineName.current(defaults: defaults) }
-    /// Where a session started from the phone opens (#91): "auto" (cmux
-    /// when installed, else Terminal), "cmux", "terminal".
-    @Published var sessionHost: String { didSet { defaults.set(sessionHost, forKey: "session_host") } }
     /// Per-turn workspace checkpoints (#167): a hidden git ref per prompt,
     /// recorded when the plugin's UserPromptSubmit hook fires.
     @Published var checkpointsEnabled: Bool { didSet { defaults.set(checkpointsEnabled, forKey: "checkpoints_enabled") } }
@@ -762,12 +731,8 @@ final class AppModel: ObservableObject {
     static let statsSurface = "stats"
     private(set) lazy var timelineCache = TimelineCache(log: sequenceLog)
     let mirrorServer = MirrorServer()
-    /// `session-delete`d past sessions (#220 Phase 2): a set kept off the
-    /// main actor so `PastSessions.list/find` can read it from the mirror
-    /// box or a popover's detached task without hopping here first.
-    let hiddenSessions = OSAllocatedUnfairLock(initialState: PastSessions.Hidden.load(root: AppSupport.root()).ids)
     /// `Stop`/`SessionEnd` hints ahead of Claude Code's own record (#79);
-    /// off the main actor like `hiddenSessions` — `ownedRoster` reads it
+    /// off the main actor — `sessionRows` reads it
     /// from wherever the control socket calls in.
     let sessionStatusHints = OSAllocatedUnfairLock(initialState: SessionStatusHints())
     /// Agent CLI socket (ControlServer.swift); the real model only.
@@ -811,7 +776,8 @@ final class AppModel: ObservableObject {
     /// The live sessions as the control socket lists them (#79): the
     /// record plus the name the popup shows.
     func sessionRows() -> [SessionRow] {
-        ownedRoster(claudeDir: ClaudeSessions.configHome()).map { record in
+        let hinted = sessionStatusHints.withLock { $0.apply(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())) }
+        return hinted.map { record in
             let pid = Int(record.pid)
             let progress = sessionProgress.byPid[pid]
             let shown = SessionNaming.displayName(name: progress?.name ?? record.name,
@@ -880,10 +846,8 @@ final class AppModel: ObservableObject {
         if event.name == "StopFailure", !isPlayground {
             logEvent("hook", icon: "bolt.horizontal", event.logLine)
         }
-        if let line = event.pushLine, !isPlayground, !forkDriven {
+        if event.needsHuman, !isPlayground, !forkDriven {
             logEvent("hook", icon: "bolt.horizontal", event.logLine)
-            if let pid { pushTriggers.announceWaiting(pid: pid) }
-            if pushWaiting { push(line) }
         }
         // One refresh per burst, at most every 30 s: the record's status
         // flips a beat after the hook fires, Stop + Notification often
@@ -943,18 +907,14 @@ final class AppModel: ObservableObject {
     }
     private let awake = KeepAwake()
     /// Seeded with what the triggers remembered before the last relaunch
-    /// (#98, #231): AWS-login needs already pushed (`failedAt` comes from
-    /// the transcript line, so the key is stable across launches), the
-    /// last-alive warning, the busy stretch.
+    /// (#98, #231): the last-alive warning.
     private lazy var pushTriggers = PushTriggers(memory: persistedPushMemory)
     private lazy var persistedPushMemory: PushTriggers.Memory = {
         if let data = defaults.data(forKey: Self.pushMemoryKey),
            let memory = try? JSONDecoder().decode(PushTriggers.Memory.self, from: data) { return memory }
-        // Before the blob only the AWS keys were kept.
-        return PushTriggers.Memory(announcedAwsLogins: Set(defaults.stringArray(forKey: Self.announcedAwsLoginsKey) ?? []))
+        return PushTriggers.Memory()
     }()
     static let pushMemoryKey = "push_triggers_memory"
-    static let announcedAwsLoginsKey = "push_announced_aws_logins"
     private let defaults: UserDefaults
 
     /// Custom skins from themes.json, loaded at launch and on demand
@@ -1036,7 +996,6 @@ final class AppModel: ObservableObject {
         titleReset = TitlePrefs.resetChoices.contains(reset) ? reset : "countdown"
         titleIconOnly = defaults.object(forKey: "title_icon_only") as? Bool ?? false
         popoverPinned = defaults.object(forKey: "popover_pinned") as? Bool ?? false
-        sessionAutoNames = defaults.object(forKey: "session_auto_names") as? Bool ?? true
         popupLayout = defaults.string(forKey: "popup_layout") ?? "wide"
         popupTextSize = defaults.string(forKey: "popup_text_size") ?? "default"
         glassFocused = defaults.object(forKey: "glass_focused") as? Double ?? 0.7
@@ -1070,11 +1029,8 @@ final class AppModel: ObservableObject {
         let storedToken = defaults.string(forKey: "mirror_pair_token") ?? ""
         mirrorPairToken = storedToken.isEmpty ? MirrorPairing.generateToken() : storedToken
         // Push triggers default ON — they exist because they were asked for.
-        pushSessionsDone = defaults.object(forKey: "push_sessions_done") as? Bool ?? true
         pushAllDead = defaults.object(forKey: "push_all_dead") as? Bool ?? true
         pushLastAlive = defaults.object(forKey: "push_last_alive") as? Bool ?? true
-        pushWaiting = defaults.object(forKey: "push_waiting") as? Bool ?? true
-        pushAwsLogin = defaults.object(forKey: "push_aws_login") as? Bool ?? true
         pushRevived = defaults.object(forKey: "push_revived") as? Bool ?? true
         reviveLeadMinutes = defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10
         priorityMode = Self.priorityMode(defaults)
@@ -1082,7 +1038,6 @@ final class AppModel: ObservableObject {
         priorityAbundantPct = defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50
         liveActivityRateSeconds = defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
-        sessionHost = defaults.string(forKey: "session_host") ?? "auto"
         checkpointsEnabled = defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
@@ -1147,11 +1102,6 @@ final class AppModel: ObservableObject {
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
         statsModel.leases = mirrorServer.leases
-        if !isPlayground, !mockMode {
-            let namer = SessionNamer(appSupport: AppSupport.root())
-            namer.enabled = sessionAutoNames
-            sessionProgress.namer = namer
-        }
     }
 
     /// App-side cache of our own subprocess output (never an engine
@@ -1268,11 +1218,8 @@ final class AppModel: ObservableObject {
         set(\.keepAwake, defaults.object(forKey: "keep_awake") as? Bool ?? false)
         set(\.keepAwakeDisplay, defaults.object(forKey: "keep_awake_display") as? Bool ?? true)
         set(\.popupSort, Self.popupSort(defaults))
-        set(\.pushSessionsDone, defaults.object(forKey: "push_sessions_done") as? Bool ?? true)
         set(\.pushAllDead, defaults.object(forKey: "push_all_dead") as? Bool ?? true)
         set(\.pushLastAlive, defaults.object(forKey: "push_last_alive") as? Bool ?? true)
-        set(\.pushWaiting, defaults.object(forKey: "push_waiting") as? Bool ?? true)
-        set(\.pushAwsLogin, defaults.object(forKey: "push_aws_login") as? Bool ?? true)
         set(\.pushRevived, defaults.object(forKey: "push_revived") as? Bool ?? true)
         set(\.reviveLeadMinutes, defaults.object(forKey: "revive_lead_minutes") as? Int ?? 10)
         set(\.priorityMode, Self.priorityMode(defaults))
@@ -1280,13 +1227,11 @@ final class AppModel: ObservableObject {
         set(\.priorityAbundantPct, defaults.object(forKey: "priority_abundant_pct") as? Int ?? 50)
         set(\.liveActivityRateSeconds, defaults.object(forKey: "live_activity_rate_seconds") as? Int ?? 5)
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
-        set(\.sessionHost, defaults.string(forKey: "session_host") ?? "auto")
         set(\.checkpointsEnabled, defaults.object(forKey: "checkpoints_enabled") as? Bool ?? true)
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.chatHeader, defaults.string(forKey: "chat_header") ?? "compact")
-        set(\.sessionAutoNames, defaults.object(forKey: "session_auto_names") as? Bool ?? true)
         set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
         set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
         set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
@@ -1416,7 +1361,7 @@ final class AppModel: ObservableObject {
             return state.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
                 .flatMap(UsageHistory.parseISO)
         }
-        let fleet = overlayingOwnedStatus(try await engine.refresh(fleet: provider, number: number))
+        let fleet = try await engine.refresh(fleet: provider, number: number)
         _ = registry.state(for: fleet).apply(fleet)
         return fleet.accounts.first { $0.number == number }?.usage?.fiveHour?.resetsAt
             .flatMap(UsageHistory.parseISO)
@@ -1502,11 +1447,6 @@ final class AppModel: ObservableObject {
         // real events log either.
         if !isPlayground, !mockMode {
             Task.detached(priority: .utility) { [eventStore] in await eventStore.prune() }
-            Task.detached(priority: .utility) { [weak self] in
-                let swept = Self.sweepOwnedOrphans()
-                guard !swept.isEmpty else { return }
-                await MainActor.run { self?.logEvent("other", icon: "terminal", "swept \(swept.count) orphaned headless sessions") }
-            }
         }
         resume.log = { [weak self] icon, text in
             self?.logEvent("nudge", icon: icon, text)
@@ -1539,27 +1479,6 @@ final class AppModel: ObservableObject {
             guard let self else { return AccountAction.Reply(outcome: "failed", detail: "app gone") }
             return await self.performAccountAction(request)
         }
-        let host = sessionHost
-        mirrorServer.sessionStart.set { [weak self] request in
-            guard let self else { return SessionStart.Reply(outcome: "failed", detail: "app gone") }
-            // The box is synchronous (the terminal launcher blocks too);
-            // an owned start awaits the actor from this off-main thread.
-            let done = DispatchSemaphore(value: 0)
-            nonisolated(unsafe) var reply = SessionStart.Reply(outcome: "failed", detail: "start did not complete")
-            Task { reply = await self.startSession(request, preferredHost: host); done.signal() }
-            done.wait()
-            let label = (request.cwd as NSString).lastPathComponent
-            let verb = request.resume == nil ? "started" : "resumed"
-            let born = request.profile.map { " (profile \($0))" } ?? ""
-            Task { @MainActor in
-                if reply.outcome == "started", let pid = reply.pid, let birth = SessionBirth(request: request, host: reply.host) {
-                    self.recordBirth(pid: pid, birth)
-                }
-                self.logMirrorInput(reply.outcome == "started" ? "🚀" : "⚠️",
-                                    "phone \(verb) a session in \(label)\(born): \(reply.outcome)\(reply.host.map { " via \($0)" } ?? "")")
-            }
-            return reply
-        }
         // A session's hook mode (#163 phase 2) is remembered in its birth
         // across a relaunch, but the hook answers from ToolApprovals'
         // memory — reseed it, or the chip would promise a mode the hook
@@ -1568,7 +1487,6 @@ final class AppModel: ObservableObject {
         for (pid, birth) in sessionBirths {
             guard let record = live.first(where: { Int($0.pid) == pid }), birth.sessionId == record.sessionId else { continue }
             if let mode = birth.hookMode { toolApprovals.setMode(mode, sessionId: record.sessionId) }
-            for rule in profileAllowRules(birth) { toolApprovals.add(rule, sessionId: record.sessionId) }
         }
         // UserDefaults is thread-safe; the closure only reads it.
         nonisolated(unsafe) let prefDefaults = defaults
@@ -1586,11 +1504,6 @@ final class AppModel: ObservableObject {
             }
             done.wait()
             return try outcome.get()
-        }
-        mirrorServer.pastSessions.set { [hiddenSessions] limit, search in
-            PastSessions.Reply(sessions: PastSessions.list(claudeDir: ClaudeSessions.configHome(),
-                                                           limit: limit, search: search,
-                                                           hidden: hiddenSessions.withLock { $0 }))
         }
         // The phone's checkpoint routes (#167 phase 2) act on the live
         // session's record — the same lookup `infinitusctl checkpoints`
@@ -1720,19 +1633,14 @@ final class AppModel: ObservableObject {
         Task { [mirrorExporter] in await mirrorExporter.attach(payload: payload) }
         mirrorServer.start(machineName: machineName,
                            token: mirrorPairToken)
-        let ownedBox = ownedBox
         let feedTails = FeedTails()
         mirrorServer.sessionFeed.set { pid, limit, since, wait, rows in
             let claudeDir = ClaudeSessions.configHome()
-            let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
-            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: wait,
-                                            decorate: { stamp in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp },
-                                            wake: owned?.wake)
+            SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir, since: since, wait: wait)
             guard let record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid })
             else { return nil }
-            guard var feed = feedTails.read(record: record, claudeDir: claudeDir, limit: limit)
+            guard let feed = feedTails.read(record: record, claudeDir: claudeDir, limit: limit)
             else { return nil }
-            if let owned { feed = OwnedFeed.augment(feed, pending: owned.pending(pid: pid), limits: owned.limits(pid: pid)) }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             guard rows, let timeline = feed.timeline,
@@ -1783,7 +1691,7 @@ final class AppModel: ObservableObject {
         // on the actor rather than touched from the nonisolated closure).
         let timelineCache = timelineCache, attentionStore = attentionStore
         mirrorServer.attention.set { pid, request in
-            Self.applyAttention(pid: pid, request, timelineCache: timelineCache, attentionStore: attentionStore, ownedBox: ownedBox)
+            Self.applyAttention(pid: pid, request, timelineCache: timelineCache, attentionStore: attentionStore)
         }
         // `GET /sessions/<pid>/commands` (#223, the phone's `/` popover): the
         // session's cwd decides the list; the reply is cached per cwd for a
@@ -1811,30 +1719,26 @@ final class AppModel: ObservableObject {
         let sequenceLog = sequenceLog
         mirrorServer.timeline.set { pid, after, epoch, wait in
             let claudeDir = ClaudeSessions.configHome()
-            let owned = ownedBox.existing.flatMap { $0.ownedPids.contains(pid) ? $0 : nil }
             guard var record = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
                   var timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
             // Rebuilt first, so a change since the client's last reply
             // answers at once; the long-poll only when THIS pid has
             // nothing after the cursor (a gap snapshots without waiting).
-            // Same wait rule as /tail: the record stamp, an owned pid's
-            // parked prompts folded in and its actor's wake-up.
+            // Same wait rule as /tail: the record stamp.
             if wait > 0, let after, sequenceLog.events(pid: pid, after: after)?.isEmpty == true {
-                let decorate = { (stamp: String) in owned.map { OwnedFeed.decorate(stamp, pending: $0.pending(pid: pid), limits: $0.limits(pid: pid)) } ?? stamp }
                 SessionFeedReader.waitForChange(pid: pid, claudeDir: claudeDir,
-                                                since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir).map(decorate),
-                                                wait: wait, decorate: decorate, wake: owned?.wake)
+                                                since: SessionFeedReader.stamp(record: record, claudeDir: claudeDir),
+                                                wait: wait)
                 if let fresh = ClaudeSessions.list(claudeDir: claudeDir).first(where: { $0.pid == pid }),
                    let rebuilt = timelineCache.timeline(record: fresh, claudeDir: claudeDir) {
                     record = fresh; timeline = rebuilt
                 }
             }
-            let full = timeline.appending(limits: owned?.limits(pid: pid) ?? []).appending(pending: owned?.pending(pid: pid) ?? [])
-            let facts = SessionFacts.derive(timeline: full, status: record.status,
+            let facts = SessionFacts.derive(timeline: timeline, status: record.status,
                                             attention: attentionStore.entry(sessionId: record.sessionId))
             _ = sequenceLog.record(pid: pid, facts: facts)
             let reply = TimelineSync.reply(log: sequenceLog, pid: pid, afterSequence: after, epoch: epoch,
-                                           timeline: full, facts: facts)
+                                           timeline: timeline, facts: facts)
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             return try? encoder.encode(reply)
@@ -1864,14 +1768,12 @@ final class AppModel: ObservableObject {
     /// pieces on the actor and pass them in, rather than this touching
     /// `self` from whatever thread the caller runs on.
     nonisolated static func applyAttention(pid: Int32, _ request: SessionAttention.Request,
-                                           timelineCache: TimelineCache, attentionStore: AttentionStore,
-                                           ownedBox: OwnedSessionsBox) -> SessionAttention.Outcome? {
+                                           timelineCache: TimelineCache, attentionStore: AttentionStore) -> SessionAttention.Outcome? {
         let claudeDir = ClaudeSessions.configHome()
         guard let record = ClaudeSessions.record(pid: pid, sessionId: request.sessionId, in: ClaudeSessions.list(claudeDir: claudeDir)),
               let timeline = timelineCache.timeline(record: record, claudeDir: claudeDir) else { return nil }
-        let pending = ownedBox.existing?.pending(pid: record.pid) ?? []
         return SessionAttention.apply(request, sessionId: record.sessionId,
-                                      timeline: timeline.appending(pending: pending),
+                                      timeline: timeline,
                                       status: record.status, store: attentionStore)
     }
 
@@ -1907,10 +1809,7 @@ final class AppModel: ObservableObject {
                 Task { @MainActor in self.logMirrorInput("🛡️", "\(source) allows \(rule.label) for the rest of session \(pid)") }
             }
             let reply = SessionInput.deliver(request: request, record: record,
-                                             hosts: PtyHosts.available(), claudeDir: claudeDir,
-                                             owned: self.ownedBox.existing.map { owned in
-                                                 { owned.deliver(Self.imagesForOwned($0), record: $1) }
-                                             })
+                                             hosts: PtyHosts.available(), claudeDir: claudeDir)
             let label = URL(fileURLWithPath: record.cwd).lastPathComponent
             Task { @MainActor in
                 if reply.outcome == "delivered" {
@@ -1948,24 +1847,6 @@ final class AppModel: ObservableObject {
             for provider in AwsLogin.Provider.allCases {
                 guard let profile = progress.loginProfile(provider) else { continue }
                 needs.append((pid, provider, profile, progress.loginFailedAt(provider), progress.name))
-            }
-        }
-        // A headless child's lapsed sign-in comes off its stream (#402),
-        // ahead of the transcript scan; the newer failure wins per
-        // (session, provider). `existing`: never construct the actor here.
-        // An exited child (status nil) is published a beat before it
-        // leaves the registry; its need goes with it either way.
-        if let owned = ownedBox.existing {
-            for pid in owned.ownedPids where owned.status(pid: pid) != nil {
-                for need in owned.loginNeeds(pid: pid) {
-                    let pid = Int(pid)
-                    if let i = needs.firstIndex(where: { $0.pid == pid && $0.provider == need.provider }) {
-                        if let wire = need.failedAt, let file = needs[i].failedAt, wire <= file { continue }
-                        needs[i] = (pid, need.provider, need.profile, need.failedAt ?? needs[i].failedAt, needs[i].name)
-                    } else {
-                        needs.append((pid, need.provider, need.profile, need.failedAt, sessionProgress.byPid[pid]?.name))
-                    }
-                }
             }
         }
         needs.sort { ($0.pid, $0.provider.rawValue) < ($1.pid, $1.provider.rawValue) }
@@ -2660,7 +2541,7 @@ final class AppModel: ObservableObject {
             if engineErrors[r.id] != nil { engineErrors[r.id] = nil }
             for reported in fleets {
                 let state = registry.state(for: reported)
-                let fleet = overlayingOwnedStatus(withLocalSessions(reported, primary: state === primary))
+                let fleet = withLocalSessions(reported, primary: state === primary)
                 let before = state.lastFleet
                 let change = state.apply(fleet)
                 anyChanged = anyChanged || change.changed
@@ -2819,9 +2700,8 @@ final class AppModel: ObservableObject {
                 updateVersion: appUpdateVersion,
                 updateChannel: BrewUpdater.channel.rawValue,
                 phoneLatest: appReleaseLatest)
-            let timelineCache = timelineCache, attentionStore = attentionStore, ownedBox = ownedBox
+            let timelineCache = timelineCache, attentionStore = attentionStore
             let sequenceLog = sequenceLog, leases = mirrorServer.leases
-            let sessionProfilesList = sessionProfiles.profiles
             let mirrorNow = mirrorExportDue
             mirrorExportDue = false
             // A living UI keeps its lease; the cap only catches one that died.
@@ -2835,8 +2715,7 @@ final class AppModel: ObservableObject {
                                             stats: stats,
                                             pushesAlerts: self.liveActivityPusher.configured,
                                             app: appInfo,
-                                            profiles: sessionProfilesList,
-                                            projects: { self.projectSummaries(profiles: sessionProfilesList) },
+                                            projects: { self.projectSummaries() },
                                             births: self.sessionBirths,
                                             facts: { records in
                                                 // Only leased sessions get a timeline rebuild (#223
@@ -2845,13 +2724,12 @@ final class AppModel: ObservableObject {
                                                 let wanted = leases.leasedPids().map { pids in records.filter { pids.contains($0.pid) } } ?? records
                                                 let facts = timelineCache.facts(records: wanted, claudeDir: ClaudeSessions.configHome(),
                                                                                 attention: attentionStore, roster: records,
-                                                                                watched: leases.watchedPids()) { ownedBox.existing?.pending(pid: $0) ?? [] }
+                                                                                watched: leases.watchedPids()) { _ in [] }
                                                 // The Mac's own sessions card reads the same facts (phase 3).
                                                 Task { @MainActor [weak self] in self?.sessionProgress.setFacts(facts) }
                                                 return facts
                                             },
-                                            sequence: sequenceLog, now: mirrorNow,
-                                            overlay: self.overlayingOwnedStatus)
+                                            sequence: sequenceLog, now: mirrorNow)
             }
         }
         // All-limited: count the limit-stopped sessions waiting to be
@@ -2937,28 +2815,9 @@ final class AppModel: ObservableObject {
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
                 worstPct: PushTriggers.worstPlanPct(a.usage)) }
-        // #777: nested in the desktop, the fork's own threads (SDK-entered,
-        // #648) leave the "sessions done" and waiting counts — the desktop
-        // announces those itself; terminal sessions stay the helper's.
-        var live = list.liveSessions
-        if Nesting.isNested, let all = live, let details = all.sessions {
-            let forkPids = Set(ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
-                .filter(\.resumedElsewhere).map { Int($0.pid) })
-            let fork = details.filter { forkPids.contains($0.pid) }
-            if !fork.isEmpty {
-                live = LiveSessions(busy: all.busy - fork.filter { $0.status == "busy" }.count,
-                                    total: all.total - fork.count,
-                                    sessions: details.filter { !forkPids.contains($0.pid) })
-            }
-        }
         let pushes = pushTriggers.tick(
-            busy: live?.busy, total: live?.total,
             accounts: health,
-            flags: .init(sessionsDone: pushSessionsDone,
-                         allDead: pushAllDead, lastAlive: pushLastAlive,
-                         waiting: pushWaiting, awsLogin: pushAwsLogin),
-            sessions: live?.sessions,
-            awsLogins: awsLoginsScanned ? awsLogins : nil,
+            flags: .init(allDead: pushAllDead, lastAlive: pushLastAlive),
             now: Date())
         if pushTriggers.memory != persistedPushMemory {
             persistedPushMemory = pushTriggers.memory
@@ -2968,38 +2827,17 @@ final class AppModel: ObservableObject {
         if !isPlayground { await sync.tick() }
     }
 
-    private let pastSessionsMemo = PastSessionsMemo()
-
     /// T3's project list for the window and the mirror (spec §2.1). Off
-    /// the main actor (called from the exporter's detached tick) — takes
-    /// `profiles` from the caller since a `nonisolated` func can't read
-    /// the main-actor-isolated `sessionProfiles` itself.
+    /// the main actor (called from the exporter's detached tick).
     /// `live` is the caller's own `ClaudeSessions.list` when it has one
     /// (the workspace window lists for its inputs anyway, #384); nil lists here.
-    nonisolated func projectSummaries(profiles: [SessionProfile], live: [ClaudeSessionRecord]? = nil) -> [ProjectSummary] {
+    nonisolated func projectSummaries(live: [ClaudeSessionRecord]? = nil) -> [ProjectSummary] {
         let claudeDir = ClaudeSessions.configHome()
         let live = live ?? ClaudeSessions.list(claudeDir: claudeDir)
-        // `PastSessions.list` stats every transcript under the projects
-        // dir (10k files, ~1 s of CPU here) and the export asked for it
-        // on every refresh — 7% idle CPU on its own (#346). The walk is
-        // reused while the live set and the project dirs' fingerprint
-        // hold: a session ending is what turns a transcript into a past
-        // one, a new or removed transcript moves its project dir's
-        // mtime, and nothing else changes what the walk would find. The
-        // ten-minute backstop covers a clock or filesystem oddity.
-        let liveKey = live.map(\.sessionId).sorted().joined(separator: ",")
-        // A `session-delete` (#220 Phase 2) changes the list without moving
-        // any mtime: the hidden count is part of the key.
-        let hidden = hiddenSessions.withLock { $0 }
-        let key = liveKey + "|" + PastSessions.fingerprint(claudeDir: claudeDir) + "|" + String(hidden.count)
-        let past = pastSessionsMemo.value(key: key, maxAge: 600) {
-            PastSessions.list(claudeDir: claudeDir, limit: 200, hidden: hidden)
-        }
         let recentCwds = AppDefaults.standard.stringArray(forKey: "recent_cwds") ?? []
         // The branch is one HEAD-file read per cwd (#346) — no spawn, no
         // memo, so a checkout shows on the next pump.
-        return ProjectSummary.derive(live: live, past: past, profiles: profiles,
-                                     recentCwds: recentCwds,
+        return ProjectSummary.derive(live: live, recentCwds: recentCwds,
                                      branch: { cwd in T3GitFacts.branch(cwd: cwd) })
     }
 
@@ -3044,49 +2882,12 @@ final class AppModel: ObservableObject {
         namedTunnel.stop()
         forkTunnel.stop()
         let swapdSupervisor = swapdSupervisor
-        let owned = ownedBox.existing
         Task {
             await swapdSupervisor?.stop()
-            // Owned Claude sessions are this process's children (#151):
-            // they don't outlive the app either (the #274 lesson).
-            await owned?.stopAll()
             await MainActor.run {
                 NSApplication.shared.terminate(nil)
             }
         }
-    }
-
-    // MARK: - Owned sessions (#151)
-
-    /// Headless Claude Code sessions this app spawned and talks to over
-    /// stdin. Made on first use, off the main actor — locating `claude`
-    /// may run a login shell.
-    let ownedBox = OwnedSessionsBox()
-    nonisolated static let ownedLedgerURL = AppSupport.root().appendingPathComponent("owned-sessions.json")
-
-    nonisolated func ownedSessions() -> OwnedSessions? {
-        ownedBox.get { [weak self] in
-            guard let path = ClaudeLocator.locate() else { return nil }
-            return OwnedSessions(binaryPath: path, ledger: OwnedLedger(url: Self.ownedLedgerURL),
-                                 onState: { pid, state in
-                                     Task { @MainActor in self?.ownedStateChanged(pid: pid, state: state) }
-                                 },
-                                 onLoginNeed: { _ in Task { @MainActor in self?.rebuildAwsLogins() } })
-        }
-    }
-
-    /// The roster with the hook hints applied (#79) and an owned child's
-    /// status filled in from its actor (the CLI leaves an sdk-cli record's
-    /// status empty) — the overlay stays last: an owned child's actor is
-    /// the truth for its own pid.
-    nonisolated func ownedRoster(claudeDir: URL) -> [ClaudeSessionRecord] {
-        let hinted = sessionStatusHints.withLock { $0.apply(ClaudeSessions.list(claudeDir: claudeDir)) }
-        return overlayingOwnedStatus(hinted)
-    }
-
-    nonisolated func overlayingOwnedStatus(_ records: [ClaudeSessionRecord]) -> [ClaudeSessionRecord] {
-        guard let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return records }
-        return records.map { r in owned.status(pid: r.pid).map { r.with(status: $0) } ?? r }
     }
 
     /// The primary fleet's live sessions are the app's own scan when the
@@ -3098,67 +2899,6 @@ final class AppModel: ObservableObject {
     func withLocalSessions(_ fleet: EngineFleet, primary: Bool) -> EngineFleet {
         guard primary, fleet.liveSessions == nil, !isPlayground else { return fleet }
         return fleet.with(liveSessions: LiveSessions(records: ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())))
-    }
-
-    /// The engine's live-session list with the same overlay, so the card
-    /// says busy/idle/waiting for an owned session, not "unknown".
-    nonisolated func overlayingOwnedStatus(_ fleet: EngineFleet) -> EngineFleet {
-        guard let live = fleet.liveSessions, let owned = ownedBox.existing, !owned.ownedPids.isEmpty else { return fleet }
-        return fleet.with(liveSessions: live.overlaying { owned.status(pid: Int32($0)) })
-    }
-
-    /// A headless child from a crashed prior launch (no PDEATHSIG on
-    /// Darwin) — swept once at startup, off the main actor (#151 follow-up).
-    nonisolated static func sweepOwnedOrphans() -> [Int32] {
-        OwnedSessions.sweepOrphans(ledger: OwnedLedger(url: ownedLedgerURL), claudeDir: ClaudeSessions.configHome())
-    }
-
-    /// A headless session takes the API's image types only; a phone file
-    /// pick can be HEIC — ImageIO reads it, so it goes as a JPEG bounded
-    /// to the API's recommended long edge instead of bouncing.
-    nonisolated static func imagesForOwned(_ request: SessionInput.Request) -> SessionInput.Request {
-        guard let attachments = request.attachments, attachments.contains(where: needsJPEG) else { return request }
-        let converted = attachments.map { a -> SessionInput.Attachment in
-            guard needsJPEG(a), let jpeg = ImageThumbnail.jpeg(a.data, maxPixels: 1568) else { return a }
-            return SessionInput.Attachment(name: a.name, mime: "image/jpeg", data: jpeg)
-        }
-        return SessionInput.Request(kind: request.kind, text: request.text, attachments: converted,
-                                    requestId: request.requestId, queuedAt: request.queuedAt,
-                                    sessionId: request.sessionId, commandId: request.commandId)
-    }
-
-    private nonisolated static func needsJPEG(_ a: SessionInput.Attachment) -> Bool {
-        a.mime.hasPrefix("image/") && !OwnedWire.imageMediaTypes.contains(a.mime)
-    }
-
-    private func ownedStateChanged(pid: Int32, state: OwnedSessions.State) {
-        switch state {
-        case .exited:
-            logEvent("other", icon: "terminal", "headless session \(pid) ended")
-            rebuildAwsLogins()   // its stream's need goes with it (#402)
-        case .waiting: logEvent("other", icon: "hand.raised", "headless session \(pid) is waiting for an answer")
-        default: break
-        }
-    }
-
-    /// Start a session the way the phone, the popup and Past sessions ask:
-    /// `headless` (or the "owned" host) spawns a child this app talks to,
-    /// anything else opens a terminal through `SessionLauncher`.
-    nonisolated func startSession(_ request: SessionStart.Request, preferredHost: String) async -> SessionStart.Reply {
-        let headless = request.headless ?? (preferredHost == "owned")
-        guard headless else {
-            return SessionLauncher.start(request, preferredHost: preferredHost == "owned" ? "auto" : preferredHost)
-        }
-        // Locating `claude` may block on a login shell: never on the
-        // cooperative pool (Infi4, 2026-09-07) — a GCD thread does it.
-        let located = await withCheckedContinuation { (c: CheckedContinuation<OwnedSessions?, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async { c.resume(returning: self.ownedSessions()) }
-        }
-        guard let owned = located else {
-            return SessionStart.Reply(outcome: "failed",
-                                      detail: "claude isn't on this Mac's PATH; a headless session needs Claude Code \(ClaudeLocator.minimumVersion.map(String.init).joined(separator: ".")) or newer")
-        }
-        return await owned.start(request)
     }
 
     func rename(_ number: Int, to name: String) { primary?.rename(number, to: name) }
@@ -3213,25 +2953,4 @@ extension AppModel: FleetModel {
 
     /// The primary fleet's engine decides what the mac-only panes may do.
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }
-}
-
-    private let pastSessionsMemo = PastSessionsMemo()
-/// One remembered `PastSessions.list` for `projectSummaries` (#346):
-/// a value, the key it was computed under and when. Called off the main
-/// actor from the exporter's detached tick, so it locks.
-final class PastSessionsMemo: @unchecked Sendable {
-    private let lock = NSLock()
-    private var key = "", at = Date.distantPast, stored: [PastSession] = []
-
-    func value(key: String, maxAge: TimeInterval, now: Date = Date(),
-               compute: () -> [PastSession]) -> [PastSession] {
-        lock.lock()
-        if self.key == key, now.timeIntervalSince(at) < maxAge {
-            let hit = stored; lock.unlock(); return hit
-        }
-        lock.unlock()
-        let fresh = compute()
-        lock.lock(); self.key = key; at = now; stored = fresh; lock.unlock()
-        return fresh
-    }
 }

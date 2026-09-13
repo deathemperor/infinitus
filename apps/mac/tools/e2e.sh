@@ -43,7 +43,6 @@ export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
 export INFINITUS_SWAPD_CLI="$PWD/tools/demo-swapd"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
-export INFINITUS_PROFILES="$SOCKDIR/profiles.json"   # #165: never the real list
 LOG="$(mktemp -t infinitus-e2e)"
 # This run's own defaults domain (#690): unbundled debug binaries used to
 # share one, so a peer's leftover fork_server_port could fail another
@@ -357,11 +356,7 @@ REV="$(python3 -c "print(' '.join(reversed('$ORDER'.split())))")"
 "$CTL" randomize-names swapd/claude | expect "len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts']) and len(d['names'])==len(d['fleet']['accounts'])" || fail "randomize-names didn't give every account its own name"
 # One account re-rolls alone (#145): one name, worn by that account, still distinct from every other.
 "$CTL" randomize-names swapd/claude 2 | expect "len(d['names'])==1 and [a for a in d['fleet']['accounts'] if a['number']==2][0].get('alias')==d['names'][0] and len(set(a.get('alias') for a in d['fleet']['accounts']))==len(d['fleet']['accounts'])" || fail "randomize-names <n> didn't re-roll account 2 alone"
-"$CTL" profile-set e2e-review --cwd /tmp --mode acceptEdits --model opus --allow "Edit, Bash git" | expect "d['profile']['name']=='e2e-review' and d['profile']['permissionMode']=='acceptEdits' and d['profile']['model']=='opus' and d['profile']['allowTools']==['Edit','Bash git']" || fail "profile-set didn't save the fields"
-"$CTL" profiles | expect "[p['name'] for p in d['profiles']]==['e2e-review']" || fail "profiles didn't list the saved profile"
-"$CTL" profile-remove e2e-review | expect "d['removed'] is True" || fail "profile-remove didn't remove"
-"$CTL" past-sessions --limit 3 | expect "isinstance(d['sessions'], list) and len(d['sessions'])<=3" || fail "past-sessions didn't list"
-echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names, past-sessions, profiles)"
+echo "round-trips: ok (switch, rotate, hold, unhold, rename, prefer, reorder, randomize-names)"
 "$CTL" plan | expect "'plan' in d and (d['plan'] is None or 'steps' in d['plan'])" || fail "plan verb"
 "$CTL" ignite swapd/claude 2 | expect "'fleet' in d" || fail "ignite verb"
 
@@ -414,8 +409,8 @@ echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
 # --- windows: Settings open idles too ------------------------------------
-# The Settings-open case sat at 18% for a week (#346: transcript reads,
-# the past-sessions walk and the machine sampler all ran on behind it)
+# The Settings-open case sat at 18% for a week (#346: transcript reads
+# and the machine sampler all ran on behind it)
 # while the pop-out gate read 0.5%; this is the gate
 # that would have caught it. Settle first: the window builds its tabs on
 # the first open.
@@ -844,8 +839,8 @@ python3 -c "import sys; sys.exit(0 if $PCT <= $IDLE_BUDGET_PCT else 1)" || fail 
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
 # #654: the fork's quit-with-window setting sends `quit`; the app answers,
-# then leaves on its own (tunnels, terminals, owned sessions first) — the
-# wait below is bounded, and the time is printed.
+# then leaves on its own (tunnels stop first) — the wait below is bounded,
+# and the time is printed.
 "$CTL" quit | expect "d['quitting'] is True" || fail "quit"
 # The app is this shell's child: until `wait` reaps it the pid lingers as
 # a zombie, so the exit shows as state Z, not as a missing pid.

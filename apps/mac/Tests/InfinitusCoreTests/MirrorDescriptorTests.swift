@@ -44,8 +44,7 @@ final class MirrorDescriptorTests: XCTestCase {
                        d.capabilities.checkpoints, d.capabilities.attention, d.capabilities.images] {
             XCTAssertEqual(served, true)
         }
-        for other in [d.capabilities.leases, d.capabilities.ownedSessions,
-                     d.capabilities.pastSessions, d.capabilities.prefs] {
+        for other in [d.capabilities.leases, d.capabilities.prefs] {
             XCTAssertEqual(other, false)
         }
         let text = String(decoding: try JSONEncoder().encode(d), as: UTF8.self)

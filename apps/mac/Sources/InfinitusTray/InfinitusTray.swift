@@ -195,8 +195,8 @@ struct InfinitusTray {
                                            over HTTP (Linux only); also ticks the
                                            away-push triggers (#13 parity) every S
                                            seconds (default 30) — env vars
-                                           INFINITUS_PUSH_SESSIONS_DONE/ALL_DEAD/
-                                           LAST_ALIVE/WAITING (default on) gate them
+                                           INFINITUS_PUSH_ALL_DEAD/LAST_ALIVE
+                                           (default on) gate them
       pair [--port N]                     print the pair URL (+ QR if qrencode is on PATH)
 
     Wire-up (packaging/omarchy/waybar-infinitus.jsonc):
@@ -601,10 +601,8 @@ struct InfinitusTray {
             guard let v = env[name] else { return true }
             return !["0", "false", "off"].contains(v.lowercased())
         }
-        return .init(sessionsDone: on("INFINITUS_PUSH_SESSIONS_DONE"),
-                     allDead: on("INFINITUS_PUSH_ALL_DEAD"),
-                     lastAlive: on("INFINITUS_PUSH_LAST_ALIVE"),
-                     waiting: on("INFINITUS_PUSH_WAITING"))
+        return .init(allDead: on("INFINITUS_PUSH_ALL_DEAD"),
+                     lastAlive: on("INFINITUS_PUSH_LAST_ALIVE"))
     }
 
     /// One `PushTriggers` tick off a freshly-collected list — mirrors
@@ -623,9 +621,7 @@ struct InfinitusTray {
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
                 worstPct: PushTriggers.worstPlanPct(a.usage)) }
-        let pushes = box.with { $0.tick(
-            busy: list?.liveSessions?.busy, total: list?.liveSessions?.total,
-            accounts: health, flags: flags, sessions: list?.liveSessions?.sessions) }
+        let pushes = box.with { $0.tick(accounts: health, flags: flags) }
         for msg in pushes { await deliverPush(msg) }
     }
 
@@ -818,8 +814,7 @@ struct InfinitusTray {
                         "sessions": .number(Double(sessions))])
     }
 
-    static func controlHandlers(queue: DispatchQueue, pushes box: PushBox,
-                                flags: PushTriggers.Flags) -> ControlDispatch.Handlers {
+    static func controlHandlers(queue: DispatchQueue) -> ControlDispatch.Handlers {
         ControlDispatch.Handlers(
             checkpoint: { cwd, sessionId, subject in
                 queue.async { recordCheckpoint(cwd: cwd, sessionId: sessionId, subject: subject) }
@@ -828,15 +823,6 @@ struct InfinitusTray {
             sessionPid: { sessionId in
                 ClaudeSessions.list(claudeDir: ClaudeSessions.configHome())
                     .first { $0.sessionId == sessionId }.map { Int($0.pid) }
-            },
-            hook: { event, pid in
-                // A Notification that needs a human goes out now, not on
-                // the next tick — which then skips the same pid
-                // (announceWaiting, the Mac's rule). Detached: the hook
-                // gets its reply first, Claude Code times hooks out.
-                guard let line = event.pushLine, flags.waiting else { return }
-                if let pid { box.with { $0.announceWaiting(pid: pid) } }
-                Task { await deliverPush(line) }
             })
     }
 
@@ -1061,7 +1047,7 @@ struct InfinitusTray {
         // A bind that fails is logged, never fatal: the phone's mirror is
         // this process's job, the socket is the extra.
         let checkpointQueue = DispatchQueue(label: "infinitus.tray.checkpoints")
-        let handlers = controlHandlers(queue: checkpointQueue, pushes: pushes, flags: pushFlags)
+        let handlers = controlHandlers(queue: checkpointQueue)
         let controlPath = ControlProtocol.socketURL().path
         let control = PosixControlSocket(path: controlPath) {
             ControlDispatch.replyLine(to: $0, handlers: handlers)

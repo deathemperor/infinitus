@@ -1,29 +1,12 @@
 import SwiftUI
 import InfinitusCore
 
-/// What the app pushes to the phone (#9): session and account
-/// triggers.
+/// What the app pushes to the phone (#9): account triggers.
 struct NotifyPane: View {
     @ObservedObject var app: AppModel
 
     var body: some View {
         Form {
-            Section {
-                Toggle("All sessions finish working", isOn: $app.pushSessionsDone)
-                Toggle("A session waits on you", isOn: $app.pushWaiting)
-                Toggle("A session needs an AWS sign-in", isOn: $app.pushAwsLogin)
-            } header: {
-                Text("Push about sessions")
-            } footer: {
-                Text("Finish: one push when every live session has been idle for two "
-                     + "refresh passes after at least \(Int(PushTriggers.sessionsDoneMinBusy / 60)) minutes "
-                     + "of work \u{2014} turn gaps and short bursts don't count. Waits on you: one "
-                     + "push per session when it stops at a permission prompt or a "
-                     + "question. AWS: one push per session and profile when a command "
-                     + "fails on an expired sign-in \u{2014} sign in from the phone's "
-                     + "sessions list.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
             Section {
                 Toggle("All accounts are exhausted", isOn: $app.pushAllDead)
                 Toggle("The last alive account nears its limit", isOn: $app.pushLastAlive)

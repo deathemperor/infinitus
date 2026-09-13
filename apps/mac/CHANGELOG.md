@@ -8,6 +8,10 @@ publishes the matching section as the GitHub release body.
 ## Unreleased
 
 ### Mac
+- The sessions popover is gone: the footer chip, the live session list and the Start-a-session form left the menu bar app.
+- Starting a session from the phone, headless sessions and session profiles (`infinitusctl profiles` / `profile-set` / `profile-remove`) are gone.
+- Past sessions (`infinitusctl past-sessions`, `session-delete`, `session-stop`) and the "Push about sessions" switches are gone.
+- Sessions are no longer auto-named, and "Capture Screen for a Session" left the menu.
 - The Slack webhook and Telegram bot channels are gone: the Mac's pushes reach Notification Center and the phone only.
 - The Linux tray no longer posts its pushes to Slack or Telegram; the desktop notification stays.
 - A terminal session's permission prompts can no longer be routed to the desktop or the web; they stay in the terminal.
