@@ -39,7 +39,9 @@ makes wrong, in its own PR.
   `DesktopAppIdentity.test.ts` and `DesktopPreReadyPlatform.test.ts` (plain
   title, no stage suffix) and `apps/desktop/src/updates/DesktopUpdates.test.ts`
   (upstream-channel tests start on a nightly feed via the harness `settings`
-  option) are re-flipped to `infinitus` after each merge, never the rule.
+  option; the harness's `resourcesPath` option and the feed-swap test are
+  the fork's, #1042) are re-flipped to `infinitus` after each merge, never
+  the rule.
   An upstream migration whose number collides with the fork's own
   (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`

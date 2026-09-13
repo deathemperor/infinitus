@@ -13,6 +13,8 @@
 # main, on the schedule or when the dispatch says so.
 name: Infinitus nightly
 on:
+  push:
+    branches: [nightly-track] # TEMPORARY (#1058): the caller's own pre-merge dry run; removed before merge
   schedule:
     - cron: "17 17 * * *" # 17:17 UTC, off the hour like #1034 (00:17 GMT+7)
   workflow_dispatch:
@@ -87,17 +89,17 @@ jobs:
           set -euo pipefail
           title="Nightly $(date -u +%Y-%m-%d) ($(git rev-parse --short HEAD))"
           git push --force origin HEAD:refs/tags/nightly
+          notes="Rolling build of main: the desktop app (Nightly track under Settings › Updates), the menu bar app (brew reinstall infinitus@nightly) and the Linux tray."
           if gh release view nightly >/dev/null 2>&1; then
-            # One night's build on the release: the previous versioned assets go.
+            # Tonight's assets land first, so a client holding last night's
+            # manifest still finds its files until they are replaced; then the
+            # previous versioned assets go.
+            gh release upload nightly nightly-assets/* --clobber
             gh release view nightly --json assets --jq '.assets[].name' \
               | { grep -- '-infinitus-nightly\.' || true; } \
               | { grep -v -F -- "$VERSION" || true; } \
               | while read -r name; do gh release delete-asset nightly "$name" --yes; done
-            gh release upload nightly nightly-assets/* --clobber
-            gh release edit nightly --title "$title" --prerelease
+            gh release edit nightly --title "$title" --notes "$notes" --prerelease
           else
-            gh release create nightly nightly-assets/* \
-              --title "$title" \
-              --notes "Rolling build of main: the desktop app (Nightly track under Settings › Updates), the menu bar app (brew reinstall infinitus@nightly) and the Linux tray." \
-              --prerelease
+            gh release create nightly nightly-assets/* --title "$title" --notes "$notes" --prerelease
           fi
