@@ -445,6 +445,10 @@ function answer(request, socketPath) {
       return { clientId: "fixture" };
     case "lock-status":
       return { enabled: true, locked: false, relock: "5 min" };
+    case "proxy":
+      return { baseURL: "http://127.0.0.1:8317", keyPresent: false };
+    case "9router":
+      return { baseURL: "http://127.0.0.1:20128", passwordPresent: false, enabled: false };
     default:
       return undefined;
   }

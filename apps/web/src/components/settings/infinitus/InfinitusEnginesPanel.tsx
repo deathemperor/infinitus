@@ -1,19 +1,19 @@
 /**
- * The Engines pane: what each engine is doing right now, above the toggles
- * that turn them on. Keys stay on the Mac — the fork never shows or writes
- * one, it only says whether the app has it and hands the user over.
+ * The Engines pane: what each engine is doing right now, the toggles that
+ * turn them on, and the proxy engines' base URL and secret (#1177,
+ * `InfinitusEngineSecrets`) — the form the Mac's own engine panes drew. A key
+ * travels once, over `infinitus.secret`; the status list only says whether
+ * the app has one.
  *
  * @module InfinitusEnginesPanel
  */
 import type { EnvironmentPresentation } from "~/state/environments";
 import { Badge } from "../../ui/badge";
-import { Button } from "../../ui/button";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
-import { infinitusEnvironment } from "~/state/infinitus";
-import { useAtomCommand } from "~/state/use-atom-command";
 
-import { buildEngineStatusRows } from "./panel.logic";
+import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 import { InfinitusPrefsPanel, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
+import { buildEngineStatusRows } from "./panel.logic";
 
 const KEY_STATUS: Readonly<Record<"present" | "missing", string>> = {
   present: "Key set",
@@ -25,8 +25,7 @@ function InfinitusEngineStatusList({
 }: {
   readonly environment?: EnvironmentPresentation | null;
 }) {
-  const { environmentId, snapshot } = useInfinitusEnvironment(environment);
-  const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  const { snapshot } = useInfinitusEnvironment(environment);
   const rows = buildEngineStatusRows(snapshot?.status);
   if (rows.length === 0) return null;
 
@@ -46,26 +45,6 @@ function InfinitusEngineStatusList({
                 <Badge variant="outline">{KEY_STATUS[row.keyState]}</Badge>
               )}
             </span>
-          }
-          control={
-            row.keyState === "none" ? null : (
-              // The key itself is entered in the Mac app's own Settings; it
-              // never crosses this boundary.
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={environmentId === null}
-                onClick={() => {
-                  if (environmentId === null) return;
-                  void runCommand({
-                    environmentId,
-                    input: { command: "show", args: ["settings"], options: {} },
-                  });
-                }}
-              >
-                Manage in Infinitus
-              </Button>
-            )
           }
         />
       ))}
@@ -96,6 +75,7 @@ export function InfinitusEnginesPanel({
         </a>
       </p>
       <InfinitusEngineStatusList {...target} />
+      <InfinitusEngineSecrets {...target} />
     </InfinitusPrefsPanel>
   );
 }

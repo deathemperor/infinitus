@@ -72,6 +72,9 @@ export function infinitusCommandFailure(cause: Cause.Cause<unknown>): {
     if (tagged._tag === "InfinitusCommandFailed" && typeof tagged.error === "string") {
       return { message: tagged.error, restarting: tagged.restarting === true };
     }
+    if (tagged._tag === "InfinitusSecretRefused" && typeof tagged.detail === "string") {
+      return { message: tagged.detail, restarting: false };
+    }
     if (tagged._tag === "InfinitusUnavailable" && typeof tagged.cause === "string") {
       return { message: `Infinitus is not answering: ${tagged.cause}`, restarting: false };
     }
@@ -106,8 +109,8 @@ export interface EngineStatusRow {
   readonly label: string;
   readonly enabled: boolean;
   readonly registered: boolean;
-  /** `none` for an engine that holds no key at all — only the proxies do, and
-      only they get the "Manage in Infinitus" hand-off. */
+  /** `none` for an engine that holds no key at all — only the proxies do
+      (their form is `InfinitusEngineSecrets`, #1177). */
   readonly keyState: "present" | "missing" | "none";
 }
 

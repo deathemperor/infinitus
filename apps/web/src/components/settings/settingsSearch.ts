@@ -831,7 +831,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/engines",
     targetId: "infinitus-engines",
     infinitusOnly: true,
-    searchTerms: ["swapd cliproxy 9router proxy accounts registered key"],
+    searchTerms: [
+      "swapd cliproxy 9router proxy accounts registered key",
+      "management key dashboard password base url test connection",
+    ],
   },
   {
     id: "github-routing",

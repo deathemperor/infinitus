@@ -1333,7 +1333,17 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (mocked engine, projection, provider stream, settings, Slack client, an
   in-memory FileSystem).
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
-  (preferences, Engines) and their pure logic, and the Devices
+  (preferences, Engines) and their pure logic — Engines carries the proxy
+  engines' form (`InfinitusEngineSecrets` + `engines.logic`, #1177): base
+  URL and management key / dashboard password per engine, read over `proxy`
+  / `9router`, written over `infinitus.secret` as `proxy-key` /
+  `9router-password` with the url as `--url` (there is no url-only write:
+  the url is stored with the secret; "Forget" sends an empty secret), which
+  relaunch the app; gated on the manifest marking both verbs as taking
+  their secret on stdin, else "no engine secret commands (needs ≥
+  4eaccb341c)"; Test
+  connection is drawn off until a `test-connection` verb exists on the Mac
+  — and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
