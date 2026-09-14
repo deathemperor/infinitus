@@ -147,13 +147,43 @@ public enum TokenRateScanner {
 
     /// Parse complete lines from `entry.offset` on; a trailing partial
     /// line (Claude Code mid-write) waits for the next pass.
-    static func parse(url: URL, into entry: inout FileEntry, cutoff: Double) {
+    /// One read window (#1204): a cold scan used to `readToEnd()` every
+    /// transcript touched in the week — a 900 MB session file was one
+    /// Data. Each file is read in windows of this size, the window
+    /// doubling only while it holds no complete line, and every parsed
+    /// line folds straight into the entry's 5-minute buckets. Each window
+    /// parses inside its own autorelease pool: the scan runs in a detached
+    /// task, where nothing drains the pool until the task ends, so the
+    /// `JSONSerialization` objects of every line of a 14 GB corpus stayed
+    /// alive together — 4.4 GB of heap on one `utilization --days 7`.
+    /// What a scan holds now is one window's objects plus the buckets of
+    /// the files seen so far.
+    static let windowBytes = 8 << 20
+
+    static func parse(url: URL, into entry: inout FileEntry, cutoff: Double,
+                      windowBytes: Int = TokenRateScanner.windowBytes) {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return }
         defer { try? handle.close() }
-        guard (try? handle.seek(toOffset: UInt64(entry.offset))) != nil,
-              let data = try? handle.readToEnd(), !data.isEmpty else { return }
-        guard let lastNewline = data.lastIndex(of: newline) else { return }
-        let complete = data[data.startIndex...lastNewline]
+        var window = windowBytes
+        while true {
+            guard (try? handle.seek(toOffset: UInt64(entry.offset))) != nil,
+                  let data = try? handle.read(upToCount: window), !data.isEmpty else { return }
+            guard let lastNewline = data.lastIndex(of: newline) else {
+                // No complete line in the window: a longer line, or a
+                // trailing partial one at EOF (left for the next pass).
+                if data.count < window { return }
+                window *= 2
+                continue
+            }
+            let complete = data[data.startIndex...lastNewline]
+            autoreleasepool { parseLines(complete, into: &entry, cutoff: cutoff) }
+            entry.offset += complete.count
+            if data.count < window { return }   // EOF inside this window
+            window = windowBytes
+        }
+    }
+
+    private static func parseLines(_ complete: Data.SubSequence, into entry: inout FileEntry, cutoff: Double) {
         var lineStart = complete.startIndex
         while lineStart < complete.endIndex {
             let lineEnd = complete[lineStart...].firstIndex(of: newline) ?? complete.endIndex
@@ -187,7 +217,6 @@ public enum TokenRateScanner {
             let key = String(Int(t / bucket))
             entry.buckets[key] = (entry.buckets[key] ?? TokenRates.Totals()) + tot
         }
-        entry.offset += complete.count
     }
 
     nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {

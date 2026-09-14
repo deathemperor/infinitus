@@ -794,7 +794,11 @@ public enum StatsScanner {
         // One pass over the raw bytes: lines split by memchr, the type
         // pre-filter a first-byte/memcmp search. `Data.range(of:)` on a
         // slice per line ran the whole corpus at ~15 MB/s (2026-09-05).
-        complete.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
+        // Inside its own autorelease pool (#1204): the scan runs in a
+        // detached task, where the pool drains only when the task ends,
+        // so every line's `JSONSerialization` objects stayed alive across
+        // the whole corpus.
+        autoreleasepool { complete.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
             guard let base = buf.baseAddress else { return }
             var lineStart = 0
             while lineStart < buf.count {
@@ -826,7 +830,7 @@ public enum StatsScanner {
                 guard let obj else { continue }
                 ingest(obj, sessionID: sessionID, into: &entry, calendar: calendar)
             }
-        }
+        } }
         entry.offset += complete.count
         return complete.count
     }
