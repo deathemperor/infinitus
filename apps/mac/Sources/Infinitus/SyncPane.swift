@@ -3,20 +3,21 @@ import AppKit
 import UniformTypeIdentifiers
 import InfinitusCore
 
-/// Devices: this Mac's name, the Cloudflare tunnel the desktop server
-/// rides, phone alerts (APNs), crash reports, plus settings sync across
-/// Macs (iCloud, file) and account backup (#1179). Was "Sync" — it lived
-/// in Display before, which is the wrong home (user report 2026-08-30):
-/// it syncs notify flags and engine config too, not just display prefs.
-/// The phone mirror it once paired (#9) left with #1041; the phone pairs
-/// through the desktop.
+/// Devices: what cannot leave the Mac — the Cloudflare tunnel the desktop
+/// server rides (cloudflared on this Mac), crash reports, settings as a
+/// file (a file panel) and account backup (#1179, a file panel over the
+/// keychain-backed store). This Mac's name, phone alerts (APNs) and the
+/// iCloud sync toggle are the desktop's Settings › Infinitus › Devices
+/// since #1218/#1221 (their prefs and the `apns` / `apns-key` verbs), and
+/// left this pane with #1178. Was "Sync" — it lived in Display before,
+/// which is the wrong home (user report 2026-08-30). The phone mirror it
+/// once paired (#9) left with #1041; the phone pairs through the desktop.
 struct SyncPane: View {
     @ObservedObject var sync: SettingsSyncModel
     @ObservedObject var app: AppModel
     /// The named tunnel publishes its own state (connected, status), so
     /// the pane observes it directly — AppModel doesn't republish it.
     @ObservedObject private var named: NamedTunnel
-    @ObservedObject private var pusher: LiveActivityPusher
     /// Typed hostname/token live here until Save: the model restarts the
     /// tunnel on a hostname change, and a half-typed one shouldn't.
     @State private var namedHost = ""
@@ -24,29 +25,17 @@ struct SyncPane: View {
     /// The crash report whose Delete is being confirmed. Lives here, not
     /// on CrashReportsSection, so the dialog can sit on the Form.
     @State private var confirmCrashDelete: CrashReport?
-    /// Forgetting a keychain secret is hard to undo (the APNs .p8 downloads
-    /// from Apple once), so both Forget buttons ask first.
-    @State private var confirmForgetKey = false
+    /// Forgetting the tunnel token asks first.
     @State private var confirmForgetToken = false
 
     init(sync: SettingsSyncModel, app: AppModel) {
         self.sync = sync
         self.app = app
         _named = ObservedObject(wrappedValue: app.namedTunnel)
-        _pusher = ObservedObject(wrappedValue: app.liveActivityPusher)
     }
 
     var body: some View {
         Form {
-            Section {
-                TextField("This Mac's name", text: $app.machineNameOverride,
-                          prompt: Text(MachineName.system()))
-            } header: {
-                Text("This Mac")
-            } footer: {
-                Text("How the phone and the desktop name this Mac. Empty follows the computer name.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
             Section {
                 if QuickTunnel.binaryPath != nil {
                     namedTunnelRows
@@ -68,39 +57,20 @@ struct SyncPane: View {
             }
             .onAppear { namedHost = app.mirrorNamedTunnelHost }
             CrashReportsSection(app: app, confirmDelete: $confirmCrashDelete)
-            Section {
-                liveActivityRows
-            } header: {
-                Text("Phone alerts")
-            } footer: {
-                Text("The Mac's own notifications reach the phone while the app is "
-                     + "open. To keep reaching it with the app closed, this Mac pushes "
-                     + "through Apple (APNs) with a key from your developer account: "
-                     + "Certificates, Identifiers & Profiles \u{2192} Keys \u{2192} + \u{2192} "
-                     + "Apple Push Notifications service, download the .p8.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            Section {
-                Toggle("Sync settings via iCloud Drive", isOn: $sync.enabled)
-                if let status = sync.status {
-                    Text(status).font(.caption).foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("iCloud")
-            } footer: {
-                Text("Display preferences, custom themes and engine settings travel through "
-                     + "one file in your iCloud Drive. Never credentials, never push "
-                     + "secrets. The last Mac to write wins.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
             // Manual path for machines outside the iCloud account
-            // (user request 2026-08-30). Same snapshot, same scope.
+            // (user request 2026-08-30). Same snapshot, same scope as the
+            // iCloud sync, whose toggle is the desktop's `icloud_sync`
+            // pref; its outcome line stays here, since export and import
+            // report through it too.
             Section {
                 LabeledContent("Settings as a file") {
                     HStack {
                         Button("Export\u{2026}") { runExportPanel() }
                         Button("Import\u{2026}") { runImportPanel() }
                     }
+                }
+                if let status = sync.status {
+                    Text(status).font(.caption).foregroundStyle(.secondary)
                 }
             } header: {
                 Text("File")
@@ -134,15 +104,6 @@ struct SyncPane: View {
                  + "crash it describes has already happened \u{2014} deleting it changes "
                  + "nothing else.")
         }
-        .confirmationDialog("Forget the push key?", isPresented: $confirmForgetKey) {
-            Button("Forget", role: .destructive) { pusher.storeKey(pem: "") }
-            Button("Keep Key", role: .cancel) { }
-        } message: {
-            Text("The key leaves the keychain and the phone stops getting this Mac's "
-                 + "alerts with the app closed. Apple hands out each key file once, so "
-                 + "without your own copy you'll need a new key to set push up again. "
-                 + "Pairing and everything else here are untouched.")
-        }
         .confirmationDialog("Forget the tunnel token?", isPresented: $confirmForgetToken) {
             Button("Forget", role: .destructive) { app.saveNamedTunnelToken("") }
             Button("Keep Token", role: .cancel) { }
@@ -157,38 +118,6 @@ struct SyncPane: View {
     /// The restart-proof remote route: a Cloudflare tunnel the user owns.
     /// Cloudflare holds the hostname → localhost:port mapping; this Mac
     /// holds only the tunnel token, in the keychain.
-    /// Alert pushes (APNs): the .p8 key that lets this Mac reach the
-    /// phone with its own notifications while the app is closed.
-    @ViewBuilder private var liveActivityRows: some View {
-        TextField("Team ID", text: $pusher.teamID, prompt: Text("ABCDE12345"))
-        TextField("Key ID", text: $pusher.keyID, prompt: Text("the key's 10-character id"))
-        HStack {
-            Button(pusher.keyStored ? "Replace Key from Clipboard" : "Paste Key from Clipboard") {
-                pusher.storeKey(pem: NSPasteboard.general.string(forType: .string) ?? "")
-            }
-            if pusher.keyStored {
-                Button("Forget Key\u{2026}", role: .destructive) { confirmForgetKey = true }
-            }
-            Text(pusher.keyStored ? "In the Keychain" : "Not Set Up")
-                .font(.caption).foregroundStyle(.secondary)
-        }
-        if pusher.registrations.isEmpty {
-            Text("No phone has registered a push token yet — open the app once "
-                 + "on the phone after it's paired.")
-                .font(.caption).foregroundStyle(.secondary)
-        } else {
-            ForEach(pusher.registrations.values.sorted { $0.registeredAt > $1.registeredAt },
-                    id: \.slot) { reg in
-                Text("\(reg.deviceName) · \(reg.kind.rawValue) · \(reg.environment) · "
-                     + reg.registeredAt.formatted(date: .omitted, time: .shortened))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        if let result = pusher.lastResult {
-            Text(result).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-
     @ViewBuilder private var namedTunnelRows: some View {
         Toggle("Expose through your own Cloudflare tunnel",
                isOn: $app.mirrorNamedTunnelEnabled)

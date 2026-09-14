@@ -142,9 +142,10 @@ before that the `native` branch). Split out of
   APNs key (#845): the `.p8` item's decrypt ACL names `Infinitus.app`
   only, `Keychain.read` skips UI, so the dev-signed binary reads nil and
   the pusher stays unconfigured — silently (no last-result line, no
-  event). Verify push changes on the tagged build; never paste the key
-  into the instance's Devices pane (`Keychain.write` deletes the shipped
-  app's item first).
+  event). Verify push changes on the tagged build; never send the key
+  to a dev instance's `apns-key` verb — through the desktop's Devices
+  page or `infinitusctl` (`Keychain.write` deletes the shipped app's
+  item first).
 - Every SwiftUI-driven frame (TimelineView tick, repeatForever
   `.animation`) commits a CA transaction: display-list diff, AppKit
   drag-region + tracking-area rebuild, a WindowServer fence — ~7 ms
