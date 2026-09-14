@@ -82,7 +82,7 @@ public enum PrefCatalog {
     public static let entries: [Entry] = [
         // Display: the status item itself. Off = no status item at all; the
         // app keeps running headless (#828). First because every other
-        // Display pref only matters while it is on (#1183).
+        // Display pref only matters while it is on (#1184).
         Entry("menu_bar_enabled", .bool, .bool(true), display),
         // Display: the menu bar title.
         Entry("show_account_name", .bool, .bool(true), display),

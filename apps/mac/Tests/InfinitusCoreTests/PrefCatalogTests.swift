@@ -91,7 +91,7 @@ final class PrefCatalogTests: XCTestCase {
     }
 
     /// The table's order is the order the desktop app draws the Menu bar page
-    /// in (#1183), so the master switch leads its section: every other Display
+    /// in (#1184), so the master switch leads its section: every other Display
     /// pref only matters while the status item is there.
     func testTheStatusItemSwitchLeadsTheDisplaySection() {
         let display = PrefCatalog.entries.filter { $0.section == "display" }.map(\.key)

@@ -49,7 +49,7 @@ export const PREF_COPY: Readonly<
   >
 > = {
   // Display › Menu bar. The status item's own switch leads the section in the
-  // catalog (#1183), and this map follows it so the two read in step.
+  // catalog (#1184), and this map follows it so the two read in step.
   menu_bar_enabled: {
     label: "Show the icon in the menu bar",
     description:
