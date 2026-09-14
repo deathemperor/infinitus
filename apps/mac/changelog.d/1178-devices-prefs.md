@@ -1,1 +1,0 @@
-Mac: The Devices page's settings reach the control socket: `machine_name`, `apns_team_id`, `apns_key_id` and `icloud_sync` join the `devices` prefs, `apns` reads the push setup (key ids, whether the .p8 is stored, the registered phones — never a token) and `apns-key` keeps the .p8 from stdin or forgets it.
