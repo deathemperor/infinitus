@@ -122,15 +122,11 @@ describe("routeFailures", () => {
     const missing = 'missing "[Sync settings via iCloud Drive: on]"';
     // The label alone is what `innerText` captured, and what a switch that
     // never took its pref still draws.
-    expect(routeFailures(devices, `Sync settings via iCloud Drive ${port}`)).toEqual([
+    expect(routeFailures(devices, `Sync settings via iCloud Drive ${port}`)).toEqual([missing]);
+    expect(routeFailures(devices, `[Sync settings via iCloud Drive: off] ${port}`)).toEqual([
       missing,
     ]);
-    expect(
-      routeFailures(devices, `[Sync settings via iCloud Drive: off] ${port}`),
-    ).toEqual([missing]);
-    expect(
-      routeFailures(devices, `[Sync settings via iCloud Drive: on] ${port}`),
-    ).toEqual([]);
+    expect(routeFailures(devices, `[Sync settings via iCloud Drive: on] ${port}`)).toEqual([]);
   });
 
   it("fails the port #1110 grouped into 3,773", () => {
