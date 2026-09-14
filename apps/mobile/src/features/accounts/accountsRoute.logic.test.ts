@@ -11,6 +11,7 @@ import {
   macAccountsModel,
   rowBadges,
   rowMenuActions,
+  removeConfirmation,
   switchConfirmation,
   windowTone,
 } from "./accountsRoute.logic";
@@ -162,6 +163,12 @@ describe("rowMenuActions", () => {
 });
 
 describe("row presentation", () => {
+  it("names the remove confirmation after the account and the fleet", () => {
+    const copy = removeConfirmation({ ...row, label: "spare", email: "two@example.com" }, "Claude");
+    expect(copy.title).toBe("Remove spare from Claude?");
+    expect(copy.message).toContain("two@example.com");
+  });
+
   it("names the switch confirmation after the fleet and the account", () => {
     expect(switchConfirmation(row, "claude").title).toBe("Switch claude to death4?");
   });

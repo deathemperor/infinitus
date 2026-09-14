@@ -22,7 +22,7 @@ CLIProxyAPI accounts can be added from its accounts controls. For 9Router, open 
 
 Accounts groups logins by fleet and shows each account's usage windows, limits, reset times, and active status when the engine supplies them. The forecast estimates remaining fleet capacity from reported usage. A missing estimate means there is not enough information to calculate it.
 
-Use **Switch** to choose an account manually. Automatic switching follows the engine's policy: swapd swaps the provider CLI's active login, while proxy engines route requests behind their own endpoint. Proxy session affinity can keep existing conversations on their current credential even after you switch.
+Use **Switch** to choose an account manually. Automatic switching follows the engine's policy: swapd swaps the provider CLI's active login, while proxy engines route requests behind their own endpoint. Proxy session affinity can keep existing conversations on their current credential even after you switch. **Remove** deletes an account's credential from the engine after a confirmation; sign in again to add it back.
 
 When accounts run out of headroom, the fleet shows its exhausted state and reported reset timing. Whether a thread can resume automatically depends on its provider and your resume settings; adding another usable account or waiting for a reset restores capacity. A login that expires needs sign-in again rather than a quota reset. Use the account's re-login action, or the separate **Sign-ins** section for pending service logins.
 

@@ -18,7 +18,7 @@ import { infinitusAccountLabel } from "./infinitus.ts";
  */
 
 /** What a row's buttons can ask the control socket to do. */
-export type AccountAction = "switch" | "hold" | "unhold" | "prefer" | "rename";
+export type AccountAction = "switch" | "hold" | "unhold" | "prefer" | "rename" | "remove";
 
 /** One usage window drawn as a bar. `countdown` is the engine's own
     human string ("2h 14m"), absent on a window that has not started. */
@@ -196,6 +196,7 @@ function rowActions(
   if (capabilities.has("hold")) actions.push(account.disabled === true ? "unhold" : "hold");
   if (capabilities.has("prefer") && account.preferred !== undefined) actions.push("prefer");
   if (capabilities.has("rename")) actions.push("rename");
+  if (capabilities.has("remove")) actions.push("remove");
   return actions;
 }
 
@@ -398,14 +399,20 @@ export function buildForecast(snapshot: InfinitusSnapshot): ForecastModel | null
 /**
  * The control-socket call a row's button makes. `prefer` is a toggle and takes
  * the side it is switching to, which is what the socket's
- * `prefer <fleet> <n> on|off` expects; the other four take the account alone.
+ * `prefer <fleet> <n> on|off` expects; `remove` carries the `--yes` the socket
+ * refuses it without (the row confirmed already); the others take the
+ * account alone.
  */
 export function accountCommandArgs(
   fleetKey: string,
   row: AccountRowModel,
   action: AccountAction,
   alias?: string,
-): { command: string; args: ReadonlyArray<string> } {
+): {
+  command: string;
+  args: ReadonlyArray<string>;
+  options?: Readonly<Record<string, string>>;
+} {
   const target = [fleetKey, String(row.number)];
   if (action === "rename") {
     if (alias === undefined) throw new Error("rename needs an alias");
@@ -413,6 +420,9 @@ export function accountCommandArgs(
   }
   if (action === "prefer") {
     return { command: "prefer", args: [...target, row.preferred ? "off" : "on"] };
+  }
+  if (action === "remove") {
+    return { command: "remove", args: target, options: { yes: "true" } };
   }
   return { command: action, args: target };
 }
