@@ -67,6 +67,8 @@ import * as PreviewIpc from "./methods/preview.ts";
 import * as AppActivationIpc from "./methods/appActivation.ts";
 import { getWslState, setWslBackendEnabled, setWslDistro, setWslOnly } from "./methods/wsl.ts";
 import {
+  beginInfinitusOAuthSignIn,
+  cancelInfinitusOAuthSignIn,
   closeInfinitusSignIn,
   consumeInfinitusDeepLink,
   getInfinitusDesktopPrefs,
@@ -136,6 +138,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(openInfinitusSignIn);
   yield* ipc.handle(closeInfinitusSignIn);
   yield* ipc.handle(submitInfinitusSignInCode);
+  yield* ipc.handle(beginInfinitusOAuthSignIn);
+  yield* ipc.handle(cancelInfinitusOAuthSignIn);
   yield* ipc.handle(consumeInfinitusDeepLink);
   yield* ipc.handle(setBadgeCount);
   yield* ipc.handle(setKeepAwake);

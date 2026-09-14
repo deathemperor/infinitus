@@ -577,6 +577,30 @@ export const InfinitusSignInCodeResult = Schema.Struct({
 });
 export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
 
+/** Fork (#1213): a sign-in the desktop shell runs itself, through the engine's
+    own `add-oauth` verb — swapd is the OAuth client, so its loopback listener
+    catches the redirect and there is no code to paste. `provider` is the
+    engine's own provider name (`swapd --provider <p>`), `label` titles the
+    child window. No slot and no relogin target: `add-oauth` resolves the
+    account from the sign-in itself and lands a known address back in its own
+    slot, so signing in again just works. */
+export const InfinitusOAuthSignInInput = Schema.Struct({
+  flowId: Schema.String,
+  provider: Schema.String,
+  label: Schema.String,
+});
+export type InfinitusOAuthSignInInput = typeof InfinitusOAuthSignInInput.Type;
+
+/** What `add-oauth` stored, or why it did not. `error` is the engine's own
+    message; the shell never invents one. */
+export const InfinitusOAuthSignInResult = Schema.Struct({
+  ok: Schema.Boolean,
+  slot: Schema.optionalKey(Schema.Number),
+  email: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+});
+export type InfinitusOAuthSignInResult = typeof InfinitusOAuthSignInResult.Type;
+
 export const InfinitusDesktopPrefs = Schema.Struct({
   quitInfinitusWithApp: Schema.Boolean,
   /** #433 slice 2: a double tap of Shift in any app captures its selected text

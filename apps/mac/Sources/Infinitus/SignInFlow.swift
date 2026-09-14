@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 import AuthenticationServices
 import InfinitusCore
 
@@ -42,44 +41,8 @@ import InfinitusCore
     /// Which account this flow is for (relogin) — display only; cswap
     /// matches the credential identity itself.
     @Published var reloginTarget: String?
-    /// Persistent per-account web session (user 2026-08-31: "if
-    /// relogin an account can open that browser session of that
-    /// account"): each account gets its own WKWebsiteDataStore
-    /// identifier, so a relogin window opens already signed in — the
-    /// approve click is usually all that's left. Adds start fresh
-    /// under a new identifier, bound to the account once it appears.
-    private var storeID = UUID()
     private var reloginEmail: String?
     private var preEmails: Set<String> = []
-    private static let mapKey = "auth_web_store_map"
-
-    private static func storeMap() -> [String: String] {
-        AppDefaults.standard.dictionary(forKey: mapKey) as? [String: String] ?? [:]
-    }
-    private static func bind(email: String, id: UUID) {
-        var m = storeMap()
-        m[email] = id.uuidString
-        AppDefaults.standard.set(m, forKey: mapKey)
-    }
-    /// Google's cookies (only Google's — never Anthropic's, that would
-    /// be the cross-account bleed again) live in one shared jar: a
-    /// fresh account's private window seeds from it, so Google shows
-    /// its account chooser instead of the email field (user
-    /// 2026-09-07: "keep what belong to Google so I won't have to type
-    /// emails again"); every private window harvests back on close.
-    private static let googleJarKey = "auth_web_store_google"
-    private static var googleJar: WKWebsiteDataStore {
-        let d = AppDefaults.standard
-        let id = d.string(forKey: googleJarKey).flatMap(UUID.init) ?? {
-            let id = UUID(); d.set(id.uuidString, forKey: googleJarKey); return id
-        }()
-        return WKWebsiteDataStore(forIdentifier: id)
-    }
-    private static func copyGoogleCookies(from: WKWebsiteDataStore, to: WKWebsiteDataStore) async {
-        for c in await from.httpCookieStore.allCookies() where c.domain.hasSuffix("google.com") {
-            await to.httpCookieStore.setCookie(c)
-        }
-    }
 
     private var process: Process?
     private weak var model: AppModel?
@@ -92,8 +55,6 @@ import InfinitusCore
     private var previousActive: Int?
     private var shimDir: URL?
     private var authWindow: NSWindow?
-    private var webWindow: NSWindow?
-    private var webDelegate: AuthWebDelegate?
     private var systemSession: ASWebAuthenticationSession?
     private var anchorProvider: AuthAnchorProvider?
     /// Engine-driven variant (`.addOAuth`, the proxy): the poll task,
@@ -125,12 +86,6 @@ import InfinitusCore
         reloginEmail = relogin?.email
         previousActive = model.activeNumber
         preEmails = Set(model.accounts.map(\.email))
-        if let email = relogin?.email,
-           let saved = Self.storeMap()[email], let id = UUID(uuidString: saved) {
-            storeID = id            // reopen THIS account's session
-        } else {
-            storeID = UUID()        // fresh jar for a fresh login
-        }
         code = ""
         buffer = ""
         authURL = nil
@@ -175,12 +130,6 @@ import InfinitusCore
                 .accounts.map(\.email) ?? [])
         }
         preEmails = fleetEmails(model)
-        if let email = relogin?.email,
-           let saved = Self.storeMap()[email], let id = UUID(uuidString: saved) {
-            storeID = id
-        } else {
-            storeID = UUID()
-        }
         code = ""
         authURL = nil
         sheetError = nil
@@ -199,12 +148,10 @@ import InfinitusCore
                 self.phase = .registering
                 await model.refreshSnapshot()
                 if let email = self.reloginEmail {
-                    Self.bind(email: email, id: self.storeID)
                     self.completedEmail = email
                 } else {
                     let new = fleetEmails(model).subtracting(self.preEmails)
                     if let email = new.first, new.count == 1 {
-                        Self.bind(email: email, id: self.storeID)
                         self.completedEmail = email
                     }
                 }
@@ -402,16 +349,14 @@ import InfinitusCore
                     try? await engine.switchTo(fleet: .claude, number: n)
                 }
                 await model.refreshSnapshot()
-                // Bind the web session to its account for future
-                // relogins: the relogin target, or the one new email.
+                // The account this flow signed in: the relogin target,
+                // or the one new email.
                 if let email = self.reloginEmail {
-                    Self.bind(email: email, id: self.storeID)
                     self.completedEmail = email
                 } else {
                     let new = Set(model.accounts.map(\.email))
                         .subtracting(self.preEmails)
                     if let email = new.first, new.count == 1 {
-                        Self.bind(email: email, id: self.storeID)
                         self.completedEmail = email
                     }
                 }
@@ -438,8 +383,7 @@ import InfinitusCore
     /// rejected): capturing the OAuth URL immediately opens the SYSTEM
     /// sign-in sheet, where passkeys, Touch ID and Google all just
     /// work, anchored to a compact companion window holding the
-    /// paste-code bar. The per-account private WKWebView window stays
-    /// available as the opt-in alternative for isolated sessions.
+    /// paste-code bar.
     private func openAuthWindow(_ url: URL) {
         // A headless run (#677) shows nothing here: the desktop app
         // opened `url` in its own window and pastes the code back.
@@ -463,52 +407,15 @@ import InfinitusCore
         authWindow = w
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        // ALWAYS the sheet: it does passkeys AND passwords. The
-        // saved-session auto-routing sent a passkey account into the
-        // private window — where WebAuthn can never run — and hit the
-        // Bluetooth-fallback wall again (user screenshot 2026-08-31).
-        // The private window stays strictly opt-in. A sheet SHARING the
-        // browser's cookies behind a claude.ai logout hop was tried
-        // (2026-09-07): Google remembered, but the double sheet flash
-        // bothered more than typing the email — reverted the same day.
+        // ALWAYS the sheet: it does passkeys AND passwords. A per-account
+        // WKWebView "private window" (no passkeys — WebAuthn is
+        // entitlement-locked to real browsers) was the opt-in alternative
+        // until 2026-09-14; the desktop's sign-in page and the browser
+        // route cover its case now. A sheet SHARING the browser's
+        // cookies behind a claude.ai logout hop was tried (2026-09-07):
+        // Google remembered, but the double sheet flash bothered more
+        // than typing the email — reverted the same day.
         startSystemSheet()
-    }
-
-    /// The opt-in private window: this account's own isolated session
-    /// (signed in already on later re-logins), Safari UA, popup
-    /// hosting. No passkeys — WebAuthn is entitlement-locked to real
-    /// browsers; password sign-in works.
-    func openPrivateWindow() {
-        guard let url = authURL else { return }
-        if let w = webWindow { w.makeKeyAndOrderFront(nil); return }
-        let cfg = WKWebViewConfiguration()
-        let store = WKWebsiteDataStore(forIdentifier: storeID)
-        cfg.websiteDataStore = store
-        let web = WKWebView(frame: .zero, configuration: cfg)
-        web.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-            + "Version/26.0 Safari/605.1.15"
-        let delegate = AuthWebDelegate()
-        webDelegate = delegate
-        web.uiDelegate = delegate
-        if Self.storeMap().values.contains(storeID.uuidString) {
-            web.load(URLRequest(url: url))     // this account's own jar
-        } else {
-            Task { @MainActor in               // fresh jar: seed Google first
-                await Self.copyGoogleCookies(from: Self.googleJar, to: store)
-                web.load(URLRequest(url: url))
-            }
-        }
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 720),
-                         styleMask: [.titled, .closable, .resizable],
-                         backing: .buffered, defer: false)
-        w.title = "Claude login (private)"
-        w.contentView = web
-        w.isReleasedWhenClosed = false
-        w.center()
-        w.level = .floating          // same reason as the companion window
-        webWindow = w
-        w.makeKeyAndOrderFront(nil)
     }
 
     /// Passkey path (user 2026-08-31: "couldn't use passkey"): WebAuthn
@@ -536,9 +443,8 @@ import InfinitusCore
             // user copies the code and closes the sheet, so a plain
             // cancel is the NORMAL ending and says nothing. Any other
             // error means the sheet never got the user to the page, and
-            // silence there left only the passkey-less private window
-            // (user 2026-09-14: "the windows didn't open, I had to use
-            // private window with no passkey").
+            // silence there left the user with nothing (user 2026-09-14:
+            // "the windows didn't open").
             self?.systemSession = nil
             guard let error else { return }
             let failure = error as NSError
@@ -563,8 +469,7 @@ import InfinitusCore
         // opened; say so and offer the way on.
         if !session.start() {
             systemSession = nil
-            sheetError = "The sign-in sheet couldn't open. Try \u{201C}Reopen sign-in sheet\u{201D}, "
-                + "or use the private window (no passkeys)."
+            sheetError = "The sign-in sheet couldn't open. Try \u{201C}Reopen sign-in sheet\u{201D}."
         }
     }
 
@@ -614,7 +519,6 @@ import InfinitusCore
     /// does. A headless run has no windows of ours to raise.
     func reopenAuth() {
         guard !headless else { return }
-        webWindow?.makeKeyAndOrderFront(nil)
         if let w = authWindow {
             w.level = .floating      // back above a pinned pop-out (#1134)
             w.makeKeyAndOrderFront(nil)
@@ -627,14 +531,6 @@ import InfinitusCore
     private func closeAuthWindow() {
         authWindow?.orderOut(nil)
         authWindow = nil
-        if let web = webWindow?.contentView as? WKWebView {
-            let store = web.configuration.websiteDataStore
-            Task { await Self.copyGoogleCookies(from: store, to: Self.googleJar); _ = web }
-        }
-        webWindow?.orderOut(nil)
-        webWindow = nil
-        webDelegate?.closePopups()
-        webDelegate = nil
         systemSession?.cancel()
         systemSession = nil
         anchorProvider = nil
@@ -657,50 +553,6 @@ final class AuthAnchorProvider: NSObject,
     }
 }
 
-/// OAuth popup host: window.open from the login page (Google's flow)
-/// gets a real child window sharing the SAME configuration — required
-/// by WebKit, and what keeps the popup inside the private session.
-@MainActor final class AuthWebDelegate: NSObject, WKUIDelegate {
-    private var popups: [NSWindow] = []
-
-    func webView(_ webView: WKWebView,
-                 createWebViewWith configuration: WKWebViewConfiguration,
-                 for navigationAction: WKNavigationAction,
-                 windowFeatures: WKWindowFeatures) -> WKWebView? {
-        let web = WKWebView(frame: .zero, configuration: configuration)
-        web.customUserAgent = webView.customUserAgent
-        web.uiDelegate = self
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
-                         styleMask: [.titled, .closable, .resizable],
-                         backing: .buffered, defer: false)
-        w.title = "Sign in"
-        w.contentView = web
-        w.isReleasedWhenClosed = false
-        w.center()
-        w.makeKeyAndOrderFront(nil)
-        popups.append(w)
-        return web
-    }
-
-    func webViewDidClose(_ webView: WKWebView) {
-        if let i = popups.firstIndex(where: { $0.contentView === webView }) {
-            popups[i].orderOut(nil)
-            popups.remove(at: i)
-        }
-    }
-
-    func closePopups() {
-        popups.forEach { $0.orderOut(nil) }
-        popups = []
-    }
-}
-
-private struct AuthWebView: NSViewRepresentable {
-    let web: WKWebView
-    func makeNSView(context: Context) -> WKWebView { web }
-    func updateNSView(_ nsView: WKWebView, context: Context) {}
-}
-
 /// The companion window: sign-in status + the paste-code bar. The
 /// actual signing-in happens in the system sheet (passkeys work
 /// there), which this window anchors.
@@ -714,7 +566,7 @@ private struct AuthWindowRoot: View {
                     .font(.caption).foregroundStyle(.orange)
             }
             if flow.pasteCode {
-                Text("1. Sign in and approve in the sign-in sheet or window "
+                Text("1. Sign in and approve in the sign-in sheet "
                      + "(the sheet is a fresh private session \u{2014} "
                      + "passkeys and Touch ID work; it never remembers "
                      + "another account).\n"
@@ -731,7 +583,7 @@ private struct AuthWindowRoot: View {
                     Button("Cancel") { flow.cancel() }
                 }
             } else {
-                Text("Sign in and approve in the sign-in sheet or window "
+                Text("Sign in and approve in the sign-in sheet "
                      + "(the sheet is a fresh private session \u{2014} "
                      + "passkeys and Touch ID work). This closes by "
                      + "itself once the engine holds the credential.")
@@ -754,17 +606,8 @@ private struct AuthWindowRoot: View {
                 Text(route.note).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 6) {
-                Button(flow.browserRoute.map { "Open in \($0.name) again" }
-                       ?? "Reopen sign-in sheet") { flow.startSystemSheet() }
-                Button("Use private window (no passkeys)") {
-                    flow.openPrivateWindow()
-                }
-                .help("An isolated per-account browser session \u{2014} "
-                      + "remembers this account's login for the next "
-                      + "re-login. Passkeys CANNOT work there (a macOS "
-                      + "restriction); password sign-in only.")
-            }
+            Button(flow.browserRoute.map { "Open in \($0.name) again" }
+                   ?? "Reopen sign-in sheet") { flow.startSystemSheet() }
         }
         .padding(14)
         .frame(width: 520, alignment: .leading)

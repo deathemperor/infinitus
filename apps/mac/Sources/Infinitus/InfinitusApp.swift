@@ -91,6 +91,7 @@ struct InfinitusApp: App {
         }
         #endif
         RenameMigration.run()   // before anything reads App Support
+        PrivateWindowCleanup.run()
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
         let release = AppReleaseModel()

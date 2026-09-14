@@ -29,6 +29,7 @@ import { RefreshIcon } from "~/components/ui/refresh-icon";
 
 import { isElectron } from "../../env";
 import { useNowMinute } from "../../hooks/useNowMinute";
+import { randomUUID } from "../../lib/utils";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { useEnvironmentQuery } from "../../state/query";
@@ -51,6 +52,9 @@ import { WAIT_ADD_STEP_SECONDS, waitAddStep, type AddAccountFlow } from "./addAc
 import { FleetSection, type FleetSignIn } from "./FleetSection";
 import { ForecastStrip } from "./ForecastStrip";
 import {
+  fleetRunsShellOAuth,
+  oauthSignInBridge,
+  shellOAuthWindowLabel,
   SIGN_IN_POLL_MS,
   signInBeginCommandArgs,
   signInBeginReply,
@@ -130,15 +134,27 @@ export function AccountsPage() {
     () => signInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
     [],
   );
+  const oauthBridge = useMemo(
+    () => oauthSignInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
+    [],
+  );
   // Each add/re-login gets a run number; a newer run or an unmount retires
   // the polling loop of the one before it.
   const addRunRef = useRef(0);
+  /** The shell's own sign-in outlives this page: the engine's child process and
+      its window keep running until something ends them, and once the page is
+      gone nothing here can (#1213). Leaving it retires the flow. */
+  const shellFlowIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       addRunRef.current += 1;
       signInRunRef.current += 1;
+      const flowId = shellFlowIdRef.current;
+      if (flowId === null) return;
+      shellFlowIdRef.current = null;
+      void oauthBridge?.cancel(flowId).catch(() => {});
     },
-    [],
+    [oauthBridge],
   );
 
   const infinitusEnvironments = useMemo(
@@ -275,11 +291,21 @@ export function AccountsPage() {
       : null;
   const inAppSignIn = environmentId !== null;
 
+  // The sign-in this shell runs itself (#1213): the engine's own `add-oauth`,
+  // spawned here, its loopback listener catching the redirect. It needs the
+  // engine binary on this machine, so it exists only where the shell path
+  // does — the desktop client looking at this Mac's own environment.
+  const shellOAuthSignIn =
+    oauthBridge !== null && environmentId !== null && environmentId === primaryEnvironmentId
+      ? oauthBridge
+      : null;
+
   const startSignIn = async (fleetKey: string, target: AccountRowModel | null) => {
     if (environmentId === null) return;
     const run = ++signInRunRef.current;
     const live = () => signInRunRef.current === run;
     const base: SignInFlow = {
+      kind: "app",
       fleetKey,
       target: target?.label ?? null,
       flowId: null,
@@ -356,9 +382,69 @@ export function AccountsPage() {
     }
   };
 
+  // The shell's own sign-in (#1213): one call for the whole flow. The shell
+  // opens the provider's page as soon as the engine prints its URL, so the
+  // flow waits for the provider from the moment it starts — there is no
+  // status to poll and no code to paste, and the window is the only place
+  // anything happens.
+  const startShellOAuthSignIn = async (
+    fleetKey: string,
+    provider: string,
+    target: AccountRowModel | null,
+  ) => {
+    if (environmentId === null || shellOAuthSignIn === null) return;
+    const run = ++signInRunRef.current;
+    const live = () => signInRunRef.current === run;
+    const targetLabel = target?.label ?? null;
+    const flowId = randomUUID();
+    const base: SignInFlow = {
+      kind: "shell",
+      fleetKey,
+      target: targetLabel,
+      flowId,
+      url: null,
+      pasteCode: false,
+      phase: "waitingForToken",
+      error: null,
+      account: null,
+      codeError: null,
+      codeBusy: false,
+    };
+    setSignInFlow(base);
+    shellFlowIdRef.current = flowId;
+    const result = await shellOAuthSignIn
+      .begin({ flowId, provider, label: shellOAuthWindowLabel(fleetKey, targetLabel) })
+      .catch((cause: unknown) => ({
+        ok: false as const,
+        error: cause instanceof Error ? cause.message : String(cause),
+      }));
+    if (shellFlowIdRef.current === flowId) shellFlowIdRef.current = null;
+    if (!live()) return;
+    if (result.ok) {
+      setSignInFlow({ ...base, phase: "done", account: result.email ?? null });
+      await runCommand({ environmentId, input: { command: "refresh", args: [], options: {} } });
+      return;
+    }
+    // A run the shell cancelled says nothing; the page drops the flow rather
+    // than showing a failure the user caused.
+    if (result.error === undefined) {
+      setSignInFlow(null);
+      return;
+    }
+    setSignInFlow({ ...base, phase: "failed", error: result.error });
+  };
+
   const cancelSignIn = async () => {
     if (environmentId === null || signInFlow === null) return;
     signInRunRef.current += 1;
+    if (signInFlow.kind === "shell") {
+      if (signInFlow.flowId !== null) {
+        if (shellFlowIdRef.current === signInFlow.flowId) shellFlowIdRef.current = null;
+        await shellOAuthSignIn?.cancel(signInFlow.flowId).catch(() => {});
+      }
+      setSignInFlow(null);
+      return;
+    }
     if (signInFlow.flowId !== null) {
       await shellSignIn?.close(signInFlow.flowId).catch(() => {});
       await runCommand({ environmentId, input: signInCancelCommandArgs(signInFlow.flowId) });
@@ -498,11 +584,15 @@ export function AccountsPage() {
               signIn={{
                 offers: false,
                 inApp: inAppSignIn,
+                shellOAuth: shellOAuthSignIn !== null,
                 flow: signInFlow,
                 onCancel: () => void cancelSignIn(),
                 onSubmitCode: (code) => void submitSignInCode(code),
               }}
               onStartSignIn={(fleetKey, target) => void startSignIn(fleetKey, target)}
+              onStartShellOAuthSignIn={(fleetKey, provider, target) =>
+                void startShellOAuthSignIn(fleetKey, provider, target)
+              }
               onRetry={snapshotQuery.refresh}
               onAction={(fleetKey, row, action, alias) =>
                 void dispatch(fleetKey, row, action, alias)
@@ -529,6 +619,7 @@ function AccountsBody({
   addFlow,
   signIn,
   onStartSignIn,
+  onStartShellOAuthSignIn,
   onRetry,
   onAction,
   onSignIn,
@@ -546,6 +637,12 @@ function AccountsBody({
   /** The in-app sign-in, before the page's fleet and `offers` are known. */
   readonly signIn: Omit<FleetSignIn, "onStart">;
   readonly onStartSignIn: (fleetKey: string, target: AccountRowModel | null) => void;
+  /** The shell's own sign-in (#1213); the fleet's provider names the flow. */
+  readonly onStartShellOAuthSignIn: (
+    fleetKey: string,
+    provider: string,
+    target: AccountRowModel | null,
+  ) => void;
   readonly onRetry: () => void;
   readonly onAction: (
     fleetKey: string,
@@ -625,6 +722,9 @@ function AccountsBody({
       {forecast === null ? null : <ForecastStrip forecast={forecast} />}
       {snapshot.fleets.map((fleet) => {
         const section = buildFleetSection(fleet);
+        // Only the engine whose sign-in is a loopback OAuth flow takes the
+        // shell path; the others keep the app's.
+        const shellOAuth = signIn.shellOAuth && fleetRunsShellOAuth(section.engineID);
         return (
           <FleetSection
             key={section.key}
@@ -646,8 +746,12 @@ function AccountsBody({
             signIn={{
               ...signIn,
               offers: offersSignIn,
+              shellOAuth,
               flow: signIn.flow?.fleetKey === section.key ? signIn.flow : null,
-              onStart: (target) => onStartSignIn(section.key, target),
+              onStart: (target) =>
+                shellOAuth
+                  ? onStartShellOAuthSignIn(section.key, section.provider, target)
+                  : onStartSignIn(section.key, target),
             }}
             onAction={(row, action, alias) => onAction(section.key, row, action, alias)}
             onAdd={(target) => onAdd(section.key, target)}

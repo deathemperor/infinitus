@@ -205,6 +205,11 @@ export const PREF_COPY: Readonly<
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
   engine_9router_enabled: { label: "9Router engine on (rotates behind its own endpoint)" },
+  mock_mode: {
+    label: "Demo fleet (fabricated accounts)",
+    description:
+      "Made-up accounts standing in for the engine. Nothing reads or touches your real accounts; flipping this restarts Infinitus.",
+  },
   // About.
   update_channel: {
     label: "Update channel",

@@ -287,13 +287,16 @@ describe("add account and re-login", () => {
     expect(buildFleetSection(fleet({ capabilities: ["addToken"] })).canAdd).toBe(false);
   });
 
-  it("marks a lapsed sign-in for re-login only where the fleet can run one", () => {
+  it("marks a lapsed sign-in whatever the fleet advertises (#1213)", () => {
     const lapsed = account({ usageStatus: "relogin_required" });
     expect(rowAt(fleet({ capabilities: ["addOAuth"], accounts: [lapsed] })).reloginNeeded).toBe(
       true,
     );
     expect(rowAt(fleet({ capabilities: ["addOAuth"] })).reloginNeeded).toBe(false);
-    expect(rowAt(fleet({ capabilities: [], accounts: [lapsed] })).reloginNeeded).toBe(false);
+    // The capability decides who can RUN a sign-in, not whether this one
+    // lapsed: a fleet that advertises nothing is the case the shell's own
+    // `add-oauth` exists for, and the page still has to offer the row.
+    expect(rowAt(fleet({ capabilities: [], accounts: [lapsed] })).reloginNeeded).toBe(true);
   });
 
   it("gates on the manifest listing add and reads the app's sign-in flag", () => {

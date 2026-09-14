@@ -42,6 +42,10 @@ final class PrefCatalogTests: XCTestCase {
         XCTAssertEqual(layout.effect, .live)
         XCTAssertEqual(layout.choices, [.string("wide"), .string("stacked"), .string("hstack")])
         XCTAssertEqual(reply.prefs.first { $0.key == "engine_swapd_enabled" }?.effect, .restart)
+        // #1177: the demo fleet is a restart-effect pref of the engines section.
+        let mock = reply.prefs.first { $0.key == "mock_mode" }
+        XCTAssertEqual(mock?.effect, .restart)
+        XCTAssertEqual(mock?.section, "engines")
     }
 
     /// The fork server's tunnel (#572) is a Devices pref pair: off, on T3's port.

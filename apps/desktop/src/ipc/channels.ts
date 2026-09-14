@@ -122,6 +122,9 @@ export const SET_KEEP_AWAKE_CHANNEL = "desktop:infinitus-set-keep-awake";
 export const OPEN_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-open-sign-in";
 export const CLOSE_INFINITUS_SIGN_IN_CHANNEL = "desktop:infinitus-close-sign-in";
 export const SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL = "desktop:infinitus-submit-sign-in-code";
+// Fork: a sign-in the shell runs through the account engine itself (#1213).
+export const BEGIN_INFINITUS_OAUTH_SIGN_IN_CHANNEL = "desktop:infinitus-begin-oauth-sign-in";
+export const CANCEL_INFINITUS_OAUTH_SIGN_IN_CHANNEL = "desktop:infinitus-cancel-oauth-sign-in";
 // Fork: deep links (#270 D).
 export const CONSUME_INFINITUS_DEEP_LINK_CHANNEL = "desktop:infinitus-consume-deep-link";
 export const INFINITUS_DEEP_LINK_PENDING_CHANNEL = "desktop:infinitus-deep-link-pending";

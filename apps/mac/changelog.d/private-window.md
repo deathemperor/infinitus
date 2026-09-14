@@ -1,0 +1,1 @@
+Mac: The sign-in flow's "Use private window (no passkeys)" button is gone; the system sheet and the default-browser route are the two ways in, and the per-account cookie jars it kept are removed at the next launch.
