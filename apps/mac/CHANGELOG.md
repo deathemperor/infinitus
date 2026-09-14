@@ -10,6 +10,17 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.10
+
+### Mac
+- Settings drops its Display, Push and Lock panes — all three are Settings › Infinitus pages in the desktop app now (#569).
+- Priority mode holds background threads when the active account's window is on pace to fill before it resets, not only once it is already near the line.
+- Priority mode remembers its last headroom verdict across a relaunch, so held threads are not released and re-held while the app comes back.
+- When the default browser declares system sign-in sheet support but presents nothing (Google Chrome does: a flash of the browser and no page), Add account and Re-login open the Claude page in that browser instead — a private window where it has one — and the companion window says so; with Safari as the default browser the in-app passkey sheet is unchanged.
+
+### Linux
+- The team sync timer units are gone with Team; a machine that installed them should run `systemctl --user disable --now infinitus-team.timer`.
+
 ## 0.5.0-alpha.9
 
 ### Mac
