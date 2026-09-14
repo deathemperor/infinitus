@@ -138,6 +138,7 @@ const ACTION_SYMBOL: Record<AccountAction, string> = {
   unhold: "play.circle",
   prefer: "star",
   rename: "pencil",
+  remove: "trash",
 };
 
 function actionTitle(action: AccountAction, row: AccountRowModel): string {
@@ -152,7 +153,20 @@ function actionTitle(action: AccountAction, row: AccountRowModel): string {
       return row.preferred ? "Unstar" : "Star (pick first)";
     case "rename":
       return "Rename…";
+    case "remove":
+      return "Remove…";
   }
+}
+
+/** The confirmation a remove shows: the credential leaves the engine for good. */
+export function removeConfirmation(
+  row: AccountRowModel,
+  fleetTitle: string,
+): { readonly title: string; readonly message: string } {
+  return {
+    title: `Remove ${row.label} from ${fleetTitle}?`,
+    message: `Deletes ${row.email}'s credential from the engine. Signing in again adds it back.`,
+  };
 }
 
 /** The confirmation a switch shows before it runs: the Mac's live sessions

@@ -72,14 +72,6 @@ struct PanelRecovery: Encodable {
     let at: String
 }
 
-/// A phone on the mirror (#9 parity with the Mac's device list).
-struct PanelDevice: Encodable {
-    let name: String
-    let route: String
-    let secondsAgo: Int
-    let active: Bool
-}
-
 struct PanelPayload: Encodable {
     let schemaVersion: Int
     let themeId: String
@@ -91,8 +83,6 @@ struct PanelPayload: Encodable {
     /// Footer chips (#9 parity), all nil in the error path.
     let serviceStatus: PanelServiceStatus?
     let engine: PanelEngine?
-    /// Phones heard from by `serve`, newest first; additive field.
-    let devices: [PanelDevice]
     let error: String?
 }
 
@@ -104,9 +94,6 @@ struct InfinitusTray {
         var themeID = "off"
         var remaining = false
         var engineOrder = false
-        var port: UInt16 = MirrorTransport.defaultPort
-        var token: String?
-        var tokenFile: String?
         var interval: UInt64 = 30
         var positional: [String] = []
         var i = 0
@@ -119,16 +106,6 @@ struct InfinitusTray {
                 remaining = true
             case "--engine-order":
                 engineOrder = true
-            case "--port" where i + 1 < args.count:
-                guard let parsed = UInt16(args[i + 1]) else { fail("--port needs a number") }
-                port = parsed
-                i += 1
-            case "--token" where i + 1 < args.count:
-                token = args[i + 1]
-                i += 1
-            case "--token-file" where i + 1 < args.count:
-                tokenFile = args[i + 1]
-                i += 1
             case "--interval" where i + 1 < args.count:
                 guard let parsed = UInt64(args[i + 1]) else { fail("--interval needs a number") }
                 interval = parsed
@@ -156,9 +133,7 @@ struct InfinitusTray {
                 print("\(theme.id)\t\(theme.name)")
             }
         case "serve":
-            await serve(port: port, token: token, tokenFile: tokenFile, themeID: themeID, interval: interval)
-        case "pair":
-            pair(port: port)
+            await serve(interval: interval)
         case "help", "--help", "-h":
             print(help)
         default:
@@ -175,14 +150,12 @@ struct InfinitusTray {
       switch <n>                          switch to account n
       disable <n> / enable <n>            hold an account out of rotation / return it
       themes                              list built-in theme ids
-      serve [--port N] [--token T|--token-file PATH] [--interval S]
-                                           phone companion: serve the fleet snapshot
-                                           over HTTP (Linux only); also ticks the
-                                           away-push triggers (#13 parity) every S
-                                           seconds (default 30) — env vars
-                                           INFINITUS_PUSH_ALL_DEAD/LAST_ALIVE
+      serve [--interval S]                the tray's daemon (Linux only): binds the
+                                           control socket for infinitusctl and hooks,
+                                           and ticks the away-push triggers (#13
+                                           parity) every S seconds (default 30) —
+                                           env vars INFINITUS_PUSH_ALL_DEAD/LAST_ALIVE
                                            (default on) gate them
-      pair [--port N]                     print the pair URL (+ QR if qrencode is on PATH)
 
     Wire-up (packaging/omarchy/waybar-infinitus.jsonc):
       "custom/infinitus": exec `infinitus-tray status --theme rpg`,
@@ -193,17 +166,15 @@ struct InfinitusTray {
 
     /// The Claude fleet off one `swapd list --json` (#756): the provider's
     /// view through the same SwapdMapping the Mac uses, packed as the
-    /// AccountList this file renders — and its bytes, which are what
-    /// the mirror hands the phone. No Claude provider, or one with no
+    /// AccountList this file renders. No Claude provider, or one with no
     /// accounts, is an empty fleet, not an error: the onboarding branch.
-    static func fleet(bin: String, now: Date = Date()) async throws -> (AccountList, Data) {
+    static func fleet(bin: String, now: Date = Date()) async throws -> AccountList {
         let swapd = try await SwapdCLI(binaryPath: bin).list()
         let view = swapd.providers.first { SwapdMapping.provider(for: $0.provider) == .claude }
         let mapped = view.map { SwapdMapping.fleet(from: $0, provider: .claude, now: now) }
-        let list = AccountList(
+        return AccountList(
             activeAccountNumber: mapped?.activeNumber, accounts: mapped?.accounts ?? [],
             nextCandidate: mapped?.nextCandidate, nextRecovery: mapped?.nextRecovery)
-        return (list, (try? JSONEncoder().encode(list)) ?? Data())
     }
 
     // MARK: status
@@ -218,16 +189,10 @@ struct InfinitusTray {
         }
         let theme = RowTheme.builtins.first { $0.id == themeID } ?? .off
         do {
-            let (list, raw) = try await fleet(bin: bin)
+            let list = try await fleet(bin: bin)
             // Utilization history rides the Waybar heartbeat — one
             // append per fresh engine usage poll (todo 2026-09-01).
             TrayHistory.record(accounts: list.accounts, enginePath: bin)
-            // Fleet mirror export (#9 phase 1 parity — macOS's
-            // MirrorExporter). Own throttle, own demo-swapd gate.
-            let footer = await FooterState.current()
-            TrayMirror.export(raw: raw,
-                              enginePath: bin, prefs: FleetPrefs(themeID: theme.id),
-                              serviceStatus: footer.serviceStatus, engine: footer.engine)
             // Engine installed, fleet empty: a bare glyph with no
             // tooltip reads as broken — onboard instead.
             guard !list.accounts.isEmpty else {
@@ -330,7 +295,7 @@ struct InfinitusTray {
                 title: "\(TitleFormatter.icon) \(message)",
                 activeNumber: nil, accounts: [], themes: themes,
                 nextRecovery: nil,
-                serviceStatus: nil, engine: nil, devices: [], error: message))
+                serviceStatus: nil, engine: nil, error: message))
         }
         guard let bin = SwapdLocator.locate() else {
             emitError("swapd not found")
@@ -338,7 +303,7 @@ struct InfinitusTray {
         }
         do {
             let now = Date()
-            let (list, raw) = try await fleet(bin: bin, now: now)
+            let list = try await fleet(bin: bin, now: now)
             let active = list.accounts.first { $0.active }
             let prefs = TitlePrefs(showAccountName: true, titlePct: "both",
                                    titleScoped: false, titleRemaining: false,
@@ -426,12 +391,7 @@ struct InfinitusTray {
             if list.nextCandidate == nil, let rec = recovery {
                 panelRecovery = PanelRecovery(number: rec.number, at: rec.at)
             }
-            // Fleet mirror export (#9 phase 1 parity — macOS's
-            // MirrorExporter). Shares the throttle sidecar with status().
             let footer = await FooterState.current(now: now)
-            TrayMirror.export(raw: raw, enginePath: bin,
-                              prefs: FleetPrefs(themeID: theme.id, sortByHeadroom: !engineOrder),
-                              serviceStatus: footer.serviceStatus, engine: footer.engine, now: now)
             emitPanel(PanelPayload(
                 schemaVersion: 1, themeId: theme.id,
                 title: list.accounts.isEmpty
@@ -440,7 +400,7 @@ struct InfinitusTray {
                 activeNumber: active?.number, accounts: accounts,
                 themes: themes, nextRecovery: panelRecovery,
                 serviceStatus: footer.panelStatus,
-                engine: footer.panelEngine, devices: TrayClients.panelDevices(now: now), error: nil))
+                engine: footer.panelEngine, error: nil))
         } catch {
             emitError("engine error: \(error)")
         }
@@ -487,29 +447,16 @@ struct InfinitusTray {
         }
     }
 
-    // MARK: serve / pair (#9 phone companion, Linux side)
+    // MARK: serve (the tray's daemon, Linux side)
 
     /// One collection pass, independent of `panel`/`status`'s stdout
-    /// paths — always produces *some* snapshot, even with no `swapd` on
-    /// the box: `serve` in a container with no engine installed answers
-    /// `/snapshot` with an empty fleet rather than crashing. Returns the
-    /// decoded list (nil when `swapd` is missing or the fetch failed) so
-    /// `serve`'s loop can tick `PushTriggers` off the same fetch instead
-    /// of paying for a second `swapd list --json`.
-    @discardableResult
-    static func collectAndExport(themeID: String, now: Date = Date()) async -> AccountList? {
-        var raw = Data(#"{"schemaVersion":1,"accounts":[]}"#.utf8)
-        var list: AccountList?
-        let bin = SwapdLocator.locate()
-        if let bin, let (fetched, rawData) = try? await fleet(bin: bin, now: now) {
-            list = fetched
-            raw = rawData
-        }
-        let footer = await FooterState.current(now: now)
-        TrayMirror.export(raw: raw, enginePath: bin ?? "",
-                          prefs: FleetPrefs(themeID: themeID),
-                          serviceStatus: footer.serviceStatus, engine: footer.engine, now: now)
-        return list
+    /// paths: the decoded list, nil when `swapd` is missing or the fetch
+    /// failed, so `serve`'s loop ticks `PushTriggers` off one
+    /// `swapd list --json`. Never fatal — `serve` in a container with no
+    /// engine installed keeps its socket up.
+    static func collect(now: Date = Date()) async -> AccountList? {
+        guard let bin = SwapdLocator.locate() else { return nil }
+        return try? await fleet(bin: bin, now: now)
     }
 
     /// Env-var flags for `serve`'s push triggers (#13 parity, Linux side)
@@ -548,7 +495,7 @@ struct InfinitusTray {
     /// One push, every way this box can deliver it: the desktop's
     /// notify-send.
     static func deliverPush(_ msg: String) async {
-        logPhoneInput("🔔 \(msg)")
+        logEvent("🔔 \(msg)")
         if let notifySend = which("notify-send") {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: notifySend)
@@ -558,23 +505,11 @@ struct InfinitusTray {
         }
     }
 
-    /// The descriptor's `machineId` (#486): systemd's stable per-machine id
-    /// where one exists — no daemon of its own to persist a minted one in,
-    /// unlike the Mac's `MachineIdentity` (UserDefaults) or the tray's own
-    /// pairing token (a 0600 file, `PairingStore`).
-    static func machineIdentity(path: String = "/etc/machine-id") -> String {
-        if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
-            let trimmed = contents.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { return trimmed }
-        }
-        return ProcessInfo.processInfo.hostName
-    }
-
     // MARK: #486 slice 3 — the control socket
     //
-    // Same rule as the slice 2 routes above: the work lives in plain funcs
-    // out here (type-checked by a Mac build too), `serve` only binds the
-    // socket and hands `ControlDispatch` these handlers.
+    // The work lives in plain funcs out here (type-checked by a Mac build
+    // too), `serve` only binds the socket and hands `ControlDispatch`
+    // these handlers.
 
     /// `infinitusctl status` against the tray: enough to prove whose
     /// socket answered.
@@ -599,68 +534,19 @@ struct InfinitusTray {
         }
     }
 
-    static func serve(port: UInt16, token: String?, tokenFile: String?, themeID: String,
-                      interval: UInt64 = 30) async {
+    static func serve(interval: UInt64 = 30) async {
         #if canImport(Glibc)
-        let resolved: String
-        if let token, !token.isEmpty {
-            resolved = MirrorPairing.normalize(token)
-        } else if let tokenFile {
-            guard let contents = try? String(contentsOfFile: tokenFile, encoding: .utf8) else {
-                fail("--token-file \(tokenFile): couldn't read")
-            }
-            resolved = MirrorPairing.normalize(contents)
-        } else {
-            resolved = PairingStore.loadOrCreate()
-        }
-        guard !resolved.isEmpty else { fail("serve: empty pairing token") }
         let pushes = PushBox()
         let pushFlags = pushFlagsFromEnv()
-        // The first request must not 503 while the first 30s tick is
-        // still pending. This first tick also seeds PushTriggers: a
-        // session already `waiting` at launch is not news (same rule
-        // as the Mac — PushTriggers.seededWaiting).
-        let firstList = await collectAndExport(themeID: themeID)
+        // The first tick seeds PushTriggers: a session already `waiting`
+        // at launch is not news (same rule as the Mac —
+        // PushTriggers.seededWaiting).
+        let firstList = await collect()
         await tickPushes(list: firstList, pushes: pushes, flags: pushFlags)
-        // `GET /.well-known/infinitus` (#486 slice 1+2): what this tray
-        // serves, read before pairing, same as the Mac's descriptor
-        // (`MirrorServer.descriptor`, #223 phase 4) — unauthenticated by
-        // design, so it never changes and is built once up front.
-        //
-        let descriptorBody = (try? JSONEncoder().encode(MirrorDescriptor.tray(
-            machineId: machineIdentity(), label: ProcessInfo.processInfo.hostName, appVersion: BuiltVersion.string)))
-            ?? Data()
-        let server = PosixHTTPServer(authorize: {
-            $0.path == MirrorTransport.wellKnownPath || MirrorTransport.isAuthorized($0, token: resolved)
-        }) { request in
-            if request.method == "GET", request.path == MirrorTransport.wellKnownPath {
-                return MirrorTransport.jsonResponse(descriptorBody)
-            }
-            guard MirrorTransport.isAuthorized(request, token: resolved) else {
-                return MirrorTransport.unauthorizedResponse()
-            }
-            TrayClients.note(request)
-            if request.method == "GET", request.path == MirrorTransport.snapshotPath {
-                guard let data = try? Data(contentsOf: TrayMirror.url) else {
-                    return MirrorTransport.unavailableResponse()
-                }
-                return MirrorTransport.snapshotResponse(data)
-            }
-            return MirrorTransport.notFoundResponse()
-        }
-        let bound: UInt16
-        do {
-            bound = try server.start(port: port)
-        } catch {
-            fail("serve: couldn't bind port \(port): \(error)")
-        }
-        print("infinitus-tray serve: listening on 0.0.0.0:\(bound), "
-            + "pairing token \(MirrorPairing.mask(resolved))")
-        // #486 slice 3: the control socket beside the HTTP listener, so
-        // `infinitusctl status` reaches this box. `status` only —
-        // `ControlDispatch` answers everything else with a considered no.
-        // A bind that fails is logged, never fatal: the phone's mirror is
-        // this process's job, the socket is the extra.
+        // #486 slice 3: the control socket, so `infinitusctl status`
+        // reaches this box. `status` only — `ControlDispatch` answers
+        // everything else with a considered no. A bind that fails is
+        // logged, never fatal: the push ticks still run.
         let handlers = controlHandlers()
         let controlPath = ControlProtocol.socketURL().path
         let control = PosixControlSocket(path: controlPath) {
@@ -670,54 +556,21 @@ struct InfinitusTray {
             try control.start()
             print("infinitus-tray serve: control socket at \(controlPath)")
         } catch {
-            logPhoneInput("⚠️ control socket at \(controlPath) not bound: \(error) "
+            logEvent("⚠️ control socket at \(controlPath) not bound: \(error) "
                 + "— hooks and infinitusctl won't reach this tray")
         }
         while true {
-            // MirrorWriter.shouldWrite needs a strict `>` on the interval
-            // — sleep a touch over it so this loop's own tick never gets
-            // throttled away by itself.
-            try? await Task.sleep(nanoseconds: (interval + 1) * 1_000_000_000)
-            let list = await collectAndExport(themeID: themeID)
+            try? await Task.sleep(nanoseconds: interval * 1_000_000_000)
+            let list = await collect()
             await tickPushes(list: list, pushes: pushes, flags: pushFlags)
         }
         #else
-        fail("serve is Linux-only (no POSIX HTTP listener on this platform)")
+        fail("serve is Linux-only (no POSIX control socket on this platform)")
         #endif
     }
 
-    static func pair(port: UInt16) {
-        #if canImport(Glibc)
-        let token = PairingStore.loadOrCreate()
-        let addresses = PosixInterfaceAddresses.ipv4()
-        var endpoints: [String] = []
-        if let lan = MirrorPairing.lanAddress(in: addresses) {
-            endpoints.append("http://\(lan):\(port)")
-        }
-        if let tailnet = MirrorPairing.tailnetAddress(in: addresses) {
-            endpoints.append("http://\(tailnet):\(port)")
-        }
-        guard !endpoints.isEmpty else {
-            fail("pair: no non-loopback IPv4 address found — connect to a network first")
-        }
-        let url = MirrorPairing.pairURL(endpoints: endpoints, token: token)
-        print(url)
-        if let qrencode = which("qrencode") {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: qrencode)
-            process.arguments = ["-t", "ANSIUTF8", url]
-            try? process.run()
-            process.waitUntilExit()
-        } else {
-            print("install qrencode for a QR")
-        }
-        #else
-        fail("pair is Linux-only")
-        #endif
-    }
-
-    /// PATH lookup for an optional external tool (qrencode) — no shell,
-    /// no `which` subprocess.
+    /// PATH lookup for an optional external tool (notify-send) — no
+    /// shell, no `which` subprocess.
     static func which(_ name: String) -> String? {
         let path = ProcessInfo.processInfo.environment["PATH"] ?? ""
         return path.split(separator: ":")
@@ -743,11 +596,9 @@ struct InfinitusTray {
         print(String(decoding: data, as: UTF8.self))
     }
 
-    /// The tray's stand-in for the Mac's event log (#17): every phone
-    /// input delivery/failure — and, since #486 slice 3, the first
-    /// checkpoint of a session, any that fails, and every restore the phone
-    /// asks for — timestamped, to stderr.
-    static func logPhoneInput(_ text: String) {
+    /// The tray's stand-in for the Mac's event log (#17): every push and
+    /// every control-socket fault, timestamped, to stderr.
+    static func logEvent(_ text: String) {
         let stamp = ISO8601DateFormatter().string(from: Date())
         FileHandle.standardError.write(Data("[\(stamp)] \(text)\n".utf8))
     }

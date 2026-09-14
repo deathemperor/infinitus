@@ -5,6 +5,7 @@ import type { LiveActivityTokenKind } from "./liveActivity.logic";
 import {
   type AgentActivityPushState,
   EMPTY_AGENT_ACTIVITY_PUSH_STATE,
+  type PushRegistrationOutcome,
   withRegistration,
   withWatching,
 } from "./pushDiagnostics.logic";
@@ -34,13 +35,13 @@ export function noteTokenRegistered(kind: LiveActivityTokenKind, at: Date): void
   );
 }
 
-/** The Mac refused one, in its own words. */
-export function noteTokenRefused(
+/** A send that did not land, in its own words: the Mac refused it, or the
+    phone could not reach the Mac to make it (#941). */
+export function noteTokenFailed(
   kind: LiveActivityTokenKind,
   at: Date,
+  outcome: Exclude<PushRegistrationOutcome, "registered">,
   detail: string | null,
 ): void {
-  update((state) =>
-    withRegistration(state, kind, { outcome: "refused", at: at.toISOString(), detail }),
-  );
+  update((state) => withRegistration(state, kind, { outcome, at: at.toISOString(), detail }));
 }

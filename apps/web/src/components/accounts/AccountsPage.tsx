@@ -200,11 +200,11 @@ export function AccountsPage() {
     alias?: string,
   ) => {
     if (environmentId === null) return;
-    const { command, args } = accountCommandArgs(fleetKey, row, action, alias);
+    const { command, args, options } = accountCommandArgs(fleetKey, row, action, alias);
     setPending({ fleetKey, number: row.number, action, snapshot });
     const result = await runCommand({
       environmentId,
-      input: { command, args, options: {} },
+      input: { command, args, options: options ?? {} },
     });
     if (result._tag === "Success") {
       setFailure(null);

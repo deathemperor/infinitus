@@ -263,10 +263,23 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["notification sound alert completion input approval desktop"],
   },
   {
+    id: "in-app-notifications",
+    title: "In-app notifications",
+    to: "/settings/general",
+    searchTerms: ["notification toast popup completion input approval failure"],
+  },
+  {
     id: "time-format",
     title: "Time format",
     to: "/settings/general",
     searchTerms: ["timestamp clock locale system browser os 12 hour 24 hour"],
+  },
+  {
+    id: "response-streaming",
+    title: "Response streaming",
+    to: "/settings/general",
+    scope: "project-defaults",
+    searchTerms: ["output token paragraph buffered wait turn legacy"],
   },
   {
     id: "hide-whitespace-changes",
@@ -424,13 +437,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Context window indicator (legacy)",
     to: "/settings/general",
     searchTerms: ["composer meter usage tokens circle old"],
-  },
-  {
-    id: "legacy-token-streaming",
-    title: "Stream token by token (legacy)",
-    to: "/settings/general",
-    scope: "project-defaults",
-    searchTerms: ["response output old compatibility"],
   },
   {
     id: "legacy-sidebar",
@@ -711,7 +717,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "connections-environment",
-    title: "This environment",
+    title: "This machine",
     to: "/settings/connections",
     searchTerms: [
       "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
@@ -719,7 +725,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "remote-environments",
-    title: "Remote environments",
+    title: "Environments",
     to: "/settings/connections",
     searchTerms: ["add pair backend host code ssh config agent tunnel saved t3 connect"],
   },
@@ -815,9 +821,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/devices",
     targetId: "infinitus-devices",
     infinitusOnly: true,
-    // "live activity" went with the Mac's cards (#1041); the page is the phone
-    // mirror, the tunnel fronting this server, and the pairing cards under it.
-    searchTerms: ["phone mirror lan tunnel cloudflare rendezvous pair qr port hostname"],
+    // "live activity" went with the Mac's cards and the phone mirror with its
+    // server (#1041); the page is this Mac's name, the tunnel fronting this
+    // server, its push key and iCloud sync, and the pairing cards under it.
+    searchTerms: [
+      "phone tunnel cloudflare pair qr port hostname name apns icloud",
+      "machine push key p8 team sync registered phones alerts",
+    ],
   },
   {
     id: "infinitus-engines",
@@ -825,11 +835,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus/engines",
     targetId: "infinitus-engines",
     infinitusOnly: true,
-    searchTerms: ["swapd cliproxy 9router proxy accounts registered key"],
+    searchTerms: [
+      "swapd cliproxy 9router proxy accounts registered key",
+      "management key dashboard password base url test connection",
+    ],
   },
   {
     id: "github-routing",
-    title: "GitHub routing",
+    title: "GitHub sharing",
     to: "/settings/connections",
     searchTerms: ["pull request trusted environments shared credentials permissions read actions"],
   },

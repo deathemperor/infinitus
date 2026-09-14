@@ -237,9 +237,6 @@ final class AppModel: ObservableObject {
     /// A newer Infinitus release than this build (About → Updates does
     /// the check; the popup chip just points there).
     @Published var appUpdateVersion: String?
-    /// Whatever About's release check last found, newer or not (#121) —
-    /// the phone mirrors this to know when a newer PHONE build is out.
-    @Published var appReleaseLatest: String?
     /// The one BrewUpdater instance the About pane's button and the
     /// phone's `POST /app/update` route both drive; set by InfinitusApp.
     var brewUpdater: BrewUpdater?
@@ -486,7 +483,7 @@ final class AppModel: ObservableObject {
     /// "<name> is back" (and "all accounts are back — reset early") pushes (2026-09-05).
     @Published var pushRevived: Bool { didSet { defaults.set(pushRevived, forKey: "push_revived") } }
     /// Minutes before a reset that the row's countdown goes live and the
-    /// phone's reset alarm fires (#227); mirrored to the phone in FleetPrefs.
+    /// phone's reset alarm fires (#227).
     @Published var reviveLeadMinutes: Int { didSet { defaults.set(reviveLeadMinutes, forKey: "revive_lead_minutes") } }
     var reviveLead: TimeInterval { TimeInterval(reviveLeadMinutes * 60) }
     /// Headroom mode (#616): "off" or "hold"; the thresholds are the
@@ -500,10 +497,6 @@ final class AppModel: ObservableObject {
     @Published var machineNameOverride: String {
         didSet {
             defaults.set(machineNameOverride, forKey: MachineName.overrideKey)
-            guard machineNameOverride != oldValue else { return }
-            // The Bonjour service carries the name — re-advertise.
-            mirrorServer.stop()
-            applyMirrorLAN()
         }
     }
     var machineName: String { MachineName.current(defaults: defaults) }
@@ -511,44 +504,10 @@ final class AppModel: ObservableObject {
     /// and its effects (switch/death/revival flash, the burn breath).
     @Published var menuBarThemed: Bool { didSet { defaults.set(menuBarThemed, forKey: "menubar_themed") } }
     @Published var menuBarEffects: Bool { didSet { defaults.set(menuBarEffects, forKey: "menubar_effects") } }
-    // Phone companion (#9): serve the mirror snapshot over the LAN when
-    // the Sync pane's toggle is on. Off by default — it's an open port.
-    @Published var mirrorLANEnabled: Bool {
-        didSet {
-            defaults.set(mirrorLANEnabled, forKey: "mirror_lan_enabled")
-            applyMirrorLAN()
-        }
-    }
-    /// The pairing token every mirror request must carry (#9 remote
-    /// access). Not a credential to Anthropic — a read key for this
-    /// Mac's snapshot, which is why plain UserDefaults is its home.
-    @Published var mirrorPairToken: String {
-        didSet {
-            defaults.set(mirrorPairToken, forKey: "mirror_pair_token")
-            mirrorServer.token.set(mirrorPairToken)
-        }
-    }
-    /// Publish the quick tunnel's current URL to the infinitus.run
-    /// rendezvous (MirrorRendezvous) so a paired phone finds the new
-    /// address after a restart instead of rescanning. On by default: it
-    /// only ever runs while a tunnel does, and the URL is useless
-    /// without the token.
-    @Published var mirrorRendezvousEnabled: Bool {
-        didSet {
-            defaults.set(mirrorRendezvousEnabled, forKey: "mirror_rendezvous_enabled")
-            if mirrorRendezvousEnabled, let url = publicURL { publishRendezvous(url) }
-        }
-    }
-    /// "Expose through a Cloudflare quick tunnel" — off by default; a
-    /// public hostname, even a throwaway one, is never a default.
-    @Published var mirrorTunnelEnabled: Bool {
-        didSet {
-            defaults.set(mirrorTunnelEnabled, forKey: "mirror_tunnel_enabled")
-            applyQuickTunnel()
-        }
-    }
     /// The named Cloudflare tunnel (#9, the restart-proof route): the
     /// user's own hostname, the token in the keychain. Off by default.
+    /// Since the mirror's retirement it stands on its own toggle and
+    /// hostname; the fork server's stable route (#650) rides it.
     @Published var mirrorNamedTunnelEnabled: Bool {
         didSet {
             defaults.set(mirrorNamedTunnelEnabled, forKey: NamedTunnel.enabledKey)
@@ -592,7 +551,6 @@ final class AppModel: ObservableObject {
     }
     let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
-    let mirrorExporter = MirrorExporter()
 
     /// The Mac's own popup / pop-out / chat window is a client too (#223
     /// phase 5): while one is open, nothing the user sees here depends on
@@ -620,16 +578,18 @@ final class AppModel: ObservableObject {
             var scopes: [ClientActivity.Scope] = []
             if !visibleSurfaces.subtracting([Self.statsSurface]).isEmpty { scopes += [.sessions, .fleets] }
             if visibleSurfaces.contains(Self.statsSurface) { scopes.append(.stats) }
-            mirrorServer.leases.report(.init(clientId: ClientActivity.localClientId, visible: true, focused: true,
+            leases.report(.init(clientId: ClientActivity.localClientId, visible: true, focused: true,
                                              recentlyInteracted: true, scopes: scopes,
                                              ttlMs: ClientActivity.ttlCapMs))
         } else {
-            mirrorServer.leases.release(clientId: ClientActivity.localClientId)
+            leases.release(clientId: ClientActivity.localClientId)
         }
     }
     /// `uiSurface` id the Stats pane reports while it shows.
     static let statsSurface = "stats"
-    let mirrorServer = MirrorServer()
+    /// Who is watching what (ClientActivity): the local UI, the desktop
+    /// (`client-activity`) and the Stats pane hold scoped leases here.
+    let leases = LeaseTable()
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
     /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
@@ -640,7 +600,6 @@ final class AppModel: ObservableObject {
         credential.log = { [weak self] text in self?.logEvent("desktop", icon: "key", text) }
         return credential
     }()
-    let quickTunnel = QuickTunnel()
     let namedTunnel = NamedTunnel()
     let forkTunnel = QuickTunnel(pidKey: "fork_tunnel_pid")
     /// Live Activity pushes to the phone (APNs), LiveActivityPusher.swift.
@@ -651,7 +610,8 @@ final class AppModel: ObservableObject {
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
     /// phone (#756: the engine's own away-push channels went with cswap;
     /// swapd's `notify` only reports).
-    func push(_ msg: String) {
+    @discardableResult
+    func push(_ msg: String) -> PushReach {
         notify(msg)
     }
 
@@ -690,12 +650,12 @@ final class AppModel: ObservableObject {
 
     /// The pass a freshly surfaced AWS-login need starts (rebuildAwsLogins).
     private var awsNeedRefresh: Task<Void, Never>?
-    /// That pass writes the mirror snapshot past the exporter's throttle.
-    private var mirrorExportDue = false
 
-    func notify(_ body: String) {
+    /// Answers the phones the line reached (the `push` verb reports it).
+    @discardableResult
+    func notify(_ body: String) -> PushReach {
         Notifier.post(title: "Infinitus", body: body)
-        liveActivityPusher.pushAlert(title: "Infinitus", body: body)
+        return liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
     /// Seeded with what the triggers remembered before the last relaunch
     /// (#98, #231): the last-alive warning.
@@ -805,17 +765,11 @@ final class AppModel: ObservableObject {
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         popupSort = Self.popupSort(defaults)
-        mirrorLANEnabled = defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false
-        mirrorTunnelEnabled = defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false
-        mirrorRendezvousEnabled = defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true
         mirrorNamedTunnelEnabled = defaults.bool(forKey: NamedTunnel.enabledKey)
         mirrorNamedTunnelHost = defaults.string(forKey: NamedTunnel.hostnameKey) ?? ""
         forkTunnelEnabled = defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false
         forkTunnelHostname = defaults.string(forKey: "fork_tunnel_hostname") ?? ""
         forkServerPort = defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort
-        // One token per install, minted the first time anyone looks.
-        let storedToken = defaults.string(forKey: "mirror_pair_token") ?? ""
-        mirrorPairToken = storedToken.isEmpty ? MirrorPairing.generateToken() : storedToken
         // Push triggers default ON — they exist because they were asked for.
         pushAllDead = defaults.object(forKey: "push_all_dead") as? Bool ?? true
         pushLastAlive = defaults.object(forKey: "push_last_alive") as? Bool ?? true
@@ -848,9 +802,6 @@ final class AppModel: ObservableObject {
             swapd = nil
             if swapdEnabled { lastError = "Account engine missing — install a current Infinitus release to restore bundled swapd, then relaunch." }
         }
-        // A freshly minted token has to survive the launch that made it:
-        // property initialisation doesn't run `didSet`.
-        if storedToken.isEmpty { defaults.set(mirrorPairToken, forKey: "mirror_pair_token") }
         if !playground { sync.attach(model: self) }
         if let swapd, swapdEnabled || playground { registry.register(SwapdEngine(cli: swapd)) }
         // The proxy is never part of the playground (isolation contract)
@@ -887,7 +838,7 @@ final class AppModel: ObservableObject {
         // backfill or write real App Support caches under
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
-        statsModel.leases = mirrorServer.leases
+        statsModel.leases = leases
     }
 
     /// App-side cache of our own subprocess output (never an engine
@@ -1013,12 +964,14 @@ final class AppModel: ObservableObject {
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
-        set(\.mirrorLANEnabled, defaults.object(forKey: "mirror_lan_enabled") as? Bool ?? false)
-        set(\.mirrorTunnelEnabled, defaults.object(forKey: "mirror_tunnel_enabled") as? Bool ?? false)
-        set(\.mirrorRendezvousEnabled, defaults.object(forKey: "mirror_rendezvous_enabled") as? Bool ?? true)
         set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
         set(\.forkTunnelHostname, defaults.string(forKey: "fork_tunnel_hostname") ?? "")
+        // #1178: the Devices page's prefs land on their owners; each didSet
+        // writes the same key back and re-reads the keychain for the key id.
+        set(\.liveActivityPusher.teamID, defaults.string(forKey: LiveActivityPusher.teamIDKey) ?? "")
+        set(\.liveActivityPusher.keyID, defaults.string(forKey: LiveActivityPusher.keyIDKey) ?? "")
+        set(\.sync.enabled, defaults.object(forKey: "icloud_sync") as? Bool ?? false)
     }
 
     // MARK: battle plan (#7)
@@ -1236,61 +1189,16 @@ final class AppModel: ObservableObject {
         if !isPlayground, !mockMode {
             Task.detached(priority: .utility) { [eventStore] in await eventStore.prune() }
         }
-        mirrorServer.log = { [weak self] icon, text in
+        namedTunnel.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, text)
         }
-        quickTunnel.log = { [weak self] icon, text in
-            self?.logEvent("other", icon: icon, text)
-        }
-        namedTunnel.log = quickTunnel.log
         forkTunnel.log = { [weak self] icon, text in
             self?.logEvent("other", icon: icon, "fork server: " + text)
         }
-        liveActivityPusher.log = quickTunnel.log
-        mirrorServer.activityTokens.set { [weak self] registration in
-            Task { @MainActor in self?.liveActivityPusher.register(registration) }
-        }
-        mirrorServer.crashes.set { [weak self] report in
-            Task { @MainActor in self?.ingestCrash(report, announce: true) }
-        }
-        mirrorServer.appUpdate.set { [weak self] in
-            guard let self else { return AppUpdate.Reply(outcome: "unavailable", detail: nil) }
-            return await self.triggerAppUpdate()
-        }
-        mirrorServer.accountAction.set { [weak self] request in
-            guard let self else { return AccountAction.Reply(outcome: "failed", detail: "app gone") }
-            return await self.performAccountAction(request)
-        }
-        // UserDefaults is thread-safe; the closure only reads it.
-        nonisolated(unsafe) let prefDefaults = defaults
-        mirrorServer.prefs.set { try PrefCatalog.reply(from: prefDefaults) }
-        mirrorServer.prefs.setWrite { [weak self] write in
-            // The box is synchronous and off-main; the write and its
-            // reload touch published state, so it hops to the main actor
-            // and waits (the session-start box does the same).
-            let done = DispatchSemaphore(value: 0)
-            nonisolated(unsafe) var outcome: Result<PrefCatalog.Pref, Error> =
-                .failure(PrefCatalog.Violation(key: write.key, message: "app gone"))
-            Task { @MainActor in
-                if let self { outcome = Result { try self.setPref(key: write.key, value: write.value).pref } }
-                done.signal()
-            }
-            done.wait()
-            return try outcome.get()
-        }
+        liveActivityPusher.log = namedTunnel.log
         crashReports = crashStore.list()
         scanMacCrashReports()
-        quickTunnel.onURL = { [weak self] url in self?.publishRendezvous(url) }
-        // Up or down, the named tunnel decides whether the quick one runs;
-        // its hostname is never published to the rendezvous (`publicURL`).
-        namedTunnel.onConnected = { [weak self] _ in self?.applyQuickTunnel() }
-        // The tunnels can only point at a bound port, which arrives later.
-        // Named first: it ends by applying the quick tunnel, which must see
-        // the named process already running to stay down (#697).
-        mirrorServer.onReady = { [weak self] _ in
-            self?.applyNamedTunnel()
-        }
-        applyMirrorLAN()
+        applyNamedTunnel()  // ends by applying the fork tunnel
         _ = awsLoginRunner
         // The playground gets a socket only where INFINITUS_CONTROL_SOCKET
         // points — never the real app's path.
@@ -1330,54 +1238,6 @@ final class AppModel: ObservableObject {
                                detail: "brew is upgrading Infinitus; the Mac relaunches when it's done")
     }
 
-    /// Starts or stops the phone companion's LAN listener (#9). Never in
-    /// the playground: it seeds from the real defaults and would
-    /// advertise a second service with the same machine name.
-    private func applyMirrorLAN() {
-        let allowed = exposureAllowed
-        mirrorServer.phoneEnabled = mirrorLANEnabled
-        guard allowed, mirrorLANEnabled else {
-            mirrorServer.stop()
-            quickTunnel.stop()
-            namedTunnel.stop()
-            return
-        }
-        if !mirrorLANEnabled {
-            quickTunnel.stop()
-            namedTunnel.stop()
-        }
-        let payload = mirrorServer.payload
-        Task { [mirrorExporter] in await mirrorExporter.attach(payload: payload) }
-        mirrorServer.start(machineName: machineName,
-                           token: mirrorPairToken)
-        mirrorServer.awsLogin.set(
-            start: { [weak self] request in
-                guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
-                let items = await MainActor.run { self.awsLogins }
-                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, items: items)
-                return await self.startAwsLogin(provider: provider, profile: request.profile, pid: request.pid,
-                                                local: request.local ?? false, remote: request.remote)
-            },
-            code: { [weak self] request in
-                guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
-                let items = await MainActor.run { self.awsLogins }
-                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, items: items)
-                return await self.submitAwsLoginCode(provider: provider, profile: request.profile, code: request.code)
-            },
-            callback: { [weak self] request in
-                guard let self else { return AwsLogin.Reply(ok: false, error: "app gone") }
-                let items = await MainActor.run { self.awsLogins }
-                let provider = request.provider ?? AwsLogin.inferProvider(profile: request.profile, items: items)
-                return await self.awsLoginRunner.relay(provider: provider, profile: request.profile, url: request.url)
-            })
-        mirrorServer.descriptor.set {
-            MirrorDescriptor.current(machineId: MachineIdentity.current(), label: MachineName.current(),
-                                     appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")
-        }
-        applyNamedTunnel()  // ends by applying the quick tunnel (#697)
-        applyForkTunnel()
-    }
-
     /// Every phone-injected input is logged, per #17 — success or not.
     // MARK: AWS sign-in from the phone (AwsLogin.swift)
 
@@ -1403,7 +1263,6 @@ final class AppModel: ObservableObject {
         let fresh = waiting.subtracting(awsAnnouncedRunKeys)
         awsAnnouncedRunKeys.formUnion(waiting)
         if !fresh.isEmpty, !isPlayground, awsNeedRefresh == nil {
-            mirrorExportDue = true
             awsNeedRefresh = Task { [weak self] in
                 await self?.refreshSnapshot()
                 self?.awsNeedRefresh = nil
@@ -1502,15 +1361,19 @@ final class AppModel: ObservableObject {
     /// leave still does. `ForkServerProbe.verdict` holds the rule; this adds
     /// the work-log line, so a refusal is on the record rather than inferred.
     func acceptsForkServerPublish(port: Int) async -> Bool {
-        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: forkServerPort,
+        // Only a port a publish stored is a target of this instance's (#1199):
+        // on the default with no pref, what answers there is another
+        // instance's server — the installed app's desktop, on a dev Mac.
+        let published = defaults.object(forKey: "fork_server_port") as? Int
+        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: published,
                                                    using: forkServerProbe)
         if verdict == .accept { return true }
         logMirrorInput("⚠️", ForkServerProbe.refusalLine(port: port))
         return false
     }
 
-    /// Whether this instance may open a door onto this Mac at all — the
-    /// LAN listener and every tunnel. Mock mode only swaps the CLI —
+    /// Whether this instance may open a door onto this Mac at all — every
+    /// tunnel. Mock mode only swaps the CLI —
     /// sessions/usage in the snapshot are still this machine's real
     /// ones, so a dev instance must never advertise them on the LAN.
     /// `mirror_lan_allow_mock` lifts that for a dev COPY of the binary
@@ -1580,38 +1443,17 @@ final class AppModel: ObservableObject {
                                        url: forkTunnel.url)
     }
 
-    /// Starts or stops the Cloudflare quick tunnel (#9). It only ever
-    /// fronts the listener, so it follows the LAN toggle too. While the
-    /// named tunnel's cloudflared runs it stands down (#697: one public
-    /// door is enough — gated on the process, not on `connected`, so a
-    /// relaunch never spawns a quick tunnel just to kill it seconds later
-    /// when the named one registers) and comes back as the fallback the
-    /// moment that process exits (`NamedTunnel.ended`).
-    private func applyQuickTunnel() {
-        if namedTunnel.isRunning {
-            if quickTunnel.isRunning { logEvent("other", icon: "🌐", "quick tunnel stood down: the named tunnel has the door") }
-            quickTunnel.stop()
-            return
-        }
-        guard mirrorTunnelEnabled, mirrorLANEnabled,
-              let port = mirrorServer.port else {
-            quickTunnel.stop()
-            return
-        }
-        quickTunnel.start(port: port)
-    }
-
     /// Starts or stops the named tunnel (#9): needs the toggle, a
-    /// hostname, a token in the keychain and a bound port. A hostname
-    /// change while running restarts it — the token is per hostname.
+    /// hostname and a token in the keychain (or a local config). A
+    /// hostname change while running restarts it — the token is per
+    /// hostname. Ends by applying the fork tunnel, whose named route
+    /// (#650) rides this connector.
     private func applyNamedTunnel() {
         let host = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
         if namedTunnel.isRunning, namedTunnel.hostname != host { namedTunnel.stop() }
-        guard mirrorNamedTunnelEnabled, mirrorLANEnabled, mirrorServer.port != nil,
-              !host.isEmpty else {
+        guard mirrorNamedTunnelEnabled, !host.isEmpty else {
             namedTunnel.stop()
             applyForkTunnel()
-            applyQuickTunnel()
             return
         }
         // A local cloudflared config for this hostname wins over a token:
@@ -1624,7 +1466,6 @@ final class AppModel: ObservableObject {
             namedTunnel.stop()
         }
         applyForkTunnel()
-        applyQuickTunnel()
     }
 
     var namedTunnelTokenPresent: Bool {
@@ -1645,94 +1486,6 @@ final class AppModel: ObservableObject {
         NamedTunnel.setToken(token, for: host)
         namedTunnel.stop()
         applyNamedTunnel()
-    }
-
-    /// A new pairing token: every phone must be re-paired, and the
-    /// running listener picks it up without a restart.
-    func regeneratePairToken() {
-        mirrorPairToken = MirrorPairing.generateToken()
-        logEvent("pairing", icon: "🔑", "phone pairing token regenerated")
-        // A new token is a new rendezvous key; the old entry just expires.
-        if let url = publicURL { publishRendezvous(url) }
-    }
-
-    /// The address the rendezvous carries: the quick tunnel's only. The
-    /// named hostname is stable, so nothing needs a lookup for it, and
-    /// infinitus.run's worker and the phone's `parseLookup` accept
-    /// `*.trycloudflare.com` alone — offering it answered HTTP 400 on
-    /// every named connect (#697).
-    private var publicURL: String? { quickTunnel.url }
-
-    /// PUTs the public tunnel URL under this token's rendezvous key
-    /// (MirrorRendezvous). Best effort: the QR still carries the URL, this
-    /// only spares the rescan after a restart.
-    func publishRendezvous(_ url: String) {
-        guard mirrorRendezvousEnabled else { return }
-        if let target = MirrorRendezvous.url(token: mirrorPairToken) { publish(url, at: target, label: "tunnel address") }
-    }
-
-    private func publish(_ url: String, at target: URL, label: String) {
-        var request = URLRequest(url: target, timeoutInterval: 10)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = MirrorRendezvous.publishBody(url: url)
-        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            Task { @MainActor in
-                if code == 204 {
-                    self?.logEvent("other", icon: "mappin", "\(label) published to infinitus.run")
-                } else {
-                    let why = error?.localizedDescription ?? "HTTP \(code)"
-                    self?.logEvent("other", icon: "exclamationmark.triangle", "rendezvous publish failed (\(label)): \(why)")
-                }
-            }
-        }.resume()
-    }
-
-    /// Every way a phone can reach this Mac right now (#9 remote access):
-    /// lan, tailnet, named tunnel, quick tunnel, in that order — the order the single pair QR
-    /// lists them in, and the order the phone tries them in.
-    var pairRoutes: [PairRoute] {
-        guard let port = mirrorServer.port else { return [] }
-        var routes: [PairRoute] = []
-        let addresses = LocalAddresses.ipv4()
-        func route(id: String, title: String, detail: String, endpoint: String) {
-            routes.append(PairRoute(id: id, title: title, detail: detail, endpoint: endpoint))
-        }
-        if let lan = MirrorPairing.lanAddress(in: addresses) {
-            route(id: "lan", title: "On this Wi-Fi",
-                  detail: "Both devices on the same network.",
-                  endpoint: "http://\(lan):\(port)")
-        }
-        if let tailnet = MirrorPairing.tailnetAddress(in: addresses) {
-            route(id: "tailnet", title: "Anywhere via Tailscale",
-                  detail: "The phone needs Tailscale, signed into the same "
-                        + "tailnet. Nothing else to set up — this Mac already "
-                        + "listens on every interface.",
-                  endpoint: "http://\(tailnet):\(port)")
-        }
-        if let named = namedTunnel.endpoint {
-            route(id: "named", title: "Anywhere, your domain",
-                  detail: "Your Cloudflare tunnel hostname — the same every start.",
-                  endpoint: named)
-        }
-        if let tunnel = quickTunnel.url {
-            route(id: "tunnel", title: "Anywhere, no account",
-                  detail: "A random Cloudflare URL that changes every start; "
-                        + "the pairing token is the only lock.",
-                  endpoint: tunnel)
-        }
-        return routes
-    }
-
-    /// The one QR a phone ever needs to scan (#9 pair once, every route):
-    /// every current route's endpoint, in `pairRoutes` order, plus the
-    /// token. Empty until at least one route is up, so the pane can hide
-    /// the QR instead of encoding a useless link.
-    var pairURL: String {
-        let endpoints = pairRoutes.map(\.endpoint)
-        guard !endpoints.isEmpty else { return "" }
-        return MirrorPairing.pairURL(endpoints: endpoints, token: mirrorPairToken)
     }
 
     /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the daemon's
@@ -2064,7 +1817,6 @@ final class AppModel: ObservableObject {
                                nextCandidate: fleet.nextCandidate,
                                candidateOrder: fleet.candidateOrder,
                                nextRecovery: fleet.nextRecovery)
-        let raw = fleet.raw ?? (try? JSONEncoder().encode(list)) ?? Data()
         let previous = change.previousActive
         let firstLoad = change.firstLoad
         if !isPlayground {
@@ -2080,53 +1832,9 @@ final class AppModel: ObservableObject {
             Task.detached(priority: .utility) { [historyRecorder] in
                 await historyRecorder.record(accounts: accts, syncEnabled: syncOn)
             }
-            // Fleet mirror (#9 phase 1): lets the mobile companion see
-            // this machine's last snapshot. Throttled inside the actor.
-            // Prefs (#9 phase C1: "Follow Mac") captured here on the
-            // main actor since AppModel's published properties aren't
-            // Sendable-safe to read from the detached task.
-            let prefs = FleetPrefs(
-                themeID: gamification, compactRows: compactRows,
-                popupLayout: popupLayout, burnStyle: burnStyle,
-                introStyle: introStyle, introTitle: introTitle,
-                introSpeed: introSpeed, customThemes: customThemes,
-                sortByHeadroom: popupSort != .engine, popupSort: popupSort.rawValue,
-                popupTextSize: popupTextSize, reviveLeadMinutes: reviveLeadMinutes)
-            // Footer-chip state (#9 phase D2), captured here for the
-            // same main-actor reason as the prefs above.
-            let serviceStatus = ServiceStatusSummary(
-                indicator: ServiceStatusModel.shared.indicator)
-            let engine = engineBadge ?? .stopped
-            let allFleets = fleets.compactMap { $0.lastFleet?.with(capabilities: $0.capabilities) }
-            let forecast = forecast
-            let plan = battlePlan
-            let awsLogins = awsLogins
             statsModel.refreshIfStale()
-            let stats = statsModel.bundle
-            // This Mac's own version, mirrored for the phone's Settings
-            // (#121) — same keys ControlServer.status reads.
-            let info = Bundle.main.infoDictionary ?? [:]
-            let appInfo = AppInfo(
-                version: info["CFBundleShortVersionString"] as? String ?? "dev",
-                sha: info["InfinitusGitSHA"] as? String ?? info["CFBundleVersion"] as? String ?? "dev",
-                updateVersion: appUpdateVersion,
-                updateChannel: BrewUpdater.channel.rawValue,
-                phoneLatest: appReleaseLatest)
-            let mirrorNow = mirrorExportDue
-            mirrorExportDue = false
             // A living UI keeps its lease; the cap only catches one that died.
             if localUIVisible { reportLocalActivity(visible: true) }
-            Task.detached(priority: .utility) { [mirrorExporter] in
-                await mirrorExporter.record(listJSON: raw, prefs: prefs,
-                                            serviceStatus: serviceStatus,
-                                            engine: engine, fleets: allFleets,
-                                            forecast: forecast, plan: plan,
-                                            awsLogins: awsLogins,
-                                            stats: stats,
-                                            pushesAlerts: self.liveActivityPusher.configured,
-                                            app: appInfo,
-                                            now: mirrorNow)
-            }
         }
         // Death/revive ticks fired inside FleetState.apply.
         // Launch greeting: once the first snapshot renders, the
@@ -2218,7 +1926,6 @@ final class AppModel: ObservableObject {
     /// watches its stdin pipe for EOF as the backstop against a hard kill).
     func shutdown() {
         // The tunnels are child processes: they must not outlive the app.
-        quickTunnel.stop()
         namedTunnel.stop()
         forkTunnel.stop()
         let swapdSupervisor = swapdSupervisor

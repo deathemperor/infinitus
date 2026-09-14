@@ -212,6 +212,11 @@ describe("row actions", () => {
     expect(actionsFor({ preferred: false }, ["switch"])).not.toContain("hold");
   });
 
+  it("offers remove only on a fleet whose capabilities carry it", () => {
+    expect(actionsFor({ preferred: false })).not.toContain("remove");
+    expect(actionsFor({ preferred: false }, ["switch", "remove"])).toContain("remove");
+  });
+
   it("hides the pick-first star on an engine whose accounts carry no preferred knob", () => {
     expect(actionsFor({})).not.toContain("prefer");
     expect(actionsFor({ preferred: false })).toContain("prefer");
@@ -236,6 +241,11 @@ describe("command arguments", () => {
     expect(accountCommandArgs("claude", row, "hold")).toEqual({
       command: "hold",
       args: ["claude", "2"],
+    });
+    expect(accountCommandArgs("claude", row, "remove")).toEqual({
+      command: "remove",
+      args: ["claude", "2"],
+      options: { yes: "true" },
     });
     expect(accountCommandArgs("claude", row, "unhold")).toEqual({
       command: "unhold",

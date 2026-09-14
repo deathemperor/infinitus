@@ -6,8 +6,7 @@ import Glibc
 //
 // The Mac binds its control socket through NWListener (`ControlServer`);
 // there is no Network.framework on Linux, so the tray binds a plain
-// POSIX one here — same shape as `PosixHTTPServer` beside it (one accept
-// loop on its own thread, one thread per connection, EINTR loops,
+// POSIX one here (one accept loop on its own thread, one thread per connection, EINTR loops,
 // MSG_NOSIGNAL writes). The wire is Core's `ControlProtocol` either way:
 // one JSON request line in, one reply line out, per connection.
 //
@@ -107,7 +106,7 @@ public final class PosixControlSocket: @unchecked Sendable {
     private func handle(_ fd: Int32) {
         defer { close(fd) }
         // A peer that connects and sends nothing must not park this thread
-        // forever (same guard as PosixHTTPServer).
+        // forever.
         var timeout = timeval()   // field types differ across libcs
         timeout.tv_sec = 5
         timeout.tv_usec = 0

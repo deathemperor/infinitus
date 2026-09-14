@@ -537,6 +537,150 @@ jobs:
           name: linux-${{ matrix.arch }}
           path: apps/mac/dist/
 
+  # The self-contained CLI archives every runtime installer downloads
+  # (#1192): `t3-<version>-linux-<arch>.tar.gz` plus the SHA256SUMS
+  # `pinnedRuntime` verifies against. Linux only — that is where SSH remote
+  # environments run; a Mac or Windows CLI has no archive here and the
+  # installers fail with the plain "no archive for this version" 404 rather
+  # than reaching for upstream's (`CLI_RELEASE_REPOSITORY`, #1193).
+  #
+  # Registration point: the build steps below are upstream's `cli_archive`
+  # steps from .github/workflows/release-desktop.yml, copied rather than
+  # called. That workflow's job downloads a `js-bundle` artifact only
+  # upstream's `build_bundle` produces, plus its relay tracing config and
+  # four required clerk/relay inputs this fork has no source for, so calling
+  # it would mean porting half of upstream's release pipeline. Re-diff these
+  # steps against that file on every sync, like the runner swap.
+  #
+  # Skipped for the nightly (`inputs.version` is set only by
+  # infinitus-nightly.yml's workflow_call): a nightly ships no archives, so
+  # a nightly desktop's SSH remotes fail cleanly. The dispatch dry run still
+  # builds them, so a tag is never the first time these steps run. `publish`
+  # needs this job and is tag-only, and a tag sets no inputs, so the skip
+  # never strands it.
+  cli:
+    name: Build CLI archive ${{ matrix.label }}
+    if: ${{ !inputs.version }}
+    needs: notes
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        include:
+          - label: linux-x64
+            runner: ubuntu-latest
+            arch: x64
+            rust_target: x86_64-unknown-linux-gnu
+          - label: linux-arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+            rust_target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="$(head -1 VERSION | tr -cd '0-9A-Za-z.-')"
+          case "$GITHUB_REF" in
+            refs/tags/*)
+              if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+                echo "Tag $GITHUB_REF_NAME does not match VERSION ($version)." >&2
+                exit 1
+              fi;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+
+      # Upstream's three filters unchanged: build-cli-archive.ts imports the
+      # staging helpers from scripts/build-desktop-artifact.ts, so the
+      # desktop package's dependency closure has to be installed even though
+      # nothing Electron is built here.
+      - name: Install CLI dependencies
+        run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+
+      - name: Cache resource monitor
+        id: resource_monitor_cache
+        uses: actions/cache@v6
+        with:
+          path: native/resource-monitor/target/${{ matrix.rust_target }}/release/t3-resource-monitor
+          key: resource-monitor-${{ matrix.rust_target }}-${{ hashFiles('native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
+
+      - name: Setup Rust
+        if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      # The desktop build script builds this for the DMG; a CLI-only job has
+      # to do it itself, with the flags that script uses.
+      - name: Build resource monitor
+        if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
+        run: >-
+          cargo build --locked --release
+          --manifest-path native/resource-monitor/Cargo.toml
+          --target ${{ matrix.rust_target }}
+
+      - name: Align package versions to release version
+        run: node scripts/update-release-package-versions.ts "${{ steps.version.outputs.version }}"
+
+      # Before the single-executable: `build-exe` packs apps/server/dist-exe,
+      # but the archive also carries apps/server/dist/client, which t3#build
+      # emits. Not `build:desktop` — that adds the Electron main and needs
+      # libsecret headers on Linux for a bundle nothing here ships.
+      - name: Build server bundle and web client
+        run: vp run --filter t3 build
+
+      # The single-executable needs a Node with --build-sea (25.7+) while the
+      # repo stays on engines.node; vp downloads this exact version. Keep in
+      # step with SEA_NODE_VERSION in apps/server/vite.config.ts.
+      - name: Build CLI single-executable
+        env:
+          VP_NODE_VERSION: "26.8.2"
+        run: node apps/server/scripts/cli.ts build-exe --verbose
+
+      - name: Stage resource monitor for the CLI archive
+        run: |
+          set -euo pipefail
+          target_dir="$RUNNER_TEMP/cli-resource-monitor/linux-${{ matrix.arch }}"
+          mkdir -p "$target_dir"
+          cp "native/resource-monitor/target/${{ matrix.rust_target }}/release/t3-resource-monitor" \
+             "$target_dir/t3-resource-monitor"
+
+      - name: Build CLI archive
+        run: >-
+          node scripts/build-cli-archive.ts
+          --platform linux
+          --arch ${{ matrix.arch }}
+          --version "${{ steps.version.outputs.version }}"
+          --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor"
+          --output-dir release-cli
+
+      - name: Smoke-test CLI archive
+        run: >-
+          node scripts/smoke-cli-archive.ts --archive release-cli/*
+          --expect-version "${{ steps.version.outputs.version }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-linux-${{ matrix.arch }}
+          path: release-cli/*
+          if-no-files-found: error
+
   # One release for the tag: the DMG, its zip, blockmaps and the
   # `<prerelease id>-mac.yml` manifest electron-updater installs from
   # (#924), both menu bar zips, the Linux binaries. A prerelease while the
@@ -548,7 +692,7 @@ jobs:
   publish:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [mac, desktop, linux]
+    needs: [mac, desktop, linux, cli]
     runs-on: macos-latest
     permissions:
       contents: write
@@ -571,12 +715,28 @@ jobs:
           cp artifacts/linux-x86_64/infinitus-tray-linux-x86_64 \
              artifacts/linux-aarch64/infinitus-tray-linux-aarch64 \
              artifacts/linux-x86_64/infinitus-omarchy.tar.gz release-assets/
+          # The CLI archives every runtime installer downloads (#1192).
+          cp artifacts/cli-linux-x64/t3-*.tar.gz \
+             artifacts/cli-linux-arm64/t3-*.tar.gz release-assets/
           channel="${VERSION#*-}"
           [[ "$channel" == "$VERSION" ]] && channel=latest || channel="${channel%%.*}"
           for want in "Infinitus-${VERSION}.zip" "Infinitus-Menu-Bar-${VERSION}.zip" \
-                      "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" "${channel}-mac.yml"; do
+                      "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" "${channel}-mac.yml" \
+                      "t3-${VERSION}-linux-x64.tar.gz" "t3-${VERSION}-linux-arm64.tar.gz"; do
             [[ -f "release-assets/$want" ]] || { echo "Missing release asset $want" >&2; ls -1 release-assets >&2; exit 1; }
           done
+          # `pinnedRuntime` verifies a downloaded archive against this file
+          # (`CLI_RELEASE_CHECKSUMS_FILE`), and `parseChecksums` keys on the
+          # name as written — so hash from inside the directory, with bare
+          # names. `shasum -a 256`, not `sha256sum`: this is a macOS runner.
+          (
+            cd release-assets
+            shopt -s nullglob
+            archives=(t3-*.tar.gz)
+            if [[ ${#archives[@]} -eq 0 ]]; then echo "No CLI archives were produced." >&2; exit 1; fi
+            shasum -a 256 "${archives[@]}" > SHA256SUMS
+            cat SHA256SUMS
+          )
           ls -l release-assets
       - name: Publish release
         env:

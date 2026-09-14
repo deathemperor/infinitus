@@ -11,11 +11,21 @@ import {
   PencilIcon,
   PlayIcon,
   StarIcon,
+  Trash2Icon,
   TrendingUpIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "../../lib/utils";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -80,6 +90,7 @@ const ACTION_ICON: Record<AccountAction, typeof StarIcon> = {
   unhold: PlayIcon,
   prefer: StarIcon,
   rename: PencilIcon,
+  remove: Trash2Icon,
 };
 
 /** The tooltip an action's button carries; `prefer` names the side it toggles to. */
@@ -95,6 +106,8 @@ function actionLabel(row: AccountRowModel, action: AccountAction): string {
       return row.preferred ? "Stop preferring" : "Prefer";
     case "rename":
       return "Rename";
+    case "remove":
+      return "Remove";
   }
 }
 
@@ -124,6 +137,8 @@ export function AccountRow({
   const [renaming, setRenaming] = useState(false);
   const [alias, setAlias] = useState(row.label);
   const [scopedOpen, setScopedOpen] = useState(false);
+  /** `remove` deletes the credential from the engine, so it asks first. */
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = pendingAction !== null;
 
@@ -217,6 +232,7 @@ export function AccountRow({
                       aria-label={`${label} ${row.label}`}
                       onClick={() => {
                         if (action === "rename") startRename();
+                        else if (action === "remove") setConfirmRemove(true);
                         else onAction(action);
                       }}
                     />
@@ -263,6 +279,30 @@ export function AccountRow({
       ) : null}
 
       {failure === null ? null : <p className="text-destructive text-xs">{failure}</p>}
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {row.label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deletes {row.email}'s credential from the engine. Signing in again adds it back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <Button
+              variant="destructive"
+              aria-label={`Confirm removing ${row.label}`}
+              onClick={() => {
+                setConfirmRemove(false);
+                onAction("remove");
+              }}
+            >
+              Remove
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
     </div>
   );
 }

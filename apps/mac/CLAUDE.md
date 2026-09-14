@@ -29,8 +29,7 @@ before that the `native` branch). Split out of
   dirs left for rollback). The local checkout may still live at
   `~/death/limitless`. Notification Center and login-item grants key on
   the id and must be re-granted once under it; keychain items are
-  ACL'd to the old signature, so the proxy key is re-entered and the
-  phone re-paired. Never change the id casually again — the 2026-08-29
+  ACL'd to the old signature, so the proxy key is re-entered. Never change the id casually again — the 2026-08-29
   casual change cost a day of ControlCenter-ban debugging.
 - **Improvements ship by default** (user 2026-09-09: "all of these are
   just experimental. any better improvements are by default valid"):
@@ -204,9 +203,7 @@ before that the `native` branch). Split out of
   socket and `infinitusctl`/the phone get "connection refused" until
   the bundle relaunches (bit us 2026-09-03 08:21). Short path: unix
   sockets cap at ~104 bytes, so never the scratchpad dir. It also needs
-  `INFINITUS_MIRROR_SNAPSHOT=<state-dir>/mirror-snapshot.json`, or
-  MirrorExporter overwrites the real app's mirror snapshot (#474), and
-  `INFINITUS_APP_SUPPORT=<state-dir>/app-support`, or every other file
+  `INFINITUS_APP_SUPPORT=<state-dir>/app-support`, or every file
   it writes (stats caches, events…) lands in
   the real Application Support/Infinitus (#506; the stats clobber cost
   each relaunch a year's re-read, #346).

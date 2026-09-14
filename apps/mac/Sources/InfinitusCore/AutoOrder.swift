@@ -96,8 +96,8 @@ public enum AutoOrder {
     }
 }
 
-/// How the popup lays its rows out (`popup_sort`, mirrored to the phone
-/// as FleetPrefs.popupSort). Engine slot numbers never move either way.
+/// How the popup lays its rows out (`popup_sort`). Engine slot numbers
+/// never move either way.
 public enum PopupSort: String, CaseIterable, Sendable {
     /// The engine's own slot order.
     case engine

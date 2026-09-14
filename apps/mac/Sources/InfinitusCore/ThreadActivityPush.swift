@@ -6,6 +6,9 @@ import Foundation
 /// — and hands it to the `push` verb as `{kind: "thread.activity",
 /// state}`; `state: null` ends the card. The Mac never reads the rows:
 /// the object travels whole into the expo-widgets envelope's `props`.
+/// The verb answers `{pushed, card, targets, kinds}` — `PushReach`, what
+/// the pusher actually sent, so a push with no phone registered reads
+/// `targets: 0` instead of a bare success.
 public struct AgentActivityState: Equatable, Sendable {
     /// The card's headline, also the push-to-start alert's title.
     public let title: String

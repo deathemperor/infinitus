@@ -13,7 +13,7 @@ describe("attentionNotificationTitle (#1032)", () => {
     expect(attentionNotificationTitle("approval")).toBe("Approval needed");
     expect(attentionNotificationTitle("input")).toBe("Input needed");
     expect(attentionNotificationTitle("held")).toBe("Held for headroom");
-    expect(attentionNotificationTitle("failed")).toBe("Session failed");
+    expect(attentionNotificationTitle("failed")).toBe("Thread failed");
   });
 
   it("is null for every other state", () => {

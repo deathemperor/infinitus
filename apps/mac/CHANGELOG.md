@@ -10,6 +10,49 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.12
+
+### Mac
+- A `test-connection` verb probes a proxy engine with the stored credential and answers within 5 s.
+- The Devices settings, the APNs key and the registered phones are reachable over the control socket (`devices` prefs, `apns`, `apns-key`).
+- A dev instance that never published a fork port no longer refuses its first publish because the installed app answers on the default port.
+- Reading Claude transcripts for stats streams each file instead of loading it whole.
+- A card or alert push reports how many phones it reached.
+- The mirror server and its pairing token are gone; the phone pairs through the desktop.
+- Your own Cloudflare tunnel no longer needs fleet serving on.
+
+### Desktop
+- The Engines page can test a proxy engine's connection before saving.
+- Settings › Infinitus › Engines sets each proxy engine's base URL and key or password itself; the Mac's engine panes are no longer needed for it.
+- Settings › Infinitus › Devices sets the machine name, the APNs key and iCloud sync, and lists the phones registered for pushes.
+- `t3 update` no longer replaces an Infinitus CLI with T3 Code, and a remote runtime is looked for under Infinitus rather than upstream.
+- SSH remote environments run the Infinitus runtime of the same version (release builds; a nightly ships no runtime archive).
+- The runtime SSH remotes install carries the Infinitus web assets.
+- The worktree limit no longer refuses a thread whose project has no repository.
+- The backend's log is kept on disk under the app's logs folder.
+- An account can be removed from the Accounts page.
+
+### Phone
+- An account can be removed from its row menu on the Accounts screen.
+
+### Linux
+- A headless server installs with one command from infinitus.run.
+- The tray's mirror server and pairing are gone; the phone pairs through the desktop.
+
+## 0.5.0-alpha.11
+
+### Desktop
+- Settings › Infinitus › Menu bar leads with "Show the icon in the menu bar", the switch every other row on the page depends on.
+- A thread that fails now raises a notification, like one waiting for input.
+- While the window has focus, an alert arrives as an in-app toast instead of a system banner, and the thread you are reading stays silent.
+- Starting a thread in a new worktree shows each setup step — fetch, checkout, submodules, setup script — and can be cancelled while it runs.
+- A thread whose project is not a git repository, or whose base branch has no commit, now runs in the project checkout instead of failing.
+
+### Phone
+- Settings shows whether the lock-screen thread card's push registration reached your Mac, and what stopped it if it did not.
+- The lock-screen card's push registration is retried once the Mac is reachable, so a card can start on its own.
+- The lock-screen card carries the Infinitus mark instead of the T3 one.
+
 ## 0.5.0-alpha.10
 
 ### Mac

@@ -1,40 +1,72 @@
-# Running T3 Code in the background
+# Running the server in the background
 
-On Linux and macOS, T3 Code can run as a service for your user so you do not need
-to keep a terminal open.
+A Linux machine can run the Infinitus server as a service for your user, so it
+stays available to your phone, a browser or the desktop app without a terminal
+kept open.
+
+## Before you start
+
+The service runs the self-contained server from a release archive. Get it onto
+the machine first:
+
+```sh
+curl -fsSL https://infinitus.run/install.sh | sh
+```
+
+It downloads the newest release's `t3-<version>-linux-<arch>.tar.gz`, checks
+it against the release's `SHA256SUMS`, unpacks it under `~/.infinitus/runtime`
+and links `t3` into `~/.local/bin`. It needs only `sh`, `tar`, `curl` or
+`wget`, and `sha256sum`; no Node.js. Set `T3CODE_VERSION` to pin a release
+(the archives start with the release after 0.5.0-alpha.11), or
+`T3CODE_RELEASE_BASE_URL` to download from a mirror.
+
+Without the script, download the archive and `SHA256SUMS` from a
+[release](https://github.com/deathemperor/infinitus/releases) yourself, check
+it — `sha256sum -c --ignore-missing SHA256SUMS` — and unpack it; the `t3`
+inside is the server, run as `./t3` below.
+
+If the machine is an SSH remote of your desktop app, skip all of this: the
+desktop puts the matching server on it by itself.
 
 ## Manage the service
 
-Run these commands on the machine that will host T3 Code:
+Run these on the machine that will host the server:
 
-| Task                            | Command                           |
-| ------------------------------- | --------------------------------- |
-| Install and start               | `npx t3@latest service install`   |
-| Inspect status and log location | `npx t3@latest service status`    |
-| Update or repair                | `npx t3@latest service update`    |
-| Stop and remove from startup    | `npx t3@latest service uninstall` |
+| Task                            | Command                |
+| ------------------------------- | ---------------------- |
+| Install and start               | `t3 service install`   |
+| Inspect status and log location | `t3 service status`    |
+| Update or repair                | `t3 service update`    |
+| Stop and remove from startup    | `t3 service uninstall` |
 
-Uninstalling the service leaves your projects, threads, and settings intact.
+The service reuses the copy the install script put under
+`~/.infinitus/runtime`; a hand-unpacked `./t3` downloads that version's
+archive there first, so the machine needs to reach the releases (or
+`T3CODE_RELEASE_BASE_URL`). Uninstalling the service leaves your projects,
+threads and settings under `~/.infinitus/userdata` intact.
 
-Install and update use the version of the CLI you invoke. For nightly, use
-`npx t3@nightly service update`; replace `nightly` with an exact version to pin
-one. An older CLI refuses to replace a newer service unless you explicitly add
-`--allow-downgrade`.
+`t3 update` moves a script-installed `t3` to the newest release: it downloads
+and verifies it, points `t3` at it, and asks before restarting a background
+service (pass `--yes` from a script; a server you started by hand is left for
+you to restart). Pass an exact version to pin one, or `--allow-downgrade` to
+move backwards. Install and update use the version of the `t3` you run; an
+older `t3` refuses to replace a newer service unless you add
+`--allow-downgrade`. `t3 uninstall` reverses the install script — the service,
+the `t3` link, every downloaded version — and keeps `~/.infinitus/userdata`.
 
 Updating restarts the server. Finish active work first, and wait for any remote
-update already in progress. To match a remote client's version, follow
-[Updating T3 Code](./updating.md).
+update already in progress.
 
 ## Platform support
 
-Linux needs systemd user services. Setup enables lingering so T3 Code starts at
-boot and keeps running after logout. If this needs administrator permission,
+Linux needs systemd user services. Setup enables lingering so the server starts
+at boot and keeps running after logout. If this needs administrator permission,
 setup prints a recovery command before changing the service.
 
-macOS starts the service when you log in and stops it when you log out. Keep the
-Mac logged in and awake for unattended remote access. Installing over SSH while
-nobody is logged in at the Mac's screen can fail at the final start step; the
-service is still installed and will start at the next login.
+macOS: the service commands exist, but no macOS server archive is published
+yet (the install script says so and stops), so there is nothing to install
+them from. Keep the desktop app running on
+the Mac instead; it hosts remote clients the same way.
 
 Windows background services are not supported.
 
@@ -43,8 +75,8 @@ separately. Signing out of T3 Connect does not stop or uninstall the service.
 
 ## Troubleshooting
 
-Start with `t3 service status` on the host. It prints the log path and, on Linux,
-checks whether the installed service is running, enabled, and allowed to survive
+Start with `t3 service status` on the host. It prints the log path and checks
+whether the installed service is running, enabled, and allowed to survive
 logout.
 
 If it stops when your SSH session closes, check for `linger-disabled`. An
@@ -61,21 +93,15 @@ ssh -t your-server 'sudo loginctl enable-linger "$(id -un)"'
 ```
 
 Then retry service setup as your normal user. Run only the `loginctl` command
-with sudo; running T3 Code as root creates a separate installation and Connect
-identity. Without administrator access, run `t3 serve` in a terminal and keep
-that session open.
+with sudo; running the server as root creates a separate installation and
+Connect identity. Without administrator access, run `./t3 serve` in a terminal
+and keep that session open.
 
 | Status problem                          | Next step                                                                                                                      |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                             |
 | `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support. |
-| `service-disabled` or `service-stopped` | Read the log and `systemctl --user status t3code.service`, then use the repair command printed by T3 Code.                     |
-
-On macOS, check **System Settings → General → Login Items** if the service no
-longer starts at login. If agent work cannot access Desktop, Documents, or
-Downloads, it may need Full Disk Access for the Node executable listed in
-`ProgramArguments` in
-`~/Library/LaunchAgents/com.t3tools.t3code.service.plist`.
+| `service-disabled` or `service-stopped` | Read the log and `systemctl --user status t3code.service`, then use the repair command printed by the server.                  |
 
 For failures after signing in to T3 Connect, see
 [connection troubleshooting](./remote-access.md#t3-connect-troubleshooting).

@@ -9,6 +9,15 @@ on:
     # GitHub delays scheduled runs under load, and at :30 the fork's runs
     # landed ~5 h late two days running (2026-09-11/12) or not at all.
     - cron: "17 1 * * *"
+    # A backup slot, because an off-peak minute was not enough: on
+    # 2026-09-14 the 01:17 slot never ran at all (watched to +3 h 29 m),
+    # while the nightly's 17:17 slot that same day ran 2 h 09 m late. So
+    # GitHub here both delays and silently DROPS scheduled runs, and one
+    # slot a day is a single point of failure. Two independent chances is
+    # the cheap fix: the job is idempotent — it exits `uptodate` when
+    # upstream is already an ancestor or a branch for that upstream sha
+    # exists — so a day where both fire costs one no-op run.
+    - cron: "43 4 * * *"
   workflow_dispatch:
 permissions:
   contents: write

@@ -1,4 +1,9 @@
-import type { ProviderInstanceEnvironmentVariable } from "@t3tools/contracts";
+import type {
+  CustomModelSetting,
+  ProviderInstanceEnvironmentVariable,
+  ProviderOptionDescriptor,
+} from "@t3tools/contracts";
+import { createModelCapabilities } from "@t3tools/shared/model";
 
 /**
  * Fork: "Route through a proxy" on the Claude Config step of the add-instance
@@ -87,6 +92,30 @@ function customModelSlug(entry: unknown): string | null {
 }
 
 /**
+ * The descriptors a picked proxy model is stored with. A custom model entry
+ * without capabilities gets the Claude driver's empty default, which leaves
+ * the composer with no reasoning control at all; writing Claude's own effort
+ * descriptor makes the control appear without editing every model by hand.
+ * Custom entries carry no runtime effort map, so the chosen value reaches the
+ * proxy verbatim as `output_config.effort`. Fast mode and thinking are Claude
+ * Code settings a proxy upstream need not honour, so they stay off the entry.
+ */
+const PROXY_MODEL_OPTION_DESCRIPTORS = [
+  {
+    id: "effort",
+    label: "Reasoning",
+    type: "select",
+    options: [
+      { id: "low", label: "Low" },
+      { id: "medium", label: "Medium" },
+      { id: "high", label: "High", isDefault: true },
+      { id: "xhigh", label: "Extra High" },
+      { id: "max", label: "Max" },
+    ],
+  },
+] as const satisfies ReadonlyArray<ProviderOptionDescriptor>;
+
+/**
  * Fold the draft into the instance being created: env vars for the proxy,
  * a dedicated CLAUDE_CONFIG_DIR unless one was typed, and the picker models
  * appended to `customModels`. A disabled draft leaves everything untouched.
@@ -113,12 +142,17 @@ export function applyProxyDraft(
   const taken = new Set(
     existingModels.map((entry) => customModelSlug(entry)).filter((slug) => slug !== null),
   );
-  const added: string[] = [];
+  const added: CustomModelSetting[] = [];
   for (const model of draft.pickerModels) {
     const slug = model.trim();
     if (slug.length === 0 || taken.has(slug)) continue;
     taken.add(slug);
-    added.push(slug);
+    added.push({
+      slug,
+      capabilities: createModelCapabilities({
+        optionDescriptors: PROXY_MODEL_OPTION_DESCRIPTORS,
+      }),
+    });
   }
   return {
     config: {

@@ -665,43 +665,6 @@ Panel {
                 }
               }
 
-              // Phones on the mirror (#9 parity with the Mac's device
-              // list): the newest active one by name and route, or how
-              // long since the last was heard from. Hidden until a
-              // phone has ever connected to `infinitus-tray serve`.
-              Row {
-                visible: !!(root.fleet && root.fleet.devices && root.fleet.devices.length > 0)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(4)
-
-                Rectangle {
-                  width: Style.space(7)
-                  height: Style.space(7)
-                  radius: width / 2
-                  anchors.verticalCenter: parent.verticalCenter
-                  color: (root.fleet && root.fleet.devices && root.fleet.devices.length > 0
-                          && root.fleet.devices[0].active) ? "green" : root.mutedForeground
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: {
-                    var list = root.fleet ? root.fleet.devices : null
-                    if (!list || list.length === 0) return ""
-                    var d = list[0]
-                    var ago = d.secondsAgo < 60 ? d.secondsAgo + " s ago"
-                            : d.secondsAgo < 3600 ? Math.floor(d.secondsAgo / 60) + " min ago"
-                            : Math.floor(d.secondsAgo / 3600) + " h ago"
-                    var more = list.length > 1 ? " +" + (list.length - 1) : ""
-                    return d.name + " · " + d.route + " · " + ago + more
-                  }
-                  color: root.mutedForeground
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.caption
-                }
-              }
-
               // Auto-switch engine badge: alive/not, mac's EngineBadgeText
               // wording ("auto" / "off") — informational only here, the
               // tray has no supervisor to toggle.

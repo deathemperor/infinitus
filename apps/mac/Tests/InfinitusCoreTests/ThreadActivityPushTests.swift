@@ -81,3 +81,23 @@ final class ThreadActivityPushTests: XCTestCase {
         XCTAssertEqual(ActivityPushRegistration.Kind(rawValue: "agent-activity-start"), .agentActivityStart)
     }
 }
+
+/// The `push` reply says what was addressed (`targets`, `kinds`).
+final class PushReachTests: XCTestCase {
+    func testNothingSentReadsZero() {
+        let reach = PushReach()
+        XCTAssertEqual(reach.targets, 0)
+        XCTAssertEqual(reach.replyFields, ["targets": .number(0), "kinds": .object([:])])
+    }
+
+    func testOnePhoneTwoKindsCountsOneTarget() {
+        var reach = PushReach()
+        reach.add(device: "phone-a", kind: "agent-activity")
+        reach.add(device: "phone-a", kind: "alert")
+        reach.add(device: "phone-b", kind: "agent-activity-start")
+        XCTAssertEqual(reach.targets, 2)
+        XCTAssertEqual(reach.kinds, ["agent-activity": 1, "alert": 1, "agent-activity-start": 1])
+        XCTAssertEqual(reach.replyFields["targets"], .number(2))
+        XCTAssertEqual(reach.replyFields["kinds"]?["alert"], .number(1))
+    }
+}

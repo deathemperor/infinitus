@@ -5,6 +5,7 @@ included:
   - modules/t3-terminal/ios
   - modules/t3-review-diff/ios
   - modules/infinitus-markup/ios
+  - modules/infinitus-loopback-catch/ios
 
 excluded:
   - ios/Pods

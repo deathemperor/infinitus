@@ -63,17 +63,29 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   {
     route: "/settings/infinitus/devices",
     label: "Devices",
-    // A switch's state, which the fixture sets on where its two neighbours are
-    // off. A label renders whether or not its control took the pref, so the
-    // value is the only part of this page that proves one arrived — and a
-    // switch state is the same string whatever the number formatting.
-    marker: "[Publish the current URL to infinitus.run: on]",
+    // A switch's state, which the fixture sets on where the page's other
+    // switch is off. A label renders whether or not its control took the pref,
+    // so the value is the only part of this page that proves one arrived — and
+    // a switch state is the same string whatever the number formatting.
+    marker: "[Sync settings via iCloud Drive: on]",
     // The port the fixture sets, unformatted. #1110 shipped a port that read
     // "3,773" — the label and the description were on screen, so nothing here
     // saw it. It is a number field's value, so this is the check that would.
-    shows: ["[Server port: 3773]"],
+    // #1178: the APNs card read the fixture's empty setup; the key itself is a
+    // file input, never text.
+    shows: ["[Server port: 3773]", "No phones registered."],
   },
-  { route: "/settings/infinitus/engines", label: "Engines", marker: "swapd engine on" },
+  {
+    route: "/settings/infinitus/engines",
+    label: "Engines",
+    marker: "swapd engine on",
+    shows: [
+      "Management key",
+      "Dashboard password",
+      "[CLIProxyAPI base URL: http://127.0.0.1:8317]",
+      "nothing is saved",
+    ],
+  },
   {
     route: "/accounts",
     label: "Accounts",

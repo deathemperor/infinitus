@@ -190,8 +190,8 @@ export const triageCommand = Command.make("triage", {
         buildTriageContext({
           generatedAt: DateTime.formatIso(now),
           version,
-          releaseTag: version.includes("-nightly.")
-            ? `v${version} (nightly build; if this tag does not exist, clone main)`
+          releaseTag: /^[^-+]+-(?:nightly|preview)\./.test(version)
+            ? `v${version} (prerelease build; if this tag does not exist, clone main)`
             : `v${version}`,
           os: `${yield* HostProcessPlatform} ${yield* HostProcessArchitecture} (${NodeOS.release()})`,
           nodeVersion: process.version,
@@ -203,6 +203,7 @@ export const triageCommand = Command.make("triage", {
             settingsPath: paths.settingsPath,
             logsDir: paths.logsDir,
             serverLogPath: paths.serverLogPath,
+            serverLogNdjsonPath: paths.serverLogNdjsonPath,
             serverTracePath: paths.serverTracePath,
             providerEventLogPath: paths.providerEventLogPath,
             terminalLogsDir: paths.terminalLogsDir,

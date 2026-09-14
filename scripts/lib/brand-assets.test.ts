@@ -86,6 +86,9 @@ describe("brand-assets", () => {
     expect(
       resolveWebAssetBrandForPackageVersion("0.5.0-alpha.7-infinitus-nightly.20260913.42"),
     ).toBe("infinitus");
+    // Upstream's preview train (#11372) keeps upstream's nightly artwork; the
+    // fork cuts no previews, so this only guards a merged-in upstream build.
+    expect(resolveWebAssetBrandForPackageVersion("0.0.29-preview.20260723.882")).toBe("nightly");
   });
 
   it("maps fork web assets to the Infinitus icons", () => {

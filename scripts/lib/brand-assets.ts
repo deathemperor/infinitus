@@ -53,9 +53,11 @@ export function resolveWebAssetBrandForChannel(channel: WebAssetChannel): WebAss
 
 /** Every build of this repo wears the Infinitus brand, its own nightly
     (`-infinitus-nightly.<date>.<run>`, #1042) included; only an upstream
-    nightly — first prerelease id `nightly` — keeps its own (#823). */
+    nightly or preview — first prerelease id `nightly` / `preview` — keeps
+    its own (#823). The fork cuts no preview builds, so that arm is
+    upstream's alone; it is kept so the test stays theirs verbatim. */
 export function resolveWebAssetBrandForPackageVersion(version: string): WebAssetBrand {
-  return /^\d+\.\d+\.\d+-nightly\./.test(version) ? "nightly" : "infinitus";
+  return /^[^-+]+-(?:nightly|preview)\./.test(version) ? "nightly" : "infinitus";
 }
 
 export interface IconOverride {

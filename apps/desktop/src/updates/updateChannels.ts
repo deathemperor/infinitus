@@ -10,9 +10,16 @@ function resolvePrereleaseId(version: string): string | undefined {
   return PRERELEASE_ID_PATTERN.exec(version)?.[1];
 }
 
-/** An upstream nightly: `x.y.z-nightly.<date>.<run>`. */
+/** An upstream build that wears upstream's own brand: a nightly
+    (`x.y.z-nightly.<date>.<run>`) or a preview, the maintainers' hand-cut
+    test train (upstream #11372). Branding only — the update feed is a
+    separate question, and `resolveDefaultDesktopUpdateChannel` below keeps
+    upstream's split by asking for a nightly specifically: upstream packages
+    a preview with no feed at all. The fork cuts neither, so both arms exist
+    here to keep an upstream build merged in from being mistaken for ours. */
 export function isNightlyDesktopVersion(version: string): boolean {
-  return resolvePrereleaseId(version) === "nightly";
+  const id = resolvePrereleaseId(version);
+  return id === "nightly" || id === "preview";
 }
 
 const INFINITUS_NIGHTLY_SUFFIX_PATTERN = /-infinitus-nightly\.\d{8}\.\d+$/;
@@ -36,7 +43,11 @@ export function isInfinitusDesktopVersion(version: string): boolean {
 }
 
 export function resolveDefaultDesktopUpdateChannel(appVersion: string): DesktopUpdateChannel {
-  if (isNightlyDesktopVersion(appVersion)) return "nightly";
+  // The nightly TRACK, not the nightly brand: an upstream preview brands as
+  // nightly but follows no feed, so only a true upstream nightly defaults
+  // here. Everything else is ours; `latest` is upstream's stable channel and
+  // never a default in this repo, which is where we part from upstream.
+  if (resolvePrereleaseId(appVersion) === "nightly") return "nightly";
   return isInfinitusNightlyDesktopVersion(appVersion) ? "infinitus-nightly" : "infinitus";
 }
 

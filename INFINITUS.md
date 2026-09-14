@@ -19,9 +19,9 @@ makes wrong, in its own PR.
 - **One API.** The fork talks to Infinitus only over its control socket
   (`ControlProtocol`: one JSON line each way; `infinitusctl manifest` is the
   runtime command table — its reply shapes are prose, so reply schemas are
-  hand-written in `packages/contracts` and validated at the boundary) and
-  the mirror HTTP routes — the same wire the phone and the
-  Linux tray use (inventory: issue #553). Anything missing becomes a new
+  hand-written in `packages/contracts` and validated at the boundary);
+  the phone reaches the Mac through the desktop (inventory: issue #553;
+  the Mac's mirror HTTP server left with #1041). Anything missing becomes a new
   route on the `native` branch, never a second protocol or a read of the
   native app's files.
 - **Upstream merges daily, our history never rebased.** `git fetch upstream
@@ -64,7 +64,10 @@ makes wrong, in its own PR.
   deployed by hand with wrangler from that directory.
 - **One release (#823 layer 3).** A `v<version>` tag on `main` runs
   `.github/workflows/infinitus-release.yml` (upstream's `release.yml` stays
-  disabled and untouched, hence the name): the `mac` job builds, signs,
+  disabled, hence the name; its CONTENT is still upstream's, taken whole at
+  every sync, but the sync's runner swap rewrites it like every other
+  workflow — a merge that takes upstream's file wholesale and skips the
+  swap silently reintroduces Blacksmith runners): the `mac` job builds, signs,
   notarizes and staples both Swift bundles on `macos-26`; `desktop` nests
   that run's `Infinitus-Menu-Bar-<v>.zip` and builds the DMG with
   `--build-version "$VERSION"`; `linux` builds the tray; `publish` creates
@@ -664,7 +667,14 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   its worktree) and the setting. The direct `vcs.createWorktree` RPC runs the
   same check (refused as a `GitCommandError`), and bootstraps reserve a slot
   in `worktreesInFlight` before the reads, so Best-of members starting
-  together count each other. Settings → General "Worktree limit"
+  together count each other. Reserving is not refusing (#1190): since
+  upstream's staged worktree setup (#11372), `prepareWorktree` only means a
+  worktree _may_ be created — a project that is no repository, or a base
+  branch naming no commit, runs the thread in the project checkout instead —
+  so the refusal is taken once `shouldPrepareWorktree` is final and the
+  reservation is given back when it reads false, while the check still sits
+  above the `thread.create` so an over-limit send costs no thread.
+  Settings → General "Worktree limit"
   (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
   `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
   `server.test.ts`, `settings.test.ts`.
@@ -820,6 +830,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service; a
   `Layer.mock(InfinitusPairing)` and a `Layer.mock(CaptureStore)` beside it.
+- `apps/server/src/serverLogger.ts` — `ServerLoggerLive` adds the fork's file
+  logger (`infinitus/serverLogFile.ts`, below) beside `consolePretty` and
+  `tracerLogger` (#1182); `apps/server/src/config.ts` — `serverLogNdjsonPath`
+  (`<logsDir>/server.log.ndjson`) on `ServerDerivedPaths` beside upstream's
+  `serverLogPath`; `apps/server/src/cli/triage.ts` and `triagePrompt.ts` —
+  the path in the triage context so `t3 triage` names it.
 - `apps/server/src/http.ts` — the `/.well-known/t3/environment` handler passes
   the descriptor through `withAlternateHttpBaseUrls` (#663).
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`
@@ -868,6 +884,26 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (`ProviderCommandReactor.buildGeneratedWorktreeBranchName` strips both);
   `GitManager.ts` / `BitbucketApi.ts` build fork-PR checkout branches from the
   constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
+- `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is
+  `deathemperor/infinitus`, and `cliReleaseChannelOf` reads this repo's
+  nightly suffix (`-infinitus-nightly.<date>.<run>`, #1042) as the nightly
+  train wherever the line's own prerelease id left it (#1192). That one
+  constant is where every runtime installer gets its download URLs and its
+  "what is newest" lookup, so upstream's value means an Infinitus desktop
+  asks `pingdotgg/t3code` for a `v0.5.0-alpha.N` archive that cannot exist,
+  and `t3 update` on an Infinitus CLI resolves upstream's newest build and
+  installs T3 Code over it. Re-flipped after every sync, like the runner
+  swap. Two fixtures pin the value and are re-flipped with it:
+  `packages/shared/src/cliRelease.test.ts` (the download base URL and the
+  release-index page URL) and `packages/ssh/src/tunnel.test.ts` (the remote
+  runner script's `T3_RELEASE_BASE_URL`) — the second lives in another
+  package and is easy to miss, which is how it went red on #1193.
+  **The archives themselves are not built yet** — until the release
+  workflow attaches upstream's five CLI archives and `SHA256SUMS` to our
+  tags, an SSH remote and `t3 update` fail with "no archive for this
+  version" instead of fetching upstream's; that is the point. Desktop-managed
+  backend updates never came this way (`selfUpdate` short-circuits on
+  `desktopManaged`).
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
@@ -895,6 +931,14 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` re-letters the stable DMG artwork ("Drag T3 Code
   into Applications") for the `infinitus` channel before rasterizing (#601).
+- `scripts/build-cli-archive.ts` — one call before the stage is copied:
+  `applyWebBrandAssets(resolveWebAssetBrandForPackageVersion(version),
+"apps/server/dist/client")`, so a runtime unpacked from the archive serves
+  the fork's favicons at its own origin instead of upstream's (#1196). The
+  same repo-relative target and call shape `build-desktop-artifact.ts` uses —
+  `applyWebBrandAssets` joins its target against the repo root, so the
+  archive's temp stage is not a target it can take, and branding the build
+  output in place is the only shape that reuses the function as written.
 - `apps/desktop/gnome-extension/metadata.json` — the bundled extension is
   named "Infinitus SnapShots" (uuid `snap-shot@t3.codes` unchanged), matching
   the setup copy that tells the user to find it; `KdeSnapShot.ts`'s desktop
@@ -938,6 +982,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
   `extra.productVersion` is the root `VERSION` (#823 layer 3), which
   `SettingsRouteScreen` shows in place of the store version.
+- `apps/mobile/plugins/withWidgetLogoAsset.cjs` (+ its test) — the mark the
+  lock-screen card draws in its header comes from the variant
+  (`SOURCE_BY_VARIANT`, #941): the `infinitus` build gets
+  `assets/widget/InfinitusMark.svg`, every upstream variant keeps
+  `T3Mark.svg` — they build the real T3 Code side by side. Only the artwork
+  copied in changes; the catalog entry keeps the `T3Mark` name
+  `AgentActivity.tsx` asks for, and the Infinitus mark's viewBox is padded to
+  the 3:2 the widget's `renderLogo` frames it at, so the glyph is not
+  stretched and upstream's widget file needs no edit. The plugin's ordering
+  rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
@@ -1109,11 +1163,24 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   bundled sounds; ruling #1032, which retired the fork's #270 B banners over
   the Electron main process and the #270 H per-window completion sound).
   The fork layers a few things. In `ThreadNotificationCoordinator.tsx` (an
-  upstream file, one registration point): `held` and `failed` threads
-  notify like input does (the holds come from the environment's
-  `subscribeInfinitusHolds` stream; titles in `attentionNotificationTitle`),
-  and the thread on screen stays quiet while the window has focus
-  (`quietForViewer`) — upstream posts and rings for it. Next, #270 B's
+  upstream file, one registration point): `held` and `limited` threads
+  notify like input does — the holds come from the environment's
+  `subscribeInfinitusHolds` stream, and `attentionNotificationTitle` is
+  what titles them, since upstream has no word for either. `failed` now
+  reads "Thread failed", upstream's word, so the fork carries no second
+  vocabulary for one banner. Upstream's two coordinator tests mock
+  `../state/environments`, so they also stub `useEnvironment`,
+  `../state/infinitus` and `../state/query`: without the capability the
+  holds path stays inert and their assertions read upstream's behaviour. Upstream now
+  notifies on `failed` itself (by the latest TURN's state; the fork's
+  resolver reads the SESSION, so both checks run and catch different
+  rows), and it now quiets its own banner while the window has focus,
+  showing an in-app toast instead — so the fork's remaining focus rule is
+  narrower than it was: `quietForViewer` keeps the thread ON SCREEN
+  silent, toast and bell included, where upstream still rings for it.
+  Mind the naming when merging this file: both sides bind `attention`
+  and mean different things by it — the fork's is the banner title,
+  upstream's is the dedupe key the fork calls `input`. Next, #270 B's
   queue rule: a turn that completes while the thread still has
   `queuedTurns` neither posts nor rings
   (`notificationKind`), since the #806 drain sends the next row the moment
@@ -1167,7 +1234,32 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
-- `README.md` — the fork notice at the top.
+- `scripts/install.sh`, `scripts/install.ps1` — `repo` is this repository and
+  the home `~/.infinitus`, the same flip as `CLI_RELEASE_REPOSITORY` (#1192);
+  the shell script installs on Linux only and says plainly that no macOS or
+  Windows archive exists (exit 1 before any fetch, never upstream's), resolves
+  only the release train (a `v…` tag without a nightly/preview suffix — the
+  fork's nightly is the rolling tag and ships no archive), and is served at
+  `https://infinitus.run/install.sh` as the checked-in copy
+  `apps/mac/site/public/install.sh`: `scripts/sync-install-script.ts` writes
+  it, `--check` and its test fail on drift, and the test fails while the
+  source names upstream's owner. The PowerShell script stops at once (no
+  Windows archive) and is not served. Regenerate the copy after any edit; the
+  site deploy is by hand from `apps/mac/site`.
+- `README.md` — the fork notice at the top, and the Installation section
+  below the rule: this product's releases (the DMG, the Linux server archives,
+  what is not published yet) in place of upstream's npm, winget, brew and AUR
+  paths (#1192). `docs/user/install.md` (the install sections) and
+  `docs/user/background-service.md` (whole) say the same; `updating.md`,
+  `remote-access.md`, `welcome-wizard.md`, `install.md`'s mobile section
+  (installed from a build, no store), `docs/operations/release.md` (a fork
+  note at the top pointing at `infinitus-release.yml` and
+  `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and
+  `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
+- `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
+  section appended at the end (#1178): Settings › Infinitus › Devices, the
+  push key and the registered phones. Upstream's T3 Connect text above it is
+  untouched.
 - **The project file is `infinitus.json`** (#823 layer 1: the upstream name
   never reaches a screen, and this one is on screen every time the scripts
   menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`
@@ -1266,7 +1358,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   (mocked engine, projection, provider stream, settings, Slack client, an
   in-memory FileSystem).
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
-  (preferences, Engines) and their pure logic, and the Devices
+  (preferences, Engines) and their pure logic — Engines carries the proxy
+  engines' form (`InfinitusEngineSecrets` + `engines.logic`, #1177): base
+  URL and management key / dashboard password per engine, read over `proxy`
+  / `9router`, written over `infinitus.secret` as `proxy-key` /
+  `9router-password` with the url as `--url` (there is no url-only write:
+  the url is stored with the secret; "Forget" sends an empty secret), which
+  relaunch the app; gated on the manifest marking both verbs as taking
+  their secret on stdin, else "no engine secret commands (needs ≥
+  4eaccb341c)"; Test connection sends `test-connection <engine> [--url]`
+  (native #1216, read effect) at the typed url without saving and shows
+  "Reachable in N ms" or the engine's own sentence, gated on the manifest
+  listing the verb — and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
@@ -1287,6 +1390,20 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `applinks` + forwarder first, then this card, then a phone build with the
   entitlement. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
+  Before it in that slot, the "Phone alerts" card (`InfinitusApnsCard` +
+  `apns.logic`, #1178): the `apns` read (`{keyPresent, teamId, keyId,
+registrations}`, never a token; each registration decoded alone) drawn as
+  "In the Keychain." / "Not set up." and a list of the registered phones by
+  name · kind · environment, and the `.p8` as a file input — read in the
+  browser, refused without the `-----BEGIN PRIVATE KEY-----` header (the
+  Mac's own check, so a misclicked file is never sent), handed once to
+  `infinitus.secret` as `apns-key` and kept nowhere; "Forget key" is the
+  empty secret. The input stays off while the `apns_key_id` pref above is
+  blank (read off the snapshot's prefs: the Mac stores the key under it and
+  refuses until it is set); gated on the manifest marking `apns-key` as
+  stdin secret. The page's Team ID, Key ID, "This Mac's name" and iCloud
+  rows are the `devices` catalog section with copy in `PREF_COPY`; the
+  Mac's pair token has no consumer left and is not on the page.
   Above it, through the panel's `lead` slot (drawn whatever the native app's
   state — the requests come from this server), the "Pairing requests" card
   (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710): the
@@ -1853,6 +1970,20 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   path. A standalone helper is left alone whatever its version; one that
   reports no `bundlePath` only has its skew logged
   (`infinitus.companion.skew-unarmed`).
+- `apps/server/src/infinitus/serverLogFile.ts` (+ test) — the backend's own
+  log file (#1182). Upstream keeps a server's log lines only through whoever
+  started it: a boot service redirects stdout into `server.log`
+  (`cloud/bootService.ts`) and the desktop's main process drains the child's
+  pipes into `server-child.log` — which the packaged desktop stopped
+  receiving, while `server.trace.ndjson` holds spans only (a log becomes a
+  span event only inside a sampled span). So `ServerLoggerLive` also writes
+  `<logsDir>/server.log.ndjson`, whoever spawned the process: one
+  `Logger.formatJson` record per line, batched (1 s, flushed when the layer's
+  scope closes) into the shared `RotatingFileSink` (10 MiB × 10, the trace
+  file's sizing). A separate file from `serverLogPath` on purpose — a boot
+  service redirects stdout there, and writing both would put every line in
+  that file twice, in two formats. A sink that cannot write swallows it: a
+  log file is never worth failing a turn over.
 - `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+
   `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins for
   the threads this server runs (#1076), the fork's counterpart to the Mac's
@@ -1992,6 +2123,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
+- `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the
+  lock-screen card's header (#941), monochrome so the widget's foreground
+  tint applies: the same geometry `apps/mac/make-icon.swift` draws (rings at
+  (6, 8) and (11, 8), radius 3.2, stroke 2, the right one broken between 10°
+  and 70° with the swap arrow on the break), hand-traced as filled paths and
+  checked against that renderer's own output. Redraw it from there if the
+  mark changes.
 - `assets/infinitus/` — the desktop and web artwork for fork builds: the
   native Mac app's 1024 icon master (`make-icon.swift` on `native`), the
   phone's full-bleed mark for Linux/apple-touch, and the `.ico`/favicon sizes
@@ -2050,6 +2188,37 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   (idle while voice input is busy). `apps/mobile/.swiftlint.yml` lists the
   module's `ios/` directory. Android and the new-task draft screen are
   unchanged.
+- `apps/mobile/modules/infinitus-loopback-catch/` (fork-owned local Expo
+  module, iOS) — the phone answers the sign-in redirect itself, so nothing is
+  pasted anywhere. gcloud's and AWS's CLIs run DESKTOP OAuth clients: the only
+  redirect URIs their providers accept are `http://localhost:<port>` and
+  `http://127.0.0.1:<port>`, and the CLI reuses the same one at the token
+  exchange, so the redirect can never be pointed at the Mac's tunnel, and the
+  phone cannot redeem the code itself (the PKCE verifier and the client secret
+  live in the Mac's CLI process). What can move is the listener.
+  `InfinitusLoopbackCatch.listen(port)` binds that port on BOTH of this
+  phone's loopback addresses (gcloud's URI spells `localhost`, which resolves
+  to ::1 first) and nothing beyond them — a port on the Wi‑Fi would let anyone
+  there hand the Mac an authorization code of their own; `awaitRedirect()`
+  resolves with the first request carrying a query (a favicon fetch never
+  does), rebuilt verbatim — the browser's own `Host` kept whenever it spells
+  this loopback on this port, since the Mac validates the name — after
+  answering it a "you can close this page"; `stop()` gives the port back.
+  `apps/mobile/src/features/infinitus/loopbackCatch.ts` binds it
+  (`requireOptionalNativeModule`, so Android and a build without the module
+  keep today's behaviour). The flow is in `InfinitusSignIns.tsx`: a row whose
+  `state.callbackPort` says the Mac started a relay login (the contract already
+  carries it, so no `redirect_uri` is parsed here) listens, opens the auth URL
+  in an `expo-web-browser` sheet — `Linking.openURL` would background the app
+  and Google blocks embedded webviews, so a `react-native-webview` is not an
+  option — and hands the caught URL to the Mac as
+  `infinitus.secret {command: "aws-login-callback", args: {profile}}`, the
+  fork's one secret-carrying path: the URL holds the authorization code and
+  never travels as an argument. The Mac side needed no change —
+  `AwsLoginRunner.relay()` validates the URL and GETs it against the CLI's own
+  listener. With a catcher `startSignInCommand` drops `--local`, so a login
+  started from the phone is relayable too. `apps/mobile/.swiftlint.yml` lists
+  the module's `ios/` directory.
 - `apps/mobile/src/state/threadOutboxQueue.logic.ts` (+ `threadOutboxHolds.ts`)
   — the phone outbox's queue rule (#807, #270 F): `queueBehindRunningTurn`
   turns an existing thread's `send` into `wait` while the thread's session is
@@ -2158,14 +2327,27 @@ agent-activity` (the session cards' kinds retired with #1041).
   come from (`infinitusLiveActivityMac`). `pushRegistration.ts` logs a
   refused `activities-token` (`[infinitus-push]`) since the bridge sends
   with `reportFailure: false`.
+- `apps/mobile/src/features/infinitus/pushRetry.logic.ts` (+ test) — the
+  thread-card bridge's re-send rule (#941): ActivityKit vends the
+  push-to-start token as the bridge mounts, before the environment's socket
+  is up, so the first send failed with `EnvironmentRpcUnavailableError` and
+  nothing fired it again — the Mac held no start token and no card could
+  begin. The bridge now keeps the newest token per kind and re-sends it;
+  `nextRetry` backs a failed round off by `RETRY_DELAYS_MS` (5 s, 15 s,
+  1 min, then the 5 min cap) while the Mac is reachable, schedules nothing
+  while it is not — the environment connecting, or the app coming to the
+  foreground, sends at once — and stops as soon as every token is on file.
+  `isEnvironmentUnreachable` is the same tag check the web's legacy-queue
+  migration makes, and decides the row's wording above.
 - `apps/mobile/src/features/infinitus/pushDiagnostics.ts` (+
   `pushDiagnostics.logic.ts`, test) — what this phone's registrations have
   done, for the "Card push registration" row in Settings › Infinitus (#941):
   the thread-card bridge notes when it attaches and lets go of its listeners,
   `tokenSender` notes each kind's outcome, and `agentActivityPushSummary`
   folds the two into one line — not running / no token yet / card token only
-  / registered / refused — with the Mac's own refusal text, or the gates to
-  check, behind a tap. The lock-screen card's start token is vended by
+  / registered / refused / Mac unreachable — with the failure's own text, or
+  the gates to check, behind a tap. A send the RPC could not deliver is never
+  worded as a refusal: the Mac did not see that token. The lock-screen card's start token is vended by
   ActivityKit through an event that never fires when it declines (Live
   Activities off for the app, or iOS before 17.2), and a refusal is a
   `console.warn` a Release build shows nobody, so without this one silence
@@ -2261,6 +2443,26 @@ pair` (token masked, server log never uploaded), screenshots every route in
   upstream builds pass no helper and nest nothing. The helper is never
   rebuilt in the desktop job (macOS 26 SDK, Swift toolchain and a second
   sign/notarize path for a bundle the `mac` job already sealed).
+  Its `cli` job builds the self-contained CLI archives every runtime
+  installer downloads (#1192): `t3-<version>-linux-x64.tar.gz` and
+  `-linux-arm64.tar.gz`, which `publish` attaches along with the
+  `SHA256SUMS` `pinnedRuntime` verifies against. Linux only — that is where
+  SSH remote environments run; a Mac or Windows CLI has no archive and the
+  installers 404 plainly instead of reaching upstream (`CLI_RELEASE_REPOSITORY`
+  below). Its steps are upstream's `cli_archive` steps from
+  `.github/workflows/release-desktop.yml`, **copied rather than called**:
+  that workflow downloads a `js-bundle` artifact only upstream's
+  `build_bundle` produces, plus a relay tracing config and four required
+  clerk/relay inputs the fork has no source for, so calling it would mean
+  porting half of upstream's release pipeline. Re-diff the copied steps
+  against that file on every sync, like the runner swap. The job is skipped
+  for the nightly (`inputs.version` is set only by the nightly's
+  `workflow_call`), so a nightly desktop's SSH remotes fail cleanly; a
+  dispatch dry run still builds them. Known gap (#1196): the archive's
+  `client/` is the plain `t3#build` output, so it carries upstream's
+  favicons — the fork's `applyWebBrandAssets` pass runs only in
+  `scripts/build-desktop-artifact.ts`, and a remote runtime serves that
+  client on its own origin.
 
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,
