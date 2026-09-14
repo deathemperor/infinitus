@@ -12,13 +12,15 @@ import {
   type SentToken,
   shouldSendToken,
 } from "./liveActivity.logic";
+import { noteTokenRefused, noteTokenRegistered } from "./pushDiagnostics";
 
 /** One token sender per bridge: it throttles repeats with `shouldSendToken`
     and files every kind under the SAME device id and APNs environment, so the
     Mac sees one phone whichever token it looks at (its revival dedup keys on
     the device id). A failed send forgets the token so the next chance re-sends,
     and says why in the console — the bridges run with `reportFailure: false`,
-    so this is the only trace of a Mac refusing the verb (#845). */
+    so nothing else surfaces one (#845). Both outcomes are also recorded for
+    the Settings row (#941): a Release build shows the console to nobody. */
 export function tokenSender(input: {
   readonly environmentId: EnvironmentId;
   readonly run: (input: {
@@ -52,7 +54,9 @@ export function tokenSender(input: {
         environmentId: input.environmentId,
         input: registrationCommand(body),
       });
-      if (result._tag !== "Success") {
+      if (result._tag === "Success") {
+        noteTokenRegistered(kind, new Date());
+      } else {
         sent.delete(kind);
         warnRefused(kind, input.environmentId, Cause.squash(result.cause));
       }
@@ -64,9 +68,11 @@ export function tokenSender(input: {
 }
 
 function warnRefused(kind: LiveActivityTokenKind, environmentId: EnvironmentId, error: unknown) {
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  noteTokenRefused(kind, new Date(), detail);
   console.warn("[infinitus-push] token registration failed", {
     kind,
     environmentId,
-    error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    error: detail,
   });
 }

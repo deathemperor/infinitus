@@ -19,6 +19,8 @@ import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { pusherMac } from "../infinitus/liveActivity.logic";
 import { noteLocalLiveActivityStart } from "../infinitus/liveActivityStarts";
+import { agentActivityPushAtom } from "../infinitus/pushDiagnostics";
+import { agentActivityPushSummary } from "../infinitus/pushDiagnostics.logic";
 import { testCardLabel, toggleTestCard } from "../infinitus/testCard.logic";
 import AgentActivity from "../../widgets/AgentActivity";
 import { SettingsRow } from "./components/SettingsRow";
@@ -93,6 +95,7 @@ export function SettingsInfinitusSection() {
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
   const pushAlertsEnabled = loaded && preferences.value.infinitusPushAlertsEnabled === true;
   const threadCardEnabled = loaded && preferences.value.infinitusThreadCardEnabled !== false;
+  const pushSummary = agentActivityPushSummary(useAtomValue(agentActivityPushAtom));
   const pusher = pusherMac(loaded ? preferences.value.infinitusLiveActivityMac : undefined, macs);
   // The test-card row (#845, #1047): how many thread cards are live,
   // re-read after every press; the count is what the row offers to end.
@@ -166,6 +169,14 @@ export function SettingsInfinitusSection() {
           value={liveCards === 0 ? "No push involved" : `${liveCards} live`}
           disabled={!threadCardEnabled}
           onPress={() => void pressTestCard()}
+        />
+      ) : null}
+      {Platform.OS === "ios" ? (
+        <SettingsRow
+          icon="antenna.radiowaves.left.and.right"
+          label="Card push registration"
+          value={pushSummary.value}
+          onPress={() => Alert.alert("Card push registration", pushSummary.explanation)}
         />
       ) : null}
       <SettingsSwitchRow

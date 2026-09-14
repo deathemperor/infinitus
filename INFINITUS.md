@@ -2158,6 +2158,18 @@ agent-activity` (the session cards' kinds retired with #1041).
   come from (`infinitusLiveActivityMac`). `pushRegistration.ts` logs a
   refused `activities-token` (`[infinitus-push]`) since the bridge sends
   with `reportFailure: false`.
+- `apps/mobile/src/features/infinitus/pushDiagnostics.ts` (+
+  `pushDiagnostics.logic.ts`, test) — what this phone's registrations have
+  done, for the "Card push registration" row in Settings › Infinitus (#941):
+  the thread-card bridge notes when it attaches and lets go of its listeners,
+  `tokenSender` notes each kind's outcome, and `agentActivityPushSummary`
+  folds the two into one line — not running / no token yet / card token only
+  / registered / refused — with the Mac's own refusal text, or the gates to
+  check, behind a tap. The lock-screen card's start token is vended by
+  ActivityKit through an event that never fires when it declines (Live
+  Activities off for the app, or iOS before 17.2), and a refusal is a
+  `console.warn` a Release build shows nobody, so without this one silence
+  covers four faults. Memory only: it describes this run of the app.
 
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives

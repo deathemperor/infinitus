@@ -14,6 +14,7 @@ import AgentActivity from "../../widgets/AgentActivity";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { AGENT_ACTIVITY_TOKEN_KINDS, pusherMac } from "./liveActivity.logic";
 import { localLiveActivityStartsAtom } from "./liveActivityStarts";
+import { noteAgentActivityWatching } from "./pushDiagnostics";
 import { useForgetOnSwitchOff } from "./pushForget";
 import { tokenSender } from "./pushRegistration";
 
@@ -74,12 +75,14 @@ export function InfinitusThreadCardBridge() {
       ),
     );
     attach();
+    noteAgentActivityWatching(new Date());
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") attach();
     });
     const localStarts = appAtomRegistry.subscribe(localLiveActivityStartsAtom, attach);
     return () => {
       cancelled = true;
+      noteAgentActivityWatching(null);
       appState.remove();
       localStarts();
       for (const subscription of subscriptions) subscription.remove();

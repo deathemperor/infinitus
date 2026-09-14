@@ -1,0 +1,128 @@
+import type { LiveActivityTokenKind } from "./liveActivity.logic";
+
+/**
+ * What the phone knows about its own push registrations (#941 step 3). The
+ * lock-screen card's start token is handed to the app by iOS through an
+ * event that simply never fires when ActivityKit declines to vend one, and
+ * the refusal of a send it does make is a `console.warn` a Release build
+ * shows nobody — so "no card appeared" covers four different faults with one
+ * silence. This is the state that tells them apart.
+ */
+
+export interface PushRegistrationNote {
+  readonly outcome: "registered" | "refused";
+  /** ISO instant of the attempt. */
+  readonly at: string;
+  /** The refusal's own words; null for a registration, or a refusal with none. */
+  readonly detail: string | null;
+}
+
+export type PushRegistrations = Readonly<
+  Partial<Record<LiveActivityTokenKind, PushRegistrationNote>>
+>;
+
+export interface AgentActivityPushState {
+  /** When the thread-card bridge attached its listeners; null while it is not
+      running at all (the switch is off, or no paired Mac runs Infinitus). */
+  readonly watchingSince: string | null;
+  readonly registrations: PushRegistrations;
+}
+
+export const EMPTY_AGENT_ACTIVITY_PUSH_STATE: AgentActivityPushState = {
+  watchingSince: null,
+  registrations: {},
+};
+
+export function withWatching(
+  state: AgentActivityPushState,
+  since: Date | null,
+): AgentActivityPushState {
+  return { ...state, watchingSince: since === null ? null : since.toISOString() };
+}
+
+export function withRegistration(
+  state: AgentActivityPushState,
+  kind: LiveActivityTokenKind,
+  note: PushRegistrationNote,
+): AgentActivityPushState {
+  return { ...state, registrations: { ...state.registrations, [kind]: note } };
+}
+
+const KIND_LABELS: Record<LiveActivityTokenKind, string> = {
+  "agent-activity-start": "start token",
+  "agent-activity": "card token",
+  alert: "alert token",
+};
+
+const timeOf = (at: string) => {
+  const ms = Date.parse(at);
+  return Number.isFinite(ms)
+    ? new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : "an unknown time";
+};
+
+export interface AgentActivityPushSummary {
+  /** The row's value, a couple of words. */
+  readonly value: string;
+  /** What that means and what to check, shown when the row is tapped. */
+  readonly explanation: string;
+}
+
+/**
+ * The one line the Settings row shows, and the paragraph behind it. The order
+ * is the pipeline's own: the bridge has to be running before iOS can hand it
+ * a token, and the Mac cannot refuse a token that was never sent.
+ */
+export function agentActivityPushSummary(state: AgentActivityPushState): AgentActivityPushSummary {
+  if (state.watchingSince === null) {
+    return {
+      value: "Not running",
+      explanation:
+        "This phone is not offering the Mac any tokens for the lock-screen card, so nothing can start one. Turn on “Thread card on the lock screen” above, and check that a paired Mac is running Infinitus.",
+    };
+  }
+  const start = state.registrations["agent-activity-start"];
+  const card = state.registrations["agent-activity"];
+  const refused = [
+    { kind: "agent-activity-start" as LiveActivityTokenKind, note: start },
+    { kind: "agent-activity" as LiveActivityTokenKind, note: card },
+  ]
+    .flatMap((entry) =>
+      entry.note !== undefined && entry.note.outcome === "refused"
+        ? [{ kind: entry.kind, note: entry.note }]
+        : [],
+    )
+    .sort((left, right) => right.note.at.localeCompare(left.note.at))[0];
+  if (refused !== undefined) {
+    return {
+      value: "Refused",
+      explanation: `The Mac refused this phone's ${KIND_LABELS[refused.kind]} at ${timeOf(
+        refused.note.at,
+      )}: ${refused.note.detail ?? "it gave no reason"}.`,
+    };
+  }
+  if (start?.outcome === "registered") {
+    const cardLine =
+      card?.outcome === "registered"
+        ? ` The card token followed at ${timeOf(card.at)}, so a card is live.`
+        : " No card is live yet, which is normal until the Mac starts one.";
+    return {
+      value: "Registered",
+      explanation: `The Mac has this phone's start token, filed at ${timeOf(start.at)}.${cardLine}`,
+    };
+  }
+  if (card?.outcome === "registered") {
+    return {
+      value: "Card token only",
+      explanation: `The Mac has the token of a card that is already running, filed at ${timeOf(
+        card.at,
+      )}, but not the start token it would need to raise one by itself. iOS hands that one over separately, and has not.`,
+    };
+  }
+  return {
+    value: "No token yet",
+    explanation: `Watching since ${timeOf(
+      state.watchingSince,
+    )}. iOS has not handed this app a start token for the lock-screen card, so the Mac has nothing to raise one with. That token needs Live Activities turned on for Infinitus in the phone's own Settings, on iOS 17.2 or newer.`,
+  };
+}
