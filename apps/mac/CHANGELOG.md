@@ -10,6 +10,20 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.11
+
+### Desktop
+- Settings › Infinitus › Menu bar leads with "Show the icon in the menu bar", the switch every other row on the page depends on.
+- A thread that fails now raises a notification, like one waiting for input.
+- While the window has focus, an alert arrives as an in-app toast instead of a system banner, and the thread you are reading stays silent.
+- Starting a thread in a new worktree shows each setup step — fetch, checkout, submodules, setup script — and can be cancelled while it runs.
+- A thread whose project is not a git repository, or whose base branch has no commit, now runs in the project checkout instead of failing.
+
+### Phone
+- Settings shows whether the lock-screen thread card's push registration reached your Mac, and what stopped it if it did not.
+- The lock-screen card's push registration is retried once the Mac is reachable, so a card can start on its own.
+- The lock-screen card carries the Infinitus mark instead of the T3 one.
+
 ## 0.5.0-alpha.10
 
 ### Mac
