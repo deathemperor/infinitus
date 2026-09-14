@@ -5,7 +5,14 @@
  * platform key, so a rename here is a release-breaking change.
  */
 
-const CLI_RELEASE_REPOSITORY = "pingdotgg/t3code";
+// Fork registration point (INFINITUS.md, #1192): this repo's releases, not
+// upstream's. Every runtime installer derives its download URLs and its
+// "what is newest" lookup from this one constant, so upstream's value here
+// means an Infinitus desktop asks pingdotgg for a `v0.5.0-alpha.N` archive
+// that cannot exist (404), and `t3 update` on an Infinitus CLI resolves
+// upstream's newest build and installs T3 Code over it. Re-flipped after
+// every upstream sync.
+const CLI_RELEASE_REPOSITORY = "deathemperor/infinitus";
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 /** Overrides the download origin for mirrors and air-gapped installs. */
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
@@ -86,8 +93,16 @@ export const CLI_RELEASE_CHANNELS: ReadonlyArray<CliReleaseChannel> = [
   "preview",
 ];
 
-/** The release train a version was published on, derived from its prerelease tag. */
+/**
+ * The release train a version was published on, derived from its prerelease
+ * tag. This repo's nightly (#1042) carries its line's own id first —
+ * `0.5.0-alpha.7-infinitus-nightly.20260913.42` — so upstream's rule, which
+ * wants the train immediately after the version core, reads it as `stable`
+ * and would answer a nightly CLI with a stable lookup. The second arm reads
+ * the fork's suffix wherever the line's id left it.
+ */
 export function cliReleaseChannelOf(version: string): CliReleaseChannel {
+  if (/-infinitus-nightly\.\d{8}\.\d+$/.test(version)) return "nightly";
   const channel = /^[^-+]+-(nightly|preview)\.\d{8}\.\d+$/.exec(version)?.[1];
   return channel === "nightly" || channel === "preview" ? channel : "stable";
 }
