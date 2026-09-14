@@ -64,6 +64,19 @@ describe("agentActivityPushSummary", () => {
     expect(agentActivityPushSummary(state).explanation).toContain("newer");
   });
 
+  it("never says the Mac refused a token it could not be handed", () => {
+    const state = withRegistration(WATCHING, "agent-activity-start", {
+      outcome: "unreachable",
+      at: "2026-09-14T02:11:20.000Z",
+      detail: "HyperNovae is not connected.",
+    });
+    const summary = agentActivityPushSummary(state);
+    expect(summary.value).toBe("Mac unreachable");
+    expect(summary.explanation).toContain("could not reach the Mac");
+    expect(summary.explanation).toContain("HyperNovae is not connected.");
+    expect(summary.explanation).not.toContain("refused this phone");
+  });
+
   it("goes back to not running when the bridge lets its listeners go", () => {
     const state = withWatching(
       withRegistration(WATCHING, "agent-activity-start", registered("2026-09-14T02:11:14.000Z")),

@@ -4,16 +4,20 @@ import type { LiveActivityTokenKind } from "./liveActivity.logic";
  * What the phone knows about its own push registrations (#941 step 3). The
  * lock-screen card's start token is handed to the app by iOS through an
  * event that simply never fires when ActivityKit declines to vend one, and
- * the refusal of a send it does make is a `console.warn` a Release build
+ * the failure of a send it does make is a `console.warn` a Release build
  * shows nobody — so "no card appeared" covers four different faults with one
  * silence. This is the state that tells them apart.
  */
 
+/** What became of one attempt. `unreachable` is not a refusal: the Mac never
+    saw the token, because the phone could not reach it (#941). */
+export type PushRegistrationOutcome = "registered" | "refused" | "unreachable";
+
 export interface PushRegistrationNote {
-  readonly outcome: "registered" | "refused";
+  readonly outcome: PushRegistrationOutcome;
   /** ISO instant of the attempt. */
   readonly at: string;
-  /** The refusal's own words; null for a registration, or a refusal with none. */
+  /** The failure's own words; null for a registration, or a failure with none. */
   readonly detail: string | null;
 }
 
@@ -83,22 +87,32 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
   }
   const start = state.registrations["agent-activity-start"];
   const card = state.registrations["agent-activity"];
-  const refused = [
+  const failed = [
     { kind: "agent-activity-start" as LiveActivityTokenKind, note: start },
     { kind: "agent-activity" as LiveActivityTokenKind, note: card },
   ]
     .flatMap((entry) =>
-      entry.note !== undefined && entry.note.outcome === "refused"
+      entry.note !== undefined && entry.note.outcome !== "registered"
         ? [{ kind: entry.kind, note: entry.note }]
         : [],
     )
     .sort((left, right) => right.note.at.localeCompare(left.note.at))[0];
-  if (refused !== undefined) {
+  if (failed !== undefined) {
+    const label = KIND_LABELS[failed.kind];
+    const at = timeOf(failed.note.at);
+    if (failed.note.outcome === "unreachable") {
+      return {
+        value: "Mac unreachable",
+        explanation: `This phone could not reach the Mac to file its ${label} at ${at}: ${
+          failed.note.detail ?? "it is not connected"
+        }. The Mac never saw the token, so it refused nothing — the phone sends it again as soon as the Mac is reachable.`,
+      };
+    }
     return {
       value: "Refused",
-      explanation: `The Mac refused this phone's ${KIND_LABELS[refused.kind]} at ${timeOf(
-        refused.note.at,
-      )}: ${refused.note.detail ?? "it gave no reason"}.`,
+      explanation: `The Mac refused this phone's ${label} at ${at}: ${
+        failed.note.detail ?? "it gave no reason"
+      }.`,
     };
   }
   if (start?.outcome === "registered") {

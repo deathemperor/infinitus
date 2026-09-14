@@ -2158,14 +2158,27 @@ agent-activity` (the session cards' kinds retired with #1041).
   come from (`infinitusLiveActivityMac`). `pushRegistration.ts` logs a
   refused `activities-token` (`[infinitus-push]`) since the bridge sends
   with `reportFailure: false`.
+- `apps/mobile/src/features/infinitus/pushRetry.logic.ts` (+ test) — the
+  thread-card bridge's re-send rule (#941): ActivityKit vends the
+  push-to-start token as the bridge mounts, before the environment's socket
+  is up, so the first send failed with `EnvironmentRpcUnavailableError` and
+  nothing fired it again — the Mac held no start token and no card could
+  begin. The bridge now keeps the newest token per kind and re-sends it;
+  `nextRetry` backs a failed round off by `RETRY_DELAYS_MS` (5 s, 15 s,
+  1 min, then the 5 min cap) while the Mac is reachable, schedules nothing
+  while it is not — the environment connecting, or the app coming to the
+  foreground, sends at once — and stops as soon as every token is on file.
+  `isEnvironmentUnreachable` is the same tag check the web's legacy-queue
+  migration makes, and decides the row's wording above.
 - `apps/mobile/src/features/infinitus/pushDiagnostics.ts` (+
   `pushDiagnostics.logic.ts`, test) — what this phone's registrations have
   done, for the "Card push registration" row in Settings › Infinitus (#941):
   the thread-card bridge notes when it attaches and lets go of its listeners,
   `tokenSender` notes each kind's outcome, and `agentActivityPushSummary`
   folds the two into one line — not running / no token yet / card token only
-  / registered / refused — with the Mac's own refusal text, or the gates to
-  check, behind a tap. The lock-screen card's start token is vended by
+  / registered / refused / Mac unreachable — with the failure's own text, or
+  the gates to check, behind a tap. A send the RPC could not deliver is never
+  worded as a refusal: the Mac did not see that token. The lock-screen card's start token is vended by
   ActivityKit through an event that never fires when it declines (Live
   Activities off for the app, or iOS before 17.2), and a refusal is a
   `console.warn` a Release build shows nobody, so without this one silence
