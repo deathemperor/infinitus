@@ -880,7 +880,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   asks `pingdotgg/t3code` for a `v0.5.0-alpha.N` archive that cannot exist,
   and `t3 update` on an Infinitus CLI resolves upstream's newest build and
   installs T3 Code over it. Re-flipped after every sync, like the runner
-  swap. **The archives themselves are not built yet** — until the release
+  swap. Two fixtures pin the value and are re-flipped with it:
+  `packages/shared/src/cliRelease.test.ts` (the download base URL and the
+  release-index page URL) and `packages/ssh/src/tunnel.test.ts` (the remote
+  runner script's `T3_RELEASE_BASE_URL`) — the second lives in another
+  package and is easy to miss, which is how it went red on #1193.
+  **The archives themselves are not built yet** — until the release
   workflow attaches upstream's five CLI archives and `SHA256SUMS` to our
   tags, an SSH remote and `t3 update` fail with "no archive for this
   version" instead of fetching upstream's; that is the point. Desktop-managed
