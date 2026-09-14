@@ -586,10 +586,12 @@ private let addAccountFooter =
             capabilities: info[SignInSheetRoute.capabilitiesKey] as? [String: Any])
     }
 
-    /// `open -na <browser> --args <flag> <url>`: a second instance hands
-    /// its command line to the running one, which honours the private
-    /// flag (probed on Chrome 152, 2026-09-14). NSWorkspace's
-    /// OpenConfiguration cannot carry the URL and the flag together.
+    /// `open -na <browser> --args <flag> <url>`: a running browser gets a
+    /// URL over Apple Events and ignores launch arguments, so the flag
+    /// only counts on a NEW instance, which hands its command line to the
+    /// running one (probed on Chrome 152, 2026-09-14). NSWorkspace's
+    /// `open(_:withApplicationAt:configuration:)` sends the URL the
+    /// Apple-Events way and drops the flag for the same reason.
     private func openInDefaultBrowser(_ url: URL, name: String, privateFlag: String?) {
         var placement = "in your profile \u{2014} if it is signed in to another Claude account, sign out there first"
         if let privateFlag, let app = NSWorkspace.shared.urlForApplication(toOpen: url) {
@@ -609,8 +611,8 @@ private let addAccountFooter =
             + "(\(placement)). Paste the code back here; with Safari as the default "
             + "browser the sheet opens in this app.")
         // The user is in the browser now: the companion window goes back
-        // under it (#1134's .floating stays for the sheet route) and the
-        // app does not pull focus back.
+        // under it (#1134's .floating stays for the sheet route);
+        // reopenAuth floats it again when they come back for the paste bar.
         authWindow?.level = .normal
     }
 
@@ -621,6 +623,7 @@ private let addAccountFooter =
         guard !headless else { return }
         webWindow?.makeKeyAndOrderFront(nil)
         if let w = authWindow {
+            w.level = .floating      // back above a pinned pop-out (#1134)
             w.makeKeyAndOrderFront(nil)
         } else if let url = authURL {
             openAuthWindow(url)
