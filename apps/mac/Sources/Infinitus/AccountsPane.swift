@@ -43,6 +43,9 @@ private let addAccountFooter =
     /// Why the system sign-in sheet did not come up, when it did not
     /// (a plain cancel is not a failure and leaves this nil).
     @Published var sheetError: String?
+    /// Set on the browser route (#1180): the browser that took the sheet
+    /// and where the page went. Information, not a failure.
+    @Published var browserRoute: (name: String, note: String)?
     /// Which account this flow is for (relogin) — display only; cswap
     /// matches the credential identity itself.
     @Published var reloginTarget: String?
@@ -139,6 +142,7 @@ private let addAccountFooter =
         buffer = ""
         authURL = nil
         sheetError = nil
+        browserRoute = nil
         pasteCode = true
         phase = .launching
         self.model = model
@@ -187,6 +191,7 @@ private let addAccountFooter =
         code = ""
         authURL = nil
         sheetError = nil
+        browserRoute = nil
         pasteCode = false
         phase = .launching
         self.model = model
@@ -464,7 +469,6 @@ private let addAccountFooter =
         w.level = .floating
         authWindow = w
         w.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
         // ALWAYS the sheet: it does passkeys AND passwords. The
         // saved-session auto-routing sent a passkey account into the
         // private window — where WebAuthn can never run — and hit the
@@ -474,6 +478,8 @@ private let addAccountFooter =
         // (2026-09-07): Google remembered, but the double sheet flash
         // bothered more than typing the email — reverted the same day.
         startSystemSheet()
+        // The browser route already handed focus to the browser.
+        if browserRoute == nil { NSApp.activate(ignoringOtherApps: true) }
     }
 
     /// The opt-in private window: this account's own isolated session
@@ -522,6 +528,7 @@ private let addAccountFooter =
     func startSystemSheet() {
         guard let url = authURL else { return }
         sheetError = nil
+        browserRoute = nil
         // A default browser that declares sheet support gets the session
         // from macOS instead of Safari — and Chrome, which declares it,
         // presents nothing (user 2026-09-14: "flash of browser focus,
@@ -599,9 +606,13 @@ private let addAccountFooter =
         } else {
             NSWorkspace.shared.open(url)
         }
-        sheetError = "\(name) takes over the sign-in sheet, so the page opened there "
+        browserRoute = (name, "\(name) takes over the sign-in sheet, so the page opened there "
             + "(\(placement)). Paste the code back here; with Safari as the default "
-            + "browser the sheet opens in this app."
+            + "browser the sheet opens in this app.")
+        // The user is in the browser now: the companion window goes back
+        // under it (#1134's .floating stays for the sheet route) and the
+        // app does not pull focus back.
+        authWindow?.level = .normal
     }
 
     /// Brings a running flow's windows back to the front — the only way
@@ -615,7 +626,7 @@ private let addAccountFooter =
         } else if let url = authURL {
             openAuthWindow(url)
         }
-        NSApp.activate(ignoringOtherApps: true)
+        if browserRoute == nil { NSApp.activate(ignoringOtherApps: true) }
     }
 
     private func closeAuthWindow() {
@@ -744,8 +755,13 @@ private struct AuthWindowRoot: View {
                 Text(why).font(.caption).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let route = flow.browserRoute {
+                Text(route.note).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 6) {
-                Button("Reopen sign-in sheet") { flow.startSystemSheet() }
+                Button(flow.browserRoute.map { "Open in \($0.name) again" }
+                       ?? "Reopen sign-in sheet") { flow.startSystemSheet() }
                 Button("Use private window (no passkeys)") {
                     flow.openPrivateWindow()
                 }
