@@ -1,4 +1,8 @@
-import type { InfinitusManifestCommand, InfinitusSecretInput } from "@t3tools/contracts/infinitus";
+import type {
+  InfinitusCommandInput,
+  InfinitusManifestCommand,
+  InfinitusSecretInput,
+} from "@t3tools/contracts/infinitus";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -100,4 +104,60 @@ export function engineSecretInput(
   if (engine === undefined) throw new Error(`unknown proxy engine ${key}`);
   const trimmed = url.trim();
   return { command: engine.secretVerb, args: trimmed === "" ? {} : { url: trimmed } };
+}
+
+/** The probe verb (native #1216): `test-connection cliproxy|9router [--url]`,
+    read effect, answered within 5 s with the engine's own words on failure. */
+const TEST_CONNECTION_VERB = "test-connection";
+
+/** A build whose manifest lists the probe verb; older builds keep the button off. */
+export function testConnectionSupported(
+  commands: ReadonlyArray<InfinitusManifestCommand>,
+): boolean {
+  return commands.some((command) => command.name === TEST_CONNECTION_VERB);
+}
+
+/**
+ * The `infinitus.command` input that probes one engine at the typed url —
+ * before it is saved, which is the point — or at the stored one when the
+ * field is blank. The credential stays in the Mac's keychain either way.
+ */
+export function connectionTestInput(key: ProxyEngineKey, url: string): InfinitusCommandInput {
+  const trimmed = url.trim();
+  return {
+    command: TEST_CONNECTION_VERB,
+    args: [key],
+    options: trimmed === "" ? {} : { url: trimmed },
+  };
+}
+
+const ConnectionTestReply = Schema.Struct({
+  ok: Schema.Boolean,
+  latencyMs: Schema.optionalKey(Schema.Number),
+  version: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+});
+
+const decodeConnectionTest = Schema.decodeUnknownOption(ConnectionTestReply);
+
+export type ConnectionTestResult =
+  | { readonly ok: true; readonly latencyMs: number; readonly version: string | null }
+  | { readonly ok: false; readonly error: string };
+
+/** The probe's reply, null when the shape is not `{ok, latencyMs?, version?, error?}`. */
+export function parseConnectionTest(result: unknown): ConnectionTestResult | null {
+  const reply = Option.getOrNull(decodeConnectionTest(result));
+  if (reply === null) return null;
+  if (reply.ok) {
+    return { ok: true, latencyMs: reply.latencyMs ?? 0, version: reply.version ?? null };
+  }
+  return { ok: false, error: reply.error ?? "The engine did not say why." };
+}
+
+/** One line under the button: the round trip, or the engine's sentence verbatim. */
+export function connectionTestLine(result: ConnectionTestResult): string {
+  if (!result.ok) return result.error;
+  return result.version === null
+    ? `Reachable in ${result.latencyMs} ms.`
+    : `Reachable in ${result.latencyMs} ms, version ${result.version}.`;
 }
