@@ -21,7 +21,7 @@
 
 ## Platforms
 
-- macOS 14+ (Apple silicon): `brew install --cask deathemperor/tap/infinitus`, or download `Infinitus.app` from the latest release — or the whole desktop app, `Infinitus-<version>-arm64.dmg`, which carries the menu bar app inside as a login item. One `v<version>` release ships all of them. Releases are Developer ID signed and notarized.
+- macOS 14+ (Apple silicon): download the desktop app, `Infinitus-<version>-arm64.dmg`, from https://infinitus.run/download/mac or the latest release; it carries the menu bar app inside as a login item. One `v<version>` release ships all of it. Releases are Developer ID signed and notarized.
 - Linux: static `infinitus-tray` binaries for x86_64 and aarch64; Omarchy / Arch panel plugin for Quickshell and a Waybar module (`apps/mac/packaging/omarchy/`), also on the AUR.
 - Phone app (iOS and Android, `APP_VARIANT=infinitus`): the fleet mirror on Accounts, thread chat, and the lock-screen thread card the Mac keeps moving over push; device builds from the repo, not on the stores yet.
 

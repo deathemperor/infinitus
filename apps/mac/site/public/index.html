@@ -115,20 +115,6 @@
   }
   .btn.primary:hover { filter: brightness(1.08); }
   .cta .note { color: var(--faint); font-size: 13px; }
-  .brew {
-    display: inline-flex; align-items: baseline; gap: 8px; margin: 16px 0 0;
-    padding: 10px 14px; border-radius: 8px; max-width: 100%;
-    font-family: var(--mono); font-size: 13px; color: var(--text);
-    background: rgba(255,255,255,.04); border: 1px solid var(--line);
-    cursor: pointer; text-align: left; white-space: nowrap; overflow-x: auto;
-  }
-  .brew:hover { border-color: var(--dim); }
-  .brew .p { color: var(--orange); }
-  .brew .k {
-    margin-left: 8px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
-    color: var(--faint); border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px;
-  }
-  .brew.done .k { color: var(--orange); border-color: var(--orange); }
   .also { color: var(--faint); font-size: 12.5px; margin: 14px 0 0; }
   .also a { color: var(--dim); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
   .also a:hover { color: var(--text); }
@@ -299,11 +285,11 @@
         { "@type": "Question", "name": "Does Infinitus work with Claude Code?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus drives account switching through the swapd CLI and reads Claude Code's own local files for usage. It never modifies Claude Code itself." } },
         { "@type": "Question", "name": "Which platforms does Infinitus support?",
-          "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (menu bar app, Homebrew cask), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. The phone app for iPhone and Android builds from the repository; it is not on the stores yet." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "macOS 14 or newer on Apple silicon (the desktop app with the menu bar app inside), and Linux — a static infinitus-tray binary for x86_64 and aarch64 with a Quickshell panel plugin for Omarchy / Arch, also on the AUR. The phone app for iPhone and Android builds from the repository; it is not on the stores yet." } },
         { "@type": "Question", "name": "Is Infinitus free?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Infinitus is free and open source under the MIT license. Source code is on GitHub." } },
         { "@type": "Question", "name": "How do I install Infinitus?",
-          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: brew install --cask deathemperor/tap/infinitus, or download Infinitus.app — or the desktop app's DMG, which carries the menu bar app inside — from the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The swapd CLI must be on your PATH." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "On macOS: download the desktop app's DMG, which carries the menu bar app inside, from infinitus.run or the GitHub releases page. On Linux: download the infinitus-tray binary or the Omarchy tarball from the same release, or build with swift build. The swapd CLI must be on your PATH." } },
         { "@type": "Question", "name": "Are the usage numbers Infinitus shows exact?",
           "acceptedAnswer": { "@type": "Answer", "text": "Usage percentages come from Anthropic's own limits reporting; usage-cost figures in the app are estimates, never billing truth." } }
       ]
@@ -345,11 +331,6 @@
     <a class="btn" href="https://github.com/deathemperor/infinitus">Source on GitHub</a>
     <span class="note" id="version-note">alpha · macOS menu bar + Linux panel · free &amp; open source</span>
   </div>
-  <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
-          title="Copy to clipboard" aria-label="Copy the Homebrew install command">
-    <span class="p">$</span> brew install --cask deathemperor/tap/infinitus
-    <span class="k">copy</span>
-  </button>
   <p class="also">Signed and notarized — it opens like any other app.
     Needs the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI
     on your PATH — Infinitus walks you through the first account.</p>
@@ -357,9 +338,9 @@
     <a href="/download/linux-x86_64">Linux x86_64</a> ·
     <a href="/download/linux-aarch64">Linux aarch64</a> ·
     <a href="/download/omarchy">Omarchy</a>
-    — or <a href="#install">brew / AUR / source</a>.
-    The full desktop app, menu bar included:
-    <a href="/download/dmg">Infinitus desktop (DMG, Apple silicon)</a>.</p>
+    — or <a href="#install">AUR / source</a>.
+    The macOS download is the desktop app, menu bar app included
+    (DMG, Apple silicon).</p>
 </header>
 
 <div class="fleet wrap" aria-hidden="true">
@@ -589,17 +570,14 @@
     <div class="install-cols">
       <div>
         <h3>macOS</h3>
-        <pre><span class="c"># Homebrew</span>
-<span class="g">brew</span> install --cask deathemperor/tap/infinitus
-
-<span class="c"># or grab Infinitus.app — or the whole desktop app, Infinitus-&lt;version&gt;-arm64.dmg, menu bar app included — from the latest release</span>
-<span class="g">open</span> https://github.com/deathemperor/infinitus/releases
+        <pre><span class="c"># the desktop app, Infinitus-&lt;version&gt;-arm64.dmg, menu bar app included</span>
+<span class="g">open</span> https://infinitus.run/download/mac
 
 <span class="c"># or build it yourself</span>
 <span class="g">git</span> clone https://github.com/deathemperor/infinitus
 <span class="g">cd</span> infinitus/apps/mac &amp;&amp; ./make-app.sh &amp;&amp; <span class="g">open</span> Infinitus.app</pre>
-        <p class="fineprint">Releases are Developer ID signed and notarized
-        (nightlies are not: right-click → Open once). Requires the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI on your PATH
+        <p class="fineprint">Releases and nightlies are Developer ID signed and
+        notarized, so they open like any other app. Requires the <a href="https://github.com/deathemperor/swapd">swapd</a> CLI on your PATH
         (<code>cargo install --git https://github.com/deathemperor/swapd swapd</code>);
         Infinitus walks you through first-account setup.</p>
       </div>
@@ -632,7 +610,7 @@
         Claude Code's own local files for usage. It never modifies Claude
         Code.</dd>
       <dt>Which platforms?</dt>
-      <dd>macOS 14+ on Apple silicon (Homebrew cask), and Linux — a static
+      <dd>macOS 14+ on Apple silicon, and Linux — a static
         <code>infinitus-tray</code> for x86_64 and aarch64 with a Quickshell
         panel plugin for Omarchy / Arch (also on the AUR). The phone app for
         iPhone and Android builds from source today — no store build yet.</dd>
@@ -652,11 +630,6 @@
       <a class="btn primary" href="/download/mac">Download for macOS</a>
       <a class="btn" href="#install">Linux &amp; source</a>
     </div>
-    <button class="brew" type="button" data-copy="brew install --cask deathemperor/tap/infinitus"
-            title="Copy to clipboard" aria-label="Copy the Homebrew install command">
-      <span class="p">$</span> brew install --cask deathemperor/tap/infinitus
-      <span class="k">copy</span>
-    </button>
   </div>
 </section>
 </main>
@@ -681,21 +654,6 @@
     var note = document.getElementById("version-note");
     if (v && v.version && note) note.textContent = "v" + v.version + " · " + note.textContent;
   }).catch(function () {});
-  // Hero brew line: click copies, the badge says so for a moment.
-  document.querySelectorAll(".brew").forEach(function (button) {
-    button.addEventListener("click", function () {
-      var done = function () {
-        button.classList.add("done");
-        button.querySelector(".k").textContent = "copied";
-        setTimeout(function () {
-          button.classList.remove("done");
-          button.querySelector(".k").textContent = "copy";
-        }, 1600);
-      };
-      if (navigator.clipboard) navigator.clipboard.writeText(button.dataset.copy).then(done, done);
-      else done();
-    });
-  });
   var accounts = [
     { name: "papaya",  pct: 64, warn: false, dead: false, reset: "resets 2d 4h" },
     { name: "banyan",  pct: 12, warn: true,  dead: false, reset: "resets 9h 12m" },
