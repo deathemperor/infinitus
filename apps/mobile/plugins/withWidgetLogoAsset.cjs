@@ -1,6 +1,6 @@
 "use strict";
 
-// Ships the branded T3 mark to the Live Activity / widget extension.
+// Ships the build's brand mark to the Live Activity / widget extension.
 //
 // expo-widgets generates ExpoWidgetsTarget without a Resources build phase and
 // has no asset support, so this plugin (a) writes an SVG template image set into
@@ -25,6 +25,13 @@ const CATALOG_NAME = "Assets.xcassets";
 const IMAGE_SET = "T3Mark.imageset";
 const SVG_NAME = "T3Mark.svg";
 
+// The fork's builds carry the Infinitus twin loop, the upstream variants the
+// T3 mark — they build the real T3 Code side by side. Only the artwork copied
+// in changes: the catalog entry keeps the name AgentActivity.tsx asks for, and
+// both marks are drawn at the 3:2 the widget frames them at, so neither is
+// stretched and the widget file stays upstream's.
+const SOURCE_BY_VARIANT = { infinitus: "InfinitusMark.svg" };
+
 const CATALOG_CONTENTS = JSON.stringify({ info: { author: "expo", version: 1 } }, null, 2) + "\n";
 const IMAGE_SET_CONTENTS =
   JSON.stringify(
@@ -44,7 +51,8 @@ function withAssetFiles(config) {
   return withDangerousMod(config, [
     "ios",
     (cfg) => {
-      const source = path.join(cfg.modRequest.projectRoot, "assets", "widget", SVG_NAME);
+      const sourceName = SOURCE_BY_VARIANT[cfg.extra?.appVariant] ?? SVG_NAME;
+      const source = path.join(cfg.modRequest.projectRoot, "assets", "widget", sourceName);
       const catalogDir = path.join(cfg.modRequest.platformProjectRoot, TARGET_NAME, CATALOG_NAME);
       const imageSetDir = path.join(catalogDir, IMAGE_SET);
       fs.mkdirSync(imageSetDir, { recursive: true });

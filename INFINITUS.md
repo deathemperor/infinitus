@@ -938,6 +938,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
   `extra.productVersion` is the root `VERSION` (#823 layer 3), which
   `SettingsRouteScreen` shows in place of the store version.
+- `apps/mobile/plugins/withWidgetLogoAsset.cjs` (+ its test) — the mark the
+  lock-screen card draws in its header comes from the variant
+  (`SOURCE_BY_VARIANT`, #941): the `infinitus` build gets
+  `assets/widget/InfinitusMark.svg`, every upstream variant keeps
+  `T3Mark.svg` — they build the real T3 Code side by side. Only the artwork
+  copied in changes; the catalog entry keeps the `T3Mark` name
+  `AgentActivity.tsx` asks for, and the Infinitus mark's viewBox is padded to
+  the 3:2 the widget's `renderLogo` frames it at, so the glyph is not
+  stretched and upstream's widget file needs no edit. The plugin's ordering
+  rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
@@ -1992,6 +2002,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
+- `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the
+  lock-screen card's header (#941), monochrome so the widget's foreground
+  tint applies: the same geometry `apps/mac/make-icon.swift` draws (rings at
+  (6, 8) and (11, 8), radius 3.2, stroke 2, the right one broken between 10°
+  and 70° with the swap arrow on the break), hand-traced as filled paths and
+  checked against that renderer's own output. Redraw it from there if the
+  mark changes.
 - `assets/infinitus/` — the desktop and web artwork for fork builds: the
   native Mac app's 1024 icon master (`make-icon.swift` on `native`), the
   phone's full-bleed mark for Linux/apple-touch, and the `.ico`/favicon sizes
