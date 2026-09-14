@@ -2016,15 +2016,18 @@ final class AppModel: ObservableObject {
         // not one per engine (user 2026-09-02: 429s). Claude fleets only:
         // the budget being spared is Anthropic's, and a Codex login with
         // the same email is a different account with its own window (#899).
+        // `results` fills in completion order, so when two engines hold one
+        // email the donation goes to the richest reading (`richest(with:)`),
+        // never to whichever engine happened to answer first.
         let stamp = Date()
         for engine in engines {
             var byEmail: [String: SharedUsage] = [:]
             for r in results where r.id != engine.id {
                 for fleet in r.fleets ?? [] where fleet.provider == .claude {
                     for a in fleet.accounts where a.usageStatus == "ok" {
-                        if let u = a.usage, byEmail[a.email] == nil {
-                            byEmail[a.email] = SharedUsage(usage: u, at: stamp)
-                        }
+                        guard let u = a.usage else { continue }
+                        let offered = SharedUsage(usage: u, at: stamp)
+                        byEmail[a.email] = byEmail[a.email]?.richest(with: offered) ?? offered
                     }
                 }
             }

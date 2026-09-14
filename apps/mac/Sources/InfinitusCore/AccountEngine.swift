@@ -204,6 +204,27 @@ public struct SharedUsage: Sendable {
         self.usage = usage
         self.at = at
     }
+
+    /// How much a reading is worth as a donation, richest first.
+    /// Two engines can hold the same email, and whichever finished its
+    /// snapshot first used to win — a race, so the row's numbers flipped
+    /// between engines from one refresh to the next. Rank instead: a
+    /// reading that carries the weekly pace signal beats one that does
+    /// not, then one with more windows, so a shared row shows the same
+    /// engine's copy every time.
+    var richness: (Int, Int) {
+        let weekly = [usage.sevenDay].compactMap { $0 } + (usage.scoped ?? [])
+        let pace = weekly.contains { $0.expectedPct != nil } ? 1 : 0
+        let windows = weekly.count + (usage.fiveHour == nil ? 0 : 1)
+        return (pace, windows)
+    }
+
+    /// The donation to keep for one email: `self` unless `other` is
+    /// strictly richer. Ties keep `self`, so the walk's order still
+    /// decides only between equals.
+    public func richest(with other: SharedUsage) -> SharedUsage {
+        other.richness > richness ? other : self
+    }
 }
 
 public extension AccountEngine {
