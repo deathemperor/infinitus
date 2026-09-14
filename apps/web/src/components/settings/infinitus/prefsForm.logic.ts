@@ -184,9 +184,23 @@ export const PREF_COPY: Readonly<
     label: "This Mac's name",
     description: "How the phone and this server name the Mac. Empty follows the computer name.",
   },
-  apns_team_id: { label: "APNs team ID" },
-  apns_key_id: { label: "APNs key ID", description: "The 10-character id of the push key." },
-  icloud_sync: { label: "Sync settings via iCloud Drive" },
+  // "Team ID" / "Key ID" as the Mac's Sync pane words them: the rows sit under
+  // the page's Phone alerts card, whose file input stays off until the key id
+  // is set (the Mac stores the key under it).
+  apns_team_id: {
+    label: "Team ID",
+    description: "The Apple Developer team the push key belongs to, like ABCDE12345.",
+  },
+  apns_key_id: {
+    label: "Key ID",
+    description:
+      "The push key's 10-character id. Set it before uploading the .p8 below; the key is stored under it.",
+  },
+  icloud_sync: {
+    label: "Sync settings via iCloud Drive",
+    description:
+      "Display preferences, custom themes and engine settings travel through one file in your iCloud Drive. Never credentials, never push secrets.",
+  },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
