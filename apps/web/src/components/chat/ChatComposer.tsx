@@ -1163,7 +1163,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
               <ComposerSelectControl
                 size={size}
                 className={size === "xs" ? undefined : "font-medium"}
-                chevronOnHover={runtimeModeLabelCollapsed}
+                noChevron={runtimeModeLabelCollapsed}
                 aria-label="Runtime mode"
               />
             }
