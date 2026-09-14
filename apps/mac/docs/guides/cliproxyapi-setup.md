@@ -86,8 +86,8 @@ Turn swapd off unless the two engines hold different accounts.
 ## 4. Add accounts
 
 In the Infinitus desktop app, open the Accounts page → the "Claude —
-CLIProxyAPI" section → **Add account**. The sign-in opens in a private
-window; your default browser is never used.
+CLIProxyAPI" section → **Add account**, and sign in in the window that
+opens.
 
 Sign in, approve, and the credential appears in the section within a
 few seconds (Infinitus polls the proxy's auth state; the proxy runs the
