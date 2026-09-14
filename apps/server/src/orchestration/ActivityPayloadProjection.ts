@@ -461,6 +461,15 @@ export function projectActivityPayload(
   if (command !== undefined) {
     projectedData.command = command;
   }
+  // Claude's Bash input carries a one-line `description` of what the command
+  // is for; the web shows it as the row's headline (#1231).
+  const description =
+    payload.itemType === "command_execution"
+      ? asTrimmedString(asRecord(data.input)?.description)
+      : undefined;
+  if (description) {
+    projectedData.description = description;
+  }
   const imagePath = projectViewedImagePath(data);
   if (imagePath) {
     projectedData.imagePath = imagePath;
