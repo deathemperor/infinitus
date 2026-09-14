@@ -167,20 +167,18 @@ struct InfinitusApp: App {
     // Ordered by how often each pane is reached for (user 2026-08-30:
     // "reorder the settings"): everyday looks first, plumbing after,
     // About last; engines keep their own trailing section.
+    // Display, Push and Lock left on 2026-09-14 (#569): all three are
+    // Settings › Infinitus pages in the desktop app now, and the native
+    // window keeps only what cannot leave the Mac. The prefs themselves
+    // stay in PrefCatalog — that is what the fork's pages write — and
+    // the lock's biometric prompt stays native, driven by `lock` /
+    // `unlock` / `lock-status`.
     [
-        SettingsTab(title: "Display", symbol: "menubar.rectangle", tint: .purple,
-                    keywords: ["layout", "popup", "size", "compact",
-                               "menu bar", "icon"],
-                    view: AnyView(DisplayPane(model: model))),
         SettingsTab(title: "Accounts", symbol: "person.2.badge.key", tint: .blue,
                     keywords: ["account", "login", "relogin", "token",
                                "add", "remove", "delete", "oauth",
                                "order", "reorder", "alias", "rename"],
                     view: AnyView(AccountsPane(model: model))),
-        SettingsTab(title: "Push", symbol: "antenna.radiowaves.left.and.right",
-                    tint: .red,
-                    keywords: ["push", "phone", "notification", "sessions", "accounts"],
-                    view: AnyView(NotifyPane(app: model))),
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
@@ -188,10 +186,6 @@ struct InfinitusApp: App {
                                "phone", "iphone", "lan", "bonjour", "companion",
                                "tailscale", "cloudflare", "tunnel", "pair", "qr"],
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
-        SettingsTab(title: LockModel.paneTitle, symbol: "lock.fill", tint: .gray,
-                    keywords: ["biometric", "touch id", "face id", "password",
-                               "unlock", "privacy"],
-                    view: AnyView(LockPane(lock: model.lock))),
     ]
     + [
         SettingsTab(title: "About", symbol: "info.circle", tint: .indigo,
