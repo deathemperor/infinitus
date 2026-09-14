@@ -811,6 +811,14 @@
         "value": false
       },
       {
+        "default": false,
+        "effect": "restart",
+        "key": "mock_mode",
+        "section": "engines",
+        "type": "bool",
+        "value": false
+      },
+      {
         "choices": ["stable", "nightly"],
         "default": "stable",
         "effect": "live",

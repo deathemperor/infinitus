@@ -45,6 +45,7 @@ const TIMELINE_MINIMAP_PERSISTENT_GUTTER = 48;
 function singleToolCallLabel(entry: WorkLogEntry): string {
   const toolPresentation = resolveWorkEntryToolPresentation(entry, "completed");
   if (toolPresentation) return toolPresentation.displayName;
+  if (entry.commandDescription) return entry.commandDescription;
   const command = entry.command?.trim();
   if (command) return command;
   const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
@@ -54,6 +55,9 @@ function singleToolCallLabel(entry: WorkLogEntry): string {
 export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string | undefined) {
   const toolPresentation = resolveWorkEntryToolPresentation(entry);
   if (toolPresentation) return toolPresentation.displayName;
+  // A Bash call the model described reads by that description; the command
+  // itself is the expanded row's first block (#1231).
+  if (entry.commandDescription) return entry.commandDescription;
   if (entry.command) return entry.command;
   if (entry.detail) return entry.detail;
   const [firstPath] = entry.changedFiles ?? [];
@@ -78,6 +82,7 @@ export function liveWorkEntryLabel(
     toolLifecycleStatus: status,
   });
   if (toolPresentation) return toolPresentation.displayName;
+  if (entry.commandDescription) return entry.commandDescription;
   const command = entry.command?.trim();
   if (command) {
     const verb =

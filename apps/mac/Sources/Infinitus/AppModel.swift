@@ -882,6 +882,11 @@ final class AppModel: ObservableObject {
             let changed = try setEngineEnabled(engine, on: on)
             return (PrefCatalog.pref(entry, in: defaults), changed)
         }
+        if key == "mock_mode", case .bool(let on) = value {
+            guard mockMode != on else { return (PrefCatalog.pref(entry, in: defaults), false) }
+            mockMode = on   // didSet stores it and relaunches
+            return (PrefCatalog.pref(entry, in: defaults), true)
+        }
         let pref = try PrefCatalog.write(value, key: key, to: defaults)
         reloadPrefs()
         return (pref, false)

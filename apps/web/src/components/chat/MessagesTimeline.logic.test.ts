@@ -749,6 +749,20 @@ describe("work entry labels", () => {
     expect(workEntryDisplayLabel(commandEntry, undefined)).toBe("vp test run");
   });
 
+  it("labels a described Bash call by its description in every view (#1231)", () => {
+    const described = {
+      ...entry,
+      command: "vp test run",
+      commandDescription: "Run the web tests",
+      detail: "All tests passed",
+    };
+    expect(workEntryDisplayLabel(described, undefined)).toBe("Run the web tests");
+    expect(liveWorkEntryLabel(described, undefined, true)).toBe("Run the web tests");
+    expect(liveWorkEntryLabel(described, undefined, false)).toBe("Run the web tests");
+    const { commandDescription: _omitted, ...plain } = described;
+    expect(workEntryDisplayLabel(plain, undefined)).toBe("vp test run");
+  });
+
   it("summarizes the program inside a shell wrapper while preserving the expanded command", () => {
     const command = "/bin/zsh -lc 'vp test run apps/web/src/session-logic.test.ts'";
     const commandEntry = { ...entry, command };

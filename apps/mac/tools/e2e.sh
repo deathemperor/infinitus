@@ -269,6 +269,8 @@ echo "aws: orphan login wrapper swept at launch"
 "$CTL" lock relock never >/dev/null 2>&1 && fail "lock relock must refuse an unknown choice"
 "$CTL" unlock 2>&1 | grep -q "the lock is off" || fail "unlock must say the lock is off"
 "$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
+# #1177: the swapd pane's read-only lines ride `status` (binary path, daemon word).
+"$CTL" status | expect "d['engines']['swapd']['binaryPath'].endswith('demo-swapd') and d['engines']['swapd']['daemon'] in ('stopped','running','backingOff','refused','schemaMismatch')" || fail "status swapd binary/daemon"
 sleep 4   # first demo snapshot
 N="$("$CTL" fleets | json "sum(len(f['accounts']) for f in d)")"
 [ "$N" -ge 5 ] || fail "expected the demo fleet (>=5 accounts), got $N"
@@ -380,6 +382,8 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs get popup_layout engine_swapd_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_swapd_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
 # A key with no window behind it: a layout swap here would re-lay the
 # pop-out twice and leave ~45 MB resident before the RSS gate (2026-09-10).
+# The demo fleet this run turned on is a catalog pref now (#1177), restart-effect like the engine toggles.
+"$CTL" prefs get mock_mode | expect "d['prefs'][0]['value'] is True and d['prefs'][0]['effect']=='restart' and d['prefs'][0]['section']=='engines'" || fail "prefs get mock_mode"
 "$CTL" prefs set revive_lead_minutes 15 | expect "d['key']=='revive_lead_minutes' and d['value']==15" || fail "prefs set"
 "$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
 "$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"

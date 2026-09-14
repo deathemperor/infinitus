@@ -60,9 +60,10 @@ infinitusctl events [--limit 100]            the app's event log (switches, deat
 infinitusctl stats [--period week]          engineering metrics: commits, lines, PRs, messages by source, sessions, waiting, switches, cost
 infinitusctl perf                            cpuSeconds/rssBytes/heapBytes/threads — sample twice for an idle % and heap growth
 infinitusctl engine  swapd|cliproxy|9router on|off   restarts the app
-infinitusctl proxy                           base URL, key stored?, routing strategy
+infinitusctl proxy                           base URL, key stored?, routing strategy, session affinity
 infinitusctl proxy-key [--url U] < keyfile   key from stdin, never argv; restarts the app
 infinitusctl proxy-routing fill-first|round-robin|weighted-round-robin
+infinitusctl proxy-affinity on|off           a conversation stays on one credential
 ```
 
 `<fleet>` is a key from `fleets`, e.g. `swapd/claude` or `cliproxy/claude`.

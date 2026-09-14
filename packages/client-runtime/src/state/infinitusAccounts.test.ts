@@ -281,8 +281,13 @@ describe("add account and re-login", () => {
     replyShape: "",
   };
 
-  it("offers add on a fleet with the in-app sign-in, never off the engine's name", () => {
+  it("offers add on a fleet with either sign-in shape, never off the engine's name", () => {
     expect(buildFleetSection(fleet({ capabilities: ["addOAuth"] })).canAdd).toBe(true);
+    // swapd, live: the CLI's paste-code flow, and no addOAuth (#1213).
+    expect(
+      buildFleetSection(fleet({ engineID: "swapd", capabilities: ["addCurrent", "addToken"] }))
+        .canAdd,
+    ).toBe(true);
     expect(buildFleetSection(fleet({ engineID: "swapd", capabilities: [] })).canAdd).toBe(false);
     expect(buildFleetSection(fleet({ capabilities: ["addToken"] })).canAdd).toBe(false);
   });
@@ -290,6 +295,9 @@ describe("add account and re-login", () => {
   it("marks a lapsed sign-in whatever the fleet advertises (#1213)", () => {
     const lapsed = account({ usageStatus: "relogin_required" });
     expect(rowAt(fleet({ capabilities: ["addOAuth"], accounts: [lapsed] })).reloginNeeded).toBe(
+      true,
+    );
+    expect(rowAt(fleet({ capabilities: ["addCurrent"], accounts: [lapsed] })).reloginNeeded).toBe(
       true,
     );
     expect(rowAt(fleet({ capabilities: ["addOAuth"] })).reloginNeeded).toBe(false);
