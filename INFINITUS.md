@@ -669,7 +669,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   in `worktreesInFlight` before the reads, so Best-of members starting
   together count each other. Reserving is not refusing (#1190): since
   upstream's staged worktree setup (#11372), `prepareWorktree` only means a
-  worktree *may* be created — a project that is no repository, or a base
+  worktree _may_ be created — a project that is no repository, or a base
   branch naming no commit, runs the thread in the project checkout instead —
   so the refusal is taken once `shouldPrepareWorktree` is final and the
   reservation is given back when it reads false, while the check still sits
