@@ -1674,7 +1674,9 @@ registrations}`, never a token; each registration decoded alone) drawn as
   (`infinitusCapabilityOf`) gets the missing-adapter copy; a config that has not
   arrived waits like a missing snapshot, and Accounts folds every environment's
   answer together with `infinitusCapabilityAcross`. Add account and
-  re-login (#671): a fleet whose capabilities carry `addOAuth` gets "Add
+  re-login (#671): a fleet whose capabilities carry `addOAuth` or
+  `addCurrent` (swapd's CLI paste-code flow — it declares no `addOAuth`,
+  #1213) gets "Add
   account" in its header and "Sign in again" on a `relogin_required` row, both
   native's `add <fleet>` (the sign-in opens on the Mac), then the page polls
   `wait-add --timeout 5` until the app says the flow ended
