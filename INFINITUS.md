@@ -1073,7 +1073,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   "Pending" feed row waits for an echo the timeline only gives at drain.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
-- `apps/mobile/src/features/home/HomeHeader.tsx` — its
+- `apps/mobile/src/features/home/HomeHeader.tsx` — the header's
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
 - `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's

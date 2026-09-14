@@ -26,9 +26,9 @@ interface Watched {
  * switch, every account exhausted — each with one Open action to
  * /accounts. Nothing
  * from the first snapshot after mount (no replay on reload), nothing twice
- * (by the server's id), and a line the app re-emits unchanged only once. It
- * shares the sidebar accounts pill's subscription; on a page without the pill
- * this hook is what keeps the fast poll and the client-activity lease running.
+ * (by the server's id), and a line the app re-emits unchanged only once. It is
+ * the web's one always-on snapshot subscriber, so it is what keeps the fast
+ * poll and the client-activity lease running whatever page is open.
  */
 export function useInfinitusEventToasts(): void {
   const environment = usePrimaryEnvironment();
