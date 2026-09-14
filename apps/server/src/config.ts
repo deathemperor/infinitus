@@ -43,6 +43,8 @@ export interface ServerDerivedPaths {
   readonly browserArtifactsDir: string;
   readonly logsDir: string;
   readonly serverLogPath: string;
+  /** The backend's own log file (#1182); `serverLogPath` is a boot service's stdout. */
+  readonly serverLogNdjsonPath: string;
   readonly serverTracePath: string;
   readonly providerLogsDir: string;
   readonly providerEventLogPath: string;
@@ -132,6 +134,7 @@ export const deriveServerPaths = Effect.fn(function* (
     browserArtifactsDir: join(stateDir, "browser-artifacts"),
     logsDir,
     serverLogPath: join(logsDir, "server.log"),
+    serverLogNdjsonPath: join(logsDir, "server.log.ndjson"),
     serverTracePath: join(logsDir, "server.trace.ndjson"),
     providerLogsDir,
     providerEventLogPath: join(providerLogsDir, "events.log"),

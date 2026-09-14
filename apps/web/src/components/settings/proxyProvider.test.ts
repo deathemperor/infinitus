@@ -1,3 +1,5 @@
+import type { CustomModelEntry } from "@t3tools/contracts";
+import { readCustomModelEntries } from "@t3tools/shared/model";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -45,12 +47,27 @@ describe("proxyProvider", () => {
   it("lists the picker models after any custom models already typed", () => {
     expect(applyProxyDraft(filled, "id", { customModels: ["a"] }).config.customModels).toEqual([
       "a",
-      "kr/gpt-5.6-sol",
-      "kr/claude-opus-5",
+      { slug: "kr/gpt-5.6-sol", capabilities: expect.anything() },
+      { slug: "kr/claude-opus-5", capabilities: expect.anything() },
     ]);
     expect(applyProxyDraft({ ...filled, pickerModels: [] }, "id", {}).config).not.toHaveProperty(
       "customModels",
     );
+  });
+
+  it("gives every picked model the Claude effort descriptor, so the composer shows it", () => {
+    const [added] = applyProxyDraft({ ...filled, pickerModels: ["kr/x"] }, "id", {}).config
+      .customModels as ReadonlyArray<CustomModelEntry>;
+    const descriptors = readCustomModelEntries([added])[0]?.capabilities?.optionDescriptors ?? [];
+    const effort = descriptors.find((descriptor) => descriptor.id === "effort");
+    expect(effort?.type).toBe("select");
+    expect(effort?.type === "select" ? effort.options.map((option) => option.id) : []).toEqual([
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ]);
   });
 
   it("skips picker models the instance already lists, as a slug or an object", () => {

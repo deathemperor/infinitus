@@ -667,7 +667,14 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   its worktree) and the setting. The direct `vcs.createWorktree` RPC runs the
   same check (refused as a `GitCommandError`), and bootstraps reserve a slot
   in `worktreesInFlight` before the reads, so Best-of members starting
-  together count each other. Settings → General "Worktree limit"
+  together count each other. Reserving is not refusing (#1190): since
+  upstream's staged worktree setup (#11372), `prepareWorktree` only means a
+  worktree _may_ be created — a project that is no repository, or a base
+  branch naming no commit, runs the thread in the project checkout instead —
+  so the refusal is taken once `shouldPrepareWorktree` is final and the
+  reservation is given back when it reads false, while the check still sits
+  above the `thread.create` so an over-limit send costs no thread.
+  Settings → General "Worktree limit"
   (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
   `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
   `server.test.ts`, `settings.test.ts`.
@@ -823,6 +830,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service; a
   `Layer.mock(InfinitusPairing)` and a `Layer.mock(CaptureStore)` beside it.
+- `apps/server/src/serverLogger.ts` — `ServerLoggerLive` adds the fork's file
+  logger (`infinitus/serverLogFile.ts`, below) beside `consolePretty` and
+  `tracerLogger` (#1182); `apps/server/src/config.ts` — `serverLogNdjsonPath`
+  (`<logsDir>/server.log.ndjson`) on `ServerDerivedPaths` beside upstream's
+  `serverLogPath`; `apps/server/src/cli/triage.ts` and `triagePrompt.ts` —
+  the path in the triage context so `t3 triage` names it.
 - `apps/server/src/http.ts` — the `/.well-known/t3/environment` handler passes
   the descriptor through `withAlternateHttpBaseUrls` (#663).
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`
@@ -1907,6 +1920,20 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   path. A standalone helper is left alone whatever its version; one that
   reports no `bundlePath` only has its skew logged
   (`infinitus.companion.skew-unarmed`).
+- `apps/server/src/infinitus/serverLogFile.ts` (+ test) — the backend's own
+  log file (#1182). Upstream keeps a server's log lines only through whoever
+  started it: a boot service redirects stdout into `server.log`
+  (`cloud/bootService.ts`) and the desktop's main process drains the child's
+  pipes into `server-child.log` — which the packaged desktop stopped
+  receiving, while `server.trace.ndjson` holds spans only (a log becomes a
+  span event only inside a sampled span). So `ServerLoggerLive` also writes
+  `<logsDir>/server.log.ndjson`, whoever spawned the process: one
+  `Logger.formatJson` record per line, batched (1 s, flushed when the layer's
+  scope closes) into the shared `RotatingFileSink` (10 MiB × 10, the trace
+  file's sizing). A separate file from `serverLogPath` on purpose — a boot
+  service redirects stdout there, and writing both would put every line in
+  that file twice, in two formats. A sink that cannot write swallows it: a
+  log file is never worth failing a turn over.
 - `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+
   `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins for
   the threads this server runs (#1076), the fork's counterpart to the Mac's

@@ -203,6 +203,7 @@ export const triageCommand = Command.make("triage", {
             settingsPath: paths.settingsPath,
             logsDir: paths.logsDir,
             serverLogPath: paths.serverLogPath,
+            serverLogNdjsonPath: paths.serverLogNdjsonPath,
             serverTracePath: paths.serverTracePath,
             providerEventLogPath: paths.providerEventLogPath,
             terminalLogsDir: paths.terminalLogsDir,
