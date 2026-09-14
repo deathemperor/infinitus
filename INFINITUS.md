@@ -83,8 +83,9 @@ makes wrong, in its own PR.
   `notes` job checks before anything is built), `--prerelease` iff the version carries a prerelease tag, then
   bumps the cask from the standalone zip. The tag must equal
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
-  published). Installed menu bar apps poll `releases/latest` and the
-  `nightly` tag: `latest` becomes the one-app release with the first plain
+  published). The site's installer and the cask read `releases/latest`
+  and the `nightly` tag (the menu bar app's own poll left with its About
+  pane, #1237): `latest` becomes the one-app release with the first plain
   version; `nightly` is `infinitus-nightly.yml`'s rolling build of the
   whole product (#1042): the same build jobs, called (`workflow_call`)
   every night at 17:17 UTC with `<VERSION>-infinitus-nightly.<yyyymmdd>.<run>`
