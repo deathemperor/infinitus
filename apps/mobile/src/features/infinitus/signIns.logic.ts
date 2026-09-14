@@ -1,12 +1,13 @@
-import type { InfinitusCommandInput } from "@t3tools/contracts/infinitus";
+import type { InfinitusCommandInput, InfinitusSecretInput } from "@t3tools/contracts/infinitus";
 import type { InfinitusAwsLogin, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 
-/** One lapsed sign-in as the phone shows it (#572 task 7). Through the fork's
-    RPC only two of the Mac's flows are reachable: the device-code flow (the
-    Mac prints a URL and a code, finishes by itself once approved on any
-    device) and `--local` (the Mac opens its own browser). The relay and
-    `--remote` flows need a callback URL or a code fed to the Mac over stdin,
-    which the RPC deliberately never carries. */
+/** One lapsed sign-in as the phone shows it (#572 task 7). Three of the Mac's
+    flows reach the phone: the device-code flow (the Mac prints a URL and a
+    code, finishes by itself once approved on any device), the relay flow (the
+    CLI redirects to a loopback port, which this phone binds itself — see
+    `loopbackCatch.ts` — and hands back over `infinitus.secret`), and `--local`
+    (the Mac opens its own browser). `--remote` wants a code typed back into
+    the Mac and has no phone surface. */
 export interface SignInModel {
   readonly key: string;
   readonly profile: string;
@@ -17,6 +18,8 @@ export interface SignInModel {
   readonly url: string | null;
   /** The code the page asks for (device-code flow). */
   readonly userCode: string | null;
+  /** The loopback port the relay flow's CLI redirects to, when it is one. */
+  readonly callbackPort: number | null;
   readonly message: string | null;
 }
 
@@ -55,6 +58,7 @@ export function signInModel(item: InfinitusAwsLogin): SignInModel {
     phase: phaseOf(item),
     url: item.state?.url ?? null,
     userCode: item.state?.userCode ?? null,
+    callbackPort: item.state?.callbackPort ?? null,
     message: item.state?.message ?? null,
   };
 }
@@ -84,12 +88,33 @@ export function signInHeadline(item: SignInModel): string {
   return `Expired ${item.providerLabel} credentials for ${item.profile}.`;
 }
 
-/** Start the sign-in on the Mac's own browser: `aws-login <profile> --local`
-    (`gcloud-login` for gcloud). */
-export function startSignInCommand(item: SignInModel): InfinitusCommandInput {
+/** Start the sign-in: `aws-login <profile>` (`gcloud-login` for gcloud).
+    `catching` says this phone can answer the CLI's loopback redirect, so the
+    Mac is left to pick its own flow — the relay one for gcloud and for a
+    plain AWS profile. Without a catcher that redirect would dead-end in the
+    phone's browser, so `--local` sends the person to the Mac instead. */
+export function startSignInCommand(item: SignInModel, catching: boolean): InfinitusCommandInput {
   return {
     command: item.provider === "gcloud" ? "gcloud-login" : "aws-login",
     args: [item.profile],
-    options: { local: "true" },
+    options: catching ? {} : { local: "true" },
   };
+}
+
+/** The loopback port this phone would bind to finish the row's login, or null
+    when the Mac's flow does not redirect to one (the device-code flow, a login
+    the Mac has not started yet, an app too old to report the port). */
+export function signInCallbackPort(item: SignInModel): number | null {
+  const port = item.callbackPort;
+  if (port === null || !Number.isInteger(port) || port <= 0 || port > 65535) return null;
+  return port;
+}
+
+/** Hand the intercepted redirect to the Mac: `aws-login-callback <profile>`
+    with the whole URL on stdin (one verb for both CLIs — the Mac reads the
+    outstanding login to know whose listener to replay it against). The URL
+    carries the authorization code, which is why it travels as a secret and
+    never as an argument. */
+export function signInCallbackSecretArgs(item: SignInModel): Omit<InfinitusSecretInput, "secret"> {
+  return { command: "aws-login-callback", args: { profile: item.profile } };
 }

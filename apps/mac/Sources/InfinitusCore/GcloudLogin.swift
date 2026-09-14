@@ -12,8 +12,9 @@ import Foundation
 /// Two flows for the phone. `.relay` (#403): plain `gcloud auth login`
 /// with the browser suppressed keeps the CLI's own listener on
 /// `http://localhost:8085/` (gcloud 552, verified 2026-09-09); the
-/// phone's web view is the browser and hands the final redirect to the
-/// Mac, which replays it against that listener — one tap plus Google's
+/// phone opens the page in its own browser while binding that port on
+/// its own loopback, and hands the intercepted redirect to the Mac,
+/// which replays it against the CLI's listener — one tap plus Google's
 /// consent screen. `.remote`: `--no-launch-browser` prints a URL and
 /// waits for the verification code the browser shows after sign-in,
 /// paste-back. `.local` is the plain command with this Mac's browser.

@@ -1,7 +1,14 @@
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
-import { lapsedSignIns, signInHeadline, signInModel, startSignInCommand } from "./signIns.logic";
+import {
+  lapsedSignIns,
+  signInCallbackPort,
+  signInCallbackSecretArgs,
+  signInHeadline,
+  signInModel,
+  startSignInCommand,
+} from "./signIns.logic";
 
 const base: InfinitusSnapshot = { available: true, fleets: [], commands: [] };
 
@@ -115,16 +122,53 @@ describe("signInHeadline / startSignInCommand", () => {
     );
   });
 
-  it("starts the Mac's local flow, gcloud through its own verb, with no session scope", () => {
-    expect(startSignInCommand(item)).toEqual({
+  it("sends the person to the Mac's own browser when this phone cannot catch the redirect", () => {
+    expect(startSignInCommand(item, false)).toEqual({
       command: "aws-login",
       args: ["papaya"],
       options: { local: "true" },
     });
-    expect(startSignInCommand({ ...item, provider: "gcloud" })).toEqual({
+    expect(startSignInCommand({ ...item, provider: "gcloud" }, false)).toEqual({
       command: "gcloud-login",
       args: ["papaya"],
       options: { local: "true" },
+    });
+  });
+
+  it("leaves the Mac its own flow — the relay one — when the phone can catch the redirect", () => {
+    expect(startSignInCommand(item, true)).toEqual({
+      command: "aws-login",
+      args: ["papaya"],
+      options: {},
+    });
+  });
+});
+
+describe("signInCallbackPort / signInCallbackSecretArgs", () => {
+  const item = signInModel({ profile: "papaya", flow: "relay" });
+
+  it("takes the port the relay flow reported", () => {
+    expect(signInCallbackPort({ ...item, callbackPort: 8085 })).toBe(8085);
+    expect(signInCallbackPort({ ...item, callbackPort: 60861 })).toBe(60861);
+  });
+
+  it("answers null for a flow with no loopback redirect and for nonsense", () => {
+    // A device-code login, a login the Mac has not started, or an app too old
+    // to report the port: there is nothing for this phone to bind.
+    expect(signInCallbackPort(item)).toBeNull();
+    expect(signInCallbackPort({ ...item, callbackPort: 0 })).toBeNull();
+    expect(signInCallbackPort({ ...item, callbackPort: 70000 })).toBeNull();
+    expect(signInCallbackPort({ ...item, callbackPort: 8085.5 })).toBeNull();
+  });
+
+  it("hands the Mac one verb for both CLIs, the URL never an argument", () => {
+    expect(signInCallbackSecretArgs(item)).toEqual({
+      command: "aws-login-callback",
+      args: { profile: "papaya" },
+    });
+    expect(signInCallbackSecretArgs({ ...item, provider: "gcloud" })).toEqual({
+      command: "aws-login-callback",
+      args: { profile: "papaya" },
     });
   });
 });

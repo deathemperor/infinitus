@@ -1,4 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
+import * as Redacted from "effect/Redacted";
+import * as WebBrowser from "expo-web-browser";
 import { useMemo, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 
@@ -15,8 +17,16 @@ import {
   infinitusMacs,
 } from "../accounts/accountsRoute.logic";
 import {
+  awaitLoopbackRedirect,
+  listenForLoopbackRedirect,
+  loopbackCatchSupported,
+  stopLoopbackCatch,
+} from "./loopbackCatch";
+import {
   lapsedSignIns,
   type SignInModel,
+  signInCallbackPort,
+  signInCallbackSecretArgs,
   signInHeadline,
   startSignInCommand,
 } from "./signIns.logic";
@@ -56,15 +66,61 @@ function MacSignIns(props: { readonly mac: InfinitusMac }) {
 function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInModel }) {
   const { mac, item } = props;
   const run = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The relay flow's redirect can be answered here (`loopbackCatch.ts`), so the
+  // Mac is left to start its own flow rather than being sent to its browser.
+  const catchPort = loopbackCatchSupported ? signInCallbackPort(item) : null;
 
   const start = async () => {
     setBusy(true);
     setError(null);
-    const result = await run({ environmentId: mac.environmentId, input: startSignInCommand(item) });
+    const result = await run({
+      environmentId: mac.environmentId,
+      input: startSignInCommand(item, loopbackCatchSupported),
+    });
     setBusy(false);
     if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
+  };
+
+  /** Open the sign-in page with this phone listening on the port the CLI
+      redirects to, and hand the Mac the whole intercepted URL. The sheet stays
+      in the app, so the catch happens while it is still up; dismissing it
+      cancels the wait and gives the port back. */
+  const openCatching = async (url: string, port: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await listenForLoopbackRedirect(port);
+    } catch (cause) {
+      setBusy(false);
+      setError(cause instanceof Error ? cause.message : `Could not listen on port ${port}.`);
+      return;
+    }
+    const redirect = awaitLoopbackRedirect();
+    void WebBrowser.openBrowserAsync(url).finally(() => void stopLoopbackCatch());
+    const caught = await redirect;
+    void WebBrowser.dismissBrowser();
+    if (caught === null) {
+      setBusy(false);
+      return;
+    }
+    const answer = await runSecret({
+      environmentId: mac.environmentId,
+      input: { ...signInCallbackSecretArgs(item), secret: Redacted.make(caught) },
+    });
+    setBusy(false);
+    if (answer._tag !== "Success") setError(commandFailureMessage(answer.cause));
+  };
+
+  const openPage = (url: string) => {
+    if (catchPort === null) {
+      void Linking.openURL(url);
+      return;
+    }
+    void openCatching(url, catchPort);
   };
 
   return (
@@ -73,8 +129,10 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
       <Text className="text-xs text-warning-foreground">
         {item.phase === "starting"
           ? `${mac.label} is starting the sign-in…`
-          : item.phase === "waiting" && item.url
-            ? "Open the sign-in page; the Mac finishes by itself once you approve."
+          : item.phase === "waiting" && item.url !== null
+            ? catchPort !== null
+              ? "Open the sign-in page here — this phone hands the result back to the Mac."
+              : "Open the sign-in page; the Mac finishes by itself once you approve."
             : item.phase === "waiting"
               ? `${mac.label} is waiting for the sign-in to finish in its browser.`
               : item.phase === "failed"
@@ -87,13 +145,16 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
         </Text>
       ) : null}
       <View className="flex-row flex-wrap items-center gap-2">
-        {item.url ? (
+        {item.url !== null ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => void Linking.openURL(item.url ?? "")}
+            disabled={busy}
+            onPress={() => openPage(item.url ?? "")}
             className="rounded-full bg-primary px-4 py-2 active:opacity-70"
           >
-            <Text className="text-sm font-t3-bold text-primary-foreground">Open sign-in page</Text>
+            <Text className="text-sm font-t3-bold text-primary-foreground">
+              {busy && catchPort !== null ? "Waiting for the sign-in…" : "Open sign-in page"}
+            </Text>
           </Pressable>
         ) : null}
         {item.phase === "idle" || item.phase === "failed" ? (
