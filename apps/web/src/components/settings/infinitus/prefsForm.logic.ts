@@ -182,6 +182,15 @@ export const PREF_COPY: Readonly<
     description:
       "A named tunnel's hostname, so the URL survives a restart. Empty takes a fresh quick-tunnel URL each time.",
   },
+  // Devices: this Mac's name, the APNs key ids and iCloud sync (#1178). The
+  // .p8 itself goes over `apns-key`, never a pref, so no row for it here.
+  machine_name: {
+    label: "This Mac's name",
+    description: "How the phone and this server name the Mac. Empty follows the computer name.",
+  },
+  apns_team_id: { label: "APNs team ID" },
+  apns_key_id: { label: "APNs key ID", description: "The 10-character id of the push key." },
+  icloud_sync: { label: "Sync settings via iCloud Drive" },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
