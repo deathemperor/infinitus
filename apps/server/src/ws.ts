@@ -1246,18 +1246,14 @@ const makeWsRpcLayer = (
             });
 
           const bootstrapProgram = Effect.gen(function* () {
-            // Fork (#269 H): the worktree limit is checked before anything is
-            // created, so an over-limit send costs no thread.
+            // Fork (#269 H): the slot is reserved before the reads, so members
+            // started together see each other. Reserving is not yet refusing:
+            // `prepareWorktree` only means a worktree *may* be created, and the
+            // reads below can still send the thread to the project checkout
+            // (#1190). The cap is checked once that is settled, and the
+            // reservation released here if it is not.
             if (bootstrap?.prepareWorktree) {
-              // Reserved before the reads, so members started together see each other.
               worktreesInFlight.add(command.threadId);
-              const refusal = yield* worktreeCapRefusalNow(1);
-              if (refusal !== null) {
-                worktreesInFlight.delete(command.threadId);
-                return yield* Effect.fail(
-                  new OrchestrationDispatchCommandError({ message: refusal }),
-                );
-              }
             }
             const prepareWorktree = bootstrap?.prepareWorktree;
             let shouldPrepareWorktree = prepareWorktree
@@ -1331,6 +1327,9 @@ const makeWsRpcLayer = (
             if (prepareWorktree && !shouldPrepareWorktree) {
               // Not a git repo, or the base has no commit: the thread runs in
               // the project checkout instead. The card says so and moves on.
+              // It takes no worktree, so it gives its slot back before members
+              // started alongside it read the count (#1190).
+              worktreesInFlight.delete(command.threadId);
               yield* track(
                 worktreeSetupTracker.update(threadId, (snapshot) => ({
                   ...snapshot,
@@ -1341,6 +1340,20 @@ const makeWsRpcLayer = (
                   ),
                 })),
               );
+            }
+
+            // Fork (#269 H): the limit is checked once `shouldPrepareWorktree`
+            // is final and still above the create, so an over-limit send costs
+            // no thread and a fallback to the project checkout is never refused
+            // over a worktree it was not going to take (#1190).
+            if (prepareWorktree && shouldPrepareWorktree) {
+              const refusal = yield* worktreeCapRefusalNow(1);
+              if (refusal !== null) {
+                worktreesInFlight.delete(command.threadId);
+                return yield* Effect.fail(
+                  new OrchestrationDispatchCommandError({ message: refusal }),
+                );
+              }
             }
 
             if (bootstrap?.createThread) {

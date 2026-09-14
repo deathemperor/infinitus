@@ -11906,6 +11906,15 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         const dispatchedCommands: Array<OrchestrationCommand> = [];
         yield* buildAppUnderTest({
           layers: {
+            // The cap only applies to a bootstrap that is really going to
+            // create a worktree (#1190), so the project must read as a git
+            // repository whose base branch names a commit.
+            vcsDriver: {
+              isInsideWorkTree: () => Effect.succeed(true),
+            },
+            gitVcsDriver: {
+              execute: () => Effect.succeed(SUCCESSFUL_GIT_EXECUTION),
+            },
             serverSettings: {
               getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, worktreeMaxCount: 2 }),
             },
@@ -11978,6 +11987,91 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.include(result.failure.message, "Old spike");
         assert.strictEqual(result.failure.bootstrapThreadDisposition, undefined);
         assert.deepEqual(dispatchedCommands, []);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "lets a bootstrap that falls back to the project checkout past the worktree limit (#1190)",
+    () =>
+      Effect.gen(function* () {
+        const dispatchedCommands: Array<OrchestrationCommand> = [];
+        // The default driver reads the project as no repository at all, which
+        // is one of the two ways upstream's staged setup falls back to the
+        // project checkout. Such a thread takes no worktree, so the cap has
+        // nothing to refuse however many the user already holds.
+        yield* buildAppUnderTest({
+          layers: {
+            serverSettings: {
+              getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, worktreeMaxCount: 2 }),
+            },
+            projectionSnapshotQuery: {
+              getWorktreeHolders: () =>
+                Effect.succeed({
+                  count: 2,
+                  oldestArchived: [
+                    {
+                      threadId: ThreadId.make("thread-old"),
+                      title: "Old spike",
+                      archivedAt: "2026-01-01T00:00:00.000Z",
+                    },
+                  ],
+                }),
+            },
+            orchestrationEngine: {
+              dispatch: (command) => {
+                dispatchedCommands.push(command);
+                return Effect.succeed({ sequence: dispatchedCommands.length });
+              },
+              readEvents: () => Stream.empty,
+            },
+          },
+        });
+
+        const createdAt = "2026-01-01T00:00:00.000Z";
+        const wsUrl = yield* getWsServerUrl("/ws");
+        const result = yield* Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[ORCHESTRATION_WS_METHODS.dispatchCommand]({
+              type: "thread.turn.start",
+              commandId: CommandId.make("cmd-bootstrap-worktree-fallback"),
+              threadId: ThreadId.make("thread-bootstrap-worktree-fallback"),
+              message: {
+                messageId: MessageId.make("msg-bootstrap-worktree-fallback"),
+                role: "user",
+                text: "hello",
+                attachments: [],
+              },
+              modelSelection: defaultModelSelection,
+              runtimeMode: "full-access",
+              interactionMode: "default",
+              bootstrap: {
+                createThread: {
+                  projectId: defaultProjectId,
+                  title: "Bootstrap Thread",
+                  modelSelection: defaultModelSelection,
+                  runtimeMode: "full-access",
+                  interactionMode: "default",
+                  branch: "main",
+                  worktreePath: null,
+                  createdAt,
+                },
+                prepareWorktree: {
+                  projectCwd: "/tmp/project",
+                  baseBranch: "main",
+                  branch: "t3code/bootstrap-fallback",
+                },
+                runSetupScript: false,
+              },
+              createdAt,
+            }),
+          ).pipe(Effect.result),
+        );
+
+        assertTrue(result._tag === "Success");
+        assert.deepEqual(
+          dispatchedCommands.map((dispatched) => dispatched.type),
+          ["thread.create", "thread.turn.start"],
+        );
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
