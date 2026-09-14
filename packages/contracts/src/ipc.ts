@@ -101,6 +101,8 @@ import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import type {
   InfinitusDesktopPrefs,
+  InfinitusOAuthSignInInput,
+  InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
   InfinitusSignInWindowInput,
@@ -1362,6 +1364,16 @@ export interface DesktopBridge {
   submitInfinitusSignInCode?: (
     input: InfinitusSignInCodeInput,
   ) => Promise<InfinitusSignInCodeResult>;
+  /**
+   * Fork (#1213): a sign-in this shell runs itself, through the engine's
+   * `add-oauth`. One promise for the whole flow: it settles when the account
+   * is stored or the engine refused. Optional: without them the page falls
+   * back to the #677 flow, then to the sign-in on the Mac.
+   */
+  beginInfinitusOAuthSignIn?: (
+    input: InfinitusOAuthSignInInput,
+  ) => Promise<InfinitusOAuthSignInResult>;
+  cancelInfinitusOAuthSignIn?: (flowId: string) => Promise<void>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   /** Optional while older desktop shells can host a newer web client. */
   pickProjectFavicon?: (initialPath?: string) => Promise<string | null>;

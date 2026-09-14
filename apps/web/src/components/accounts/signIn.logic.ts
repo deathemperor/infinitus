@@ -1,6 +1,8 @@
 import type { DesktopBridge } from "@t3tools/contracts";
 import type {
   InfinitusCommandInput,
+  InfinitusOAuthSignInInput,
+  InfinitusOAuthSignInResult,
   InfinitusSecretInput,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
@@ -38,9 +40,15 @@ export const SignInPhase = Schema.Literals([
 ]);
 export type SignInPhase = typeof SignInPhase.Type;
 
+/** Which half runs a flow: the menu-bar app's (#677, `signin-begin` polled
+    over the socket) or this shell's own, through the engine's `add-oauth`
+    (#1213). They start, cancel and end differently, so a flow says which. */
+export type SignInKind = "app" | "shell";
+
 /** One sign-in this page started: which fleet, who to sign in again as (or
     null for a new account), the app's flow and where it stands. */
 export interface SignInFlow {
+  readonly kind: SignInKind;
   readonly fleetKey: string;
   readonly target: string | null;
   readonly flowId: string | null;
@@ -77,6 +85,58 @@ export function signInBridge(bridge: Partial<DesktopBridge> | undefined): SignIn
     open: bridge.openInfinitusSignIn,
     close: bridge.closeInfinitusSignIn,
     submitCode: bridge.submitInfinitusSignInCode,
+  };
+}
+
+/** The engine whose own `add-oauth` the desktop shell can run (#1213). The
+    proxy engine declares `addOAuth` too, but its sign-in is not a loopback
+    OAuth flow the shell could catch, so only this one takes the path. */
+const SHELL_OAUTH_ENGINE_ID = "swapd";
+
+export function fleetRunsShellOAuth(engineID: string): boolean {
+  return engineID === SHELL_OAUTH_ENGINE_ID;
+}
+
+/** The desktop shell's own sign-in, when this is the desktop and it is new
+    enough to carry it (#1213); anything else has no shell path. */
+export interface OAuthSignInBridge {
+  readonly begin: (input: InfinitusOAuthSignInInput) => Promise<InfinitusOAuthSignInResult>;
+  readonly cancel: (flowId: string) => Promise<void>;
+}
+
+export function oauthSignInBridge(
+  bridge: Partial<DesktopBridge> | undefined,
+): OAuthSignInBridge | null {
+  if (bridge?.beginInfinitusOAuthSignIn === undefined) return null;
+  if (bridge.cancelInfinitusOAuthSignIn === undefined) return null;
+  return { begin: bridge.beginInfinitusOAuthSignIn, cancel: bridge.cancelInfinitusOAuthSignIn };
+}
+
+/** The child window's title for a sign-in the shell runs. */
+export function shellOAuthWindowLabel(fleetKey: string, target: string | null): string {
+  return target === null ? `Sign in to ${fleetKey}` : `Sign in as ${target}`;
+}
+
+/** Which sign-in a fleet's section draws. `inApp` is a flow this client runs —
+    the shell's own `add-oauth` (#1213) or the app's in-app sign-in (#677) —
+    and `canAdd` the older hand-off to the Mac (#672). The shell's path asks the
+    app for nothing, so the `addOAuth` capability does not gate it: a fleet that
+    never advertised it is the case #1213 exists for. */
+export function fleetSignInGate(input: {
+  /** This shell can run this fleet's own `add-oauth`. */
+  readonly shellOAuth: boolean;
+  /** The running build lists `signin-begin`. */
+  readonly offers: boolean;
+  /** This client can show the app's flow itself. */
+  readonly inApp: boolean;
+  /** The running build lists `add`. */
+  readonly offersAdd: boolean;
+  /** The fleet advertises `addOAuth`. */
+  readonly canAdd: boolean;
+}): { readonly inApp: boolean; readonly canAdd: boolean } {
+  return {
+    inApp: input.shellOAuth || (input.offers && input.inApp && input.canAdd),
+    canAdd: !input.offers && !input.shellOAuth && input.offersAdd && input.canAdd,
   };
 }
 

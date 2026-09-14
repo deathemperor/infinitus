@@ -47,8 +47,9 @@ export interface AccountRowModel {
   readonly scoped: ReadonlyArray<UsageWindowBar>;
   readonly freshness: string | null;
   readonly actions: ReadonlyArray<AccountAction>;
-  /** The engine says the stored sign-in expired and the fleet can run a new
-      one: the row offers "Sign in again" (native's "Sign-In Needed" chip). */
+  /** The engine says the stored sign-in expired (native's "Sign-In Needed"
+      chip). Whether a new one can be *run* is the page's to decide: the app's
+      own flow needs the fleet's `addOAuth`, the shell's own does not (#1213). */
   readonly reloginNeeded: boolean;
 }
 
@@ -57,6 +58,11 @@ export interface AccountRowModel {
 export interface FleetSectionModel {
   readonly key: string;
   readonly title: string;
+  /** The fleet's own provider and engine names, as the app reports them. A
+      sign-in run outside the app needs both: the provider names the flow to
+      run, the engine says which engine would run it. */
+  readonly provider: string;
+  readonly engineID: string;
   readonly caveat: string | null;
   readonly rows: ReadonlyArray<AccountRowModel>;
   /** The fleet runs an in-app sign-in (`add <fleet>`), so the section offers
@@ -227,7 +233,7 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
     scoped,
     freshness: freshnessLabel(account),
     actions: rowActions(fleet, account),
-    reloginNeeded: fleetCanAdd(fleet) && account.usageStatus === RELOGIN_USAGE_STATUS,
+    reloginNeeded: account.usageStatus === RELOGIN_USAGE_STATUS,
   };
 }
 
@@ -288,6 +294,8 @@ export function buildFleetSection(fleet: InfinitusFleet): FleetSectionModel {
     key: fleet.key,
     title:
       fleet.provider === fleet.engineID ? fleet.provider : `${fleet.provider} (${fleet.engineID})`,
+    provider: fleet.provider,
+    engineID: fleet.engineID,
     caveat: fleet.caveat ?? null,
     rows: [...fleet.accounts]
       .sort((left, right) => left.number - right.number)
