@@ -609,7 +609,13 @@ PCT="$(python3 -c "print(round(($B-$A)/$WINDOW_S*100,1))")"
 GROWTH="$(python3 -c "print(int(($HEAP_B-$HEAP_A)*60/$WINDOW_S))")"
 echo "idle CPU with pop-out open (rpg + ember): ${PCT}%  rss: ${RSS} MB  heap growth: ${GROWTH} KB/min  (budgets ${IDLE_BUDGET_PCT}% / ${RSS_BUDGET_MB} MB / ${GROWTH_BUDGET_KB_MIN} KB/min)"
 idle_cpu_ok "idle CPU" "$PCT" "$WINDOW_S"
-[ "$RSS" -le "$RSS_BUDGET_MB" ] || fail "RSS ${RSS} MB over budget ${RSS_BUDGET_MB} MB"
+# An RSS failure prints where the pages are (#1204): IOSurface / CoreAnimation
+# regions say "screen-sized layers", MALLOC says "heap" — the next one is
+# diagnosable from the log alone. Diagnostic only; the budget is unchanged.
+[ "$RSS" -le "$RSS_BUDGET_MB" ] || {
+    echo "--- vmmap --summary $APP_PID"; vmmap --summary "$APP_PID" 2>/dev/null | sed -n '/REGION TYPE/,/TOTAL/p' | head -60
+    fail "RSS ${RSS} MB over budget ${RSS_BUDGET_MB} MB"
+}
 [ "$GROWTH" -le "$GROWTH_BUDGET_KB_MIN" ] || fail "idle heap growth ${GROWTH} KB/min over budget ${GROWTH_BUDGET_KB_MIN} KB/min"
 
 # --- no lease (#223 phase 5) --------------------------------------------
