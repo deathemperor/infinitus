@@ -469,6 +469,7 @@ private let addAccountFooter =
         w.level = .floating
         authWindow = w
         w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
         // ALWAYS the sheet: it does passkeys AND passwords. The
         // saved-session auto-routing sent a passkey account into the
         // private window — where WebAuthn can never run — and hit the
@@ -478,8 +479,6 @@ private let addAccountFooter =
         // (2026-09-07): Google remembered, but the double sheet flash
         // bothered more than typing the email — reverted the same day.
         startSystemSheet()
-        // The browser route already handed focus to the browser.
-        if browserRoute == nil { NSApp.activate(ignoringOtherApps: true) }
     }
 
     /// The opt-in private window: this account's own isolated session
@@ -626,7 +625,7 @@ private let addAccountFooter =
         } else if let url = authURL {
             openAuthWindow(url)
         }
-        if browserRoute == nil { NSApp.activate(ignoringOtherApps: true) }
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func closeAuthWindow() {
