@@ -129,6 +129,9 @@ public enum PrefCatalog {
         Entry("engine_swapd_enabled", .bool, .bool(true), engines, effect: .restart),
         Entry("engine_cliproxy_enabled", .bool, .bool(false), engines, effect: .restart),
         Entry("engine_9router_enabled", .bool, .bool(false), engines, effect: .restart),
+        // The demo fleet (fabricated accounts, #1177): relaunches like an
+        // engine toggle — the registry is built once at init.
+        Entry("mock_mode", .bool, .bool(false), engines, effect: .restart),
         // About: updates.
         Entry("update_channel", .string, .string("stable"), about, choices: strings(["stable", "nightly"])),
         // Priority: the headroom mode (#616) — `hold` publishes a per-fleet
