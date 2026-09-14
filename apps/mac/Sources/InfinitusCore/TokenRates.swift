@@ -176,11 +176,22 @@ public enum TokenRateScanner {
                 continue
             }
             let complete = data[data.startIndex...lastNewline]
-            autoreleasepool { parseLines(complete, into: &entry, cutoff: cutoff) }
+            drainingPool { parseLines(complete, into: &entry, cutoff: cutoff) }
             entry.offset += complete.count
             if data.count < window { return }   // EOF inside this window
             window = windowBytes
         }
+    }
+
+    /// `autoreleasepool` where Foundation is Objective-C (the Mac app);
+    /// on Linux (the tray) `JSONSerialization` objects are plain Swift
+    /// and freed as they go, so the closure just runs.
+    static func drainingPool<T>(_ body: () throws -> T) rethrows -> T {
+        #if canImport(ObjectiveC)
+        return try autoreleasepool(invoking: body)
+        #else
+        return try body()
+        #endif
     }
 
     private static func parseLines(_ complete: Data.SubSequence, into entry: inout FileEntry, cutoff: Double) {

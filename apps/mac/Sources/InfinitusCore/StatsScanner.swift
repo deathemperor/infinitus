@@ -798,7 +798,7 @@ public enum StatsScanner {
         // detached task, where the pool drains only when the task ends,
         // so every line's `JSONSerialization` objects stayed alive across
         // the whole corpus.
-        autoreleasepool { complete.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
+        TokenRateScanner.drainingPool { complete.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
             guard let base = buf.baseAddress else { return }
             var lineStart = 0
             while lineStart < buf.count {
