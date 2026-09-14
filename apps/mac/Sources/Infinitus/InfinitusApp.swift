@@ -96,7 +96,6 @@ struct InfinitusApp: App {
         let release = AppReleaseModel()
         _appRelease = StateObject(wrappedValue: release)
         release.onUpdate = { [weak model] in model?.appUpdateVersion = $0 }
-        release.onLatest = { [weak model] in model?.appReleaseLatest = $0 }
         release.startAutoCheck()
         // Hoisted out of AboutPane so the phone's `/app/update` route
         // (#121) drives the SAME BrewUpdater as the About pane's button
@@ -184,7 +183,7 @@ struct InfinitusApp: App {
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
                     keywords: ["icloud", "sync", "settings", "drive", "devices",
                                "phone", "iphone", "lan", "bonjour", "companion",
-                               "tailscale", "cloudflare", "tunnel", "pair", "qr"],
+                               "cloudflare", "tunnel"],
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
     ]
     + [

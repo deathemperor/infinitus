@@ -19,9 +19,9 @@ makes wrong, in its own PR.
 - **One API.** The fork talks to Infinitus only over its control socket
   (`ControlProtocol`: one JSON line each way; `infinitusctl manifest` is the
   runtime command table — its reply shapes are prose, so reply schemas are
-  hand-written in `packages/contracts` and validated at the boundary) and
-  the mirror HTTP routes — the same wire the phone and the
-  Linux tray use (inventory: issue #553). Anything missing becomes a new
+  hand-written in `packages/contracts` and validated at the boundary);
+  the phone reaches the Mac through the desktop (inventory: issue #553;
+  the Mac's mirror HTTP server left with #1041). Anything missing becomes a new
   route on the `native` branch, never a second protocol or a read of the
   native app's files.
 - **Upstream merges daily, our history never rebased.** `git fetch upstream

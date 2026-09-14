@@ -733,30 +733,6 @@
       {
         "default": false,
         "effect": "live",
-        "key": "mirror_lan_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": false
-      },
-      {
-        "default": false,
-        "effect": "live",
-        "key": "mirror_tunnel_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": false
-      },
-      {
-        "default": true,
-        "effect": "live",
-        "key": "mirror_rendezvous_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": true
-      },
-      {
-        "default": false,
-        "effect": "live",
         "key": "fork_tunnel_enabled",
         "section": "devices",
         "type": "bool",

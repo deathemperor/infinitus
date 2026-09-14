@@ -162,10 +162,6 @@ export const PREF_COPY: Readonly<
   push_last_alive: { label: "The last alive account nears its limit" },
   push_revived: { label: "An account comes back" },
   revive_lead_minutes: { label: "Revive countdown lead (minutes)" },
-  // Devices.
-  mirror_lan_enabled: { label: "Serve the fleet to my phone" },
-  mirror_tunnel_enabled: { label: "Expose through a Cloudflare quick tunnel" },
-  mirror_rendezvous_enabled: { label: "Publish the current URL to infinitus.run" },
   // Devices: the tunnel fronting this server's own port, which the "Pair a
   // phone" card below hands the QR when the phone is off the Wi‑Fi. The keys
   // are the Mac's (#572) and say "fork"; the screen never does (#823).

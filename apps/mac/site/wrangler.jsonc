@@ -1,8 +1,9 @@
-// infinitus.run — static landing page plus the pairing rendezvous
+// infinitus.run — static landing page plus the download links
 // (src/worker.js) as one Cloudflare Worker. `npx wrangler deploy` from
 // this directory; the custom domain binds automatically (zone must be on
 // the same Cloudflare account). The KV namespace was created once with
-// `npx wrangler kv namespace create RENDEZVOUS`.
+// `npx wrangler kv namespace create RENDEZVOUS` (for the pairing
+// rendezvous, retired with the phone mirror; it now caches the release).
 {
   "name": "infinitus-run",
   "main": "src/worker.js",

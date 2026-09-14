@@ -39,19 +39,6 @@ public struct MirrorDescriptor: Codable, Sendable, Equatable {
         self.appVersion = appVersion; self.capabilities = capabilities
     }
 
-    /// This build's truth.
-    public static func current(machineId: String, label: String, appVersion: String) -> MirrorDescriptor {
-        #if os(macOS)
-        let platform = "macos"
-        #elseif os(Linux)
-        let platform = "linux"
-        #else
-        let platform = "other"
-        #endif
-        return MirrorDescriptor(machineId: machineId, label: label, platform: platform, appVersion: appVersion,
-                                capabilities: Capabilities(leases: true, prefs: true))
-    }
-
     /// The Linux tray's truth (#486 slice 2, `infinitus-tray serve`):
     /// explicit `false` for what the tray doesn't answer, not the nil the
     /// struct also accepts as "unknown", so a phone comparing builds sees a

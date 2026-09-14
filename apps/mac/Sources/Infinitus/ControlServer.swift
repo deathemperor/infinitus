@@ -618,8 +618,8 @@ final class ControlServer {
             malloc_zone_statistics(nil, &stats)
             return ControlReply(ok: true, result: .object([
                 "cpuSeconds": .number(cpu),
-                "leases": .number(Double(model.mirrorServer.leases.clientCount())),
-                "leaseScopes": .object(model.mirrorServer.leases.held().mapValues { .array($0.map { .string($0) }) }),
+                "leases": .number(Double(model.leases.clientCount())),
+                "leaseScopes": .object(model.leases.held().mapValues { .array($0.map { .string($0) }) }),
                 "rssBytes": .number(rss),
                 "heapBytes": .number(Double(stats.size_in_use)),
                 "threads": .number(Double(threadCount)),
@@ -691,7 +691,7 @@ final class ControlServer {
 
         case "client-activity":
             let report = try ControlBody.decode(ClientActivity.Report.self, from: r)
-            model.mirrorServer.leases.report(report)
+            model.leases.report(report)
             return ControlReply(ok: true, result: .object(["clientId": .string(report.clientId)]))
 
         case "crash-report":

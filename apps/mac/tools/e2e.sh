@@ -91,7 +91,7 @@ fail() {
         # the signal (141 SIGPIPE, 143 SIGTERM, 137 SIGKILL).
         # (`|| st=$?`: under set -e a bare non-zero `wait` ends the script before the echo.)
         if /bin/kill -0 "$APP_PID" 2>/dev/null; then echo "--- app alive: $(ps -o pid=,stat=,etime= -p "$APP_PID")"; else st=0; wait "$APP_PID" 2>/dev/null || st=$?; echo "--- app gone: wait status $st"; fi
-        # #1007: what the app did on the way here — the mirror-input and
+        # #1007: what the app did on the way here — the input and
         # hook lines name a released login, a nudge's outcome, a refused
         # write; kind and text only (the feed carries no secret).
         echo "--- events (last 40)"; "$CTL" events --limit 40 2>/dev/null | python3 -c "import json,sys
@@ -211,7 +211,6 @@ STUB
 chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
-export INFINITUS_MIRROR_SNAPSHOT="$SOCKDIR/mirror-snapshot.json"
 # A stub `gcloud` (#367): `auth login --no-launch-browser` prints the
 # SDK's paste-back prompt and reads the code.
 cat >"$SOCKDIR/gcloud" <<'STUB'
@@ -416,7 +415,7 @@ printf 'x' | "$CTL" apns-key 2>&1 | grep -q "apns_key_id" || fail "apns-key must
 pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
 echo "prefs: ok"
 
-# JSON-body verbs (#572 N1): the socket takes what the mirror routes take.
+# JSON-body verbs (#572 N1): the socket takes a JSON body on stdin.
 "$CTL" client-activity --body '{"clientId":"e2e","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":5000}' | expect "d['clientId']=='e2e'" || fail "client-activity"
 "$CTL" perf | expect "d['leaseScopes'].get('e2e')==['fleets']" || fail "perf must name the lease e2e just took (#499)"
 "$CTL" perf | expect "'stats' not in d['leaseScopes'].get('local', [])" || fail "the local client must not hold stats without the Stats pane (#499)"
