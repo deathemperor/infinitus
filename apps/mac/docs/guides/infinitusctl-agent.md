@@ -2,10 +2,12 @@
 
 `infinitusctl` lets a coding agent read and drive the running Infinitus
 app from a shell: which accounts exist, their usage, switch/hold/rename,
-engine on/off, proxy setup, and starting a sign-in. It is bundled at
-`Infinitus.app/Contents/MacOS/infinitusctl` (and `ictl`, the same binary
-under a short name); symlink it onto `$PATH` or
-call it by that path.
+engine on/off, proxy setup, and starting a sign-in. It is bundled inside
+the desktop app's nested menu bar app, at
+`/Applications/Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/infinitusctl`
+(and `ictl`, the same binary under a short name; #1238 retired the
+standalone bundle it used to ship in); symlink it onto `$PATH` or call it
+by that path.
 
 Talks to the app over `~/Library/Application Support/Infinitus/control/control.sock`
 (a 0700 directory owned by you — that is the auth). The app must be running.
