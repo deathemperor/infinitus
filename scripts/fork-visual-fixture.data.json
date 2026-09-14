@@ -784,7 +784,7 @@
         "key": "icloud_sync",
         "section": "devices",
         "type": "bool",
-        "value": false
+        "value": true
       },
       {
         "default": true,

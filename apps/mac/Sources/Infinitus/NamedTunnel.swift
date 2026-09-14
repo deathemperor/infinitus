@@ -4,9 +4,10 @@ import AppKit
 /// Runs `cloudflared tunnel run` for a dashboard-managed Cloudflare
 /// tunnel (#9 remote access, the stable route): the user creates the
 /// tunnel once in Zero Trust (Networks → Tunnels → Cloudflared), points
-/// its public hostname at `http://localhost:47824` there, and pastes the
-/// tunnel token here. Unlike the quick tunnel the hostname is theirs and
-/// never changes, so a phone paired to it survives every restart.
+/// its public hostname at `http://localhost:<port>` there (the desktop
+/// server's port, `fork_server_port`), and pastes the tunnel token here.
+/// Unlike the quick tunnel the hostname is theirs and never changes, so a
+/// phone paired to it survives every restart.
 ///
 /// Two ways to hold the credentials, both invisible to argv:
 ///  - dashboard-managed: the tunnel token in the keychain

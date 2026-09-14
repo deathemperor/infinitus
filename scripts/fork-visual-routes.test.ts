@@ -119,17 +119,17 @@ describe("routeFailures", () => {
       (route) => route.route === "/settings/infinitus/devices",
     )!;
     const port = "[Server port: 3773]";
-    const missing = 'missing "[Publish the current URL to infinitus.run: on]"';
+    const missing = 'missing "[Sync settings via iCloud Drive: on]"';
     // The label alone is what `innerText` captured, and what a switch that
     // never took its pref still draws.
-    expect(routeFailures(devices, `Publish the current URL to infinitus.run ${port}`)).toEqual([
+    expect(routeFailures(devices, `Sync settings via iCloud Drive ${port}`)).toEqual([
       missing,
     ]);
     expect(
-      routeFailures(devices, `[Publish the current URL to infinitus.run: off] ${port}`),
+      routeFailures(devices, `[Sync settings via iCloud Drive: off] ${port}`),
     ).toEqual([missing]);
     expect(
-      routeFailures(devices, `[Publish the current URL to infinitus.run: on] ${port}`),
+      routeFailures(devices, `[Sync settings via iCloud Drive: on] ${port}`),
     ).toEqual([]);
   });
 
@@ -137,7 +137,7 @@ describe("routeFailures", () => {
     const devices = FORK_VISUAL_ROUTES.find(
       (route) => route.route === "/settings/infinitus/devices",
     )!;
-    const on = "[Publish the current URL to infinitus.run: on]";
+    const on = "[Sync settings via iCloud Drive: on]";
     expect(routeFailures(devices, `${on} [Server port: 3,773]`)).toEqual([
       'missing "[Server port: 3773]"',
     ]);
