@@ -11,7 +11,6 @@ import InfinitusCore
 /// shared with the settings scene; nothing about grouping belongs there.
 enum SettingsGroup: String, CaseIterable, Identifiable {
     case general = "General"
-    case accounts = "Accounts"
     case dashboards = "Dashboards"
     case engines = "Engines"
     /// About and the debug Animations pane: last, and under no header —
@@ -29,7 +28,6 @@ enum SettingsGroup: String, CaseIterable, Identifiable {
     static func of(_ tab: SettingsTab) -> SettingsGroup {
         if tab.provider != nil { return .engines }
         switch tab.title {
-        case "Accounts": return .accounts
         case "Usage", "Utilization", "Stats", "Machine", "Activity": return .dashboards
         case "About", "Animations": return .app
         default: return .general

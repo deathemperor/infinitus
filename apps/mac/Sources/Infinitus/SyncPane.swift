@@ -5,10 +5,11 @@ import InfinitusCore
 
 /// Devices: this Mac's name, the Cloudflare tunnel the desktop server
 /// rides, phone alerts (APNs), crash reports, plus settings sync across
-/// Macs (iCloud, file). Was "Sync" — it lived in Display before, which is
-/// the wrong home (user report 2026-08-30): it syncs notify flags and
-/// engine config too, not just display prefs. The phone mirror it once
-/// paired (#9) left with #1041; the phone pairs through the desktop.
+/// Macs (iCloud, file) and account backup (#1179). Was "Sync" — it lived
+/// in Display before, which is the wrong home (user report 2026-08-30):
+/// it syncs notify flags and engine config too, not just display prefs.
+/// The phone mirror it once paired (#9) left with #1041; the phone pairs
+/// through the desktop.
 struct SyncPane: View {
     @ObservedObject var sync: SettingsSyncModel
     @ObservedObject var app: AppModel
@@ -108,6 +109,14 @@ struct SyncPane: View {
                      + "preferences, custom themes and engine settings. Never "
                      + "credentials, never push secrets.")
                     .font(.caption2).foregroundStyle(.secondary)
+            }
+            // Account backup lived in the Accounts pane until #1179
+            // retired it; a file panel over the keychain-backed store
+            // is the one account action that cannot leave the Mac.
+            ForEach(app.fleets.filter { $0.capabilities.contains(.backup) }) { fleet in
+                Section("Account backup \u{2014} \(fleet.engine.displayName)") {
+                    BackupRow(fleet: fleet)
+                }
             }
         }
         .formStyle(.grouped)

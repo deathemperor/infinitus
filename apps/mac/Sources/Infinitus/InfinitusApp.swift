@@ -171,19 +171,19 @@ struct InfinitusApp: App {
     // window keeps only what cannot leave the Mac. The prefs themselves
     // stay in PrefCatalog — that is what the fork's pages write — and
     // the lock's biometric prompt stays native, driven by `lock` /
-    // `unlock` / `lock-status`.
+    // `unlock` / `lock-status`. Accounts left the same day (#1179): the
+    // desktop's Accounts page adds, re-logs, renames, reorders and
+    // removes; the sign-in flow it drives stays native (SignInFlow.swift)
+    // and account backup, a file panel over the keychain-backed store,
+    // moved to Devices.
     [
-        SettingsTab(title: "Accounts", symbol: "person.2.badge.key", tint: .blue,
-                    keywords: ["account", "login", "relogin", "token",
-                               "add", "remove", "delete", "oauth",
-                               "order", "reorder", "alias", "rename"],
-                    view: AnyView(AccountsPane(model: model))),
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
                     keywords: ["icloud", "sync", "settings", "drive", "devices",
                                "phone", "iphone", "lan", "bonjour", "companion",
-                               "cloudflare", "tunnel"],
+                               "cloudflare", "tunnel", "backup", "restore",
+                               "accounts", "export", "import"],
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
     ]
     + [

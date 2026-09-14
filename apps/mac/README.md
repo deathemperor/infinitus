@@ -132,7 +132,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
 - **Crash reports, on-device** — both apps record their own crashes.
-- **Randomize names** — every account gets a fresh name from the theme's pool, or one account with the dice beside its name; Tab moves between the name fields.
+- **Randomize names** — `infinitusctl randomize-names` gives every account a fresh name from the theme's pool, or one account by number.
 - **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
 - **Ignite says what it did** — the plan line reports the window it started or why it failed, and the desktop app's Activity page keeps the log across relaunches.
 - **`infinitusctl`** — an agent-facing control CLI: status, fleets, switch, hold, rename, proxy, AWS and gcloud logins, stats, perf, and Infinitus desktop's projects and threads (`threads`, `thread show|send|new|interrupt|release`, `desktop status`); plus an agent-setup guide.

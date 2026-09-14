@@ -213,9 +213,9 @@ struct NineRouterEnginePane: View {
                 } header: {
                     Text("Accounts")
                 } footer: {
-                    Text("9Router's connections are managed in the Accounts tab, next to "
-                         + "the other engines'. Adding one is done in the 9Router dashboard "
-                         + "under Providers \u{2192} Connect Claude Code.")
+                    Text("9Router's connections are managed on the desktop app's Accounts "
+                         + "page, next to the other engines'. Adding one is done in the "
+                         + "9Router dashboard under Providers \u{2192} Connect Claude Code.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

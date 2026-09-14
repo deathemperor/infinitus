@@ -386,9 +386,11 @@ final class AppModel: ObservableObject {
     }()
 
     /// OAuth add / re-login for an engine that signs accounts in through
-    /// a browser (the proxy): the same in-app sign-in chooser as cswap
-    /// (system sheet or per-account private window — never the user's
-    /// default browser), polling the engine until the credential lands.
+    /// a browser (the proxy): the same native sign-in flow as swapd
+    /// (`TokenFlow`: the system sheet or a per-account private window —
+    /// never the user's default browser; the desktop's `signin-begin`
+    /// path runs it headless), polling the engine until the credential
+    /// lands.
     func addOAuthAccount(engineID: String, provider: Provider, relogin: Account? = nil,
                          headless: Bool = false) {
         guard let engine = registry.engine(id: engineID),
