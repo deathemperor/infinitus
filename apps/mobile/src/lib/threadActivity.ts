@@ -90,6 +90,8 @@ export interface WorkLogEntry {
   viewedImagePath?: string;
   command?: string;
   rawCommand?: string;
+  /** The agent's one-line description of a Bash call; the row's headline when present (#1231). */
+  commandDescription?: string;
   changedFiles?: ReadonlyArray<string>;
   tone: "thinking" | "tool" | "info" | "error";
   toolTitle?: string;
@@ -563,6 +565,11 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   if (commandPreview.rawCommand) {
     entry.rawCommand = commandPreview.rawCommand;
   }
+  const commandDescription =
+    itemType === "command_execution" ? asTrimmedString(asRecord(payload?.data)?.description) : null;
+  if (commandDescription) {
+    entry.commandDescription = collapseWhitespace(commandDescription);
+  }
   if (changedFiles.length > 0) {
     entry.changedFiles = changedFiles;
   }
@@ -852,6 +859,7 @@ function mergeDerivedWorkLogEntries(
   const viewedImagePath = next.viewedImagePath ?? previous.viewedImagePath;
   const command = next.command ?? previous.command;
   const rawCommand = next.rawCommand ?? previous.rawCommand;
+  const commandDescription = next.commandDescription ?? previous.commandDescription;
   const toolTitle = next.toolTitle ?? previous.toolTitle;
   const toolSurface = next.toolSurface ?? previous.toolSurface;
   const toolIcon = next.toolIcon ?? previous.toolIcon;
@@ -871,6 +879,7 @@ function mergeDerivedWorkLogEntries(
     ...(viewedImagePath ? { viewedImagePath } : {}),
     ...(command ? { command } : {}),
     ...(rawCommand ? { rawCommand } : {}),
+    ...(commandDescription ? { commandDescription } : {}),
     ...(changedFiles.length > 0 ? { changedFiles } : {}),
     ...(toolTitle ? { toolTitle } : {}),
     ...(toolSurface ? { toolSurface } : {}),
@@ -1017,6 +1026,7 @@ export function workEntryRowLabel(entry: WorkLogEntry, expanded = false): string
   if (entry.agentSpawn) return agentSpawnLabel(entry.agentSpawn);
   const presentation = resolveWorkEntryToolPresentation(entry);
   if (presentation) return presentation.displayName;
+  if (entry.commandDescription) return entry.commandDescription;
   if (expanded && entry.command?.trim()) return "Command";
   const preview = workEntryPreview(entry);
   if (expanded) return preview?.trim() || workEntryHeading(entry);
@@ -1176,6 +1186,7 @@ function workEntryHeading(workEntry: WorkLogEntry): string {
 function singleToolCallLabel(activity: ThreadFeedActivity): string {
   const presentation = resolveWorkEntryToolPresentation(activity.workEntry, "completed");
   if (presentation) return presentation.displayName;
+  if (activity.workEntry.commandDescription) return activity.workEntry.commandDescription;
   const command = activity.workEntry.command?.trim();
   return command || activity.summary;
 }
@@ -2076,6 +2087,7 @@ function liveToolActivitySummary(activity: ThreadFeedActivity, presentTense: boo
     toolLifecycleStatus: status,
   });
   if (presentation) return presentation.displayName;
+  if (activity.workEntry.commandDescription) return activity.workEntry.commandDescription;
   const command = activity.workEntry.command?.trim();
   if (command) {
     const program = commandProgramName(command);

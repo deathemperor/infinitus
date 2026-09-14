@@ -2729,6 +2729,72 @@ describe("buildThreadFeed", () => {
       activities: [{ status: "failure", workEntry: { tone: "error" } }],
     });
   });
+  it("uses a Bash call's description as the row's headline, with the command beneath (#1231)", () => {
+    const turnId = TurnId.make("turn-described-command");
+    const thread = makeThread({
+      id: ThreadId.make("thread-described-command"),
+      projectId: ProjectId.make("project-1"),
+      title: "Described command",
+      activities: [
+        makeActivity({
+          id: EventId.make("described-started"),
+          kind: "tool.started",
+          tone: "tool",
+          summary: "Command run",
+          createdAt: "2026-09-01T00:00:00.000Z",
+          turnId,
+          payload: {
+            toolCallId: "tool-described",
+            itemType: "command_execution",
+            status: "inProgress",
+            data: { toolName: "Bash", command: "vp test run" },
+          },
+        }),
+        makeActivity({
+          id: EventId.make("described-completed"),
+          kind: "tool.completed",
+          tone: "tool",
+          summary: "Command run",
+          createdAt: "2026-09-01T00:00:01.000Z",
+          turnId,
+          payload: {
+            toolCallId: "tool-described",
+            itemType: "command_execution",
+            status: "completed",
+            data: { toolName: "Bash", command: "vp test run", description: "Run the\n web tests" },
+          },
+        }),
+        makeActivity({
+          id: EventId.make("plain-completed"),
+          kind: "tool.completed",
+          tone: "tool",
+          summary: "Command run",
+          createdAt: "2026-09-01T00:00:02.000Z",
+          turnId,
+          payload: {
+            toolCallId: "tool-plain",
+            itemType: "command_execution",
+            status: "completed",
+            data: { toolName: "Bash", command: "ls" },
+          },
+        }),
+      ],
+    });
+
+    const [group] = buildThreadFeed(thread);
+    expect(group?.type).toBe("activity-group");
+    if (group?.type !== "activity-group") return;
+    const [described, plain] = group.activities;
+    expect(described?.workEntry).toMatchObject({
+      command: "vp test run",
+      commandDescription: "Run the web tests",
+    });
+    expect(workEntryRowLabel(described!.workEntry)).toBe("Run the web tests");
+    expect(workEntryRowLabel(described!.workEntry, true)).toBe("Run the web tests");
+    expect(described?.getFullDetail()?.startsWith("vp test run")).toBe(true);
+    expect(plain?.workEntry.commandDescription).toBeUndefined();
+    expect(workEntryRowLabel(plain!.workEntry)).toBe("ls");
+  });
 });
 
 describe("quiet timeline: nested agents", () => {

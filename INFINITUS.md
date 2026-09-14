@@ -337,8 +337,14 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   — `workEntryDisplayLabel`, `singleToolCallLabel` and `liveWorkEntryLabel`
   prefer it over the command, and `buildToolCallExpandedBody` (unchanged)
   then adds the command as the expanded row's first block, since it differs
-  from the visible label. Rows without a description are as before. The
-  phone's `threadActivity.ts` mirror is the issue's open half.
+  from the visible label. Rows without a description are as before.
+  `apps/mobile/src/lib/threadActivity.ts` (an upstream file) mirrors it:
+  `WorkLogEntry.commandDescription` derived from `data.description` on a
+  `command_execution` row (whitespace collapsed), merged forward in
+  `mergeDerivedWorkLogEntries`, and preferred over the command in
+  `workEntryRowLabel` (compact and expanded), `singleToolCallLabel` and
+  `liveToolActivitySummary`; the expanded body already leads with the
+  command block.
 - Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
   exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
 turnId)` → `{durationMs, completedAt, runningShells, runningAgents}` for a
