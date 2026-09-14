@@ -5,7 +5,6 @@ import {
   engineSecretsSupported,
   parseProxyEngineState,
   PROXY_ENGINES,
-  testConnectionSupported,
 } from "./engines.logic";
 
 const command = (name: string, stdin?: string) => ({
@@ -80,16 +79,11 @@ describe("engineSecretInput", () => {
   });
 });
 
-describe("PROXY_ENGINES / testConnectionSupported", () => {
+describe("PROXY_ENGINES", () => {
   it("lists the two proxy engines with their verbs", () => {
     expect(PROXY_ENGINES.map((e) => [e.key, e.readVerb, e.secretVerb])).toEqual([
       ["cliproxy", "proxy", "proxy-key"],
       ["9router", "9router", "9router-password"],
     ]);
-  });
-
-  it("is off until the manifest lists test-connection", () => {
-    expect(testConnectionSupported(SUPPORTED)).toBe(false);
-    expect(testConnectionSupported([...SUPPORTED, command("test-connection")])).toBe(true);
   });
 });

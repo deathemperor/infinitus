@@ -77,7 +77,11 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     route: "/settings/infinitus/engines",
     label: "Engines",
     marker: "swapd engine on",
-    shows: ["Management key", "Dashboard password", "Key not set."],
+    shows: [
+      "Management key",
+      "Dashboard password",
+      "[CLIProxyAPI base URL: http://127.0.0.1:8317]",
+    ],
   },
   {
     route: "/accounts",

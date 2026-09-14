@@ -61,15 +61,6 @@ export function engineSecretsSupported(commands: ReadonlyArray<InfinitusManifest
   );
 }
 
-/** The probe the Mac runs from its own network position; not in any manifest yet (#1177). */
-export const TEST_CONNECTION_VERB = "test-connection";
-
-export function testConnectionSupported(
-  commands: ReadonlyArray<InfinitusManifestCommand>,
-): boolean {
-  return commands.some((command) => command.name === TEST_CONNECTION_VERB);
-}
-
 /** The `proxy` and `9router` replies share a shape but name the secret differently. */
 const ProxyEngineReply = Schema.Struct({
   baseURL: Schema.String,

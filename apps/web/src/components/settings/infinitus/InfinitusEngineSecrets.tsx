@@ -26,7 +26,6 @@ import {
   engineSecretsSupported,
   parseProxyEngineState,
   PROXY_ENGINES,
-  testConnectionSupported,
   type ProxyEngine,
   type ProxyEngineKey,
   type ProxyEngineState,
@@ -60,7 +59,6 @@ export function InfinitusEngineSecrets({
 
   const supported =
     snapshot !== null && snapshot.available && engineSecretsSupported(snapshot.commands);
-  const canTest = snapshot !== null && testConnectionSupported(snapshot.commands);
 
   const read = useCallback(
     async (engine: ProxyEngine) => {
@@ -213,19 +211,18 @@ export function InfinitusEngineSecrets({
                 </div>
               }
             />
+            {/* Wired in the follow-up once the Mac's test-connection verb
+                exists (its contract is on #1177); drawn now so the row does
+                not move. */}
             <SettingsRow
               title="Connection"
-              description={
-                canTest
-                  ? "Probes the engine from the Mac with the stored credential."
-                  : TEST_UNAVAILABLE
-              }
+              description={TEST_UNAVAILABLE}
               control={
                 <Button
                   size="sm"
                   variant="outline"
                   aria-label={`Test ${engine.label} connection`}
-                  disabled={!canTest || locked}
+                  disabled
                 >
                   Test connection
                 </Button>
