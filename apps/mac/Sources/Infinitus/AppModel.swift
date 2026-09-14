@@ -483,7 +483,7 @@ final class AppModel: ObservableObject {
     /// "<name> is back" (and "all accounts are back — reset early") pushes (2026-09-05).
     @Published var pushRevived: Bool { didSet { defaults.set(pushRevived, forKey: "push_revived") } }
     /// Minutes before a reset that the row's countdown goes live and the
-    /// phone's reset alarm fires (#227); mirrored to the phone in FleetPrefs.
+    /// phone's reset alarm fires (#227).
     @Published var reviveLeadMinutes: Int { didSet { defaults.set(reviveLeadMinutes, forKey: "revive_lead_minutes") } }
     var reviveLead: TimeInterval { TimeInterval(reviveLeadMinutes * 60) }
     /// Headroom mode (#616): "off" or "hold"; the thresholds are the

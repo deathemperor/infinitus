@@ -370,8 +370,8 @@ public enum Stats {
         /// every field falls back to its memberwise default. The
         /// synthesized initializer throws on the first missing key,
         /// which would drop both stats caches on the ground every time
-        /// a field is added AND make an older phone fail to decode the
-        /// whole `MirrorSnapshot`, not just its stats. Encoding stays
+        /// a field is added AND make an older reader fail to decode the
+        /// whole bundle, not just one day. Encoding stays
         /// synthesized.
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)

@@ -70,7 +70,7 @@ final class QuickTunnel: ObservableObject {
             guard !chunk.isEmpty else { return }
             let text = String(decoding: chunk, as: UTF8.self)
             for line in text.split(separator: "\n") {
-                guard let found = MirrorPairing.quickTunnelURL(in: String(line)) else {
+                guard let found = CloudflaredOutput.quickTunnelURL(in: String(line)) else {
                     continue
                 }
                 Task { @MainActor [weak self] in self?.adopt(found) }
