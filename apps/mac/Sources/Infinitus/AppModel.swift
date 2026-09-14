@@ -1022,6 +1022,11 @@ final class AppModel: ObservableObject {
         set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
         set(\.forkTunnelHostname, defaults.string(forKey: "fork_tunnel_hostname") ?? "")
+        // #1178: the Devices page's prefs land on their owners; each didSet
+        // writes the same key back and re-reads the keychain for the key id.
+        set(\.liveActivityPusher.teamID, defaults.string(forKey: LiveActivityPusher.teamIDKey) ?? "")
+        set(\.liveActivityPusher.keyID, defaults.string(forKey: LiveActivityPusher.keyIDKey) ?? "")
+        set(\.sync.enabled, defaults.object(forKey: "icloud_sync") as? Bool ?? false)
     }
 
     // MARK: battle plan (#7)

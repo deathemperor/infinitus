@@ -799,6 +799,27 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: .object(["routingStrategy": .string(strategy)]))
 
+        case "apns":
+            // #1178: the push setup for the Devices page — the key ids,
+            // whether the .p8 is in the keychain, the phones registered.
+            // Never a token: a registration's token is the phone's push
+            // address.
+            let pusher = model.liveActivityPusher
+            return ControlReply(ok: true, result: .object(ApnsStatus.fields(
+                keyPresent: pusher.keyStored, teamId: pusher.teamID, keyId: pusher.keyID,
+                registrations: Array(pusher.registrations.values))))
+
+        case "apns-key":
+            // #1178: the .p8 rides stdin, never argv; empty stdin forgets it.
+            // Stored under the key id, so that pref comes first.
+            let pusher = model.liveActivityPusher
+            guard !pusher.keyID.isEmpty else { throw Fail("set the key id first (prefs set apns_key_id <id>)") }
+            let pem = r.secret ?? ""
+            let forgetting = pem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            pusher.storeKey(pem: pem)
+            guard forgetting || pusher.keyStored else { throw Fail(pusher.lastResult ?? "couldn't store the key") }
+            return ControlReply(ok: true, result: .object(["stored": .bool(pusher.keyStored)]))
+
         case "desktop-credential":
             // #822: the desktop's own push at port publish (or a hand-fed
             // token); the secret rides stdin, never argv. Empty stdin forgets.

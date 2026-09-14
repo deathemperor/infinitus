@@ -62,6 +62,19 @@ final class PrefCatalogTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "fork_tunnel_hostname"), "code.example.com")
     }
 
+    func testTheDevicesPagePrefsSitUnderDevices() throws {
+        // #1178: this Mac's name, the APNs ids and the iCloud sync switch.
+        let keys = ["machine_name", "apns_team_id", "apns_key_id", "icloud_sync"]
+        let reply = try PrefCatalog.reply(from: defaults, keys: keys)
+        XCTAssertEqual(reply.prefs.map(\.section), Array(repeating: "devices", count: 4))
+        XCTAssertEqual(reply.prefs.map(\.effect), Array(repeating: .live, count: 4))
+        XCTAssertEqual(reply.prefs.map(\.value), [.string(""), .string(""), .string(""), .bool(false)])
+        XCTAssertEqual(try PrefCatalog.write(.string("Studio"), key: "machine_name", to: defaults).value, .string("Studio"))
+        XCTAssertEqual(defaults.string(forKey: "machine_name"), "Studio")
+        XCTAssertEqual(try PrefCatalog.write(.bool(true), key: "icloud_sync", to: defaults).value, .bool(true))
+        XCTAssertThrowsError(try PrefCatalog.write(.number(1), key: "apns_key_id", to: defaults))
+    }
+
     func testStoredValuesReadBackTypedAndAnInvalidChoiceIsTheDefault() throws {
         defaults.set(false, forKey: "show_account_name")
         defaults.set(300, forKey: "refresh_interval")
