@@ -80,6 +80,10 @@ public enum PrefCatalog {
 
     /// Defaults are `AppModel.init`'s fallbacks; keep the two in step.
     public static let entries: [Entry] = [
+        // Display: the status item itself. Off = no status item at all; the
+        // app keeps running headless (#828). First because every other
+        // Display pref only matters while it is on (#1183).
+        Entry("menu_bar_enabled", .bool, .bool(true), display),
         // Display: the menu bar title.
         Entry("show_account_name", .bool, .bool(true), display),
         Entry("title_pct", .string, .string("both"), display, choices: strings(TitlePrefs.pctChoices)),
@@ -87,11 +91,9 @@ public enum PrefCatalog {
         Entry("title_remaining", .bool, .bool(false), display),
         Entry("title_reset", .string, .string("countdown"), display, choices: strings(TitlePrefs.resetChoices)),
         Entry("title_icon_only", .bool, .bool(false), display),
-        Entry("refresh_interval", .int, .number(60), display, choices: ints(TitlePrefs.refreshChoices)),
         Entry("menubar_themed", .bool, .bool(true), display),
         Entry("menubar_effects", .bool, .bool(true), display),
-        // Off = no status item at all; the app keeps running headless (#828).
-        Entry("menu_bar_enabled", .bool, .bool(true), display),
+        Entry("refresh_interval", .int, .number(60), display, choices: ints(TitlePrefs.refreshChoices)),
         // Display: the popup.
         Entry("popup_layout", .string, .string("wide"), display, choices: strings(["wide", "stacked", "hstack"])),
         Entry("popup_text_size", .string, .string("default"), display,

@@ -90,6 +90,14 @@ final class PrefCatalogTests: XCTestCase {
         XCTAssertEqual(try PrefCatalog.reply(from: defaults, keys: ["gamification_style"]).prefs.first?.value, .string("off"))
     }
 
+    /// The table's order is the order the desktop app draws the Menu bar page
+    /// in (#1183), so the master switch leads its section: every other Display
+    /// pref only matters while the status item is there.
+    func testTheStatusItemSwitchLeadsTheDisplaySection() {
+        let display = PrefCatalog.entries.filter { $0.section == "display" }.map(\.key)
+        XCTAssertEqual(display.first, "menu_bar_enabled")
+    }
+
     func testGetKeepsTableOrderAndRejectsAnUnknownKey() throws {
         let reply = try PrefCatalog.reply(from: defaults, keys: ["title_pct", "show_account_name"])
         XCTAssertEqual(reply.prefs.map(\.key), ["show_account_name", "title_pct"])

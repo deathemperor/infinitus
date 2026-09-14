@@ -48,7 +48,13 @@ export const PREF_COPY: Readonly<
     { label: string; description?: string; choices?: Readonly<Record<string, string>> }
   >
 > = {
-  // Display › Menu bar.
+  // Display › Menu bar. The status item's own switch leads the section in the
+  // catalog (#1183), and this map follows it so the two read in step.
+  menu_bar_enabled: {
+    label: "Show the icon in the menu bar",
+    description:
+      "Off, the icon stays hidden across relaunches. Infinitus keeps running in the background; this page and infinitusctl turn it back on.",
+  },
   title_icon_only: { label: "Show only the icon" },
   show_account_name: { label: "Show the account name" },
   title_pct: {
@@ -66,11 +72,6 @@ export const PREF_COPY: Readonly<
   menubar_effects: {
     label: "Animate switches and burn",
     description: "Needs the theme on.",
-  },
-  menu_bar_enabled: {
-    label: "Show the icon in the menu bar",
-    description:
-      "Off, the icon stays hidden across relaunches. Infinitus keeps running in the background; this page and infinitusctl turn it back on.",
   },
   refresh_interval: {
     label: "Refresh interval",
