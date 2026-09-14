@@ -35,8 +35,7 @@ all day, but expect rough edges — please file issues.
 brew install --cask deathemperor/tap/infinitus
 ```
 
-Nightly channel (built from `main` every day; reinstall to update —
-or flip the track in-app under About → Update channel):
+Nightly channel (built from `main` every day; reinstall to update):
 
 ```sh
 brew install --cask deathemperor/tap/infinitus@nightly

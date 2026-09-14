@@ -84,6 +84,8 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
       "Dashboard password",
       "[CLIProxyAPI base URL: http://127.0.0.1:8317]",
       "nothing is saved",
+      // The About section's version line, drawn once `status` answered.
+      "Menu bar app 0.0.0-fixture",
     ],
   },
   {

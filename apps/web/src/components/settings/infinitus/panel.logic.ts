@@ -115,6 +115,18 @@ export interface EngineStatusRow {
 }
 
 /** One row per engine the app reports, in key order so the list never jumps. */
+/** The menu bar app's version line for the Engines page's About section:
+    "Menu bar app 0.5.0-alpha.7 (1d90390896)". It ships inside the desktop
+    bundle and updates with it, so the line carries no updater; undefined
+    until the app has answered `status`. */
+export function menuBarAppVersionLine(status: InfinitusStatus | undefined): string | undefined {
+  if (status === undefined) return undefined;
+  const sha = status.sha.trim();
+  return sha.length === 0
+    ? `Menu bar app ${status.version}`
+    : `Menu bar app ${status.version} (${sha.slice(0, 10)})`;
+}
+
 export function buildEngineStatusRows(
   status: InfinitusStatus | undefined,
 ): ReadonlyArray<EngineStatusRow> {

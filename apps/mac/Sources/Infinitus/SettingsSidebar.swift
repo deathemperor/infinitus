@@ -29,7 +29,7 @@ enum SettingsGroup: String, CaseIterable, Identifiable {
         if tab.provider != nil { return .engines }
         switch tab.title {
         case "Usage", "Utilization", "Stats", "Machine", "Activity": return .dashboards
-        case "About", "Animations": return .app
+        case "Animations": return .app
         default: return .general
         }
     }

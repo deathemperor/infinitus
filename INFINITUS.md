@@ -2476,8 +2476,7 @@ pair` (token masked, server log never uploaded), screenshots every route in
   (`secrets: inherit`, so the Mac job signs and notarizes as for a release),
   `publish` — `main` only, on the schedule or a dispatch with `publish` —
   force-moves the `nightly` tag, clobbers the assets (`Infinitus-nightly.zip`
-  is a copy of the standalone zip for the cask and the menu bar app's
-  About pane), removes older nights' versioned assets and edits the title.
+  is a copy of the standalone zip for the cask), removes older nights' versioned assets and edits the title.
 - `.github/workflows/infinitus-release.yml` — the one release (see
   "One release" above). Its `desktop` job nests the menu bar app as a login
   item (#777): the `mac` job of the same run uploads `Infinitus-Menu-Bar-<version>.zip`

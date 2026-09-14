@@ -234,12 +234,6 @@ final class AppModel: ObservableObject {
     // The bundle on disk was rebuilt since this instance launched (the
     // dev loop, or a manual make-app.sh) — surfaced as "restart to update".
     @Published var appUpdatePending = false
-    /// A newer Infinitus release than this build (About → Updates does
-    /// the check; the popup chip just points there).
-    @Published var appUpdateVersion: String?
-    /// The one BrewUpdater instance the About pane's button and the
-    /// phone's `POST /app/update` route both drive; set by InfinitusApp.
-    var brewUpdater: BrewUpdater?
     private let launchExecutableDate = AppModel.executableDate()
     private var swapdSupervisor: EngineSupervisor?
     private var refreshTask: Task<Void, Never>?
@@ -1218,25 +1212,6 @@ final class AppModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
             }
         }
-    }
-
-    /// `POST /app/update` (#121): the phone's own trigger for this Mac's
-    /// update, reusing the same BrewUpdater the About pane's button
-    /// drives so the two never run two upgrades at once.
-    private func triggerAppUpdate() -> AppUpdate.Reply {
-        guard BrewUpdater.channel != .nested else {
-            return AppUpdate.Reply(outcome: "unavailable", detail: "updates arrive with Infinitus desktop")
-        }
-        guard BrewUpdater.channel != .source else {
-            return AppUpdate.Reply(outcome: "unavailable",
-                                   detail: "this Mac runs a source build — rebuild from the repo")
-        }
-        guard appUpdateVersion != nil else {
-            return AppUpdate.Reply(outcome: "upToDate", detail: nil)
-        }
-        brewUpdater?.upgrade()
-        return AppUpdate.Reply(outcome: "started",
-                               detail: "brew is upgrading Infinitus; the Mac relaunches when it's done")
     }
 
     /// Every phone-injected input is logged, per #17 — success or not.

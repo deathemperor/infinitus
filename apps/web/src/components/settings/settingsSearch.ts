@@ -838,6 +838,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [
       "swapd cliproxy 9router proxy accounts registered key",
       "management key dashboard password base url test connection",
+      "about version build release",
     ],
   },
   {
