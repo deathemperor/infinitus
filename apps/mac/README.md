@@ -6,7 +6,6 @@ May your limits never bind.
 
 [![Release](https://img.shields.io/github/v/release/deathemperor/infinitus)](https://github.com/deathemperor/infinitus/releases)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
-[![Homebrew](https://img.shields.io/badge/homebrew-deathemperor%2Ftap-orange)](https://github.com/deathemperor/homebrew-tap)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ![Infinitus demo — layouts, compact mode, pop-out, live theme switching](docs/demo.gif)
@@ -29,36 +28,24 @@ a glance and swaps before you stall.
 Infinitus is alpha software (0.5.0-alpha.1): it runs its author's fleet
 all day, but expect rough edges — please file issues.
 
-### Homebrew
+### GitHub releases
 
-```sh
-brew install --cask deathemperor/tap/infinitus
-```
-
-Nightly channel (built from `main` every day; reinstall to update —
-or flip the track in-app under About → Update channel):
-
-```sh
-brew install --cask deathemperor/tap/infinitus@nightly
-```
+Grab `Infinitus-<version>-arm64.dmg` from
+[releases](https://github.com/deathemperor/infinitus/releases) and drop
+`Infinitus.app` into `/Applications`: the desktop app, with the menu bar
+app nested inside as a login item — one download for both. (The
+standalone menu bar zip and its Homebrew cask left with #1238; the tap
+stays as it was.)
 
 Releases are Developer ID signed and notarized since 0.4.3, and nightly
 builds are too since #1042 (they come out of the release workflow's own
 jobs), so both open like any other app.
 
-### GitHub releases
-
-Grab `Infinitus-<version>.zip` from
-[releases](https://github.com/deathemperor/infinitus/releases), unzip,
-drop `Infinitus.app` into `/Applications`. The same release carries the
-whole desktop app, `Infinitus-<version>-arm64.dmg`, with the menu bar app
-nested inside as a login item — one download for both.
-
-The `infinitusctl` CLI ships inside the bundle at
-`Infinitus.app/Contents/MacOS/infinitusctl`, with `ictl` beside it as the
-short name for the same binary — Homebrew links them onto your PATH; from
-a release, symlink them yourself
-(`ln -sf /Applications/Infinitus.app/Contents/MacOS/{infinitusctl,ictl} /usr/local/bin/`).
+The `infinitusctl` CLI ships inside the nested bundle at
+`Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/infinitusctl`,
+with `ictl` beside it as the short name for the same binary — symlink
+them onto your PATH yourself
+(`ln -sf "/Applications/Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/"{infinitusctl,ictl} /usr/local/bin/`).
 
 ### Linux — engine CLI + Waybar module (Omarchy-ready)
 
@@ -117,7 +104,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Push notifications** — switch and limit events in Notification Center and on the phone.
 - **Pop-out window, compact mode, three layouts, popup scaling** — the pop-out remembers its spot.
 - **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
-- **Versions on the phone** — Settings shows both apps' versions, updates the Mac with one tap (brew builds), and says when a newer phone build is out.
+- **Versions on the phone** — Settings shows both apps' versions and says when a newer phone build is out.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the desktop app or the phone** — start `aws login` or `gcloud auth login` from the Accounts page or the phone (passkeys for AWS, a paste-back code for gcloud).
 - **Three engines** — swapd, CLIProxyAPI and 9Router as stacked fleets; policy stays in each engine, the app sets its knobs. swapd is multi-provider: one fleet per provider it holds (Claude, Gemini CLI…), and igniting an account refreshes it at once.

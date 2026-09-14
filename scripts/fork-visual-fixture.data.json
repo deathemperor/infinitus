@@ -819,15 +819,6 @@
         "value": false
       },
       {
-        "choices": ["stable", "nightly"],
-        "default": "stable",
-        "effect": "live",
-        "key": "update_channel",
-        "section": "about",
-        "type": "string",
-        "value": "stable"
-      },
-      {
         "choices": ["off", "hold", "interrupt"],
         "default": "off",
         "effect": "live",

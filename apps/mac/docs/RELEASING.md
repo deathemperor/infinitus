@@ -8,19 +8,19 @@ for Settings. The release PR bumps it, renames the CHANGELOG's
 `git tag v<version> && git push origin v<version>`.
 
 The tag runs `.github/workflows/infinitus-release.yml` on `main`: the Mac
-app on the macOS 26 runner (both bundles, signed, notarized, stapled),
+app on the macOS 26 runner (the Menu Bar bundle, signed, notarized, stapled),
 the desktop DMG with the Menu Bar bundle of the same run nested inside
 (#777), the Linux tray, then one GitHub release with all of it (a
-prerelease while the version has a `-alpha.N`/`-beta.N`/`-rc.N` tag) and
-the tap cask bump. The tag must match `VERSION` and the CHANGELOG must
+prerelease while the version has a `-alpha.N`/`-beta.N`/`-rc.N` tag).
+The tag must match `VERSION` and the CHANGELOG must
 have the section, or the run fails before publishing. A
 `workflow_dispatch` is the dry run: artifacts, nothing published.
 Nightly (`infinitus-nightly.yml`) calls the same build jobs from `main`
 daily with a dated version and publishes the rolling `nightly` prerelease
 itself; a dispatch with `publish` unset is its dry run.
-The two Mac assets: `Infinitus-<v>.zip` (the standalone app, what the cask
-installs) and `Infinitus-Menu-Bar-<v>.zip` (the same build as `Infinitus
-Menu Bar.app`, no `infinitus://` URL type — what the desktop nests).
+The Mac asset: `Infinitus-Menu-Bar-<v>.zip` (`Infinitus Menu Bar.app`, no
+`infinitus://` URL type — what the desktop nests). The standalone
+`Infinitus-<v>.zip` and its Homebrew cask left with #1238.
 
 ## Signing today
 
@@ -66,8 +66,7 @@ Repository secrets; the workflow's Developer ID steps run only when
 The steps: import the cert into a throwaway keychain → `make-app.sh`
 signs with `--options runtime --timestamp` → `notarytool submit --wait` →
 `stapler staple Infinitus.app` → zip. Stapling attaches to the app, so the
-released zip is built after it. Once a notarized release exists, drop the
-`--no-quarantine` wording from the README and the cask.
+released zip is built after it.
 
 Local check of a Developer ID build: the wizard's stage 3 re-signs a
 copy of `Infinitus.app` in a temp dir, notarizes, staples and runs
