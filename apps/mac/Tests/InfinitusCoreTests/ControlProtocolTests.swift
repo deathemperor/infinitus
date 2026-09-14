@@ -122,7 +122,7 @@ final class ControlProtocolTests: XCTestCase {
     /// anywhere else; payload readers are marked apart from them.
     func testTheManifestDeclaresWhichVerbsTakeASecret() {
         let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
-        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "proxy-key", "9router-password", "desktop-credential"])
+        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "apns-key", "proxy-key", "9router-password", "desktop-credential"])
         let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
         XCTAssertEqual(Set(payload), ["push"])
         XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
