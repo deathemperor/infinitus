@@ -162,7 +162,12 @@ origin/main HEAD || echo STALE`. A PR whose checks are green but whose
   mergeability sits at UNKNOWN for a quarter hour is GitHub's, not ours:
   `gh pr close` then `gh pr reopen` recomputes it and re-fires the PR event
   (auto-merge drops on reopen; arm it again). Never push empty commits for
-  either.
+  either. The stash stack is shared the same way, so **`git stash` is
+  off-limits in this repo** (ruling 2026-09-14): two sessions' push/pop pairs
+  interleaved and each popped the other's work — one baseline run swapped a
+  #1213 edit for another lane's uncommitted feature, recovered only because
+  the tree was diffed to a patch before anything else touched it. Commit to
+  the branch, or use a scratch worktree, for a baseline.
 - **Never install anything on the developer's Mac** (toolchains, brew,
   Xcode components, Docker). `vp i` inside the worktree is fine.
 - Secrets travel over stdin, never argv; shown masked only.
