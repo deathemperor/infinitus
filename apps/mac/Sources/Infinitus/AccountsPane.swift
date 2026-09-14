@@ -522,6 +522,15 @@ private let addAccountFooter =
     func startSystemSheet() {
         guard let url = authURL else { return }
         sheetError = nil
+        // A default browser that declares sheet support gets the session
+        // from macOS instead of Safari — and Chrome, which declares it,
+        // presents nothing (user 2026-09-14: "flash of browser focus,
+        // nothing opens"; the request sat queued until cancelled). Open
+        // the page there ourselves, in a private window where it has one.
+        if case .browser(let name, let flag) = Self.sheetRoute(for: url) {
+            openInDefaultBrowser(url, name: name, privateFlag: flag)
+            return
+        }
         let session = ASWebAuthenticationSession(
             url: url, callbackURLScheme: nil) { [weak self] _, error in
             // No custom-scheme callback exists — the flow ends when the
@@ -558,6 +567,41 @@ private let addAccountFooter =
             sheetError = "The sign-in sheet couldn't open. Try \u{201C}Reopen sign-in sheet\u{201D}, "
                 + "or use the private window (no passkeys)."
         }
+    }
+
+    /// The default https handler's verdict, read off its bundle.
+    static func sheetRoute(for url: URL) -> SignInSheetRoute {
+        guard let app = NSWorkspace.shared.urlForApplication(toOpen: url),
+              let bundle = Bundle(url: app) else { return .systemSheet }
+        let info = bundle.infoDictionary ?? [:]
+        let name = (info["CFBundleDisplayName"] as? String) ?? (info["CFBundleName"] as? String)
+        return SignInSheetRoute.classify(
+            bundleID: bundle.bundleIdentifier, name: name,
+            capabilities: info[SignInSheetRoute.capabilitiesKey] as? [String: Any])
+    }
+
+    /// `open -na <browser> --args <flag> <url>`: a second instance hands
+    /// its command line to the running one, which honours the private
+    /// flag (probed on Chrome 152, 2026-09-14). NSWorkspace's
+    /// OpenConfiguration cannot carry the URL and the flag together.
+    private func openInDefaultBrowser(_ url: URL, name: String, privateFlag: String?) {
+        var placement = "in your profile \u{2014} if it is signed in to another Claude account, sign out there first"
+        if let privateFlag, let app = NSWorkspace.shared.urlForApplication(toOpen: url) {
+            let open = Process()
+            open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            open.arguments = ["-na", app.path, "--args", privateFlag, url.absoluteString]
+            do {
+                try open.run()
+                placement = "in a private window"
+            } catch {
+                NSWorkspace.shared.open(url)
+            }
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+        sheetError = "\(name) takes over the sign-in sheet, so the page opened there "
+            + "(\(placement)). Paste the code back here; with Safari as the default "
+            + "browser the sheet opens in this app."
     }
 
     /// Brings a running flow's windows back to the front — the only way

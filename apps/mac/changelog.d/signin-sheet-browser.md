@@ -1,0 +1,1 @@
+Mac: When the default browser declares system sign-in sheet support but presents nothing (Google Chrome does: a flash of the browser and no page), Add account and Re-login open the Claude page in that browser instead — a private window where it has one — and the companion window says so; with Safari as the default browser the in-app passkey sheet is unchanged.
