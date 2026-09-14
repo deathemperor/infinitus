@@ -206,16 +206,19 @@ function rowActions(
   return actions;
 }
 
-/** The capability the native `add <fleet>` verb acts on: the in-app OAuth
-    sign-in (swapd declares every capability, the proxy this one). A fleet with
-    only `addToken` pastes a token in the Mac app and is not offered here. */
-const ADD_CAPABILITY = "addOAuth";
+/** The capabilities the native `add <fleet>` and `signin-begin` verbs act on
+    (#1213): `addOAuth` is the engine-driven OAuth sign-in (the proxy),
+    `addCurrent` the claude CLI's own flow whose code is pasted back (swapd —
+    every subscription account; it does not declare `addOAuth`). Either way
+    the Mac runs it and the page only watches. A fleet with only `addToken`
+    pastes a token in the Mac app and is not offered here. */
+const ADD_CAPABILITIES: ReadonlySet<string> = new Set(["addOAuth", "addCurrent"]);
 
 /** The usage status the engines report for a stored sign-in that expired. */
 const RELOGIN_USAGE_STATUS = "relogin_required";
 
 function fleetCanAdd(fleet: InfinitusFleet): boolean {
-  return fleet.capabilities.includes(ADD_CAPABILITY);
+  return fleet.capabilities.some((capability) => ADD_CAPABILITIES.has(capability));
 }
 
 function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowModel {

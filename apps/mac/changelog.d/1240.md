@@ -1,0 +1,1 @@
+Desktop: A Bash call the agent described shows that description as the tool row, with the command folded beneath, as in Claude Code's terminal.

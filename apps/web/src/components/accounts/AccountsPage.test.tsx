@@ -394,7 +394,8 @@ describe("AccountsPage", () => {
     fleets: [
       {
         ...readySnapshot.fleets[0]!,
-        capabilities: [...readySnapshot.fleets[0]!.capabilities, "addOAuth"],
+        // swapd's live shape (#1213): the CLI's paste-code flow, no addOAuth.
+        capabilities: [...readySnapshot.fleets[0]!.capabilities, "addCurrent", "addToken"],
         accounts: [
           readySnapshot.fleets[0]!.accounts[0]!,
           account({
@@ -415,6 +416,22 @@ describe("AccountsPage", () => {
     expect(markup).toContain("Add account: Claude (swapd)");
     expect(markup).not.toContain("Add account: OpenAI (cliproxy)");
     expect(markup).toContain("Sign in again as spare");
+
+    // The proxy's shape, the engine-driven OAuth sign-in, is offered the same.
+    const oauthFleet = addableSnapshot.fleets[0]!;
+    testState.snapshot = {
+      ...addableSnapshot,
+      fleets: [
+        {
+          ...oauthFleet,
+          capabilities: oauthFleet.capabilities
+            .filter((capability) => capability !== "addCurrent")
+            .concat("addOAuth"),
+        },
+        addableSnapshot.fleets[1]!,
+      ],
+    };
+    expect(renderToStaticMarkup(<AccountsPage />)).toContain("Add account: Claude (swapd)");
 
     // The same fleets on a build whose manifest has no `add` verb.
     testState.snapshot = { ...addableSnapshot, commands: [] };

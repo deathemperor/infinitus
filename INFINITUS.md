@@ -161,7 +161,12 @@ origin/main HEAD || echo STALE`. A PR whose checks are green but whose
   mergeability sits at UNKNOWN for a quarter hour is GitHub's, not ours:
   `gh pr close` then `gh pr reopen` recomputes it and re-fires the PR event
   (auto-merge drops on reopen; arm it again). Never push empty commits for
-  either.
+  either. The stash stack is shared the same way, so **`git stash` is
+  off-limits in this repo** (ruling 2026-09-14): two sessions' push/pop pairs
+  interleaved and each popped the other's work — one baseline run swapped a
+  #1213 edit for another lane's uncommitted feature, recovered only because
+  the tree was diffed to a patch before anything else touched it. Commit to
+  the branch, or use a scratch worktree, for a baseline.
 - **Never install anything on the developer's Mac** (toolchains, brew,
   Xcode components, Docker). `vp i` inside the worktree is fine.
 - Secrets travel over stdin, never argv; shown masked only.
@@ -320,6 +325,19 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   the menu's "Restore files only" between the full revert and the chat
   rewind, its own confirm text, and the mode skips the conversation-rollback
   check. Test beside the E1 one.
+- Bash description as the row's headline (#1231):
+  `apps/server/src/orchestration/ActivityPayloadProjection.ts` — the
+  client-bound projection rebuilds a tool row's `data` and drops `input`
+  whole, so for `command_execution` it now carries `data.description`
+  (Claude's Bash `input.description`, trimmed) beside `data.command`;
+  `apps/web/src/session-logic.ts` — `WorkLogEntry.commandDescription` from
+  it, merged forward like `command` (the started row can arrive before the
+  input finished streaming); `apps/web/src/components/chat/MessagesTimeline.logic.ts`
+  — `workEntryDisplayLabel`, `singleToolCallLabel` and `liveWorkEntryLabel`
+  prefer it over the command, and `buildToolCallExpandedBody` (unchanged)
+  then adds the command as the expanded row's first block, since it differs
+  from the visible label. Rows without a description are as before. The
+  phone's `threadActivity.ts` mirror is the issue's open half.
 - Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
   exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
 turnId)` → `{durationMs, completedAt, runningShells, runningAgents}` for a
@@ -1676,7 +1694,9 @@ registrations}`, never a token; each registration decoded alone) drawn as
   (`infinitusCapabilityOf`) gets the missing-adapter copy; a config that has not
   arrived waits like a missing snapshot, and Accounts folds every environment's
   answer together with `infinitusCapabilityAcross`. Add account and
-  re-login (#671): a fleet whose capabilities carry `addOAuth` gets "Add
+  re-login (#671): a fleet whose capabilities carry `addOAuth` or
+  `addCurrent` (swapd's CLI paste-code flow — it declares no `addOAuth`,
+  #1213) gets "Add
   account" in its header and "Sign in again" on a `relogin_required` row, both
   native's `add <fleet>` (the sign-in opens on the Mac), then the page polls
   `wait-add --timeout 5` until the app says the flow ended
