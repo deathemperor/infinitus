@@ -1,6 +1,6 @@
 # Remote access
 
-Connect a phone, browser, or another desktop app to T3 Code running on a different
+Connect a phone, browser, or another desktop app to Infinitus running on a different
 machine. That machine must stay running and reachable while you work.
 
 ## T3 Connect
@@ -9,16 +9,18 @@ T3 Connect makes an environment available to your other devices without setting
 up router forwarding. In the desktop app on the host, open **Settings →
 Connections**, sign in, and enable **T3 Connect** for that environment.
 
-For a command-line host, run:
+For a Linux host without the desktop app, run the unpacked server archive's
+`t3` (see [Install](./install.md#headless-server-linux)):
 
 ```bash
-npx t3@latest connect
+./t3 connect
 ```
 
 Follow the sign-in instructions. Setup offers a
 [background service](./background-service.md); if you decline it, start the
-server with `npx t3 serve`. Saving your sign-in alone does not make the machine
-reachable.
+server with `./t3 serve`. Saving your sign-in alone does not make the machine
+reachable. Every `t3` command on this page is that executable; a Mac host runs
+the desktop app instead and does all of this from **Settings → Connections**.
 
 On your other device, sign in to the same T3 Connect account and choose the
 environment. Over SSH, the CLI prints a browser link and accepts the returned
@@ -41,13 +43,13 @@ For a command-line host, replace `<private-ip>` with the host's LAN or tailnet
 address:
 
 ```bash
-npx t3 serve --host <private-ip>
+./t3 serve --host <private-ip>
 ```
 
 If a server is already running, generate a fresh link without restarting it:
 
 ```bash
-npx t3 pair
+./t3 pair
 ```
 
 Scan the QR code on your phone or paste the pairing URL into **Add environment**
@@ -87,13 +89,13 @@ HTTPS** in **Settings → Connections**. Turn it off there to remove that route.
 To start a command-line server with Tailscale HTTPS:
 
 ```bash
-npx t3 serve --tailscale-serve
+./t3 serve --tailscale-serve
 ```
 
 For an already-running server:
 
 ```bash
-npx t3 pair --tailscale
+./t3 pair --tailscale
 ```
 
 The pairing link uses an address such as `https://machine.tailnet.ts.net/`.
@@ -105,39 +107,31 @@ tailscale serve --https=443 off
 ```
 
 If that port is already in use, choose another with
-`--tailscale-serve-port`. See `npx t3 pair --help` for other pairing options.
+`--tailscale-serve-port`. See `./t3 pair --help` for other pairing options.
 
-### Hosted web app
+### Web app
 
-[app.t3.codes](https://app.t3.codes) needs an HTTPS endpoint. It connects directly
-to your server; a hosted pairing link does not make an unreachable backend
-reachable or convert HTTP to HTTPS.
-
-For a plain HTTP LAN endpoint, use the direct pairing URL in a browser that can
-open it, or pair from the desktop app. On mobile, an IP address entered without a
-scheme uses HTTP, so include `https://` when your server uses HTTPS.
+Infinitus has no hosted web app; the web app is the one your server serves, at
+the pairing link's address. Open the link in a browser that can reach it, or
+pair from the desktop app. On mobile, an IP address entered without a scheme
+uses HTTP, so include `https://` when your server uses HTTPS.
 
 ## Desktop-managed SSH
 
 In the desktop app, open **Settings → Connections → Add environment**, choose
-**SSH**, and enter a host or SSH alias such as `user@example.com`. T3 Code starts
-or reuses a server there and opens the port forward for you. Projects, provider
-credentials, and agent work stay on the remote machine.
+**SSH**, and enter a host or SSH alias such as `user@example.com`. Infinitus
+downloads the server of its own version onto the host (it needs `curl` or
+`wget` and `tar` there, and a way to reach the releases), starts or reuses it,
+and opens the port forward for you. Projects, provider credentials, and agent
+work stay on the remote machine, which needs the
+[provider setup](./install.md#providers) but no Node.js.
 
-The remote host needs a compatible [Node.js installation](./install.md#requirements)
-and [provider setup](./install.md#providers). If launch cannot find Node or reports
-an incompatible version, check it through a non-interactive SSH session:
-
-```bash
-ssh user@example.com 'sh -lc "command -v node && node --version"'
-```
-
-Configure your version manager for non-interactive shells if this differs from
-your normal terminal. With nvm, setting a compatible default, such as
-`nvm alias default 24`, can resolve the problem.
+The remote host must be Linux: no macOS server build is published yet, so a
+Mac cannot be added this way. A nightly desktop build ships no server archive
+and cannot set up a remote either.
 
 If SSH reconnecting fails after an app update, retry the launch once. Removing
-the connection stops a server that T3 Code launched; a server that was already
+the connection stops a server that Infinitus launched; a server that was already
 running is left alone.
 
 For Antigravity's Google callback on a remote host, see
@@ -148,7 +142,7 @@ For Antigravity's Google callback on a remote host, see
 On the host, **Settings → Connections** lets authorized administrators create
 pairing links and revoke client sessions. Revoking an unused link prevents new
 pairings; revoke a device's session to remove its existing access. Command-line
-management is available through `npx t3 auth --help`.
+management is available through `./t3 auth --help`.
 
 A session with an open connection stays listed after its access credential
 expires.
@@ -174,9 +168,9 @@ when SSH closes, see [background-service troubleshooting](./background-service.m
 
 | Error                                                     | Recovery                                                                                                                                    |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environment_link_limit_exceeded` or managed tunnel limit | Deregister an unused environment, then restart T3 Code on the host.                                                                         |
+| `environment_link_limit_exceeded` or managed tunnel limit | Deregister an unused environment, then restart the server on the host.                                                                      |
 | `auth_invalid` or `invalid_bearer`                        | Run `t3 connect login`. If credentials were revoked, run `t3 connect logout`, then `t3 connect` again. Restart the server after signing in. |
-| Expired or invalid link proof                             | Check the host's date and time, update T3 Code, then restart it.                                                                            |
+| Expired or invalid link proof                             | Check the host's date and time, update the server, then restart it.                                                                         |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                               |
 | HTTP 408, 429, or 5xx                                     | Check network and relay availability. Startup retries temporary failures for up to ten minutes.                                             |
 
@@ -186,4 +180,4 @@ foreground server, stop it and run `t3 serve` again with your usual options.
 Include the diagnostic message and trace ID when reporting a persistent failure.
 
 For a connection that still fails after linking, check the date and time on both
-devices. For server version warnings, follow [Updating T3 Code](./updating.md).
+devices. For server version warnings, follow [Updating](./updating.md).
