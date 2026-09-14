@@ -2307,6 +2307,25 @@ pair` (token masked, server log never uploaded), screenshots every route in
   upstream builds pass no helper and nest nothing. The helper is never
   rebuilt in the desktop job (macOS 26 SDK, Swift toolchain and a second
   sign/notarize path for a bundle the `mac` job already sealed).
+  Its `cli` job builds the self-contained CLI archives every runtime
+  installer downloads (#1192): `t3-<version>-linux-x64.tar.gz` and
+  `-linux-arm64.tar.gz`, which `publish` attaches along with the
+  `SHA256SUMS` `pinnedRuntime` verifies against. Linux only — that is where
+  SSH remote environments run; a Mac or Windows CLI has no archive and the
+  installers 404 plainly instead of reaching upstream (`CLI_RELEASE_REPOSITORY`
+  below). Its steps are upstream's `cli_archive` steps from
+  `.github/workflows/release-desktop.yml`, **copied rather than called**:
+  that workflow downloads a `js-bundle` artifact only upstream's
+  `build_bundle` produces, plus a relay tracing config and four required
+  clerk/relay inputs the fork has no source for, so calling it would mean
+  porting half of upstream's release pipeline. Re-diff the copied steps
+  against that file on every sync, like the runner swap. The job is skipped
+  for the nightly (`inputs.version` is set only by the nightly's
+  `workflow_call`), so a nightly desktop's SSH remotes fail cleanly; a
+  dispatch dry run still builds them. Known gap: the archive's `client/` is
+  the plain `t3#build` output, so it carries upstream's favicons — the
+  fork's `applyWebBrandAssets` pass runs only in
+  `scripts/build-desktop-artifact.ts`.
 
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,
