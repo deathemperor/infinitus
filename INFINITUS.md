@@ -925,6 +925,14 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` re-letters the stable DMG artwork ("Drag T3 Code
   into Applications") for the `infinitus` channel before rasterizing (#601).
+- `scripts/build-cli-archive.ts` — one call before the stage is copied:
+  `applyWebBrandAssets(resolveWebAssetBrandForPackageVersion(version),
+"apps/server/dist/client")`, so a runtime unpacked from the archive serves
+  the fork's favicons at its own origin instead of upstream's (#1196). The
+  same repo-relative target and call shape `build-desktop-artifact.ts` uses —
+  `applyWebBrandAssets` joins its target against the repo root, so the
+  archive's temp stage is not a target it can take, and branding the build
+  output in place is the only shape that reuses the function as written.
 - `apps/desktop/gnome-extension/metadata.json` — the bundled extension is
   named "Infinitus SnapShots" (uuid `snap-shot@t3.codes` unchanged), matching
   the setup copy that tells the user to find it; `KdeSnapShot.ts`'s desktop

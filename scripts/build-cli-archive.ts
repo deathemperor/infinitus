@@ -40,6 +40,8 @@ import {
   resolveFffNativeDependencies,
   STAGE_INSTALL_ARGS,
 } from "./build-desktop-artifact.ts";
+import { applyWebBrandAssets } from "./apply-web-brand-assets.ts";
+import { resolveWebAssetBrandForPackageVersion } from "./lib/brand-assets.ts";
 import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
@@ -499,6 +501,17 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     resourceMonitorDir,
     "Build the resource monitor or pass --resource-monitor-dir.",
   );
+
+  // A runtime started from this archive serves the client at its own origin,
+  // so the archive's copy wears the fork's favicons the way the desktop's does
+  // (#1196). Branded in place, at the same repo-relative path and with the same
+  // call shape build-desktop-artifact.ts uses: applyWebBrandAssets joins its
+  // target against the repo root, so the temp stage below is not a target it
+  // can take. The copy is idempotent, so the per-platform builds of one job
+  // re-applying it costs four file copies each.
+  const webAssetBrand = resolveWebAssetBrandForPackageVersion(input.version);
+  yield* applyWebBrandAssets(webAssetBrand, "apps/server/dist/client");
+  yield* Effect.log(`[cli-archive] Applied ${webAssetBrand} web client branding.`);
 
   const stem = cliArchiveStem(input.version, input.platform, input.arch);
   const stageRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-archive-" });

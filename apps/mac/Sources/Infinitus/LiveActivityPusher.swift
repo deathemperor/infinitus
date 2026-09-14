@@ -139,12 +139,18 @@ final class LiveActivityPusher: ObservableObject {
     }
 
     /// The app's own notifications, mirrored to every phone that
-    /// registered an alert token (issue #3). No phone → nothing sent.
-    func pushAlert(title: String, body: String) {
-        guard configured else { return }
+    /// registered an alert token (issue #3). No phone → nothing sent,
+    /// and the reach says so.
+    @discardableResult
+    func pushAlert(title: String, body: String) -> PushReach {
+        var reach = PushReach()
+        guard configured else { return reach }
         for registration in registrations.values where registration.kind == .alert {
-            send(LiveActivityPush.alertPayload(title: title, body: body), to: registration, what: "alert")
+            if send(LiveActivityPush.alertPayload(title: title, body: body), to: registration, what: "alert") {
+                reach.add(device: registration.deviceId, kind: registration.kind.rawValue)
+            }
         }
+        return reach
     }
 
     /// The desktop's thread card (#1047): every phone with a live
@@ -152,16 +158,22 @@ final class LiveActivityPusher: ObservableObject {
     /// only a push-to-start token gets it as a start; nil ends the card
     /// and drops the update token (the next start brings a new one).
     /// The push-to-start token stays: it is good for the next card.
-    func pushAgentActivity(_ state: AgentActivityState?) {
-        guard configured else { return }
+    /// Answers what went out: a phone whose card already shows this
+    /// state, or that holds no token for it, is not a target.
+    @discardableResult
+    func pushAgentActivity(_ state: AgentActivityState?) -> PushReach {
+        var reach = PushReach()
+        guard configured else { return reach }
         let devices = Set(registrations.values.filter { $0.kind.isLiveActivity }.map(\.deviceId))
         for device in devices {
             let live = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivity.rawValue]
             let start = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivityStart.rawValue]
             guard let state else {
                 if let live {
-                    send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[device]),
-                         to: live, what: "end thread card")
+                    if send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[device]),
+                            to: live, what: "end thread card") {
+                        reach.add(device: device, kind: live.kind.rawValue)
+                    }
                     registrations[live.slot] = nil
                     persist()
                 }
@@ -170,15 +182,20 @@ final class LiveActivityPusher: ObservableObject {
             }
             if lastAgentActivity[device] == state { continue }
             if let live {
-                send(LiveActivityPush.agentActivityUpdatePayload(state), to: live, what: "update thread card",
-                     priority: "5")
+                if send(LiveActivityPush.agentActivityUpdatePayload(state), to: live, what: "update thread card",
+                        priority: "5") {
+                    reach.add(device: device, kind: live.kind.rawValue)
+                }
             } else if let start {
-                send(LiveActivityPush.agentActivityStartPayload(state), to: start, what: "start thread card")
+                if send(LiveActivityPush.agentActivityStartPayload(state), to: start, what: "start thread card") {
+                    reach.add(device: device, kind: start.kind.rawValue)
+                }
             } else {
                 continue
             }
             lastAgentActivity[device] = state
         }
+        return reach
     }
 
     // MARK: APNs
@@ -193,13 +210,15 @@ final class LiveActivityPusher: ObservableObject {
     }
 
     /// `retried`: this is the one resend on the other APNs gateway after
-    /// a BadDeviceToken — a second refusal writes the token off.
+    /// a BadDeviceToken — a second refusal writes the token off. True
+    /// when the request went out (a key that does not sign sends nothing).
+    @discardableResult
     private func send(_ payload: Data, to registration: ActivityPushRegistration, what: String,
-                      priority: String = "10", retried: Bool = false) {
+                      priority: String = "10", retried: Bool = false) -> Bool {
         let slot = registration.slot
         // Alerts are each their own message (two in one refresh must both land).
         let key = "\(slot)#\(UUID().uuidString)"
-        guard !inFlight.contains(key), let bearer = bearer() else { return }
+        guard !inFlight.contains(key), let bearer = bearer() else { return false }
         inFlight.insert(key)
         var request = URLRequest(url: LiveActivityPush.url(token: registration.token,
                                                            sandbox: registration.isSandbox),
@@ -247,5 +266,6 @@ final class LiveActivityPusher: ObservableObject {
                 }
             }
         }.resume()
+        return true
     }
 }

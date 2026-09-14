@@ -245,22 +245,28 @@ final class ControlServer {
             // own pusher, so they get its gating and every channel on.
             // #1047: its thread card state rides the same verb to the
             // phone's lock screen — no Notification Center line for it.
+            // The reply says what was addressed: `targets` phones and the
+            // requests per token kind, 0 when nobody is registered (a
+            // synthetic push into nothing used to read as a success).
             if let payload = r.secret, let activity = ThreadActivityPush.parse(payload) {
+                let reach: PushReach
                 switch activity {
                 case .show(let state):
-                    model.liveActivityPusher.pushAgentActivity(state)
+                    reach = model.liveActivityPusher.pushAgentActivity(state)
                     model.desktopActiveThreads = state.activeCount
                 case .end:
-                    model.liveActivityPusher.pushAgentActivity(nil)
+                    reach = model.liveActivityPusher.pushAgentActivity(nil)
                     model.desktopActiveThreads = 0
                 }
-                return ControlReply(ok: true, result: .object(["pushed": .bool(true), "card": .bool(true)]))
+                return ControlReply(ok: true, result: .object(
+                    ["pushed": .bool(true), "card": .bool(true)].merging(reach.replyFields) { _, new in new }))
             }
             guard let payload = r.secret, let push = ThreadPhasePush.parse(payload) else {
                 throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} or {kind: \"thread.activity\", state} is expected on stdin")
             }
-            model.push(push.line)
-            return ControlReply(ok: true, result: .object(["pushed": .bool(true)]))
+            let reach = model.push(push.line)
+            return ControlReply(ok: true, result: .object(
+                ["pushed": .bool(true)].merging(reach.replyFields) { _, new in new }))
 
         case "switch", "hold", "unhold", "rename", "remove":
             let (fleet, n) = try target(r)

@@ -651,7 +651,8 @@ final class AppModel: ObservableObject {
     /// Both push channels: the Mac notice (+ Live Activity alert) and the
     /// phone (#756: the engine's own away-push channels went with cswap;
     /// swapd's `notify` only reports).
-    func push(_ msg: String) {
+    @discardableResult
+    func push(_ msg: String) -> PushReach {
         notify(msg)
     }
 
@@ -693,9 +694,11 @@ final class AppModel: ObservableObject {
     /// That pass writes the mirror snapshot past the exporter's throttle.
     private var mirrorExportDue = false
 
-    func notify(_ body: String) {
+    /// Answers the phones the line reached (the `push` verb reports it).
+    @discardableResult
+    func notify(_ body: String) -> PushReach {
         Notifier.post(title: "Infinitus", body: body)
-        liveActivityPusher.pushAlert(title: "Infinitus", body: body)
+        return liveActivityPusher.pushAlert(title: "Infinitus", body: body)
     }
     /// Seeded with what the triggers remembered before the last relaunch
     /// (#98, #231): the last-alive warning.

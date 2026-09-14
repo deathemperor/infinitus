@@ -411,7 +411,8 @@ echo "prefs: ok"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
 # #1047: the desktop's thread card on the push verb — a null state ends
 # it (no phone registered: a no-op that still answers), a stray shape is refused.
-printf '{"kind":"thread.activity","state":null}' | "$CTL" push | expect "d['pushed'] is True and d['card'] is True" || fail "push thread.activity end"
+# No phone is registered on this private instance, so the reply says so.
+printf '{"kind":"thread.activity","state":null}' | "$CTL" push | expect "d['pushed'] is True and d['card'] is True and d['targets'] == 0 and d['kinds'] == {}" || fail "push thread.activity end"
 printf '{"kind":"thread.activity","state":{"title":"x"}}' | "$CTL" push 2>&1 | grep -q "thread.activity" || fail "push thread.activity refuses a stray state"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
 # #835: --forget has no body, so a stdin pipe nobody closes must not hold it
