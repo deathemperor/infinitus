@@ -1234,7 +1234,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
-- `README.md` — the fork notice at the top.
+- `README.md` — the fork notice at the top, and the Installation section
+  below the rule: this product's releases (the DMG, the Linux server archives,
+  what is not published yet) in place of upstream's npm, winget, brew and AUR
+  paths (#1192). `docs/user/install.md` (the install sections) and
+  `docs/user/background-service.md` (whole) say the same; every other user
+  doc still reads `npx t3` — follow-up issue linked from PR #1192's tail.
 - **The project file is `infinitus.json`** (#823 layer 1: the upstream name
   never reaches a screen, and this one is on screen every time the scripts
   menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`
