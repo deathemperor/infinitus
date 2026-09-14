@@ -66,10 +66,9 @@ so this is not available on Infinitus for now.
 
 ## Mobile app
 
-Install the T3 Code app from the
-[App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or
-[Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code).
-The phone connects to a server on another machine. Follow
+The Infinitus phone app is not on a store: it is installed from a build
+(TestFlight or a device build). The phone connects to a server on another
+machine. Follow
 [remote access](./remote-access.md) to link it through T3 Connect or a pairing URL.
 
 If the app crashes during launch, open Settings → Diagnostics on the next launch
