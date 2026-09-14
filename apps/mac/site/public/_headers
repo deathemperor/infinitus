@@ -5,6 +5,9 @@
   Cache-Control: public, max-age=86400
 /llms.txt
   Content-Type: text/plain; charset=utf-8
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=300
 /.well-known/apple-app-site-association
   Content-Type: application/json
 /.well-known/assetlinks.json

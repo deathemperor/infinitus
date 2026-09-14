@@ -1234,6 +1234,18 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
+- `scripts/install.sh`, `scripts/install.ps1` — `repo` is this repository and
+  the home `~/.infinitus`, the same flip as `CLI_RELEASE_REPOSITORY` (#1192);
+  the shell script installs on Linux only and says plainly that no macOS or
+  Windows archive exists (exit 1 before any fetch, never upstream's), resolves
+  only the release train (a `v…` tag without a nightly/preview suffix — the
+  fork's nightly is the rolling tag and ships no archive), and is served at
+  `https://infinitus.run/install.sh` as the checked-in copy
+  `apps/mac/site/public/install.sh`: `scripts/sync-install-script.ts` writes
+  it, `--check` and its test fail on drift, and the test fails while the
+  source names upstream's owner. The PowerShell script stops at once (no
+  Windows archive) and is not served. Regenerate the copy after any edit; the
+  site deploy is by hand from `apps/mac/site`.
 - `README.md` — the fork notice at the top, and the Installation section
   below the rule: this product's releases (the DMG, the Linux server archives,
   what is not published yet) in place of upstream's npm, winget, brew and AUR

@@ -9,44 +9,50 @@ kept open.
 The service runs the self-contained server from a release archive. Get it onto
 the machine first:
 
-1. From a [release](https://github.com/deathemperor/infinitus/releases) cut
-   after 0.5.0-alpha.11, download `t3-<version>-linux-x64.tar.gz` or
-   `t3-<version>-linux-arm64.tar.gz` for the machine's architecture, and
-   `SHA256SUMS` from the same release.
-2. Check it — `sha256sum -c --ignore-missing SHA256SUMS` — and unpack it:
-   `tar -xzf t3-<version>-linux-x64.tar.gz`.
-3. The `t3` executable inside is the server. It needs no Node.js.
+```sh
+curl -fsSL https://infinitus.run/install.sh | sh
+```
 
-There is no install script for Infinitus yet; the `curl … | sh` and
-`npx t3` paths you may know from T3 Code install upstream's product, not this
-one.
+It downloads the newest release's `t3-<version>-linux-<arch>.tar.gz`, checks
+it against the release's `SHA256SUMS`, unpacks it under `~/.infinitus/runtime`
+and links `t3` into `~/.local/bin`. It needs only `sh`, `tar`, `curl` or
+`wget`, and `sha256sum`; no Node.js. Set `T3CODE_VERSION` to pin a release
+(the archives start with the release after 0.5.0-alpha.11), or
+`T3CODE_RELEASE_BASE_URL` to download from a mirror.
+
+Without the script, download the archive and `SHA256SUMS` from a
+[release](https://github.com/deathemperor/infinitus/releases) yourself, check
+it — `sha256sum -c --ignore-missing SHA256SUMS` — and unpack it; the `t3`
+inside is the server, run as `./t3` below.
 
 If the machine is an SSH remote of your desktop app, skip all of this: the
 desktop puts the matching server on it by itself.
 
 ## Manage the service
 
-Run these on the machine that will host the server, from the directory you
-unpacked into:
+Run these on the machine that will host the server:
 
-| Task                            | Command                  |
-| ------------------------------- | ------------------------ |
-| Install and start               | `./t3 service install`   |
-| Inspect status and log location | `./t3 service status`    |
-| Update or repair                | `./t3 service update`    |
-| Stop and remove from startup    | `./t3 service uninstall` |
+| Task                            | Command                |
+| ------------------------------- | ---------------------- |
+| Install and start               | `t3 service install`   |
+| Inspect status and log location | `t3 service status`    |
+| Update or repair                | `t3 service update`    |
+| Stop and remove from startup    | `t3 service uninstall` |
 
-Installing downloads that version's archive once more from the release into
-`~/.infinitus/runtime` (set `T3CODE_RELEASE_BASE_URL` to take it from a
-mirror), so the machine needs to reach the releases and you can delete the
-unpacked directory afterwards. Uninstalling the service
-leaves your projects, threads and settings under `~/.infinitus/userdata`
-intact.
+The service reuses the copy the install script put under
+`~/.infinitus/runtime`; a hand-unpacked `./t3` downloads that version's
+archive there first, so the machine needs to reach the releases (or
+`T3CODE_RELEASE_BASE_URL`). Uninstalling the service leaves your projects,
+threads and settings under `~/.infinitus/userdata` intact.
 
-Install and update use the version of the `t3` you run. To move the service to
-a newer release, download and unpack that release's archive the same way and
-run its `./t3 service update`. An older `t3` refuses to replace a newer service
-unless you add `--allow-downgrade`.
+`t3 update` moves a script-installed `t3` to the newest release: it downloads
+and verifies it, points `t3` at it, and asks before restarting a background
+service (pass `--yes` from a script; a server you started by hand is left for
+you to restart). Pass an exact version to pin one, or `--allow-downgrade` to
+move backwards. Install and update use the version of the `t3` you run; an
+older `t3` refuses to replace a newer service unless you add
+`--allow-downgrade`. `t3 uninstall` reverses the install script — the service,
+the `t3` link, every downloaded version — and keeps `~/.infinitus/userdata`.
 
 Updating restarts the server. Finish active work first, and wait for any remote
 update already in progress.
@@ -58,7 +64,8 @@ at boot and keeps running after logout. If this needs administrator permission,
 setup prints a recovery command before changing the service.
 
 macOS: the service commands exist, but no macOS server archive is published
-yet, so there is nothing to install them from. Keep the desktop app running on
+yet (the install script says so and stops), so there is nothing to install
+them from. Keep the desktop app running on
 the Mac instead; it hosts remote clients the same way.
 
 Windows background services are not supported.

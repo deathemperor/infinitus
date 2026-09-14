@@ -18,19 +18,26 @@ else. In-app updates come from the same releases.
 
 ## Headless server (Linux)
 
-Releases cut after 0.5.0-alpha.11 attach `t3-<version>-linux-x64.tar.gz` and
-`t3-<version>-linux-arm64.tar.gz`: the server as one self-contained executable,
-with `SHA256SUMS` beside them. No Node.js is needed. Download the one for the
-machine, check it against `SHA256SUMS`, unpack it, and run:
+One command installs the server as a self-contained executable — no Node.js:
 
 ```bash
-./t3
+curl -fsSL https://infinitus.run/install.sh | sh
 ```
 
-This starts the server and opens the local web app. Run `./t3 --help` for
-command-line options, and see
+It takes the newest release's `t3-<version>-linux-<arch>.tar.gz` (releases cut
+after 0.5.0-alpha.11 attach them, with `SHA256SUMS`), verifies it, unpacks it
+under `~/.infinitus/runtime` and links `t3` into `~/.local/bin`. Then run:
+
+```bash
+t3
+```
+
+This starts the server and opens the local web app. Run `t3 --help` for
+command-line options, `t3 update` for a newer release, and see
 [Running in the background](./background-service.md) to keep it running as a
-service.
+service. You can also download an archive from a
+[release](https://github.com/deathemperor/infinitus/releases) yourself and run
+its `./t3`.
 
 A Linux machine you reach over SSH from the desktop app needs none of this: the
 desktop installs the matching server on it by itself.

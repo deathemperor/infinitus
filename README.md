@@ -50,13 +50,12 @@ Every Infinitus build comes from one [GitHub release](https://github.com/deathem
 
 ### Headless server (Linux)
 
-Releases cut after 0.5.0-alpha.11 attach `t3-<version>-linux-x64.tar.gz` and `t3-<version>-linux-arm64.tar.gz` — the server as one self-contained executable, no Node.js needed — with `SHA256SUMS` beside them. The desktop app installs the matching one onto a Linux SSH remote by itself. To run one by hand, see [Install](./docs/user/install.md#headless-server-linux) and [Running in the background](./docs/user/background-service.md).
+`curl -fsSL https://infinitus.run/install.sh | sh` installs the newest release's `t3-<version>-linux-<arch>.tar.gz` — the server as one self-contained executable, no Node.js needed — verified against its `SHA256SUMS` (releases cut after 0.5.0-alpha.11 attach them). The desktop app installs the matching one onto a Linux SSH remote by itself. To run one by hand, see [Install](./docs/user/install.md#headless-server-linux) and [Running in the background](./docs/user/background-service.md).
 
 ### Not available yet
 
 - A macOS server archive. A Mac either runs the desktop app or a [build from source](./docs/user/install.md#build-from-source); for the same reason a Mac cannot yet be set up as an SSH remote from the desktop.
 - Windows server archives.
-- The `curl … | sh` install script and `t3 update`, which still point at upstream. Update a Linux server with `t3 service update` (see [Running in the background](./docs/user/background-service.md)).
 
 ## Some notes
 

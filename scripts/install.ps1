@@ -1,13 +1,15 @@
-# Installs the T3 Code CLI from a GitHub Release archive on Windows. Needs
-# only PowerShell 5.1+; no Node, npm, or compiler.
+# Installs the Infinitus server (`t3`) from a GitHub Release archive on
+# Windows. Needs only PowerShell 5.1+; no Node, npm, or compiler.
 #
-#   irm https://t3.codes/install.ps1 | iex
+# Not yet: Infinitus publishes no Windows server archive, so this script
+# says so and stops before fetching anything. The rest is kept for the day
+# the release attaches one (#1192).
 #
 # Environment:
 #   T3CODE_CHANNEL           release train to follow: stable, nightly, or preview
 #                            (default: stable; preview is a maintainers' test train)
 #   T3CODE_VERSION           exact version to install (overrides T3CODE_CHANNEL)
-#   T3CODE_HOME              T3 home directory (default: ~\.t3)
+#   T3CODE_HOME              Infinitus home directory (default: ~\.infinitus)
 #   T3CODE_INSTALL_BIN_DIR   where t3.exe is linked (default: ~\.local\bin)
 #   T3CODE_RELEASE_BASE_URL  mirror for releases/download (default: GitHub)
 #
@@ -16,15 +18,19 @@
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$repo = "pingdotgg/t3code"
+# Fork registration point (INFINITUS.md, #1192): this repo's releases and the
+# fork's home, re-applied after every upstream sync.
+$repo = "deathemperor/infinitus"
 $baseUrl = if ($env:T3CODE_RELEASE_BASE_URL) { $env:T3CODE_RELEASE_BASE_URL.TrimEnd("/") } else { "https://github.com/$repo/releases/download" }
-$t3Home = if ($env:T3CODE_HOME) { $env:T3CODE_HOME } else { Join-Path $HOME ".t3" }
+$t3Home = if ($env:T3CODE_HOME) { $env:T3CODE_HOME } else { Join-Path $HOME ".infinitus" }
 $binDir = if ($env:T3CODE_INSTALL_BIN_DIR) { $env:T3CODE_INSTALL_BIN_DIR } else { Join-Path $HOME ".local\bin" }
 
 function Fail([string] $message) {
   Write-Error "t3 install: $message"
   exit 1
 }
+
+Fail "Infinitus publishes no Windows server archive yet; use a Linux host (curl -fsSL https://infinitus.run/install.sh | sh) or the macOS desktop app"
 
 # PROCESSOR_ARCHITEW6432 reports the real machine when a 32-bit PowerShell
 # runs under WOW64; RuntimeInformation needs .NET 4.7.1+, which 5.1 hosts
