@@ -1144,7 +1144,7 @@ final class StatsTests: XCTestCase {
         // encode would fix it and is deliberately NOT done — every
         // already-installed phone decodes Day with the synthesized
         // initializer that throws on a missing key, so a sparse Mac
-        // would break the whole MirrorSnapshot on it (the very failure
+        // would break the whole bundle on it (the very failure
         // B2 exists to prevent), and the e2e gate asserts `commits` and
         // `humanMessages` are present on a zero summary. 14.8 KB → this;
         // the tokens/min record book (#89: three Day fields, a 30-day

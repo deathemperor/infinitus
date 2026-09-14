@@ -1,5 +1,5 @@
 [Unit]
-Description=Infinitus phone companion (fleet snapshot over HTTP)
+Description=Infinitus tray daemon (control socket, away-push triggers)
 After=network-online.target
 Wants=network-online.target
 

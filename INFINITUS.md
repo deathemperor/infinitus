@@ -19,9 +19,9 @@ makes wrong, in its own PR.
 - **One API.** The fork talks to Infinitus only over its control socket
   (`ControlProtocol`: one JSON line each way; `infinitusctl manifest` is the
   runtime command table — its reply shapes are prose, so reply schemas are
-  hand-written in `packages/contracts` and validated at the boundary) and
-  the mirror HTTP routes — the same wire the phone and the
-  Linux tray use (inventory: issue #553). Anything missing becomes a new
+  hand-written in `packages/contracts` and validated at the boundary);
+  the phone reaches the Mac through the desktop (inventory: issue #553;
+  the Mac's mirror HTTP server left with #1041). Anything missing becomes a new
   route on the `native` branch, never a second protocol or a read of the
   native app's files.
 - **Upstream merges daily, our history never rebased.** `git fetch upstream
@@ -1256,6 +1256,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   note at the top pointing at `infinitus-release.yml` and
   `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and
   `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
+- `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
+  section appended at the end (#1178): Settings › Infinitus › Devices, the
+  push key and the registered phones. Upstream's T3 Connect text above it is
+  untouched.
 - **The project file is `infinitus.json`** (#823 layer 1: the upstream name
   never reaches a screen, and this one is on screen every time the scripts
   menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`
@@ -1362,9 +1366,10 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the url is stored with the secret; "Forget" sends an empty secret), which
   relaunch the app; gated on the manifest marking both verbs as taking
   their secret on stdin, else "no engine secret commands (needs ≥
-  4eaccb341c)"; Test
-  connection is drawn off until a `test-connection` verb exists on the Mac
-  — and the Devices
+  4eaccb341c)"; Test connection sends `test-connection <engine> [--url]`
+  (native #1216, read effect) at the typed url without saving and shows
+  "Reachable in N ms" or the engine's own sentence, gated on the manifest
+  listing the verb — and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
@@ -1385,6 +1390,20 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `applinks` + forwarder first, then this card, then a phone build with the
   entitlement. It is mounted through the prefs panel's `footer`
   slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
+  Before it in that slot, the "Phone alerts" card (`InfinitusApnsCard` +
+  `apns.logic`, #1178): the `apns` read (`{keyPresent, teamId, keyId,
+registrations}`, never a token; each registration decoded alone) drawn as
+  "In the Keychain." / "Not set up." and a list of the registered phones by
+  name · kind · environment, and the `.p8` as a file input — read in the
+  browser, refused without the `-----BEGIN PRIVATE KEY-----` header (the
+  Mac's own check, so a misclicked file is never sent), handed once to
+  `infinitus.secret` as `apns-key` and kept nowhere; "Forget key" is the
+  empty secret. The input stays off while the `apns_key_id` pref above is
+  blank (read off the snapshot's prefs: the Mac stores the key under it and
+  refuses until it is set); gated on the manifest marking `apns-key` as
+  stdin secret. The page's Team ID, Key ID, "This Mac's name" and iCloud
+  rows are the `devices` catalog section with copy in `PREF_COPY`; the
+  Mac's pair token has no consumer left and is not on the page.
   Above it, through the panel's `lead` slot (drawn whatever the native app's
   state — the requests come from this server), the "Pairing requests" card
   (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710): the

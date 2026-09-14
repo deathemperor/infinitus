@@ -1,129 +1,29 @@
 import Foundation
 import AppKit
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import InfinitusCore
 
-// MARK: - Backend-free remote access, mac side (#9)
-//
-// The rules are all in InfinitusCore.MirrorPairing (token, pair URL,
-// which address is a tailnet one). What lives here is the machinery
-// AppKit brings: walking the interfaces, drawing a QR, and running a
-// cloudflared child for the quick-tunnel mode.
-
-enum LocalAddresses {
-    /// Every up, non-loopback IPv4 address on this Mac, in interface
-    /// order — so the Wi-Fi/Ethernet address comes before Tailscale's
-    /// utun and `MirrorPairing.lanAddress` picks the right one.
-    static func ipv4() -> [String] {
-        var head: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&head) == 0, let first = head else { return [] }
-        defer { freeifaddrs(head) }
-        var found: [String] = []
-        for pointer in sequence(first: first, next: { $0.pointee.ifa_next }) {
-            let flags = Int32(pointer.pointee.ifa_flags)
-            guard flags & IFF_UP == IFF_UP, flags & IFF_LOOPBACK == 0,
-                  let address = pointer.pointee.ifa_addr,
-                  address.pointee.sa_family == UInt8(AF_INET) else { continue }
-            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            guard getnameinfo(address, socklen_t(address.pointee.sa_len),
-                              &host, socklen_t(host.count),
-                              nil, 0, NI_NUMERICHOST) == 0 else { continue }
-            let text = String(cString: host)
-            if !found.contains(text) { found.append(text) }
-        }
-        return found
-    }
-}
-
-enum PairQR {
-    /// A crisp QR for a pair URL. CoreImage renders one module per pixel,
-    /// so it's scaled with nearest-neighbour before it becomes an image.
-    static func image(for text: String, side: CGFloat = 132) -> NSImage? {
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(text.utf8)
-        // "M": a pair URL is short, and the extra correction survives a
-        // phone camera at an angle.
-        filter.correctionLevel = "M"
-        guard let output = filter.outputImage else { return nil }
-        let scale = side / output.extent.width
-        let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        let rep = NSCIImageRep(ciImage: scaled)
-        let image = NSImage(size: rep.size)
-        image.addRepresentation(rep)
-        return image
-    }
-}
-
-/// One way in: a reachable address for the mirror listener plus the QR
-/// that pairs a phone with it.
-struct PairRoute: Identifiable {
-    let id: String
-    /// "On this Wi-Fi", "Anywhere via Tailscale", "Anywhere (Cloudflare)".
-    let title: String
-    let detail: String
-    /// `http://192.168.1.20:47824` — what the phone's address field takes.
-    let endpoint: String
-}
-
-/// Where the tailnet route comes from: a Tailscale client on this Mac.
-/// Infinitus never installs it — Tailscale needs an account, a browser
-/// sign-in and a VPN-configuration grant, none of which an app can do on
-/// the user's behalf — it points the way and notices when it's there.
-enum TailscaleStatus: Equatable {
-    case notInstalled
-    /// App present, no tailnet address: not running, or signed out.
-    case installed(URL)
-    case connected(String)
-
-    static let downloadURL = URL(string: "https://tailscale.com/download/mac")!
-
-    /// The Mac App Store and the standalone builds carry different ids;
-    /// the Homebrew formula is CLI-only and lives in the prefix.
-    static var appURL: URL? {
-        for id in ["io.tailscale.ipn.macos", "io.tailscale.ipn.macsys"] {
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
-                return url
-            }
-        }
-        return ["/opt/homebrew/bin/tailscale", "/usr/local/bin/tailscale"]
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-            .map { URL(fileURLWithPath: $0) }
-    }
-
-    static func probe(addresses: [String]) -> TailscaleStatus {
-        if let ip = MirrorPairing.tailnetAddress(in: addresses) { return .connected(ip) }
-        if let app = appURL { return .installed(app) }
-        return .notInstalled
-    }
-}
-
-/// Runs `cloudflared tunnel --url http://127.0.0.1:<port>` (#9): a
+/// Runs `cloudflared tunnel --url http://127.0.0.1:<port>` (#9, #572): a
 /// throwaway public hostname, no Cloudflare account, no backend of ours.
-/// The URL changes every start and the pairing token is the only lock,
-/// which is exactly what the Sync pane's help text says.
+/// The URL changes every start. Fronts the fork server's port; the
+/// phone mirror it was written for is gone.
 @MainActor
 final class QuickTunnel: ObservableObject {
     @Published private(set) var url: String?
     @Published private(set) var status: String?
     /// Set by AppModel so tunnel events land in the popup's event log.
     var log: ((String, String) -> Void)?
-    /// Fires with each URL the tunnel comes up on — the rendezvous publish.
-    var onURL: ((String) -> Void)?
 
     private var process: Process?
     /// The child's pid, remembered across launches: a hard kill of the
     /// app (crash, SIGKILL) can't run any cleanup, and a public tunnel
-    /// left running afterwards is exactly what nobody asked for. One
-    /// key per instance — the mirror's tunnel and the fork server's
-    /// (#572) each remember their own child.
+    /// left running afterwards is exactly what nobody asked for.
     private let pidKey: String
     /// The port the running child fronts.
     private(set) var port: UInt16?
 
     var isRunning: Bool { process != nil }
 
-    init(pidKey: String = "mirror_tunnel_pid") {
+    init(pidKey: String) {
         self.pidKey = pidKey
         reapOrphan()
         // A child process must not outlive the app that opened a public
@@ -170,7 +70,7 @@ final class QuickTunnel: ObservableObject {
             guard !chunk.isEmpty else { return }
             let text = String(decoding: chunk, as: UTF8.self)
             for line in text.split(separator: "\n") {
-                guard let found = MirrorPairing.quickTunnelURL(in: String(line)) else {
+                guard let found = CloudflaredOutput.quickTunnelURL(in: String(line)) else {
                     continue
                 }
                 Task { @MainActor [weak self] in self?.adopt(found) }
@@ -235,7 +135,6 @@ final class QuickTunnel: ObservableObject {
         url = found
         status = found
         log?("🌐", "quick tunnel up at \(found)")
-        onURL?(found)
     }
 
     private func ended() {

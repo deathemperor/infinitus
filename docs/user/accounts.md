@@ -10,7 +10,7 @@ Official Mac releases include swapd. In the desktop or web client, open **Settin
 
 In the Mac app, the swapd pane shows the detected binary and daemon status. An installed copy takes precedence over the bundled copy. If swapd is missing, install a current Infinitus release and relaunch. Source builds can install swapd separately with `cargo install --git https://github.com/deathemperor/swapd swapd` (requires Rust).
 
-CLIProxyAPI and 9Router are optional alternatives, installed separately. In the Mac app's engine settings, enter CLIProxyAPI's base URL and management key, or 9Router's base URL and dashboard password. Use **Test Connection**, then **Save & Restart**. Secrets stay in the Mac's keychain. Enabling or disabling an engine restarts the Mac app. Use one engine per account set to avoid competing rotation policies.
+CLIProxyAPI and 9Router are optional alternatives, installed separately. In **Settings → Infinitus → Engines**, enter CLIProxyAPI's base URL and management key, or 9Router's base URL and dashboard password, then **Save and relaunch**. Only the desktop app on the owning Mac can change a secret; it stays in that Mac's keychain, and **Forget** clears it. **Test connection** reaches the engine at the address in the field with the stored secret, without saving anything. Enabling or disabling an engine restarts the Mac app. Use one engine per account set to avoid competing rotation policies.
 
 ## Add accounts
 
@@ -22,7 +22,7 @@ CLIProxyAPI accounts can be added from its accounts controls. For 9Router, open 
 
 Accounts groups logins by fleet and shows each account's usage windows, limits, reset times, and active status when the engine supplies them. The forecast estimates remaining fleet capacity from reported usage. A missing estimate means there is not enough information to calculate it.
 
-Use **Switch** to choose an account manually. Automatic switching follows the engine's policy: swapd swaps the provider CLI's active login, while proxy engines route requests behind their own endpoint. Proxy session affinity can keep existing conversations on their current credential even after you switch.
+Use **Switch** to choose an account manually. Automatic switching follows the engine's policy: swapd swaps the provider CLI's active login, while proxy engines route requests behind their own endpoint. Proxy session affinity can keep existing conversations on their current credential even after you switch. **Remove** deletes an account's credential from the engine after a confirmation; sign in again to add it back.
 
 When accounts run out of headroom, the fleet shows its exhausted state and reported reset timing. Whether a thread can resume automatically depends on its provider and your resume settings; adding another usable account or waiting for a reset restores capacity. A login that expires needs sign-in again rather than a quota reset. Use the account's re-login action, or the separate **Sign-ins** section for pending service logins.
 

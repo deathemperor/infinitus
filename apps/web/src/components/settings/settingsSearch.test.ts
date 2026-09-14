@@ -266,11 +266,14 @@ describe("searchSettings", () => {
     expect(ids("waiting")).not.toContain("infinitus-push");
     expect(ids("aws sign-in")).not.toContain("infinitus-push");
     expect(ids("live activity")).not.toContain("infinitus-devices");
+    // The phone mirror and its rendezvous went with the mirror server.
+    expect(ids("mirror")).not.toContain("infinitus-devices");
+    expect(ids("rendezvous")).not.toContain("infinitus-devices");
 
     // What each page does still hold is still findable.
     expect(ids("account exhausted")).toContain("infinitus-push");
     expect(ids("revive countdown")).toContain("infinitus-push");
-    expect(ids("mirror tunnel")).toContain("infinitus-devices");
+    expect(ids("cloudflare tunnel")).toContain("infinitus-devices");
   });
 
   it("lights up the deepest Infinitus nav item only", () => {

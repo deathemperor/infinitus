@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  connectionTestInput,
+  connectionTestLine,
   engineSecretInput,
   engineSecretsSupported,
+  parseConnectionTest,
   parseProxyEngineState,
   PROXY_ENGINES,
+  testConnectionSupported,
 } from "./engines.logic";
 
 const command = (name: string, stdin?: string) => ({
@@ -76,6 +80,70 @@ describe("engineSecretInput", () => {
 
   it("omits the url when it is blank so the Mac's default applies", () => {
     expect(engineSecretInput("cliproxy", "  ")).toEqual({ command: "proxy-key", args: {} });
+  });
+});
+
+describe("testConnectionSupported", () => {
+  it("needs the manifest to list test-connection", () => {
+    expect(testConnectionSupported([...SUPPORTED, command("test-connection")])).toBe(true);
+    expect(testConnectionSupported(SUPPORTED)).toBe(false);
+  });
+});
+
+describe("connectionTestInput", () => {
+  it("names the engine as the positional and the typed url as --url", () => {
+    expect(connectionTestInput("9router", " http://10.0.0.5:20128 ")).toEqual({
+      command: "test-connection",
+      args: ["9router"],
+      options: { url: "http://10.0.0.5:20128" },
+    });
+  });
+
+  it("probes the stored url when the field is blank", () => {
+    expect(connectionTestInput("cliproxy", "  ")).toEqual({
+      command: "test-connection",
+      args: ["cliproxy"],
+      options: {},
+    });
+  });
+});
+
+describe("parseConnectionTest", () => {
+  it("reads a reached reply with its round trip and version", () => {
+    expect(parseConnectionTest({ ok: true, latencyMs: 12, version: "1.4.0" })).toEqual({
+      ok: true,
+      latencyMs: 12,
+      version: "1.4.0",
+    });
+  });
+
+  it("reads a failed reply with the engine's words", () => {
+    expect(parseConnectionTest({ ok: false, error: "connection refused" })).toEqual({
+      ok: false,
+      error: "connection refused",
+    });
+  });
+
+  it("is null for a shape it cannot read", () => {
+    expect(parseConnectionTest({ reached: true })).toBeNull();
+    expect(parseConnectionTest(null)).toBeNull();
+  });
+});
+
+describe("connectionTestLine", () => {
+  it("words a reach with the round trip, the version when the engine says one", () => {
+    expect(connectionTestLine({ ok: true, latencyMs: 12, version: null })).toBe(
+      "Reachable in 12 ms.",
+    );
+    expect(connectionTestLine({ ok: true, latencyMs: 340, version: "1.4.0" })).toBe(
+      "Reachable in 340 ms, version 1.4.0.",
+    );
+  });
+
+  it("is the engine's own sentence on a failure", () => {
+    expect(connectionTestLine({ ok: false, error: "connection refused" })).toBe(
+      "connection refused",
+    );
   });
 });
 

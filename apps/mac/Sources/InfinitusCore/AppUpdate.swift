@@ -1,8 +1,7 @@
 import Foundation
 
-/// The phone's trigger for this Mac's own update (#121): `POST
-/// /app/update` (path lives on `MirrorTransport`, empty body) — the Mac
-/// decides from its own `AppReleaseModel`/`BrewUpdater` state, same as
+/// The control socket's `app-update` verb (#121; once the phone's `POST
+/// /app/update` on the mirror, retired with #1041) — the Mac decides from its own `AppReleaseModel`/`BrewUpdater` state, same as
 /// the About pane's button.
 public enum AppUpdate {
     public struct Reply: Codable, Sendable, Equatable {

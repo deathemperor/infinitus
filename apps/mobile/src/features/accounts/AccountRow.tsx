@@ -20,6 +20,7 @@ import {
   commandFailureMessage,
   rowBadges,
   rowMenuActions,
+  removeConfirmation,
   switchConfirmation,
   windowTone,
 } from "./accountsRoute.logic";
@@ -59,10 +60,13 @@ export function AccountRow(props: {
 
   const perform = useCallback(
     async (action: AccountAction, alias?: string) => {
-      const { command, args } = accountCommandArgs(fleetKey, row, action, alias);
+      const { command, args, options } = accountCommandArgs(fleetKey, row, action, alias);
       setBusy(action);
       setError(null);
-      const result = await run({ environmentId, input: { command, args: [...args], options: {} } });
+      const result = await run({
+        environmentId,
+        input: { command, args: [...args], options: options ?? {} },
+      });
       setBusy(null);
       if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
     },
@@ -85,6 +89,23 @@ export function AccountRow(props: {
         Alert.alert(copy.title, copy.message, [
           { text: "Cancel", style: "cancel" },
           { text: "Switch", onPress: () => void perform("switch") },
+        ]);
+        return;
+      }
+      if (action === "remove") {
+        const copy = removeConfirmation(row, fleetTitle);
+        if (Platform.OS === "android") {
+          showConfirmDialog({
+            title: copy.title,
+            message: copy.message,
+            confirmText: "Remove",
+            onConfirm: () => void perform("remove"),
+          });
+          return;
+        }
+        Alert.alert(copy.title, copy.message, [
+          { text: "Cancel", style: "cancel" },
+          { text: "Remove", style: "destructive", onPress: () => void perform("remove") },
         ]);
         return;
       }

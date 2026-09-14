@@ -282,8 +282,8 @@ public enum TokenRateScanner {
 /// The fleet-wide output-token rate (user 2026-09-03 "display
 /// tokens/minute gauge on live activities, popup"). The live scan that
 /// fed this (a session's own transcript tail) is gone (#1041 d5); the
-/// type stays because `FleetMirror.tokenRate` and
-/// `UtilizationModel.Snapshot.liveRate` still carry it, always nil now.
+/// type stays because `UtilizationModel.Snapshot.liveRate` still carries
+/// it, always nil now.
 public struct TokenRate: Codable, Sendable, Equatable {
     public let perMinute: Int
     public let peakPerMinute: Int

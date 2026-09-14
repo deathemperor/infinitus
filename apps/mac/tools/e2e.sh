@@ -91,7 +91,7 @@ fail() {
         # the signal (141 SIGPIPE, 143 SIGTERM, 137 SIGKILL).
         # (`|| st=$?`: under set -e a bare non-zero `wait` ends the script before the echo.)
         if /bin/kill -0 "$APP_PID" 2>/dev/null; then echo "--- app alive: $(ps -o pid=,stat=,etime= -p "$APP_PID")"; else st=0; wait "$APP_PID" 2>/dev/null || st=$?; echo "--- app gone: wait status $st"; fi
-        # #1007: what the app did on the way here — the mirror-input and
+        # #1007: what the app did on the way here — the input and
         # hook lines name a released login, a nudge's outcome, a refused
         # write; kind and text only (the feed carries no secret).
         echo "--- events (last 40)"; "$CTL" events --limit 40 2>/dev/null | python3 -c "import json,sys
@@ -211,7 +211,6 @@ STUB
 chmod +x "$SOCKDIR/aws"
 export INFINITUS_AWS_CLI="$SOCKDIR/aws"
 export INFINITUS_AWS_LEDGER="$SOCKDIR/aws-logins.json"
-export INFINITUS_MIRROR_SNAPSHOT="$SOCKDIR/mirror-snapshot.json"
 # A stub `gcloud` (#367): `auth login --no-launch-browser` prints the
 # SDK's paste-back prompt and reads the code.
 cat >"$SOCKDIR/gcloud" <<'STUB'
@@ -404,18 +403,32 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs set fork_tunnel_enabled false | expect "d['value'] is False" || fail "prefs set fork_tunnel_enabled back"
 "$CTL" prefs set fork_tunnel_hostname code.e2e.invalid | expect "d['value']=='code.e2e.invalid'" || fail "prefs set fork_tunnel_hostname"
 "$CTL" prefs get fork_tunnel_hostname | expect "d['prefs'][0]['value']=='code.e2e.invalid'" || fail "prefs get fork_tunnel_hostname"
+# #1178: the Devices page's prefs and the push setup verbs.
+"$CTL" prefs set machine_name "E2E Mac" | expect "d['value']=='E2E Mac' and d['section']=='devices'" || fail "prefs set machine_name"
+"$CTL" prefs set machine_name "" | expect "d['value']==''" || fail "prefs set machine_name back"
+"$CTL" prefs get apns_team_id apns_key_id icloud_sync | expect "[p['value'] for p in d['prefs']]==['','',False]" || fail "prefs get apns ids / icloud_sync"
+"$CTL" apns | expect "d['keyPresent'] is False and d['teamId']=='' and d['keyId']=='' and d['registrations']==[]" || fail "apns"
+printf 'x' | "$CTL" apns-key 2>&1 | grep -q "apns_key_id" || fail "apns-key must want a key id first"
+"$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='apns-key')['stdin']=='secret'" || fail "manifest: apns-key takes stdin"
 "$CTL" prefs set fork_tunnel_hostname '""' | expect "d['value']==''" || fail "prefs set fork_tunnel_hostname back"
 "$CTL" status | expect "d['forkTunnel']['state']=='off'" || fail "fork tunnel must be off again"
 pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
 echo "prefs: ok"
 
-# JSON-body verbs (#572 N1): the socket takes what the mirror routes take.
+# JSON-body verbs (#572 N1): the socket takes a JSON body on stdin.
 "$CTL" client-activity --body '{"clientId":"e2e","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":5000}' | expect "d['clientId']=='e2e'" || fail "client-activity"
 "$CTL" perf | expect "d['leaseScopes'].get('e2e')==['fleets']" || fail "perf must name the lease e2e just took (#499)"
 "$CTL" perf | expect "'stats' not in d['leaseScopes'].get('local', [])" || fail "the local client must not hold stats without the Stats pane (#499)"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
+# #1177: the fork's "Test connection" against a port nothing serves — a
+# dev Mac's keychain may hold a real key (CI's never does), so the words
+# differ but the verdict and the shape do not; a bad target is a usage
+# error; the reply never fails the verb itself.
+"$CTL" test-connection cliproxy --url http://127.0.0.1:9 | expect "d['ok'] is False and isinstance(d['error'], str) and d['error'] and 'latencyMs' not in d" || fail "test-connection cliproxy against a dead port"
+"$CTL" test-connection 9router --url http://127.0.0.1:9 | expect "d['ok'] is False and isinstance(d['error'], str) and d['error']" || fail "test-connection 9router against a dead port"
+"$CTL" test-connection swapd >/dev/null 2>&1 && fail "test-connection must refuse an unknown engine"
 # #1047: the desktop's thread card on the push verb — a null state ends
 # it (no phone registered: a no-op that still answers), a stray shape is refused.
 # No phone is registered on this private instance, so the reply says so.

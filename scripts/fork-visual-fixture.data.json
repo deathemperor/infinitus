@@ -420,6 +420,31 @@
         "summary": "Store the 9Router dashboard password read from stdin in the keychain. Empty stdin clears it. The app relaunches."
       },
       {
+        "args": [],
+        "effect": "read",
+        "name": "apns",
+        "options": [],
+        "replyShape": "{keyPresent, teamId, keyId, registrations: [{deviceId, deviceName, kind, environment, registeredAt}]}",
+        "summary": "The phone-alert push setup (#1178): the APNs key id and team id (prefs apns_key_id / apns_team_id), whether the .p8 is in the keychain, and every registered phone by device and kind — never a token."
+      },
+      {
+        "args": [],
+        "effect": "write",
+        "name": "apns-key",
+        "options": [],
+        "replyShape": "{stored}",
+        "stdin": "secret",
+        "summary": "Keep the APNs .p8 (PEM on stdin, never argv) in the keychain under apns_key_id, once it proves to sign; empty stdin forgets it. A dev instance's write evicts the installed app's key (#845)."
+      },
+      {
+        "args": ["cliproxy|9router"],
+        "effect": "read",
+        "name": "test-connection",
+        "options": ["--url <base URL, this probe only; default the stored one>"],
+        "replyShape": "{ok, latencyMs?, version?, error?}",
+        "summary": "Probe an engine's management API with the credential in the keychain (the caller never holds it): ok with the round-trip time, or the engine's own words in error — never the credential. Answers within 5 s; a dead URL reads as a timeout. --url probes an address before it is saved."
+      },
+      {
         "args": ["fill-first|round-robin|weighted-round-robin"],
         "effect": "write",
         "name": "proxy-routing",
@@ -708,30 +733,6 @@
       {
         "default": false,
         "effect": "live",
-        "key": "mirror_lan_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": false
-      },
-      {
-        "default": false,
-        "effect": "live",
-        "key": "mirror_tunnel_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": false
-      },
-      {
-        "default": true,
-        "effect": "live",
-        "key": "mirror_rendezvous_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": true
-      },
-      {
-        "default": false,
-        "effect": "live",
         "key": "fork_tunnel_enabled",
         "section": "devices",
         "type": "bool",
@@ -752,6 +753,38 @@
         "section": "devices",
         "type": "string",
         "value": ""
+      },
+      {
+        "default": "",
+        "effect": "live",
+        "key": "machine_name",
+        "section": "devices",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "default": "",
+        "effect": "live",
+        "key": "apns_team_id",
+        "section": "devices",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "default": "",
+        "effect": "live",
+        "key": "apns_key_id",
+        "section": "devices",
+        "type": "string",
+        "value": ""
+      },
+      {
+        "default": false,
+        "effect": "live",
+        "key": "icloud_sync",
+        "section": "devices",
+        "type": "bool",
+        "value": true
       },
       {
         "default": true,

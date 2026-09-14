@@ -104,6 +104,16 @@ vi.mock("../ui/tooltip", () => ({
     isValidElement(render) ? cloneElement(render, undefined, children) : <>{children}</>,
   TooltipPopup: () => null,
 }));
+vi.mock("../ui/alert-dialog", () => ({
+  AlertDialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
+    open ? children : null,
+  AlertDialogClose: "button",
+  AlertDialogDescription: "p",
+  AlertDialogFooter: "footer",
+  AlertDialogHeader: "header",
+  AlertDialogPopup: "section",
+  AlertDialogTitle: "h2",
+}));
 vi.mock("../WorkspaceBreadcrumb", () => ({
   WorkspaceBreadcrumb: "div",
   WorkspaceBreadcrumbItem: "div",
@@ -130,7 +140,7 @@ const readySnapshot: InfinitusSnapshot = {
       key: "claude",
       engineID: "swapd",
       provider: "Claude",
-      capabilities: ["switch", "hold", "prefer", "rename"],
+      capabilities: ["switch", "hold", "prefer", "rename", "remove"],
       caveat: "Usage readings lag the engine by a minute.",
       activeNumber: 1,
       nextCandidate: 2,
@@ -314,6 +324,59 @@ describe("AccountsPage", () => {
       environmentId,
       input: { command: "switch", args: ["claude", "2"], options: {} },
     });
+    renderer.unmount();
+  });
+
+  it("removes an account only after the confirm, with --yes", async () => {
+    testState.snapshot = readySnapshot;
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const byLabel = (label: string) =>
+      renderer.root.findAll((node) => node.props["aria-label"] === label)[0]!;
+
+    await act(async () => {
+      byLabel("Remove spare").props.onClick();
+    });
+    expect(testState.command).not.toHaveBeenCalled();
+    const titles = renderer.root
+      .findAll((node) => node.type === "h2")
+      .map((node) => node.children.join(""));
+    expect(titles).toContain("Remove spare?");
+
+    await act(async () => {
+      byLabel("Confirm removing spare").props.onClick();
+    });
+    expect(testState.command).toHaveBeenCalledWith({
+      environmentId,
+      input: { command: "remove", args: ["claude", "2"], options: { yes: "true" } },
+    });
+    renderer.unmount();
+  });
+
+  it("shows the app's refusal of a remove verbatim", async () => {
+    testState.snapshot = readySnapshot;
+    testState.command.mockResolvedValueOnce({
+      _tag: "Failure",
+      cause: Cause.fail({ _tag: "InfinitusCommandFailed", error: "remove: swapd has no slot 2" }),
+    });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const byLabel = (label: string) =>
+      renderer.root.findAll((node) => node.props["aria-label"] === label)[0]!;
+    await act(async () => {
+      byLabel("Remove spare").props.onClick();
+    });
+    await act(async () => {
+      byLabel("Confirm removing spare").props.onClick();
+    });
+    const failure = renderer.root.findAll(
+      (node) => typeof node.type === "string" && node.props.className?.includes("text-destructive"),
+    )[0]!;
+    expect(failure.children.join("")).toBe("remove: swapd has no slot 2");
     renderer.unmount();
   });
 
