@@ -1238,8 +1238,12 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   below the rule: this product's releases (the DMG, the Linux server archives,
   what is not published yet) in place of upstream's npm, winget, brew and AUR
   paths (#1192). `docs/user/install.md` (the install sections) and
-  `docs/user/background-service.md` (whole) say the same; every other user
-  doc still reads `npx t3` — follow-up issue linked from PR #1192's tail.
+  `docs/user/background-service.md` (whole) say the same; `updating.md`,
+  `remote-access.md`, `welcome-wizard.md`, `install.md`'s mobile section
+  (installed from a build, no store), `docs/operations/release.md` (a fork
+  note at the top pointing at `infinitus-release.yml` and
+  `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and
+  `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
 - **The project file is `infinitus.json`** (#823 layer 1: the upstream name
   never reaches a screen, and this one is on screen every time the scripts
   menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`

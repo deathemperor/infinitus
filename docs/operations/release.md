@@ -1,8 +1,19 @@
 # Release Checklist
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Using the product? See [docs/user](../user/).
 
-This document covers the unified release workflow for stable and nightly desktop releases.
+> **This repository does not release this way.** Infinitus ships from a
+> `v<version>` tag on `main` through `.github/workflows/infinitus-release.yml`
+> (version from the root `VERSION` file, notes from `apps/mac/CHANGELOG.md`
+> and the `apps/mac/changelog.d/` fragments, nightly from
+> `infinitus-nightly.yml`); the process is in
+> [`apps/mac/docs/RELEASING.md`](../../apps/mac/docs/RELEASING.md) and the
+> "One release" section of [INFINITUS.md](../../INFINITUS.md). Upstream's
+> `release.yml` described below is disabled here and kept only so upstream
+> syncs stay clean: there is no npm publish, hosted web app, marketing site,
+> relay deployment or AUR package for Infinitus.
+
+This document covers upstream's unified release workflow for stable and nightly desktop releases.
 
 ## What the workflow does
 
