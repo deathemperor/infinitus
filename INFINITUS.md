@@ -80,12 +80,10 @@ makes wrong, in its own PR.
   `## Unreleased` into that section. The script unlinks every fragment it
   folds, so those deletions belong in the cut commit itself: the tag must
   point at a tree whose `changelog.d/` holds only its README, which the
-  `notes` job checks before anything is built), `--prerelease` iff the version carries a prerelease tag, then
-  bumps the cask from the standalone zip. The tag must equal
+  `notes` job checks before anything is built), `--prerelease` iff the version carries a prerelease tag. The tag must equal
   `v$(cat VERSION)`. `workflow_dispatch` is the dry run (artifacts, nothing
-  published). The site's installer and the cask read `releases/latest`
-  and the `nightly` tag (the menu bar app's own poll left with its About
-  pane, #1237): `latest` becomes the one-app release with the first plain
+  published). Installed menu bar apps poll `releases/latest` and the
+  `nightly` tag: `latest` becomes the one-app release with the first plain
   version; `nightly` is `infinitus-nightly.yml`'s rolling build of the
   whole product (#1042): the same build jobs, called (`workflow_call`)
   every night at 17:17 UTC with `<VERSION>-infinitus-nightly.<yyyymmdd>.<run>`
@@ -338,8 +336,14 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   — `workEntryDisplayLabel`, `singleToolCallLabel` and `liveWorkEntryLabel`
   prefer it over the command, and `buildToolCallExpandedBody` (unchanged)
   then adds the command as the expanded row's first block, since it differs
-  from the visible label. Rows without a description are as before. The
-  phone's `threadActivity.ts` mirror is the issue's open half.
+  from the visible label. Rows without a description are as before.
+  `apps/mobile/src/lib/threadActivity.ts` (an upstream file) mirrors it:
+  `WorkLogEntry.commandDescription` derived from `data.description` on a
+  `command_execution` row (whitespace collapsed), merged forward in
+  `mergeDerivedWorkLogEntries`, and preferred over the command in
+  `workEntryRowLabel` (compact and expanded), `singleToolCallLabel` and
+  `liveToolActivitySummary`; the expanded body already leads with the
+  command block.
 - Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
   exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
 turnId)` → `{durationMs, completedAt, runningShells, runningAgents}` for a
@@ -2496,13 +2500,14 @@ pair` (token masked, server log never uploaded), screenshots every route in
   `infinitus-release.yml` through `workflow_call` with that version
   (`secrets: inherit`, so the Mac job signs and notarizes as for a release),
   `publish` — `main` only, on the schedule or a dispatch with `publish` —
-  force-moves the `nightly` tag, clobbers the assets (`Infinitus-nightly.zip`
-  is a copy of the standalone zip for the cask), removes older nights' versioned assets and edits the title.
+  force-moves the `nightly` tag, clobbers the assets, removes older nights'
+  versioned assets and edits the title.
 - `.github/workflows/infinitus-release.yml` — the one release (see
   "One release" above). Its `desktop` job nests the menu bar app as a login
   item (#777): the `mac` job of the same run uploads `Infinitus-Menu-Bar-<version>.zip`
   (the nested build: CFBundleName "Infinitus Menu Bar", no `infinitus://` URL
-  type; the standalone `Infinitus-<version>.zip` beside it is the cask's),
+  type; the standalone `Infinitus-<version>.zip` and its Homebrew cask left
+  with #1238),
   which `desktop` unpacks, checks (bundle id `run.infinitus`, version equal
   to the release's; on signed builds Developer ID from team `Q783W6B4FA`,
   hardened runtime, `stapler validate`) and hands to the build script as

@@ -210,11 +210,6 @@ export const PREF_COPY: Readonly<
     description:
       "Made-up accounts standing in for the engine. Nothing reads or touches your real accounts; flipping this restarts Infinitus.",
   },
-  // About.
-  update_channel: {
-    label: "Update channel",
-    choices: { stable: "Stable", nightly: "Nightly" },
-  },
   // Priority: thread priority mode (#616 hold, #743 interrupt). The verdict
   // itself is native's; these are the knobs it reads.
   priority_mode: {
