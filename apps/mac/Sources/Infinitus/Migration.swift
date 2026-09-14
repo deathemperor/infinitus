@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 /// One-time copy-migration for the rename (Limitless → Infinitus,
 /// 2026-08-30): the App Support dir and the iCloud Drive folder move to
@@ -29,6 +30,30 @@ enum RenameMigration {
             } catch {
                 NSLog("Infinitus: migration of \(name) failed: \(error)")
             }
+        }
+    }
+}
+
+/// The sign-in flow's per-account "private window" (retired 2026-09-14)
+/// kept one WKWebsiteDataStore per account plus a shared Google jar,
+/// each holding login cookies nothing reads any more. Removed once,
+/// then the two defaults keys that named them.
+enum PrivateWindowCleanup {
+    static let mapKey = "auth_web_store_map"
+    static let googleJarKey = "auth_web_store_google"
+
+    @MainActor static func run(defaults: UserDefaults = AppDefaults.standard) {
+        let map = defaults.dictionary(forKey: mapKey) as? [String: String] ?? [:]
+        let ids = (Array(map.values) + [defaults.string(forKey: googleJarKey)].compactMap { $0 })
+            .compactMap(UUID.init)
+        guard !ids.isEmpty else { return }
+        Task { @MainActor in
+            for id in ids {
+                try? await WKWebsiteDataStore.remove(forIdentifier: id)
+            }
+            defaults.removeObject(forKey: mapKey)
+            defaults.removeObject(forKey: googleJarKey)
+            NSLog("Infinitus: removed \(ids.count) retired sign-in web store(s)")
         }
     }
 }
