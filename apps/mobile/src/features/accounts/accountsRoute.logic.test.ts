@@ -5,9 +5,7 @@ import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  chipEnvironment,
   commandFailureMessage,
-  homeChip,
   infinitusMacs,
   exhaustedCopy,
   macAccountsModel,
@@ -210,80 +208,6 @@ describe("commandFailureMessage", () => {
   });
 });
 
-describe("homeChip", () => {
-  it("is silent while loading and muted when the app is unavailable", () => {
-    expect(homeChip(null, NOW)).toBeNull();
-    expect(homeChip({ available: false, fleets: [], commands: [] }, NOW)).toEqual({
-      label: "Infinitus",
-      pct: null,
-      tone: "off",
-      limited: false,
-    });
-  });
-
-  it("names the active account and grades its fullest window", () => {
-    const snapshot: InfinitusSnapshot = {
-      ...readySnapshot,
-      fleets: [
-        {
-          ...readySnapshot.fleets[0]!,
-          activeNumber: 2,
-          accounts: [
-            {
-              number: 1,
-              email: "one@example.com",
-              isOrganization: false,
-              active: false,
-              usageStatus: "ok",
-            },
-            {
-              number: 2,
-              alias: "death2",
-              email: "two@example.com",
-              isOrganization: false,
-              active: true,
-              usageStatus: "ok",
-              usage: { fiveHour: { pct: 42 }, sevenDay: { pct: 91 } },
-            },
-          ],
-        },
-      ],
-    };
-    expect(homeChip(snapshot, NOW)).toEqual({
-      label: "death2",
-      pct: 91,
-      tone: "hot",
-      limited: false,
-    });
-  });
-
-  it("has nothing to say for a fleet with no active account, and no pct without usage", () => {
-    expect(
-      homeChip({ ...readySnapshot, fleets: [{ ...readySnapshot.fleets[0]!, accounts: [] }] }, NOW),
-    ).toBeNull();
-    expect(homeChip(readySnapshot, NOW)).toEqual({
-      label: "one@example.com",
-      pct: null,
-      tone: "calm",
-      limited: false,
-    });
-  });
-});
-
-describe("chipEnvironment", () => {
-  const macs = [
-    { environmentId: macId, label: "Studio", connected: true },
-    { environmentId: plainId, label: "Mini", connected: true },
-  ];
-
-  it("follows the selected environment when it is a Mac, else the first Mac", () => {
-    expect(chipEnvironment(plainId, macs)?.label).toBe("Mini");
-    expect(chipEnvironment(EnvironmentId.make("other"), macs)?.label).toBe("Studio");
-    expect(chipEnvironment(null, macs)?.label).toBe("Studio");
-    expect(chipEnvironment(null, [])).toBeNull();
-  });
-});
-
 describe("exhausted band (#706)", () => {
   it("the model carries a band only for a fleet whose every account is at a limit", () => {
     expect(macAccountsModel(readySnapshot, NOW).bands.size).toBe(0);
@@ -291,15 +215,6 @@ describe("exhausted band (#706)", () => {
     expect(bands.get("swapd/claude")).toEqual({ revivalAt: RESET, revivesFirst: "death1" });
     // Past the reset the reading belongs to a window that rolled: no band.
     expect(macAccountsModel(exhaustedSnapshot, Date.parse(RESET) + 1).bands.size).toBe(0);
-  });
-
-  it("the chip reads limited in the hot tone instead of the pct", () => {
-    expect(homeChip(exhaustedSnapshot, NOW)).toEqual({
-      label: "death1",
-      pct: 100,
-      tone: "hot",
-      limited: true,
-    });
   });
 
   it("the copy names the revival and who comes back first", () => {

@@ -13,10 +13,6 @@ import {
   exhaustedBand,
   type ExhaustedBandModel,
 } from "@t3tools/client-runtime/state/infinitusExhausted";
-import {
-  infinitusAccountLabel,
-  infinitusActiveAccount,
-} from "@t3tools/client-runtime/state/infinitus";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
@@ -213,48 +209,3 @@ export function commandFailureMessage(cause: Cause.Cause<unknown>): string {
     : "The command did not reach the Mac.";
 }
 
-/** What the home header's chip says for one Mac: the active account and its
-    fullest window, or "limited" in the hot tone while every unheld account of
-    its fleet is at a limit (#706). Nothing while the first snapshot is in
-    flight; an unavailable app still earns a muted chip, so the tap leads to
-    the reason. */
-export interface HomeChipModel {
-  readonly label: string;
-  readonly pct: number | null;
-  readonly tone: "calm" | "warm" | "hot" | "off";
-  readonly limited: boolean;
-}
-
-export function homeChip(snapshot: InfinitusSnapshot | null, nowMs: number): HomeChipModel | null {
-  if (snapshot === null) return null;
-  if (!snapshot.available) return { label: "Infinitus", pct: null, tone: "off", limited: false };
-  for (const fleet of snapshot.fleets) {
-    const active = infinitusActiveAccount(fleet);
-    if (active === null) continue;
-    const row = buildFleetSection(fleet).rows.find(
-      (candidate) => candidate.number === active.number,
-    );
-    const pct = row && row.windows.length > 0 ? Math.max(...row.windows.map((w) => w.pct)) : null;
-    const limited = exhaustedBand(fleet, nowMs) !== null;
-    return {
-      label: infinitusAccountLabel(active),
-      pct,
-      tone: limited ? "hot" : pct === null ? "calm" : windowTone(pct),
-      limited,
-    };
-  }
-  return null;
-}
-
-/** The Mac the chip follows: the environment the home list is filtered to
-    when that is a Mac, else the first Mac paired. */
-export function chipEnvironment(
-  selectedEnvironmentId: EnvironmentId | null,
-  macs: ReadonlyArray<InfinitusMac>,
-): InfinitusMac | null {
-  if (selectedEnvironmentId !== null) {
-    const selected = macs.find((mac) => mac.environmentId === selectedEnvironmentId);
-    if (selected !== undefined) return selected;
-  }
-  return macs[0] ?? null;
-}

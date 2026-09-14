@@ -30,7 +30,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "../../lib/cn";
 import { AppText as Text } from "../../components/AppText";
 import { EmptyState } from "../../components/EmptyState";
-import { InfinitusHomeChip } from "../accounts/InfinitusHomeChip";
 import { InfinitusSignIns } from "../infinitus/InfinitusSignIns";
 import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspaceModel";
 import type { SavedRemoteConnection } from "../../lib/connection";
@@ -1119,18 +1118,9 @@ export function HomeScreen(props: HomeScreenProps) {
 
   // Infinitus (fork, #572): a paired Mac's lapsed AWS / gcloud sign-ins sit
   // above the list; the component renders nothing when there are none.
-  // The Infinitus chip (active account + fullest window of the Mac the list
-  // follows) lives in the Android header; iOS draws a native header with no
-  // slot for it, so there it heads the list instead.
   const listHeader = (
     <>
-      {Platform.OS === "ios" ? (
-        <View className="flex-row justify-end px-4 pb-2">
-          <InfinitusHomeChip selectedEnvironmentId={props.selectedEnvironmentId} />
-        </View>
-      ) : (
-        <HomeTopContentSpacer />
-      )}
+      {Platform.OS === "ios" ? null : <HomeTopContentSpacer />}
       <InfinitusSignIns className="px-4 pb-3" />
     </>
   );

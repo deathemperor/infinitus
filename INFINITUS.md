@@ -1072,11 +1072,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `completeQueuedMessageDelivery` takes `{ retainInFeed: false }` so no
   "Pending" feed row waits for an echo the timeline only gives at drain.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
-  the `InfinitusHomeChip` on iOS (whose native header has no slot for it) and
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
-- `apps/mobile/src/features/home/HomeHeader.tsx` — the `InfinitusHomeChip`
-  (active account + fullest window of the Mac the list follows) before the
-  filter button, in the Android header; its
+- `apps/mobile/src/features/home/HomeHeader.tsx` — its
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
 - `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's
@@ -1163,8 +1160,7 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
   added; the upstream sync re-generates it.
 - `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts utility
-  item and its `infinitus` capability gate, the footer's
-  `SidebarAccountsPill`, and `/accounts`
+  item and its `infinitus` capability gate, and `/accounts`
   in the `currentFooterPage` selector (so the Back button appears on the page).
 - `packages/contracts/src/keybindings.ts` — `accounts.open` in
   `STATIC_KEYBINDING_COMMANDS`.
@@ -2163,8 +2159,6 @@ agent-activity` (the session cards' kinds retired with #1041).
   refused `activities-token` (`[infinitus-push]`) since the bridge sends
   with `reportFailure: false`.
 
-- `apps/web/src/components/sidebar/SidebarAccountsPill.tsx` (+
-  `sidebarAccountsPill.logic.ts`) — the sidebar footer's Infinitus line.
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives
   shiki's default per-line budget must still tokenize the whole line.
