@@ -10,9 +10,9 @@ import Foundation
 /// Chrome and no page. Nothing on our side can pick the presenter, so
 /// such a browser gets the URL directly — in a private window where its
 /// command line has one, since the sheet's point was a fresh session.
-/// Firefox implements the handler itself and may well present; routing
-/// it here too costs nothing (its private window is the same fresh
-/// session) and keeps the rule one line: not Safari, declares support.
+/// The private flags are the Chromium family's only (probed on Chrome
+/// 152 handed to its running instance): any other declaring browser
+/// gets the page in its profile, and the companion window says so.
 public enum SignInSheetRoute: Equatable, Sendable {
     /// The system sheet: Safari, or a default browser without the key.
     case systemSheet
@@ -36,7 +36,6 @@ public enum SignInSheetRoute: Equatable, Sendable {
         "com.microsoft.edgemac.Beta": "--inprivate",
         "com.microsoft.edgemac.Dev": "--inprivate",
         "com.microsoft.edgemac.Canary": "--inprivate",
-        "org.mozilla.firefox": "--private-window",
     ]
 
     /// `bundleID`, `name` and `capabilities` are the default handler's
