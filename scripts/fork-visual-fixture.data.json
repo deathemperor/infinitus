@@ -437,6 +437,14 @@
         "summary": "Keep the APNs .p8 (PEM on stdin, never argv) in the keychain under apns_key_id, once it proves to sign; empty stdin forgets it. A dev instance's write evicts the installed app's key (#845)."
       },
       {
+        "args": ["cliproxy|9router"],
+        "effect": "read",
+        "name": "test-connection",
+        "options": ["--url <base URL, this probe only; default the stored one>"],
+        "replyShape": "{ok, latencyMs?, version?, error?}",
+        "summary": "Probe an engine's management API with the credential in the keychain (the caller never holds it): ok with the round-trip time, or the engine's own words in error — never the credential. Answers within 5 s; a dead URL reads as a timeout. --url probes an address before it is saved."
+      },
+      {
         "args": ["fill-first|round-robin|weighted-round-robin"],
         "effect": "write",
         "name": "proxy-routing",

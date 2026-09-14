@@ -819,6 +819,46 @@ final class ControlServer {
             pusher.storeKey(pem: pem)
             guard forgetting || pusher.keyStored else { throw Fail(pusher.lastResult ?? "couldn't store the key") }
             return ControlReply(ok: true, result: .object(["stored": .bool(pusher.keyStored)]))
+        case "test-connection":
+            // #1177: the fork's Engines page probes with the keychain
+            // credential; the reply never carries it, only the engine's words.
+            guard r.args.count == 1, ConnectionTest.targets.contains(r.args[0]) else {
+                throw Fail("usage: test-connection cliproxy|9router [--url <base URL>]")
+            }
+            let target = r.args[0]
+            let stored = target == "cliproxy" ? model.cliproxyBaseURL : model.nineRouterBaseURL
+            let urlString = r.options["url"] ?? stored
+            guard let url = URL(string: urlString), url.scheme != nil, url.host != nil else {
+                return ControlReply(ok: true, result: .object(
+                    ConnectionTest.Reply.failed("That isn't a valid address \u{2014} it should look like "
+                        + (target == "cliproxy" ? CLIProxyEngine.defaultBaseURL : NineRouterEngine.defaultBaseURL).absoluteString
+                        + ".").fields))
+            }
+            let credential = target == "cliproxy"
+                ? Keychain.read(account: stored)
+                : Keychain.read(account: stored, service: Keychain.nineRouterService)
+            guard let credential, !credential.isEmpty else {
+                return ControlReply(ok: true, result: .object(ConnectionTest.Reply.failed(
+                    target == "cliproxy" ? "No management key is stored. Save one first, then test."
+                                         : "No dashboard password is stored. Save one first, then test.").fields))
+            }
+            let started = Date()
+            let reply: ConnectionTest.Reply
+            do {
+                if target == "cliproxy" {
+                    let engine = CLIProxyEngine(baseURL: url, managementKey: credential)
+                    _ = try await ConnectionTest.withDeadline { try await engine.probe() }
+                } else {
+                    let engine = NineRouterEngine(baseURL: url, password: credential)
+                    _ = try await ConnectionTest.withDeadline { try await engine.probe() }
+                }
+                reply = .reached(latencyMs: Int(Date().timeIntervalSince(started) * 1000))
+            } catch is ConnectionTest.TimedOut {
+                reply = .failed("The engine didn't answer within \(Int(ConnectionTest.timeoutSeconds)) s. Check it is running and its address is right, then try again.")
+            } catch {
+                reply = .failed(EngineFailure.sentence(error))
+            }
+            return ControlReply(ok: true, result: .object(reply.fields))
 
         case "desktop-credential":
             // #822: the desktop's own push at port publish (or a hand-fed
