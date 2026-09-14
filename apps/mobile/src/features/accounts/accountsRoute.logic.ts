@@ -208,4 +208,3 @@ export function commandFailureMessage(cause: Cause.Cause<unknown>): string {
     ? error.message
     : "The command did not reach the Mac.";
 }
-
