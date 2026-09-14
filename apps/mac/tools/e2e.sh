@@ -41,6 +41,13 @@ ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple D
 SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
+# An empty Claude home (#1204): the stats and token-rate scanners read
+# `$CLAUDE_CONFIG_DIR/projects`, and without this the run scanned the
+# developer's real transcript tree — 14 GB on one Mac, nothing on CI — so
+# the perf gate measured the corpus, not the app. CI and a dev Mac now
+# measure the same thing; the scan's own cost is #1204's fix, not hidden.
+export CLAUDE_CONFIG_DIR="$SOCKDIR/claude-home"
+mkdir -p "$CLAUDE_CONFIG_DIR/projects"
 export INFINITUS_SWAPD_CLI="$PWD/tools/demo-swapd"
 export INFINITUS_DEMO_STATE="$SOCKDIR/demo-state.json"   # not $TMPDIR: the bundled app in mock mode shares that one
 LOG="$(mktemp -t infinitus-e2e)"
