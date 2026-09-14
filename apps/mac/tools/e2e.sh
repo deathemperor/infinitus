@@ -416,6 +416,13 @@ echo "prefs: ok"
 # #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
 "$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
 "$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
+# #1177: the fork's "Test connection" against a port nothing serves — a
+# dev Mac's keychain may hold a real key (CI's never does), so the words
+# differ but the verdict and the shape do not; a bad target is a usage
+# error; the reply never fails the verb itself.
+"$CTL" test-connection cliproxy --url http://127.0.0.1:9 | expect "d['ok'] is False and isinstance(d['error'], str) and d['error'] and 'latencyMs' not in d" || fail "test-connection cliproxy against a dead port"
+"$CTL" test-connection 9router --url http://127.0.0.1:9 | expect "d['ok'] is False and isinstance(d['error'], str) and d['error']" || fail "test-connection 9router against a dead port"
+"$CTL" test-connection swapd >/dev/null 2>&1 && fail "test-connection must refuse an unknown engine"
 # #1047: the desktop's thread card on the push verb — a null state ends
 # it (no phone registered: a no-op that still answers), a stray shape is refused.
 # No phone is registered on this private instance, so the reply says so.

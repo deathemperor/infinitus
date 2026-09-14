@@ -449,6 +449,8 @@ function answer(request, socketPath) {
       return { baseURL: "http://127.0.0.1:8317", keyPresent: false };
     case "9router":
       return { baseURL: "http://127.0.0.1:20128", passwordPresent: false, enabled: false };
+    case "test-connection":
+      return { ok: true, latencyMs: 12 };
     default:
       return undefined;
   }
