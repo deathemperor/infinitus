@@ -1505,7 +1505,11 @@ final class AppModel: ObservableObject {
     /// leave still does. `ForkServerProbe.verdict` holds the rule; this adds
     /// the work-log line, so a refusal is on the record rather than inferred.
     func acceptsForkServerPublish(port: Int) async -> Bool {
-        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: forkServerPort,
+        // Only a port a publish stored is a target of this instance's (#1199):
+        // on the default with no pref, what answers there is another
+        // instance's server — the installed app's desktop, on a dev Mac.
+        let published = defaults.object(forKey: "fork_server_port") as? Int
+        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: published,
                                                    using: forkServerProbe)
         if verdict == .accept { return true }
         logMirrorInput("⚠️", ForkServerProbe.refusalLine(port: port))
