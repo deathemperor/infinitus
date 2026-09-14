@@ -10,7 +10,7 @@ Official Mac releases include swapd. In the desktop or web client, open **Settin
 
 In the Mac app, the swapd pane shows the detected binary and daemon status. An installed copy takes precedence over the bundled copy. If swapd is missing, install a current Infinitus release and relaunch. Source builds can install swapd separately with `cargo install --git https://github.com/deathemperor/swapd swapd` (requires Rust).
 
-CLIProxyAPI and 9Router are optional alternatives, installed separately. In **Settings → Infinitus → Engines**, enter CLIProxyAPI's base URL and management key, or 9Router's base URL and dashboard password, then **Save and relaunch**. Only the desktop app on the owning Mac can change a secret; it stays in that Mac's keychain, and **Forget** clears it. Test connection is not available yet. Enabling or disabling an engine restarts the Mac app. Use one engine per account set to avoid competing rotation policies.
+CLIProxyAPI and 9Router are optional alternatives, installed separately. In **Settings → Infinitus → Engines**, enter CLIProxyAPI's base URL and management key, or 9Router's base URL and dashboard password, then **Save and relaunch**. Only the desktop app on the owning Mac can change a secret; it stays in that Mac's keychain, and **Forget** clears it. **Test connection** reaches the engine at the address in the field with the stored secret, without saving anything. Enabling or disabling an engine restarts the Mac app. Use one engine per account set to avoid competing rotation policies.
 
 ## Add accounts
 

@@ -22,10 +22,14 @@ import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 import {
+  connectionTestInput,
+  connectionTestLine,
   engineSecretInput,
   engineSecretsSupported,
+  parseConnectionTest,
   parseProxyEngineState,
   PROXY_ENGINES,
+  testConnectionSupported,
   type ProxyEngine,
   type ProxyEngineKey,
   type ProxyEngineState,
@@ -56,9 +60,13 @@ export function InfinitusEngineSecrets({
   const [secrets, setSecrets] = useState<PerEngine<string>>({});
   const [busy, setBusy] = useState<ProxyEngineKey | null>(null);
   const [relaunching, setRelaunching] = useState(false);
+  /** The last probe's line per engine; cleared when the url changes. */
+  const [probes, setProbes] = useState<PerEngine<string>>({});
 
   const supported =
     snapshot !== null && snapshot.available && engineSecretsSupported(snapshot.commands);
+  const probeSupported =
+    snapshot !== null && snapshot.available && testConnectionSupported(snapshot.commands);
 
   const read = useCallback(
     async (engine: ProxyEngine) => {
@@ -129,6 +137,32 @@ export function InfinitusEngineSecrets({
     [environmentId, runSecret, urls],
   );
 
+  // The probe reads the typed url and never saves it: the Mac reaches the
+  // engine with the credential in its keychain and answers with the round
+  // trip or the engine's own words, which are shown as they are.
+  const probe = useCallback(
+    async (engine: ProxyEngine) => {
+      if (environmentId === null) return;
+      setBusy(engine.key);
+      const result = await runCommand({
+        environmentId,
+        input: connectionTestInput(engine.key, urls[engine.key] ?? ""),
+      });
+      setBusy(null);
+      const line =
+        result._tag === "Failure"
+          ? infinitusCommandFailure(result.cause).message
+          : (() => {
+              const parsed = parseConnectionTest(result.value.result);
+              return parsed === null
+                ? "Infinitus answered test-connection with a shape this build cannot read."
+                : connectionTestLine(parsed);
+            })();
+      setProbes((current) => ({ ...current, [engine.key]: line }));
+    },
+    [environmentId, runCommand, urls],
+  );
+
   if (capability !== true || snapshot === null || !snapshot.available) return null;
   if (!supported) {
     return (
@@ -163,9 +197,10 @@ export function InfinitusEngineSecrets({
                   spellCheck={false}
                   disabled={locked}
                   value={urls[engine.key] ?? ""}
-                  onChange={(event) =>
-                    setUrls((current) => ({ ...current, [engine.key]: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setUrls((current) => ({ ...current, [engine.key]: event.target.value }));
+                    setProbes((current) => ({ ...current, [engine.key]: undefined }));
+                  }}
                 />
               }
             />
@@ -211,23 +246,30 @@ export function InfinitusEngineSecrets({
                 </div>
               }
             />
-            {/* Wired in the follow-up once the Mac's test-connection verb
-                exists (its contract is on #1177); drawn now so the row does
-                not move. */}
             <SettingsRow
               title="Connection"
-              description={TEST_UNAVAILABLE}
+              description={
+                probeSupported
+                  ? `Reaches ${engine.label} at the URL above with the stored ${engine.secretNoun.toLowerCase()}; nothing is saved.`
+                  : TEST_UNAVAILABLE
+              }
               control={
                 <Button
                   size="sm"
                   variant="outline"
                   aria-label={`Test ${engine.label} connection`}
-                  disabled
+                  disabled={!probeSupported || locked}
+                  onClick={() => void probe(engine)}
                 >
                   Test connection
                 </Button>
               }
             />
+            {probes[engine.key] === undefined ? null : (
+              <p role="status" className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">
+                {probes[engine.key]}
+              </p>
+            )}
             {state?.error ? (
               <p className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">
                 Last error from the engine: {state.error}

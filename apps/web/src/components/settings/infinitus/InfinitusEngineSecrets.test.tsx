@@ -228,4 +228,48 @@ describe("InfinitusEngineSecrets", () => {
     expect(button.props.disabled).toBe(true);
     expect(rendered()).toContain("needs a newer Infinitus app");
   });
+
+  it("probes the typed url without saving and reports the round trip", async () => {
+    fake.snapshot = snapshot([...ENGINE_COMMANDS, command("test-connection")]);
+    fake.run = vi.fn(async ({ input }: { input: { command: string } }) =>
+      input.command === "test-connection" ? reply({ ok: true, latencyMs: 12 }) : answerReads(input),
+    );
+    await renderSection();
+    await type("CLIProxyAPI base URL", "http://10.0.0.9:8317");
+    await act(async () => {
+      byLabel("Test CLIProxyAPI connection").props.onClick();
+    });
+    expect(fake.run).toHaveBeenCalledWith({
+      environmentId: "env-1",
+      input: {
+        command: "test-connection",
+        args: ["cliproxy"],
+        options: { url: "http://10.0.0.9:8317" },
+      },
+    });
+    expect(fake.runSecret).not.toHaveBeenCalled();
+    expect(rendered()).toContain("Reachable in 12 ms.");
+  });
+
+  it("shows the engine's own words when the probe fails", async () => {
+    fake.snapshot = snapshot([...ENGINE_COMMANDS, command("test-connection")]);
+    fake.run = vi.fn(async ({ input }: { input: { command: string } }) =>
+      input.command === "test-connection"
+        ? reply({ ok: false, error: "connection refused" })
+        : answerReads(input),
+    );
+    await renderSection();
+    await act(async () => {
+      byLabel("Test 9Router connection").props.onClick();
+    });
+    expect(fake.run).toHaveBeenCalledWith({
+      environmentId: "env-1",
+      input: {
+        command: "test-connection",
+        args: ["9router"],
+        options: { url: "http://10.0.0.5:20128" },
+      },
+    });
+    expect(rendered()).toContain("connection refused");
+  });
 });
