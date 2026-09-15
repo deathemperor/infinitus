@@ -336,7 +336,11 @@ struct InfinitusTray {
                 } else if let cause = AccountVitals.cause(a.usage) {
                     deadBySession = cause.kind == .session
                     var s = "\(theme.deadMarker) \(theme.deadVerb)"
-                    if let reset = ResetLabel.label(resetsAt: cause.resetsAt,
+                    // A dead model window that rolls with the 7d one would
+                    // repeat the clock the weekly gauge below already
+                    // carries (user 2026-09-15).
+                    if !AccountVitals.resetEchoesWeekly(cause, in: a.usage),
+                       let reset = ResetLabel.label(resetsAt: cause.resetsAt,
                                                    countdown: cause.countdown,
                                                    clock: cause.clock, now: now) {
                         s += " — \(theme.revivePrefix)\(reset)"
