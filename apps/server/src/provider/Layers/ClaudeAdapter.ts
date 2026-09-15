@@ -1552,6 +1552,11 @@ function workflowAgentStatus(entry: ClaudeWorkflowAgentEntry): RuntimeTaskStatus
 }
 
 function summarizeToolRequest(toolName: string, input: Record<string, unknown>): string {
+  // The server-side advisor takes no input; its raw form is an empty object.
+  if (toolName === "advisor") {
+    return "Consulted the advisor";
+  }
+
   const imagePath = readToolImagePath(toolName, input);
   if (imagePath) {
     return imagePath;
@@ -1926,6 +1931,45 @@ function toolResultStreamKind(itemType: CanonicalItemType): ClaudeToolResultStre
       return "command_output";
     case "file_change":
       return "file_change_output";
+    default:
+      return undefined;
+  }
+}
+
+interface AdvisorToolResultBlock {
+  readonly toolUseId: string;
+  readonly content: {
+    readonly type: "advisor_result" | "advisor_redacted_result" | "advisor_tool_result_error";
+    readonly text?: string;
+    readonly errorCode?: string;
+  };
+}
+
+// The advisor's answer is an assistant content block keyed by tool_use_id
+// (#1247), never a user tool_result. Locally the redacted form is the rule.
+function readAdvisorToolResultBlock(block: unknown): AdvisorToolResultBlock | undefined {
+  if (!block || typeof block !== "object") {
+    return undefined;
+  }
+  const candidate = block as { type?: unknown; tool_use_id?: unknown; content?: unknown };
+  if (candidate.type !== "advisor_tool_result" || typeof candidate.tool_use_id !== "string") {
+    return undefined;
+  }
+  const content = candidate.content as
+    | { type?: unknown; text?: unknown; error_code?: unknown }
+    | undefined;
+  switch (content?.type) {
+    case "advisor_result":
+    case "advisor_redacted_result":
+    case "advisor_tool_result_error":
+      return {
+        toolUseId: candidate.tool_use_id,
+        content: {
+          type: content.type,
+          ...(typeof content.text === "string" ? { text: content.text } : {}),
+          ...(typeof content.error_code === "string" ? { errorCode: content.error_code } : {}),
+        },
+      };
     default:
       return undefined;
   }
@@ -3097,6 +3141,13 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         });
         return;
       }
+      if (block.type === "advisor_tool_result") {
+        yield* completeAdvisorToolResult(context, block, {
+          rawMethod: "claude/stream_event/content_block_start",
+          rawPayload: message,
+        });
+        return;
+      }
       if (
         block.type !== "tool_use" &&
         block.type !== "server_tool_use" &&
@@ -3187,6 +3238,96 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         return;
       }
     }
+  });
+
+  // Closes an advisor consult on its answer. With includePartialMessages the
+  // block arrives twice (the stream's content_block_start, then the assistant
+  // snapshot); whichever comes first closes it and the other finds nothing.
+  const completeAdvisorToolResult = Effect.fn("completeAdvisorToolResult")(function* (
+    context: ClaudeSessionContext,
+    block: unknown,
+    input: {
+      readonly rawMethod: string;
+      readonly rawPayload: unknown;
+    },
+  ) {
+    const result = readAdvisorToolResultBlock(block);
+    if (!result) {
+      return;
+    }
+    const toolEntry = Array.from(context.inFlightTools.entries()).find(
+      ([, tool]) => tool.itemId === result.toolUseId,
+    );
+    if (!toolEntry) {
+      return;
+    }
+    const [index, tool] = toolEntry;
+    const failed = result.content.type === "advisor_tool_result_error";
+    const detail =
+      result.content.type === "advisor_redacted_result"
+        ? "The advisor answered; its reply is encrypted."
+        : failed
+          ? `The advisor did not answer: ${result.content.errorCode ?? "unknown error"}.`
+          : tool.detail;
+    const toolData = {
+      toolName: tool.toolName,
+      input: tool.input,
+      result: block,
+    };
+    const raw = {
+      source: "claude.sdk.message" as const,
+      method: input.rawMethod,
+      payload: input.rawPayload,
+    };
+
+    const updatedStamp = yield* makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "item.updated",
+      eventId: updatedStamp.eventId,
+      provider: PROVIDER,
+      createdAt: updatedStamp.createdAt,
+      threadId: context.session.threadId,
+      ...(context.turnState ? { turnId: asCanonicalTurnId(context.turnState.turnId) } : {}),
+      itemId: asRuntimeItemId(tool.itemId),
+      payload: {
+        itemType: tool.itemType,
+        status: failed ? "failed" : "inProgress",
+        title: tool.title,
+        ...(detail ? { detail } : {}),
+        ...(tool.agentId ? { agentId: tool.agentId } : {}),
+        ...(tool.parentToolUseId ? { parentToolUseId: tool.parentToolUseId } : {}),
+        data: toolData,
+      },
+      providerRefs: nativeProviderRefs(context, {
+        providerItemId: tool.itemId,
+      }),
+      raw,
+    });
+
+    const completedStamp = yield* makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "item.completed",
+      eventId: completedStamp.eventId,
+      provider: PROVIDER,
+      createdAt: completedStamp.createdAt,
+      threadId: context.session.threadId,
+      ...(context.turnState ? { turnId: asCanonicalTurnId(context.turnState.turnId) } : {}),
+      itemId: asRuntimeItemId(tool.itemId),
+      payload: {
+        itemType: tool.itemType,
+        status: failed ? "failed" : "completed",
+        title: tool.title,
+        ...(detail ? { detail } : {}),
+        ...(tool.agentId ? { agentId: tool.agentId } : {}),
+        ...(tool.parentToolUseId ? { parentToolUseId: tool.parentToolUseId } : {}),
+        data: toolData,
+      },
+      providerRefs: nativeProviderRefs(context, {
+        providerItemId: tool.itemId,
+      }),
+      raw,
+    });
+    context.inFlightTools.delete(index);
   });
 
   const handleUserMessage = Effect.fn("handleUserMessage")(function* (
@@ -3467,6 +3608,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         if (!block || typeof block !== "object") {
           continue;
         }
+        yield* completeAdvisorToolResult(context, block, {
+          rawMethod: "claude/assistant",
+          rawPayload: message,
+        });
         const toolUse = block as {
           type?: unknown;
           id?: unknown;
