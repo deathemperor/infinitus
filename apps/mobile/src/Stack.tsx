@@ -17,6 +17,7 @@ import { useResolveClassNames } from "uniwind";
 import { AppText as Text } from "./components/AppText";
 import { getCompactBrandHeaderOptions } from "./components/CompactBrandTitle";
 import { AccountsRouteScreen } from "./features/accounts/AccountsRouteScreen";
+import { TeamRouteScreen } from "./features/team/TeamRouteScreen";
 import { ArchivedThreadsRouteScreen } from "./features/archive/ArchivedThreadsRouteScreen";
 import { useAgentNotificationNavigation } from "./features/agent-awareness/notificationNavigation";
 import { ConnectOnboardingRouteScreen } from "./features/cloud/ConnectOnboardingRouteScreen";
@@ -250,6 +251,14 @@ const SettingsContentStack = createNativeStackNavigator({
       linking: "accounts",
       options: {
         title: "Accounts",
+      },
+    }),
+    // Fork (#1313): Settings › Team; `team?code=…` is where an invite link lands (App.tsx).
+    SettingsTeam: createNativeStackScreen({
+      screen: TeamRouteScreen,
+      linking: "team",
+      options: {
+        title: "Team",
       },
     }),
   },

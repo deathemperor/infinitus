@@ -286,6 +286,9 @@ these bullets.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@t3tools/client-runtime/state/infinitusAccounts`).
+- `apps/mobile/src/features/team/` — Settings › Team (#1313): members, the
+  leader's requests, join from a code or the site's `/join#<code>` invite
+  link; the phone's subset of the web pane's `team.logic.ts`.
 - `packages/client-runtime/src/connection/roaming.ts`, `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN, roam to the tunnel (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect and tried after the last-good and paired hosts. Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt

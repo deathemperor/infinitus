@@ -13,6 +13,7 @@ import {
   pairingUrlFromUniversalLink,
   UNIVERSAL_PAIR_HOST,
 } from "./features/connection/universalPairLink.logic";
+import { teamJoinLinkCode } from "./features/team/team.logic";
 import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet";
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
@@ -51,6 +52,9 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
     scanned QR takes (#746); any other URL passes through untouched. */
 const rewriteIncomingUrl = (url: string | null): string | null => {
   if (url === null) return null;
+  // #1313: a team invite (`https://infinitus.run/join#<code>`) opens Settings › Team with the code.
+  const teamCode = teamJoinLinkCode(url);
+  if (teamCode !== null) return Linking.createURL("team", { queryParams: { code: teamCode } });
   const pairingUrl = pairingUrlFromUniversalLink(url);
   return pairingUrl === null
     ? url

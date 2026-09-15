@@ -343,7 +343,11 @@ const config: ExpoConfig = {
             {
               action: "VIEW",
               autoVerify: true,
-              data: [{ scheme: "https", host: variant.universalLinkHost, pathPrefix: "/pair" }],
+              data: [
+                { scheme: "https", host: variant.universalLinkHost, pathPrefix: "/pair" },
+                // #1313: a team invite, infinitus.run/join#<code>.
+                { scheme: "https", host: variant.universalLinkHost, pathPrefix: "/join" },
+              ],
               category: ["BROWSABLE", "DEFAULT"],
             },
           ],
