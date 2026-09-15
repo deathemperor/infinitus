@@ -66,7 +66,7 @@ import {
   type TeamStatus,
 } from "./team.logic";
 
-const UNSUPPORTED = "This Infinitus build has no team commands (needs ≥ 0.5.0-alpha.16).";
+const UNSUPPORTED = "This Infinitus build has no team commands (needs ≥ 0.5.0-alpha.17).";
 const LOCK_OFF = "Turn the lock on in Settings › Infinitus › Lock";
 
 export function InfinitusTeamPanel() {
@@ -472,11 +472,18 @@ export function InfinitusTeamPanel() {
                 disabled={busy !== null}
                 value={team.policy?.requests ?? "code"}
                 onValueChange={(value) => {
-                  if (value === "code" || value === "off") void run({ type: "policy", requests: value });
+                  if (value === "code" || value === "off")
+                    void run({ type: "policy", requests: value });
                 }}
               >
-                <SelectTrigger size="sm" className="w-full sm:w-44" aria-label="Who may request to join">
-                  <SelectValue>{team.policy?.requests === "off" ? "Nobody" : "With a code"}</SelectValue>
+                <SelectTrigger
+                  size="sm"
+                  className="w-full sm:w-44"
+                  aria-label="Who may request to join"
+                >
+                  <SelectValue>
+                    {team.policy?.requests === "off" ? "Nobody" : "With a code"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   <SelectItem hideIndicator value="code">
@@ -505,12 +512,18 @@ export function InfinitusTeamPanel() {
                     value={current}
                     onValueChange={(value) => {
                       const target = TEAM_SHARE_TARGETS.find((choice) => choice.target === value);
-                      if (target !== undefined) void run({ type: "share", kind, target: target.target });
+                      if (target !== undefined)
+                        void run({ type: "share", kind, target: target.target });
                     }}
                   >
-                    <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={`Share ${kind} with`}>
+                    <SelectTrigger
+                      size="sm"
+                      className="w-full sm:w-40"
+                      aria-label={`Share ${kind} with`}
+                    >
                       <SelectValue>
-                        {TEAM_SHARE_TARGETS.find((choice) => choice.target === current)?.label ?? current}
+                        {TEAM_SHARE_TARGETS.find((choice) => choice.target === current)?.label ??
+                          current}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectPopup align="end" alignItemWithTrigger={false}>

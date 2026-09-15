@@ -54,9 +54,19 @@ describe("team.logic (#1313)", () => {
       role: "leader",
       rev: 3,
       members: [
-        { kid: "k-me", name: "Me", role: "leader", isMe: true, founder: true, kinds: [], threadsNow: 2 },
+        {
+          kid: "k-me",
+          name: "Me",
+          role: "leader",
+          isMe: true,
+          founder: true,
+          kinds: [],
+          threadsNow: 2,
+        },
       ],
-      requests: [{ kid: "k-2", name: "Bo", platform: "macos", devices: ["MBP"], at: 1_699_999_000 }],
+      requests: [
+        { kid: "k-2", name: "Bo", platform: "macos", devices: ["MBP"], at: 1_699_999_000 },
+      ],
       shares: { transcripts: "off" },
       exclusions: ["secret-repo"],
       lockEnabled: false,
@@ -68,12 +78,18 @@ describe("team.logic (#1313)", () => {
     expect(parsed?.team?.requests?.[0]?.name).toBe("Bo");
     expect(parsed?.team?.shares?.transcripts).toBe("off");
     expect(parseTeamStatus({ name: "Alpha" })).toBeNull();
-    expect(parseTeamCode({ code: "infinitus://join/abc", expires: 1 })?.code).toBe("infinitus://join/abc");
+    expect(parseTeamCode({ code: "infinitus://join/abc", expires: 1 })?.code).toBe(
+      "infinitus://join/abc",
+    );
     expect(parseTeamCode({ nope: 1 })).toBeNull();
   });
 
   it("builds every secret-free verb", () => {
-    expect(teamCommandInput({ type: "status" })).toEqual({ command: "team-status", args: [], options: {} });
+    expect(teamCommandInput({ type: "status" })).toEqual({
+      command: "team-status",
+      args: [],
+      options: {},
+    });
     expect(teamCommandInput({ type: "approve", kid: "k-2" })).toEqual({
       command: "team-approve",
       args: ["k-2"],
@@ -112,7 +128,10 @@ describe("team.logic (#1313)", () => {
   });
 
   it("keys the join's name by the manifest's `<your name>` and keeps the code off it", () => {
-    expect(teamJoinSecretArgs("Alice")).toEqual({ command: "team-join", args: { "your name": "Alice" } });
+    expect(teamJoinSecretArgs("Alice")).toEqual({
+      command: "team-join",
+      args: { "your name": "Alice" },
+    });
     expect(teamMemberName("  Alice ")).toBe("Alice");
     expect(teamMemberName("   ")).toBeNull();
     expect(teamMemberName("a".repeat(129))).toBeNull();
@@ -140,7 +159,9 @@ describe("team.logic (#1313)", () => {
   });
 
   it("puts the code in the site link's fragment", () => {
-    expect(teamJoinLink("infinitus://join/a b")).toBe("https://infinitus.run/join#infinitus%3A%2F%2Fjoin%2Fa%20b");
+    expect(teamJoinLink("infinitus://join/a b")).toBe(
+      "https://infinitus.run/join#infinitus%3A%2F%2Fjoin%2Fa%20b",
+    );
   });
 
   it("words times and members", () => {
@@ -170,7 +191,13 @@ describe("team.logic (#1313)", () => {
   it("words the server's secret refusals and passes the socket's error through", () => {
     expect(
       infinitusSecretFailure(
-        Cause.fail(new InfinitusSecretRefused({ command: "team-join", reason: "too_many_attempts", detail: "" })),
+        Cause.fail(
+          new InfinitusSecretRefused({
+            command: "team-join",
+            reason: "too_many_attempts",
+            detail: "",
+          }),
+        ),
       ),
     ).toBe("Too many attempts; wait a minute and try again.");
     expect(infinitusSecretFailure(Cause.fail(new Error("team-join needs the team code")))).toBe(

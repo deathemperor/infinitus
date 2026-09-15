@@ -114,14 +114,20 @@ export function teamCommandInput(action: TeamAction): InfinitusCommandInput {
     case "share":
       return { command: "team-share", args: [action.kind, action.target], options: {} };
     case "exclude":
-      return { command: "team-exclude", args: [action.on ? "add" : "remove", action.slug], options: {} };
+      return {
+        command: "team-exclude",
+        args: [action.on ? "add" : "remove", action.slug],
+        options: {},
+      };
     case "policy":
       return { command: "team-policy", args: ["requests", action.requests], options: {} };
     case "code":
       return {
         command: "team-code",
         args: [],
-        options: action.invite ? { days: String(action.days), invite: "true" } : { days: String(action.days) },
+        options: action.invite
+          ? { days: String(action.days), invite: "true" }
+          : { days: String(action.days) },
       };
   }
 }
