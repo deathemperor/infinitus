@@ -83,7 +83,11 @@ describe("bestOfGroupKey (phone audit 2026-09-15)", () => {
     const after = [shell("a"), shell("b"), shell("x", { groupId: null, status: "ready" })];
     expect(bestOfGroupKey(before, "env-1", "g1")).toBe(bestOfGroupKey(after, "env-1", "g1"));
     expect(
-      bestOfGroupKey([shell("a"), shell("b", { archivedAt: "2026-09-15T05:00:00Z" })], "env-1", "g1"),
+      bestOfGroupKey(
+        [shell("a"), shell("b", { archivedAt: "2026-09-15T05:00:00Z" })],
+        "env-1",
+        "g1",
+      ),
     ).not.toBe(bestOfGroupKey(before, "env-1", "g1"));
     expect(bestOfGroupKey(before, "env-2", "g1")).toBe("");
   });
