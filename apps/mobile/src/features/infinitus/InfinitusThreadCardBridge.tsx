@@ -20,9 +20,9 @@ import {
 } from "./liveActivity.logic";
 import { localLiveActivityStartsAtom } from "./liveActivityStarts";
 import { syncWatchedCards } from "./cardSync.logic";
-import { noteAgentActivityWatching, noteTokenWithdrawn } from "./pushDiagnostics";
+import { noteAgentActivityWatching, noteSwitchOff, noteTokenWithdrawn } from "./pushDiagnostics";
 import { useForgetOnSwitchOff } from "./pushForget";
-import { forgetTokenLanded } from "./pushForget.logic";
+import { forgetTokensOutcome } from "./pushForget.logic";
 import { tokenSender } from "./pushRegistration";
 import { nextRetry, NO_RETRY } from "./pushRetry.logic";
 
@@ -77,6 +77,7 @@ export function InfinitusThreadCardBridge() {
     environmentId,
     kinds: AGENT_ACTIVITY_TOKEN_KINDS,
     run,
+    onOutcome: noteSwitchOff,
   });
 
   useEffect(() => {
@@ -137,12 +138,15 @@ export function InfinitusThreadCardBridge() {
         token offered meanwhile has already dropped it, so a landing then is
         not recorded over the new card's registration. */
     const forgetCard = async (): Promise<boolean> => {
-      const landed = await forgetTokenLanded({
-        environmentId,
-        kind: "agent-activity",
-        run,
-        loadDeviceId: loadOrCreateAgentAwarenessDeviceId,
-      });
+      const landed =
+        (
+          await forgetTokensOutcome({
+            environmentId,
+            kinds: ["agent-activity"],
+            run,
+            loadDeviceId: loadOrCreateAgentAwarenessDeviceId,
+          })
+        ).outcome === "withdrawn";
       if (!landed || cancelled || !withdraw) return landed;
       withdraw = false;
       slotCleared = true;

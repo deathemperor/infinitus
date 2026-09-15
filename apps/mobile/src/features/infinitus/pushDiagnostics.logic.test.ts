@@ -4,6 +4,7 @@ import {
   agentActivityPushSummary,
   EMPTY_AGENT_ACTIVITY_PUSH_STATE,
   withRegistration,
+  withSwitchOff,
   withWatching,
 } from "./pushDiagnostics.logic";
 
@@ -97,5 +98,40 @@ describe("agentActivityPushSummary — withdrawn card token (#1265)", () => {
     expect(summary.value).toBe("Registered");
     expect(summary.explanation).toContain("withdrawn");
     expect(summary.explanation).toContain("start token");
+  });
+});
+
+describe("agentActivityPushSummary — the switch off (#1265)", () => {
+  const off = withWatching(WATCHING, null);
+
+  it("reads what the withdrawal did, and that an unreachable one is retried", () => {
+    expect(
+      agentActivityPushSummary(
+        withSwitchOff(off, { outcome: "withdrawn", at: "2026-09-15T04:00:00Z", detail: null }),
+      ).value,
+    ).toBe("Off, withdrawn");
+    const unreachable = agentActivityPushSummary(
+      withSwitchOff(off, {
+        outcome: "unreachable",
+        at: "2026-09-15T04:00:00Z",
+        detail: "mac-1 is not connected",
+      }),
+    );
+    expect(unreachable.value).toBe("Off, Mac unreachable");
+    expect(unreachable.explanation).toContain("foreground");
+    expect(
+      agentActivityPushSummary(
+        withSwitchOff(off, { outcome: "refused", at: "2026-09-15T04:00:00Z", detail: null }),
+      ).value,
+    ).toBe("Off, refused");
+  });
+
+  it("forgets the switch-off once the bridge watches again", () => {
+    const state = withWatching(
+      withSwitchOff(off, { outcome: "withdrawn", at: "2026-09-15T04:00:00Z", detail: null }),
+      new Date("2026-09-15T04:01:00Z"),
+    );
+    expect(state.switchOff).toBeNull();
+    expect(agentActivityPushSummary(state).value).toBe("No token yet");
   });
 });

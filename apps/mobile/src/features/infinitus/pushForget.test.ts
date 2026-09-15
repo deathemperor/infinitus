@@ -1,8 +1,9 @@
 import { EnvironmentId } from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 
 import { forgetCommand } from "./liveActivity.logic";
-import { forgetTokenLanded, forgetTokens, macToForget } from "./pushForget.logic";
+import { forgetTokensOutcome, macToForget } from "./pushForget.logic";
 
 const mac = EnvironmentId.make("mac-1");
 
@@ -39,34 +40,47 @@ describe("macToForget", () => {
   });
 });
 
-describe("forgetTokens", () => {
-  it("withdraws the kind under the phone's device id", async () => {
+describe("forgetTokensOutcome", () => {
+  it("withdraws every kind under the phone's device id", async () => {
     const sent: string[] = [];
-    await forgetTokens({
+    const outcome = await forgetTokensOutcome({
       environmentId: mac,
-      kinds: ["alert"],
+      kinds: ["agent-activity-start", "agent-activity"],
       run: async (input) => {
         sent.push(`${input.environmentId}:${input.input.options.forget}`);
         return { _tag: "Success" };
       },
       loadDeviceId: async () => "dev-1",
     });
-    expect(sent).toEqual(["mac-1:dev-1/alert"]);
+    expect(sent).toEqual(["mac-1:dev-1/agent-activity-start", "mac-1:dev-1/agent-activity"]);
+    expect(outcome).toEqual({ outcome: "withdrawn", detail: null });
   });
 
-  it("swallows a refusing Mac and a missing device id", async () => {
-    await expect(
-      forgetTokens({
-        environmentId: mac,
-        kinds: ["alert"],
-        run: async () => {
-          throw new Error("refused");
-        },
-        loadDeviceId: async () => "dev-1",
-      }),
-    ).resolves.toBeUndefined();
+  it("tells a Mac that refused from one the phone could not reach", async () => {
+    const refused = await forgetTokensOutcome({
+      environmentId: mac,
+      kinds: ["alert"],
+      run: async () => ({ _tag: "Failure", cause: Cause.fail(new Error("no such device")) }),
+      loadDeviceId: async () => "dev-1",
+    });
+    expect(refused.outcome).toBe("refused");
+    expect(refused.detail).toContain("no such device");
+    const unreachable = await forgetTokensOutcome({
+      environmentId: mac,
+      kinds: ["alert"],
+      run: async () => {
+        throw Object.assign(new Error("mac-1 is not connected"), {
+          _tag: "EnvironmentRpcUnavailableError",
+        });
+      },
+      loadDeviceId: async () => "dev-1",
+    });
+    expect(unreachable).toEqual({ outcome: "unreachable", detail: "mac-1 is not connected" });
+  });
+
+  it("never throws on a missing device id", async () => {
     let ran = 0;
-    await forgetTokens({
+    const outcome = await forgetTokensOutcome({
       environmentId: mac,
       kinds: ["alert"],
       run: async () => {
@@ -78,36 +92,6 @@ describe("forgetTokens", () => {
       },
     });
     expect(ran).toBe(0);
-  });
-});
-
-describe("forgetTokenLanded", () => {
-  it("answers whether the Mac took the withdrawal", async () => {
-    expect(
-      await forgetTokenLanded({
-        environmentId: mac,
-        kind: "agent-activity",
-        run: async () => ({ _tag: "Success" }),
-        loadDeviceId: async () => "dev-1",
-      }),
-    ).toBe(true);
-    expect(
-      await forgetTokenLanded({
-        environmentId: mac,
-        kind: "agent-activity",
-        run: async () => ({ _tag: "Failure" }),
-        loadDeviceId: async () => "dev-1",
-      }),
-    ).toBe(false);
-    expect(
-      await forgetTokenLanded({
-        environmentId: mac,
-        kind: "agent-activity",
-        run: async () => {
-          throw new Error("unreachable");
-        },
-        loadDeviceId: async () => "dev-1",
-      }),
-    ).toBe(false);
+    expect(outcome.outcome).toBe("refused");
   });
 });

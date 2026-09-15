@@ -26,23 +26,42 @@ export type PushRegistrations = Readonly<
   Partial<Record<LiveActivityTokenKind, PushRegistrationNote>>
 >;
 
+/** What the switch going off did to the Mac's registrations (#1265). */
+export interface SwitchOffNote {
+  readonly outcome: "withdrawn" | "refused" | "unreachable";
+  readonly at: string;
+  readonly detail: string | null;
+}
+
 export interface AgentActivityPushState {
   /** When the thread-card bridge attached its listeners; null while it is not
       running at all (the switch is off, or no paired Mac runs Infinitus). */
   readonly watchingSince: string | null;
   readonly registrations: PushRegistrations;
+  /** The last switch-off's withdrawal; cleared when the bridge runs again. */
+  readonly switchOff: SwitchOffNote | null;
 }
 
 export const EMPTY_AGENT_ACTIVITY_PUSH_STATE: AgentActivityPushState = {
   watchingSince: null,
   registrations: {},
+  switchOff: null,
 };
 
 export function withWatching(
   state: AgentActivityPushState,
   since: Date | null,
 ): AgentActivityPushState {
-  return { ...state, watchingSince: since === null ? null : since.toISOString() };
+  return since === null
+    ? { ...state, watchingSince: null }
+    : { ...state, watchingSince: since.toISOString(), switchOff: null };
+}
+
+export function withSwitchOff(
+  state: AgentActivityPushState,
+  note: SwitchOffNote,
+): AgentActivityPushState {
+  return { ...state, switchOff: note };
 }
 
 export function withRegistration(
@@ -80,6 +99,7 @@ export interface AgentActivityPushSummary {
  */
 export function agentActivityPushSummary(state: AgentActivityPushState): AgentActivityPushSummary {
   if (state.watchingSince === null) {
+    if (state.switchOff !== null) return switchOffSummary(state.switchOff);
     return {
       value: "Not running",
       explanation:
@@ -146,4 +166,30 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
       state.watchingSince,
     )}. iOS has not handed this app a start token for the lock-screen card, so the Mac has nothing to raise one with. That token needs Live Activities turned on for Infinitus in the phone's own Settings, on iOS 17.2 or newer.`,
   };
+}
+
+/** The row while the switch is off: what became of the withdrawal it sent. */
+function switchOffSummary(note: SwitchOffNote): AgentActivityPushSummary {
+  const at = timeOf(note.at);
+  switch (note.outcome) {
+    case "withdrawn":
+      return {
+        value: "Off, withdrawn",
+        explanation: `The switch is off and the Mac dropped this phone's card tokens at ${at}, so it will not push into a card that is gone. Turning the switch on registers them again.`,
+      };
+    case "unreachable":
+      return {
+        value: "Off, Mac unreachable",
+        explanation: `The switch is off, but this phone could not reach the Mac to withdraw its card tokens at ${at}: ${
+          note.detail ?? "it is not connected"
+        }. The Mac still holds them; the phone tries again the next time the app comes to the foreground.`,
+      };
+    case "refused":
+      return {
+        value: "Off, refused",
+        explanation: `The switch is off, but the Mac refused to drop this phone's card tokens at ${at}: ${
+          note.detail ?? "it gave no reason"
+        }.`,
+      };
+  }
 }

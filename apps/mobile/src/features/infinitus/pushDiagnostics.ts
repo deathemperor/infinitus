@@ -6,7 +6,9 @@ import {
   type AgentActivityPushState,
   EMPTY_AGENT_ACTIVITY_PUSH_STATE,
   type PushRegistrationOutcome,
+  type SwitchOffNote,
   withRegistration,
+  withSwitchOff,
   withWatching,
 } from "./pushDiagnostics.logic";
 
@@ -53,6 +55,20 @@ export function noteTokenWithdrawn(at: Date): void {
       outcome: "withdrawn",
       at: at.toISOString(),
       detail: null,
+    }),
+  );
+}
+
+/** The switch went off and the withdrawal it sent ended this way (#1265). */
+export function noteSwitchOff(
+  outcome: { readonly outcome: SwitchOffNote["outcome"]; readonly detail: string | null },
+  at: Date,
+): void {
+  update((state) =>
+    withSwitchOff(state, {
+      outcome: outcome.outcome,
+      at: at.toISOString(),
+      detail: outcome.detail,
     }),
   );
 }

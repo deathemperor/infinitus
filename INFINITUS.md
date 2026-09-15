@@ -2516,7 +2516,12 @@ agent-activity` (the session cards' kinds retired with #1041).
   folds the two into one line — not running / no token yet / card token only
   / registered / refused / Mac unreachable — with the failure's own text, or
   the gates to check, behind a tap. A send the RPC could not deliver is never
-  worded as a refusal: the Mac did not see that token. The lock-screen card's start token is vended by
+  worded as a refusal: the Mac did not see that token. The switch going off
+  is read the same way (#1265 follow-up): `useForgetOnSwitchOff` sends the
+  withdrawal through `forgetTokensOutcome` and the row reads "Off, withdrawn"
+  / "Off, refused" / "Off, Mac unreachable" — an unreachable one is sent again
+  on the next foreground and dropped if the switch comes back on first, since
+  the bridge then registers afresh. The lock-screen card's start token is vended by
   ActivityKit through an event that never fires when it declines (Live
   Activities off for the app, or iOS before 17.2), and a refusal is a
   `console.warn` a Release build shows nobody, so without this one silence
