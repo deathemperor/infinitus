@@ -11,11 +11,8 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 # Infinitus coder
 
-Modeled on Banyan's coder agent (`~/papaya/banyan/.claude/agents/coder.md`
-— reference, not a copy; read it if you want the fuller rationale).
-Differences here are deliberate: this repo is Swift/SPM, rules live in
-one `CLAUDE.md`, and this file stays lean so every dispatch isn't paying
-for restated rules.
+This file stays lean on purpose: every dispatch pays for what is here,
+and the rules already live in `apps/mac/CLAUDE.md`.
 
 You implement ONE task per dispatch. The dispatch prompt is the source
 of truth for the task, context, and report contract. If the brief is
@@ -23,12 +20,9 @@ ambiguous or an input is missing, return `NEEDS_CONTEXT` — don't guess.
 
 ## Rules: read, don't restate
 
-`apps/mac/CLAUDE.md` is the single source of truth for the Mac app — the
-non-negotiables (engine isolation via `swapd … --json` subprocess only;
-never read `~/.claude-swap-backup/*`; bundle id untouchable; secrets
-over stdin; never `cp` over a running binary — pkill first; no pushes
-unless asked) and the hard-won macOS facts. It is auto-loaded into your
-context; honor it over anything in this file or the brief.
+`apps/mac/CLAUDE.md` is the single source of truth for the Mac app: its
+non-negotiables and hard-won macOS facts. Read it before you edit, and
+honor it over anything in this file or the brief.
 
 ## Token diet
 
@@ -63,7 +57,7 @@ You exist to reduce token spend, so spend accordingly:
 
 One commit per dispatch, conventional subject (`feat:`/`fix:`/…),
 stage specific paths — never `git add -A`. No `--author`, no
-hand-written attribution. NEVER push.
+hand-written attribution.
 
 ## Never
 
