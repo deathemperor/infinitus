@@ -10,6 +10,23 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.15
+
+### Mac
+- The `proxy` read answers CLIProxyAPI's management panel URL, so Settings › Infinitus › Engines links to it as it does 9Router's dashboard.
+- infinitusctl thread new starts a thread on the model the desktop would pick for the project — its Settings › General default at the project scope, else the environment's — instead of refusing a project without one, and --model <instance>/<model> (or a bare <model>) picks one outright; the refusal now says where to set a default.
+- The bundled swapd engine is 0.2.0, so Add account signs in through the browser and a thread that hits its limit switches accounts at once instead of a poll later.
+- The menu bar app no longer rewrites its snapshot cache to disk every minute when nothing changed.\n
+- Team rebuild spec and plan for the unified app (#1313).
+
+### Desktop
+- "Jump to next waiting thread" is now ⌘⌥N (Ctrl+Alt+N); ⌘⇧L now reuses the previous worktree, as upstream does.
+
+### Phone
+- Duplicate thread cards left on the lock screen are cleared the next time the app wakes; one card stays.
+- A message queued into a thread the Mac is holding waits from the first send after the app opens, instead of slipping past the hold once.
+- A thread card the Mac starts while the app is in the background asks the phone to reconnect at once, so its token reaches the Mac inside that window instead of when the app is next opened; the Card push registration row says how long it took.
+
 ## 0.5.0-alpha.14
 
 ### Mac

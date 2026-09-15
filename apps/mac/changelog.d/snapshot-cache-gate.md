@@ -1,1 +1,0 @@
-Mac: The menu bar app no longer rewrites its snapshot cache to disk every minute when nothing changed.\n
