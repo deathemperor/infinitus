@@ -1076,7 +1076,11 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   foreground and after a local start; both withdrawn the same way when the
   switch goes off) and `InfinitusNotificationPresenter` (the app's one
   foreground notification handler: Infinitus notifications show as banners
-  in-app, T3's keep the no-handler default).
+  in-app, T3's keep the no-handler default), and `InfinitusHoldsBridge` (#1278 finding 7: one
+  `subscribeInfinitusHolds` subscription per Infinitus Mac for the app's
+  lifetime, so the outbox drain's registry read of the holds atom sees a
+  delivered list instead of mounting the stream itself and reading null on
+  the first queued message).
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
