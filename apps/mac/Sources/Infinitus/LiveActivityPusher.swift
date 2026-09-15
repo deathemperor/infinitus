@@ -32,6 +32,9 @@ final class LiveActivityPusher: ObservableObject {
     /// The thread card each phone last got (#1047), by device id: a
     /// repeat of the same state is not sent again.
     private var lastAgentActivity: [String: AgentActivityState] = [:]
+    /// Devices whose card was started and whose update token has not
+    /// registered yet (#1277, `ThreadCardStart`), by device id.
+    private var startHolds: [String: ThreadCardStart.Hold] = [:]
     /// When that card was last started or updated, by device id (#1265).
     private var lastAgentActivityAt: [String: Date] = [:]
 
@@ -108,11 +111,38 @@ final class LiveActivityPusher: ObservableObject {
             log?("📲", "\(fresh.deviceName) registered a \(fresh.kind.rawValue) push token")
         }
         persist()
+        if fresh.kind == .agentActivity, let hold = startHolds.removeValue(forKey: fresh.deviceId) {
+            releaseStartHold(hold, to: fresh)
+        }
+    }
+
+    /// The started card's token arrived: what was held meanwhile goes out
+    /// to it now (#1277).
+    private func releaseStartHold(_ hold: ThreadCardStart.Hold, to live: ActivityPushRegistration) {
+        switch ThreadCardStart.release(hold) {
+        case .update:
+            guard case .update(let state) = hold.pending, lastAgentActivity[live.deviceId] != state else { return }
+            if send(LiveActivityPush.agentActivityUpdatePayload(state), to: live, what: "update thread card",
+                    priority: "5") {
+                lastAgentActivity[live.deviceId] = state
+                lastAgentActivityAt[live.deviceId] = Date()
+            }
+        case .end:
+            _ = send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[live.deviceId]), to: live,
+                     what: "end thread card")
+            registrations[live.slot] = nil
+            persist()
+            lastAgentActivity[live.deviceId] = nil
+            lastAgentActivityAt[live.deviceId] = nil
+        case .start, .held, .none:
+            return
+        }
     }
 
     /// A phone forgotten in Settings › Devices: nothing is pushed to it
     /// any more. It registers afresh if it opens the app again.
     func forget(deviceId: String) {
+        startHolds[deviceId] = nil
         let slots = registrations.values.filter { $0.deviceId == deviceId }.map(\.slot)
         guard !slots.isEmpty else { return }
         for slot in slots {
@@ -180,31 +210,41 @@ final class LiveActivityPusher: ObservableObject {
                 live = nil
                 log?("📲", "\(lapsed.deviceName)'s thread card token went quiet — the next card starts afresh")
             }
-            guard let state else {
-                if let live {
-                    if send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[device]),
-                            to: live, what: "end thread card") {
-                        reach.add(device: device, kind: live.kind.rawValue)
-                    }
-                    registrations[live.slot] = nil
-                    persist()
+            if state != nil, lastAgentActivity[device] == state, startHolds[device] == nil { continue }
+            let plan = ThreadCardStart.plan(state: state, live: live != nil, start: start != nil,
+                                            hold: startHolds[device], now: now)
+            startHolds[device] = plan.hold
+            switch plan.action {
+            case .held:
+                continue
+            case .end:
+                if let live, send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[device]),
+                                  to: live, what: "end thread card") {
+                    reach.add(device: device, kind: live.kind.rawValue)
                 }
+                if let live { registrations[live.slot] = nil; persist() }
                 lastAgentActivity[device] = nil
                 lastAgentActivityAt[device] = nil
                 continue
-            }
-            if lastAgentActivity[device] == state { continue }
-            if let live {
+            case .none:
+                if state == nil {
+                    lastAgentActivity[device] = nil
+                    lastAgentActivityAt[device] = nil
+                }
+                continue
+            case .update:
+                guard let state, let live else { continue }
                 if send(LiveActivityPush.agentActivityUpdatePayload(state), to: live, what: "update thread card",
                         priority: "5") {
                     reach.add(device: device, kind: live.kind.rawValue)
                 }
-            } else if let start {
+            case .start:
+                guard let state, let start else { continue }
                 if send(LiveActivityPush.agentActivityStartPayload(state), to: start, what: "start thread card") {
                     reach.add(device: device, kind: start.kind.rawValue)
+                } else {
+                    startHolds[device] = nil
                 }
-            } else {
-                continue
             }
             lastAgentActivity[device] = state
             lastAgentActivityAt[device] = now
@@ -273,6 +313,7 @@ final class LiveActivityPusher: ObservableObject {
                 } else {
                     let why = error?.localizedDescription ?? "HTTP \(code) \(body)"
                     self.lastResult = "\(what) → \(device) failed: \(why)"
+                    if what == "start thread card" { self.startHolds[registration.deviceId] = nil }
                     // A dead token will never work again — drop it.
                     let dead = LiveActivityPush.isDeadToken(status: code, body: body)
                     if let line = LiveActivityPush.outcomeLine(what: what, device: device, status: code, body: body,
