@@ -143,11 +143,13 @@ struct InfinitusApp: App {
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
 @MainActor func settingsTabs(model: AppModel) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
-    // "reorder the settings"): everyday looks first, plumbing after;
-    // engines keep their own trailing section. About left on 2026-09-14
-    // with its Homebrew updater: the menu bar app ships inside the
-    // desktop bundle and updates with it, and the desktop's Settings ›
-    // Infinitus › Engines shows its version.
+    // "reorder the settings"): everyday looks first, plumbing after.
+    // About left on 2026-09-14 with its Homebrew updater: the menu bar
+    // app ships inside the desktop bundle and updates with it, and the
+    // desktop's Settings › Infinitus › Engines shows its version. The
+    // three engine panes (swapd, CLIProxyAPI, 9Router) left on
+    // 2026-09-15 (#1177): that Engines page draws everything they drew,
+    // over the engine verbs and the catalog's engine prefs.
     // Display, Push and Lock left on 2026-09-14 (#569): all three are
     // Settings › Infinitus pages in the desktop app now, and the native
     // window keeps only what cannot leave the Mac. The prefs themselves
@@ -168,34 +170,6 @@ struct InfinitusApp: App {
                                "cloudflare", "tunnel", "backup", "restore",
                                "accounts", "export", "import"],
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
-    ]
-    + [
-        // Providers under everything, CodexBar-style (user 2026-08-30).
-        // The engine is swapd; Claude is what it drives (user 2026-08-30:
-        // "claude is not an engine, cswap is").
-        SettingsTab(title: "swapd", symbol: "bolt.horizontal",
-                    keywords: ["swapd", "engine", "auto switch", "rotate", "provider",
-                               "claude", "codex", "kiro", "gemini", "rust",
-                               "nudge", "resume", "wake", "session", "demo", "mock"],
-                    // "on" = the engine is enabled and found; whether its
-                    // auto-switch daemon runs is the tab's own business.
-                    provider: ProviderBadge(live: model.swapdRegistered
-                                            && model.engineErrors[SwapdEngine.engineID] == nil),
-                    view: AnyView(SwapdEnginePane(model: model))),
-        SettingsTab(title: "CLIProxyAPI", symbol: "network",
-                    keywords: ["proxy", "cliproxy", "router", "management",
-                               "key", "engine", "provider", "claude"],
-                    provider: ProviderBadge(live: model.cliproxyEnabled
-                                            && model.engineErrors[CLIProxyEngine.engineID] == nil
-                                            && model.fleets.contains { $0.engineID == CLIProxyEngine.engineID }),
-                    view: AnyView(CLIProxyEnginePane(model: model))),
-        SettingsTab(title: "9Router", symbol: "arrow.triangle.branch",
-                    keywords: ["9router", "router", "engine", "provider",
-                               "claude", "password"],
-                    provider: ProviderBadge(live: model.nineRouterEnabled
-                                            && model.engineErrors[NineRouterEngine.engineID] == nil
-                                            && model.fleets.contains { $0.engineID == NineRouterEngine.engineID }),
-                    view: AnyView(NineRouterEnginePane(model: model))),
     ]
 }
 
