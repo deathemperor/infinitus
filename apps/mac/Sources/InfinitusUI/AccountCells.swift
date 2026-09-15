@@ -260,6 +260,19 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
 
     var deadCause: AccountVitals.DeadCause? { AccountVitals.cause(account.usage) }
 
+    /// Whether the weekly cell of THIS row already counts down the clock a
+    /// dead model window would repeat — Fable's quota rolls with the 7d one
+    /// (user 2026-09-15: "fable has reset time of 7d so when fable is down
+    /// no needs to show its reset time"). Only when that cell is really on
+    /// screen: compact mode hides an untouched or exhausted weekly, and
+    /// then the dead line is the row's only clock. (A weekly with no
+    /// parseable reset never echoes — resetEchoesWeekly says so.)
+    func weeklyAlreadyShows(_ cause: AccountVitals.DeadCause) -> Bool {
+        guard let weekly = account.usage?.sevenDay else { return false }
+        return AccountVitals.resetEchoesWeekly(cause, in: account.usage)
+            && !hiddenInCompact(weekly.pct)
+    }
+
     /// Every present window untouched — in compact mode all its cells are
     /// hidden, so the row needs SOMETHING or it reads as broken.
     var allFresh: Bool {
@@ -312,7 +325,7 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
 
     /// The dead line as a cell of its own (the narrow list's one-liner).
     @ViewBuilder var deadCell: some View {
-        deadLine.fixedSize().activeBand(banded && account.active)
+        deadLine().fixedSize().activeBand(banded && account.active)
     }
 
     /// One line saying what blocks a dead row, drawn in that window's own
@@ -320,7 +333,11 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     /// down, the others are visible"). Plain words, not themed icon soup —
     /// "📦 💊 spent" read as a riddle (user-verified); only the color and
     /// the dead marker carry the theme here.
-    @ViewBuilder var deadLine: some View {
+    ///
+    /// `timer: false` drops the reset: a dead per-model window whose
+    /// clock the weekly cell already counts down says it twice otherwise
+    /// (user 2026-09-15). The tooltip keeps the countdown either way.
+    @ViewBuilder func deadLine(timer: Bool = true) -> some View {
         if let cause = deadCause {
             HStack(spacing: 4) {
                 // Themed label + themed verb ("MP down", "🎬 sold out");
@@ -331,27 +348,29 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                      : "\(causeLabel(cause)) \(PopupGlyph.text(theme.deadVerb))")
                     .font(PopupFont.caption).bold()
                     .foregroundStyle(ThemeColor.resolve(causeColor(cause)))
-                Text("·").font(PopupFont.caption).foregroundStyle(.tertiary)
-                if let text = model.compactRows
-                    ? ResetLabel.compact(resetsAt: cause.resetsAt,
-                                         countdown: cause.countdown)
-                    : ResetLabel.label(
-                        resetsAt: cause.resetsAt, countdown: cause.countdown,
-                        clock: cause.clock) {
-                    // Themed revival word ("🩸", "re-release", "💊") in the
-                    // cause's color; plain keeps "back" ("themify all
-                    // info", user 2026-08-30).
-                    let revive = PopupGlyph.text(theme.revivePrefix)
-                        .trimmingCharacters(in: .whitespaces)
-                    Text(theme.plain || revive.isEmpty ? "back" : revive)
-                        .font(PopupFont.caption)
-                        .foregroundStyle(theme.plain || revive.isEmpty
-                                         ? AnyShapeStyle(.secondary)
-                                         : AnyShapeStyle(ThemeColor.resolve(causeColor(cause)).opacity(0.8)))
-                    resetLabelView(resetsAt: cause.resetsAt, staticText: text)
-                } else {
-                    // No reset on record (a spent credit cap).
-                    Text("spent").font(PopupFont.caption).foregroundStyle(.secondary)
+                if timer {
+                    Text("·").font(PopupFont.caption).foregroundStyle(.tertiary)
+                    if let text = model.compactRows
+                        ? ResetLabel.compact(resetsAt: cause.resetsAt,
+                                             countdown: cause.countdown)
+                        : ResetLabel.label(
+                            resetsAt: cause.resetsAt, countdown: cause.countdown,
+                            clock: cause.clock) {
+                        // Themed revival word ("🩸", "re-release", "💊") in the
+                        // cause's color; plain keeps "back" ("themify all
+                        // info", user 2026-08-30).
+                        let revive = PopupGlyph.text(theme.revivePrefix)
+                            .trimmingCharacters(in: .whitespaces)
+                        Text(theme.plain || revive.isEmpty ? "back" : revive)
+                            .font(PopupFont.caption)
+                            .foregroundStyle(theme.plain || revive.isEmpty
+                                             ? AnyShapeStyle(.secondary)
+                                             : AnyShapeStyle(ThemeColor.resolve(causeColor(cause)).opacity(0.8)))
+                        resetLabelView(resetsAt: cause.resetsAt, staticText: text)
+                    } else {
+                        // No reset on record (a spent credit cap).
+                        Text("spent").font(PopupFont.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
             .instantTip("\(plainCause(cause)) is used up (100%) — the "
@@ -444,7 +463,7 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                                  timer: Bool = true) -> some View {
         Group {
             if showAsDead, let cause = deadCause, cause.blocks(session: session) {
-                deadLine.fixedSize()
+                deadLine().fixedSize()
             } else if let w, !hiddenInCompact(w.pct) {
                 HStack(spacing: 3) {
                     // No ahead-of-pace badge: the burn effect on the bar
@@ -626,7 +645,7 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             let w = entry.win
             Group {
                 if showAsDead, let cause = deadCause, cause.blocks(scoped: w.name) {
-                    deadLine
+                    deadLine(timer: !weeklyAlreadyShows(cause))
                 } else if hiddenInCompact(w.pct) {
                     if banded, !model.compactRows {
                         Text(verbatim: "")
