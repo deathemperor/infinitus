@@ -607,7 +607,8 @@ env -u INFINITUS_TEAM_DIR "$CTL" team identity show 2>&1 | grep -q "owns this Ma
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish | expect "'published' in d" || fail "cli team publish"
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts off \
     | expect "d['byKind']['transcripts']=='off'" || fail "team share transcripts off"
-"$CTL" team-fetch | expect "any(m['name']=='Bo' and 'stats' in m['kinds'] for m in d['members'])" || fail "the member's files are not readable"
+# `now` is the one kind every publish carries; stats need a transcript corpus the CI runner has none of.
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and 'now' in m['kinds'] for m in d['members'])" || fail "the member's files are not readable"
 "$CTL" team-publish | expect "'published' in d" || fail "team-publish"
 "$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
 "$CTL" team-share now team | expect "d['shares']['now']=='team'" || fail "team-share"

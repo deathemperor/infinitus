@@ -508,7 +508,12 @@ export type InfinitusTeamCode = typeof InfinitusTeamCode.Type;
 export const InfinitusTeamInsights = Schema.Struct({
   period: Schema.String,
   blockers: Schema.Array(
-    Schema.Struct({ kid: Schema.String, name: Schema.String, kind: Schema.String, text: Schema.String }),
+    Schema.Struct({
+      kid: Schema.String,
+      name: Schema.String,
+      kind: Schema.String,
+      text: Schema.String,
+    }),
   ),
   headroom: Schema.Array(
     Schema.Struct({

@@ -178,51 +178,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/settings.ts` — `ComposerSendMode` and
   `composerSendMode` (`queue` default, `steer`) on `ClientSettings` and its
   patch (#270 F); `settings.test.ts` covers the default.
-- Queue vs steer (#270 F; the queue lives on the server since #806):
-  `apps/web/src/composer-logic.ts` — `ComposerSubmissionIntent` has `queue`
-  and `composerSendModeForEnter` (⌘↩ on a non-draft thread flips the mode;
-  drafts keep ⌘↩ = background); `ChatComposer.tsx` — `submitComposer`
-  resolves the intent to `queue` while `phase === "running"` (never for a
-  question or approval answer) and hands it to `ChatView.onSend`, which runs
-  the usual preflight and uploads then dispatches `thread.turn.queue`
-  instead of `thread.turn.start` (no optimistic row, no local dispatch, no
-  title step; runtime/interaction mode still persist so the drain reads
-  them); `components/chat/useQueuedTurnActions.ts` — the rows from
-  `thread.queuedTurns` and their actions (send now = `thread.turn.start`
-  with `queuedFrom`; edit = `.queue.remove`, then for a row with context
-  records (#969) the composer's `importContextRecords` from this
-  environment — the stash restore's path, chips back and attachments
-  transferred by id — and the text with its links rewritten to the
-  re-minted ids (`restoredQueuedTurnText`, #971); a row without records
-  has its attachments fetched back through the asset URL first, then text
-  and files into the composer; move = `.queue.move` with
-  `queuedTurnMoveKey`; remove); `ComposerSendQueue.tsx`
-  renders them; `composerSendQueue.logic.ts` (+ test) — `orderedQueuedTurns`,
-  `queuedTurnSnippet`, `queuedTurnEditableText`, `restoredQueuedTurnText`,
-  `queuedTurnMoveKey`, and the legacy-stash helpers; `hooks/useLegacyQueueMigration.ts` (mounted in
-  `routes/_chat.tsx`) — moves entries the stash still holds with `queuedFor`
-  (#270 F, pre-#806) to the server once, ids derived from the entry, a
-  refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);
-  `ComposerPrimaryActions.tsx` — `runningSendMode` keeps the send button
-  beside Stop while running, labelled "Queue message" / "Send at next step"
-  (#1318: steer mode queues the message with `sendAt: "tool-boundary"`, the
-  intent `steer`, and the drain sends it at the running turn's next finished
-  tool call — `docs/internals/turn-queue.md`; `queuedTurnTiming` labels the
-  row "at next step" on the web and the phone, `queuedTurnsHeader` words
-  the list's header) (upstream
-  shows its own "Queue message" there since #11673, so the fork's prop only
-  changes the steer label); `ChatView.tsx` `onSend` — upstream's client-side
-  queue (#11673, `queuedMessageStore.ts`: a mid-turn send parked in memory
-  until the next tool boundary, drawn as a dashed bubble at the end of the
-  timeline, returned to the composer by Stop) is gated off on a server thread
-  (`!isServerThread` at its enqueue), where this setting decides: `queue`
-  dispatches `thread.turn.queue`, `steer` sends into the running turn at
-  once — one row, never two; the store, its timeline rows and the Stop drain
-  stay compiled and idle, and `docs/user/composer.md`'s "Send while the
-  agent is working" section is rewritten to the fork's rule at every sync;
-  `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a turn
-  runs" row. Client-runtime: `operations/commands.ts` + `state/threadCommands.ts`
-  — `queueTurn` / `updateQueuedTurn` / `removeQueuedTurn` / `moveQueuedTurn`.
+- Queue vs steer (#270 F, #1318; the queue lives on the server since #806): `apps/web/src/composer-logic.ts` (`ComposerSubmissionIntent`, `composerSendModeForEnter`), `ChatComposer.tsx` (`submitComposer`), `ChatView.tsx` (`onSend`; upstream's client-side queue #11673 gated off on a server thread), `components/chat/useQueuedTurnActions.ts`, `ComposerSendQueue.tsx`, `composerSendQueue.logic.ts` (+ test), `hooks/useLegacyQueueMigration.ts`, `ComposerPrimaryActions.tsx` (`runningSendMode`), `SettingsPanels.tsx` + `settingsSearch.ts`; client-runtime `operations/commands.ts` + `state/threadCommands.ts`. Rules and traps: `docs/internals/turn-queue.md`.
 - `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
   `DesktopUpdateChannel` / `DesktopUpdateChannelSchema` (#1042); the fork's
   optional `DesktopBridge` methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
@@ -474,21 +430,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the header's
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
-- `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's
-  elapsed timer (#1047 follow-up), the fork's one edit to the widget:
-  `AgentActivityRowProps` gains an optional `startedAt` (the turn's, which the
-  server sends on a starting or running row and the Mac forwards untouched)
-  and `renderCompactRow` draws a `Text` with `timerInterval` +
-  `countsDown={false}` for such a row, so SwiftUI counts it up on the phone
-  between pushes. Both bounds are derived from `startedAt` — the widget reads
-  no clock — and the upper one caps the display a day in. The timer text is
-  boxed in a fixed-width trailing `frame` with `multilineTextAlignment`: a
-  bare `Text(timerInterval:)` is greedy and swallowed the title and project
-  of every working row, so a sync that drops the frame brings that back. It lives here rather
-  than in a fork file because the widget body carries the `"widget"` directive
-  and is serialized into the widget extension's bundle: it can reference only
-  imported view and modifier factories, never a module-scope helper of ours.
-  Keep the edit to those two places so every upstream sync meets a small one.
+- `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's elapsed timer (#1047 follow-up), the fork's one edit to the widget: `AgentActivityRowProps.startedAt` and the `timerInterval` `Text` in `renderCompactRow`. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
   `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
