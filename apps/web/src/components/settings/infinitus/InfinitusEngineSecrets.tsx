@@ -307,10 +307,10 @@ export function InfinitusEngineSecrets({
                 onAffinity={(on) => void route(engine, affinityInput(on))}
               />
             ) : null}
-            {engine.key === "9router" && state?.dashboardURL ? (
+            {state?.dashboardURL ? (
               <SettingsRow
                 title="Dashboard"
-                description="Providers → Connect Claude Code adds an account there."
+                description={engine.dashboardNote}
                 control={
                   <a
                     href={state.dashboardURL}
@@ -318,7 +318,7 @@ export function InfinitusEngineSecrets({
                     rel="noreferrer"
                     className="text-sm underline underline-offset-4"
                   >
-                    Open 9Router dashboard
+                    {`Open ${engine.label} dashboard`}
                   </a>
                 }
               />
