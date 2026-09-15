@@ -8380,3 +8380,171 @@ describe("fork fallback (side questions)", () => {
     );
   });
 });
+
+describe("advisor tool result (#1247)", () => {
+  const SESSION_ID = "sdk-session-advisor";
+  const TOOL_USE_ID = "srvtoolu-advisor-1";
+
+  const consult = (query: FakeClaudeQuery) => {
+    query.emit({
+      type: "stream_event",
+      session_id: SESSION_ID,
+      uuid: "stream-advisor-start",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "server_tool_use",
+          id: TOOL_USE_ID,
+          name: "advisor",
+          input: {},
+        },
+      },
+    } as unknown as SDKMessage);
+    query.emit({
+      type: "stream_event",
+      session_id: SESSION_ID,
+      uuid: "stream-advisor-stop",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_stop",
+        index: 0,
+      },
+    } as unknown as SDKMessage);
+  };
+
+  // The advisor's answer arrives twice with includePartialMessages: as the
+  // stream's own content_block_start and inside the assistant snapshot.
+  const answer = (query: FakeClaudeQuery, content: Record<string, unknown>) => {
+    const block = {
+      type: "advisor_tool_result",
+      tool_use_id: TOOL_USE_ID,
+      content,
+    };
+    query.emit({
+      type: "stream_event",
+      session_id: SESSION_ID,
+      uuid: "stream-advisor-result",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_start",
+        index: 1,
+        content_block: block,
+      },
+    } as unknown as SDKMessage);
+    query.emit({
+      type: "assistant",
+      session_id: SESSION_ID,
+      uuid: "assistant-advisor-result",
+      parent_tool_use_id: null,
+      message: {
+        id: "msg-advisor",
+        role: "assistant",
+        model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+        content: [{ type: "server_tool_use", id: TOOL_USE_ID, name: "advisor", input: {} }, block],
+      },
+    } as unknown as SDKMessage);
+  };
+
+  const finish = (query: FakeClaudeQuery) =>
+    query.emit({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      errors: [],
+      session_id: SESSION_ID,
+      uuid: "result-advisor",
+    } as unknown as SDKMessage);
+
+  const run = (content: Record<string, unknown>) => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({ threadId: session.threadId, input: "hello", attachments: [] });
+
+      consult(harness.query);
+      answer(harness.query, content);
+      finish(harness.query);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      assert.deepEqual(
+        runtimeEvents.map((event) => event.type),
+        [
+          "session.started",
+          "session.configured",
+          "session.state.changed",
+          "turn.started",
+          "thread.started",
+          "item.started",
+          "item.updated",
+          "item.completed",
+          "turn.completed",
+        ],
+      );
+      const started = runtimeEvents.find((event) => event.type === "item.started");
+      assert.equal(started?.type, "item.started");
+      if (started?.type === "item.started") {
+        assert.equal(started.payload.itemType, "dynamic_tool_call");
+        assert.equal(started.payload.detail, "Consulted the advisor");
+      }
+      const completed = runtimeEvents.find((event) => event.type === "item.completed");
+      assert.equal(completed?.type, "item.completed");
+      return completed?.type === "item.completed" ? completed : undefined;
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  };
+
+  it.effect("closes the consult on the redacted answer, once, before the turn ends", () =>
+    Effect.gen(function* () {
+      const completed = yield* run({
+        type: "advisor_redacted_result",
+        encrypted_content: "opaque",
+      });
+      assert.equal(completed?.payload.status, "completed");
+      // Closed by the answer itself, not by the end-of-turn sweep.
+      assert.equal(completed?.raw?.method, "claude/stream_event/content_block_start");
+      assert.equal(
+        (completed?.payload.data as { result?: { type?: string } } | undefined)?.result?.type,
+        "advisor_tool_result",
+      );
+      assert.equal(completed?.payload.detail, "The advisor answered; its reply is encrypted.");
+    }),
+  );
+
+  it.effect("a failed consult is a failed item naming the error", () =>
+    Effect.gen(function* () {
+      const completed = yield* run({
+        type: "advisor_tool_result_error",
+        error_code: "overloaded",
+      });
+      assert.equal(completed?.payload.status, "failed");
+      assert.equal(completed?.payload.detail, "The advisor did not answer: overloaded.");
+    }),
+  );
+
+  it.effect("a plain answer completes with its text in the result", () =>
+    Effect.gen(function* () {
+      const completed = yield* run({ type: "advisor_result", text: "Use the cursor." });
+      assert.equal(completed?.payload.status, "completed");
+      assert.equal(completed?.payload.detail, "Consulted the advisor");
+      assert.equal(
+        (completed?.payload.data as { result?: { content?: { text?: string } } } | undefined)
+          ?.result?.content?.text,
+        "Use the cursor.",
+      );
+    }),
+  );
+});
