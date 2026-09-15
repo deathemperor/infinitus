@@ -100,7 +100,9 @@ before that the `native` branch). Split out of
   `fitPinned` applies it.
 - Never `cp` over the RUNNING unbundled binary — overwriting a signed
   executable in place gets the process killed on its next page-in
-  (the dev instance "mysteriously died" 2026-08-30). pkill first.
+  (the dev instance "mysteriously died" 2026-08-30). Stop the instance
+  first, by the PID you captured when you spawned it — never by name or
+  pattern (AGENTS.md's first rule: several dev servers share this Mac).
 - macOS 26 ControlCenter can stop adopting new bundled apps' status items
   after rapid relaunch churn — only a logout clears it; `run-unbundled.sh`
   is the workaround. Don't run the dev loop's kill/reopen cycle for hours.
