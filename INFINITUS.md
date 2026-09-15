@@ -1733,33 +1733,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   waited on; an unreachable Mac or a refused verb is logged and the row
   stays. The result text and the command reach no log, span or payload —
   only the thread id, the provider and the profile.
-- `apps/server/src/infinitus/Layers/InfinitusAgentActivity.ts` (+
-  `infinitusAgentActivity.logic.ts`, tests) — the phone's lock-screen thread
-  card, the server half (#1047 part 3; the Mac half is `ThreadActivityPush`
-  in `apps/mac`, the phone's the `AgentActivity` widget). The server folds
-  every live thread's `projectThreadAwareness` (what the T3 Connect relay is
-  fed per thread; side questions skipped) into upstream's aggregate card as
-  the relay's `makeAggregateState` does — ported, since the server cannot
-  import `infra/relay`: the active rows by priority (approval and input,
-  failed, working), then the threads finished within 15 min, five rows at
-  most, "Agent work in progress" / "completed" / "failed"; the title is
-  `PRODUCT_NAME`, and a starting or running row carries its turn's
-  `startedAt`, which the Mac forwards untouched — and hands it to the Mac's
-  `push` verb on stdin (the request line's `secret` field: `{kind, state}`
-  with the kind `thread.activity`, `state: null` ending the card; the reply
-  is `{pushed, card}`). Cadence is `AgentAwarenessRelay`'s: a thread event the relay
-  would publish schedules one fold 5 s later, the fold reads the whole shell
-  snapshot and sends only when the card's identity (everything but the
-  timestamps, at both levels) changed since the last push the Mac took (an
-  unavailable Mac leaves the slot empty, so the next event tries again);
-  each push showing a finished row arms one wake for the moment it ages
-  out, since no thread event says so; a clean shutdown sends `null`
-  best-effort when a card was up. Gated on the manifest's `push` taking a
-  payload whose summary names `thread.activity` (older builds refuse the
-  kind and stay quiet); withheld exactly where the port publish is. Counts
-  and phases reach the log; titles never. Staleness (a phone that stops
-  hearing) is the Mac pusher's, not the server's: an identical card is
-  never re-sent.
+- `apps/server/src/infinitus/Layers/InfinitusAgentActivity.ts` (+ `infinitusAgentActivity.logic.ts`, tests) — the phone's lock-screen thread card, the server half (#1047 part 3): folds every live thread's `projectThreadAwareness` into the aggregate card and hands it to the Mac's `push` verb as `thread.activity`; `InfinitusAgentActivityLive` in `server.ts`. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
@@ -2067,44 +2041,7 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the
   device's clock format — the phone has no timestamp setting — null once
   the instant is past).
-- `apps/mobile/src/features/infinitus/InfinitusThreadCardBridge.tsx` (+
-  `threadCardBridge.controller.ts` — the effect's body outside React, with
-  every trigger injected so its timers are tested; `liveActivityStarts.ts`,
-  `testCard.logic.ts`) — the phone half of the
-  lock-screen thread card (#1047, part 2; the Mac's `push
-{kind: "thread.activity"}` is part 1, the server's fold part 3). The card
-  is upstream's `AgentActivity` Live Activity, edited only for the elapsed
-  timer (the registration point above): the Mac pushes
-  its `{name, props}` envelope, so the phone only files tokens — the
-  push-to-start one and each running card's own — with the Mac it follows
-  (`pusherMac`) through `activities-token`, the alert kind's path, and
-  withdraws both kinds when Settings › Infinitus › "Thread card on the lock
-  screen" goes off (default on, iOS only). The card's own token is withdrawn
-  once no card is live (#1265, `cardSync.logic.ts`): expo-widgets surfaces no
-  activity-state event, so the bridge re-scans `getInstances()` — native
-  lists the active AND stale cards, a stale one being still on screen and
-  updatable — at mount, on every foreground and after a local start or end,
-  and an empty scan forgets `agent-activity` once per empty stretch, never
-  gated on what this run offered (a reinstall replaces the card whose token
-  the Mac still holds; forgetting an empty slot is the Mac's no-op). The
-  forget rides the bridge's send loop — retried while the Mac is unreachable,
-  dropped when a new card's token is offered — and the Settings row reads
-  "withdrawn". A card iOS starts from a push-to-start while the app is in the
-  background is seen through the patched `onExpoWidgetsActivityUpdate` event
-  (#1277, above), which runs the same re-scan, so its token reaches the Mac
-  and the next push updates the card in place instead of starting another.
-  Every re-scan keeps ONE card — the one whose token the bridge holds, else
-  the first listed, as upstream's app does — and ends the others at once
-  (`cardsToEnd`), so a stack a dead-app window left collapses the next time
-  the app wakes. A card dismissed while the app stays closed is caught on the
-  next foreground; the Mac's staleAfter fallback covers the gap. "Show a test card" starts the
-  card locally with a fabricated state (`TEST_CARD_STATE`, one row per
-  ranked phase, the working one dated against the press so its timer ticks —
-  `testCardState`), no APNs in the loop, so a blank card blames the widget and
-  a refusal (ActivityKit's message in an alert) blames the phone's settings;
-  with cards live the row ends them all. `packages/contracts/src/infinitus.ts`
-  `InfinitusActivityPushKind` is `alert | agent-activity-start |
-agent-activity` (the session cards' kinds retired with #1041).
+- `apps/mobile/src/features/infinitus/InfinitusThreadCardBridge.tsx` (+ `threadCardBridge.controller.ts`, `liveActivityStarts.ts`, `testCard.logic.ts`, `cardSync.logic.ts`) — the phone half of the lock-screen thread card (#1047 part 2, #1265, #1277): files the `agent-activity-start` / `agent-activity` tokens with `pusherMac` through `activities-token`, re-scans `getInstances()` (`cardsToEnd`), the test card (`TEST_CARD_STATE`, `testCardState`); `packages/contracts/src/infinitus.ts` `InfinitusActivityPushKind`. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
@@ -2119,36 +2056,8 @@ agent-activity` (the session cards' kinds retired with #1041).
   come from (`infinitusLiveActivityMac`). `pushRegistration.ts` logs a
   refused `activities-token` (`[infinitus-push]`) since the bridge sends
   with `reportFailure: false`.
-- `apps/mobile/src/features/infinitus/pushRetry.logic.ts` (+ test) — the
-  thread-card bridge's re-send rule (#941): ActivityKit vends the
-  push-to-start token as the bridge mounts, before the environment's socket
-  is up, so the first send failed with `EnvironmentRpcUnavailableError` and
-  nothing fired it again — the Mac held no start token and no card could
-  begin. The bridge now keeps the newest token per kind and re-sends it;
-  `nextRetry` backs a failed round off by `RETRY_DELAYS_MS` (5 s, 15 s,
-  1 min, then the 5 min cap) while the Mac is reachable, schedules nothing
-  while it is not — the environment connecting, or the app coming to the
-  foreground, sends at once — and stops as soon as every token is on file.
-  `isEnvironmentUnreachable` is the same tag check the web's legacy-queue
-  migration makes, and decides the row's wording above.
-- `apps/mobile/src/features/infinitus/pushDiagnostics.ts` (+
-  `pushDiagnostics.logic.ts`, test) — what this phone's registrations have
-  done, for the "Card push registration" row in Settings › Infinitus (#941):
-  the thread-card bridge notes when it attaches and lets go of its listeners,
-  `tokenSender` notes each kind's outcome, and `agentActivityPushSummary`
-  folds the two into one line — not running / no token yet / card token only
-  / registered / refused / Mac unreachable — with the failure's own text, or
-  the gates to check, behind a tap. A send the RPC could not deliver is never
-  worded as a refusal: the Mac did not see that token. The switch going off
-  is read the same way (#1265 follow-up): `useForgetOnSwitchOff` sends the
-  withdrawal through `forgetTokensOutcome` and the row reads "Off, withdrawn"
-  / "Off, refused" / "Off, Mac unreachable" — an unreachable one is sent again
-  on the next foreground and dropped if the switch comes back on first, since
-  the bridge then registers afresh. The lock-screen card's start token is vended by
-  ActivityKit through an event that never fires when it declines (Live
-  Activities off for the app, or iOS before 17.2), and a refusal is a
-  `console.warn` a Release build shows nobody, so without this one silence
-  covers four faults. Memory only: it describes this run of the app.
+- `apps/mobile/src/features/infinitus/pushRetry.logic.ts` (+ test) — the thread-card bridge's re-send rule (#941): `nextRetry`, `RETRY_DELAYS_MS`, `isEnvironmentUnreachable`. Rules and traps: `docs/internals/phone-thread-card.md`.
+- `apps/mobile/src/features/infinitus/pushDiagnostics.ts` (+ `pushDiagnostics.logic.ts`, test) — the "Card push registration" row in Settings › Infinitus (#941, #1265): `tokenSender`, `agentActivityPushSummary`, `useForgetOnSwitchOff`, `forgetTokensOutcome`. Rules and traps: `docs/internals/phone-thread-card.md`.
 
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives
