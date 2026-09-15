@@ -1431,8 +1431,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the
   port layer (which is why that block sits below `AuthLayerLive` in
   `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. Queue-behind-a-
-  turn is #806, not this; `thread show`, `send`, `new`, `interrupt` and
-  `--wait` use routes that already existed.
+  turn is #806, not this; `thread show`, `send`, `interrupt` and
+  `--wait` use routes that already existed, and `new` too but for the
+  thread-defaults read above.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
