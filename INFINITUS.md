@@ -396,54 +396,7 @@ completedAt`, an older turn's user message → last assistant `updatedAt`
   `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity
   context, drawn by `AssistantMessageMeta` in place of the bare time;
   `ChatView.tsx` — the hook and the prop. The phone reuses the module.
-- Server-side message queue (#806, the server half of #270 F):
-  `packages/contracts/src/baseSchemas.ts` — `QueueId`;
-  `packages/contracts/src/orchestration.ts` — `OrchestrationQueuedTurn`,
-  `queuedTurns?` on `OrchestrationThread` and `OrchestrationThreadShell`
-  (optional; absent when empty so pre-queue payloads still decode), the
-  commands `thread.turn.queue` (client variant carries uploads like
-  `thread.turn.start`'s), `.queue.update`, `.queue.remove`, `.queue.move`,
-  `queuedFrom?` on both turn-start commands, and the events
-  `thread.turn-queued` / `-queue-updated` / `-queue-removed` (`reason:
-user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
-  fractional key helpers moved out of `client-runtime` `threadSort.ts` (which
-  re-exports them as `pinOrderKeyBetween` / `generateSpreadPinOrderKeys`) so
-  the decider validates and defaults a key; `apps/server/src/orchestration/decider.ts`
-  — the four cases (queue is idempotent by re-emission, update/move refuse a
-  missing row, remove re-emits) and the turn start's `queuedFrom` removal in
-  the same batch (a row already gone refuses the start, so "Send now" and
-  the idle drain racing on one row send it once); `projector.ts`,
-  `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
-  the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
-  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`;
-  `context_json`, migration `059`, keeps the message's context records
-  upstream #11265 added, and the drain sends them with it — #969),
-  dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
-  every thread read (snapshot, command read model, shells, detail);
-  `Normalizer.ts` — the queue commands' uploads stored like a sent
-  message's (and pruned like a reverted message's, #847: a row removed
-  without sending, or an edit that dropped an upload, schedules the
-  thread's attachment prune, whose retained set now counts queued rows'
-  uploads too; a `sent` removal prunes nothing, and the boot-time cleanup
-  replay covers reverts and deletes only, so a crash between the queue
-  event and its prune leaves the copy until the thread is deleted); `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
-  `ReactorLayerLive` above the interrupt and hold layers it consumes;
-  `Services/InfinitusSessionInterrupt.ts` — `paused` stream (like the
-  hold's `held`). Fork-only: `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts`
-  (+ `infinitusTurnQueue.logic.ts`, test) — the drain: sends a thread's
-  first row as `thread.turn.start {queuedFrom}` when the thread is idle
-  (`queueDrainVerdict`: no turn running, starting or pending, not held,
-  not paused, not archived, no send of its own in flight; `error` sessions
-  never, see #832), one send per thread at a time; wakes on session-set,
-  the queue events, unarchive, a failed start, a hold or pause letting the
-  thread go, and once at boot after the hold and interrupt layers have
-  published their first lists (5 s cap). A send the decider refuses stays
-  in the queue with an `error` activity `queue.send.failed` and is skipped
-  until edited, moved or removed (the queue blocks behind it; a row already
-  sent or removed only logs); a send the provider fails to start after the
-  row was consumed is put back once, at the head, as `<queueId>~retry` with
-  a fresh message id and an `info` activity `queue.requeued` — the drain's
-  own sends only, "Send now" stays a manual send.
+- Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`; `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
 - Update idle gate (#829): a server update is gated on the server's own
   turn state, never on process heuristics. `packages/contracts/src/server.ts`
   — `ServerRunningTurn` (`threadId`, `turnId`), `ServerUpdateRunningTurnsPolicy`
