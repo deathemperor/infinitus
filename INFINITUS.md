@@ -343,7 +343,12 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (#270 F, pre-#806) to the server once, ids derived from the entry, a
   refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);
   `ComposerPrimaryActions.tsx` — `runningSendMode` keeps the send button
-  beside Stop while running, labelled "Queue message" / "Send now" (upstream
+  beside Stop while running, labelled "Queue message" / "Send at next step"
+  (#1318: steer mode queues the message with `sendAt: "tool-boundary"`, the
+  intent `steer`, and the drain sends it at the running turn's next finished
+  tool call — `docs/internals/turn-queue.md`; `queuedTurnTiming` labels the
+  row "at next step" on the web and the phone, `queuedTurnsHeader` words
+  the list's header) (upstream
   shows its own "Queue message" there since #11673, so the fork's prop only
   changes the steer label); `ChatView.tsx` `onSend` — upstream's client-side
   queue (#11673, `queuedMessageStore.ts`: a mid-turn send parked in memory

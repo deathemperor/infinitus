@@ -7860,9 +7860,13 @@ export default function ChatView(props: ChatViewProps) {
 
     const resolvedSubmissionIntent =
       submissionIntent === "background" && isLocalDraftThread ? "background" : "foreground";
-    // Fork (#806): the message waits on the server for the running turn to
-    // finish. Only a thread the server already has can hold a queue.
-    const isQueueSubmission = submissionIntent === "queue" && isServerThread && !isLocalDraftThread;
+    // Fork (#806, #1318): the message waits on the server — for the running
+    // turn to finish, or (steer) for its next tool call to. Only a thread
+    // the server already has can hold a queue.
+    const isQueueSubmission =
+      (submissionIntent === "queue" || submissionIntent === "steer") &&
+      isServerThread &&
+      !isLocalDraftThread;
     if (
       shouldDockDraftHeroForSubmission({
         isDraftHeroState,
@@ -8124,6 +8128,7 @@ export default function ChatView(props: ChatViewProps) {
             ...messageContextFields(turnAttachmentsResult.value),
           },
           modelSelection: ctxSelectedModelSelection,
+          ...(submissionIntent === "steer" ? { sendAt: "tool-boundary" as const } : {}),
           createdAt: messageCreatedAt,
         },
       });

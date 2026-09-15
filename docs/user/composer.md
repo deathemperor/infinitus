@@ -35,9 +35,12 @@ A message sent during a running turn is queued on the server and goes out on
 its own when the turn ends. The queue is listed at the composer: reorder,
 edit, send a message now or remove it, from any device signed in to the
 server. Stop ends the turn, so the next queued message goes out; remove it
-first if you want nothing to follow. To send into the running turn instead,
-set Settings › General › "Sending while a turn runs" to "Send now"; ⌘↩
-(Ctrl+Enter) uses the other mode for one message.
+first if you want nothing to follow. To steer the running turn instead, set
+Settings › General › "Sending while a turn runs" to "Send at its next step":
+the message waits for the agent's current tool call to finish, then goes
+into the turn (or out when the turn ends, if that comes first); such a row
+is marked "at next step" in the queue. ⌘↩ (Ctrl+Enter) uses the other mode
+for one message; "Send now" on a queued row sends it into the turn at once.
 
 ## Queue messages offline on mobile
 

@@ -323,7 +323,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "composer-send-mode",
     title: "Sending while a turn runs",
     to: "/settings/general",
-    searchTerms: ["queue steer send now interrupt running turn enter composer follow-up"],
+    searchTerms: ["queue steer send next step tool running turn enter composer follow-up"],
   },
   {
     id: "provider-update-checks",

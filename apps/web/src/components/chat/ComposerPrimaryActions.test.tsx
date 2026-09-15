@@ -135,7 +135,7 @@ describe("ComposerPrimaryActions", () => {
 
   it("keeps send next to stop while running and names the send mode (#270 F)", () => {
     expect(renderRunningActions(true, "queue")).toContain('aria-label="Queue message"');
-    expect(renderRunningActions(true, "steer")).toContain('aria-label="Send now"');
+    expect(renderRunningActions(true, "steer")).toContain('aria-label="Send at next step"');
     expect(renderRunningActions(false, "queue")).not.toContain('aria-label="Queue message"');
   });
 
