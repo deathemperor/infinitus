@@ -24,7 +24,7 @@ func teamUsage() -> String {
       remove <kid> | promote <kid>                 roster edits (leaders; the founder cannot be removed)
       fetch                                        pull the store and accept the roster
       policy [--requests code|off] [--members-see-each-other on|off]   (leaders) show or set the roster policy
-      share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|sessions|transcripts|crashes|fleet ("off" keeps it on this machine; new envelopes — see reshare)
+      share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|sessions|transcripts|crashes|fleet ("off" keeps it on this machine; new envelopes only)
       leave [--rotate-identity]                    delete my files on the store, tell the leaders, forget the team here (and mint a new identity)
       exclude <project-dir> [--off]                keep a Claude Code project private (local, never sent)
       identity [show]                    this machine's identity kid
@@ -92,15 +92,6 @@ private func routeToApp(_ sub: String, positional: [String], options: [String: S
 
 private struct ReadableEntry: Encodable {
     var path: String; var size: Int; var kind: String; var from: String; var at: Int
-}
-
-private struct MemberRow: Encodable {
-    var kid: String; var name: String; var role: String; var online: Bool
-    var sessionsNow: Int; var blockers: [String]; var crashes: Int; var lastPublished: Int?
-    var usd: Double; var commits: Int; var messages: Int; var outputTokens: Int; var sessions: Int
-    var sharesToMe: [String]
-    /// Unix seconds: roster approval; `removedAt` for a removed sender still readable.
-    var joined: Int?; var removedAt: Int?
 }
 
 func runTeam(_ args: [String]) -> Int32 {

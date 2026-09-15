@@ -142,7 +142,7 @@ sees it.
 | `team-status` | — | read | — | `null` when not in a team, else `TeamSnapshot` (below) |
 | `team-create <name>` | `--remote <url>`, `--as <your name>` | write | secret (the remote's token, when the URL needs one) | `TeamSnapshot` |
 | `team-join <your name>` | — | write | secret (the team code) | `{requested: true, kid}` |
-| `team-code` | `--days n`, `--invite` (one-use nonce) | read | — | `{code, expires}` (rendered, never logged) |
+| `team-code` | `--days n`, `--invite` (one-use nonce) | write (the invite book changes) | — | `{code, expires}` (rendered, never logged) |
 | `team-fetch` | — | write | — | `TeamSnapshot` |
 | `team-publish` | — | write | — | `{published: [paths]}` |
 | `team-approve <kid>` / `team-decline <kid>` | — | write | — | `TeamSnapshot` |
@@ -342,8 +342,8 @@ One PR each, in this order; the plan has the steps.
 
 1. Spec + plan (this document; docs only).
 2. Crypto core (§3): files, tests, `CZlib`, `TeamCommand` with the CLI
-   subcommands in §5.5, e2e's team round restored in its old shape with
-   `sessions` untouched.
+   subcommands in §5.5 (the e2e's team round needs the app's verbs and
+   lands with slice 3).
 3. Verbs + contracts + Mac loop (§4, §5): `TeamModel`, `ControlProtocol`
    entries, `ControlServer` cases, `threads`/`now` on `DesktopAPI`,
    lock gates, contracts, fixture `team-status`.
