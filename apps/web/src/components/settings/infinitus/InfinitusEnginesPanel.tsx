@@ -13,7 +13,7 @@ import { SettingsRow, SettingsSection } from "../settingsLayout";
 
 import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 import { InfinitusPrefsPanel, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
-import { buildEngineStatusRows } from "./panel.logic";
+import { buildEngineStatusRows, menuBarAppVersionLine } from "./panel.logic";
 
 const KEY_STATUS: Readonly<Record<"present" | "missing", string>> = {
   present: "Key set",
@@ -35,6 +35,7 @@ function InfinitusEngineStatusList({
         <SettingsRow
           key={row.key}
           title={row.label}
+          description={row.detail ?? undefined}
           status={
             <span className="flex flex-wrap items-center gap-1.5">
               <Badge variant={row.enabled ? "default" : "outline"}>
@@ -48,6 +49,45 @@ function InfinitusEngineStatusList({
           }
         />
       ))}
+      {rows
+        .filter((row) => row.error !== null)
+        .map((row) => (
+          <p key={row.key} className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+            {row.label}: {row.error}
+          </p>
+        ))}
+    </SettingsSection>
+  );
+}
+
+/** About, the Mac's pane folded into this page (2026-09-14): version and
+    build only. The menu bar app is bundled with the desktop app and updates
+    with it, so there is nothing to check for or switch here. */
+function InfinitusAboutSection({
+  environment,
+}: {
+  readonly environment?: EnvironmentPresentation | null;
+}) {
+  const { snapshot } = useInfinitusEnvironment(environment);
+  const line = menuBarAppVersionLine(snapshot?.status);
+  if (line === undefined) return null;
+
+  return (
+    <SettingsSection id="infinitus-about" title="About">
+      <SettingsRow
+        title={line}
+        description="Bundled with the desktop app; updates arrive with it."
+        control={
+          <a
+            href="https://github.com/deathemperor/infinitus/releases"
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm underline underline-offset-4"
+          >
+            Releases
+          </a>
+        }
+      />
     </SettingsSection>
   );
 }
@@ -76,6 +116,7 @@ export function InfinitusEnginesPanel({
       </p>
       <InfinitusEngineStatusList {...target} />
       <InfinitusEngineSecrets {...target} />
+      <InfinitusAboutSection {...target} />
     </InfinitusPrefsPanel>
   );
 }

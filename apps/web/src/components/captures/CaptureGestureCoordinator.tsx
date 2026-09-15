@@ -1,3 +1,4 @@
+import type { DesktopCaptureGestureEvent } from "@t3tools/contracts";
 import { useCallback, useEffect, useRef } from "react";
 
 import { toastManager } from "../ui/toast";
@@ -9,15 +10,18 @@ import { type ActiveProjectRef, useActiveProjectRef, useAddCapture } from "./use
  * Mounted once in the app shell: the desktop's double-tap-Shift gesture
  * (#433 slice 2) as captures. The text goes to the routed thread's project,
  * else to the last project a gesture reached, else it is held until a
- * thread with a project is open — never dropped. Nothing here reveals the
- * window; the shell's beep is the confirmation, the toasts wait for the
- * user to come back.
+ * thread with a project is open — never dropped. The shell queues the reads
+ * and pings; this pulls on mount and on every ping, so a read that beat the
+ * mount of a freshly opened window is still delivered (slice 3). Nothing
+ * here reveals the window; the shell's beep is the confirmation, the toasts
+ * wait for the user to come back.
  */
 export function CaptureGestureCoordinator() {
   const project = useActiveProjectRef();
   const addCapture = useAddCapture();
   const lastProjectRef = useRef<ActiveProjectRef | null>(null);
   const pendingRef = useRef<string | null>(null);
+  const queueRef = useRef(Promise.resolve());
 
   const deliver = useCallback(
     async (text: string) => {
@@ -57,10 +61,16 @@ export function CaptureGestureCoordinator() {
 
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
-    if (typeof bridge?.onCaptureGestureEvent !== "function") return;
-    return bridge.onCaptureGestureEvent((event) => {
+    if (
+      typeof bridge?.consumePendingCaptureGestures !== "function" ||
+      typeof bridge.onCaptureGesturePending !== "function"
+    ) {
+      return;
+    }
+    const consume = bridge.consumePendingCaptureGestures;
+    const handle = async (event: DesktopCaptureGestureEvent) => {
       if (event.type === "captured") {
-        void deliverRef.current(event.text);
+        await deliverRef.current(event.text);
         return;
       }
       if (event.type === "empty") {
@@ -76,7 +86,17 @@ export function CaptureGestureCoordinator() {
         title: "Capture failed",
         description: captureGestureFailureMessage(event.reason),
       });
-    });
+    };
+    const drain = () => {
+      queueRef.current = queueRef.current
+        .then(async () => {
+          for (const event of await consume()) await handle(event);
+        })
+        .catch(() => undefined);
+    };
+    const unsubscribe = bridge.onCaptureGesturePending(drain);
+    drain();
+    return unsubscribe;
   }, []);
 
   return null;

@@ -19,7 +19,9 @@ const RELEASE_FRESH_MS = 5 * 60 * 1000;
 const DOWNLOAD = /^\/download\/([a-z0-9_-]+)$/;
 // Route → the asset's file name for version v (the release workflow's names).
 const DOWNLOADS = {
-  mac: (v) => `Infinitus-${v}.zip`,
+  // `mac` was the standalone menu bar zip until #1238; the menu bar app
+  // ships only inside the desktop DMG now, so both routes name it.
+  mac: (v) => `Infinitus-${v}-arm64.dmg`,
   dmg: (v) => `Infinitus-${v}-arm64.dmg`,
   "linux-x86_64": () => "infinitus-tray-linux-x86_64",
   "linux-aarch64": () => "infinitus-tray-linux-aarch64",

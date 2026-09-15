@@ -11,7 +11,10 @@ import {
 export type ComposerTriggerKind = "path" | "pull-request" | "slash-command" | "skill";
 export type ComposerSlashCommand = "model" | "plan" | "default";
 /** `queue` (#806): the message waits on the server for the running turn to finish. */
-export type ComposerSubmissionIntent = "foreground" | "background" | "queue";
+// Fork (#270 F, #806, #1318): `queue` and `steer` hand the message to the
+// server's queue while a turn runs; a `steer` row is due at the turn's next
+// finished tool call, a `queue` row when the thread is idle.
+export type ComposerSubmissionIntent = "foreground" | "background" | "queue" | "steer";
 
 export interface ComposerTrigger {
   kind: ComposerTriggerKind;

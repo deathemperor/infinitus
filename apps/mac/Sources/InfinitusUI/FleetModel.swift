@@ -51,9 +51,8 @@ public protocol FleetModel: ObservableObject {
     /// Multi-engine (#8): the section header when several fleets stack;
     /// nil on a host that shows one fleet.
     var fleetLabel: FleetLabel? { get }
-    /// Update chips: a newer build on disk / a newer release upstream.
+    /// Update chip: a newer build on disk.
     var appUpdatePending: Bool { get }
-    var appUpdateVersion: String? { get }
     /// #7: the reset battle plan the planner proposes right now; nil when
     /// nothing is worth planning. The card rides the error slot.
     var battlePlan: WindowPlanner.Plan? { get }
@@ -131,7 +130,6 @@ public extension FleetModel {
     func openSettings() {}
     var engineBadge: EngineBadge? { nil }
     var appUpdatePending: Bool { false }
-    var appUpdateVersion: String? { nil }
     var battlePlan: WindowPlanner.Plan? { nil }
     var igniting: Int? { nil }
     var igniteResult: IgniteResult? { nil }

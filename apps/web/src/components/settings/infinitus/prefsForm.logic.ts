@@ -55,6 +55,11 @@ export const PREF_COPY: Readonly<
     description:
       "Off, the icon stays hidden across relaunches. Infinitus keeps running in the background; this page and infinitusctl turn it back on.",
   },
+  dock_icon_enabled: {
+    label: "Show a Dock icon while Settings is open",
+    description:
+      "Off, Infinitus stays out of the Dock and Cmd+Tab entirely. Reach an open Settings window from the menu bar icon or `infinitusctl show settings` instead.",
+  },
   title_icon_only: { label: "Show only the icon" },
   show_account_name: { label: "Show the account name" },
   title_pct: {
@@ -205,10 +210,10 @@ export const PREF_COPY: Readonly<
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
   engine_9router_enabled: { label: "9Router engine on (rotates behind its own endpoint)" },
-  // About.
-  update_channel: {
-    label: "Update channel",
-    choices: { stable: "Stable", nightly: "Nightly" },
+  mock_mode: {
+    label: "Demo fleet (fabricated accounts)",
+    description:
+      "Made-up accounts standing in for the engine. Nothing reads or touches your real accounts; flipping this restarts Infinitus.",
   },
   // Priority: thread priority mode (#616 hold, #743 interrupt). The verdict
   // itself is native's; these are the knobs it reads.

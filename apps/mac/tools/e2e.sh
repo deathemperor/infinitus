@@ -41,6 +41,7 @@ ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple D
 SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
+export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"          # the app's team dir + file secrets (#1313: CI has no keychain)
 # An empty Claude home (#1204): the stats and token-rate scanners read
 # `$CLAUDE_CONFIG_DIR/projects`, and without this the run scanned the
 # developer's real transcript tree — 14 GB on one Mac, nothing on CI — so
@@ -269,6 +270,8 @@ echo "aws: orphan login wrapper swept at launch"
 "$CTL" lock relock never >/dev/null 2>&1 && fail "lock relock must refuse an unknown choice"
 "$CTL" unlock 2>&1 | grep -q "the lock is off" || fail "unlock must say the lock is off"
 "$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
+# #1177: the swapd pane's read-only lines ride `status` (binary path, daemon word).
+"$CTL" status | expect "d['engines']['swapd']['binaryPath'].endswith('demo-swapd') and d['engines']['swapd']['daemon'] in ('stopped','running','backingOff','refused','schemaMismatch')" || fail "status swapd binary/daemon"
 sleep 4   # first demo snapshot
 N="$("$CTL" fleets | json "sum(len(f['accounts']) for f in d)")"
 [ "$N" -ge 5 ] || fail "expected the demo fleet (>=5 accounts), got $N"
@@ -336,6 +339,9 @@ pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null || fail "swapd auto m
 "$CTL" prefs set menu_bar_enabled false | expect "d['value'] is False" || fail "prefs set menu_bar_enabled false"
 "$CTL" status | expect "d['badge']" || fail "the socket must keep answering with the menu bar off (#828)"
 "$CTL" prefs set menu_bar_enabled true | expect "d['value'] is True" || fail "prefs set menu_bar_enabled true"
+# The Dock icon is a pref too, default off: Settings takes one only when it is on.
+"$CTL" prefs set dock_icon_enabled true | expect "d['value'] is True" || fail "prefs set dock_icon_enabled true"
+"$CTL" prefs set dock_icon_enabled false | expect "d['value'] is False" || fail "prefs set dock_icon_enabled false"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
 echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 # #743: the interrupt mode says critical where hold says low, same line.
@@ -380,6 +386,8 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs get popup_layout engine_swapd_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_swapd_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
 # A key with no window behind it: a layout swap here would re-lay the
 # pop-out twice and leave ~45 MB resident before the RSS gate (2026-09-10).
+# The demo fleet this run turned on is a catalog pref now (#1177), restart-effect like the engine toggles.
+"$CTL" prefs get mock_mode | expect "d['prefs'][0]['value'] is True and d['prefs'][0]['effect']=='restart' and d['prefs'][0]['section']=='engines'" || fail "prefs get mock_mode"
 "$CTL" prefs set revive_lead_minutes 15 | expect "d['key']=='revive_lead_minutes' and d['value']==15" || fail "prefs set"
 "$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
 "$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"
@@ -568,6 +576,53 @@ done
 pgrep -f "$SOCKDIR/aws" >/dev/null && fail "stub aws CLI still running"
 echo "aws: rebind refused"
 
+# --- team (#1313) ----------------------------------------------------------
+# The app creates a team on a bare repo; a second identity — the CLI
+# in-process, its own INFINITUS_TEAM_DIR — joins with a team code and
+# publishes; the app approves and reads it back. No desktop answers here,
+# so the publish carries stats and now, and the index stays empty.
+"$CTL" team-status | expect "d is None" || fail "team-status must be null before a team exists"
+git init -q --bare "$SOCKDIR/team.git"
+git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
+"$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
+    | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder'] and d['lockEnabled'] is False" || fail "team-create"
+# Spec §2.2: minting a code and approving need the lock on; the e2e never
+# turns it on, so the CLI mints in-process against the app's own team dir.
+"$CTL" team-code --days 1 2>&1 | grep -q "biometric lock" || fail "team-code must want the lock on"
+CODE="$(INFINITUS_TEAM_DIR="$SOCKDIR/team-app" "$CTL" team code --days 1 | json "d['code']")"
+case "$CODE" in infinitus://join/*) ;; *) fail "team-code shape" ;; esac
+CLI_TEAM="$SOCKDIR/team-cli"
+printf '%s' "$CODE" | INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team request - --name Bo >/dev/null || fail "cli team request"
+KID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team status | json "d['kid']")"
+"$CTL" team-fetch | expect "len(d['requests'])==1 and d['requests'][0]['name']=='Bo'" || fail "the request did not reach the leader"
+"$CTL" team-approve "$KID" 2>&1 | grep -q "biometric lock" || fail "team-approve must want the lock on"
+INFINITUS_TEAM_DIR="$SOCKDIR/team-app" "$CTL" team approve "$KID" >/dev/null || fail "cli team approve"
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members']) and not d['requests']" || fail "the approval did not reach the app"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team fetch >/dev/null || fail "cli team fetch"
+# #354: on a Mac with the app up and no INFINITUS_TEAM_DIR, `team status` is
+# the app's own view, and a subcommand the app has no verb for either refuses
+# to mint a second identity or says whose identity it is using.
+env -u INFINITUS_TEAM_DIR "$CTL" team status | expect "d['role']=='leader' and d['name']=='Papaya'" || fail "cli team status did not route to the app"
+env -u INFINITUS_TEAM_DIR "$CTL" team identity show 2>&1 | grep -q "owns this Mac's team identity\|infinitusctl's own identity" || fail "cli team identity neither refused nor named its own identity beside the app's"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish | expect "'published' in d" || fail "cli team publish"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts off \
+    | expect "d['byKind']['transcripts']=='off'" || fail "team share transcripts off"
+# `now` is the one kind every publish carries; stats need a transcript corpus the CI runner has none of.
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and 'now' in m['kinds'] for m in d['members'])" || fail "the member's files are not readable"
+"$CTL" team-publish | expect "'published' in d" || fail "team-publish"
+"$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
+"$CTL" team-share now team | expect "d['shares']['now']=='team'" || fail "team-share"
+"$CTL" team-exclude add secret-repo | expect "'secret-repo' in d['exclusions']" || fail "team-exclude add"
+"$CTL" team-exclude remove secret-repo | expect "'secret-repo' not in d['exclusions']" || fail "team-exclude remove"
+"$CTL" team-policy requests off | expect "d['policy']['requests']=='off'" || fail "team-policy"
+"$CTL" team-insights --period week | expect "d['period']=='week' and isinstance(d['blockers'], list)" || fail "team-insights"
+"$CTL" team-identity | expect "len(d['kid'])>8" || fail "team-identity"
+echo "team: ok (leader Ann, member Bo $KID)"
+# #747: the secret-carrying team verbs refuse an empty stdin by name.
+"$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
+"$CTL" lock off 2>&1 | grep -q -- "--yes" || fail "lock off in a team must want --yes"
+"$CTL" team-leave 2>&1 | grep -q -- "--yes" || fail "team-leave must want --yes"
+
 # #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
 # credential comes on stdin like every secret and stays in this run's own
 # keychain slot, the CLI reads it back over the socket and talks HTTP.
@@ -605,6 +660,11 @@ printf 'ping\n' | "$CTL" thread send t-idle - --wait | expect "d['text']=='echo:
 "$CTL" thread interrupt t-running | expect "d['ok'] is True and d['turnId']=='u-1'" || fail "thread interrupt"
 "$CTL" threads --status running | expect "d==[]" || fail "the interrupted thread is no longer running"
 desk_get /api/demo/dispatches | expect "[c['type'] for c in d]==['thread.turn.start','thread.turn.start','thread.turn.start','thread.turn.interrupt'] and d[0]['runtimeMode']=='full-access' and d[0]['message']['role']=='user' and d[0]['message']['attachments']==[] and d[1]['runtimeMode']=='approval-required' and d[2]['bootstrap']['createThread']['projectId']=='p-demo' and d[2]['bootstrap']['createThread']['modelSelection']=={'provider':'claude','model':'opus'} and d[2]['bootstrap']['prepareWorktree']['branch']=='fix/build' and d[2]['bootstrap']['prepareWorktree']['projectCwd']=='/tmp/demo-project' and d[2]['bootstrap']['prepareWorktree']['baseBranch']=='main' and d[2]['titleSeed']=='Fix the build' and d[3]['turnId']=='u-1'" || fail "the dispatched commands must carry the desktop's shapes"
+"$CTL" thread new --project "Bare project" "No default here" --wait | expect "d['text']=='echo: No default here'" || fail "thread new must fall back to the environment's default model (#1315)"
+"$CTL" thread new --project "Bare project" "Pick one" --model codex/gpt-5 --wait | expect "d['text']=='echo: Pick one'" || fail "thread new --model instance/model"
+"$CTL" thread new --project "Demo project" "Bare model" --model haiku --wait | expect "d['text']=='echo: Bare model'" || fail "thread new --model model"
+"$CTL" thread new --project "Bare project" "x" --model /haiku 2>&1 | grep -q "wants <instanceId>/<model>" || fail "thread new must refuse a malformed --model"
+desk_get /api/demo/dispatches | expect "[c['bootstrap']['createThread']['modelSelection'] for c in d[4:7]]==[{'instanceId':'claude','model':'sonnet'},{'instanceId':'codex','model':'gpt-5'},{'instanceId':'claude','model':'haiku'}]" || fail "the new threads must carry the environment default, the explicit instance/model and the project's instance with the bare model"
 printf 'wrong' | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" >/dev/null || fail "desktop-credential replace"
 rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && grep -q "no longer accepts this credential" "$LOG.desk" || fail "a revoked credential must exit 2 with the relaunch hint (got $rc: $(head -c 200 "$LOG.desk"))"

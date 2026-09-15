@@ -10,9 +10,9 @@ import { useCallback, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 
 import { infinitusEnvironment } from "../../state/infinitus";
-import { environmentServerConfigsAtom } from "../../state/server";
+import { serverEnvironment } from "../../state/server";
+import { threadProviderSnapshot } from "./threadProvider.logic";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { resolveThreadProviderInstance } from "../threads/thread-provider-instance";
 import { hasCompletedTurn, SIDE_QUESTION_NEEDS_TURN } from "./sideQuestions";
 import type { ThreadMenuAction } from "./threadHeaderMenu.logic";
 
@@ -40,11 +40,13 @@ export function useSideQuestionHeaderItem(
   detail: OrchestrationThread | null,
 ): SideQuestionHeaderItem {
   const navigation = useNavigation();
-  const configs = useAtomValue(environmentServerConfigsAtom);
-  const supported =
-    thread !== null &&
-    configs.get(thread.environmentId)?.environment.capabilities.infinitus === true &&
-    resolveThreadProviderInstance(configs, thread)?.driverKind === "claudeAgent";
+  const supported = useAtomValue(
+    serverEnvironment.configValueAtom(thread?.environmentId ?? null),
+    (config) =>
+      thread !== null &&
+      config?.environment.capabilities.infinitus === true &&
+      threadProviderSnapshot(config, thread)?.driver === "claudeAgent",
+  );
   const fork = useAtomCommand(infinitusEnvironment.forkThread, { reportFailure: false });
   const environmentId = thread?.environmentId ?? null;
   const threadId = thread?.id ?? null;

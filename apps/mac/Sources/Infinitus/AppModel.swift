@@ -234,12 +234,6 @@ final class AppModel: ObservableObject {
     // The bundle on disk was rebuilt since this instance launched (the
     // dev loop, or a manual make-app.sh) — surfaced as "restart to update".
     @Published var appUpdatePending = false
-    /// A newer Infinitus release than this build (About → Updates does
-    /// the check; the popup chip just points there).
-    @Published var appUpdateVersion: String?
-    /// The one BrewUpdater instance the About pane's button and the
-    /// phone's `POST /app/update` route both drive; set by InfinitusApp.
-    var brewUpdater: BrewUpdater?
     private let launchExecutableDate = AppModel.executableDate()
     private var swapdSupervisor: EngineSupervisor?
     private var refreshTask: Task<Void, Never>?
@@ -386,9 +380,10 @@ final class AppModel: ObservableObject {
     }()
 
     /// OAuth add / re-login for an engine that signs accounts in through
-    /// a browser (the proxy): the same in-app sign-in chooser as cswap
-    /// (system sheet or per-account private window — never the user's
-    /// default browser), polling the engine until the credential lands.
+    /// a browser (the proxy): the same native sign-in flow as swapd
+    /// (`TokenFlow`: the system sheet, or the default browser where the
+    /// sheet cannot present; the desktop's `signin-begin` path runs it
+    /// headless), polling the engine until the credential lands.
     func addOAuthAccount(engineID: String, provider: Provider, relogin: Account? = nil,
                          headless: Bool = false) {
         guard let engine = registry.engine(id: engineID),
@@ -459,6 +454,10 @@ final class AppModel: ObservableObject {
     // icon, so it no longer needs the popup to be reachable. Off, the app
     // runs headless — the socket, the mirror and the pinned window stay.
     @Published var menuBarIconShown: Bool { didSet { defaults.set(menuBarIconShown, forKey: "menu_bar_enabled") } }
+    // Off by default: the Dock icon only ever appeared while Settings was
+    // open, and a menu bar app in the Dock is what most asked to be rid of.
+    // On, Settings takes a Dock icon and a Cmd+Tab entry as it did before.
+    @Published var dockIconShown: Bool { didSet { defaults.set(dockIconShown, forKey: "dock_icon_enabled") } }
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
@@ -781,6 +780,7 @@ final class AppModel: ObservableObject {
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
+        dockIconShown = defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
             // Isolation is the contract: no demo script, no data at all
@@ -839,10 +839,61 @@ final class AppModel: ObservableObject {
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
         statsModel.leases = leases
+        // Settings › Team (#1313): the loop rides the refresh tick; the
+        // publisher works from StatsModel's scan (#251) and gives the
+        // table back once folded (#499).
+        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true }
+        team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(home: NSHomeDirectory(), machine: "Mac") }
+        team.ownsScan = { [weak self] in self?.statsModel.enabled == true }
+        team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
+        team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
+        team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
+        team.scanRequested = { [weak self] in self?.statsModel.refresh() }
+        team.lockEnabled = { [weak self] in self?.lock.enabled ?? false }
+        team.desktopCredential = { [weak self] in
+            guard let self, let origin = desktopCredential.origin, let url = URL(string: origin),
+                  let token = desktopCredential.token() else { return nil }
+            return (url, token)
+        }
+        team.onLog = { [weak self] text in self?.logEvent("team", icon: "person.2", text) }
+        team.load()
+    }
+
+    /// Settings › Team (spec §9). Secrets in the keychain, or files when
+    /// INFINITUS_TEAM_DIR redirects the team dir (e2e, a second instance).
+    private(set) lazy var team: TeamModel = {
+        let paths = TeamPaths.standard()
+        let model = TeamModel(paths: paths, makeSecrets: TeamSecretsFactory.make(paths: paths), defaults: defaults)
+        model.enabled = !isPlayground && (!mockMode || ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] != nil)
+        return model
+    }()
+
+    /// What this Mac publishes to its team (spec §7) besides the scan and
+    /// the desktop's threads: this Mac's crash reports, each engine's
+    /// active account with its window percentages, every account for the
+    /// member fleet view (#221), and the blockers the pop-out shows
+    /// (lapsed AWS logins, an all-limited fleet).
+    func teamSources() -> TeamPublisher.Sources {
+        var s = TeamPublisher.Sources(home: NSHomeDirectory(), machine: machineName)
+        s.crashes = crashStore.list()
+        let lastFleets = fleets.compactMap(\.lastFleet)
+        s.fleets = lastFleets.map { fleet in
+            let active = fleet.accounts.first { $0.number == fleet.activeNumber }
+            var windows: [TeamDocs.Window] = []
+            if let w = active?.usage?.fiveHour { windows.append(TeamDocs.Window(label: "5h", pct: Int(w.pct.rounded()))) }
+            if let w = active?.usage?.sevenDay { windows.append(TeamDocs.Window(label: "7d", pct: Int(w.pct.rounded()))) }
+            return TeamDocs.Fleet(engine: fleet.engineID, account: active.map { $0.alias ?? $0.email }, windows: windows)
+        }
+        s.fleetRows = lastFleets.map { TeamDocs.FleetDoc.row($0) }
+        s.blockers = awsLogins.map { "\($0.providerOrAws.loginLabel): \($0.profile)" }
+            + lastFleets.filter { !$0.accounts.isEmpty && $0.activeNumber == nil && $0.nextCandidate == nil }
+                .map { "\($0.engineID): every account limited" }
+        return s
     }
 
     /// App-side cache of our own subprocess output (never an engine
     /// internal file).
+    private var snapshotCacheWrite = WriteIfChanged()
     static let snapshotCacheURL: URL = {
         return AppSupport.root().appendingPathComponent("snapshot-cache.json")
     }()
@@ -886,6 +937,11 @@ final class AppModel: ObservableObject {
            let engine = Self.enginePrefs[key] {
             let changed = try setEngineEnabled(engine, on: on)
             return (PrefCatalog.pref(entry, in: defaults), changed)
+        }
+        if key == "mock_mode", case .bool(let on) = value {
+            guard mockMode != on else { return (PrefCatalog.pref(entry, in: defaults), false) }
+            mockMode = on   // didSet stores it and relaunches
+            return (PrefCatalog.pref(entry, in: defaults), true)
         }
         let pref = try PrefCatalog.write(value, key: key, to: defaults)
         reloadPrefs()
@@ -963,6 +1019,7 @@ final class AppModel: ObservableObject {
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
+        set(\.dockIconShown, defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
@@ -1217,25 +1274,6 @@ final class AppModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
             }
         }
-    }
-
-    /// `POST /app/update` (#121): the phone's own trigger for this Mac's
-    /// update, reusing the same BrewUpdater the About pane's button
-    /// drives so the two never run two upgrades at once.
-    private func triggerAppUpdate() -> AppUpdate.Reply {
-        guard BrewUpdater.channel != .nested else {
-            return AppUpdate.Reply(outcome: "unavailable", detail: "updates arrive with Infinitus desktop")
-        }
-        guard BrewUpdater.channel != .source else {
-            return AppUpdate.Reply(outcome: "unavailable",
-                                   detail: "this Mac runs a source build — rebuild from the repo")
-        }
-        guard appUpdateVersion != nil else {
-            return AppUpdate.Reply(outcome: "upToDate", detail: nil)
-        }
-        brewUpdater?.upgrade()
-        return AppUpdate.Reply(outcome: "started",
-                               detail: "brew is upgrading Infinitus; the Mac relaunches when it's done")
     }
 
     /// Every phone-injected input is logged, per #17 — success or not.
@@ -1659,8 +1697,12 @@ final class AppModel: ObservableObject {
         let bundle = Bundle.main.bundleURL.path
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
+        let team = team
         Task {
             await oldSwapd?.stop()
+            // The team's now.json delete (bounded by TeamModel.quitBound), so
+            // teammates stop seeing this Mac "on" across the relaunch.
+            await team.quit()
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
             // Unbundled dev runs are a bare executable — `open` on its
@@ -1687,7 +1729,16 @@ final class AppModel: ObservableObject {
     /// off the PRIMARY Claude fleet exactly as they did when swapd was
     /// the only engine. An engine that fails keeps its last good rows
     /// (the rumps menubar's _worker policy) and records its error.
+    /// One pass at a time (#1310): the timer, a control verb and the
+    /// revival probe all land here, and a request made mid-pass runs once
+    /// more after it instead of alongside it.
     func refreshSnapshot() async {
+        await refreshFlight.run { [weak self] in await self?.refreshSnapshotPass() }
+    }
+
+    private let refreshFlight = SingleFlight()
+
+    private func refreshSnapshotPass() async {
         let engines = registry.engines
         guard !engines.isEmpty else { return }
         var results: [(id: String, fleets: [EngineFleet]?, error: Error?)] = []
@@ -1769,15 +1820,18 @@ final class AppModel: ObservableObject {
         // not one per engine (user 2026-09-02: 429s). Claude fleets only:
         // the budget being spared is Anthropic's, and a Codex login with
         // the same email is a different account with its own window (#899).
+        // `results` fills in completion order, so when two engines hold one
+        // email the donation goes to the richest reading (`richest(with:)`),
+        // never to whichever engine happened to answer first.
         let stamp = Date()
         for engine in engines {
             var byEmail: [String: SharedUsage] = [:]
             for r in results where r.id != engine.id {
                 for fleet in r.fleets ?? [] where fleet.provider == .claude {
                     for a in fleet.accounts where a.usageStatus == "ok" {
-                        if let u = a.usage, byEmail[a.email] == nil {
-                            byEmail[a.email] = SharedUsage(usage: u, at: stamp)
-                        }
+                        guard let u = a.usage else { continue }
+                        let offered = SharedUsage(usage: u, at: stamp)
+                        byEmail[a.email] = byEmail[a.email]?.richest(with: offered) ?? offered
                     }
                 }
             }
@@ -1793,7 +1847,11 @@ final class AppModel: ObservableObject {
         }
         if !isPlayground {
             let cache = fleets.compactMap(\.lastFleet)
-            if let data = try? JSONEncoder().encode(cache) {
+            // Sorted keys so two passes over the same state are the same
+            // bytes, and the write is skipped when they are (#1310).
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            if let data = try? encoder.encode(cache), snapshotCacheWrite.take(data) {
                 try? FileManager.default.createDirectory(
                     at: Self.snapshotCacheURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true)
@@ -1830,6 +1888,7 @@ final class AppModel: ObservableObject {
                 await historyRecorder.record(accounts: accts, syncEnabled: syncOn)
             }
             statsModel.refreshIfStale()
+            team.refreshIfStale()
             // A living UI keeps its lease; the cap only catches one that died.
             if localUIVisible { reportLocalActivity(visible: true) }
         }
@@ -1926,8 +1985,10 @@ final class AppModel: ObservableObject {
         namedTunnel.stop()
         forkTunnel.stop()
         let swapdSupervisor = swapdSupervisor
+        let team = team
         Task {
             await swapdSupervisor?.stop()
+            await team.quit()
             await MainActor.run {
                 NSApplication.shared.terminate(nil)
             }

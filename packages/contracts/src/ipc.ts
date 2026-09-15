@@ -101,6 +101,8 @@ import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import type {
   InfinitusDesktopPrefs,
+  InfinitusOAuthSignInInput,
+  InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
   InfinitusSignInWindowInput,
@@ -357,6 +359,8 @@ export const DesktopDeepLink = Schema.Union([
     threadId: Schema.String,
   }),
   Schema.Struct({ kind: Schema.Literal("new"), project: Schema.String, prompt: Schema.String }),
+  /** `infinitus://join/<team code>` (#1313): the whole link text is the code (a secret). */
+  Schema.Struct({ kind: Schema.Literal("join"), link: Schema.String }),
 ]);
 export type DesktopDeepLink = typeof DesktopDeepLink.Type;
 
@@ -1275,6 +1279,8 @@ export interface DesktopBridge {
   // info (omits instances whose backend hasn't produced a config yet).
   // The primary backend is identified by id === PRIMARY_LOCAL_ENVIRONMENT_ID.
   getLocalEnvironmentBootstraps: () => readonly DesktopEnvironmentBootstrap[];
+  getLocalEnvironmentEnabled?: () => boolean;
+  setLocalEnvironmentEnabled?: (enabled: boolean) => Promise<void>;
   getLocalEnvironmentBearerToken: () => Promise<string>;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
@@ -1362,6 +1368,16 @@ export interface DesktopBridge {
   submitInfinitusSignInCode?: (
     input: InfinitusSignInCodeInput,
   ) => Promise<InfinitusSignInCodeResult>;
+  /**
+   * Fork (#1213): a sign-in this shell runs itself, through the engine's
+   * `add-oauth`. One promise for the whole flow: it settles when the account
+   * is stored or the engine refused. Optional: without them the page falls
+   * back to the #677 flow, then to the sign-in on the Mac.
+   */
+  beginInfinitusOAuthSignIn?: (
+    input: InfinitusOAuthSignInInput,
+  ) => Promise<InfinitusOAuthSignInResult>;
+  cancelInfinitusOAuthSignIn?: (flowId: string) => Promise<void>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   /** Optional while older desktop shells can host a newer web client. */
   pickProjectFavicon?: (initialPath?: string) => Promise<string | null>;
@@ -1393,8 +1409,14 @@ export interface DesktopBridge {
   pasteAsText?: () => Promise<void>;
   onMenuAction: (listener: (action: string) => void) => () => void;
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
-  /** Fork (#433 slice 2): the capture gesture's reads. Optional: older shells never emit them. */
-  onCaptureGestureEvent?: (listener: (event: DesktopCaptureGestureEvent) => void) => () => void;
+  /**
+   * Fork (#433 slices 2–3): the capture gesture's reads, queued by the shell
+   * until pulled, oldest first; the shell pings `onCaptureGesturePending`
+   * when one lands while the page is up. Optional: a browser or an older
+   * shell has neither.
+   */
+  consumePendingCaptureGestures?: () => Promise<ReadonlyArray<DesktopCaptureGestureEvent>>;
+  onCaptureGesturePending?: (listener: () => void) => () => void;
   /**
    * Fork (#270 D): the link the shell was opened with, cleared on read; the
    * shell pings `onDeepLinkPending` when a new one lands while the window is
@@ -1402,6 +1424,13 @@ export interface DesktopBridge {
    */
   consumePendingDeepLink?: () => Promise<DesktopDeepLink | null>;
   onDeepLinkPending?: (listener: () => void) => () => void;
+  /**
+   * Fork (#1250): macOS's navigate-back/forward gesture on the main window —
+   * what Logi Options+ sends for a mouse's back/forward buttons in place of
+   * Chromium buttons 3/4. Optional: a browser, another platform or an older
+   * shell never emits it.
+   */
+  onHistoryGesture?: (listener: (direction: "left" | "right") => void) => () => void;
   /**
    * Quit-confirmation hint pushes. Optional: older desktop builds never emit
    * them.

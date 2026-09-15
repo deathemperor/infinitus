@@ -10,8 +10,9 @@ import type { LiveActivityTokenKind } from "./liveActivity.logic";
  */
 
 /** What became of one attempt. `unreachable` is not a refusal: the Mac never
-    saw the token, because the phone could not reach it (#941). */
-export type PushRegistrationOutcome = "registered" | "refused" | "unreachable";
+    saw the token, because the phone could not reach it (#941). `withdrawn`
+    is the card token taken back once no card was live (#1265). */
+export type PushRegistrationOutcome = "registered" | "refused" | "unreachable" | "withdrawn";
 
 export interface PushRegistrationNote {
   readonly outcome: PushRegistrationOutcome;
@@ -25,23 +26,62 @@ export type PushRegistrations = Readonly<
   Partial<Record<LiveActivityTokenKind, PushRegistrationNote>>
 >;
 
+/** What the switch going off did to the Mac's registrations (#1265). */
+export interface SwitchOffNote {
+  readonly outcome: "withdrawn" | "refused" | "unreachable";
+  readonly at: string;
+  readonly detail: string | null;
+}
+
+/** What became of a card iOS started while the app was in the background
+    (#1277): whether its token reached the Mac inside the background window
+    the push-to-start grants, and how long that took. */
+export interface BackgroundCardNote {
+  readonly startedAt: string;
+  readonly outcome: "sent" | "unreachable";
+  /** From the start to the send that landed, or to the failed attempt. */
+  readonly elapsedMs: number;
+}
+
 export interface AgentActivityPushState {
   /** When the thread-card bridge attached its listeners; null while it is not
       running at all (the switch is off, or no paired Mac runs Infinitus). */
   readonly watchingSince: string | null;
   readonly registrations: PushRegistrations;
+  /** The last switch-off's withdrawal; cleared when the bridge runs again. */
+  readonly switchOff: SwitchOffNote | null;
+  /** The last card started in the background, and what its token did. */
+  readonly backgroundCard: BackgroundCardNote | null;
 }
 
 export const EMPTY_AGENT_ACTIVITY_PUSH_STATE: AgentActivityPushState = {
   watchingSince: null,
   registrations: {},
+  switchOff: null,
+  backgroundCard: null,
 };
 
 export function withWatching(
   state: AgentActivityPushState,
   since: Date | null,
 ): AgentActivityPushState {
-  return { ...state, watchingSince: since === null ? null : since.toISOString() };
+  return since === null
+    ? { ...state, watchingSince: null }
+    : { ...state, watchingSince: since.toISOString(), switchOff: null };
+}
+
+export function withBackgroundCard(
+  state: AgentActivityPushState,
+  note: BackgroundCardNote,
+): AgentActivityPushState {
+  return { ...state, backgroundCard: note };
+}
+
+export function withSwitchOff(
+  state: AgentActivityPushState,
+  note: SwitchOffNote,
+): AgentActivityPushState {
+  return { ...state, switchOff: note };
 }
 
 export function withRegistration(
@@ -78,7 +118,26 @@ export interface AgentActivityPushSummary {
  * a token, and the Mac cannot refuse a token that was never sent.
  */
 export function agentActivityPushSummary(state: AgentActivityPushState): AgentActivityPushSummary {
+  const summary = watchingSummary(state);
+  return state.backgroundCard === null || state.watchingSince === null
+    ? summary
+    : {
+        ...summary,
+        explanation: `${summary.explanation} ${backgroundCardLine(state.backgroundCard)}`,
+      };
+}
+
+/** The sentence that answers the #1277 window question without a debugger. */
+function backgroundCardLine(note: BackgroundCardNote): string {
+  const seconds = Math.round(note.elapsedMs / 1000);
+  return note.outcome === "sent"
+    ? `A card started in the background at ${timeOf(note.startedAt)} and its token reached the Mac ${seconds} s later.`
+    : `A card started in the background at ${timeOf(note.startedAt)}, but the Mac was unreachable ${seconds} s later; the token goes when the app is next opened.`;
+}
+
+function watchingSummary(state: AgentActivityPushState): AgentActivityPushSummary {
   if (state.watchingSince === null) {
+    if (state.switchOff !== null) return switchOffSummary(state.switchOff);
     return {
       value: "Not running",
       explanation:
@@ -92,7 +151,9 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
     { kind: "agent-activity" as LiveActivityTokenKind, note: card },
   ]
     .flatMap((entry) =>
-      entry.note !== undefined && entry.note.outcome !== "registered"
+      entry.note !== undefined &&
+      entry.note.outcome !== "registered" &&
+      entry.note.outcome !== "withdrawn"
         ? [{ kind: entry.kind, note: entry.note }]
         : [],
     )
@@ -119,7 +180,11 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
     const cardLine =
       card?.outcome === "registered"
         ? ` The card token followed at ${timeOf(card.at)}, so a card is live.`
-        : " No card is live yet, which is normal until the Mac starts one.";
+        : card?.outcome === "withdrawn"
+          ? ` The last card ended and its token was withdrawn at ${timeOf(
+              card.at,
+            )}, so the Mac starts the next card from the start token.`
+          : " No card is live yet, which is normal until the Mac starts one.";
     return {
       value: "Registered",
       explanation: `The Mac has this phone's start token, filed at ${timeOf(start.at)}.${cardLine}`,
@@ -139,4 +204,30 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
       state.watchingSince,
     )}. iOS has not handed this app a start token for the lock-screen card, so the Mac has nothing to raise one with. That token needs Live Activities turned on for Infinitus in the phone's own Settings, on iOS 17.2 or newer.`,
   };
+}
+
+/** The row while the switch is off: what became of the withdrawal it sent. */
+function switchOffSummary(note: SwitchOffNote): AgentActivityPushSummary {
+  const at = timeOf(note.at);
+  switch (note.outcome) {
+    case "withdrawn":
+      return {
+        value: "Off, withdrawn",
+        explanation: `The switch is off and the Mac dropped this phone's card tokens at ${at}, so it will not push into a card that is gone. Turning the switch on registers them again.`,
+      };
+    case "unreachable":
+      return {
+        value: "Off, Mac unreachable",
+        explanation: `The switch is off, but this phone could not reach the Mac to withdraw its card tokens at ${at}: ${
+          note.detail ?? "it is not connected"
+        }. The Mac still holds them; the phone tries again the next time the app comes to the foreground.`,
+      };
+    case "refused":
+      return {
+        value: "Off, refused",
+        explanation: `The switch is off, but the Mac refused to drop this phone's card tokens at ${at}: ${
+          note.detail ?? "it gave no reason"
+        }.`,
+      };
+  }
 }

@@ -103,6 +103,17 @@ final class LockModel: ObservableObject {
         defaults.set(false, forKey: LockSetting.enabledKey)
     }
 
+    /// The teams this Mac is in, by name — `lock off` and the pane warn
+    /// before turning the lock off inside one (spec §2.2: the lock gates
+    /// minting codes and approving members).
+    func teamNames() -> [String] {
+        let paths = TeamPaths.standard()
+        return paths.teamIDs().compactMap { id in
+            (try? Data(contentsOf: paths.configFile(id)))
+                .flatMap { try? CanonicalJSON.decode(TeamConfig.self, from: $0) }?.name
+        }
+    }
+
     /// Opens Settings on the Lock pane. The pane's `onReceive` subscribes
     /// on its first body evaluation, so the selection posts one turn later.
     func revealSetting() {

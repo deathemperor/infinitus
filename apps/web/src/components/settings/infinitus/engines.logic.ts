@@ -29,6 +29,8 @@ export interface ProxyEngine {
   readonly secretNoun: "Key" | "Password";
   /** What the Mac uses when no url is stored (the verb's own default). */
   readonly defaultUrl: string;
+  /** The line under the Dashboard row, drawn when the read answered a URL. */
+  readonly dashboardNote: string;
 }
 
 export const PROXY_ENGINES: ReadonlyArray<ProxyEngine> = [
@@ -40,6 +42,7 @@ export const PROXY_ENGINES: ReadonlyArray<ProxyEngine> = [
     secretLabel: "Management key",
     secretNoun: "Key",
     defaultUrl: "http://127.0.0.1:8317",
+    dashboardNote: "The proxy's own management panel: credentials, config and logs.",
   },
   {
     key: "9router",
@@ -49,6 +52,7 @@ export const PROXY_ENGINES: ReadonlyArray<ProxyEngine> = [
     secretLabel: "Dashboard password",
     secretNoun: "Password",
     defaultUrl: "http://127.0.0.1:20128",
+    dashboardNote: "Providers → Connect Claude Code adds an account there.",
   },
 ];
 
@@ -71,6 +75,12 @@ const ProxyEngineReply = Schema.Struct({
   keyPresent: Schema.optionalKey(Schema.Boolean),
   passwordPresent: Schema.optionalKey(Schema.Boolean),
   error: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  // The proxy's routing (#1235): absent on a build before the fields, and
+  // `sessionAffinity` absent on a proxy without the management route.
+  routingStrategy: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  sessionAffinity: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
+  caveat: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  dashboardURL: Schema.optionalKey(Schema.String),
 });
 
 const decodeReply = Schema.decodeUnknownOption(ProxyEngineReply);
@@ -80,6 +90,14 @@ export interface ProxyEngineState {
   readonly secretPresent: boolean;
   /** The engine's own last error, verbatim, or null. */
   readonly error: string | null;
+  /** CLIProxyAPI's routing strategy; null until the proxy answered it. */
+  readonly routingStrategy: string | null;
+  /** CLIProxyAPI's session affinity; null when the proxy has no route for it (YAML only). */
+  readonly sessionAffinity: boolean | null;
+  /** The Mac's routing caveat for the proxy's credentials, or null. */
+  readonly caveat: string | null;
+  /** The engine's own web UI, or null on a build that answers none. */
+  readonly dashboardURL: string | null;
 }
 
 /** One engine's read reply, null when the shape is not the one above. */
@@ -88,7 +106,79 @@ export function parseProxyEngineState(result: unknown): ProxyEngineState | null 
   if (reply === null) return null;
   const present = reply.keyPresent ?? reply.passwordPresent;
   if (present === undefined) return null;
-  return { baseURL: reply.baseURL, secretPresent: present, error: reply.error ?? null };
+  return {
+    baseURL: reply.baseURL,
+    secretPresent: present,
+    error: reply.error ?? null,
+    routingStrategy: reply.routingStrategy ?? null,
+    sessionAffinity: reply.sessionAffinity ?? null,
+    caveat: reply.caveat ?? null,
+    dashboardURL: reply.dashboardURL ?? null,
+  };
+}
+
+/** The proxy's routing knobs (#1235): `proxy-routing <strategy>` and
+    `proxy-affinity on|off`, each gated on its own verb — a Mac that has the
+    first may predate the second. */
+const ROUTING_VERB = "proxy-routing";
+const AFFINITY_VERB = "proxy-affinity";
+
+export const ROUTING_STRATEGIES: ReadonlyArray<{ readonly value: string; readonly label: string }> =
+  [
+    { value: "fill-first", label: "Fill first" },
+    { value: "round-robin", label: "Round robin" },
+    { value: "weighted-round-robin", label: "Weighted round robin" },
+  ];
+
+export function routingSupported(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
+  return commands.some((command) => command.name === ROUTING_VERB);
+}
+
+export function affinitySupported(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
+  return commands.some((command) => command.name === AFFINITY_VERB);
+}
+
+export function routingInput(strategy: string): InfinitusCommandInput {
+  return { command: ROUTING_VERB, args: [strategy], options: {} };
+}
+
+export function affinityInput(on: boolean): InfinitusCommandInput {
+  return { command: AFFINITY_VERB, args: [on ? "on" : "off"], options: {} };
+}
+
+interface RoutingNotes {
+  /** What the strategy does, one sentence. */
+  readonly explainer: string;
+  /** The affinity note under a rotating strategy: a warning while off (naming
+      the YAML when the proxy has no route), a reminder while on. */
+  readonly note: { readonly tone: "warn" | "muted"; readonly text: string } | null;
+}
+
+const AFFINITY_YAML =
+  "Turn on session-affinity in the proxy's config (this proxy has no management route for it yet) so a conversation stays on one credential: without it every request lands on a different account and the prompt cache misses. Under affinity, Switch only steers new sessions.";
+const AFFINITY_OFF =
+  "Turn on session affinity so a conversation stays on one credential: without it every request lands on a different account and the prompt cache misses.";
+const AFFINITY_ON =
+  "Under affinity, Switch only steers new sessions; bound ones keep their credential until the TTL lapses.";
+
+/** The Mac's `RoutingNotes` (EnginesPane.swift), word for word. */
+export function routingNotes(strategy: string | null, affinity: boolean | null): RoutingNotes {
+  const explainer =
+    strategy === "round-robin"
+      ? "Each request goes to the next credential in turn."
+      : strategy === "weighted-round-robin"
+        ? "Requests rotate in proportion to each credential's priority."
+        : strategy === null
+          ? "Read from the proxy on the next refresh."
+          : "Highest priority wins until it is rate-limited — consume-first. Switch on the Accounts page raises a credential to the top.";
+  if (strategy === null || strategy === "fill-first") return { explainer, note: null };
+  const note =
+    affinity === null
+      ? { tone: "warn" as const, text: AFFINITY_YAML }
+      : affinity
+        ? { tone: "muted" as const, text: AFFINITY_ON }
+        : { tone: "warn" as const, text: AFFINITY_OFF };
+  return { explainer, note };
 }
 
 /**

@@ -12,7 +12,11 @@ import { useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
-import { mouseHistoryIntent } from "../lib/backNavigation";
+import {
+  mouseHistoryIntent,
+  swipeHistoryIntent,
+  type MouseHistoryIntent,
+} from "../lib/backNavigation";
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
@@ -151,15 +155,14 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   // sidebar is active.
   const pathname = useLocation({ select: (location) => location.pathname });
   const canGoBack = useCanGoBack();
-  // A mouse's back button (Logitech MX and the like, Chromium `button` 3)
-  // goes back on the pages whose header shows the back arrow; its forward
-  // button (4) goes forward anywhere. Electron hands them to the renderer
-  // as plain mouse events with no default action, so this is the whole path.
+  // A mouse's back button (Chromium `button` 3) goes back on the pages whose
+  // header shows the back arrow; its forward button (4) goes forward anywhere.
+  // Electron hands them to the renderer as plain mouse events with no default
+  // action. A driver that maps those buttons to macOS's navigation gesture
+  // instead (Logi Options+ does, #1250) never produces a mouse event: the
+  // shell forwards the gesture over `onHistoryGesture` and the same rule runs.
   useEffect(() => {
-    const onMouseUp = (event: MouseEvent) => {
-      const intent = mouseHistoryIntent(event.button, pathname);
-      if (intent === null) return;
-      event.preventDefault();
+    const applyHistoryIntent = (intent: MouseHistoryIntent) => {
       if (intent === "forward") {
         window.history.forward();
         return;
@@ -170,8 +173,25 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       }
       void navigate({ to: "/" });
     };
+    const onMouseUp = (event: MouseEvent) => {
+      const intent = mouseHistoryIntent(event.button, pathname);
+      if (intent === null) return;
+      event.preventDefault();
+      applyHistoryIntent(intent);
+    };
     window.addEventListener("mouseup", onMouseUp);
-    return () => window.removeEventListener("mouseup", onMouseUp);
+    const bridge = window.desktopBridge;
+    const unsubscribeGesture =
+      typeof bridge?.onHistoryGesture === "function"
+        ? bridge.onHistoryGesture((direction) => {
+            const intent = swipeHistoryIntent(direction, pathname);
+            if (intent !== null) applyHistoryIntent(intent);
+          })
+        : undefined;
+    return () => {
+      window.removeEventListener("mouseup", onMouseUp);
+      unsubscribeGesture?.();
+    };
   }, [canGoBack, navigate, pathname]);
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;

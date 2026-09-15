@@ -83,6 +83,56 @@ final class ThreadActivityPushTests: XCTestCase {
 }
 
 /// The `push` reply says what was addressed (`targets`, `kinds`).
+/// #1265: a live card token the phone stopped re-offering is written off
+/// once its last update is older than twice the stale window.
+final class LiveTokenLapsedTests: XCTestCase {
+    private let registered = Date(timeIntervalSince1970: 1_000_000)
+
+    func testAQuietTokenLapsesAfterTwiceTheStaleWindow() {
+        let updated = registered.addingTimeInterval(60)
+        XCTAssertFalse(LiveActivityPush.liveTokenLapsed(registeredAt: registered, lastUpdateAt: updated,
+                                                        now: updated.addingTimeInterval(LiveActivityPush.staleAfter * 2)))
+        XCTAssertTrue(LiveActivityPush.liveTokenLapsed(registeredAt: registered, lastUpdateAt: updated,
+                                                       now: updated.addingTimeInterval(LiveActivityPush.staleAfter * 2 + 1)))
+    }
+
+    func testATokenReOfferedSinceTheUpdateIsKept() {
+        let updated = registered.addingTimeInterval(60)
+        XCTAssertFalse(LiveActivityPush.liveTokenLapsed(registeredAt: updated.addingTimeInterval(1), lastUpdateAt: updated,
+                                                        now: updated.addingTimeInterval(LiveActivityPush.staleAfter * 3)))
+    }
+}
+
+/// #941 follow-up: a push's outcome is readable from the Mac's event log.
+final class PushOutcomeLineTests: XCTestCase {
+    func testAStartedOrEndedCardGetsALineAndAnUpdateDoesNot() {
+        XCTAssertEqual(LiveActivityPush.outcomeLine(what: "start thread card", device: "iPhone", status: 200, body: "",
+                                                    error: nil, tokenDropped: false),
+                       "thread card started on iPhone (push-to-start)")
+        XCTAssertEqual(LiveActivityPush.outcomeLine(what: "end thread card", device: "iPhone", status: 200, body: "",
+                                                    error: nil, tokenDropped: false),
+                       "thread card ended on iPhone")
+        XCTAssertNil(LiveActivityPush.outcomeLine(what: "update thread card", device: "iPhone", status: 200, body: "",
+                                                  error: nil, tokenDropped: false))
+        XCTAssertNil(LiveActivityPush.outcomeLine(what: "alert", device: "iPhone", status: 200, body: "",
+                                                  error: nil, tokenDropped: false))
+    }
+
+    func testAFailureNamesTheKindTheReasonAndADroppedToken() {
+        XCTAssertEqual(LiveActivityPush.outcomeLine(what: "update thread card", device: "iPhone", status: 410,
+                                                    body: #"{"reason":"Unregistered","timestamp":1}"#,
+                                                    error: nil, tokenDropped: true),
+                       "update thread card → iPhone failed: HTTP 410 Unregistered — token dropped")
+        XCTAssertEqual(LiveActivityPush.outcomeLine(what: "alert", device: "iPhone", status: 0, body: "",
+                                                    error: "A server with the specified hostname could not be found.",
+                                                    tokenDropped: false),
+                       "alert → iPhone failed: A server with the specified hostname could not be found.")
+        XCTAssertEqual(LiveActivityPush.outcomeLine(what: "start thread card", device: "iPhone", status: 400,
+                                                    body: "not json", error: nil, tokenDropped: false),
+                       "start thread card → iPhone failed: HTTP 400 not json")
+    }
+}
+
 final class PushReachTests: XCTestCase {
     func testNothingSentReadsZero() {
         let reach = PushReach()

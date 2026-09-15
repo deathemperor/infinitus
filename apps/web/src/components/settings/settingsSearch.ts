@@ -23,6 +23,7 @@ export type SettingsPath =
   | "/settings/infinitus/animations"
   | "/settings/infinitus/sessions"
   | "/settings/infinitus/lock"
+  | "/settings/infinitus/team"
   | "/settings/infinitus/notifications"
   | "/settings/infinitus/devices"
   | "/settings/infinitus/engines"
@@ -60,6 +61,7 @@ export interface SettingsSearchItem {
   readonly environmentOnly?: boolean;
   readonly providerSettingsOnly?: boolean;
   readonly localBackendManagementOnly?: boolean;
+  readonly localEnvironmentOnly?: boolean;
   readonly wslAvailableOnly?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
   // Its section only exists where a connected server drives an Infinitus app.
@@ -67,6 +69,7 @@ export interface SettingsSearchItem {
 }
 
 export interface SettingsSearchAvailability {
+  readonly localEnvironmentDisabled?: boolean;
   readonly hasCloudPublicConfig: boolean;
   readonly hasEnvironment: boolean;
   readonly hasProviderSettingsEnvironment: boolean;
@@ -97,6 +100,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/infinitus/animations": "Animations",
   "/settings/infinitus/sessions": "Priority",
   "/settings/infinitus/lock": "Lock",
+  "/settings/infinitus/team": "Team",
   "/settings/infinitus/notifications": "Notifications",
   "/settings/infinitus/devices": "Devices",
   "/settings/infinitus/engines": "Engines",
@@ -321,7 +325,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "composer-send-mode",
     title: "Sending while a turn runs",
     to: "/settings/general",
-    searchTerms: ["queue steer send now interrupt running turn enter composer follow-up"],
+    searchTerms: ["queue steer send next step tool running turn enter composer follow-up"],
   },
   {
     id: "provider-update-checks",
@@ -670,6 +674,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     localBackendManagementOnly: true,
   },
   {
+    id: "local-environment",
+    title: "Local environment",
+    to: "/settings/connections",
+    targetId: "connections-environment",
+    searchTerms: ["turn off on disable enable local server agents remote only restart"],
+    desktopOnly: true,
+  },
+  {
     id: "network-access",
     title: "Network access",
     to: "/settings/connections",
@@ -700,6 +712,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "t3-connect",
+    localEnvironmentOnly: true,
     title: "T3 Connect",
     to: "/settings/connections",
     targetId: "connections-environment",
@@ -709,6 +722,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "publish-agent-activity",
+    localEnvironmentOnly: true,
     title: "Publish agent activity",
     to: "/settings/connections",
     targetId: "connections-environment",
@@ -746,7 +760,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/infinitus",
     targetId: "infinitus-display",
     infinitusOnly: true,
-    searchTerms: ["menu bar popup startup about updates threads hide icon"],
+    searchTerms: ["menu bar popup startup about threads hide icon"],
   },
   {
     // Fork (#574): the Slack bridge sits on the Menu bar page under Threads.
@@ -805,6 +819,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
   },
   {
+    id: "infinitus-team",
+    title: "Infinitus team",
+    to: "/settings/infinitus/team",
+    targetId: "infinitus-team",
+    infinitusOnly: true,
+    searchTerms: ["team members invite code join create share transcripts leader roster"],
+  },
+  {
     id: "infinitus-push",
     title: "Infinitus notifications",
     to: "/settings/infinitus/notifications",
@@ -838,6 +860,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [
       "swapd cliproxy 9router proxy accounts registered key",
       "management key dashboard password base url test connection",
+      "routing strategy session affinity daemon",
+      "about version build release",
     ],
   },
   {
@@ -878,6 +902,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/infinitus/animations": null,
   "/settings/infinitus/sessions": null,
   "/settings/infinitus/lock": null,
+  "/settings/infinitus/team": null,
   "/settings/infinitus/notifications": null,
   "/settings/infinitus/devices": null,
   "/settings/infinitus/engines": null,
@@ -996,6 +1021,7 @@ export function filterAvailableSettingsSearchItems(
       (!item.environmentOnly || availability.hasEnvironment) &&
       (!item.providerSettingsOnly || availability.hasProviderSettingsEnvironment) &&
       (!item.localBackendManagementOnly || availability.canManageLocalBackend) &&
+      (!item.localEnvironmentOnly || !availability.localEnvironmentDisabled) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
       (!item.infinitusOnly || availability.hasInfinitusEnvironment),

@@ -54,7 +54,7 @@ public final class InfinitusLoopbackCatchModule: Module {
       self.waiting = promise
     }.runOnQueue(.main)
 
-    AsyncFunction("stop") { () -> Void in self.release() }.runOnQueue(.main)
+    AsyncFunction("stop") { self.release() }.runOnQueue(.main)
 
     OnDestroy { self.release() }
   }

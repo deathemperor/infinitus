@@ -3,15 +3,15 @@ import { Atom } from "effect/unstable/reactivity";
 import { appAtomRegistry } from "../../state/atom-registry";
 
 /**
- * Bumped after this app starts a Live Activity itself (the test card, #845,
- * #1047), so `InfinitusThreadCardBridge` re-scans the live cards and hands
- * the new card's token to the Mac. Without it the bridge only scans at mount
- * and on the next foreground, and a card started from Settings — the app
- * already active — never registers an `agent-activity` token.
+ * Bumped after this app starts or ends a Live Activity itself (the test card,
+ * #845, #1047, #1265), so `InfinitusThreadCardBridge` re-scans the live cards:
+ * a new card's token goes to the Mac, and a card ended with none left has its
+ * token withdrawn. Without it the bridge only scans at mount and on the next
+ * foreground — the app is already active when Settings acts.
  */
 export const localLiveActivityStartsAtom = Atom.make(0).pipe(Atom.keepAlive);
 
-export function noteLocalLiveActivityStart(): void {
+export function noteLocalLiveActivityChange(): void {
   appAtomRegistry.set(
     localLiveActivityStartsAtom,
     appAtomRegistry.get(localLiveActivityStartsAtom) + 1,

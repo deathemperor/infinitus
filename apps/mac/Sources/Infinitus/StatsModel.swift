@@ -49,6 +49,21 @@ final class StatsModel: ObservableObject {
     private var repoNotes: [String] = []
     private var transcriptDays: [String: Stats.Day] = [:]
     private var repoDays: [String: Stats.Day] = [:]
+    /// Every live transcript file as of the last finished scan, for the
+    /// team publisher (#251: it publishes from this instead of scanning
+    /// the same corpus a second time). nil until a scan of this launch
+    /// has run to its end.
+    private(set) var scanEntries: [String: StatsScanner.FileEntry]?
+    /// Bumped with every table handed over; the team's fold memo keys
+    /// on it and gives the table back through `dropScanEntries` (#499).
+    private(set) var scanGeneration = 0
+    /// The team folded what it needs from `scanEntries` of `generation`
+    /// (#499): the table — ~40 MB decoded on a year of transcripts, and
+    /// the one reference left after `CacheHandle.release` — goes. A
+    /// newer scan's table stays; its own memo miss will take it.
+    func dropScanEntries(generation: Int) {
+        if generation == scanGeneration { scanEntries = nil }
+    }
 
     /// What the mirror exporter sends: eight folds, two of them
     /// full-year. Built OFF the main actor after every `recomputeDays`
@@ -168,9 +183,12 @@ final class StatsModel: ObservableObject {
     /// The lease table (#223 phase 5): a scan runs only while some client
     /// — the Mac's own popup counts — holds `stats`; nil scans freely.
     var leases: LeaseTable?
+    /// The team publisher reads this scan's entries (#251): while it
+    /// publishes, the scan runs lease or no lease.
+    var scanFeedsTeam: () -> Bool = { false }
 
     func refresh() {
-        guard enabled, !scanning, leases?.holds(.stats) ?? true else { return }
+        guard enabled, !scanning, leases?.holds(.stats) ?? true || scanFeedsTeam() else { return }
         scanning = true
         transcriptsFinished = false
         let store = eventStore
@@ -189,12 +207,14 @@ final class StatsModel: ObservableObject {
             var cumulativeConsumed = 0
             var firstBytesTotal: Int?
             var previousBytesRemaining = Int.max
+            var entries: [String: StatsScanner.FileEntry] = [:]
             while remaining > 0 {
                 passCount += 1
                 let transcripts = StatsScanner.scan(projectsDir: projectsDir, codexDir: codexDir, cacheURL: cacheURL,
                                                     calendar: calendar, byteBudget: Self.chunkByteBudget,
                                                     handle: cacheHandle)
                 remaining = transcripts.remaining
+                entries = transcripts.entries
                 if firstBytesTotal == nil { firstBytesTotal = transcripts.bytesTotal }
                 let consumedThisPass = transcripts.bytesTotal - transcripts.bytesRemaining
                 cumulativeConsumed += max(0, consumedThisPass)
@@ -258,6 +278,8 @@ final class StatsModel: ObservableObject {
             if unwatched { cacheHandle.release(to: cacheURL) }
             await MainActor.run {
                 self.progress = nil
+                self.scanGeneration += 1
+                self.scanEntries = entries
                 self.markTranscriptsDone()
             }
         }

@@ -18,6 +18,16 @@ export interface FleetAlarm {
   readonly body: string;
 }
 
+/** One plan as a string, so the bridge can tell an unchanged plan apart
+    before it asks the notification center anything (#1278 finding 8): a
+    snapshot arrives on every server push, and two native round trips per
+    push per Mac were spent to learn that nothing had moved. */
+export function alarmPlanKey(alarms: ReadonlyArray<FleetAlarm>): string {
+  return alarms
+    .map((alarm) => `${alarm.id}|${alarm.fireAt ?? ""}|${alarm.title}|${alarm.body}`)
+    .join("\n");
+}
+
 /** The Mac's revive lead (Settings › Notifications, `revive_lead_minutes`)
     when the snapshot carries prefs; ten minutes otherwise. */
 export const DEFAULT_LEAD_MS = 10 * 60_000;

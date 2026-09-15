@@ -181,14 +181,17 @@ public enum NineRouterUsage {
             } else if lower.hasPrefix("session") {
                 fiveHour = window(quota)
             } else if lower == "weekly (7d)" || lower == "weekly" {
-                sevenDay = window(quota)
+                // 9Router reports a bare percentage, so the ahead/behind
+                // signal is derived here (`Pace`) rather than forwarded.
+                // Weekly windows only — `fiveHour` above stays calm.
+                sevenDay = window(quota).map { Pace.applied(to: $0, fetchedAt: now) }
             } else if lower.hasPrefix("weekly ") {
                 // "weekly opus (7d)" → "Opus"
                 let model = key.dropFirst("weekly ".count)
                     .replacingOccurrences(of: "(7d)", with: "")
                     .trimmingCharacters(in: .whitespaces)
                 guard !model.isEmpty, let w = window(quota, name: model.capitalized) else { continue }
-                scoped.append(w)
+                scoped.append(Pace.applied(to: w, fetchedAt: now))
             }
         }
         if let eu = wire.extraUsage, eu.isEnabled == true,

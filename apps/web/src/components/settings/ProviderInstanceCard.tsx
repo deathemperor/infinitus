@@ -48,6 +48,7 @@ import { ProviderInstanceIcon, providerInstanceInitials } from "../chat/Provider
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
+import { hasAnthropicBaseUrl, PROXY_ADVISOR_NOTE } from "./proxyProvider";
 import {
   getProviderVersionAdvisoryPresentation,
   PROVIDER_STATUS_STYLES,
@@ -851,13 +852,18 @@ export function ProviderInstanceCard({
         className={readOnly ? "opacity-50 select-none" : undefined}
       >
         {driverOption ? (
-          <ProviderSettingsForm
-            definition={driverOption}
-            value={instance.config}
-            idPrefix={`provider-instance-${instanceId}`}
-            variant="settings"
-            onChange={updateConfig}
-          />
+          <>
+            <ProviderSettingsForm
+              definition={driverOption}
+              value={instance.config}
+              idPrefix={`provider-instance-${instanceId}`}
+              variant="settings"
+              onChange={updateConfig}
+            />
+            {instance.driver === "claudeAgent" && hasAnthropicBaseUrl(instance.environment) ? (
+              <p className="text-xs text-muted-foreground">{PROXY_ADVISOR_NOTE}</p>
+            ) : null}
+          </>
         ) : (
           <SettingsRow
             title="Driver"

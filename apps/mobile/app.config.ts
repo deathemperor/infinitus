@@ -258,7 +258,7 @@ const config: ExpoConfig = {
   slug: "t3-code",
   platforms: ["ios", "android"],
   scheme: variant.scheme,
-  version: "1.1.1",
+  version: "1.2.0",
   runtimeVersion: {
     // Development manifests resolve on every launch, so avoid fingerprint's
     // expensive native-project calculation there. Preview and production stay
@@ -343,7 +343,11 @@ const config: ExpoConfig = {
             {
               action: "VIEW",
               autoVerify: true,
-              data: [{ scheme: "https", host: variant.universalLinkHost, pathPrefix: "/pair" }],
+              data: [
+                { scheme: "https", host: variant.universalLinkHost, pathPrefix: "/pair" },
+                // #1313: a team invite, infinitus.run/join#<code>.
+                { scheme: "https", host: variant.universalLinkHost, pathPrefix: "/join" },
+              ],
               category: ["BROWSABLE", "DEFAULT"],
             },
           ],

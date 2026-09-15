@@ -44,6 +44,31 @@ describe("projectActivityPayload", () => {
     expect(data.somethingClientNeverReads).toBeUndefined();
   });
 
+  it("carries a Bash call's description beside its command and drops the rest of the input (#1231)", () => {
+    const projected = projectActivityPayload(
+      activity({
+        itemType: "command_execution",
+        data: {
+          toolName: "Bash",
+          input: { command: "vp test run", description: "  Run the web tests  ", timeout: 5000 },
+        },
+      }),
+    );
+    const data = (projected.payload as Record<string, unknown>).data as Record<string, unknown>;
+    expect(data.command).toBe("vp test run");
+    expect(data.description).toBe("Run the web tests");
+    expect(data.input).toBeUndefined();
+
+    const other = projectActivityPayload(
+      activity({
+        itemType: "file_change",
+        data: { toolName: "Edit", input: { description: "not a command" } },
+      }),
+    );
+    const otherData = (other.payload as Record<string, unknown>).data as Record<string, unknown>;
+    expect(otherData.description).toBeUndefined();
+  });
+
   it("keeps a bounded Codex command output summary", () => {
     const projected = projectActivityPayload(
       activity({

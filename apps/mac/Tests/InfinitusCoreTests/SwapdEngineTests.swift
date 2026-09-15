@@ -69,10 +69,22 @@ final class SwapdMappingTests: XCTestCase {
     }
 
     /// The payload a fresh install prints (probed against the real binary):
-    /// absent optionals, no accounts, and nothing to render.
-    func testInstalledProviderWithNoAccountsYieldsNoFleet() throws {
+    /// absent optionals and no accounts. It still yields a fleet (#1319) —
+    /// that fleet IS what `add` / `signin-begin` and the fork's Accounts
+    /// page resolve the first sign-in against.
+    func testInstalledProviderWithNoAccountsStillYieldsItsFleet() throws {
         let list = try list(#"{"schemaVersion":1,"providers":[{"provider":"claude","installed":true,"accounts":[]}]}"#)
         XCTAssertNil(list.providers[0].activeSlot)
+        let fleets = SwapdMapping.fleets(from: list, now: now)
+        XCTAssertEqual(fleets.map(\.key), ["swapd/claude"])
+        XCTAssertTrue(fleets[0].accounts.isEmpty)
+        XCTAssertNil(fleets[0].activeNumber)
+    }
+
+    /// A provider swapd knows about but neither manages accounts for nor
+    /// finds a CLI for has nothing to say, and no first sign-in to offer.
+    func testUninstalledProviderWithNoAccountsYieldsNoFleet() throws {
+        let list = try list(#"{"schemaVersion":1,"providers":[{"provider":"codex","installed":false,"accounts":[]}]}"#)
         XCTAssertTrue(SwapdMapping.fleets(from: list, now: now).isEmpty)
     }
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type {
+  ProviderSettingsFormCustomOption,
   ProviderSettingsFormAnnotation,
   ProviderSettingsFormControl,
   ProviderSettingsFormOption,
@@ -29,6 +30,8 @@ export interface ProviderSettingsFieldModel {
   readonly defaultBooleanValue?: boolean | undefined;
   /** Choices for a `select` control. The first entry is the default. */
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
+  /** A `select` that also takes a typed value (#1232). */
+  readonly customOption?: ProviderSettingsFormCustomOption | undefined;
 }
 
 function titleizeFieldKey(key: string): string {
@@ -114,6 +117,9 @@ export function deriveProviderSettingsFields(
           ...(formAnnotation.control === "select" && formAnnotation.options
             ? { options: formAnnotation.options }
             : {}),
+          ...(formAnnotation.control === "select" && formAnnotation.customOption
+            ? { customOption: formAnnotation.customOption }
+            : {}),
         } satisfies ProviderSettingsFieldModel,
       ];
     });
@@ -170,7 +176,14 @@ interface ProviderSettingsFormProps {
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
 }
 
-/** Stores the default choice as an omitted key so unchanged configs stay small. */
+const CUSTOM_OPTION_VALUE = "__custom__";
+
+/**
+ * Stores the default choice as an omitted key so unchanged configs stay small.
+ * With `customOption` the list ends in a choice that opens an input: a stored
+ * value none of the options carry is shown there, and picking it with nothing
+ * typed yet keeps the input open without touching the config (#1232).
+ */
 function ProviderSettingsSelect({
   field,
   value,
@@ -188,27 +201,54 @@ function ProviderSettingsSelect({
 }) {
   const options = field.options ?? [];
   const fallback = options[0]?.value ?? "";
-  const current = readProviderConfigString(value, field.key) || fallback;
-  const label = options.find((option) => option.value === current)?.label ?? current;
+  const stored = readProviderConfigString(value, field.key);
+  const [customPicked, setCustomPicked] = useState(false);
+  const custom =
+    field.customOption !== undefined &&
+    (customPicked || (stored !== "" && !options.some((option) => option.value === stored)));
+  const current = custom ? CUSTOM_OPTION_VALUE : stored || fallback;
+  const label = custom
+    ? field.customOption?.label
+    : (options.find((option) => option.value === current)?.label ?? current);
   return (
-    <Select
-      value={current}
-      onValueChange={(next) => {
-        if (typeof next !== "string") return;
-        onChange(nextProviderConfigWithFieldValue(value, field, next === fallback ? "" : next));
-      }}
-    >
-      <SelectTrigger id={inputId} size={size} className={className} aria-label={field.label}>
-        <SelectValue>{label}</SelectValue>
-      </SelectTrigger>
-      <SelectPopup align="start" alignItemWithTrigger={false}>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectPopup>
-    </Select>
+    <div className={cn("grid gap-1.5", className)}>
+      <Select
+        value={current}
+        onValueChange={(next) => {
+          if (typeof next !== "string") return;
+          if (next === CUSTOM_OPTION_VALUE) {
+            setCustomPicked(true);
+            return;
+          }
+          setCustomPicked(false);
+          onChange(nextProviderConfigWithFieldValue(value, field, next === fallback ? "" : next));
+        }}
+      >
+        <SelectTrigger id={inputId} size={size} aria-label={field.label}>
+          <SelectValue>{label}</SelectValue>
+        </SelectTrigger>
+        <SelectPopup align="start" alignItemWithTrigger={false}>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+          {field.customOption ? (
+            <SelectItem value={CUSTOM_OPTION_VALUE}>{field.customOption.label}</SelectItem>
+          ) : null}
+        </SelectPopup>
+      </Select>
+      {custom ? (
+        <DraftInput
+          size="sm"
+          aria-label={`${field.label}, custom value`}
+          value={stored}
+          onCommit={(next) => onChange(nextProviderConfigWithFieldValue(value, field, next))}
+          placeholder={field.customOption?.placeholder}
+          spellCheck={false}
+        />
+      ) : null}
+    </div>
   );
 }
 

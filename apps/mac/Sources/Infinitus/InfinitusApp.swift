@@ -53,10 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `open Infinitus.app` on an already-running instance lands here: show
     /// the pinned window. This is the guaranteed way into the UI when the
     /// menu bar is too full to display the status item at all.
-    /// A Dock click lands here too — the icon exists only while Settings
-    /// is open (the app is `.regular` then) — and must raise Settings, not
-    /// the pop-out: returning false stops AppKit's own window-raising, so
-    /// a buried Settings never came back (user 2026-09-09).
+    /// `open Infinitus.app` lands here, as does a Dock click on a build
+    /// whose `dock_icon_enabled` is on (the app is `.regular` only while
+    /// Settings is open then; off — the default — there is no Dock icon at
+    /// all). It must raise Settings, not the pop-out: returning false stops
+    /// AppKit's own window-raising, so a buried Settings never came back
+    /// (user 2026-09-09).
     func applicationShouldHandleReopen(_ app: NSApplication,
                                        hasVisibleWindows: Bool) -> Bool {
         guard let controller = statusHolder?.controller else { return false }
@@ -72,8 +74,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct InfinitusApp: App {
     @StateObject private var model: AppModel
-    @StateObject private var appRelease: AppReleaseModel
-    @StateObject private var brew: BrewUpdater
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     init() {
@@ -91,28 +91,14 @@ struct InfinitusApp: App {
         }
         #endif
         RenameMigration.run()   // before anything reads App Support
+        PrivateWindowCleanup.run()
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
-        let release = AppReleaseModel()
-        _appRelease = StateObject(wrappedValue: release)
-        release.onUpdate = { [weak model] in model?.appUpdateVersion = $0 }
-        release.startAutoCheck()
-        // Hoisted out of AboutPane so the phone's `/app/update` route
-        // (#121) drives the SAME BrewUpdater as the About pane's button
-        // — never two upgrades in flight.
-        let brew = BrewUpdater()
-        _brew = StateObject(wrappedValue: brew)
-        model.brewUpdater = brew
-        brew.relaunch = { model.relaunchApp() }
         appDelegate.model = model
         appDelegate.makeStatusItem = { [weak appDelegate] in
             appDelegate?.statusHolder = StatusItemHolder(
                 model: model,
-                settingsTabs: {
-                    settingsTabs(
-                        model: model,
-                        appRelease: release, brew: brew)
-                })
+                settingsTabs: { settingsTabs(model: model) })
         }
         model.startFeeds()
         // Deferred past didFinishLaunching: requesting in App.init — before
@@ -137,9 +123,7 @@ struct InfinitusApp: App {
         // (.defaultLaunchBehavior(.suppressed) would be cleaner but is
         // macOS 15+, and SceneBuilder takes no #available branch.)
         Settings {
-            SettingsRoot(tabs: settingsTabs(
-                model: model,
-                appRelease: appRelease, brew: brew))
+            SettingsRoot(tabs: settingsTabs(model: model))
         }
         // ⌘, would raise that hidden scene window (and the controller
         // would hide it again — "opened and closed immediately", user
@@ -159,64 +143,35 @@ struct InfinitusApp: App {
 /// popup's Settings… button opens renders them as an AppKit
 /// NSTabViewController(tabStyle: .toolbar) — the REAL icon-toolbar
 /// Settings look, which no public SwiftUI TabViewStyle reproduces.
-@MainActor func settingsTabs(
-    model: AppModel,
-    appRelease: AppReleaseModel, brew: BrewUpdater
-) -> [SettingsTab] {
+@MainActor func settingsTabs(model: AppModel) -> [SettingsTab] {
     // Ordered by how often each pane is reached for (user 2026-08-30:
-    // "reorder the settings"): everyday looks first, plumbing after,
-    // About last; engines keep their own trailing section.
+    // "reorder the settings"): everyday looks first, plumbing after.
+    // About left on 2026-09-14 with its Homebrew updater: the menu bar
+    // app ships inside the desktop bundle and updates with it, and the
+    // desktop's Settings › Infinitus › Engines shows its version. The
+    // three engine panes (swapd, CLIProxyAPI, 9Router) left on
+    // 2026-09-15 (#1177): that Engines page draws everything they drew,
+    // over the engine verbs and the catalog's engine prefs.
     // Display, Push and Lock left on 2026-09-14 (#569): all three are
     // Settings › Infinitus pages in the desktop app now, and the native
     // window keeps only what cannot leave the Mac. The prefs themselves
     // stay in PrefCatalog — that is what the fork's pages write — and
     // the lock's biometric prompt stays native, driven by `lock` /
-    // `unlock` / `lock-status`.
+    // `unlock` / `lock-status`. Accounts left the same day (#1179): the
+    // desktop's Accounts page adds, re-logs, renames, reorders and
+    // removes; the sign-in flow it drives stays native (SignInFlow.swift)
+    // and account backup, a file panel over the keychain-backed store,
+    // moved to Devices. Devices itself shrank on 2026-09-15 (#1178): this
+    // Mac's name, phone alerts and the iCloud toggle are the desktop's
+    // Devices page, over their prefs and the `apns` / `apns-key` verbs.
     [
-        SettingsTab(title: "Accounts", symbol: "person.2.badge.key", tint: .blue,
-                    keywords: ["account", "login", "relogin", "token",
-                               "add", "remove", "delete", "oauth",
-                               "order", "reorder", "alias", "rename"],
-                    view: AnyView(AccountsPane(model: model))),
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
-                    keywords: ["icloud", "sync", "settings", "drive", "devices",
-                               "phone", "iphone", "lan", "bonjour", "companion",
-                               "cloudflare", "tunnel"],
+                    keywords: ["settings", "file", "devices", "crash", "phone",
+                               "cloudflare", "tunnel", "backup", "restore",
+                               "accounts", "export", "import"],
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
-    ]
-    + [
-        SettingsTab(title: "About", symbol: "info.circle", tint: .indigo,
-                    keywords: ["update", "version", "license", "links"],
-                    image: AboutPane.infinitusIcon,
-                    view: AnyView(AboutPane(appRelease: appRelease, brew: brew))),
-        // Providers under everything, CodexBar-style (user 2026-08-30).
-        // The engine is swapd; Claude is what it drives (user 2026-08-30:
-        // "claude is not an engine, cswap is").
-        SettingsTab(title: "swapd", symbol: "bolt.horizontal",
-                    keywords: ["swapd", "engine", "auto switch", "rotate", "provider",
-                               "claude", "codex", "kiro", "gemini", "rust",
-                               "nudge", "resume", "wake", "session", "demo", "mock"],
-                    // "on" = the engine is enabled and found; whether its
-                    // auto-switch daemon runs is the tab's own business.
-                    provider: ProviderBadge(live: model.swapdRegistered
-                                            && model.engineErrors[SwapdEngine.engineID] == nil),
-                    view: AnyView(SwapdEnginePane(model: model))),
-        SettingsTab(title: "CLIProxyAPI", symbol: "network",
-                    keywords: ["proxy", "cliproxy", "router", "management",
-                               "key", "engine", "provider", "claude"],
-                    provider: ProviderBadge(live: model.cliproxyEnabled
-                                            && model.engineErrors[CLIProxyEngine.engineID] == nil
-                                            && model.fleets.contains { $0.engineID == CLIProxyEngine.engineID }),
-                    view: AnyView(CLIProxyEnginePane(model: model))),
-        SettingsTab(title: "9Router", symbol: "arrow.triangle.branch",
-                    keywords: ["9router", "router", "engine", "provider",
-                               "claude", "password"],
-                    provider: ProviderBadge(live: model.nineRouterEnabled
-                                            && model.engineErrors[NineRouterEngine.engineID] == nil
-                                            && model.fleets.contains { $0.engineID == NineRouterEngine.engineID }),
-                    view: AnyView(NineRouterEnginePane(model: model))),
     ]
 }
 
@@ -620,6 +575,14 @@ struct MenuContent: View {
         }
     }
 
+    /// The fleets the stack draws. An engine that reports a provider it
+    /// manages but holds no account for is a real fleet (#1319 —
+    /// `SwapdMapping.fleets`, so the add-first-account paths can resolve
+    /// it), and here it would be a header with nothing under it.
+    private var populatedFleets: [FleetState] {
+        model.fleets.filter { !$0.accounts.isEmpty }
+    }
+
     /// Ten-plus accounts scroll instead of growing an off-screen popup.
     @ViewBuilder private var accountArea: some View {
         Group {
@@ -627,13 +590,13 @@ struct MenuContent: View {
                 OnboardingCard(model: model)
             } else if model.accounts.isEmpty && model.snapshotLoaded {
                 FirstAccountCard(model: model)
-            } else if model.fleets.reduce(0, { $0 + $1.accounts.count }) > 10 {
+            } else if populatedFleets.reduce(0, { $0 + $1.accounts.count }) > 10 {
                 ScrollView(showsIndicators: false) {
-                    FleetStack(fleets: model.fleets)
+                    FleetStack(fleets: populatedFleets)
                 }
                 .frame(maxHeight: 560)
             } else {
-                FleetStack(fleets: model.fleets)
+                FleetStack(fleets: populatedFleets)
             }
         }
         .introContent(model)
@@ -673,13 +636,6 @@ struct MenuContent: View {
             }
             .instantTip("Restart to update")
         }
-        if let v = model.appUpdateVersion {
-            Button { model.showSettings?() } label: {
-                Image(systemName: "arrow.down.circle.fill")
-                    .foregroundStyle(.orange)
-            }
-            .instantTip("Infinitus \(v) is out — About → Updates")
-        }
         if model.engineBadgeShown { engineBadgeIcon }
         if !model.footerActionsHidden {
         Button { model.relaunchApp() } label: {
@@ -702,7 +658,6 @@ struct MenuContent: View {
             n += 7                                  // 5 actions + restart + quit
         }
         if model.appUpdatePending { n += 1 }
-        if model.appUpdateVersion != nil { n += 1 }
         return n
     }
 
@@ -734,13 +689,6 @@ struct MenuContent: View {
                     .foregroundStyle(.orange)
             }
             .instantTip("Restart to update")
-        }
-        if let v = model.appUpdateVersion {
-            Button { model.showSettings?() } label: {
-                Image(systemName: "arrow.down.circle.fill")
-                    .foregroundStyle(.orange)
-            }
-            .instantTip("Infinitus \(v) is out — About → Updates")
         }
         if model.engineBadgeShown { engineBadgeIcon }
         if !model.footerActionsHidden {

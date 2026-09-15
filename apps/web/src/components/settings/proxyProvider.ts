@@ -120,6 +120,18 @@ const PROXY_MODEL_OPTION_DESCRIPTORS = [
  * a dedicated CLAUDE_CONFIG_DIR unless one was typed, and the picker models
  * appended to `customModels`. A disabled draft leaves everything untouched.
  */
+/** Whether the instance routes Claude through a proxy, which the advisor tool does not cross (#1232). */
+export function hasAnthropicBaseUrl(
+  environment: ReadonlyArray<ProviderInstanceEnvironmentVariable> | undefined,
+): boolean {
+  return (environment ?? []).some(
+    (variable) => variable.name === "ANTHROPIC_BASE_URL" && variable.value.trim().length > 0,
+  );
+}
+
+export const PROXY_ADVISOR_NOTE =
+  "This instance routes through a proxy, which does not pass the advisor tool through.";
+
 export function applyProxyDraft(
   draft: ProxyDraft,
   instanceId: string,

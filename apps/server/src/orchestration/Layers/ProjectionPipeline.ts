@@ -840,6 +840,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             attachments: queued.attachments,
             modelSelection: queued.modelSelection ?? null,
             context: queued.context ?? null,
+            sendAt: queued.sendAt ?? null,
             orderKey: queued.orderKey,
             createdAt: queued.createdAt,
             updatedAt: queued.updatedAt,
@@ -883,6 +884,9 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             ...(event.payload.title !== undefined ? { title: event.payload.title } : {}),
             ...(event.payload.activeOrderKey !== undefined
               ? { activeOrderKey: event.payload.activeOrderKey }
+              : {}),
+            ...(event.payload.titleState !== undefined
+              ? { titleState: event.payload.titleState }
               : {}),
             ...(event.payload.titleRegeneration !== undefined
               ? {

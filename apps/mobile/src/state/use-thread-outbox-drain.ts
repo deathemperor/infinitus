@@ -15,7 +15,7 @@ import {
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 import { scopedThreadKey } from "../lib/scopedEntities";
@@ -64,6 +64,7 @@ import { readHeldThreads } from "./threadOutboxHolds";
 import {
   isThreadHeld,
   outboxQueueMode,
+  queuedTurnSendAt,
   queueTurnCommandInput,
   resolveThreadOutboxDelivery,
   type ThreadOutboxDelivery,
@@ -575,6 +576,15 @@ export function useThreadOutboxDrain(): void {
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
   const shellStatuses = useThreadOutboxShellStatuses();
   const threads = useThreadShells();
+  // Infinitus (fork, #1278 finding 6): the drain re-runs on every shell change
+  // and looked each queued message's thread up with a scan over every shell;
+  // one Map per shells identity makes that a lookup. `threads` stays a
+  // dependency — a shell change is what lets a queued row leave.
+  const threadsByKey = useMemo(
+    () =>
+      new Map(threads.map((thread) => [scopedThreadKey(thread.environmentId, thread.id), thread])),
+    [threads],
+  );
   const creationOutcomes = useAtomValue(pendingThreadCreationOutcomesAtom);
   const projects = useProjects();
   const serverConfigs = useServerConfigs();
@@ -841,6 +851,20 @@ export function useThreadOutboxDrain(): void {
                 attachments: prepared.attachments,
                 modelSelection: sendSettings.modelSelection,
                 queueId: QueueId.make(uuidv4()),
+                // Infinitus (fork, #1325): a steer send behind the running
+                // turn goes at its next tool boundary where the server honours it.
+                sendAt: queuedTurnSendAt({
+                  action: "send",
+                  isCreation: false,
+                  threadBusy:
+                    thread.session?.status === "running" || thread.session?.status === "starting",
+                  threadHeld: isThreadHeld(
+                    readHeldThreads(queuedMessage.environmentId, serverConfigs),
+                    queuedMessage.threadId,
+                  ),
+                  mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
+                  serverSendAt: serverConfig.environment.capabilities.turnQueueSendAt === true,
+                }),
               }),
             })
           : await startTurn({
@@ -1119,7 +1143,9 @@ export function useThreadOutboxDrain(): void {
         continue;
       }
 
-      const thread = findThread(threads, nextQueuedMessage);
+      const thread = threadsByKey.get(
+        scopedThreadKey(nextQueuedMessage.environmentId, nextQueuedMessage.threadId),
+      );
       if (thread && scopedThreadKey(thread.environmentId, thread.id) !== threadKey) {
         continue;
       }
@@ -1151,6 +1177,7 @@ export function useThreadOutboxDrain(): void {
         ),
         mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
         serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
+        serverSendAt: serverConfig?.environment.capabilities.turnQueueSendAt === true,
       });
       // The delivery action resolves first; capability checks apply only to
       // a message that will send. Checking earlier would restore a
@@ -1276,6 +1303,7 @@ export function useThreadOutboxDrain(): void {
             ),
             mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
             serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
+            serverSendAt: serverConfig?.environment.capabilities.turnQueueSendAt === true,
           });
           if (liveDeliveryAction !== deliveryAction) {
             return true;
@@ -1336,5 +1364,6 @@ export function useThreadOutboxDrain(): void {
     serverConfigs,
     shellStatuses,
     threads,
+    threadsByKey,
   ]);
 }

@@ -16,6 +16,7 @@ vi.mock("@expo/ui/swift-ui/modifiers", () => ({
   frame: (value: unknown) => value,
   layoutPriority: (value: unknown) => value,
   lineLimit: (value: unknown) => value,
+  multilineTextAlignment: (value: unknown) => value,
   padding: (value: unknown) => value,
   resizable: (value: unknown) => value,
   widgetURL: (value: unknown) => ({ widgetURL: value }),

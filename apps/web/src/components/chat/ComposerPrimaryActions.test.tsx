@@ -44,11 +44,7 @@ function renderPendingActions(isRunning: boolean) {
   );
 }
 
-function renderRunningActions(
-  showSendWhileRunning: boolean,
-  hasSendableContent: boolean,
-  runningSendMode?: "queue" | "steer",
-) {
+function renderRunningActions(hasSendableContent: boolean, runningSendMode?: "queue" | "steer") {
   return renderToStaticMarkup(
     createElement(ComposerPrimaryActions, {
       compact: true,
@@ -62,7 +58,6 @@ function renderRunningActions(
       isEnvironmentUnavailable: false,
       isPreparingWorktree: false,
       hasSendableContent,
-      showSendWhileRunning,
       runningSendMode,
       onPreviousPendingQuestion: () => {},
       onInterrupt: () => {},
@@ -130,31 +125,24 @@ describe("ComposerPrimaryActions", () => {
     expect(markup).not.toContain("stage-nightly");
   });
 
-  it("only renders stop while running when Enter-to-send is available", () => {
-    const markup = renderRunningActions(false, true);
+  it("renders a queue action alongside stop while running with a sendable draft", () => {
+    const markup = renderRunningActions(true);
 
     expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).not.toContain('aria-label="Send message"');
-  });
-
-  it("renders send alongside stop while running when Enter-to-send is unavailable", () => {
-    const markup = renderRunningActions(true, true);
-
-    expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).toContain('aria-label="Send message"');
+    expect(markup).toContain('aria-label="Queue message"');
     expect(markup).toContain('type="submit"');
   });
 
   it("keeps send next to stop while running and names the send mode (#270 F)", () => {
-    expect(renderRunningActions(false, true, "queue")).toContain('aria-label="Queue message"');
-    expect(renderRunningActions(false, true, "steer")).toContain('aria-label="Send now"');
-    expect(renderRunningActions(false, false, "queue")).not.toContain('aria-label="Queue message"');
+    expect(renderRunningActions(true, "queue")).toContain('aria-label="Queue message"');
+    expect(renderRunningActions(true, "steer")).toContain('aria-label="Send at next step"');
+    expect(renderRunningActions(false, "queue")).not.toContain('aria-label="Queue message"');
   });
 
   it("keeps stop as the only action while running with an empty composer", () => {
-    const markup = renderRunningActions(true, false);
+    const markup = renderRunningActions(false);
 
     expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).not.toContain('aria-label="Send message"');
+    expect(markup).not.toContain('aria-label="Queue message"');
   });
 });

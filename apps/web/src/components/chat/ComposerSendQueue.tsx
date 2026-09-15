@@ -4,7 +4,7 @@ import { memo } from "react";
 
 import { Button } from "~/components/ui/button";
 import { ComposerBanner } from "./ComposerBanner";
-import { queuedTurnSnippet } from "./composerSendQueue.logic";
+import { queuedTurnSnippet, queuedTurnTiming, queuedTurnsHeader } from "./composerSendQueue.logic";
 
 /**
  * The messages the server holds for this thread until its turn finishes
@@ -29,7 +29,7 @@ export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
           <ClockIcon />
         </ComposerBanner.Icon>
         <ComposerBanner.Content className="text-muted-foreground">
-          {isRunning ? "Sends when this turn finishes" : "Sending when the thread is idle"}
+          {queuedTurnsHeader(entries, isRunning)}
         </ComposerBanner.Content>
         <ComposerBanner.Actions>
           <ComposerBanner.Count>{entries.length}</ComposerBanner.Count>
@@ -38,6 +38,7 @@ export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
       <ComposerBanner.Children render={<ul role="list" />} aria-label="Queued messages">
         {entries.map((entry, index) => {
           const snippet = queuedTurnSnippet(entry);
+          const timing = queuedTurnTiming(entry);
           return (
             <ComposerBanner.Row
               render={<li />}
@@ -47,6 +48,14 @@ export const ComposerSendQueue = memo(function ComposerSendQueue(props: {
               <ComposerBanner.Icon />
               <ComposerBanner.Content>
                 <span className="min-w-0 flex-1 truncate text-foreground/80">{snippet}</span>
+                {timing ? (
+                  <span
+                    className="shrink-0 text-muted-foreground"
+                    data-queued-timing={entry.sendAt}
+                  >
+                    {timing}
+                  </span>
+                ) : null}
               </ComposerBanner.Content>
               <ComposerBanner.Actions>
                 {entries.length > 1 ? (

@@ -1,0 +1,7 @@
+# Worktree limit
+
+**Worktree limit (#269 H; Cursor's max worktrees).** A server setting `worktreeMaxCount` (`packages/contracts/src/settings.ts`, default 25, 0 lifts it) checked in `apps/server/src/ws.ts` before a bootstrap creates anything: `ProjectionSnapshotQuery.getWorktreeHolders` counts live threads with a `worktree_path` and lists the oldest archived ones; `apps/server/src/orchestration/worktreeCap.logic.ts` (`worktreeCapRefusal`) words the one-line refusal, which names those threads (deleting one frees its worktree) and the setting. The direct `vcs.createWorktree` RPC runs the same check (refused as a `GitCommandError`), and bootstraps reserve a slot in `worktreesInFlight` before the reads, so Best-of members starting together count each other.
+
+## Reserving is not refusing
+
+Reserving is not refusing (#1190): since upstream's staged worktree setup (#11372), `prepareWorktree` only means a worktree _may_ be created — a project that is no repository, or a base branch naming no commit, runs the thread in the project checkout instead — so the refusal is taken once `shouldPrepareWorktree` is final and the reservation is given back when it reads false, while the check still sits above the `thread.create` so an over-limit send costs no thread. Settings → General "Worktree limit" (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests: `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`, `server.test.ts`, `settings.test.ts`.

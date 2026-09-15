@@ -65,6 +65,20 @@ const ALIASES: Readonly<Record<string, ReadonlyArray<string>>> = {
   // alerts" card (#1178) takes the .p8 push key and lists the phones
   // registered for alerts.
   "infinitus-devices": ["qr", "p8", "registered", "alerts"],
+  // The route's About section: the menu bar app's version and build, with a
+  // link to the releases (the Mac's About pane, folded in 2026-09-14).
+  "infinitus-engines": [
+    "about",
+    "version",
+    "build",
+    "release",
+    // The routing rows and the status list's daemon word (#1235).
+    "routing",
+    "strategy",
+    "session",
+    "affinity",
+    "daemon",
+  ],
 };
 
 /** Every `Entry("<key>", …, <section>)` the catalog declares, with its section. */

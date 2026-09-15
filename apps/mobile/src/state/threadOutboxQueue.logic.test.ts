@@ -6,6 +6,7 @@ import {
   isThreadHeld,
   outboxQueueMode,
   queueBehindRunningTurn,
+  queuedTurnSendAt,
   queueTurnCommandInput,
   resolveThreadOutboxDelivery,
 } from "./threadOutboxQueue.logic";
@@ -92,6 +93,7 @@ describe("resolveThreadOutboxDelivery (#812)", () => {
     isCreation: false,
     threadHeld: false,
     mode: "queue" as const,
+    serverSendAt: false,
   };
 
   it("hands a send behind a running or held turn to a server with the queue", () => {
@@ -139,6 +141,56 @@ describe("resolveThreadOutboxDelivery (#812)", () => {
         serverQueues: true,
       }),
     ).toBe("send");
+  });
+});
+
+describe("steer as a tool-boundary row (#1325)", () => {
+  const steer = {
+    action: "send" as const,
+    isCreation: false,
+    threadBusy: true,
+    threadHeld: false,
+    mode: "steer" as const,
+    serverQueues: true,
+    serverSendAt: true,
+  };
+
+  it("queues a steer send behind a running turn at the next tool boundary on a server that honours it", () => {
+    expect(resolveThreadOutboxDelivery(steer)).toBe("queue");
+    expect(queuedTurnSendAt(steer)).toBe("tool-boundary");
+  });
+
+  it("keeps sending into the turn on a server without the flag", () => {
+    expect(resolveThreadOutboxDelivery({ ...steer, serverSendAt: false })).toBe("send");
+    expect(queuedTurnSendAt({ ...steer, serverSendAt: false })).toBeUndefined();
+  });
+
+  it("is an ordinary row for a held thread, and nothing for an idle thread, a creation or queue mode", () => {
+    expect(resolveThreadOutboxDelivery({ ...steer, threadHeld: true })).toBe("queue");
+    expect(queuedTurnSendAt({ ...steer, threadHeld: true })).toBeUndefined();
+    expect(resolveThreadOutboxDelivery({ ...steer, threadBusy: false })).toBe("send");
+    expect(queuedTurnSendAt({ ...steer, threadBusy: false })).toBeUndefined();
+    expect(queuedTurnSendAt({ ...steer, isCreation: true })).toBeUndefined();
+    expect(queuedTurnSendAt({ ...steer, mode: "queue" })).toBeUndefined();
+  });
+
+  it("stamps the row's sendAt only when given", () => {
+    const base = {
+      message: {
+        commandId: CommandId.make("c1"),
+        threadId: ThreadId.make("t1"),
+        messageId: MessageId.make("m1"),
+        text: "go",
+        createdAt: "2026-09-15T10:00:00Z",
+      },
+      attachments: [],
+      modelSelection: { instanceId: ProviderInstanceId.make("p1"), model: "m" },
+      queueId: QueueId.make("q1"),
+    };
+    expect(queueTurnCommandInput(base)).not.toHaveProperty("sendAt");
+    expect(queueTurnCommandInput({ ...base, sendAt: "tool-boundary" }).sendAt).toBe(
+      "tool-boundary",
+    );
   });
 });
 

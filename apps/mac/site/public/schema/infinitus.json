@@ -52,6 +52,10 @@
             "type": "boolean",
             "description": "When true, the script runs automatically after a worktree is created for a new thread."
           },
+          "async": {
+            "type": "boolean",
+            "description": "Only for runOnWorktreeCreate scripts. When true (the default), the agent starts while the script is still running. Set false to hold the agent until the script exits."
+          },
           "previewUrl": {
             "type": "string",
             "description": "URL opened in the in-app browser preview when this script runs. Only honored on the desktop build.",

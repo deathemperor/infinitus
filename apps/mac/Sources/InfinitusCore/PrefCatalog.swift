@@ -84,6 +84,10 @@ public enum PrefCatalog {
         // app keeps running headless (#828). First because every other
         // Display pref only matters while it is on (#1184).
         Entry("menu_bar_enabled", .bool, .bool(true), display),
+        // Display: the Dock. Only the Settings window asks for a Dock icon
+        // (it makes the app `.regular` while it is up). Off — the default —
+        // Infinitus stays out of the Dock and Cmd+Tab entirely.
+        Entry("dock_icon_enabled", .bool, .bool(false), display),
         // Display: the menu bar title.
         Entry("show_account_name", .bool, .bool(true), display),
         Entry("title_pct", .string, .string("both"), display, choices: strings(TitlePrefs.pctChoices)),
@@ -129,8 +133,11 @@ public enum PrefCatalog {
         Entry("engine_swapd_enabled", .bool, .bool(true), engines, effect: .restart),
         Entry("engine_cliproxy_enabled", .bool, .bool(false), engines, effect: .restart),
         Entry("engine_9router_enabled", .bool, .bool(false), engines, effect: .restart),
-        // About: updates.
-        Entry("update_channel", .string, .string("stable"), about, choices: strings(["stable", "nightly"])),
+        // The demo fleet (fabricated accounts, #1177): relaunches like an
+        // engine toggle — the registry is built once at init.
+        Entry("mock_mode", .bool, .bool(false), engines, effect: .restart),
+        // About: empty since #1238 (`update_channel` was the Homebrew
+        // updater's track; the desktop's Updates page owns the track now).
         // Priority: the headroom mode (#616) — `hold` publishes a per-fleet
         // verdict on `fleets` that holds background threads while low.
         Entry("priority_mode", .string, .string("off"), priority, choices: strings(priorityModes)),

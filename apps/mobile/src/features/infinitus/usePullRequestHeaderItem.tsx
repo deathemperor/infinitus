@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { Alert } from "react-native";
 
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
-import { environmentServerConfigsAtom } from "../../state/server";
+import { serverEnvironment } from "../../state/server";
 import { resolveThreadPrSource } from "../../state/thread-pr-presentation";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -48,14 +48,23 @@ const NO_ITEM: PullRequestHeaderItem = { menu: null, version: "" };
 export function usePullRequestHeaderItem(
   thread: EnvironmentThreadShell | null,
 ): PullRequestHeaderItem {
-  const configs = useAtomValue(environmentServerConfigsAtom);
-  const capabilities =
-    thread === null ? undefined : configs.get(thread.environmentId)?.environment.capabilities;
-  const supportsLinks = capabilities?.threadPullRequests === true;
-  const supportsActions = capabilities?.pullRequests === true;
+  // Its environment's own config atom with selectors (#1278 finding 5): the
+  // hook wakes when these flags flip, not on every config change anywhere.
+  const configAtom = serverEnvironment.configValueAtom(thread?.environmentId ?? null);
+  const supportsLinks = useAtomValue(
+    configAtom,
+    (config) => config?.environment.capabilities.threadPullRequests === true,
+  );
+  const supportsActions = useAtomValue(
+    configAtom,
+    (config) => config?.environment.capabilities.pullRequests === true,
+  );
   // Fork (#269 A): babysit needs the fork's server; the menu item's own gate
   // (an open PR, or already on) lives in `prHeaderMenuItems`.
-  const supportsBabysit = capabilities?.infinitus === true;
+  const supportsBabysit = useAtomValue(
+    configAtom,
+    (config) => config?.environment.capabilities.infinitus === true,
+  );
   const runAction = useAtomCommand(runPullRequestAction, { reportFailure: false });
   const updateMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,

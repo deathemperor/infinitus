@@ -10,6 +10,93 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.16
+
+### Mac
+- a freshly installed engine now reports the provider it manages before its first account, so Accounts offers the first sign-in instead of telling you to install the engine you just installed.
+- A used-up model window (Fable) no longer repeats the reset time the weekly gauge beside it already counts down.
+- Infinitus stays out of the Dock by default — turn "Show a Dock icon while Settings is open" back on under Settings › Infinitus › Menu bar.
+- the Team crypto core, store and infinitusctl team CLI are back (#1313).
+
+### Desktop
+- A message sent while a turn runs in steer mode now waits for the agent's next tool call to finish instead of landing mid-tool.
+- ⌘[ / ⌘] and the mouse's back button move through history again.
+- A team invite link (infinitus.run/join, or infinitus://join on a Mac) opens the desktop app with the code ready for the Team page (#1313).
+
+### Phone
+- The queued messages card marks such a message "at next step".
+- With "Send into the running turn" on, a message sent during a turn now waits for the running tool call to finish before it goes in, on a Mac that supports it.
+- A working row on the lock-screen thread card shows its title again; the elapsed timer no longer takes the whole row.
+
+## 0.5.0-alpha.15
+
+### Mac
+- The `proxy` read answers CLIProxyAPI's management panel URL, so Settings › Infinitus › Engines links to it as it does 9Router's dashboard.
+- infinitusctl thread new starts a thread on the model the desktop would pick for the project — its Settings › General default at the project scope, else the environment's — instead of refusing a project without one, and --model <instance>/<model> (or a bare <model>) picks one outright; the refusal now says where to set a default.
+- The bundled swapd engine is 0.2.0, so Add account signs in through the browser and a thread that hits its limit switches accounts at once instead of a poll later.
+- The menu bar app no longer rewrites its snapshot cache to disk every minute when nothing changed.\n
+- Team rebuild spec and plan for the unified app (#1313).
+
+### Desktop
+- "Jump to next waiting thread" is now ⌘⌥N (Ctrl+Alt+N); ⌘⇧L now reuses the previous worktree, as upstream does.
+
+### Phone
+- Duplicate thread cards left on the lock screen are cleared the next time the app wakes; one card stays.
+- A message queued into a thread the Mac is holding waits from the first send after the app opens, instead of slipping past the hold once.
+- A thread card the Mac starts while the app is in the background asks the phone to reconnect at once, so its token reaches the Mac inside that window instead of when the app is next opened; the Card push registration row says how long it took.
+
+## 0.5.0-alpha.14
+
+### Mac
+- The menu bar app no longer crashes at every launch on a Mac that had signed in through the retired private window.
+- A thread card the phone dismissed no longer keeps its token on the Mac; the next card starts afresh instead of updating into nothing.
+- A thread card is started once and updated in place; a slow phone can no longer stack duplicate cards.
+- The phone list shows what the last push to each device did.
+- The event log records a thread card's start and end on the phone, and a failed push says what it was sending and why.
+
+### Desktop
+- Settings › Infinitus › Devices shows each phone's last push result.
+
+### Phone
+- A thread card's own token is withdrawn from the Mac once no card is live, so the next card starts fresh instead of updating an ended one.
+- A thread card the Mac starts while the app is in the background is updated in place instead of stacking a new card.
+
+## 0.5.0-alpha.13
+
+### Mac
+- `infinitusctl` can set the proxy's session affinity and the demo fleet, and `status` reports each engine's binary, daemon and last error.
+- The Devices pane keeps the tunnel, crash reports, settings file and account backup; this Mac's name, phone alerts and iCloud sync are set in Settings › Infinitus › Devices.
+- The Settings window's Accounts pane is retired; accounts are managed on the desktop app's Accounts page, and account backup and restore moved to Settings › Devices.
+- The standalone menu bar download and its Homebrew cask are retired; the menu bar app ships inside the desktop app.
+- The Settings window's About tab and its Homebrew updater are gone; the menu bar app ships inside the desktop app and updates with it.
+- The swapd, CLIProxyAPI and 9Router panes are gone from the Mac's Settings window; engine settings live in Settings › Infinitus › Engines in the desktop app.
+- 9Router and CLIProxyAPI weekly gauges show the ahead/behind pace signal swapd rows already had.
+- The sign-in flow's "Use private window (no passkeys)" button is gone, and the cookie jars it kept are removed at the next launch.
+- An account in two fleets shows the richer engine's usage reading instead of whichever engine answered first.
+
+### Desktop
+- The local environment can be turned off in Settings › Connections, so a computer only drives work running elsewhere; switch it back on in the same place.
+- A device host that resolves to this computer is skipped, and Test connection runs against the environments you selected.
+- Settings › Infinitus › Engines shows CLIProxyAPI's routing strategy and session affinity, a link to 9Router's dashboard, and swapd's daemon state and binary path.
+- Accounts offers Add account and Sign in again for swapd accounts.
+- A Bash call the agent described shows that description as the tool row, with the command folded beneath, as in Claude Code's terminal.
+- The mouse's back and forward buttons navigate the desktop app as they do a browser, on a Mac whose mouse driver sends them as the system's page-swipe gesture.
+- A web search the agent runs is titled "Web search" in the work log on web and phone, not "Tool call".
+- Settings › Infinitus › Engines ends with an About section showing the menu bar app's version and build, with a link to the releases.
+- A Claude instance can name an advisor model for the agent to consult mid-turn, in its Runtime settings.
+- A thread's advisor consults show their outcome as soon as the advisor answers instead of spinning until the turn ends.
+- A capture taken while the app has to open its window is no longer lost.
+- Web searches and fetches a thread runs show their result count or fetched page as soon as they answer instead of spinning until the turn ends.
+
+### Phone
+- A Bash call the agent described shows that description as the tool row, with the command folded beneath.
+- Long-press a message you sent to restore the files to that point, keeping the chat, or fork a new thread from there.
+- Long-press a message you sent to edit from here or rewind the chat only; the text, files and context come back to the composer.
+- An AWS or gcloud sign-in opened on the phone finishes on the phone; nothing is pasted anywhere.
+
+### Linux
+- `t3 update` points the background service at the new version even when you decline the restart, and `t3 service restart` picks it up later.
+
 ## 0.5.0-alpha.12
 
 ### Mac

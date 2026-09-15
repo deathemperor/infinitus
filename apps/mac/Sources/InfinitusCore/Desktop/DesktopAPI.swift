@@ -60,9 +60,19 @@ public struct DesktopAPI {
         public var turnId: String
         public var state: String
         public var assistantMessageId: String?
+        public var startedAt: String?
     }
     public struct Session: Decodable, Equatable {
         public var status: String
+    }
+    /// The fork's usage rollup on a thread shell (#834); every field
+    /// optional so a server without it still decodes.
+    public struct Usage: Decodable, Equatable {
+        public var turns: Int?
+        public var inputTokens: Int?
+        public var outputTokens: Int?
+        public var costUsd: Double?
+        public var models: [String]?
     }
     public struct ThreadShell: Decodable, Equatable {
         public var id: String
@@ -70,7 +80,9 @@ public struct DesktopAPI {
         public var title: String
         public var latestTurn: Turn?
         public var session: Session?
+        public var createdAt: String?
         public var updatedAt: String?
+        public var usage: Usage?
         public var archivedAt: String?
         public var branch: String?
         public var worktreePath: String?
@@ -136,6 +148,18 @@ public struct DesktopAPI {
     /// `GET /api/infinitus/holds`: the threads the desktop holds (#616); a desktop without the route holds nothing.
     public func holds() throws -> [Hold] {
         do { return try decode(get("/api/infinitus/holds")) } catch let failure as Failure where failure.status == 404 { return [] }
+    }
+    /// `GET /api/infinitus/thread-defaults?projectId=` (#1315): the model
+    /// the desktop's own composer would create a thread on for that project
+    /// — its override in Settings › General, the row's own default, else
+    /// the environment's. A desktop without the route (404) answers nil,
+    /// so `thread new` reads the project row alone there, as before.
+    public func threadDefaults(projectId: String) throws -> JSONValue? {
+        do {
+            let reply = try decode(get("/api/infinitus/thread-defaults?projectId=\(Self.segment(projectId))")) as [String: JSONValue]
+            guard let model = reply["defaultModelSelection"], model != .null else { return nil }
+            return model
+        } catch let failure as Failure where failure.status == 404 { return nil }
     }
     /// `GET /api/auth/session`: does the desktop still accept the token?
     /// The route answers everyone (`{authenticated}`), so a revoked

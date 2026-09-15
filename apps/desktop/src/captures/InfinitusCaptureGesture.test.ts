@@ -2,7 +2,11 @@
 import type { DesktopCaptureGestureEvent } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { type CaptureGestureDeps, makeCaptureGesture } from "./InfinitusCaptureGesture.ts";
+import {
+  type CaptureGestureDeps,
+  makeCaptureGesture,
+  makeCaptureGestureOutbox,
+} from "./InfinitusCaptureGesture.ts";
 
 function harness(overrides: Partial<CaptureGestureDeps> = {}) {
   let trigger: (() => void) | undefined;
@@ -141,5 +145,35 @@ describe("makeCaptureGesture", () => {
     await h.gesture.setEnabled(true, { prompt: true });
     expect(h.deps.startPoller).toHaveBeenCalledOnce();
     expect(h.logged).toContainEqual(["accessibility not granted", undefined]);
+  });
+});
+
+describe("makeCaptureGestureOutbox (#433 slice 3)", () => {
+  const captured = (text: string): DesktopCaptureGestureEvent => ({ type: "captured", text });
+
+  it("pings a loaded page and hands the read over on drain", () => {
+    const ping = vi.fn();
+    const outbox = makeCaptureGestureOutbox();
+    outbox.offer(captured("one"), { loading: false, ping });
+    expect(ping).toHaveBeenCalledTimes(1);
+    expect(outbox.drain()).toEqual([captured("one")]);
+  });
+
+  it("keeps a read for a page still loading without a ping; the mount drain gets it", () => {
+    const ping = vi.fn();
+    const outbox = makeCaptureGestureOutbox();
+    outbox.offer(captured("one"), { loading: true, ping });
+    expect(ping).not.toHaveBeenCalled();
+    expect(outbox.drain()).toEqual([captured("one")]);
+  });
+
+  it("drains in order and then empty", () => {
+    const outbox = makeCaptureGestureOutbox();
+    const page = { loading: false, ping: vi.fn() };
+    outbox.offer(captured("one"), page);
+    outbox.offer({ type: "empty" }, page);
+    outbox.offer(captured("two"), page);
+    expect(outbox.drain()).toEqual([captured("one"), { type: "empty" }, captured("two")]);
+    expect(outbox.drain()).toEqual([]);
   });
 });

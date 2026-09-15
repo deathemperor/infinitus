@@ -1,6 +1,5 @@
 import type {
   DesktopBridge,
-  DesktopCaptureGestureEvent,
   DesktopPreviewPointerEvent,
   DesktopPreviewRecordingFrame,
   DesktopPreviewTabState,
@@ -26,21 +25,6 @@ function isSnapShotEvent(value: unknown): value is DesktopSnapShotEvent {
     SNAP_SHOT_EVENT_TYPES.has(type) &&
     (id === undefined || typeof id === "string")
   );
-}
-
-const CAPTURE_GESTURE_FAILURES = new Set([
-  "accessibility",
-  "no-focus",
-  "unsupported",
-  "timeout",
-  "helper",
-]);
-function isCaptureGestureEvent(value: unknown): value is DesktopCaptureGestureEvent {
-  if (typeof value !== "object" || value === null) return false;
-  const { type, text, reason } = value as { type?: unknown; text?: unknown; reason?: unknown };
-  if (type === "captured") return typeof text === "string";
-  if (type === "empty") return true;
-  return type === "failed" && typeof reason === "string" && CAPTURE_GESTURE_FAILURES.has(reason);
 }
 
 exposeClerkBridge({ passkeys: true });
@@ -93,6 +77,10 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   },
   getLocalEnvironmentBearerToken: () =>
     ipcRenderer.invoke(IpcChannels.GET_LOCAL_ENVIRONMENT_BEARER_TOKEN_CHANNEL),
+  getLocalEnvironmentEnabled: () =>
+    ipcRenderer.sendSync(IpcChannels.GET_LOCAL_ENVIRONMENT_ENABLED_CHANNEL) !== false,
+  setLocalEnvironmentEnabled: (enabled) =>
+    ipcRenderer.invoke(IpcChannels.SET_LOCAL_ENVIRONMENT_ENABLED_CHANNEL, enabled),
   getClientSettings: () => ipcRenderer.invoke(IpcChannels.GET_CLIENT_SETTINGS_CHANNEL),
   setClientSettings: (settings) =>
     ipcRenderer.invoke(IpcChannels.SET_CLIENT_SETTINGS_CHANNEL, settings),
@@ -178,6 +166,10 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   setKeepAwake: (active) => ipcRenderer.invoke(IpcChannels.SET_KEEP_AWAKE_CHANNEL, active),
   submitInfinitusSignInCode: (input) =>
     ipcRenderer.invoke(IpcChannels.SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL, input),
+  beginInfinitusOAuthSignIn: (input) =>
+    ipcRenderer.invoke(IpcChannels.BEGIN_INFINITUS_OAUTH_SIGN_IN_CHANNEL, input),
+  cancelInfinitusOAuthSignIn: (flowId) =>
+    ipcRenderer.invoke(IpcChannels.CANCEL_INFINITUS_OAUTH_SIGN_IN_CHANNEL, flowId),
   consumePendingDeepLink: () =>
     ipcRenderer.invoke(IpcChannels.CONSUME_INFINITUS_DEEP_LINK_CHANNEL, undefined),
   onDeepLinkPending: (listener) => {
@@ -188,6 +180,17 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.on(IpcChannels.INFINITUS_DEEP_LINK_PENDING_CHANNEL, wrappedListener);
     return () => {
       ipcRenderer.removeListener(IpcChannels.INFINITUS_DEEP_LINK_PENDING_CHANNEL, wrappedListener);
+    };
+  },
+  onHistoryGesture: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, direction: unknown) => {
+      if (direction !== "left" && direction !== "right") return;
+      listener(direction);
+    };
+
+    ipcRenderer.on(IpcChannels.INFINITUS_HISTORY_GESTURE_CHANNEL, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.INFINITUS_HISTORY_GESTURE_CHANNEL, wrappedListener);
     };
   },
   pickFolder: (options) => ipcRenderer.invoke(IpcChannels.PICK_FOLDER_CHANNEL, options),
@@ -229,15 +232,16 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.removeListener(IpcChannels.SNAP_SHOT_EVENT_CHANNEL, wrappedListener);
     };
   },
-  onCaptureGestureEvent: (listener) => {
-    const wrappedListener = (_event: Electron.IpcRendererEvent, event: unknown) => {
-      if (!isCaptureGestureEvent(event)) return;
-      listener(event);
+  consumePendingCaptureGestures: () =>
+    ipcRenderer.invoke(IpcChannels.CONSUME_CAPTURE_GESTURES_CHANNEL, undefined),
+  onCaptureGesturePending: (listener) => {
+    const wrappedListener = () => {
+      listener();
     };
 
-    ipcRenderer.on(IpcChannels.CAPTURE_GESTURE_EVENT_CHANNEL, wrappedListener);
+    ipcRenderer.on(IpcChannels.CAPTURE_GESTURE_PENDING_CHANNEL, wrappedListener);
     return () => {
-      ipcRenderer.removeListener(IpcChannels.CAPTURE_GESTURE_EVENT_CHANNEL, wrappedListener);
+      ipcRenderer.removeListener(IpcChannels.CAPTURE_GESTURE_PENDING_CHANNEL, wrappedListener);
     };
   },
   onQuitShortcut: (listener) => {

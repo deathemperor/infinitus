@@ -281,19 +281,38 @@ describe("add account and re-login", () => {
     replyShape: "",
   };
 
-  it("offers add on a fleet with the in-app sign-in, never off the engine's name", () => {
+  it("offers add on a fleet with either sign-in shape, never off the engine's name", () => {
     expect(buildFleetSection(fleet({ capabilities: ["addOAuth"] })).canAdd).toBe(true);
+    // swapd, live: the CLI's paste-code flow, and no addOAuth (#1213).
+    expect(
+      buildFleetSection(fleet({ engineID: "swapd", capabilities: ["addCurrent", "addToken"] }))
+        .canAdd,
+    ).toBe(true);
     expect(buildFleetSection(fleet({ engineID: "swapd", capabilities: [] })).canAdd).toBe(false);
     expect(buildFleetSection(fleet({ capabilities: ["addToken"] })).canAdd).toBe(false);
   });
 
-  it("marks a lapsed sign-in for re-login only where the fleet can run one", () => {
+  it("keeps the section of a fleet that holds no account yet", () => {
+    // A freshly installed engine reports its provider before its first
+    // account (#1319); the section is the header the Add button hangs on.
+    const fresh = buildFleetSection(fleet({ capabilities: ["addCurrent"], accounts: [] }));
+    expect(fresh.rows).toEqual([]);
+    expect(fresh.canAdd).toBe(true);
+  });
+
+  it("marks a lapsed sign-in whatever the fleet advertises (#1213)", () => {
     const lapsed = account({ usageStatus: "relogin_required" });
     expect(rowAt(fleet({ capabilities: ["addOAuth"], accounts: [lapsed] })).reloginNeeded).toBe(
       true,
     );
+    expect(rowAt(fleet({ capabilities: ["addCurrent"], accounts: [lapsed] })).reloginNeeded).toBe(
+      true,
+    );
     expect(rowAt(fleet({ capabilities: ["addOAuth"] })).reloginNeeded).toBe(false);
-    expect(rowAt(fleet({ capabilities: [], accounts: [lapsed] })).reloginNeeded).toBe(false);
+    // The capability decides who can RUN a sign-in, not whether this one
+    // lapsed: a fleet that advertises nothing is the case the shell's own
+    // `add-oauth` exists for, and the page still has to offer the row.
+    expect(rowAt(fleet({ capabilities: [], accounts: [lapsed] })).reloginNeeded).toBe(true);
   });
 
   it("gates on the manifest listing add and reads the app's sign-in flag", () => {
@@ -549,6 +568,14 @@ describe("page state", () => {
     expect(state({ capability: true, snapshot: snapshot({ fleets: [twoAccounts] }) })).toBe(
       "ready",
     );
+    // A freshly installed engine reports its provider with no account under
+    // it (#1319): that is a page to draw, not the install-an-engine copy.
+    expect(
+      state({
+        capability: true,
+        snapshot: snapshot({ fleets: [{ ...twoAccounts, accounts: [] }] }),
+      }),
+    ).toBe("ready");
   });
 
   it("gates every page the same way: false is unsupported, undefined waits", () => {

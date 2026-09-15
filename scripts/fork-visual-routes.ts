@@ -55,6 +55,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   },
   { route: "/settings/infinitus/sessions", label: "Priority", marker: "Thread priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
+  { route: "/settings/infinitus/team", label: "Team", marker: "Whole team" },
   {
     route: "/settings/infinitus/notifications",
     label: "Notifications",
@@ -84,6 +85,15 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
       "Dashboard password",
       "[CLIProxyAPI base URL: http://127.0.0.1:8317]",
       "nothing is saved",
+      // The routing rows (#1235): the fixture's proxy rotates with affinity on.
+      "Routing strategy",
+      "Round robin",
+      "Session affinity",
+      "Open CLIProxyAPI dashboard",
+      "Open 9Router dashboard",
+      "Daemon running",
+      // The About section's version line, drawn once `status` answered.
+      "Menu bar app 0.0.0-fixture",
     ],
   },
   {

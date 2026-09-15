@@ -73,11 +73,17 @@ export const InfinitusManifest = Schema.Struct({
 export type InfinitusManifest = typeof InfinitusManifest.Type;
 
 /** One engine's line in the `status` reply. `keyPresent` only exists for the
-    engines that hold a key (cliproxy, 9router). */
+    engines that hold a key (cliproxy, 9router); `binaryPath` and `daemon`
+    (stopped | running | backingOff | refused | schemaMismatch, kept a string
+    so a word a newer build adds costs nothing) only for swapd; `error` is the
+    engine's own last error, verbatim (#1235). */
 export const InfinitusEngineState = Schema.Struct({
   enabled: Schema.Boolean,
   registered: Schema.Boolean,
   keyPresent: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(Schema.String),
+  daemon: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusEngineState = typeof InfinitusEngineState.Type;
 
@@ -433,6 +439,100 @@ export const InfinitusAwsLogins = Schema.Struct({
 });
 export type InfinitusAwsLogins = typeof InfinitusAwsLogins.Type;
 
+/** One member of the team as `team-status` lists it (#1313): the roster
+    row plus what the member last published — absent for one that has not
+    published yet. `fleet` is left opaque (the Mac's `fleet.json`). */
+export const InfinitusTeamMember = Schema.Struct({
+  kid: Schema.String,
+  name: Schema.String,
+  role: Schema.String,
+  isMe: Schema.Boolean,
+  founder: Schema.optionalKey(Schema.Boolean),
+  since: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  lastPublished: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  kinds: Schema.optionalKey(Schema.Array(Schema.String)),
+  threadsNow: Schema.optionalKey(Schema.Number),
+  blockers: Schema.optionalKey(Schema.Array(Schema.String)),
+  crashes: Schema.optionalKey(Schema.Number),
+  todayUSD: Schema.optionalKey(Schema.Number),
+  todayMessages: Schema.optionalKey(Schema.Number),
+  todayCommits: Schema.optionalKey(Schema.Number),
+  fleet: Schema.optionalKey(Schema.Unknown),
+});
+export type InfinitusTeamMember = typeof InfinitusTeamMember.Type;
+
+/** A pending join request (leaders see them). */
+export const InfinitusTeamRequest = Schema.Struct({
+  kid: Schema.String,
+  name: Schema.String,
+  platform: Schema.optionalKey(Schema.String),
+  devices: Schema.optionalKey(Schema.Array(Schema.String)),
+  at: Schema.optionalKey(Schema.Number),
+});
+export type InfinitusTeamRequest = typeof InfinitusTeamRequest.Type;
+
+/** The `team-status` reply: the team this Mac is in, or `null` when there is
+    none. `remote` is masked by the Mac. `shares` maps a kind (stats, now,
+    threads, transcripts, crashes, fleet) to its audience (off, leaders, team);
+    `exclusions` are project slugs kept private. `lockEnabled` gates minting a
+    code and approving a member on the Mac. */
+export const InfinitusTeamSnapshot = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  remote: Schema.String,
+  kid: Schema.String,
+  role: Schema.String,
+  rev: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  members: Schema.Array(InfinitusTeamMember),
+  requests: Schema.optionalKey(Schema.Array(InfinitusTeamRequest)),
+  policy: Schema.optionalKey(Schema.NullOr(Schema.Struct({ requests: Schema.String }))),
+  shares: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  exclusions: Schema.optionalKey(Schema.Array(Schema.String)),
+  lockEnabled: Schema.optionalKey(Schema.Boolean),
+  lastFetch: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  lastPublish: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  lastError: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusTeamSnapshot = typeof InfinitusTeamSnapshot.Type;
+
+/** The `team-code` reply: the code or invite link (shown once, never logged)
+    and when it expires (unix seconds). */
+export const InfinitusTeamCode = Schema.Struct({
+  code: Schema.String,
+  expires: Schema.optionalKey(Schema.Number),
+});
+export type InfinitusTeamCode = typeof InfinitusTeamCode.Type;
+
+/** The `team-insights` reply (leaders): blockers, headroom, who is on. Spend
+    figures are estimates. */
+export const InfinitusTeamInsights = Schema.Struct({
+  period: Schema.String,
+  blockers: Schema.Array(
+    Schema.Struct({
+      kid: Schema.String,
+      name: Schema.String,
+      kind: Schema.String,
+      text: Schema.String,
+    }),
+  ),
+  headroom: Schema.Array(
+    Schema.Struct({
+      kid: Schema.String,
+      name: Schema.String,
+      engine: Schema.String,
+      active: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      headroom: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+      spare: Schema.optionalKey(Schema.Number),
+      dead: Schema.optionalKey(Schema.Number),
+    }),
+  ),
+  onNow: Schema.Array(Schema.String),
+  cost: Schema.optionalKey(Schema.Unknown),
+  repos: Schema.optionalKey(Schema.Unknown),
+  hours: Schema.optionalKey(Schema.Array(Schema.Number)),
+});
+export type InfinitusTeamInsights = typeof InfinitusTeamInsights.Type;
+
 /** One row of the `events` reply — the app's event log as the Activity pane
     shows it: `at` ISO 8601, `icon` an SF Symbol name, `text` the line. Since
     native #630 (#615) a row also carries `id`, the app's own UUID for the
@@ -576,6 +676,30 @@ export const InfinitusSignInCodeResult = Schema.Struct({
   error: Schema.optionalKey(Schema.String),
 });
 export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
+
+/** Fork (#1213): a sign-in the desktop shell runs itself, through the engine's
+    own `add-oauth` verb — swapd is the OAuth client, so its loopback listener
+    catches the redirect and there is no code to paste. `provider` is the
+    engine's own provider name (`swapd --provider <p>`), `label` titles the
+    child window. No slot and no relogin target: `add-oauth` resolves the
+    account from the sign-in itself and lands a known address back in its own
+    slot, so signing in again just works. */
+export const InfinitusOAuthSignInInput = Schema.Struct({
+  flowId: Schema.String,
+  provider: Schema.String,
+  label: Schema.String,
+});
+export type InfinitusOAuthSignInInput = typeof InfinitusOAuthSignInInput.Type;
+
+/** What `add-oauth` stored, or why it did not. `error` is the engine's own
+    message; the shell never invents one. */
+export const InfinitusOAuthSignInResult = Schema.Struct({
+  ok: Schema.Boolean,
+  slot: Schema.optionalKey(Schema.Number),
+  email: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+});
+export type InfinitusOAuthSignInResult = typeof InfinitusOAuthSignInResult.Type;
 
 export const InfinitusDesktopPrefs = Schema.Struct({
   quitInfinitusWithApp: Schema.Boolean,

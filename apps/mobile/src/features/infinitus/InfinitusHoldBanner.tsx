@@ -11,7 +11,7 @@ import { Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
 import { infinitusEnvironment } from "../../state/infinitus";
-import { environmentServerConfigsAtom } from "../../state/server";
+import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import {
   holdBannerBusy,
@@ -43,9 +43,10 @@ export function InfinitusHoldBanner(props: {
 }) {
   const { environmentId, threadId, activities, latestTurn } = props;
   const hold = useMemo(() => threadHold({ activities, latestTurn }), [activities, latestTurn]);
-  const configs = useAtomValue(environmentServerConfigsAtom);
-  const supportsPinning =
-    configs.get(environmentId)?.environment.capabilities.threadPinning === true;
+  const supportsPinning = useAtomValue(
+    serverEnvironment.configValueAtom(environmentId),
+    (config) => config?.environment.capabilities.threadPinning === true,
+  );
   const release = useAtomCommand(infinitusEnvironment.releaseThread, { reportFailure: false });
   const pinThread = usePinThread();
   // Keyed by the held row, so a later hold on the same thread starts idle.
