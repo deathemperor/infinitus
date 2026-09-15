@@ -8,74 +8,7 @@ per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
 - `apps/server/src/infinitus/Layers/InfinitusSlack.ts` (+ `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts` — the `SlackClient` seam, tests) — the Slack bridge's reactor (#574, PR 2 of 4); state in `<stateDir>/infinitus-slack/threads.json`. Rules and traps: `docs/internals/slack-bridge.md`.
-- `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes
-  (preferences, Engines) and their pure logic — Engines carries the proxy
-  engines' form (`InfinitusEngineSecrets` + `engines.logic`, #1177): base
-  URL and management key / dashboard password per engine, read over `proxy`
-  / `9router`, written over `infinitus.secret` as `proxy-key` /
-  `9router-password` with the url as `--url` (there is no url-only write:
-  the url is stored with the secret; "Forget" sends an empty secret), which
-  relaunch the app; gated on the manifest marking both verbs as taking
-  their secret on stdin, else "no engine secret commands (needs ≥
-  4eaccb341c)"; Test connection sends `test-connection <engine> [--url]`
-  (native #1216, read effect) at the typed url without saving and shows
-  "Reachable in N ms" or the engine's own sentence, gated on the manifest
-  listing the verb; the Mac's Routing section (#1235): a Routing strategy
-  select over `proxy-routing` and a Session affinity switch over
-  `proxy-affinity`, each gated on its own verb, the switch drawn only while
-  the `proxy` reply carries `sessionAffinity` (a proxy without the route
-  gets the YAML note instead), the notes worded as `RoutingNotes` in
-  `EnginesPane.swift`, the proxy re-read after every write since its
-  settings are not in the snapshot; each engine's own `dashboardURL` as a
-  link (CLIProxyAPI's `/management.html`, 9Router's `/dashboard`); and
-  the status list's `binaryPath` / `daemon` / `error` from `status.engines`
-  (`InfinitusEngineState`, optional keys) — and the Devices
-  pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
-  a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
-  tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
-  address (the desktop's `serverExposureState.endpointUrl` while Network
-  access is on, else the first of the server's own `lanHttpBaseUrls`, else
-  the page's own non-loopback origin; #651). Both up → an Internet / Same
-  Wi‑Fi choice; neither → it points at Settings › Connections › Network
-  access. "Type it instead" reveals host + code for the phone's manual form.
-  The link is the site's universal link (#724): `https://infinitus.run/pair`
-  with `token`, `for=phone` and `to=<the Mac's origin>` all in the fragment,
-  which the site's server never sees — one shape for tunnel and LAN. A phone
-  with the app opens it in the app (`applinks:infinitus.run`, #782), which
-  rebuilds `<origin>/pair#token=…` and fills the sheet; the site's `/pair`
-  page forwards an app-less phone or a desktop browser to `<origin>/pair`,
-  where `InfinitusPhoneLinkSurface` ("this link is for the Infinitus phone
-  app") from `routes/pair.tsx` replaces `PairingRouteSurface`, so a browser
-  never spends the one-time token. Order of landing: the site's AASA
-  `applinks` + forwarder first, then this card, then a phone build with the
-  entitlement. It is mounted through the prefs panel's `footer`
-  slot from `routes/settings.infinitus.devices.tsx`; no route of its own.
-  Before it in that slot, the "Phone alerts" card (`InfinitusApnsCard` +
-  `apns.logic`, #1178): the `apns` read (`{keyPresent, teamId, keyId,
-registrations}`, never a token; each registration decoded alone) drawn as
-  "In the Keychain." / "Not set up." and a list of the registered phones by
-  name · kind · environment, and the `.p8` as a file input — read in the
-  browser, refused without the `-----BEGIN PRIVATE KEY-----` header (the
-  Mac's own check, so a misclicked file is never sent), handed once to
-  `infinitus.secret` as `apns-key` and kept nowhere; "Forget key" is the
-  empty secret. The input stays off while the `apns_key_id` pref above is
-  blank (read off the snapshot's prefs: the Mac stores the key under it and
-  refuses until it is set); gated on the manifest marking `apns-key` as
-  stdin secret. The page's Team ID, Key ID, "This Mac's name" and iCloud
-  rows are the `devices` catalog section with copy in `PREF_COPY`; the
-  Mac's pair token has no consumer left and is not on the page.
-  Above it, through the panel's `lead` slot (drawn whatever the native app's
-  state — the requests come from this server), the "Pairing requests" card
-  (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710): the
-  server's pending approve-on-Mac asks from `subscribeInfinitusPairing`
-  (device name, os · address, the match code large, a countdown), each with
-  Approve / Deny through `infinitus.pairingDecide`; `decided: false` reads
-  "already expired". The stream carries no secret and no credential, so the
-  card never sees one. The stream and the decision need the administrative
-  scopes only the desktop app's own session holds; a QR / `t3 pair` client
-  is refused, and the card then says "Only the desktop app on this Mac can
-  approve devices" instead of the empty state (`pairingAccess.logic` +
-  `usePairingRequests`, shared with the toast hook, #730).
+- `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pair a phone" (`InfinitusPairPhoneCard` + `pairPhone.logic`, #724), "Phone alerts" (`InfinitusApnsCard` + `apns.logic`, #1178) and "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) cards. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
   which also holds the pairing stream + decide command, #710, and the
@@ -233,40 +166,7 @@ registrations}`, never a token; each registration decoded alone) drawn as
   on native; `isPollRow` reads the text) stay in the store but are hidden until
   the header's "Show polls" toggle, persisted like the Stats period (#696).
   Sidebar "Activity" beside Stats.
-- `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/`
-  — the `/utilization` page (#747): the native Utilization pane in the fork.
-  Forecast: every account's projection at its own measured pace (windows,
-  pct, pace, when each fills or "Resets before it fills", which window
-  binds first) plus the fleet strip Accounts shows, read off the `forecast`
-  reply the snapshot already carries — no extra verb, no extra poll.
-  `buildForecast` in `packages/client-runtime/src/state/infinitusAccounts.ts`
-  decodes the lines leniently (the contract leaves them opaque; an odd line
-  or window is dropped alone). History (every account's percentage of one
-  window — 5h, 7d, a model — over 24 hours / 7 / 30 days, one SVG line per
-  account), Five-hour windows (the windows the Mac reconstructs off its own
-  history, newest first: each one's PEAK percentage — a window starts on the
-  first request after the last expired, so its headroom idles rather than
-  leaking, and the percentage it ended on says nothing — plus the poll count
-  behind it, the still-ticking one, the range's replay sentence: switches,
-  the ones onto a cold 5h clock, minutes stalled at the limit), Weekly waste
-  (the headroom that expired at each 7d or per-model rollover, with a caveat
-  on a row the Mac stopped watching hours before the reset; 5h windows are
-  left out, since they recycle ~34× a week) and Run rate (tokens,
-  API-equivalent $ and turns over the last
-  hour / day / week, unpriced models, the live output rate) read the Mac's
-  `utilization --days n` through `infinitusEnvironment.utilization`, a
-  query atom re-read every 5 min while the page is mounted and dropped a
-  minute after it leaves; `InfinitusUtilization` in
-  `packages/contracts/src/infinitus.ts` pins the samples, the rates and the
-  three telemetry row shapes, and leaves the dry-run plan opaque (its Swift
-  `Action` is an enum with payloads whose Codable form the fork would have to
-  guess at, and it proposes steps only the Mac can run); each telemetry row
-  decodes on its own like `buildForecast`'s lines, so a Mac build that words
-  one differently drops that row, not the section. The fold is
-  `packages/client-runtime/src/state/infinitusUtilization.ts`. A build
-  without the verb keeps the forecast and says what is missing; one whose
-  reply carries no telemetry keeps the chart and the run rate, and the two
-  sections are simply absent. Sidebar "Utilization" beside Activity.
+- `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Rules and traps: `docs/internals/utilization.md`.
 - Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
@@ -285,68 +185,7 @@ registrations}`, never a token; each registration decoded alone) drawn as
   no `accounts` and the section stays hidden. Primary environment only.
   Emails travel in the summary as they do in `fleets`; never in logs, spans
   or fixtures.
-- `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the
-  Accounts page (fleet sections, account rows and their actions, the forecast
-  strip, the unavailable state, and the Sign-ins section for lapsed AWS/gcloud
-  credentials — `SignInsSection.tsx` with `signIns.logic.ts` — absent when
-  nothing lapsed; one row per tool and profile, no session names and no
-  `--pid` scope since the Mac's session sweep, #1041 — the phone's own
-  `apps/mobile/src/features/infinitus/signIns.logic.ts` folds and words its
-  rows the same way, and `InfinitusAwsLogin` carries neither `pid` nor
-  `sessionLabel` any more, so an older app still sending them has them
-  dropped at the boundary); row/section/sign-in
-  models come from
-  `packages/client-runtime/src/state/infinitusAccounts.ts`, whose
-  `infinitusPageState` gates Accounts, Stats and Activity alike (#693):
-  a server whose config arrived with `false` or without the field
-  (`infinitusCapabilityOf`) gets the missing-adapter copy; a config that has not
-  arrived waits like a missing snapshot, and Accounts folds every environment's
-  answer together with `infinitusCapabilityAcross`. Add account and
-  re-login (#671): a fleet whose capabilities carry `addOAuth` or
-  `addCurrent` (swapd's CLI paste-code flow — it declares no `addOAuth`,
-  #1213) gets "Add
-  account" in its header and "Sign in again" on a `relogin_required` row, both
-  native's `add <fleet>` (the sign-in opens on the Mac), then the page polls
-  `wait-add --timeout 5` until the app says the flow ended
-  (`addAccount.logic.ts`); hidden on a build whose manifest lacks `add`.
-  On a build whose manifest lists `signin-begin` (#677) the sign-in runs
-  inside the desktop app instead: the page sends `signin-begin <fleet>
-[--relogin <email>]` over `infinitus.command`, the desktop shell shows the
-  OAuth page in a child `BrowserWindow` per flow (fresh in-memory
-  `signin-<flowId>` partition, sandboxed, no preload —
-  `apps/desktop/src/infinitus/InfinitusSignIn.ts`), the page polls
-  `signin-status` every 2 s (`signIn.logic.ts`) and, for paste-code flows,
-  takes the code from the success page — the shell hands it to the app over
-  the control socket as `secret` (`submitInfinitusSignInCode`), so it never
-  crosses an RPC, the server or the tunnel. On every other client (a
-  browser, the tunnel, the desktop looking at a remote environment) the page
-  is a link this device opens in a new tab and the code goes over
-  `infinitus.secret` as `signin-code {flowId}` (#747 step 2): the field is
-  `type="password"`, `autoComplete="off"`, cleared on submit and gone with
-  the form; the CLI's own `error` is shown; the submitted value is never
-  interpolated into any message. Closing the OAuth window never cancels;
-  the page's Cancel sends `signin-cancel`.
-  Ahead of both, the sign-in the desktop shell runs itself (#1213): the
-  engine is the OAuth client, so the shell spawns `swapd add-oauth` (below)
-  and the engine's own loopback listener catches the redirect — no code to
-  paste, no Mac build to wait for, and a fleet whose `addOAuth` capability
-  the app never advertised can still be signed into. Its two gates are the
-  only ones (`fleetSignInGate`): the engine binary is where this client is
-  (`shellOAuthSignIn`: the desktop bridge carries both methods and this is
-  the primary environment) and the fleet's engine is the one whose sign-in
-  is that flow (`fleetRunsShellOAuth`, `swapd`; the proxy engine declares
-  `addOAuth` too and is not one). Not the `addOAuth` capability — gating on
-  it once reproduced the very bug — and not the app's `signInRunning`, which
-  is its word about a flow of its own. For the same reason the row model's
-  `reloginNeeded` is the lapsed status alone; who may run a sign-in is the
-  page's to decide. `FleetSection` renders it
-  through the in-app branch — a shell flow has no `url` and no code field,
-  so the same markup reads "Sign in in the window." with a working Cancel —
-  and `signIn.logic.ts`'s `SignInKind` says which half a flow belongs to, so
-  start, cancel and end stay apart. Unlike #677, closing the window cancels:
-  a loopback redirect leaves nothing to paste. A cancelled run answers
-  `{ok: false}` with no `error`, and the page drops the flow rather than
-  showing a failure the user caused.
+- `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the Accounts page and its Sign-ins section (`SignInsSection.tsx`, `signIns.logic.ts`; models in `packages/client-runtime/src/state/infinitusAccounts.ts`, `infinitusPageState` #693); Add account / Sign in again (`addAccount.logic.ts`, #671, #1213), the desktop's in-app sign-in (`apps/desktop/src/infinitus/InfinitusSignIn.ts`, `signIn.logic.ts`, #677) and the paste-code path over `infinitus.secret` (#747 step 2). Rules and traps: `docs/internals/accounts-page.md`.
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
   — the four Settings › Infinitus routes, thin shells over the panes above.
   Profiles (#165, the Mac's "named way to start a session") left with the
@@ -477,60 +316,7 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   autocomplete off, cleared on submit/unmount, never interpolated into a
   message, sensitive read replies like `team-code`/`pair-status` rendered
   and never logged) bind their PRs (#747).
-- `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential
-  step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus`
-  group in `packages/contracts/src/environmentHttp.ts` — the server half of
-  `infinitusctl`'s desktop verbs (#822). Right after `prefs set
-fork_server_port`, on an app whose manifest lists `desktop-credential` with
-  `stdin: "secret"`, the port publisher revokes any session with subject
-  `infinitusctl`, mints one (`EnvironmentAuth.issueSession`: scopes
-  `orchestration:read orchestration:operate access:read`, label
-  "infinitusctl on <Mac>", 90 days, no refresh) and hands the token to the app
-  on the request line's `secret` field with `{origin, expiresAt}` as options —
-  one "infinitusctl on <Mac>" row in Settings › Devices, replaced on every
-  publish, revocable there (the next CLI request gets 401 until the next
-  publish). A refused write revokes the new session again. Withheld exactly
-  where the port is (dev runner, isolated socket, worktree `.t3`); the token
-  reaches no log or span. The publish repeats on a 60 s heartbeat (#1137):
-  the keeper reads the app's own catalog and republishes port and credential
-  only when `fork_server_port` names a port that is not ours, so a server
-  that published over this one and died is corrected within a minute instead
-  of leaving the tunnel on a closed port until someone relaunches the app. A
-  read and not a blind write, because every publish re-mints the
-  `infinitusctl` session and doing that on a timer would rotate the CLI's
-  token every minute; an absent pref and a value that is not a port both read
-  as no drift for the same reason. The heartbeat is the only part here that
-  needs no watcher — `observed` starts no poll, so the app-came-back edge
-  never fires on a server nobody is looking at, which is how the stale
-  publish survived. The edge and the heartbeat share one permit: a publish
-  revokes, issues and hands over, so interleaved they could leave the app
-  holding a token the other call revoked and a matching port the heartbeat
-  would never repair. The drift line names the foreign port, so two live
-  publishers fighting over the pref read as the same port coming back every
-  minute. Residual: a stale publisher that used the same port
-  leaves a credential this server cannot tell from its own. HTTP routes for a CLI with no WebSocket, the
-  first two behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
-  list — held for headroom, stopped on a limit — plus `kind: "paused"` rows
-  from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
-  #743), `POST /api/infinitus/release-thread` (`{threadId}` →
-  `{released, reason?}`, the WS `infinitus.releaseThread` word for word) and,
-  behind the read scope, `GET /api/infinitus/thread-defaults?projectId=`
-  (#1315: `{defaultModelSelection}` resolved as the composer resolves it,
-  `resolveProjectSettings` — the project's override in
-  `projectSettingsOverrides` (what Settings › General writes at a project
-  scope; the row's `defaultModelSelection` is the retired path, read until
-  the fold), then the environment default; no other HTTP route carries
-  the settings, the composer reads them over the WS config). `thread new`
-  creates on `--model <instanceId>/<model>` or a bare `<model>` on the
-  instance of the default that applies, else the route's answer, else the
-  project row (all a desktop without the route leaves it),
-  `DesktopRows.modelSelection`.
-  Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the
-  port layer (which is why that block sits below `AuthLayerLive` in
-  `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. Queue-behind-a-
-  turn is #806, not this; `thread show`, `send`, `interrupt` and
-  `--wait` use routes that already existed, and `new` too but for the
-  thread-defaults read above.
+- `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus` group in `packages/contracts/src/environmentHttp.ts` — the server half of `infinitusctl`'s desktop verbs (#822): the `infinitusctl` session and its 60 s heartbeat (#1137), `GET /api/infinitus/holds`, `POST /api/infinitus/release-thread`, `GET /api/infinitus/thread-defaults` (#1315). Rules and traps: `docs/internals/infinitusctl-desktop-verbs.md`.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
