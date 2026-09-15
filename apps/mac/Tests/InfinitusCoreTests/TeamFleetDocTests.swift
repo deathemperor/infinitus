@@ -45,4 +45,64 @@ final class TeamFleetDocTests: XCTestCase {
         XCTAssertEqual(TeamKinds.expected(at: "m/k/fleet.json")?.kind, "fleet")
     }
 
+    func entry(_ path: String, kind: String, from: String, at: Int) -> (entry: StoreEntry, header: Envelope.Header) {
+        (StoreEntry(path: path, size: 1, version: "v"),
+         Envelope.Header(v: 1, kind: kind, from: from, eph: "", to: [], at: at, nonce: "", sig: nil))
+    }
+
+    func doc(at: Int, active: String, used: Int, spare: [String] = [], dead: [String] = []) -> TeamDocs.FleetDoc {
+        var rows = [TeamDocs.FleetDoc.AccountRow(label: active, tier: nil, status: "ok", active: true,
+                                                 windows: [.init(label: "5h", pct: used), .init(label: "7d", pct: 3)], models: [])]
+        rows += spare.map { .init(label: $0, tier: nil, status: "ok", active: false, windows: [], models: []) }
+        rows += dead.map { .init(label: $0, tier: nil, status: "dead", active: false, windows: [.init(label: "5h", pct: 100)], models: []) }
+        return TeamDocs.FleetDoc(at: at, fleets: [.init(engine: "swapd", active: active, next: spare.first, accounts: rows)])
+    }
+
+    func testFoldCarriesTheFleetOntoTheMemberAndTheSnapshotRow() throws {
+        let a = TeamIdentity.random(), b = TeamIdentity.random()
+        let roster = TeamRoster(id: "t", name: "T", createdAt: 1,
+                                leaders: [TeamRoster.Member(keys: a.keys, name: "Ann", since: 1, founder: true)],
+                                members: [TeamRoster.Member(keys: b.keys, name: "Bo", since: 2)], removed: [], rev: 2)
+        let fleet = doc(at: 500, active: "ann", used: 70, spare: ["pat"])
+        var docs: [String: Data] = [:]
+        docs["m/\(a.kid)/fleet.json"] = try CanonicalJSON.encode(fleet)
+        docs["m/\(b.kid)/fleet.json"] = Data("{\"schema\":2,\"at\":1,\"fleets\":[]}".utf8)   // unknown schema: skipped
+        let reader = TeamReader.fold(headers: [entry("m/\(a.kid)/fleet.json", kind: "fleet", from: a.kid, at: 500),
+                                               entry("m/\(b.kid)/fleet.json", kind: "fleet", from: b.kid, at: 501)],
+                                     roster: roster) { docs[$0] ?? Data() }
+        XCTAssertEqual(reader.members[a.kid]?.fleet, fleet)
+        XCTAssertNil(reader.members[b.kid]?.fleet)
+        XCTAssertEqual(reader.members[a.kid]?.kinds, ["fleet"])
+        let status = TeamStatus(id: "t", name: "T", remote: "file:///r", kid: a.kid, role: "leader", rev: 2, leaders: 1, members: 1, requests: 0)
+        let snap = TeamSnapshot.make(status: status, roster: roster, reader: reader, requests: [], today: "d",
+                                     lastFetch: nil, lastPublish: nil, lastError: nil)
+        XCTAssertEqual(snap.members.first { $0.kid == a.kid }?.fleet, fleet)
+        XCTAssertNil(snap.members.first { $0.kid == b.kid }?.fleet)
+        // Additive: a row encoded before the field decodes without it.
+        let old = Data(#"{"kid":"k","name":"N","role":"member","isMe":false,"founder":false,"kinds":[],"threadsNow":0,"blockers":[],"crashes":0,"todayUSD":0,"todayMessages":0,"todayCommits":0}"#.utf8)
+        XCTAssertNil(try JSONDecoder().decode(TeamSnapshot.Member.self, from: old).fleet)
+    }
+
+    func testHeadroomBoardListsFreshFleetsNearestDryFirst() throws {
+        let now = Date(timeIntervalSince1970: 1000)
+        let a = TeamIdentity.random(), b = TeamIdentity.random(), l = TeamIdentity.random()
+        let roster = TeamRoster(id: "t", name: "T", createdAt: 1,
+                                leaders: [TeamRoster.Member(keys: a.keys, name: "Ann", since: 1, founder: true)],
+                                members: [TeamRoster.Member(keys: b.keys, name: "Bo", since: 2),
+                                          TeamRoster.Member(keys: l.keys, name: "Lee", since: 3)], removed: [], rev: 3)
+        let docs: [String: Data] = [
+            "m/\(a.kid)/fleet.json": try CanonicalJSON.encode(doc(at: 900, active: "ann", used: 70, spare: ["pat", "sam"], dead: ["old"])),
+            "m/\(b.kid)/fleet.json": try CanonicalJSON.encode(doc(at: 950, active: "bo", used: 96)),
+            "m/\(l.kid)/fleet.json": try CanonicalJSON.encode(doc(at: 10, active: "lee", used: 99)),   // stale: skipped
+        ]
+        let reader = TeamReader.fold(headers: docs.keys.map { path in
+            entry(path, kind: "fleet", from: String(path.split(separator: "/")[1]), at: 1)
+        }, roster: roster) { docs[$0] ?? Data() }
+        let board = TeamInsights.headroom(reader, now: now)
+        XCTAssertEqual(board.map(\.name), ["Bo", "Ann"])
+        XCTAssertEqual(board.map(\.headroom), [4, 30])
+        XCTAssertEqual(board[1].spare, 2)
+        XCTAssertEqual(board[1].dead, 1)
+        XCTAssertEqual(board[0].spare, 0)
+    }
 }

@@ -40,6 +40,13 @@ public struct TeamExclusions: Codable, Equatable, Sendable {
     /// Codex files, whose directories are dates). Either signal excludes
     /// on its own — the slug check runs regardless of `cwd`, so it can
     /// over-match a lossy slug; that's the safe direction.
+    /// A thread names its project by the workspace root's basename only
+    /// (`TeamThreadSources`), so an exclusion matches on its own last
+    /// component — over-matching two roots of one name, the safe direction.
+    public func excludes(project: String) -> Bool {
+        projects.contains { $0.split(separator: "/", omittingEmptySubsequences: true).last.map(String.init) == project }
+    }
+
     public func excludes(cwd: String?, projectDir: String?) -> Bool {
         for p in projects {
             if let cwd, cwd == p || cwd.hasPrefix(p + "/") { return true }

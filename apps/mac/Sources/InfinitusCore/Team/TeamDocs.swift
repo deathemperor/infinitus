@@ -118,10 +118,10 @@ public enum TeamDocs {
         public struct Repo: Codable, Equatable, Sendable {
             public var project: String
             public var usd: Double
-            public var minutes: Int
+            public var turns: Int
             public var members: Int
-            public init(project: String, usd: Double, minutes: Int, members: Int) {
-                self.project = project; self.usd = usd; self.minutes = minutes; self.members = members
+            public init(project: String, usd: Double, turns: Int, members: Int) {
+                self.project = project; self.usd = usd; self.turns = turns; self.members = members
             }
         }
         public struct MemberTotal: Codable, Equatable, Sendable {

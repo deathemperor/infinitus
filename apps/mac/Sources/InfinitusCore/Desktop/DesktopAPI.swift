@@ -60,9 +60,19 @@ public struct DesktopAPI {
         public var turnId: String
         public var state: String
         public var assistantMessageId: String?
+        public var startedAt: String?
     }
     public struct Session: Decodable, Equatable {
         public var status: String
+    }
+    /// The fork's usage rollup on a thread shell (#834); every field
+    /// optional so a server without it still decodes.
+    public struct Usage: Decodable, Equatable {
+        public var turns: Int?
+        public var inputTokens: Int?
+        public var outputTokens: Int?
+        public var costUsd: Double?
+        public var models: [String]?
     }
     public struct ThreadShell: Decodable, Equatable {
         public var id: String
@@ -70,7 +80,9 @@ public struct DesktopAPI {
         public var title: String
         public var latestTurn: Turn?
         public var session: Session?
+        public var createdAt: String?
         public var updatedAt: String?
+        public var usage: Usage?
         public var archivedAt: String?
         public var branch: String?
         public var worktreePath: String?
