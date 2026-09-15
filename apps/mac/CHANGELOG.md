@@ -13,6 +13,7 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## 0.5.0-alpha.14
 
 ### Mac
+- The menu bar app no longer crashes at every launch on a Mac that had signed in through the retired private window.
 - A thread card the phone dismissed no longer keeps its token on the Mac; the next card starts afresh instead of updating into nothing.
 - A thread card is started once and updated in place; a slow phone can no longer stack duplicate cards.
 - The phone list shows what the last push to each device did.
