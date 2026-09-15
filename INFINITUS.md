@@ -94,7 +94,13 @@ makes wrong, in its own PR.
   recreated: the desktop updater takes the first entry of `releases.atom`,
   an edited `nightly` keeps its place below the newest versioned tag, a
   recreated one would not (#924). A dispatch of the nightly workflow is a
-  dry run unless its `publish` input is set from `main`. Desktop
+  dry run unless its `publish` input is set from `main`. GitHub delivers
+  the two cron slots (17:17 UTC and the 18:17 UTC retry) hours late on this
+  repository — 2 h 09 on 2026-09-13, over 3 h on 2026-09-14, both nights
+  green — so a watcher waits until at least 4 h past the retry slot before
+  treating a night as missed, and never hand-dispatches with `publish`
+  while a slot may still deliver: two publishes in one night edit the same
+  release, waste rather than breakage. Desktop
   updates follow electron-updater's own GitHub rule (#924): the client's
   channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
   `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
