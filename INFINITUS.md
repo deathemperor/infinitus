@@ -2454,7 +2454,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   device's clock format — the phone has no timestamp setting — null once
   the instant is past).
 - `apps/mobile/src/features/infinitus/InfinitusThreadCardBridge.tsx` (+
-  `liveActivityStarts.ts`, `testCard.logic.ts`) — the phone half of the
+  `threadCardBridge.controller.ts` — the effect's body outside React, with
+  every trigger injected so its timers are tested; `liveActivityStarts.ts`,
+  `testCard.logic.ts`) — the phone half of the
   lock-screen thread card (#1047, part 2; the Mac's `push
 {kind: "thread.activity"}` is part 1, the server's fold part 3). The card
   is upstream's `AgentActivity` Live Activity, edited only for the elapsed
