@@ -6,8 +6,9 @@ import type {
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  DEFAULT_LEAD_MS,
   alarmIsScheduled,
+  alarmPlanKey,
+  DEFAULT_LEAD_MS,
   leadMs,
   planAlarms,
   resetAlarms,
@@ -184,5 +185,19 @@ describe("alarmIsScheduled", () => {
     ).toBe(false);
     expect(alarmIsScheduled({ infinitus: "accounts" }, alarm)).toBe(false);
     expect(alarmIsScheduled(undefined, alarm)).toBe(false);
+  });
+});
+
+describe("alarmPlanKey (#1278 finding 8)", () => {
+  it("is the same for an unchanged plan and differs when an alarm moves", () => {
+    const plan = [
+      { id: "revive-a", fireAt: "2026-09-15T05:00:00Z", title: "t", body: "b" },
+      { id: "swap", fireAt: null, title: "s", body: "c" },
+    ];
+    expect(alarmPlanKey(plan)).toBe(alarmPlanKey(plan.map((alarm) => ({ ...alarm }))));
+    expect(alarmPlanKey(plan)).not.toBe(
+      alarmPlanKey([{ ...plan[0]!, fireAt: "2026-09-15T05:10:00Z" }, plan[1]!]),
+    );
+    expect(alarmPlanKey([])).toBe("");
   });
 });
