@@ -505,7 +505,9 @@ jobs:
         if: needs.mac_changes.outputs.changed != 'false'
       - run: swift build
         if: needs.mac_changes.outputs.changed != 'false'
-      - run: swift test
+      # The release workflow's Linux job guards its `swift test` the same
+      # way (#1333): a hung runner fails the step with the partial log.
+      - run: timeout -k 30s 20m swift test
         if: needs.mac_changes.outputs.changed != 'false'
   # Known red today: CZlib's module map includes <zlib.h>, which no
   # Windows toolchain provides, so InfinitusCore does not build there
