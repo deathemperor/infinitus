@@ -624,24 +624,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `getLatestThreadForProject` skip `sideOf` threads. Tests:
   `ThreadFork.test.ts` (`forkCreateFields`), `ProjectionPipeline.babysit.test.ts`
   (the column), `rightPanelStore.test.ts`, `SideQuestionPanel.logic.test.ts`.
-- **Best of N (#269 B; Cursor's `/best-of-n`).** One prompt, two to four
-  models, one worktree each, no judge. Server: `groupId` on `thread.create`
-  (and the bootstrap's `createThread`, copied in `apps/server/src/ws.ts`), the
-  created payload and the thread projection (`group_id`, migration 054;
-  `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`).
-  Web: `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`:
-  the draft's id is the first member, the rest are minted, titles carry the
-  model; `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats` off the
-  usage rollup, `bestOfMemberChanges` — "5 files, +42 −7" — off the vcs
-  status stream the sidebar row for that worktree already holds); `BestOfPicker.tsx` — the
-  "Best of" control beside the model picker, checkboxes for the active
-  provider's models, "Run N"; `ChatView.tsx` `onSend(…, bestOf)` starts one
-  bootstrap turn per member (text only, no `titleSeed`) and pins each;
-  `apps/web/src/components/BestOfGroupCard.tsx` — the card at the top of every
-  member listing the live siblings with a status word, links, and "Keep this
-  one" (interrupts, archives, removes the worktree with the work kept on its
-  branch). Tests: `bestOf.logic.test.ts`, `ProjectionPipeline.babysit.test.ts`
-  (the column).
+- **Best of N (#269 B).** `groupId` on `thread.create`, the created payload and the bootstrap's `createThread` (`apps/server/src/ws.ts`); `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts` (`group_id`, migration `054`); `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`, `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats`, `bestOfMemberChanges`), `BestOfPicker.tsx`, `apps/web/src/components/BestOfGroupCard.tsx`, `ChatView.tsx` (`onSend(…, bestOf)`). Rules and traps: `docs/internals/best-of.md`.
 - **Worktree limit (#269 H; Cursor's max worktrees).** A server setting
   `worktreeMaxCount` (`packages/contracts/src/settings.ts`, default 25, 0
   lifts it) checked in `apps/server/src/ws.ts` before a bootstrap creates
