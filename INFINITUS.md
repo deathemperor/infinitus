@@ -397,49 +397,7 @@ completedAt`, an older turn's user message → last assistant `updatedAt`
   context, drawn by `AssistantMessageMeta` in place of the bare time;
   `ChatView.tsx` — the hook and the prop. The phone reuses the module.
 - Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`; `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
-- Update idle gate (#829): a server update is gated on the server's own
-  turn state, never on process heuristics. `packages/contracts/src/server.ts`
-  — `ServerRunningTurn` (`threadId`, `turnId`), `ServerUpdateRunningTurnsPolicy`
-  (`refuse` | `wait` | `interrupt`; `runningTurns?` on `ServerSelfUpdateInput`,
-  missing = `refuse`), the `waiting` progress stage with `runningTurns?`
-  (count), and `runningTurns?` on `ServerSelfUpdateError` naming the turns a
-  refusal was over; `packages/contracts/src/environmentHttp.ts` — `GET
-/api/infinitus/running-turns` (read scope) for infinitusctl and the desktop;
-  `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` +
-  `Layers/InfinitusRunningTurns.ts` — every provider session with an
-  `activeTurnId` (a turn waiting on an approval counts: it dies with the
-  process too), served by `Layers/InfinitusHttp.ts`; `apps/server/src/cloud/selfUpdate.ts`
-  — `awaitIdle`: `refuse` fails at the entry (nothing downloaded for
-  nothing), `wait` downloads first and polls (5 s) at the install hook
-  reporting each change of count, `interrupt` passes; in desktop mode the
-  run itself never waits (the desktop app's update run has a timeout) and
-  `commitDesktopUpdate` gates under the policy the preparation used (an
-  unknown token = `refuse`); `ws.ts` streams the count, `server.ts` provides
-  the layer. Client: `packages/client-runtime/src/state/server.ts` —
-  `waiting` stage + `runningTurns?` on the running state;
-  `apps/web/src/components/ServerUpdateAction.tsx` — a refusal (error with
-  `runningTurns`) becomes a toast, "Update when they finish" resends with
-  `wait`, "Update now" with `interrupt`, dismiss = later; the progress row
-  reads "Waiting for N running threads to finish…". Desktop:
-  `apps/web/src/components/desktopUpdate.logic.ts` — `countRunningLocalTurns`
-  over the thread shells of local backends (primary or desktop-local,
-  `isLocalConnectionTarget` from `ProviderUpdateLaunchNotification.environments.ts`)
-  and the copy; `sidebar/SidebarUpdatePill.tsx` — the install click while
-  turns run opens `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, a modal in
-  the plain install confirm's shape (user ruling 2026-09-12: a dialog, not a
-  toast): Later / Install now / "Install when they finish", which arms
-  `desktopInstallWhenIdleAtom` in `state/desktopUpdate.ts`; the pill fires
-  the install once the count hits zero and the install action is back,
-  reads "Installs when N running threads finish. Click to cancel.", and a
-  click on it opens the same dialog to keep, cancel or skip the wait. The
-  arming is dropped only when no downloaded build is left — the 4-minute
-  poll reads as `checking` for a moment with the build kept, and disarming
-  on that made the wait silently lapse; shells not yet bootstrapped = an
-  unknown count, which offers only "Install now". No `apps/desktop` change:
-  the main process has no orchestration access, so the two quit paths are
-  gated at the renderer (the IPC install) and at the server (the commit of
-  a remote desktop update); a plain quit never installs (`DesktopUpdates.ts`
-  sets `autoInstallOnAppQuit` false), so those two are the only paths.
+- Update idle gate (#829): `packages/contracts/src/server.ts` (`ServerRunningTurn`, `ServerUpdateRunningTurnsPolicy`, `runningTurns?` on `ServerSelfUpdateInput` and `ServerSelfUpdateError`, the `waiting` progress stage), `packages/contracts/src/environmentHttp.ts` (`GET /api/infinitus/running-turns`), `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` + `Layers/InfinitusRunningTurns.ts` (served by `Layers/InfinitusHttp.ts`), `apps/server/src/cloud/selfUpdate.ts` (`awaitIdle`, `commitDesktopUpdate`), `ws.ts`, `server.ts`; `packages/client-runtime/src/state/server.ts`, `apps/web/src/components/ServerUpdateAction.tsx`, `apps/web/src/components/desktopUpdate.logic.ts` (`countRunningLocalTurns`), `sidebar/SidebarUpdatePill.tsx`, `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts`
   — `ThreadBabysit` (`since`, `rounds`), `BABYSIT_MAX_ROUNDS` (10), `babysit?`
   on `OrchestrationThread` and `OrchestrationThreadShell` (optional, so
