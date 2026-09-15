@@ -35,6 +35,7 @@ layer("ProjectionThreadQueuedTurnRepository (#969)", (it) => {
         messageId: MessageId.make("m-with"),
         text: "with",
         context,
+        sendAt: "tool-boundary",
         orderKey: "a",
       });
       yield* repository.upsert({
@@ -43,6 +44,7 @@ layer("ProjectionThreadQueuedTurnRepository (#969)", (it) => {
         messageId: MessageId.make("m-without"),
         text: "without",
         context: null,
+        sendAt: null,
         orderKey: "b",
       });
 
@@ -54,6 +56,11 @@ layer("ProjectionThreadQueuedTurnRepository (#969)", (it) => {
       assert.deepEqual(
         rows.map((row) => row.context),
         [context, null],
+      );
+      // #1318: the send moment, null for the idle default.
+      assert.deepEqual(
+        rows.map((row) => row.sendAt),
+        ["tool-boundary", null],
       );
     }),
   );

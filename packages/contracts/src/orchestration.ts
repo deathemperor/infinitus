@@ -729,6 +729,11 @@ export type ThreadPullRequestLink = typeof ThreadPullRequestLink.Type;
  * `thread.turn.start` for it (with `queuedFrom`), which removes the row in
  * the same event batch. Rows sort by `orderKey` (`@t3tools/shared/orderKeys`).
  */
+/** Fork (#1318): the moment a queued row is due. The default, `idle`, is
+    the absent field so older rows and clients decode. */
+export const QueuedTurnSendAt = Schema.Literals(["idle", "tool-boundary"]);
+export type QueuedTurnSendAt = typeof QueuedTurnSendAt.Type;
+
 export const OrchestrationQueuedTurn = Schema.Struct({
   queueId: QueueId,
   messageId: MessageId,
@@ -737,6 +742,10 @@ export const OrchestrationQueuedTurn = Schema.Struct({
   modelSelection: Schema.optional(ModelSelection),
   /** The message's context records (upstream #11265), sent with it by the drain (#969). */
   context: Schema.optional(OrchestrationMessageContext),
+  /** When the drain sends it (#1318): absent or `idle` once the thread is
+      idle; `tool-boundary` also at the next tool call of the running turn
+      to finish, whichever comes first. */
+  sendAt: Schema.optional(QueuedTurnSendAt),
   orderKey: TrimmedNonEmptyString,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -1469,6 +1478,7 @@ export const ThreadTurnQueueCommand = Schema.Struct({
   modelSelection: Schema.optional(ModelSelection),
   // Fractional index; absent means "after the last row".
   orderKey: Schema.optional(TrimmedNonEmptyString),
+  sendAt: Schema.optional(QueuedTurnSendAt),
   createdAt: IsoDateTime,
 });
 const ClientThreadTurnQueueCommand = Schema.Struct({
@@ -1479,6 +1489,7 @@ const ClientThreadTurnQueueCommand = Schema.Struct({
   message: ClientQueuedTurnMessage,
   modelSelection: Schema.optional(ModelSelection),
   orderKey: Schema.optional(TrimmedNonEmptyString),
+  sendAt: Schema.optional(QueuedTurnSendAt),
   createdAt: IsoDateTime,
 });
 

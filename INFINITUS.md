@@ -45,7 +45,7 @@ contributor shorthand for this TypeScript tree and the Swift app.
   answers `latest` here)
   are re-flipped to `infinitus` after each merge, never the rule.
   An upstream migration whose number collides with the fork's own
-  (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
+  (`051`–`057`, `059`, `061` and `062`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
   is the fork's `058`, its `052_ProjectionThreadTitleState` the fork's
   `061`), so an existing fork database never skips it. Upstream commits
@@ -145,8 +145,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   routes (#710), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing` and `./captures` subpath exports.
-- `packages/contracts/src/environment.ts` — the `infinitus` and `turnQueue`
-  (#812) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
+- `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
+  (#812) and `turnQueueSendAt` (#1318) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
   beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
@@ -287,7 +287,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `liveToolActivitySummary`; the expanded body already leads with the
   command block.
 - Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test; `turnFooter`, `turnFooterLabel`, exported as `@t3tools/client-runtime/turnFooter`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`is_backgrounded` → `TaskStartedPayload.isBackgrounded` in `packages/contracts/src/providerRuntime.ts`, passed through by `ProviderRuntimeIngestion.ts`; `liveBackgroundAgentsMessage`, #974), `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+ test; `infinitus/backgroundAgents.logic.ts`; the `background-agents.reconcile` phase in `serverRuntimeStartup.ts`, #977), `apps/web/src/components/chat/useTurnFooters.ts`, `MessagesTimeline.tsx` (`turnFooters`, `AssistantMessageMeta`), `ChatView.tsx`. Rules and traps: `docs/internals/turn-footer.md`.
-- Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`; `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
+- Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`, `062` (`send_at`, #1318); `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
 - Update idle gate (#829): `packages/contracts/src/server.ts` (`ServerRunningTurn`, `ServerUpdateRunningTurnsPolicy`, `runningTurns?` on `ServerSelfUpdateInput` and `ServerSelfUpdateError`, the `waiting` progress stage), `packages/contracts/src/environmentHttp.ts` (`GET /api/infinitus/running-turns`), `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` + `Layers/InfinitusRunningTurns.ts` (served by `Layers/InfinitusHttp.ts`), `apps/server/src/cloud/selfUpdate.ts` (`awaitIdle`, `commitDesktopUpdate`), `ws.ts`, `server.ts`; `packages/client-runtime/src/state/server.ts`, `apps/web/src/components/ServerUpdateAction.tsx`, `apps/web/src/components/desktopUpdate.logic.ts` (`countRunningLocalTurns`), `sidebar/SidebarUpdatePill.tsx`, `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts` (`ThreadBabysit`, `BABYSIT_MAX_ROUNDS`, `babysit?`, `thread.meta.update`'s `babysit?` / `babysitRounds?`, `thread.meta-updated`'s `babysit?`), `apps/server/src/orchestration/decider.ts` (`babysitPatch`), `projector.ts`, `packages/client-runtime/src/state/threadReducer.ts`, `Migrations/052_ProjectionThreadsBabysit.ts` (`projection_threads.babysit_json`; `Layers/ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`), `PullRequestSyncReactor.ts` (`requestedSync`), `collectNeedsAttention`; fork-only `apps/server/src/infinitus/Layers/infinitusBabysit.logic.ts` (`babysitVerdict`, `settleBabysitMarks`, `seedBabysitMarks`, `babysitPrompt`), `InfinitusBabysit.ts` (`InfinitusBabysitLive`), `apps/web/src/components/ThreadBabysitToggle.tsx` (shown by `BranchToolbarBranchSelector.tsx`). Rules and traps: `docs/internals/babysit.md`.
 - Turn usage (#834): `packages/contracts/src/orchestration.ts` (`ThreadTurnUsage`, `ThreadUsageRollup`, `usage?`, `thread.turn.usage.record`, `thread.turn-usage-recorded`, `thread.usage.backfill`, `thread.usage-backfilled`), `packages/shared/src/threadUsage.ts`, `packages/contracts/src/providerRuntime.ts` (`turnCostUsd?`, `turnModels?`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (+ `claudeTurnUsage.logic.ts`), `Layers/ProviderRuntimeIngestion.ts` (+ `orchestration/threadTurnUsage.ts`), `decider.ts`, `projector.ts`, `Schemas.ts`, `threadReducer.ts`, `persistence/ProjectionTurnUsage.ts` (migrations `056`, `057`), `Layers/ProjectionPipeline.ts`, `ProjectionThreads.ts`, `ProjectionSnapshotQuery.ts`, `orchestration/Layers/ThreadUsageBackfill.ts` (+ `threadUsageBackfill.logic.ts`; `ThreadUsageBackfillLive` in `server.ts`), `apps/web/src/components/chat/ThreadUsagePopover.tsx` (+ `threadUsage.logic.ts`), `ChatHeader.tsx`'s `usage` prop from `ChatView.tsx`; `apps/server/src/usage/UsageService.ts` (`readSessionUsage`), and the upstream tests `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`, `UsageService.test.ts`. Rules and traps: `docs/internals/turn-usage.md`.
@@ -343,7 +343,12 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (#270 F, pre-#806) to the server once, ids derived from the entry, a
   refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);
   `ComposerPrimaryActions.tsx` — `runningSendMode` keeps the send button
-  beside Stop while running, labelled "Queue message" / "Send now" (upstream
+  beside Stop while running, labelled "Queue message" / "Send at next step"
+  (#1318: steer mode queues the message with `sendAt: "tool-boundary"`, the
+  intent `steer`, and the drain sends it at the running turn's next finished
+  tool call — `docs/internals/turn-queue.md`; `queuedTurnTiming` labels the
+  row "at next step" on the web and the phone, `queuedTurnsHeader` words
+  the list's header) (upstream
   shows its own "Queue message" there since #11673, so the fork's prop only
   changes the steer label); `ChatView.tsx` `onSend` — upstream's client-side
   queue (#11673, `queuedMessageStore.ts`: a mid-turn send parked in memory
