@@ -21,9 +21,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
-  routes (#710), so the typed HTTP clients carry them.
+  routes (#710), and `InfinitusTeamControlHttpApi`: a teammate's sealed team
+  command for the Mac (#1313), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
-  `./infinitusPairing` and `./captures` subpath exports.
+  `./infinitusPairing`, `./infinitusTeamControl` and `./captures` subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
   (#812) and `turnQueueSendAt` (#1318) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
@@ -97,7 +98,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   table is `satisfies Record<WsRpcMethod, …>`, so a new RPC without one is a
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
-  `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`
+  `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`.
+  `infinitusPairingHttpApiLayer` and `infinitusTeamControlHttpApiLayer` in
+  `makeRoutesLayer`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
   client (#1076), merged with `InfinitusAgentActivityLive` (#1047). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
