@@ -2547,6 +2547,50 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  it.effect("drops the CLI's rate-limit prose so a parked turn shows one notice", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({ threadId: session.threadId, input: "hello", attachments: [] });
+      // The CLI re-sends its synthetic limit message on every retry it makes.
+      for (const index of [0, 1, 2]) {
+        harness.query.emit({
+          ...rateLimitAssistant,
+          uuid: `assistant-limit-${index}`,
+          message: { ...rateLimitAssistant.message, id: `assistant-message-limit-${index}` },
+        } as unknown as SDKMessage);
+      }
+      harness.query.emit(rateLimitResult as unknown as SDKMessage);
+
+      const events = Array.from(yield* Fiber.join(eventsFiber));
+      const assistantRows = events.filter(
+        (event) =>
+          (event.type === "item.started" ||
+            event.type === "item.updated" ||
+            event.type === "item.completed") &&
+          event.payload.itemType === "assistant_message",
+      );
+      assert.deepEqual(assistantRows, []);
+      const errors = events.filter((event) => event.type === "runtime.error");
+      assert.equal(errors.length, 1);
+      assert.equal(errors[0]?.payload.message, usageLimitMessage);
+      assert.equal(completedTurn(events).usageLimited, true);
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("names repeated usage limits without carrying them into a later turn", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {

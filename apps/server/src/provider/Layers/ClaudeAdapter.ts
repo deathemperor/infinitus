@@ -3513,7 +3513,14 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         context.turnState.latestAssistantUsage = message.message.usage;
         context.turnState.compactedSinceLatestAssistantUsage = false;
       }
-      yield* backfillAssistantTextBlocksFromSnapshot(context, message);
+      // The CLI's rate-limit message ("You've reached your … limit. Switch to
+      // another model…") is re-sent on every retry while the turn is parked,
+      // and would land as one assistant row each time. The window event's
+      // warning row and the turn's failure already say it once, with the
+      // reset wait; the prose is kept off the thread.
+      if (message.error !== "rate_limit") {
+        yield* backfillAssistantTextBlocksFromSnapshot(context, message);
+      }
     }
 
     const assistantMessageId = message.message.id as string | undefined;
