@@ -10,6 +10,42 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.13
+
+### Mac
+- `infinitusctl` can set the proxy's session affinity and the demo fleet, and `status` reports each engine's binary, daemon and last error.
+- The Devices pane keeps the tunnel, crash reports, settings file and account backup; this Mac's name, phone alerts and iCloud sync are set in Settings › Infinitus › Devices.
+- The Settings window's Accounts pane is retired; accounts are managed on the desktop app's Accounts page, and account backup and restore moved to Settings › Devices.
+- The standalone menu bar download and its Homebrew cask are retired; the menu bar app ships inside the desktop app.
+- The Settings window's About tab and its Homebrew updater are gone; the menu bar app ships inside the desktop app and updates with it.
+- The swapd, CLIProxyAPI and 9Router panes are gone from the Mac's Settings window; engine settings live in Settings › Infinitus › Engines in the desktop app.
+- 9Router and CLIProxyAPI weekly gauges show the ahead/behind pace signal swapd rows already had.
+- The sign-in flow's "Use private window (no passkeys)" button is gone, and the cookie jars it kept are removed at the next launch.
+- An account in two fleets shows the richer engine's usage reading instead of whichever engine answered first.
+
+### Desktop
+- The local environment can be turned off in Settings › Connections, so a computer only drives work running elsewhere; switch it back on in the same place.
+- A device host that resolves to this computer is skipped, and Test connection runs against the environments you selected.
+- Settings › Infinitus › Engines shows CLIProxyAPI's routing strategy and session affinity, a link to 9Router's dashboard, and swapd's daemon state and binary path.
+- Accounts offers Add account and Sign in again for swapd accounts.
+- A Bash call the agent described shows that description as the tool row, with the command folded beneath, as in Claude Code's terminal.
+- The mouse's back and forward buttons navigate the desktop app as they do a browser, on a Mac whose mouse driver sends them as the system's page-swipe gesture.
+- A web search the agent runs is titled "Web search" in the work log on web and phone, not "Tool call".
+- Settings › Infinitus › Engines ends with an About section showing the menu bar app's version and build, with a link to the releases.
+- A Claude instance can name an advisor model for the agent to consult mid-turn, in its Runtime settings.
+- A thread's advisor consults show their outcome as soon as the advisor answers instead of spinning until the turn ends.
+- A capture taken while the app has to open its window is no longer lost.
+- Web searches and fetches a thread runs show their result count or fetched page as soon as they answer instead of spinning until the turn ends.
+
+### Phone
+- A Bash call the agent described shows that description as the tool row, with the command folded beneath.
+- Long-press a message you sent to restore the files to that point, keeping the chat, or fork a new thread from there.
+- Long-press a message you sent to edit from here or rewind the chat only; the text, files and context come back to the composer.
+- An AWS or gcloud sign-in opened on the phone finishes on the phone; nothing is pasted anywhere.
+
+### Linux
+- `t3 update` points the background service at the new version even when you decline the restart, and `t3 service restart` picks it up later.
+
 ## 0.5.0-alpha.12
 
 ### Mac
