@@ -31,14 +31,18 @@ public enum TeamDocs {
         }
     }
 
-    public struct LiveSession: Codable, Equatable, Sendable {
+    /// One of `now.json`'s `live` rows: a thread whose session is
+    /// starting or running on Infinitus desktop.
+    public struct LiveThread: Codable, Equatable, Sendable {
         public var id: String
+        public var title: String
         /// Project directory basename, never the path.
         public var project: String
-        public var status: String
-        public var name: String?
-        public init(id: String, project: String, status: String, name: String? = nil) {
-            self.id = id; self.project = project; self.status = status; self.name = name
+        public var startedAt: Int?
+        /// The turn's current line ("Waiting for approval", a tool name).
+        public var activityLine: String?
+        public init(id: String, title: String, project: String, startedAt: Int? = nil, activityLine: String? = nil) {
+            self.id = id; self.title = title; self.project = project; self.startedAt = startedAt; self.activityLine = activityLine
         }
     }
 
@@ -46,45 +50,58 @@ public enum TeamDocs {
     public struct Now: Codable, Equatable, Sendable {
         public var schema = 1
         public var at: Int
-        public var sessions: [LiveSession]
+        /// The Mac's name, as the roster shows it.
+        public var machine: String
+        public var live: [LiveThread]
         public var fleets: [Fleet]
         public var blockers: [String]
         public var crashesToday: Int
         /// The audience hint a leader copies into the roster (§5).
         public var sharesTo: [String: TeamRoster.ShareTarget]
-        public init(at: Int, sessions: [LiveSession], fleets: [Fleet], blockers: [String], crashesToday: Int,
-                    sharesTo: [String: TeamRoster.ShareTarget]) {
-            self.at = at; self.sessions = sessions; self.fleets = fleets; self.blockers = blockers
-            self.crashesToday = crashesToday; self.sharesTo = sharesTo
+        /// Whether Infinitus desktop answered when this was written: false
+        /// means `live` and the threads index say nothing about the Mac.
+        public var desktop: Bool
+        public init(at: Int, machine: String, live: [LiveThread], fleets: [Fleet], blockers: [String], crashesToday: Int,
+                    sharesTo: [String: TeamRoster.ShareTarget], desktop: Bool) {
+            self.at = at; self.machine = machine; self.live = live; self.fleets = fleets; self.blockers = blockers
+            self.crashesToday = crashesToday; self.sharesTo = sharesTo; self.desktop = desktop
         }
     }
 
-    /// One session in `sessions/index.json`, summed over its transcript
-    /// and its sub-agents' transcripts.
-    public struct SessionRow: Codable, Equatable, Sendable {
+    /// One thread in `threads/index.json` (spec §4): what Infinitus
+    /// desktop's shell says about it, never the transcript.
+    public struct ThreadRow: Codable, Equatable, Sendable {
+        public struct Usage: Codable, Equatable, Sendable {
+            public var inputTokens: Int
+            public var outputTokens: Int
+            public var costUsd: Double?
+            public var models: [String]
+            public init(inputTokens: Int, outputTokens: Int, costUsd: Double?, models: [String]) {
+                self.inputTokens = inputTokens; self.outputTokens = outputTokens; self.costUsd = costUsd; self.models = models
+            }
+        }
         public var id: String
+        public var title: String
+        /// Project directory basename, never the path.
         public var project: String
-        public var name: String?
-        public var engine: String
-        public var startedAt = 0
-        public var endedAt = 0
-        /// Minutes the assistant was working (stretch seconds).
-        public var busyMinutes = 0
-        /// Minutes a finished turn waited for the person.
-        public var waitingMinutes = 0
-        /// Minutes per `Stats.Activity` raw value.
-        public var activities: [String: Int] = [:]
-        public var usd = 0.0
-        public var subagents = 0
-        public init(id: String, project: String, engine: String) { self.id = id; self.project = project; self.engine = engine }
+        /// idle | starting | running | failed | archived
+        public var status: String
+        public var createdAt: Int
+        public var updatedAt: Int
+        public var turns: Int
+        public var usage: Usage?
+        public init(id: String, title: String, project: String, status: String, createdAt: Int, updatedAt: Int, turns: Int, usage: Usage? = nil) {
+            self.id = id; self.title = title; self.project = project; self.status = status
+            self.createdAt = createdAt; self.updatedAt = updatedAt; self.turns = turns; self.usage = usage
+        }
     }
 
-    public struct SessionsIndex: Codable, Equatable, Sendable {
+    public struct ThreadsIndex: Codable, Equatable, Sendable {
         public var schema = 1
         public var at: Int
-        public var sessions: [SessionRow]
+        public var threads: [ThreadRow]
         public var fleets: [Fleet]
-        public init(at: Int, sessions: [SessionRow], fleets: [Fleet]) { self.at = at; self.sessions = sessions; self.fleets = fleets }
+        public init(at: Int, threads: [ThreadRow], fleets: [Fleet]) { self.at = at; self.threads = threads; self.fleets = fleets }
     }
 
     /// `crashes.json` — `CrashReport.summary` lines, never the raw report.

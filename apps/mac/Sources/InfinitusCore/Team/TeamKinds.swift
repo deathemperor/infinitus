@@ -7,14 +7,15 @@ import Foundation
 public enum TeamKinds {
     public static let stats = "stats"
     public static let now = "now"
-    public static let sessions = "sessions"
+    /// `m/<kid>/threads/index.json` — the Mac's threads on Infinitus desktop.
+    public static let threads = "threads"
     public static let transcripts = "transcripts"
     public static let crashes = "crashes"
     public static let aggregates = "aggregates"
     /// `m/<kid>/fleet.json` — every account of every fleet (#221).
     public static let fleet = "fleet"
     /// The kinds a member publishes about itself (§7), in table order.
-    public static let memberKinds = [stats, now, sessions, transcripts, crashes, fleet]
+    public static let memberKinds = [stats, now, threads, transcripts, crashes, fleet]
 
     /// The branch a member writes `kind` to (#321): transcripts go to
     /// `t/<kid>`, fetched only by the readers their hint names, so the
@@ -58,8 +59,8 @@ public enum TeamKinds {
             return (owner, fleet)
         case 2 where parts[0] == "days" && parts[1].hasSuffix(".json"):
             return (owner, stats)
-        case 2 where parts[0] == "sessions" && parts[1] == "index.json":
-            return (owner, sessions)
+        case 2 where parts[0] == "threads" && parts[1] == "index.json":
+            return (owner, threads)
         case 2 where parts[0] == "aggregates" && parts[1].hasSuffix(".json"):
             return (owner, aggregates)
         case 3 where parts[0] == "transcripts" && parts[2].hasSuffix(".jsonl"):

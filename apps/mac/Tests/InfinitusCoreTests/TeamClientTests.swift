@@ -220,9 +220,9 @@ final class TeamClientTests: XCTestCase {
         XCTAssertEqual(memo.hits, 1)
         XCTAssertEqual(try leader.readableHeaders().map(\.entry.path), plain.map(\.entry.path))
         XCTAssertEqual(memo.hits, 2)
-        _ = try leader.publish(kind: "sessions", path: "sessions/index.json", plaintext: Data("{\"sessions\":[]}".utf8), audience: .team, now: 1_010)
+        _ = try leader.publish(kind: "threads", path: "threads/index.json", plaintext: Data("{\"threads\":[]}".utf8), audience: .team, now: 1_010)
         XCTAssertEqual(try leader.readableHeaders().map(\.entry.path).sorted(),
-                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/sessions/index.json"])
+                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/threads/index.json"])
         XCTAssertEqual(memo.hits, 2, "the publish moved m/<kid>: listed again")
         _ = try leader.readableHeaders()
         XCTAssertEqual(memo.hits, 3)

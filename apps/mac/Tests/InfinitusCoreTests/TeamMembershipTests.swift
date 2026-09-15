@@ -86,7 +86,7 @@ final class TeamMembershipTests: XCTestCase {
         func kind(_ p: String) -> String? { TeamKinds.expected(at: p)?.kind }
         XCTAssertEqual(kind("m/k/days/2026-09-05.json"), "stats")
         XCTAssertEqual(kind("m/k/now.json"), "now")
-        XCTAssertEqual(kind("m/k/sessions/index.json"), "sessions")
+        XCTAssertEqual(kind("m/k/threads/index.json"), "threads")
         XCTAssertEqual(kind("m/k/transcripts/s1/3.jsonl"), "transcripts")
         XCTAssertEqual(kind("m/k/transcripts/s1/subagents/agent-a/1.jsonl"), "transcripts")
         XCTAssertEqual(kind("m/k/crashes.json"), "crashes")
@@ -268,7 +268,7 @@ final class TeamMembershipTests: XCTestCase {
     func testLeaveDeletesOwnFilesAndLeavesANote() throws {
         let (leader, member, _) = try team()
         try member.publish(kind: TeamKinds.now, path: "now.json",
-                           plaintext: try CanonicalJSON.encode(TeamDocs.Now(at: 1, sessions: [], fleets: [], blockers: [], crashesToday: 0, sharesTo: [:])),
+                           plaintext: try CanonicalJSON.encode(TeamDocs.Now(at: 1, machine: "mac", live: [], fleets: [], blockers: [], crashesToday: 0, sharesTo: [:], desktop: false)),
                            audience: .leaders, now: 1_030)
         _ = try leader.fetch()
         XCTAssertEqual(try leader.readableHeaders().count, 1)
@@ -298,7 +298,7 @@ final class TeamMembershipTests: XCTestCase {
         try FileManager.default.copyItem(at: mp.rosterFile(member.config.id), to: mp2.rosterFile(member.config.id))
         let member2 = try TeamClient.open(id: member.config.id, paths: mp2, secrets: ms2)
         try member2.publish(kind: TeamKinds.now, path: "now.json",
-                            plaintext: try CanonicalJSON.encode(TeamDocs.Now(at: 1, sessions: [], fleets: [], blockers: [], crashesToday: 0, sharesTo: [:])),
+                            plaintext: try CanonicalJSON.encode(TeamDocs.Now(at: 1, machine: "mac", live: [], fleets: [], blockers: [], crashesToday: 0, sharesTo: [:], desktop: false)),
                             audience: .leaders, now: 1_030)
 
         // `member` (device A) never fetched/synced since device B published.
