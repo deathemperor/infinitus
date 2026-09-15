@@ -1095,8 +1095,11 @@ registrations}`, never a token; each registration decoded alone) drawn as
   workspace-root basename, case-insensitive) and opens the composer through
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
   unknown project toasts.
-  Only the link's kind is ever logged; the native app's `join` / `pair`
-  links are not claimed (Team left with #1041).
+  `join` (#1313, the Team rebuild) parks the whole link — it is the team
+  code, a secret — in `pendingTeamJoin.ts` (memory only, taken once) and
+  opens Settings › Infinitus; the Team page's Join field takes it when that
+  page lands, and nothing joins on its own. Only the link's kind is ever
+  logged; `pair` stays the native app's.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
   `packages/client-runtime/src/state/captures.ts` (exported as
   `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
@@ -1684,9 +1687,12 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
 - `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links (#270 D):
   `<scheme>://thread/<environmentId>/<threadId>` and
   `<scheme>://new?project=<id|title|folder>&prompt=<text>` on the renderer's
-  own scheme (`infinitus` / `infinitus-dev`); only those two hosts are
-  claimed, `app` stays the renderer origin and the Clerk callback, `join` /
-  `pair` are the native app's. `deepLinkIntake` is attached before Electron
+  own scheme (`infinitus` / `infinitus-dev`), and `<scheme>://join/<code>`
+  (#1313: the whole link is the code, carried untouched, never logged);
+  `app` stays the renderer origin and the Clerk callback, `pair` is the
+  native app's. The standalone Mac build declares no URL type any more
+  (`make-app.sh`, #1313), so LaunchServices has one claimant for
+  `infinitus://` on a Mac. `deepLinkIntake` is attached before Electron
   is ready (a cold launch's `open-url` lands before `ready`; Windows and
   Linux carry the URL in argv and `second-instance`) and holds the latest
   URL until the service drains it; the service keeps the latest parsed link
