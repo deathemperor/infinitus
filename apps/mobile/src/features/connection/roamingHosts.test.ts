@@ -36,9 +36,9 @@ describe("roamingHostsLine", () => {
     expect(roamingHostsLine({ target, profile: Option.none(), enabled: true })).toBeNull();
   });
 
-  it("names the other door at home and the one in use while away", () => {
+  it("names the door tried first, and the one in use once it answered", () => {
     expect(roamingHostsLine(entry({ alternateHttpBaseUrls: ["https://code.infinitus.run"] }))).toBe(
-      "Also via https://code.infinitus.run when you are away",
+      "Tries https://code.infinitus.run first",
     );
     expect(
       roamingHostsLine(
@@ -55,6 +55,6 @@ describe("roamingHostsLine", () => {
           lastGoodHttpBaseUrl: "http://192.168.100.61:3773",
         }),
       ),
-    ).toBe("Also via https://code.infinitus.run when you are away");
+    ).toBe("Tries https://code.infinitus.run first");
   });
 });

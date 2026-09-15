@@ -2148,18 +2148,25 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   pairing is picked up by the next LAN connect; each is stored in the
   profile's normalized shape (`normalizeHttpBaseUrl`), so a pairing made
   over the tunnel itself has no alternate. The server's list replaces
-  the phone's on every connect — it is the authority on its own doors, and a
-  quick-tunnel hostname it no longer holds can be handed to anyone, so the
-  bearer token never follows a stale one (a host the profile no longer
-  names is not tried, last-good or not). A connect tries the host that
-  worked last, then the paired one, then the alternates (3 s descriptor
-  wait on every host but the last); a host where
-  the Mac is not — nothing answers (network, timeout), or something else
-  does (`remote-unavailable`, a 404 or another environment's id) — is
-  walked past, one that refuses the credential ends the walk. The bearer
-  session is not host-bound, so no re-pair. The environment row says
-  "Connected via <host>" while roamed, else "Also via <host> when you are
-  away".
+  the phone's on every connect that names one — it is the authority on its
+  own doors — and a connect that names none (the tunnel down or restarting)
+  keeps what the phone has, minus any `*.trycloudflare.com` name: a quick
+  tunnel the server no longer holds can be handed to anyone, and the bearer
+  token never follows one, while the user's own named hostname is not
+  forgotten by one Wi‑Fi connect (a host the profile no longer names is not
+  tried, last-good or not). A connect dials every public host — an https
+  hostname, `isPublicHost` — before every private one (an IP literal,
+  `localhost`, `.local`), so a phone that knows the domain leads with it on
+  the Wi‑Fi too and the LAN address is the fallback, never the first
+  attempt; within a class, the host that worked last, then the paired one,
+  then the alternates. A private host gets the 3 s descriptor wait wherever
+  it stands (on the LAN it answers at once, off it nothing ever does), a
+  public one the default. A host where the Mac is not — nothing answers
+  (network, timeout), or something else does (`remote-unavailable`, a 404
+  or another environment's id) — is walked past, one that refuses the
+  credential ends the walk. The bearer session is not host-bound, so no
+  re-pair. The environment row says "Connected via <host>" while the
+  connect landed off the paired host, else "Tries <host> first".
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
   snippets (#270 G): `useProjectPromptSnippets(environmentId, projectId)`

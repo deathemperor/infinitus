@@ -36,6 +36,7 @@ import { ConnectionBlockedError, type ConnectionAttemptError } from "./model.ts"
 import * as ConnectionProfileStore from "./profileStore.ts";
 import {
   bearerHostOrder,
+  isPublicHost,
   learnedBearerProfile,
   ROAM_PROBE_TIMEOUT_MS,
   roamedWsBaseUrl,
@@ -137,10 +138,11 @@ const makeBearerBroker = Effect.fn("clientRuntime.connection.broker.makeBearer")
     if (!isBearerCredential(credential)) {
       return yield* credentialMissingError(target.connectionId);
     }
-    // Fork (#663): the paired host first (or the one that worked last), then
-    // the server's alternates — its tunnel — when a host cannot be reached at
-    // all. A host that answers and refuses ends the walk. Every host but the
-    // last gets the short descriptor wait.
+    // Fork (#663): the Mac's public hosts — its tunnel — first, its LAN
+    // address only when none of them can be reached at all. A host that
+    // answers and refuses ends the walk. A LAN address gets the short
+    // descriptor wait wherever it stands: on the Wi‑Fi it answers at once,
+    // off it nothing ever does, and the default wait would hang the walk.
     const hosts = bearerHostOrder(profile);
     let authorized: AuthorizedRemoteEnvironment | undefined;
     for (const [index, httpBaseUrl] of hosts.entries()) {
@@ -153,7 +155,7 @@ const makeBearerBroker = Effect.fn("clientRuntime.connection.broker.makeBearer")
             httpBaseUrl === profile.httpBaseUrl ? profile.wsBaseUrl : roamedWsBaseUrl(httpBaseUrl),
           bearerToken: credential.token,
           connectionMethod: "direct",
-          ...(last ? {} : { descriptorTimeoutMs: ROAM_PROBE_TIMEOUT_MS }),
+          ...(isPublicHost(httpBaseUrl) ? {} : { descriptorTimeoutMs: ROAM_PROBE_TIMEOUT_MS }),
         }),
       );
       if (Exit.isSuccess(attempt)) {
