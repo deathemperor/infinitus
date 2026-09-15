@@ -137,22 +137,7 @@ these bullets.
   `apps/web/src/components/accounts/ExhaustedBand.tsx` inside each fleet
   section ("All accounts exhausted · next revival HH:MM (account)", the
   time in the user's timestamp format), replacing the pop-out's reviver band.
-- `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the
-  `/stats` page (#659): the pop-out's Stats pane in the fork — period picker
-  (localStorage `infinitus.statsPeriod`), the tile groups (Throughput,
-  Messages & sessions, Autonomy, Friction, Limits, Cost — value, delta vs
-  the previous period, sparkline), session lengths, and the effort tables
-  (activities, models, engines, effort). Sidebar "Stats" beside Accounts.
-  Its read model is `packages/client-runtime/src/state/infinitusStats.ts`
-  (exported as `@t3tools/client-runtime/state/infinitusStats`): the `stats
---period p` reply decoded defensively and folded like native
-  `StatsPresentation`. The read goes through `infinitusEnvironment.stats`, a
-  query atom re-read every 5 min and dropped a minute after the page leaves,
-  so nothing is requested unmounted; the page subscribes to the snapshot with
-  `needs: ["stats"]` (`InfinitusSubscribeInput`, `subscribeInfinitus`'s
-  payload), which the server ref-counts into the `client-activity` lease's
-  `stats` scope only while a page holds it (#587 step 2, minimal form; #625
-  had dropped the scope for good reason). Estimates, never billing truth.
+- `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
 - `apps/web/src/routes/activity.tsx`, `apps/web/src/components/activity/` — the
   `/activity` page (#659): the pop-out's Activity pane in the fork — the
   app's event log newest first, sectioned by local day (`activity.logic.ts`),
@@ -168,23 +153,7 @@ these bullets.
   Sidebar "Activity" beside Stats.
 - `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Rules and traps: `docs/internals/utilization.md`.
 - Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
-- `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
-  on upstream's `/usage` (#779): Claude spend split by the account that was
-  active when each record was written. The server joins at scan time:
-  `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads
-  the app's `history <fleet>` verb once per scan — swapd's own append-only
-  switch log, whole, through the control client directly (the `command`
-  path would poll after it) — for the Claude fleet whose engine has the
-  `history` capability; `infinitusUsageAttribution.logic.ts` turns it into
-  `accountAt(ms)` (join on email, never slot: compaction renumbers slots) and
-  `UsageAggregator`'s optional `attribute` hook sums a per-account sibling
-  of the buckets. A record in a swap's own second or before the first logged
-  swap is "Unattributed", other providers "Other providers", so the table
-  reconciles with the page total. `UsageSummary.accounts` is optional, the
-  contract version unchanged; no Infinitus, no verb, or a refused reply means
-  no `accounts` and the section stays hidden. Primary environment only.
-  Emails travel in the summary as they do in `fleets`; never in logs, spans
-  or fixtures.
+- `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table on `/usage` (#779): `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads the app's `history <fleet>` verb once per scan, `infinitusUsageAttribution.logic.ts` gives `accountAt(ms)`, `UsageAggregator`'s `attribute` hook sums the optional `UsageSummary.accounts`. Rules and traps: `docs/internals/usage-attribution.md`.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the Accounts page and its Sign-ins section (`SignInsSection.tsx`, `signIns.logic.ts`; models in `packages/client-runtime/src/state/infinitusAccounts.ts`, `infinitusPageState` #693); Add account / Sign in again (`addAccount.logic.ts`, #671, #1213), the desktop's in-app sign-in (`apps/desktop/src/infinitus/InfinitusSignIn.ts`, `signIn.logic.ts`, #677) and the paste-code path over `infinitus.secret` (#747 step 2). Rules and traps: `docs/internals/accounts-page.md`.
 - `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
   — the four Settings › Infinitus routes, thin shells over the panes above.
@@ -238,100 +207,11 @@ these bullets.
   (kept for later; the gate captures the caller's context and runs it under
   that later). The passthrough layer is the server's default; the hold layer
   replaces it.
-- `apps/server/src/infinitus/Layers/InfinitusSessionHold.ts` (+
-  `infinitusSessionHold.logic.ts`, `Services/InfinitusSessionHold.ts`) —
-  session priority mode (#616): the gate that holds a background thread's
-  start (the user's send, an async answer, resume-on-limit, the post-update
-  continuation) while the fleet its driver spends on publishes `headroom.state`
-  `low`/`critical`, and runs it when the fleet reads `abundant`, the thread is
-  pinned, `release(threadId)` ("Run now"), or a real poll carries no verdict
-  for the fleet any more (mode turned off; an unreachable app keeps the hold).
-  Pinned threads and a thread mid-turn are never held; a fleet that publishes
-  no `headroom` (mode off, an older build) never holds. Held starts live in memory, oldest first, released
-  2 s apart; one `infinitus.thread.held` / `infinitus.thread.released` work-log
-  row per hold, which the web derives the held state from. "Run now" is the
-  `infinitus.releaseThread` RPC (operate scope, `{threadId}` → `{released,
-reason?}`, never an error) answered by `ws.ts` from the same service, falling
-  through to `InfinitusSessionInterrupt.resume` when nothing is held (#743). The
-  snapshot subscription is held only while a start is. The web reads the held
-  state from those rows (`packages/client-runtime/src/state/infinitusThreadHold.ts`)
-  and draws `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+
-  `infinitusHoldBanner.logic.ts`) in the composer banner stack, one mount in
-  `ChatView.tsx` beside the snoozed/settled banners: "Waiting for headroom",
-  the row's line, "Run now" and "Pin". The same state and banner cover a turn
-  interrupt mode paused (#743): `threadHold` also reads the
-  `infinitus.thread.paused` / `infinitus.thread.resumed` rows and answers
-  `kind: "held" | "paused"`; the banner then reads "Paused for headroom" with
-  "Resume now" (the same RPC, which falls through to the interrupt layer).
-  The sidebar row reads "Held" (#741)
-  from the `subscribeInfinitusHolds` stream (read scope; the service's `held`:
-  the in-memory list, then again on every change — lost with a restart like
-  the holds themselves), one shared stream per environment through
-  `infinitusEnvironment.holds` and `sidebar/useInfinitusHeldSummary.ts`;
-  held outranks working in `resolveSidebarThreadStatus` since the start never
-  ran; a `kind: "limited"` entry (#270 I) reads "Limit" the same way, below
-  held. `chat/PinAtCreationToggle.tsx` is
-  "Pin on create" under a draft's composer (per-browser, off by default);
-  ChatView pins the thread right after the send that creates it. Archived or deleted while held:
-  forgotten. A restart forgets held starts; the message is still in the thread.
-- `apps/server/src/infinitus/Layers/InfinitusSessionInterrupt.ts` (+
-  `infinitusSessionInterrupt.logic.ts`, `Services/InfinitusSessionInterrupt.ts`)
-  — session priority mode, interrupt (#743): pauses the background turns
-  already running on a fleet whose `headroom.state` reads `critical` (what
-  native publishes in interrupt mode where hold mode publishes `low`; the
-  fork reads only the verdict) and continues them when the fleet reads
-  `abundant`, the thread is pinned, `resume(threadId)` ("Resume now"), or a
-  real poll carries no verdict any more; an unreachable app keeps the pause.
-  Running turns are tracked from the driver's `turn.started`/`turn.completed`/
-  `turn.aborted`/`session.exited` runtime events; the snapshot subscription
-  (what makes the server poll, #346) is held only while a turn runs and the
-  `priority_mode` pref reads `interrupt` (or a fleet already reads critical),
-  or while a turn is paused — the one place the fork reads that pref, and only
-  to know whether watching can lead anywhere. A pause is upstream's own
-  `thread.turn.interrupt` command for the turn the session still names, so
-  the transcript shows the interruption, plus an `infinitus.thread.paused`
-  work-log row ("Paused for headroom on claude, 5h window 92 %"); a resume
-  appends `infinitus.thread.resumed` and sends `CONTINUATION_PROMPT` through
-  `TurnStartGate` like every other start (a fleet still low holds it) —
-  except "Resume now", which runs like the hold's "Run now". Pinned threads
-  are never paused; paused turns continue oldest first, 2 s apart; a thread
-  the user sends into, archives or deletes while paused is forgotten.
-- `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+
-  `Services/InfinitusSecret.ts`) — the fork's one secret-carrying path (#747,
-  the only exception to "secrets never over the fork RPC"): `infinitus.secret`
-  (`access:write`; `{command, args, secret}` → `{result?}`) puts `secret` on
-  the control request line's `secret` field — where stdin material always
-  travels — for a verb whose manifest entry says `stdin: "secret"` (native
-  #766), and refuses everything else before the socket: no manifest read yet,
-  another verb (`"payload"`, none, unknown), an `args` key the verb's manifest
-  `args`/`options` do not name or a positional it names missing, a sixth
-  attempt by one auth session at one verb inside a minute. `args` is keyed by
-  those names (identifiers, ≤128 chars, no control characters), the layer
-  orders them. The value is `Schema.RedactedFromValue` on the wire, a
-  `Redacted` from decode to the socket call (prints `<redacted>`), lives in
-  that one request, is kept nowhere; the span carries the verb only. The
-  reply passes through opaque; that it never echoes the secret is each verb's
-  contract. A successful call refreshes the snapshot, detached, like a write.
-  `infinitus.command` stays secret-free. The panes' rules (password input,
-  autocomplete off, cleared on submit/unmount, never interpolated into a
-  message, sensitive read replies like `team-code`/`pair-status` rendered
-  and never logged) bind their PRs (#747).
+- `apps/server/src/infinitus/Layers/InfinitusSessionHold.ts` (+ `infinitusSessionHold.logic.ts`, `Services/InfinitusSessionHold.ts`) — session priority mode, hold (#616): the `TurnStartGate` that holds a background start while the fleet reads `low`/`critical`; `infinitus.releaseThread`, `subscribeInfinitusHolds` (#741), `packages/client-runtime/src/state/infinitusThreadHold.ts`, `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+ `infinitusHoldBanner.logic.ts`), `sidebar/useInfinitusHeldSummary.ts`, `chat/PinAtCreationToggle.tsx`. Rules and traps: `docs/internals/session-priority.md`.
+- `apps/server/src/infinitus/Layers/InfinitusSessionInterrupt.ts` (+ `infinitusSessionInterrupt.logic.ts`, `Services/InfinitusSessionInterrupt.ts`) — session priority mode, interrupt (#743): pauses running background turns while the fleet reads `critical` and resumes them with `CONTINUATION_PROMPT` through `TurnStartGate`. Rules and traps: `docs/internals/session-priority.md`.
+- `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+ `Services/InfinitusSecret.ts`) — `infinitus.secret` (`access:write`), the fork's one secret-carrying path (#747): the value rides the control request line's `secret` field for a verb whose manifest entry says `stdin: "secret"` (native #766). Rules and traps: `docs/internals/infinitus-secret.md`.
 - `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus` group in `packages/contracts/src/environmentHttp.ts` — the server half of `infinitusctl`'s desktop verbs (#822): the `infinitusctl` session and its 60 s heartbeat (#1137), `GET /api/infinitus/holds`, `POST /api/infinitus/release-thread`, `GET /api/infinitus/thread-defaults` (#1315). Rules and traps: `docs/internals/infinitusctl-desktop-verbs.md`.
-- `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
-  client (one connection per request, one JSON line each way), the
-  `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
-  and the fork-port publisher (`prefs set fork_server_port` at startup —
-  withheld, with one log line, from a dev-runner server or one whose home is
-  a worktree-local `.t3`, so a dev run never takes the installed desktop's
-  tunnel, #640). A command's spans carry the verb (#676): `Infinitus.command`
-  annotates `infinitus.command`, `infinitus.args` (joined, cut at 200
-  chars), `infinitus.options` (key NAMES only, never a value) and
-  `infinitus.effect` from the manifest; `InfinitusControlClient.request`
-  and the `ws.rpc.infinitus.command` span carry the verb alone. The poller
-  reads `events --after <last id>` when the manifest lists the option
-  (#346): `known: true` replies are all new, `known: false` (the app
-  restarted) re-seeds the cursor and publishes only rows newer than the last
-  one seen; builds without the option get the full-list read as before.
+- `apps/server/src/infinitus/` — the server's Infinitus adapter: the control client, the `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command` (`events --after`, #346), the fork-port publisher (`prefs set fork_server_port`, withheld from dev and worktree servers, #640), the verb-only spans (#676). Rules and traps: `docs/internals/server-adapter.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlackSocket.ts` (+ `infinitusSlackSocket.logic.ts` — `parseSocketFrame`, `reconnectDelaySeconds`; test) — the Socket Mode client, `SlackClientLive` (#574, PR 4). Rules and traps: `docs/internals/slack-bridge.md`.
 - `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+ `slack.logic.ts` — `parseAllowedUserIds`, `slackStatusLine`; test) — Settings › Infinitus › Slack (#574, PR 3), mounted from `settings.infinitus.index.tsx`'s footer, search item `infinitus-slack`. Rules and traps: `docs/internals/slack-bridge.md`.
   `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
@@ -406,34 +286,7 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   service redirects stdout there, and writing both would put every line in
   that file twice, in two formats. A sink that cannot write swallows it: a
   log file is never worth failing a turn over.
-- `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+
-  `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins for
-  the threads this server runs (#1076), the fork's counterpart to the Mac's
-  transcript scan (retired with the terminal-session features, #1041). Every
-  tool result the Claude driver relays (`item.updated`, the raw `tool_result`
-  block under `payload.data.result`) is read for the CLIs' expired-credentials
-  signatures — the Mac's marker and line-start tables (`AwsLogin.swift`,
-  `GcloudLogin.swift`) ported verbatim: a marker anywhere plus one opening a
-  line at column 0, so the same words quoted from a file or a grep hit never
-  match; only the last 16 KiB is scanned. The profile is the error's own
-  `--profile` when it prints one, else the Bash command's `--profile` /
-  `AWS_PROFILE` (`--account` / `CLOUDSDK_CORE_ACCOUNT` for gcloud), else
-  `default`; gcloud's Application Default Credentials are the
-  `application-default` account. A hit leaves one `infinitus.signin.needed`
-  work-log row ("AWS sign-in needed on <profile>") and, on an app whose
-  manifest lists the verb, starts the Mac's `aws-login <profile>` /
-  `gcloud-login <account>` flow through `InfinitusService.command` (no `--pid`:
-  a thread has no session pid; the Mac runs its default flow, and that path's
-  post-write poll re-reads `aws-logins`, so the login reaches the Sign-ins
-  lists at once instead of at the next cycle) — unless that same reply
-  already shows a login for the credential in flight (`hasLoginInFlight`: any
-  `state.phase` short of `done`/`failed`), which is a browser tab waiting on
-  a person and must not be taken over. Once per thread per profile
-  per hour (a thread reaching two expired AWS profiles in one hour needs both
-  logins); one sequential worker off the event stream, so the turn is never
-  waited on; an unreachable Mac or a refused verb is logged and the row
-  stays. The result text and the command reach no log, span or payload —
-  only the thread id, the provider and the profile.
+- `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+ `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins read off the Claude driver's tool results (#1076): one `infinitus.signin.needed` row per hit and the Mac's `aws-login` / `gcloud-login` flow through `InfinitusService.command`. Rules and traps: `docs/internals/sign-in-lapse.md`.
 - `apps/server/src/infinitus/Layers/InfinitusAgentActivity.ts` (+ `infinitusAgentActivity.logic.ts`, tests) — the phone's lock-screen thread card, the server half (#1047 part 3): folds every live thread's `projectThreadAwareness` into the aggregate card and hands it to the Mac's `push` verb as `thread.activity`; `InfinitusAgentActivityLive` in `server.ts`. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
