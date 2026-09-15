@@ -137,6 +137,17 @@ public struct DesktopAPI {
     public func holds() throws -> [Hold] {
         do { return try decode(get("/api/infinitus/holds")) } catch let failure as Failure where failure.status == 404 { return [] }
     }
+    /// `GET /api/infinitus/thread-defaults` (#1315): the environment's
+    /// default model, for a project row that carries none. A desktop
+    /// without the route (404) answers nil, so `thread new` reads the
+    /// project alone there, as before.
+    public func threadDefaults() throws -> JSONValue? {
+        do {
+            let reply = try decode(get("/api/infinitus/thread-defaults")) as [String: JSONValue]
+            guard let model = reply["defaultModelSelection"], model != .null else { return nil }
+            return model
+        } catch let failure as Failure where failure.status == 404 { return nil }
+    }
     /// `GET /api/auth/session`: does the desktop still accept the token?
     /// The route answers everyone (`{authenticated}`), so a revoked
     /// session reads as `false` there, not as a 401.

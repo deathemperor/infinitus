@@ -9,6 +9,7 @@ import * as Stream from "effect/Stream";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { annotateEnvironmentRequest, requireEnvironmentScope } from "../../auth/http.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -35,7 +36,19 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
     const stops = yield* InfinitusLimitStops;
     const interrupt = yield* InfinitusSessionInterrupt;
     const runningTurns = yield* InfinitusRunningTurns;
+    const settings = yield* ServerSettingsService;
     return handlers
+      .handle(
+        "threadDefaults",
+        Effect.fn("environment.infinitus.threadDefaults")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          // #1315: a settings read that fails is the server's own state
+          // gone wrong, not a request the CLI can fix — die, don't 500.
+          const current = yield* settings.getSettings.pipe(Effect.orDie);
+          return { defaultModelSelection: current.defaultModelSelection ?? null };
+        }),
+      )
       .handle(
         "runningTurns",
         Effect.fn("environment.infinitus.runningTurns")(function* (args) {

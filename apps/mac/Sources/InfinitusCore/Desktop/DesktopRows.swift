@@ -64,6 +64,41 @@ public enum DesktopRows {
         return (.object(command), messageId)
     }
 
+    /// Why `thread new` has no model to create the thread on (#1315).
+    public struct NoModel: Error, Equatable { public let message: String }
+
+    /// The model `thread new` creates the thread on (#1315): `--model`
+    /// first — `instanceId/model`, or a bare `model` on the instance of
+    /// whichever default names one (the project's, else the environment's)
+    /// — else the project's default, else the environment's. Refuses when
+    /// none of them answers. A default's instance is its `instanceId`, or
+    /// the `provider` of a rollout-era row (the server promotes that too).
+    public static func modelSelection(option: String?, project: DesktopAPI.Project, environment: JSONValue?) throws -> JSONValue {
+        let projectDefault = project.defaultModelSelection.flatMap { $0 == .null ? nil : $0 }
+        if let option {
+            if let slash = option.firstIndex(of: "/") {
+                let instance = String(option[..<slash]), model = String(option[option.index(after: slash)...])
+                guard !instance.isEmpty, !model.isEmpty else {
+                    throw NoModel(message: "--model wants <instanceId>/<model> or <model>, not \(option)")
+                }
+                return .object(["instanceId": .string(instance), "model": .string(model)])
+            }
+            guard let instance = [projectDefault, environment].compactMap(instanceID).first else {
+                throw NoModel(message: "no default model on project \(project.title) or the environment names an instance for --model \(option); pass --model <instanceId>/\(option)")
+            }
+            return .object(["instanceId": .string(instance), "model": .string(option)])
+        }
+        if let projectDefault { return projectDefault }
+        if let environment { return environment }
+        throw NoModel(message: "no default model on project \(project.title) or the environment; set one in Settings › General (scope: \(project.title) or All projects), or pass --model")
+    }
+
+    private static func instanceID(_ selection: JSONValue?) -> String? {
+        guard case .object(let row)? = selection else { return nil }
+        for key in ["instanceId", "provider"] { if case .string(let id)? = row[key], !id.isEmpty { return id } }
+        return nil
+    }
+
     /// The bootstrap that makes `thread new` one dispatch: create the
     /// thread on the project (its default model), and with `--worktree`
     /// prepare that branch's worktree off `baseBranch` first. The desktop

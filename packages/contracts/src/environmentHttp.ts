@@ -41,6 +41,7 @@ import { ServerRunningTurn } from "./server.ts";
 import {
   ClientOrchestrationCommand,
   DispatchResult,
+  ModelSelection,
   OrchestrationReadModel,
   OrchestrationShellSnapshot,
   OrchestrationThreadDetailSnapshot,
@@ -633,6 +634,15 @@ export const InfinitusHoldRow = Schema.Struct({
 });
 export type InfinitusHoldRow = typeof InfinitusHoldRow.Type;
 
+/** #1315: what `infinitusctl thread new` falls back on when the project row
+    carries no default model — the environment's default from the server
+    settings, which no other HTTP route exposes (the composer reads it over
+    the WebSocket config). */
+export const InfinitusThreadDefaults = Schema.Struct({
+  defaultModelSelection: Schema.NullOr(ModelSelection),
+});
+export type InfinitusThreadDefaults = typeof InfinitusThreadDefaults.Type;
+
 /** Infinitus fork (#822): the two reads `infinitusctl` has no WebSocket for.
     Both need the operate scope, like their WS twins. */
 class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
@@ -649,6 +659,15 @@ class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
     HttpApiEndpoint.get("runningTurns", "/api/infinitus/running-turns", {
       headers: OptionalBearerHeaders,
       success: Schema.Array(ServerRunningTurn),
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    // #1315: the environment's default model, for `thread new` on a project
+    // without one.
+    HttpApiEndpoint.get("threadDefaults", "/api/infinitus/thread-defaults", {
+      headers: OptionalBearerHeaders,
+      success: InfinitusThreadDefaults,
       error: EnvironmentScopedOperationErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )

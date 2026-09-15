@@ -2,10 +2,12 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import {
   type AuthEnvironmentScope,
   AuthSessionId,
+  DEFAULT_SERVER_SETTINGS,
   EnvironmentAuthenticatedAuth,
   EnvironmentAuthenticatedPrincipal,
   EnvironmentHttpApi,
   type InfinitusHoldRow,
+  ProviderInstanceId,
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
@@ -19,6 +21,7 @@ import * as Stream from "effect/Stream";
 import { HttpApiTest } from "effect/unstable/httpapi";
 import { describe, expect } from "vite-plus/test";
 
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -43,6 +46,14 @@ const pausedRow = (threadId: string): InfinitusHoldRow => ({
 
 const HELD = ThreadId.make("t-held");
 const PAUSED = ThreadId.make("t-paused");
+
+const ENV_DEFAULT = { instanceId: ProviderInstanceId.make("claude"), model: "opus" };
+
+/** #1315: the environment default the server settings carry, or none. */
+const settingsWith = (defaultModelSelection: typeof ENV_DEFAULT | null) =>
+  Layer.mock(ServerSettingsService)({
+    getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, defaultModelSelection }),
+  });
 
 const services = Layer.mergeAll(
   Layer.mock(InfinitusSessionHold)({
@@ -87,12 +98,14 @@ const setup = HttpApiTest.groups(EnvironmentHttpApi, ["infinitus"]);
 const withClient = <A, E>(
   scopes: ReadonlyArray<AuthEnvironmentScope>,
   body: (client: Effect.Success<typeof setup>) => Effect.Effect<A, E>,
+  envDefault: typeof ENV_DEFAULT | null = ENV_DEFAULT,
 ) =>
   setup.pipe(
     Effect.flatMap(body),
     Effect.provide([NodeHttpServer.layerHttpServices, infinitusHttpApiLayer]),
     Effect.provideService(EnvironmentAuthenticatedAuth, authenticatedAuth(scopes)),
     Effect.provide(services),
+    Effect.provide(settingsWith(envDefault)),
     Effect.scoped,
   );
 
@@ -110,6 +123,23 @@ describe("infinitusHttpApiLayer (#822)", () => {
         ]);
       }),
     ),
+  );
+
+  effectIt.effect("thread defaults carry the environment's default model, or null (#1315)", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* withClient(["orchestration:read"], (client) =>
+          client.infinitus.threadDefaults({ headers: {} }),
+        ),
+      ).toEqual({ defaultModelSelection: ENV_DEFAULT });
+      expect(
+        yield* withClient(
+          ["orchestration:read"],
+          (client) => client.infinitus.threadDefaults({ headers: {} }),
+          null,
+        ),
+      ).toEqual({ defaultModelSelection: null });
+    }),
   );
 
   effectIt.effect("one read lists the held, limit-stopped and paused threads", () =>

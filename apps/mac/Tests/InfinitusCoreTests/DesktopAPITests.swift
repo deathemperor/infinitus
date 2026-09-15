@@ -199,6 +199,42 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertNil(DesktopRows.turnInterrupt(threadId: "t1", turnId: nil, now: now, id: ids)["turnId"])
     }
 
+    /// #1315: the model `thread new` creates on — `--model` first, then the
+    /// project's default, then the environment's — and the read behind it.
+    func testModelSelectionFallsBackToTheEnvironmentDefaultAndTakesAnExplicitModel() throws {
+        let bare = DesktopAPI.Project(id: "p1", title: "Bare", workspaceRoot: "/w", defaultModelSelection: .null)
+        let legacy = DesktopAPI.Project(id: "p2", title: "Legacy", workspaceRoot: "/w",
+                                        defaultModelSelection: .object(["provider": .string("claude"), "model": .string("opus")]))
+        let env: JSONValue = .object(["instanceId": .string("claude"), "model": .string("sonnet"), "options": .object([:])])
+        let resolve = { (option: String?, project: DesktopAPI.Project, environment: JSONValue?) in
+            try DesktopRows.modelSelection(option: option, project: project, environment: environment)
+        }
+        XCTAssertEqual(try resolve(nil, legacy, env), legacy.defaultModelSelection, "the project's default wins")
+        XCTAssertEqual(try resolve(nil, bare, env), env, "a project without one takes the environment's")
+        XCTAssertEqual(try resolve("codex/gpt-5", bare, nil), .object(["instanceId": .string("codex"), "model": .string("gpt-5")]))
+        XCTAssertEqual(try resolve("haiku", legacy, nil), .object(["instanceId": .string("claude"), "model": .string("haiku")]),
+                       "a bare model takes the project default's instance, a legacy provider slug included")
+        XCTAssertEqual(try resolve("haiku", bare, env), .object(["instanceId": .string("claude"), "model": .string("haiku")]),
+                       "else the environment default's, without its options")
+        XCTAssertThrowsError(try resolve(nil, bare, nil)) { error in
+            XCTAssertEqual((error as? DesktopRows.NoModel)?.message,
+                           "no default model on project Bare or the environment; set one in Settings › General (scope: Bare or All projects), or pass --model")
+        }
+        XCTAssertThrowsError(try resolve("haiku", bare, nil)) { error in
+            XCTAssertEqual((error as? DesktopRows.NoModel)?.message,
+                           "no default model on project Bare or the environment names an instance for --model haiku; pass --model <instanceId>/haiku")
+        }
+        XCTAssertThrowsError(try resolve("/haiku", bare, env))
+
+        let log = Log()
+        let a = api([(404, "not found"), (200, "{\"defaultModelSelection\":null}"),
+                     (200, "{\"defaultModelSelection\":{\"instanceId\":\"claude\",\"model\":\"sonnet\"}}")], log: log)
+        XCTAssertNil(try a.threadDefaults(), "an older desktop has no route")
+        XCTAssertNil(try a.threadDefaults(), "no environment default")
+        XCTAssertEqual(try a.threadDefaults(), .object(["instanceId": .string("claude"), "model": .string("sonnet")]))
+        XCTAssertEqual(log.calls.map(\.url).last, "http://127.0.0.1:3773/api/infinitus/thread-defaults")
+    }
+
     func testTitleMaskAndStatusList() {
         XCTAssertEqual(DesktopRows.title(from: "  Fix the build\nand more"), "Fix the build")
         XCTAssertEqual(DesktopRows.title(from: "\n\n"), "New thread")
