@@ -10,6 +10,24 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.16
+
+### Mac
+- a freshly installed engine now reports the provider it manages before its first account, so Accounts offers the first sign-in instead of telling you to install the engine you just installed.
+- A used-up model window (Fable) no longer repeats the reset time the weekly gauge beside it already counts down.
+- Infinitus stays out of the Dock by default — turn "Show a Dock icon while Settings is open" back on under Settings › Infinitus › Menu bar.
+- the Team crypto core, store and infinitusctl team CLI are back (#1313).
+
+### Desktop
+- A message sent while a turn runs in steer mode now waits for the agent's next tool call to finish instead of landing mid-tool.
+- ⌘[ / ⌘] and the mouse's back button move through history again.
+- A team invite link (infinitus.run/join, or infinitus://join on a Mac) opens the desktop app with the code ready for the Team page (#1313).
+
+### Phone
+- The queued messages card marks such a message "at next step".
+- With "Send into the running turn" on, a message sent during a turn now waits for the running tool call to finish before it goes in, on a Mac that supports it.
+- A working row on the lock-screen thread card shows its title again; the elapsed timer no longer takes the whole row.
+
 ## 0.5.0-alpha.15
 
 ### Mac
