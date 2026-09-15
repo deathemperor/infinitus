@@ -620,6 +620,14 @@ struct MenuContent: View {
         }
     }
 
+    /// The fleets the stack draws. An engine that reports a provider it
+    /// manages but holds no account for is a real fleet (#1319 —
+    /// `SwapdMapping.fleets`, so the add-first-account paths can resolve
+    /// it), and here it would be a header with nothing under it.
+    private var populatedFleets: [FleetState] {
+        model.fleets.filter { !$0.accounts.isEmpty }
+    }
+
     /// Ten-plus accounts scroll instead of growing an off-screen popup.
     @ViewBuilder private var accountArea: some View {
         Group {
@@ -627,13 +635,13 @@ struct MenuContent: View {
                 OnboardingCard(model: model)
             } else if model.accounts.isEmpty && model.snapshotLoaded {
                 FirstAccountCard(model: model)
-            } else if model.fleets.reduce(0, { $0 + $1.accounts.count }) > 10 {
+            } else if populatedFleets.reduce(0, { $0 + $1.accounts.count }) > 10 {
                 ScrollView(showsIndicators: false) {
-                    FleetStack(fleets: model.fleets)
+                    FleetStack(fleets: populatedFleets)
                 }
                 .frame(maxHeight: 560)
             } else {
-                FleetStack(fleets: model.fleets)
+                FleetStack(fleets: populatedFleets)
             }
         }
         .introContent(model)

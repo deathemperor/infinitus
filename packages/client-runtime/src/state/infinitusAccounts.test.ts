@@ -281,15 +281,27 @@ describe("add account and re-login", () => {
     replyShape: "",
   };
 
-  it("offers add on a fleet with the in-app sign-in, never off the engine's name", () => {
+  it("offers add on a fleet with either sign-in flow, never off the engine's name", () => {
     expect(buildFleetSection(fleet({ capabilities: ["addOAuth"] })).canAdd).toBe(true);
+    // swapd signs in through the CLI and declares no `addOAuth`; the app's
+    // `add` / `signin-begin` take this capability too (#1319).
+    expect(buildFleetSection(fleet({ capabilities: ["addCurrent"] })).canAdd).toBe(true);
     expect(buildFleetSection(fleet({ engineID: "swapd", capabilities: [] })).canAdd).toBe(false);
     expect(buildFleetSection(fleet({ capabilities: ["addToken"] })).canAdd).toBe(false);
+  });
+
+  it("keeps the section of a fleet that holds no account yet", () => {
+    const fresh = buildFleetSection(fleet({ capabilities: ["addCurrent"], accounts: [] }));
+    expect(fresh.rows).toEqual([]);
+    expect(fresh.canAdd).toBe(true);
   });
 
   it("marks a lapsed sign-in for re-login only where the fleet can run one", () => {
     const lapsed = account({ usageStatus: "relogin_required" });
     expect(rowAt(fleet({ capabilities: ["addOAuth"], accounts: [lapsed] })).reloginNeeded).toBe(
+      true,
+    );
+    expect(rowAt(fleet({ capabilities: ["addCurrent"], accounts: [lapsed] })).reloginNeeded).toBe(
       true,
     );
     expect(rowAt(fleet({ capabilities: ["addOAuth"] })).reloginNeeded).toBe(false);
@@ -549,6 +561,15 @@ describe("page state", () => {
     expect(state({ capability: true, snapshot: snapshot({ fleets: [twoAccounts] }) })).toBe(
       "ready",
     );
+    // A fresh engine reports its provider with no account yet: the page shows
+    // that fleet and its Add account, never "no engine reports accounts"
+    // (#1319).
+    expect(
+      state({
+        capability: true,
+        snapshot: snapshot({ fleets: [fleet({ capabilities: ["addCurrent"], accounts: [] })] }),
+      }),
+    ).toBe("ready");
   });
 
   it("gates every page the same way: false is unsupported, undefined waits", () => {
