@@ -39,6 +39,7 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/infinitus/animations",
       "/settings/infinitus/sessions",
       "/settings/infinitus/lock",
+      "/settings/infinitus/team",
       "/settings/infinitus/notifications",
       "/settings/infinitus/devices",
       "/settings/infinitus/engines",
@@ -152,7 +153,7 @@ describe("checkVisualPass", () => {
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[11]!, FORK_VISUAL_ROUTES[10]!],
+      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[12]!, FORK_VISUAL_ROUTES[11]!],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],

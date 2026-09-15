@@ -2,7 +2,127 @@ import XCTest
 @testable import InfinitusCore
 
 final class TeamClientTests: XCTestCase {
-    // The TeamReader scan and transcript cases return with the reader (team rebuild slice 2).
+    func testTheScanIsReusedWhileTheStoreRefsHoldAndRedoneWhenTheyMove() throws {
+        let remote = try makeRemote()
+        let (lp, ls) = machine("leader")
+        let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
+        _ = try leader.publish(kind: "now", path: "now.json", plaintext: Data("{\"busy\":1}".utf8), audience: .team, now: 1_005)
+        let docs = TeamReader.DocCache(), scans = TeamReader.ScanCache()
+        let first = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(first.headers.map(\.entry.path), ["m/\(leader.identity.kid)/now.json"])
+        XCTAssertEqual(scans.hits, 0)
+
+        _ = try leader.fetch()   // nothing new on the remote
+        let second = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(scans.hits, 1)
+        XCTAssertEqual(second.headers.map(\.entry.path), first.headers.map(\.entry.path))
+        XCTAssertEqual(second.reader?.members[leader.identity.kid]?.now, first.reader?.members[leader.identity.kid]?.now)
+
+        _ = try leader.publish(kind: "threads", path: "threads/index.json", plaintext: Data("{\"threads\":[]}".utf8), audience: .team, now: 1_010)
+        let third = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(scans.hits, 1, "a publish moved m/<kid>, so the scan must run again")
+        XCTAssertEqual(third.headers.map(\.entry.path).sorted(),
+                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/threads/index.json"])
+        // And the new fingerprint is the one reused next.
+        _ = TeamReader.scan(client: leader, docs: docs, scans: scans)
+        XCTAssertEqual(scans.hits, 2)
+    }
+
+    func testAFailedScanIsNotCachedUnderTheFingerprint() throws {
+        struct Broken: Error {}
+        let scans = TeamReader.ScanCache()
+        let failed = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { throw Broken() }, fold: { _ in TeamReader() })
+        XCTAssertTrue(failed.headers.isEmpty); XCTAssertNil(failed.reader)
+        let unfolded = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { [] }, fold: { _ in throw Broken() })
+        XCTAssertTrue(unfolded.headers.isEmpty); XCTAssertNil(unfolded.reader)
+        XCTAssertEqual(scans.hits, 0)
+        var scanned = 0
+        let good = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { scanned += 1; return [] }, fold: { _ in TeamReader() })
+        XCTAssertNotNil(good.reader); XCTAssertEqual(scanned, 1)
+        _ = TeamReader.scan(fingerprint: "f1", scans: scans, headers: { scanned += 1; return [] }, fold: { _ in TeamReader() })
+        XCTAssertEqual(scanned, 1); XCTAssertEqual(scans.hits, 1)
+        // No fingerprint (the store could not be read): scanned, never stored.
+        _ = TeamReader.scan(fingerprint: nil, scans: scans, headers: { scanned += 1; return [] }, fold: { _ in TeamReader() })
+        XCTAssertEqual(scanned, 2); XCTAssertEqual(scans.hits, 1)
+    }
+
+    func testTranscriptsRideTheirOwnBranchFetchedByHintOrOnDemand() throws {
+        let remote = try makeRemote()
+        let (lp, ls) = machine("leader"), (ap, asec) = machine("ann"), (bp, bs) = machine("bo")
+        let leader = try TeamClient.create(name: "Papaya", remote: remote, token: nil, paths: lp, secrets: ls, now: 1_000)
+        let code = try leader.code(expiresIn: 600, now: 1_000)
+        let ann = try TeamClient.request(code: code, name: "Ann", devices: [], platform: "linux", paths: ap, secrets: asec, now: 1_010)
+        let bo = try TeamClient.request(code: code, name: "Bo", devices: [], platform: "linux", paths: bp, secrets: bs, now: 1_011)
+        _ = try leader.fetch()
+        try leader.approve(kid: ann.identity.kid, now: 1_020)
+        try leader.approve(kid: bo.identity.kid, now: 1_021)
+        _ = try ann.fetch(); _ = try bo.fetch()
+        let annT = "origin/t/\(ann.identity.kid)"
+
+        // A chunk from before the split, sealed to the leaders under m/.
+        let old = "m/\(ann.identity.kid)/transcripts/s1/1.jsonl"
+        try ann.store.put(old, try Envelope.seal(Data("old\n".utf8), kind: TeamKinds.transcripts, from: ann.identity,
+                                                 to: leader.roster!.doc.recipients(for: .leaders), at: 1_025))
+        // Today's publish: the hint says transcripts reach the leaders.
+        let now = TeamDocs.Now(at: 1_030, machine: "ann", live: [], fleets: [], blockers: [], crashesToday: 0,
+                               sharesTo: [TeamKinds.transcripts: .leaders], desktop: false)
+        let paths = try ann.publish([
+            .init(kind: TeamKinds.now, path: "now.json", plaintext: try CanonicalJSON.encode(now), audience: .team),
+            .init(kind: TeamKinds.transcripts, path: "transcripts/s1/2.jsonl", plaintext: Data("new\n".utf8), audience: .leaders),
+        ], now: 1_030)
+        let chunk = "t/\(ann.identity.kid)/transcripts/s1/2.jsonl"
+        XCTAssertEqual(paths, ["m/\(ann.identity.kid)/now.json", chunk])
+
+        // The leader's routine fetch brings Ann's transcript branch by hint —
+        // the listing, not the chunk (#414): the session shows by its path
+        // and the bytes come when it is opened.
+        _ = try leader.fetch()
+        XCTAssertTrue(remoteBranches(in: lp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertEqual(try leader.store.list(chunk).map(\.present), [false])
+        XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
+        XCTAssertThrowsError(try leader.read(chunk))
+        try leader.fetchTranscripts(from: ann.identity.kid, session: "s1")
+        XCTAssertEqual(try leader.read(chunk).1, Data("new\n".utf8))
+        XCTAssertEqual(try TeamReader.load(client: leader).members[ann.identity.kid]?.transcripts["s1"], [old, chunk])
+        // …and Bo's does not: the hint names the leaders, so the bytes never move to him.
+        _ = try bo.fetch()
+        XCTAssertFalse(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
+        // On demand the branch arrives and its paths are listed (#414: a
+        // path, not an envelope); once the session is opened the chunk is
+        // here, isn't his to read, and the listing drops it.
+        try bo.fetchTranscripts(from: ann.identity.kid)
+        XCTAssertTrue(remoteBranches(in: bp.storeDir(leader.config.id)).contains(annT))
+        XCTAssertEqual(try TeamReader.load(client: bo).members[ann.identity.kid]?.transcripts["s1"], [chunk])
+        try bo.fetchTranscripts(from: ann.identity.kid, session: "s1")
+        XCTAssertFalse(try bo.readable().map(\.path).contains(chunk))
+        XCTAssertThrowsError(try bo.read(chunk))
+        XCTAssertNil(try TeamReader.load(client: bo).members[ann.identity.kid]?.transcripts["s1"])
+        XCTAssertThrowsError(try bo.fetchTranscripts(from: "../x"))
+        // A member whose every chunk lives on t/ (nothing from before the
+        // split): the leader's routine fetch lists the session and counts
+        // transcripts among what Bo shares, with no chunk byte fetched.
+        let boNow = TeamDocs.Now(at: 1_032, machine: "bo", live: [], fleets: [], blockers: [], crashesToday: 0,
+                                 sharesTo: [TeamKinds.transcripts: .leaders], desktop: false)
+        _ = try bo.publish([
+            .init(kind: TeamKinds.now, path: "now.json", plaintext: try CanonicalJSON.encode(boNow), audience: .team),
+            .init(kind: TeamKinds.transcripts, path: "transcripts/s2/1.jsonl", plaintext: Data("bo\n".utf8), audience: .leaders),
+        ], now: 1_032)
+        _ = try leader.fetch()
+        let boChunk = "t/\(bo.identity.kid)/transcripts/s2/1.jsonl"
+        XCTAssertEqual(try leader.store.list(boChunk).map(\.present), [false])
+        let boSeen = try TeamReader.load(client: leader).members[bo.identity.kid]
+        XCTAssertEqual(boSeen?.transcripts["s2"], [boChunk])
+        XCTAssertTrue(boSeen?.kinds.contains(TeamKinds.transcripts) ?? false)
+
+        // Leaving clears m/ and t/ alike.
+        try ann.leave(now: 1_040)
+        try leader.fetchTranscripts(from: ann.identity.kid)
+        _ = try leader.fetch()
+        XCTAssertEqual(try leader.store.list("m/\(ann.identity.kid)/"), [])
+        XCTAssertEqual(try leader.store.list("t/\(ann.identity.kid)/"), [])
+    }
+
     var scratch: URL!
 
     override func setUpWithError() throws {
@@ -220,9 +340,9 @@ final class TeamClientTests: XCTestCase {
         XCTAssertEqual(memo.hits, 1)
         XCTAssertEqual(try leader.readableHeaders().map(\.entry.path), plain.map(\.entry.path))
         XCTAssertEqual(memo.hits, 2)
-        _ = try leader.publish(kind: "sessions", path: "sessions/index.json", plaintext: Data("{\"sessions\":[]}".utf8), audience: .team, now: 1_010)
+        _ = try leader.publish(kind: "threads", path: "threads/index.json", plaintext: Data("{\"threads\":[]}".utf8), audience: .team, now: 1_010)
         XCTAssertEqual(try leader.readableHeaders().map(\.entry.path).sorted(),
-                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/sessions/index.json"])
+                       ["m/\(leader.identity.kid)/now.json", "m/\(leader.identity.kid)/threads/index.json"])
         XCTAssertEqual(memo.hits, 2, "the publish moved m/<kid>: listed again")
         _ = try leader.readableHeaders()
         XCTAssertEqual(memo.hits, 3)

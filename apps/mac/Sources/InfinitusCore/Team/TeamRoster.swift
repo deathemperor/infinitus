@@ -27,6 +27,17 @@ public struct TeamRoster: Codable, Equatable, Sendable {
             }
         }
 
+        /// The CLI's word for it (`TeamShares.parseTarget` reads it back):
+        /// off | leaders | team | a comma list of kids.
+        public var label: String {
+            switch self {
+            case .off: "off"
+            case .leaders: "leaders"
+            case .team: "team"
+            case .members(let kids): kids.joined(separator: ",")
+            }
+        }
+
         public func encode(to encoder: Encoder) throws {
             var c = encoder.singleValueContainer()
             switch self {

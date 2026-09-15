@@ -24,9 +24,16 @@ func teamUsage() -> String {
       remove <kid> | promote <kid>                 roster edits (leaders; the founder cannot be removed)
       fetch                                        pull the store and accept the roster
       policy [--requests code|off] [--members-see-each-other on|off]   (leaders) show or set the roster policy
-      share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|sessions|transcripts|crashes|fleet ("off" keeps it on this machine; new envelopes only)
+      members [--period <p>]              every member's period totals (spend is an estimate), online, blockers, when they joined, and what they share with you
+      member <kid> [--period day|week|month|year]  one member's Stats summary (default week)
+      insights [--period <p>]             leaderboards, repo coverage, blockers board, cost by member/model/repo, who's on, hours
+      aggregates                          the leaders' published team picture
+      aggregates publish [--period all|<p>]   (leaders) publish the team picture to the whole team
+      share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|threads|transcripts|crashes|fleet ("off" keeps it on this machine; new envelopes — see reshare)
       leave [--rotate-identity]                    delete my files on the store, tell the leaders, forget the team here (and mint a new identity)
-      exclude <project-dir> [--off]                keep a Claude Code project private (local, never sent)
+      exclude <project-dir> [--off]                keep a project private (local, never sent)
+      publish [--projects <dir>] [--days N]        publish stats (from the Claude Code projects dir), threads, now, redacted transcripts and crashes (default 30 days); threads and transcripts need Infinitus desktop
+      reshare [--days N]                           re-wrap the last N days (default 30) to the current audiences
       identity [show]                    this machine's identity kid
       identity recovery --show           the recovery key (base32, 8 groups) — keep it offline
       identity export [--out <file>]     passphrase on stdin (≥ 8 chars); the sealed file to --out (0600) or stdout
@@ -75,6 +82,7 @@ private func routeToApp(_ sub: String, positional: [String], options: [String: S
     case "approve", "decline":
         guard let kid = positional.first else { return nil }
         request = ControlRequest(command: "team-\(sub)", args: [kid])
+    case "publish": request = ControlRequest(command: "team-publish")
     case "create":
         guard let name = positional.first, let remote = options["remote"] else { return nil }
         request = ControlRequest(command: "team-create", args: [name, remote],
@@ -89,6 +97,25 @@ private func routeToApp(_ sub: String, positional: [String], options: [String: S
     return 0
 }
 #endif
+
+#if os(macOS)
+/// Infinitus desktop's client over the credential the running app keeps
+/// (`desktop-token`, the desktop verbs' path); nil when the app is not
+/// running or holds none — `publish` then goes out with `desktop: false`.
+private func desktopFromApp(socket: String) -> DesktopAPI? {
+    guard let reply = ControlClient.roundTrip(ControlRequest(command: "desktop-token"), path: socket), reply.ok,
+          case .string(let origin)? = reply.result?["origin"], case .string(let token)? = reply.result?["token"],
+          let url = URL(string: origin) else { return nil }
+    return DesktopAPI(origin: url, token: token)
+}
+#endif
+
+private struct MemberRow: Encodable {
+    var kid, name, role: String; var online: Bool
+    var threadsNow: Int; var blockers: [String]; var crashes: Int; var lastPublished: Int?
+    var usd: Double; var commits, messages, outputTokens, sessions: Int
+    var sharesToMe: [String]; var joined: Int?; var removedAt: Int?
+}
 
 private struct ReadableEntry: Encodable {
     var path: String; var size: Int; var kind: String; var from: String; var at: Int
@@ -357,6 +384,103 @@ func runTeam(_ args: [String]) -> Int32 {
                 emit(["kid": try TeamIdentity(secret: secret).kid])
             default:
                 return fail(teamUsage(), code: 2)
+            }
+        case "members":
+            guard let period = Stats.Period(rawValue: options["period"] ?? "week") else {
+                return fail("--period is day, week, month or year", code: 2)
+            }
+            let c = try client(); _ = try c.fetch()
+            let reader = try TeamReader.load(client: c)
+            let roster = c.roster?.doc
+            let shared = Dictionary(uniqueKeysWithValues: (roster.map { TeamInsights.sharedWithMe(reader, roster: $0, me: c.identity.kid) } ?? []).map { ($0.kid, $0.kinds) })
+            emit(TeamInsights.comparison(reader, period: period).map { r in
+                MemberRow(kid: r.kid, name: r.name, role: r.role, online: r.online, threadsNow: r.threadsNow, blockers: r.blockers,
+                          crashes: r.crashes, lastPublished: r.lastPublished, usd: r.summary.total.usd, commits: r.summary.total.commits,
+                          messages: r.summary.total.messages, outputTokens: r.summary.total.outputTokens,
+                          sessions: r.summary.total.sessionCount, sharesToMe: shared[r.kid] ?? [], joined: r.since, removedAt: r.removedAt)
+            })
+        case "member":
+            guard let kid = positional.first else { return fail(teamUsage(), code: 2) }
+            guard let period = Stats.Period(rawValue: options["period"] ?? "week") else {
+                return fail("--period is day, week, month or year", code: 2)
+            }
+            let c = try client(); _ = try c.fetch()
+            guard let summary = try TeamReader.load(client: c).summary(kid: kid, period: period) else {
+                return fail("nothing readable from \(kid)")
+            }
+            emit(summary.compacted())
+        case "publish":
+            let c = try client(); _ = try c.fetch()
+            let teamDir = paths.teamDir(c.config.id)
+            var sources = TeamPublisher.Sources(home: NSHomeDirectory(), machine: ProcessInfo.processInfo.hostName)
+            if let days = options["days"].flatMap(Int.init) { sources.historyDays = days }
+            // Stats come off the transcript corpus; `--projects` only swaps
+            // the Claude Code projects dir (and skips the Codex scan).
+            let projectsDir = options["projects"].map { URL(fileURLWithPath: $0) } ?? TokenRateScanner.defaultProjectsDir()
+            sources.entries = StatsScanner.scan(projectsDir: projectsDir,
+                                                codexDir: options["projects"] == nil ? StatsScanner.defaultCodexDir() : nil,
+                                                cacheURL: teamDir.appendingPathComponent("scan-cache.json"),
+                                                maxAge: TimeInterval(sources.historyDays + 1) * 86_400).entries
+            sources.crashes = CrashStore(directory: CrashStore.defaultDirectory()).list()
+            // Threads and transcripts are the desktop's; without it the
+            // index stays as last published and now.json says so.
+            #if os(macOS)
+            if let api = desktopFromApp(socket: ControlProtocol.socketURL().path) {
+                try TeamThreadSources.desktop(api, into: &sources, choices: TeamTranscriptChoices.load(teamDir: teamDir),
+                                              exclusions: TeamExclusions.load(paths: paths), now: Int(Date().timeIntervalSince1970))
+            }
+            #endif
+            emit(try TeamPublisher(client: c, paths: paths).publish(sources: sources))
+        case "reshare":
+            let c = try client(); _ = try c.fetch()
+            let days = options["days"].flatMap(Int.init) ?? 30
+            emit(try TeamPublisher(client: c, paths: paths).reshare(days: days))
+        case "insights":
+            guard let period = Stats.Period(rawValue: options["period"] ?? "week") else {
+                return fail("--period is day, week, month or year", code: 2)
+            }
+            let c = try client(); _ = try c.fetch()
+            let reader = try TeamReader.load(client: c)
+            let rows = TeamInsights.comparison(reader, period: period)
+            let repos = TeamInsights.repos(reader, period: period)
+            let cost = TeamInsights.cost(rows, repos: repos)
+            struct Board: Encodable { var kid, name, kind, text: String }
+            struct Repo: Encodable { var project: String; var usd: Double; var turns: Int; var members: [String] }
+            struct Row: Encodable { var kid, name: String; var value: Double }
+            struct Money: Encodable { var kid, name: String; var usd: Double }
+            struct Costs: Encodable { var total: Double; var byMember: [Money]; var byModel: [String: Double]; var byRepo: [String: Double] }
+            struct Insights: Encodable {
+                var period, from, to: String
+                var leaderboards: [String: [Row]]
+                var repos: [Repo]
+                var blockers: [Board]
+                var cost: Costs
+                var onNow: [String]
+                var hours: [Int]
+            }
+            let sample = rows.first?.summary
+            emit(Insights(
+                period: period.rawValue, from: sample?.from ?? "", to: sample?.to ?? "",
+                leaderboards: Dictionary(uniqueKeysWithValues: TeamInsights.Metric.allCases.map { m in
+                    (m.rawValue, TeamInsights.leaderboard(rows, metric: m).map { Row(kid: $0.kid, name: $0.name, value: $0.value) }) }),
+                repos: repos.map { Repo(project: $0.project, usd: $0.usd, turns: $0.turns, members: $0.members.map(\.name)) },
+                blockers: TeamInsights.blockers(reader).map { Board(kid: $0.kid, name: $0.name, kind: $0.kind, text: $0.text) },
+                cost: Costs(total: cost.total, byMember: cost.byMember.map { Money(kid: $0.kid, name: $0.name, usd: $0.usd) },
+                            byModel: cost.byModel, byRepo: cost.byRepo),
+                onNow: TeamInsights.whoIsOn(reader).map(\.name), hours: TeamInsights.hours(rows)))
+        case "aggregates":
+            let c = try client(); _ = try c.fetch()
+            if positional.first == "publish" {
+                guard let roster = c.roster?.doc else { throw TeamClient.ClientError.noRoster }
+                let which = options["period"] ?? "all"
+                let periods = which == "all" ? Stats.Period.allCases : [Stats.Period(rawValue: which)].compactMap { $0 }
+                guard !periods.isEmpty else { return fail("--period is all, day, week, month or year", code: 2) }
+                let reader = try TeamReader.load(client: c)
+                var docs: [String: Data] = [:]
+                for p in periods { docs[p.rawValue] = try CanonicalJSON.encode(TeamInsights.aggregates(reader, roster: roster, period: p)) }
+                emit(["published": try c.publishAggregates(docs)])
+            } else {
+                emit(try TeamReader.load(client: c).aggregates)
             }
         case "policy":
             let c = try client(); _ = try c.fetch()

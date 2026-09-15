@@ -134,6 +134,7 @@ export function SettingsInfinitusSection() {
   return (
     <SettingsSection title="Infinitus">
       <SettingsRow icon="person.2" label="Accounts" target="SettingsAccounts" />
+      <SettingsRow icon="person.3" label="Team" target="SettingsTeam" />
       <SettingsSwitchRow
         icon="bell.badge"
         label="Alerts from Mac"

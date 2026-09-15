@@ -55,6 +55,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
   },
   { route: "/settings/infinitus/sessions", label: "Priority", marker: "Thread priority" },
   { route: "/settings/infinitus/lock", label: "Lock", marker: "Re-lock" },
+  { route: "/settings/infinitus/team", label: "Team", marker: "Whole team" },
   {
     route: "/settings/infinitus/notifications",
     label: "Notifications",

@@ -358,8 +358,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
   `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
-  to the iOS associated domains and an `autoVerify` intent filter for
-  `https://infinitus.run/pair` on Android (the site serves the AASA
+  to the iOS associated domains and `autoVerify` intent filters for
+  `https://infinitus.run/pair` and `/join` (#1313) on Android (the site serves the AASA
   `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
   `extra.productVersion` is the root `VERSION` (#823 layer 3), which
   `SettingsRouteScreen` shows in place of the store version.
@@ -374,14 +374,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   stretched and upstream's widget file needs no edit. The plugin's ordering
   rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
-  Accounts, the Infinitus fleet per paired Mac).
+  Accounts, the Infinitus fleet per paired Mac) and the `SettingsTeam` route
+  (Settings › Team, #1313; `team?code=…` is where an invite link lands).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
-  `SettingsAccounts` in the settings target union.
+  `SettingsAccounts` and `SettingsTeam` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
   `SettingsInfinitusSection` (Accounts row, Mac alerts / thread card (with
   its test card, #1047) / reset alarms toggles, sending mode, the alerting
   Mac) after General.
-- `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusAlertPushBridge` (#702), `InfinitusThreadCardBridge` (#1047), `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
+- `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusAlertPushBridge` (#702), `InfinitusThreadCardBridge` (#1047), `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /

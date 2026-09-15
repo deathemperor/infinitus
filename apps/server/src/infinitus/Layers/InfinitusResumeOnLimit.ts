@@ -256,17 +256,24 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
 
     const onRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
       Effect.gen(function* () {
-        const existing = stops.get(event.threadId);
-        if (existing !== undefined && eventCancelsStop(event, existing)) {
-          yield* forget(event.threadId);
-        }
         const snapshot = yield* infinitus.snapshot;
         const plain = limitStopFromEvent(event, yield* nowMillis, snapshot);
-        if (plain === null) return;
-        if (plain.turnId !== null && resumed.has(plain.turnId)) return;
+        const recorded = plain !== null && (plain.turnId === null || !resumed.has(plain.turnId));
+        const existing = stops.get(event.threadId);
+        // A parked turn's failed completion is the same stop ending the way
+        // the CLI ends it: the record stays (one row, and the window it named
+        // is kept below), where a completion that records nothing ends it.
+        if (existing !== undefined && eventCancelsStop(event, existing) && !recorded) {
+          yield* forget(event.threadId);
+        }
+        if (plain === null || !recorded) return;
         const proxy = yield* proxyFor(plain.threadId);
-        const stop = proxy === null ? plain : proxyStop(plain, proxy);
-        const known = stops.get(stop.threadId);
+        const fresh = proxy === null ? plain : proxyStop(plain, proxy);
+        const known = stops.get(fresh.threadId);
+        const stop =
+          known !== undefined && fresh.resetsAt === null
+            ? { ...fresh, resetsAt: known.resetsAt, limitType: known.limitType }
+            : fresh;
         stops.set(stop.threadId, stop);
         if (known === undefined) yield* mark(stop);
         else if (known.resetsAt !== stop.resetsAt) yield* remark(stop);
@@ -284,7 +291,7 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
       Effect.gen(function* () {
         const now = yield* nowMillis;
         for (const stop of stops.values()) {
-          const target = resumeTarget(stop, snapshot);
+          const target = resumeTarget(stop, snapshot, now);
           if (target === null) continue;
           const last = lastResumeAt.get(stop.threadId);
           if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
@@ -309,7 +316,8 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
             threadId: stop.threadId,
             replacesActiveTurn: stop.kind === "parked",
             run: Effect.gen(function* () {
-              const current = resumeTarget(stop, yield* infinitus.snapshot) ?? target;
+              const current =
+                resumeTarget(stop, yield* infinitus.snapshot, yield* nowMillis) ?? target;
               yield* resume(stop, current);
             }).pipe(
               Effect.catchCause((cause) =>

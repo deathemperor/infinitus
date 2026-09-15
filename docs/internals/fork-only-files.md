@@ -166,10 +166,18 @@ these bullets.
   sessions sweep (#1041) the only one left — the Mac's terminal nudge went
   with the sessions it typed into: the Claude adapter's parked-turn
   warning (`rate_limit_info.status: "rejected"`) or a limit-failed
-  `turn.completed` records a stop; while any thread is stopped the layer
-  subscribes to the snapshot and waits for an active Claude account that
-  reads `ok` from a probe taken after the stop (native's ResumeGate); then
-  the parked turn is interrupted, a `infinitus.turn.resumed` work-log row
+  `turn.completed` records a stop (a parked turn's failed completion is the
+  same stop ending, one row, the window kept); while any thread is stopped
+  the layer subscribes to the snapshot and waits for the swapd fleet's
+  active account — the one the plain CLI spends; the proxy fleets never
+  count — to read `ok` from a probe taken after the stop (native's
+  ResumeGate). swapd's `ok` is a credential status, not headroom (the
+  account that just ran out reads `ok` on the next poll, which resumed a
+  turn onto it every cooldown), so `resumeTarget` also reads the account's
+  usage for the stop's window (`rateLimitType` on the stop): under 100 %
+  counts, full does not; a reading without that window lets a different
+  account through and the same one only once the stop's `resetsAt` passed.
+  Then the parked turn is interrupted, a `infinitus.turn.resumed` work-log row
   names the account, and the thread continues with upstream's continuation
   prompt from its resume cursor. The stop itself leaves an
   `infinitus.thread.limited` row ("Limit hit on <account>") and joins the
@@ -278,6 +286,9 @@ these bullets.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@t3tools/client-runtime/state/infinitusAccounts`).
+- `apps/mobile/src/features/team/` — Settings › Team (#1313): members, the
+  leader's requests, join from a code or the site's `/join#<code>` invite
+  link; the phone's subset of the web pane's `team.logic.ts`.
 - `packages/client-runtime/src/connection/roaming.ts`, `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN, roam to the tunnel (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect and tried after the last-good and paired hosts. Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt

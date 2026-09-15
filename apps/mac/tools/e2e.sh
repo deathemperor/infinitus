@@ -41,6 +41,7 @@ ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple D
 SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
+export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"          # the app's team dir + file secrets (#1313: CI has no keychain)
 # An empty Claude home (#1204): the stats and token-rate scanners read
 # `$CLAUDE_CONFIG_DIR/projects`, and without this the run scanned the
 # developer's real transcript tree — 14 GB on one Mac, nothing on CI — so
@@ -575,6 +576,53 @@ done
 "$CTL" aws-logins | expect "'bound to account 1 but you signed in to 2' in next(l['state']['message'] for l in d['logins'] if l['profile']=='e2e-rebind')" || fail "rebind message"
 pgrep -f "$SOCKDIR/aws" >/dev/null && fail "stub aws CLI still running"
 echo "aws: rebind refused"
+
+# --- team (#1313) ----------------------------------------------------------
+# The app creates a team on a bare repo; a second identity — the CLI
+# in-process, its own INFINITUS_TEAM_DIR — joins with a team code and
+# publishes; the app approves and reads it back. No desktop answers here,
+# so the publish carries stats and now, and the index stays empty.
+"$CTL" team-status | expect "d is None" || fail "team-status must be null before a team exists"
+git init -q --bare "$SOCKDIR/team.git"
+git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
+"$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
+    | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder'] and d['lockEnabled'] is False" || fail "team-create"
+# Spec §2.2: minting a code and approving need the lock on; the e2e never
+# turns it on, so the CLI mints in-process against the app's own team dir.
+"$CTL" team-code --days 1 2>&1 | grep -q "biometric lock" || fail "team-code must want the lock on"
+CODE="$(INFINITUS_TEAM_DIR="$SOCKDIR/team-app" "$CTL" team code --days 1 | json "d['code']")"
+case "$CODE" in infinitus://join/*) ;; *) fail "team-code shape" ;; esac
+CLI_TEAM="$SOCKDIR/team-cli"
+printf '%s' "$CODE" | INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team request - --name Bo >/dev/null || fail "cli team request"
+KID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team status | json "d['kid']")"
+"$CTL" team-fetch | expect "len(d['requests'])==1 and d['requests'][0]['name']=='Bo'" || fail "the request did not reach the leader"
+"$CTL" team-approve "$KID" 2>&1 | grep -q "biometric lock" || fail "team-approve must want the lock on"
+INFINITUS_TEAM_DIR="$SOCKDIR/team-app" "$CTL" team approve "$KID" >/dev/null || fail "cli team approve"
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members']) and not d['requests']" || fail "the approval did not reach the app"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team fetch >/dev/null || fail "cli team fetch"
+# #354: on a Mac with the app up and no INFINITUS_TEAM_DIR, `team status` is
+# the app's own view, and a subcommand the app has no verb for either refuses
+# to mint a second identity or says whose identity it is using.
+env -u INFINITUS_TEAM_DIR "$CTL" team status | expect "d['role']=='leader' and d['name']=='Papaya'" || fail "cli team status did not route to the app"
+env -u INFINITUS_TEAM_DIR "$CTL" team identity show 2>&1 | grep -q "owns this Mac's team identity\|infinitusctl's own identity" || fail "cli team identity neither refused nor named its own identity beside the app's"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish | expect "'published' in d" || fail "cli team publish"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts off \
+    | expect "d['byKind']['transcripts']=='off'" || fail "team share transcripts off"
+# `now` is the one kind every publish carries; stats need a transcript corpus the CI runner has none of.
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and 'now' in m['kinds'] for m in d['members'])" || fail "the member's files are not readable"
+"$CTL" team-publish | expect "'published' in d" || fail "team-publish"
+"$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
+"$CTL" team-share now team | expect "d['shares']['now']=='team'" || fail "team-share"
+"$CTL" team-exclude add secret-repo | expect "'secret-repo' in d['exclusions']" || fail "team-exclude add"
+"$CTL" team-exclude remove secret-repo | expect "'secret-repo' not in d['exclusions']" || fail "team-exclude remove"
+"$CTL" team-policy requests off | expect "d['policy']['requests']=='off'" || fail "team-policy"
+"$CTL" team-insights --period week | expect "d['period']=='week' and isinstance(d['blockers'], list)" || fail "team-insights"
+"$CTL" team-identity | expect "len(d['kid'])>8" || fail "team-identity"
+echo "team: ok (leader Ann, member Bo $KID)"
+# #747: the secret-carrying team verbs refuse an empty stdin by name.
+"$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
+"$CTL" lock off 2>&1 | grep -q -- "--yes" || fail "lock off in a team must want --yes"
+"$CTL" team-leave 2>&1 | grep -q -- "--yes" || fail "team-leave must want --yes"
 
 # #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
 # credential comes on stdin like every secret and stays in this run's own
