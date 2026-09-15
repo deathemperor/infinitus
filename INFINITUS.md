@@ -124,3 +124,5 @@ first before touching an upstream file, and add a bullet when you edit a
 new one or add a fork-owned file. Feature narratives belong in a
 `docs/internals/<feature>.md` page, one line in those ledgers pointing at
 it, never a paragraph in this file, which every session loads whole.
+`scripts/infinitus-md-size.test.ts` fails the build once this file passes
+16 KB (#1339).

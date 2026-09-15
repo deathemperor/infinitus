@@ -981,6 +981,9 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   — the #610 regression: a mocked regex engine whose first scan outlives
   shiki's default per-line budget must still tokenize the whole line.
 
+- `scripts/infinitus-md-size.test.ts` — the INFINITUS.md byte cap (16 KB, #1339):
+  every session loads that file whole, so a feature's narrative goes in a
+  `docs/internals/<feature>.md` page and one ledger line here.
 - `scripts/fork-visual-pass.mjs` — the visual pass: one headless Chrome over
   CDP pairs with a running web app, clicks through the first-run wizard, then
   screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Mint a
