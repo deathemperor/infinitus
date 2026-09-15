@@ -8548,3 +8548,205 @@ describe("advisor tool result (#1247)", () => {
     }),
   );
 });
+
+describe("web tool results (#1251)", () => {
+  const SESSION_ID = "sdk-session-web-tools";
+  const TOOL_USE_ID = "srvtoolu-web-1";
+
+  const run = (
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    resultType: string,
+    content: unknown,
+  ) => {
+    const harness = makeHarness();
+    const block = { type: resultType, tool_use_id: TOOL_USE_ID, content };
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({ threadId: session.threadId, input: "hello", attachments: [] });
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: SESSION_ID,
+        uuid: "stream-web-start",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "server_tool_use",
+            id: TOOL_USE_ID,
+            name: toolName,
+            input: toolInput,
+          },
+        },
+      } as unknown as SDKMessage);
+      harness.query.emit({
+        type: "stream_event",
+        session_id: SESSION_ID,
+        uuid: "stream-web-stop",
+        parent_tool_use_id: null,
+        event: { type: "content_block_stop", index: 0 },
+      } as unknown as SDKMessage);
+      // Both delivery paths: the stream's block and the assistant snapshot.
+      harness.query.emit({
+        type: "stream_event",
+        session_id: SESSION_ID,
+        uuid: "stream-web-result",
+        parent_tool_use_id: null,
+        event: { type: "content_block_start", index: 1, content_block: block },
+      } as unknown as SDKMessage);
+      harness.query.emit({
+        type: "assistant",
+        session_id: SESSION_ID,
+        uuid: "assistant-web-result",
+        parent_tool_use_id: null,
+        message: {
+          id: "msg-web",
+          role: "assistant",
+          model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+          content: [
+            { type: "server_tool_use", id: TOOL_USE_ID, name: toolName, input: toolInput },
+            block,
+          ],
+        },
+      } as unknown as SDKMessage);
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: SESSION_ID,
+        uuid: "result-web",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      assert.deepEqual(
+        runtimeEvents.map((event) => event.type),
+        [
+          "session.started",
+          "session.configured",
+          "session.state.changed",
+          "turn.started",
+          "thread.started",
+          "item.started",
+          "item.updated",
+          "item.completed",
+          "turn.completed",
+        ],
+      );
+      const completed = runtimeEvents.find((event) => event.type === "item.completed");
+      assert.equal(completed?.type, "item.completed");
+      if (completed?.type !== "item.completed") {
+        return undefined;
+      }
+      assert.equal(completed.raw?.method, "claude/stream_event/content_block_start");
+      return completed;
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  };
+
+  it.effect("a web search closes with its result count and the blobs dropped", () =>
+    Effect.gen(function* () {
+      const completed = yield* run(
+        "web_search",
+        { query: "effect streams" },
+        "web_search_tool_result",
+        [
+          {
+            type: "web_search_result",
+            title: "Streams",
+            url: "https://effect.website/docs/stream",
+            page_age: null,
+            encrypted_content: "opaque-1",
+          },
+          {
+            type: "web_search_result",
+            title: "Sinks",
+            url: "https://effect.website/docs/sink",
+            page_age: "2 days",
+            encrypted_content: "opaque-2",
+          },
+        ],
+      );
+      assert.equal(completed?.payload.status, "completed");
+      assert.equal(completed?.payload.detail, "2 results for effect streams");
+      const stored = (completed?.payload.data as { result?: { content?: unknown[] } } | undefined)
+        ?.result?.content;
+      assert.deepEqual(stored, [
+        {
+          type: "web_search_result",
+          title: "Streams",
+          url: "https://effect.website/docs/stream",
+          page_age: null,
+        },
+        {
+          type: "web_search_result",
+          title: "Sinks",
+          url: "https://effect.website/docs/sink",
+          page_age: "2 days",
+        },
+      ]);
+    }),
+  );
+
+  it.effect("a failed web search is a failed item naming the error", () =>
+    Effect.gen(function* () {
+      const completed = yield* run("web_search", { query: "x" }, "web_search_tool_result", {
+        type: "web_search_tool_result_error",
+        error_code: "max_uses_exceeded",
+      });
+      assert.equal(completed?.payload.status, "failed");
+      assert.equal(completed?.payload.detail, "Web search failed: max_uses_exceeded.");
+    }),
+  );
+
+  it.effect("a web fetch closes naming the fetched url", () =>
+    Effect.gen(function* () {
+      const completed = yield* run(
+        "web_fetch",
+        { url: "https://example.com/doc" },
+        "web_fetch_tool_result",
+        {
+          type: "web_fetch_result",
+          url: "https://example.com/doc",
+          retrieved_at: null,
+          content: {
+            type: "document",
+            source: { type: "text", media_type: "text/plain", data: "hi" },
+          },
+        },
+      );
+      assert.equal(completed?.payload.status, "completed");
+      assert.equal(completed?.payload.detail, "Fetched https://example.com/doc");
+    }),
+  );
+
+  it.effect("a failed web fetch is a failed item naming the error", () =>
+    Effect.gen(function* () {
+      const completed = yield* run(
+        "web_fetch",
+        { url: "https://example.com" },
+        "web_fetch_tool_result",
+        {
+          type: "web_fetch_tool_result_error",
+          error_code: "url_not_allowed",
+        },
+      );
+      assert.equal(completed?.payload.status, "failed");
+      assert.equal(completed?.payload.detail, "Web fetch failed: url_not_allowed.");
+    }),
+  );
+});

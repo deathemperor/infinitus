@@ -1114,13 +1114,24 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the web's `buildRevertTurnCountByUserMessageId` kept local: the checkpoint
   before the turn a message started, from `detail.checkpoints` by
   `assistantMessageId`, whatever the status, so both surfaces name the same
-  turn). Two of the web menu's modes, on an `infinitus` server: "Restore
-  files only" (`thread.checkpoint.revert` with `keepChat`, #269 E, behind the
-  web's confirm since it rewrites the worktree) and, on a Claude Agent or
-  Codex thread, "Fork a new thread from here" (`infinitus.forkThread` at that
-  `turnCount`, #270 E2, which opens the new thread). A running or starting
-  session gets the web's "Interrupt the current turn" alert. The composer
-  hand-back modes ("Edit from here", "Rewind chat only") stay on the desktop.
+  turn). The web menu's four modes, on an `infinitus` server, each behind
+  the web's confirm: "Edit from here" (`thread.checkpoint.revert`, files and
+  chat) and "Rewind chat only" (the same with `restoreFiles: false`, #270 E1)
+  — both only where the thread's provider snapshot does not say
+  `supportsConversationRollback: false`, the web's gate — hand the message
+  back to the thread's composer draft: the attachments are downloaded FIRST
+  (`restoreAttachments.ts` `downloadDraftAttachments`, the loop the queue's
+  "Edit" in `useQueuedTurnActions.ts` also runs, since the server prunes a
+  reverted message's uploads, #847), then the revert, then text
+  (`revertedMessageEditableText`: the effort prefix and trailing review
+  comments off, the phone's cut of the web's `recallableComposerPrompt`),
+  files and context records under fresh ids (`restoredRevertedMessage`, the
+  queue's #971 path; the text alone over the draft's record cap) land in the
+  draft. "Restore files only" (`keepChat`, #269 E) leaves the chat; on a
+  Claude Agent or Codex thread "Fork a new thread from here"
+  (`infinitus.forkThread` at that `turnCount`, #270 E2) opens the new thread.
+  A running or starting session gets the web's "Interrupt the current turn"
+  alert.
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time

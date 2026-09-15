@@ -1,7 +1,12 @@
 import type { MessageId, OrchestrationThread } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { restoreFilesConfirmText, revertTurnCountByUserMessageId } from "./revertMessage.logic";
+import {
+  restoreFilesConfirmText,
+  revertMenuActions,
+  revertTurnCountByUserMessageId,
+  revertedMessageEditableText,
+} from "./revertMessage.logic";
 
 type Message = OrchestrationThread["messages"][number];
 
@@ -56,5 +61,37 @@ describe("revertTurnCountByUserMessageId", () => {
     expect(restoreFilesConfirmText(3)).toBe(
       "Restore the files to checkpoint 3? The chat stays as it is.",
     );
+  });
+});
+
+describe("revertMenuActions", () => {
+  it("offers every mode in the web's order when the provider rolls back and forks", () => {
+    expect(revertMenuActions({ canRollback: true, canFork: true })).toEqual([
+      "files",
+      "restore-files",
+      "chat",
+      "fork",
+    ]);
+  });
+
+  it("keeps only the file restore and the fork without conversation rollback", () => {
+    expect(revertMenuActions({ canRollback: false, canFork: true })).toEqual([
+      "restore-files",
+      "fork",
+    ]);
+    expect(revertMenuActions({ canRollback: false, canFork: false })).toEqual(["restore-files"]);
+  });
+});
+
+describe("revertedMessageEditableText", () => {
+  it("drops the effort prefix and the review comments appended after the text", () => {
+    const text =
+      'Ultrathink:\nFix the loop\n\n<review_comment file="a.ts">\nslow\n</review_comment>\n<review_comment file="b.ts">\nunused\n</review_comment>';
+    expect(revertedMessageEditableText(text)).toBe("Fix the loop");
+  });
+
+  it("keeps a review comment block the user typed before more text", () => {
+    const text = '<review_comment file="a.ts">\nslow\n</review_comment>\nand also this';
+    expect(revertedMessageEditableText(text)).toBe(text);
   });
 });

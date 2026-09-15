@@ -1,4 +1,3 @@
-import { resolveAssetUrl } from "@t3tools/client-runtime/state/assets";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -13,11 +12,6 @@ import * as Option from "effect/Option";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 
-import { downloadAttachmentForPreview } from "../../lib/attachmentDownload";
-import {
-  persistComposerAttachmentFile,
-  type DraftComposerAttachment,
-} from "../../lib/composerImages";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { uuidv4 } from "../../lib/uuid";
 import { assetEnvironment } from "../../state/assets";
@@ -36,6 +30,7 @@ import {
   queuedTurnMoveKey,
   restoredQueuedTurn,
 } from "./queuedTurns.logic";
+import { downloadDraftAttachments } from "./restoreAttachments";
 
 export interface QueuedTurnActions {
   /** The thread's queued messages in send order. */
@@ -137,73 +132,14 @@ export function useQueuedTurnActions(input: {
       if (editingRef.current) return;
       editingRef.current = true;
       try {
-        const attachments: DraftComposerAttachment[] = [];
-        for (const attachment of row.attachments) {
-          if (attachment.type !== "image" && attachment.type !== "file") continue;
-          const baseUrl = httpBaseUrlRef.current;
-          if (baseUrl === null) {
-            Alert.alert("The environment is not connected.");
-            return;
-          }
-          const urlResult = await createAssetUrl({
-            environmentId,
-            input: {
-              resource: {
-                _tag: "attachment",
-                attachmentId: attachment.id,
-                fileName: attachment.name,
-                mimeType: attachment.mimeType,
-              },
-            },
-          });
-          if (urlResult._tag === "Failure") {
-            alertFailure(`Could not load ${attachment.name}`, urlResult);
-            return;
-          }
-          const url = resolveAssetUrl(baseUrl, urlResult.value.relativeUrl);
-          if (url === null) {
-            Alert.alert(`Could not load ${attachment.name}`);
-            return;
-          }
-          let fileUri: string;
-          try {
-            const downloaded = await downloadAttachmentForPreview({
-              url,
-              attachment,
-              signal: abortRef.current.signal,
-            });
-            if (downloaded === null) return;
-            try {
-              fileUri = await persistComposerAttachmentFile(downloaded.uri, attachment.name);
-            } finally {
-              downloaded.dispose();
-            }
-          } catch (error) {
-            Alert.alert(
-              `Could not load ${attachment.name}`,
-              error instanceof Error ? error.message : undefined,
-            );
-            return;
-          }
-          const common = {
-            id: uuidv4(),
-            name: attachment.name,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-            fileUri,
-          };
-          if (attachment.type === "image") {
-            const source = "source" in attachment ? attachment.source : undefined;
-            attachments.push({
-              ...common,
-              type: "image",
-              previewUri: fileUri,
-              ...(source ? { source } : {}),
-            });
-          } else {
-            attachments.push({ ...common, type: "file" });
-          }
-        }
+        const attachments = await downloadDraftAttachments({
+          environmentId,
+          attachments: row.attachments,
+          httpBaseUrl: httpBaseUrlRef.current,
+          createAssetUrl,
+          signal: abortRef.current.signal,
+        });
+        if (attachments === null) return;
         // The server may have sent the row while its attachments were loading.
         if (!rowsRef.current.some((candidate) => candidate.queueId === row.queueId)) {
           Alert.alert("That message was already sent.");
