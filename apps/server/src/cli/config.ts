@@ -1,5 +1,9 @@
 import * as NetService from "@t3tools/shared/Net";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@t3tools/shared/productName";
+=======
+import { OtlpHeadersFromString, OtlpProtocol } from "@t3tools/shared/observability";
+>>>>>>> upstream/main
 import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
 import { DesktopBackendBootstrap, PortSchema } from "@t3tools/contracts";
 import * as Config from "effect/Config";
@@ -100,6 +104,13 @@ const EnvServerConfig = Config.all({
     Config.withDefault(10_000),
   ),
   otlpServiceName: Config.string("T3CODE_OTLP_SERVICE_NAME").pipe(Config.withDefault("t3-server")),
+  otlpHeaders: Config.schema(OtlpHeadersFromString, "T3CODE_OTLP_HEADERS").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  otlpProtocol: Config.schema(OtlpProtocol, "T3CODE_OTLP_PROTOCOL").pipe(
+    Config.withDefault("http/json"),
+  ),
   mode: Config.schema(ServerConfig.RuntimeMode, "T3CODE_MODE").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -388,6 +399,8 @@ export const resolveServerConfig = (
         persistedObservabilitySettings.otlpMetricsUrl,
       otlpExportIntervalMs: env.otlpExportIntervalMs,
       otlpServiceName: env.otlpServiceName,
+      otlpHeaders: env.otlpHeaders,
+      otlpProtocol: env.otlpProtocol,
       mode,
       port,
       cwd,

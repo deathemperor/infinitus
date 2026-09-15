@@ -62,6 +62,7 @@ import Migration0047 from "./Migrations/047_ProjectionProjectIcon.ts";
 import Migration0048 from "./Migrations/048_ProjectionThreadBranchPullRequest.ts";
 import Migration0049 from "./Migrations/049_ProjectionThreadsActiveOrderKey.ts";
 import Migration0050 from "./Migrations/050_ProjectionThreadPullRequests.ts";
+<<<<<<< HEAD
 import Migration0051 from "./Migrations/051_ProjectionThreadQueuedTurns.ts";
 import Migration0052 from "./Migrations/052_ProjectionThreadsBabysit.ts";
 import Migration0053 from "./Migrations/053_ProjectionThreadsSideOf.ts";
@@ -72,6 +73,10 @@ import Migration0057 from "./Migrations/057_ProjectionThreadsUsageBaseline.ts";
 import Migration0058 from "./Migrations/058_ProjectionThreadMessageContext.ts";
 import Migration0059 from "./Migrations/059_ProjectionThreadQueuedTurnsContext.ts";
 import Migration0060 from "./Migrations/060_ProjectionTurnUsageCompletedAtIndex.ts";
+=======
+import Migration0051 from "./Migrations/051_ProjectionThreadMessageContext.ts";
+import Migration0052 from "./Migrations/052_ProjectionThreadTitleState.ts";
+>>>>>>> upstream/main
 
 /**
  * Migration loader with all migrations defined inline.
@@ -134,6 +139,7 @@ const migrationEntries = [
   [48, "ProjectionThreadBranchPullRequest", Migration0048],
   [49, "ProjectionThreadsActiveOrderKey", Migration0049],
   [50, "ProjectionThreadPullRequests", Migration0050],
+<<<<<<< HEAD
   [51, "ProjectionThreadQueuedTurns", Migration0051],
   [52, "ProjectionThreadsBabysit", Migration0052],
   [53, "ProjectionThreadsSideOf", Migration0053],
@@ -144,6 +150,10 @@ const migrationEntries = [
   [58, "ProjectionThreadMessageContext", Migration0058],
   [59, "ProjectionThreadQueuedTurnsContext", Migration0059],
   [60, "ProjectionTurnUsageCompletedAtIndex", Migration0060],
+=======
+  [51, "ProjectionThreadMessageContext", Migration0051],
+  [52, "ProjectionThreadTitleState", Migration0052],
+>>>>>>> upstream/main
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

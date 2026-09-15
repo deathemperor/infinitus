@@ -44,11 +44,15 @@ function renderPendingActions(isRunning: boolean) {
   );
 }
 
+<<<<<<< HEAD
 function renderRunningActions(
   showSendWhileRunning: boolean,
   hasSendableContent: boolean,
   runningSendMode?: "queue" | "steer",
 ) {
+=======
+function renderRunningActions(hasSendableContent: boolean) {
+>>>>>>> upstream/main
   return renderToStaticMarkup(
     createElement(ComposerPrimaryActions, {
       compact: true,
@@ -62,8 +66,11 @@ function renderRunningActions(
       isEnvironmentUnavailable: false,
       isPreparingWorktree: false,
       hasSendableContent,
+<<<<<<< HEAD
       showSendWhileRunning,
       runningSendMode,
+=======
+>>>>>>> upstream/main
       onPreviousPendingQuestion: () => {},
       onInterrupt: () => {},
       onImplementPlanInNewThread: () => {},
@@ -130,18 +137,11 @@ describe("ComposerPrimaryActions", () => {
     expect(markup).not.toContain("stage-nightly");
   });
 
-  it("only renders stop while running when Enter-to-send is available", () => {
-    const markup = renderRunningActions(false, true);
+  it("renders a queue action alongside stop while running with a sendable draft", () => {
+    const markup = renderRunningActions(true);
 
     expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).not.toContain('aria-label="Send message"');
-  });
-
-  it("renders send alongside stop while running when Enter-to-send is unavailable", () => {
-    const markup = renderRunningActions(true, true);
-
-    expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).toContain('aria-label="Send message"');
+    expect(markup).toContain('aria-label="Queue message"');
     expect(markup).toContain('type="submit"');
   });
 
@@ -152,9 +152,9 @@ describe("ComposerPrimaryActions", () => {
   });
 
   it("keeps stop as the only action while running with an empty composer", () => {
-    const markup = renderRunningActions(true, false);
+    const markup = renderRunningActions(false);
 
     expect(markup).toContain('aria-label="Stop generation"');
-    expect(markup).not.toContain('aria-label="Send message"');
+    expect(markup).not.toContain('aria-label="Queue message"');
   });
 });

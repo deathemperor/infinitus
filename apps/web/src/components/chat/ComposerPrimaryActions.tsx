@@ -30,11 +30,14 @@ interface ComposerPrimaryActionsProps {
   isPreparingWorktree: boolean;
   hasSendableContent: boolean;
   preserveComposerFocusOnPointerDown?: boolean;
+<<<<<<< HEAD
   /** Enter-to-send is disabled on mobile viewports, where stop would otherwise
    * be the only primary action and a running turn could not be steered. */
   showSendWhileRunning?: boolean;
   /** Fork (#270 F): while running, the send button stays and says what Enter does. */
   runningSendMode?: ComposerSendMode | undefined;
+=======
+>>>>>>> upstream/main
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
@@ -75,8 +78,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   isPreparingWorktree,
   hasSendableContent,
   preserveComposerFocusOnPointerDown = false,
+<<<<<<< HEAD
   showSendWhileRunning = false,
   runningSendMode,
+=======
+>>>>>>> upstream/main
   onPreviousPendingQuestion,
   onInterrupt,
   onImplementPlanInNewThread,
@@ -97,7 +103,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         "flex cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-[0_1px_--theme(--color-white/16%)] transition-all duration-150 hover:bg-destructive hover:scale-105 active:inset-shadow-[0_1px_--theme(--color-black/8%)] active:shadow-none",
         insidePendingAction
           ? "size-8 sm:size-7"
+<<<<<<< HEAD
           : (showSendWhileRunning || runningSendMode !== undefined) && hasSendableContent
+=======
+          : hasSendableContent
+>>>>>>> upstream/main
             ? "size-9 sm:size-8"
             : "size-8 sm:h-8 sm:w-8",
       )}
@@ -251,11 +261,17 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                 ? "Preparing worktree"
                 : isSendBusy
                   ? "Sending"
+<<<<<<< HEAD
                   : isRunning && runningSendMode === "queue"
                     ? "Queue message"
                     : isRunning && runningSendMode === "steer"
                       ? "Send now"
                       : "Send message"
+=======
+                  : isRunning
+                    ? "Queue message"
+                    : "Send message"
+>>>>>>> upstream/main
       }
     >
       {stageBackdropVariant ? (
@@ -283,12 +299,18 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     return sendButton;
   }
 
+  // While a turn runs, a sendable draft queues for the next tool boundary, so
+  // the send button stays next to Stop on every viewport.
   return (
     <>
       {renderStopGenerationButton(false)}
+<<<<<<< HEAD
       {(showSendWhileRunning || runningSendMode !== undefined) && hasSendableContent
         ? sendButton
         : null}
+=======
+      {hasSendableContent ? sendButton : null}
+>>>>>>> upstream/main
     </>
   );
 });

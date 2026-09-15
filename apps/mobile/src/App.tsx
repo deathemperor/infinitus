@@ -58,6 +58,7 @@ const rewriteIncomingUrl = (url: string | null): string | null => {
 };
 
 const appLinking = {
+<<<<<<< HEAD
   prefixes: [
     Linking.createURL("/"),
     "t3code://",
@@ -74,6 +75,11 @@ const appLinking = {
     });
     return () => subscription.remove();
   },
+=======
+  prefixes: [Linking.createURL("/"), "t3code://", "t3code-dev://", "t3code-preview://"],
+  // Keep the compact thread list available beneath a directly opened thread.
+  config: { initialRouteName: "Home" },
+>>>>>>> upstream/main
   // The Expo dev client launches the app via
   // <scheme>://expo-development-client/?url=<packager> — that URL addresses
   // the launcher, not app navigation. Without this filter it falls through

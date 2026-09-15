@@ -3,9 +3,15 @@
   "private": true,
   "type": "module",
   "exports": {
+<<<<<<< HEAD
     "./orderKeys": {
       "types": "./src/orderKeys.ts",
       "import": "./src/orderKeys.ts"
+=======
+    "./legacyCliLauncher": {
+      "types": "./src/legacyCliLauncher.ts",
+      "import": "./src/legacyCliLauncher.ts"
+>>>>>>> upstream/main
     },
     "./delimitedPreview": {
       "types": "./src/delimitedPreview.ts",
