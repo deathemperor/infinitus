@@ -439,6 +439,95 @@ export const InfinitusAwsLogins = Schema.Struct({
 });
 export type InfinitusAwsLogins = typeof InfinitusAwsLogins.Type;
 
+/** One member of the team as `team-status` lists it (#1313): the roster
+    row plus what the member last published — absent for one that has not
+    published yet. `fleet` is left opaque (the Mac's `fleet.json`). */
+export const InfinitusTeamMember = Schema.Struct({
+  kid: Schema.String,
+  name: Schema.String,
+  role: Schema.String,
+  isMe: Schema.Boolean,
+  founder: Schema.optionalKey(Schema.Boolean),
+  since: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  lastPublished: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  kinds: Schema.optionalKey(Schema.Array(Schema.String)),
+  threadsNow: Schema.optionalKey(Schema.Number),
+  blockers: Schema.optionalKey(Schema.Array(Schema.String)),
+  crashes: Schema.optionalKey(Schema.Number),
+  todayUSD: Schema.optionalKey(Schema.Number),
+  todayMessages: Schema.optionalKey(Schema.Number),
+  todayCommits: Schema.optionalKey(Schema.Number),
+  fleet: Schema.optionalKey(Schema.Unknown),
+});
+export type InfinitusTeamMember = typeof InfinitusTeamMember.Type;
+
+/** A pending join request (leaders see them). */
+export const InfinitusTeamRequest = Schema.Struct({
+  kid: Schema.String,
+  name: Schema.String,
+  platform: Schema.optionalKey(Schema.String),
+  devices: Schema.optionalKey(Schema.Array(Schema.String)),
+  at: Schema.optionalKey(Schema.Number),
+});
+export type InfinitusTeamRequest = typeof InfinitusTeamRequest.Type;
+
+/** The `team-status` reply: the team this Mac is in, or `null` when there is
+    none. `remote` is masked by the Mac. `shares` maps a kind (stats, now,
+    threads, transcripts, crashes, fleet) to its audience (off, leaders, team);
+    `exclusions` are project slugs kept private. `lockEnabled` gates minting a
+    code and approving a member on the Mac. */
+export const InfinitusTeamSnapshot = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  remote: Schema.String,
+  kid: Schema.String,
+  role: Schema.String,
+  rev: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  members: Schema.Array(InfinitusTeamMember),
+  requests: Schema.optionalKey(Schema.Array(InfinitusTeamRequest)),
+  policy: Schema.optionalKey(Schema.NullOr(Schema.Struct({ requests: Schema.String }))),
+  shares: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  exclusions: Schema.optionalKey(Schema.Array(Schema.String)),
+  lockEnabled: Schema.optionalKey(Schema.Boolean),
+  lastFetch: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  lastPublish: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  lastError: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusTeamSnapshot = typeof InfinitusTeamSnapshot.Type;
+
+/** The `team-code` reply: the code or invite link (shown once, never logged)
+    and when it expires (unix seconds). */
+export const InfinitusTeamCode = Schema.Struct({
+  code: Schema.String,
+  expires: Schema.optionalKey(Schema.Number),
+});
+export type InfinitusTeamCode = typeof InfinitusTeamCode.Type;
+
+/** The `team-insights` reply (leaders): blockers, headroom, who is on. Spend
+    figures are estimates. */
+export const InfinitusTeamInsights = Schema.Struct({
+  period: Schema.String,
+  blockers: Schema.Array(
+    Schema.Struct({ kid: Schema.String, name: Schema.String, kind: Schema.String, text: Schema.String }),
+  ),
+  headroom: Schema.Array(
+    Schema.Struct({
+      kid: Schema.String,
+      name: Schema.String,
+      engine: Schema.String,
+      active: Schema.optionalKey(Schema.NullOr(Schema.String)),
+      headroom: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+      spare: Schema.optionalKey(Schema.Number),
+      dead: Schema.optionalKey(Schema.Number),
+    }),
+  ),
+  onNow: Schema.Array(Schema.String),
+  cost: Schema.optionalKey(Schema.Unknown),
+  repos: Schema.optionalKey(Schema.Unknown),
+  hours: Schema.optionalKey(Schema.Array(Schema.Number)),
+});
+export type InfinitusTeamInsights = typeof InfinitusTeamInsights.Type;
+
 /** One row of the `events` reply — the app's event log as the Activity pane
     shows it: `at` ISO 8601, `icon` an SF Symbol name, `text` the line. Since
     native #630 (#615) a row also carries `id`, the app's own UUID for the
