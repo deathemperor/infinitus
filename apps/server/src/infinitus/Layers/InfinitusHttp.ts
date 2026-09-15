@@ -8,7 +8,11 @@ import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+
 import { annotateEnvironmentRequest, requireEnvironmentScope } from "../../auth/http.ts";
+import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -35,7 +39,30 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
     const stops = yield* InfinitusLimitStops;
     const interrupt = yield* InfinitusSessionInterrupt;
     const runningTurns = yield* InfinitusRunningTurns;
+    const settings = yield* ServerSettingsService;
+    const projection = yield* ProjectionSnapshotQuery;
     return handlers
+      .handle(
+        "threadDefaults",
+        Effect.fn("environment.infinitus.threadDefaults")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          // #1315: the composer's own resolution — the project's override,
+          // the row's default until the fold, then the environment's. A
+          // settings or projection read that fails is the server's own state
+          // gone wrong, not a request the CLI can fix — die, don't 500.
+          const current = yield* settings.getSettings.pipe(Effect.orDie);
+          const projectId = args.query.projectId ?? null;
+          const project =
+            projectId === null
+              ? null
+              : Option.getOrNull(
+                  yield* projection.getProjectShellById(projectId).pipe(Effect.orDie),
+                );
+          const resolved = resolveProjectSettings(current, projectId, project).settings;
+          return { defaultModelSelection: resolved.defaultModelSelection ?? null };
+        }),
+      )
       .handle(
         "runningTurns",
         Effect.fn("environment.infinitus.runningTurns")(function* (args) {

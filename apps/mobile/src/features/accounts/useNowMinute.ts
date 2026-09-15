@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-/** A minute clock for the session ages, the exhausted band's "reset has
-    passed" and the chip's limited state: read once on mount, then each minute. */
+/** A minute clock for the exhausted band's "reset has passed" and the chip's
+    limited state: read once on mount, then each minute. */
 export function useNowMinute(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

@@ -390,8 +390,8 @@
         "effect": "read",
         "name": "proxy",
         "options": [],
-        "replyShape": "{baseURL, keyPresent, enabled, routingStrategy?, sessionAffinity?, caveat?, error?}",
-        "summary": "CLIProxyAPI settings: base URL, whether a key is stored, whether the engine is on, routing strategy, session affinity (absent on a proxy without the route), the routing caveat and the last error."
+        "replyShape": "{baseURL, dashboardURL, keyPresent, enabled, routingStrategy?, sessionAffinity?, caveat?, error?}",
+        "summary": "CLIProxyAPI settings: base URL, its management panel's URL, whether a key is stored, whether the engine is on, routing strategy, session affinity (absent on a proxy without the route), the routing caveat and the last error."
       },
       {
         "args": [],

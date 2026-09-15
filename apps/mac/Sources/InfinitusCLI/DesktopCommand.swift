@@ -18,7 +18,7 @@ func desktopUsage() -> String {
            \(programName) thread title [--thread <id>]
            \(programName) thread show <id> [--turns <n>]
            \(programName) thread send <id> <message|-> [--steer] [--wait] [--wait-idle]
-           \(programName) thread new --project <id|name> <prompt|-> [--worktree <branch>] [--base <branch>] [--wait]
+           \(programName) thread new --project <id|name> <prompt|-> [--model <instanceId>/<model>|<model>] [--worktree <branch>] [--base <branch>] [--wait]
            \(programName) thread interrupt <id>
            \(programName) thread release <id>
            \(programName) desktop status | credential
@@ -28,6 +28,7 @@ func desktopUsage() -> String {
     `-` reads the message from stdin. `send` queues nothing: a running thread refuses
     unless --steer folds the message into the turn or --wait-idle sends it when the turn ends.
     --wait prints the assistant's answer when the turn ends (exit 1 when it errors or is interrupted).
+    `new` creates the thread on --model, else the project's default model (its Settings override first), else the environment's.
 
     """
 }
@@ -231,9 +232,14 @@ private struct DesktopVerbs {
             guard let project = shell.projects.first(where: { $0.id == wanted || $0.title == wanted }) else {
                 throw Refused(message: "no project \(wanted) in Infinitus desktop")
             }
-            guard let model = project.defaultModelSelection, model != .null else {
-                throw Refused(message: "project \(project.title) has no default model; pick one in Infinitus desktop")
-            }
+            // #1315: what the desktop's composer would pick for this project
+            // (its Settings override outranks the row); an older desktop
+            // without the route leaves the row.
+            let model: JSONValue
+            do {
+                model = try DesktopRows.modelSelection(option: options["model"], project: project,
+                                                       resolved: try api.threadDefaults(projectId: project.id))
+            } catch let refusal as DesktopRows.NoModel { throw Refused(message: refusal.message) }
             var base = options["base"]
             if options["worktree"] != nil, base == nil {
                 guard let branch = currentBranch(of: project.workspaceRoot) else {

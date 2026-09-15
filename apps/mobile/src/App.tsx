@@ -17,6 +17,7 @@ import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
 import { InfinitusAlertPushBridge } from "./features/infinitus/InfinitusAlertPushBridge";
+import { InfinitusHoldsBridge } from "./features/infinitus/InfinitusHoldsBridge";
 import { InfinitusNotificationPresenter } from "./features/infinitus/InfinitusNotificationPresenter";
 import { InfinitusThreadCardBridge } from "./features/infinitus/InfinitusThreadCardBridge";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
@@ -73,6 +74,8 @@ const appLinking = {
     });
     return () => subscription.remove();
   },
+  // Keep the compact thread list available beneath a directly opened thread.
+  config: { initialRouteName: "Home" },
   // The Expo dev client launches the app via
   // <scheme>://expo-development-client/?url=<packager> — that URL addresses
   // the launcher, not app navigation. Without this filter it falls through
@@ -137,6 +140,7 @@ function AppContent() {
               <InfinitusAlarmsBridge />
               <InfinitusAlertPushBridge />
               <InfinitusThreadCardBridge />
+              <InfinitusHoldsBridge />
               <InfinitusNotificationPresenter />
             </BlurTargetView>
             {/* Anchored-menu overlays render here — in-window, so the

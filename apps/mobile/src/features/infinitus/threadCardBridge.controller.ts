@@ -1,5 +1,5 @@
 import type { LiveActivityTokenKind } from "./liveActivity.logic";
-import { syncWatchedCards } from "./cardSync.logic";
+import { cardsToEnd, syncWatchedCards } from "./cardSync.logic";
 import { nextRetry, NO_RETRY } from "./pushRetry.logic";
 
 /**
@@ -19,6 +19,8 @@ export interface LiveCard {
   getId(): string;
   getPushToken(): Promise<string | null>;
   addPushTokenListener(listener: (event: { readonly pushToken: string }) => void): Subscription;
+  /** Ends the card; `"immediate"` takes it off the lock screen at once. */
+  end(dismissalPolicy: "immediate"): Promise<void>;
 }
 
 export interface ThreadCardBridgeDeps {
@@ -42,10 +44,21 @@ export interface ThreadCardBridgeDeps {
   /** A local card start or end (the test card); answers the unsubscribe. */
   readonly subscribeLocalChanges: (listener: () => void) => () => void;
   readonly isConnected: () => boolean;
+  /** The app's state as iOS reports it; anything but `active` is the background. */
+  readonly appState: () => string;
+  /** Asks the connection layer to bring the Mac's socket up now (#1277): a card
+      started from a push-to-start while the app is in the background finds the
+      socket down, and only the app becoming active would otherwise reconnect. */
+  readonly requestReconnect: () => void;
   readonly now: () => Date;
   readonly notes: {
     readonly watching: (since: Date | null) => void;
     readonly withdrawn: (at: Date) => void;
+    readonly backgroundCard: (note: {
+      readonly startedAt: string;
+      readonly outcome: "sent" | "unreachable";
+      readonly elapsedMs: number;
+    }) => void;
   };
 }
 
@@ -66,6 +79,11 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
   let withdraw = false;
   /** The slot was cleared since the last card token was offered. */
   let slotCleared = false;
+  /** The card whose token was last offered — the one the Mac can update. */
+  let heldCard: string | null = null;
+  /** A card iOS started while the app was in the background: its token's
+      journey is recorded for the Settings row until the send lands (#1277). */
+  let backgroundStart: { readonly at: Date; reportedUnreachable: boolean } | null = null;
   let schedule = NO_RETRY;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let sending = false;
@@ -88,11 +106,13 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
     sending = true;
     clearTimer();
     try {
+      const kinds = [...latest.keys()];
       const outcomes = await Promise.all([
         ...[...latest].map(([kind, token]) => send(kind, token)),
         ...(withdraw ? [forgetCard()] : []),
       ]);
       if (cancelled) return;
+      noteBackgroundCardSend(kinds, outcomes);
       schedule = nextRetry({
         attempt: schedule.attempt,
         landed: outcomes.every(Boolean),
@@ -105,6 +125,32 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
     if (again && !cancelled) {
       again = false;
       await flush();
+    }
+  };
+
+  /** What a round did for a card started in the background: the moment its
+      token lands is the answer to how long the window was; a round that
+      found the Mac unreachable is recorded once, and the landing overwrites it
+      (then the elapsed time is the whole wait, foreground included). */
+  const noteBackgroundCardSend = (kinds: LiveActivityTokenKind[], outcomes: boolean[]) => {
+    if (backgroundStart === null) return;
+    const index = kinds.indexOf("agent-activity");
+    if (index === -1) return;
+    const elapsedMs = deps.now().getTime() - backgroundStart.at.getTime();
+    if (outcomes[index]) {
+      deps.notes.backgroundCard({
+        startedAt: backgroundStart.at.toISOString(),
+        outcome: "sent",
+        elapsedMs,
+      });
+      backgroundStart = null;
+    } else if (!deps.isConnected() && !backgroundStart.reportedUnreachable) {
+      backgroundStart.reportedUnreachable = true;
+      deps.notes.backgroundCard({
+        startedAt: backgroundStart.at.toISOString(),
+        outcome: "unreachable",
+        elapsedMs,
+      });
     }
   };
 
@@ -121,21 +167,28 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
   };
 
   /** A token from iOS: a new one is a fresh chance, so the backoff resets. */
-  const offer = (kind: LiveActivityTokenKind, token: string) => {
+  const offer = (kind: LiveActivityTokenKind, token: string, from?: string) => {
     if (cancelled || latest.get(kind) === token) return;
     latest.set(kind, token);
     if (kind === "agent-activity") {
       withdraw = false;
       slotCleared = false;
+      heldCard = from ?? heldCard;
     }
     schedule = NO_RETRY;
     void flush();
   };
 
-  /** Re-reads the live cards: watches the new ones, lets the ended ones go,
-      and queues the withdrawal when none is left. */
+  /** Re-reads the live cards: keeps one (#1277) and ends the others at once,
+      watches the new one, lets the ended ones go, and queues the withdrawal
+      when none is left. */
   const sync = () => {
-    const live = deps.getInstances();
+    const all = deps.getInstances();
+    const extra = cardsToEnd({ live: all.map((activity) => activity.getId()), held: heldCard });
+    for (const activity of all) {
+      if (extra.end.includes(activity.getId())) void activity.end("immediate").catch(() => {});
+    }
+    const live = all.filter((activity) => activity.getId() === extra.keep);
     const next = syncWatchedCards({
       watched: new Set(watched.keys()),
       live: live.map((activity) => activity.getId()),
@@ -150,10 +203,10 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
       if (!next.added.includes(id)) continue;
       watched.set(
         id,
-        activity.addPushTokenListener((event) => offer("agent-activity", event.pushToken)),
+        activity.addPushTokenListener((event) => offer("agent-activity", event.pushToken, id)),
       );
       void activity.getPushToken().then((token) => {
-        if (token) offer("agent-activity", token);
+        if (token) offer("agent-activity", token, id);
       });
     }
     if (next.withdraw && !withdraw) {
@@ -184,7 +237,15 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
       retry();
     }),
   );
-  subscriptions.push(deps.addActivityUpdateListener(() => sync()));
+  subscriptions.push(
+    deps.addActivityUpdateListener((event) => {
+      if (event.state === "started" && deps.appState() !== "active") {
+        backgroundStart = { at: deps.now(), reportedUnreachable: false };
+        deps.requestReconnect();
+      }
+      sync();
+    }),
+  );
   const unsubscribeLocal = deps.subscribeLocalChanges(sync);
 
   return {

@@ -15,7 +15,13 @@ import AgentActivity from "../../widgets/AgentActivity";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { AGENT_ACTIVITY_TOKEN_KINDS, pusherMac } from "./liveActivity.logic";
 import { localLiveActivityStartsAtom } from "./liveActivityStarts";
-import { noteAgentActivityWatching, noteSwitchOff, noteTokenWithdrawn } from "./pushDiagnostics";
+import { requestConnectionWakeup } from "./connectionWakeups";
+import {
+  noteAgentActivityWatching,
+  noteBackgroundCard,
+  noteSwitchOff,
+  noteTokenWithdrawn,
+} from "./pushDiagnostics";
 import { useForgetOnSwitchOff } from "./pushForget";
 import { forgetTokensOutcome } from "./pushForget.logic";
 import { tokenSender } from "./pushRegistration";
@@ -45,7 +51,12 @@ import { startThreadCardBridge } from "./threadCardBridge.controller";
     re-reads the live cards, so the new card's own token reaches the Mac and
     the next push updates it in place instead of starting another. Without
     that event the scan ran only at mount, on a foreground and after a local
-    start or end, and five pushes made five cards.
+    start or end, and five pushes made five cards. The socket to the Mac is
+    down in that background window — the connection layer reconnects only on
+    the app becoming active — so a card started there also asks for the
+    `application-active-reconnect` wakeup at once (`connectionWakeups.ts`),
+    and the Settings row records how long the token took, or that the Mac
+    stayed unreachable until the next foreground.
 
     A card's own token is withdrawn once no card is live (#1265): the scan
     is the phone's mechanism, so every re-scan that finds
@@ -103,8 +114,14 @@ export function InfinitusThreadCardBridge() {
       subscribeLocalChanges: (listener) =>
         appAtomRegistry.subscribe(localLiveActivityStartsAtom, listener),
       isConnected: () => connectedRef.current,
+      appState: () => AppState.currentState,
+      requestReconnect: () => requestConnectionWakeup("application-active-reconnect"),
       now: () => new Date(),
-      notes: { watching: noteAgentActivityWatching, withdrawn: noteTokenWithdrawn },
+      notes: {
+        watching: noteAgentActivityWatching,
+        withdrawn: noteTokenWithdrawn,
+        backgroundCard: noteBackgroundCard,
+      },
     });
     retryRef.current = bridge.retry;
     return () => {

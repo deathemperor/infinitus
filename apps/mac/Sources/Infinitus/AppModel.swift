@@ -843,6 +843,7 @@ final class AppModel: ObservableObject {
 
     /// App-side cache of our own subprocess output (never an engine
     /// internal file).
+    private var snapshotCacheWrite = WriteIfChanged()
     static let snapshotCacheURL: URL = {
         return AppSupport.root().appendingPathComponent("snapshot-cache.json")
     }()
@@ -1674,7 +1675,16 @@ final class AppModel: ObservableObject {
     /// off the PRIMARY Claude fleet exactly as they did when swapd was
     /// the only engine. An engine that fails keeps its last good rows
     /// (the rumps menubar's _worker policy) and records its error.
+    /// One pass at a time (#1310): the timer, a control verb and the
+    /// revival probe all land here, and a request made mid-pass runs once
+    /// more after it instead of alongside it.
     func refreshSnapshot() async {
+        await refreshFlight.run { [weak self] in await self?.refreshSnapshotPass() }
+    }
+
+    private let refreshFlight = SingleFlight()
+
+    private func refreshSnapshotPass() async {
         let engines = registry.engines
         guard !engines.isEmpty else { return }
         var results: [(id: String, fleets: [EngineFleet]?, error: Error?)] = []
@@ -1783,7 +1793,11 @@ final class AppModel: ObservableObject {
         }
         if !isPlayground {
             let cache = fleets.compactMap(\.lastFleet)
-            if let data = try? JSONEncoder().encode(cache) {
+            // Sorted keys so two passes over the same state are the same
+            // bytes, and the write is skipped when they are (#1310).
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            if let data = try? encoder.encode(cache), snapshotCacheWrite.take(data) {
                 try? FileManager.default.createDirectory(
                     at: Self.snapshotCacheURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true)
