@@ -667,9 +667,10 @@ desk_get /api/demo/dispatches | expect "[c['type'] for c in d]==['thread.turn.st
 desk_get /api/demo/dispatches | expect "[c['bootstrap']['createThread']['modelSelection'] for c in d[4:7]]==[{'instanceId':'claude','model':'sonnet'},{'instanceId':'codex','model':'gpt-5'},{'instanceId':'claude','model':'haiku'}]" || fail "the new threads must carry the environment default, the explicit instance/model and the project's instance with the bare model"
 # #1313 spec §8, delegated control over the store lane: Ann (the app) grants
 # Bo (the CLI identity) send, view and new; Bo drives from his own team dir.
-# The app's httpBaseUrl is loopback, so Bo's network lane is skipped and the
-# command rides the store; the app's next fetch executes it against the demo
-# desktop and answers a sealed ack Bo reaps with `team acks`.
+# Ann's now.json predates the grant and carries no endpoints (and the app's
+# own httpBaseUrl is loopback, which a driver skips anyway), so the command
+# rides the store; the app's next fetch executes it against the demo desktop
+# and answers a sealed ack Bo reaps with `team acks`.
 ANN_KID="$("$CTL" team-identity | json "d['kid']")"
 "$CTL" team-grant "$KID" --cap send,view,new | expect "d['audience']==['$KID'] and d['threads']=='all' and sorted(d['capabilities'])==['new','send','view'] and 'preauthorized' not in d" || fail "team-grant"
 "$CTL" team-grants | expect "len(d['grants'])==1" || fail "team-grants"
@@ -693,7 +694,7 @@ VIEW_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle vi
 [ -n "$VIEW_ID" ] || fail "team drive view must queue"
 "$CTL" team-fetch >/dev/null || fail "team-fetch after a queued view"
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$VIEW_ID' and a['outcome']=='done' and 'echo: hello from Bo via the store' in a['detail'] for a in d)" || fail "team acks after view must carry the thread's transcript"
-"$CTL" team-fetch | expect "any(m['name']=='Bo' and m.get('controls') is None for m in d['members']) and len(d['grants'])==1 and d['pending']==[]" || fail "team-status must carry the grant and no waits"
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and m.get('controls') is None for m in d['members']) and len(d['grants'])==1 and d.get('pending') is None" || fail "team-status must carry the grant and no waits"
 GRANT_ID="$("$CTL" team-grants | json "d['grants'][0]['id']")"
 "$CTL" team-revoke "$GRANT_ID" | expect "d['removed'] is True" || fail "team-revoke"
 LATE_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle send "after the revoke" | json "d['id'] if d['outcome']=='queued' else ''")"
