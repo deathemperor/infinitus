@@ -4,12 +4,10 @@ This `main` is a fork of [T3 Code](https://github.com/pingdotgg/t3code) that
 drives the Infinitus engine. AGENTS.md (upstream's guide) applies in full;
 this file adds the fork's own rules. Plan and history: issue #555.
 Unification (#823, user ruling 2026-09-11): the product is one name,
-Infinitus — no user-facing "fork", "native" or "T3 Code" anywhere (layer 1);
-the Swift app moves into `main` as `apps/mac` (layer 2) and one version
-`0.5.0-alpha.N` ships everything from one release (layer 3). "Fork" and
-"native" below are contributor shorthand for this TypeScript tree and the
-Swift app while those layers land; each layer rewrites the paragraphs it
-makes wrong, in its own PR.
+Infinitus — no user-facing "fork", "native" or "T3 Code" anywhere; the
+Swift app lives in `main` as `apps/mac`; one version `0.5.0-alpha.N`
+ships everything from one release. "Fork" and "native" below are
+contributor shorthand for this TypeScript tree and the Swift app.
 
 ## Non-negotiables
 
@@ -156,8 +154,12 @@ makes wrong, in its own PR.
   feed a build follows is a separate thing, above.
 - **PR-only main** (ruleset "main via pull requests"): required checks are
   T3's CI jobs Check, Test, Test Server 1–3. `gh pr create --base main`,
-  `gh pr merge --squash --auto`. Every commit carries
-  `Co-Authored-By: Claude Code <noreply@anthropic.com>`.
+  `gh pr merge --squash --auto`. Every commit carries a
+  `Co-Authored-By: Claude … <noreply@anthropic.com>` trailer naming the
+  model that did the work (the harness supplies the exact name). A session
+  working for the fork's owner (deathemperor) opens the PR and arms the
+  merge without asking — standing consent, user ruling 2026-09-15; for
+  anyone else AGENTS.md's rule stands: no PR unless asked.
 - **Worktrees share one clone's `refs/remotes/origin`.** Several sessions
   work in worktrees of the same clone, so `git fetch && git merge origin/main`
   can merge a tip another session fetched moments earlier and land a branch
