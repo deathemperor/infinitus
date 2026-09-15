@@ -9,3 +9,5 @@ A server that dies mid-backoff still picks the turn up: every reconnecting state
 ## What the client sees
 
 The reason reaches the client as `OrchestrationSession.statusReason` (`packages/contracts/src/orchestration.ts`; ingestion sets it from a running `session.state.changed`, null on every other lifecycle event; `ProjectionThreadSessions` column `status_reason`, `Migrations/055_ProjectionThreadSessionsStatusReason.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`), and the web shows "Waiting for the network. Reconnect attempt n of 5." under the thread's banners (`apps/web/src/components/chat/ThreadReconnectingNotice.tsx`, mounted in `ChatView.tsx`). Codex is out of scope. Tests: `claudeReconnect.logic.test.ts`, `ClaudeAdapter.test.ts` "reconnect (#832)", `ProviderRuntimeIngestion.test.ts`, `ThreadReconnectingNotice.test.ts`.
+
+The phone's notice is in `docs/internals/phone-thread-screen.md`.
