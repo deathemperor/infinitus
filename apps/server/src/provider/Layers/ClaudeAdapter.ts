@@ -1936,43 +1936,118 @@ function toolResultStreamKind(itemType: CanonicalItemType): ClaudeToolResultStre
   }
 }
 
-interface AdvisorToolResultBlock {
+type ServerToolResultBlockType =
+  | "advisor_tool_result"
+  | "web_search_tool_result"
+  | "web_fetch_tool_result";
+
+interface ServerToolResultBlock {
+  readonly type: ServerToolResultBlockType;
   readonly toolUseId: string;
-  readonly content: {
-    readonly type: "advisor_result" | "advisor_redacted_result" | "advisor_tool_result_error";
-    readonly text?: string;
-    readonly errorCode?: string;
-  };
+  readonly content: unknown;
 }
 
-// The advisor's answer is an assistant content block keyed by tool_use_id
-// (#1247), never a user tool_result. Locally the redacted form is the rule.
-function readAdvisorToolResultBlock(block: unknown): AdvisorToolResultBlock | undefined {
+// A server tool's answer (advisor, web search, web fetch) is an assistant
+// content block keyed by tool_use_id (#1247, #1251), never a user tool_result.
+function readServerToolResultBlock(block: unknown): ServerToolResultBlock | undefined {
   if (!block || typeof block !== "object") {
     return undefined;
   }
   const candidate = block as { type?: unknown; tool_use_id?: unknown; content?: unknown };
-  if (candidate.type !== "advisor_tool_result" || typeof candidate.tool_use_id !== "string") {
+  if (typeof candidate.tool_use_id !== "string") {
     return undefined;
   }
-  const content = candidate.content as
-    | { type?: unknown; text?: unknown; error_code?: unknown }
-    | undefined;
-  switch (content?.type) {
-    case "advisor_result":
-    case "advisor_redacted_result":
-    case "advisor_tool_result_error":
-      return {
-        toolUseId: candidate.tool_use_id,
-        content: {
-          type: content.type,
-          ...(typeof content.text === "string" ? { text: content.text } : {}),
-          ...(typeof content.error_code === "string" ? { errorCode: content.error_code } : {}),
-        },
-      };
+  switch (candidate.type) {
+    case "advisor_tool_result":
+    case "web_search_tool_result":
+    case "web_fetch_tool_result":
+      return { type: candidate.type, toolUseId: candidate.tool_use_id, content: candidate.content };
     default:
       return undefined;
   }
+}
+
+interface ServerToolOutcome {
+  readonly failed: boolean;
+  // Replaces the request's detail on the closed row; undefined keeps it.
+  readonly detail: string | undefined;
+  // What data.result carries: the block, minus what no client can read.
+  readonly stored: unknown;
+}
+
+function serverToolOutcome(
+  block: ServerToolResultBlock,
+  raw: unknown,
+  requestInput: Record<string, unknown>,
+): ServerToolOutcome {
+  const keep: ServerToolOutcome = { failed: false, detail: undefined, stored: raw };
+  const errorCode = (code: unknown) => (typeof code === "string" ? code : "unknown error");
+
+  if (Array.isArray(block.content)) {
+    if (block.type !== "web_search_tool_result") {
+      return keep;
+    }
+    const results: ReadonlyArray<unknown> = block.content;
+    const query = typeof requestInput.query === "string" ? requestInput.query.trim() : "";
+    const count =
+      results.length === 0
+        ? "No results"
+        : `${results.length} result${results.length === 1 ? "" : "s"}`;
+    return {
+      failed: false,
+      detail: query ? `${count} for ${query}` : count,
+      // Every result carries an encrypted blob only the model can read; a
+      // ten-result search is tens of KB per row to every client without this.
+      stored: { ...(raw as object), content: results.map(webSearchResultForClients) },
+    };
+  }
+
+  const content = block.content as
+    | { type?: unknown; error_code?: unknown; url?: unknown }
+    | null
+    | undefined;
+  switch (content?.type) {
+    case "advisor_redacted_result":
+      return { ...keep, detail: "The advisor answered; its reply is encrypted." };
+    case "advisor_tool_result_error":
+      return {
+        failed: true,
+        detail: `The advisor did not answer: ${errorCode(content.error_code)}.`,
+        stored: raw,
+      };
+    case "web_search_tool_result_error":
+      return {
+        failed: true,
+        detail: `Web search failed: ${errorCode(content.error_code)}.`,
+        stored: raw,
+      };
+    case "web_fetch_result":
+      return {
+        ...keep,
+        detail: typeof content.url === "string" ? `Fetched ${content.url}` : undefined,
+      };
+    case "web_fetch_tool_result_error":
+      return {
+        failed: true,
+        detail: `Web fetch failed: ${errorCode(content.error_code)}.`,
+        stored: raw,
+      };
+    default:
+      return keep;
+  }
+}
+
+function webSearchResultForClients(result: unknown): unknown {
+  if (!result || typeof result !== "object") {
+    return result;
+  }
+  const { type, title, url, page_age } = result as {
+    type?: unknown;
+    title?: unknown;
+    url?: unknown;
+    page_age?: unknown;
+  };
+  return { type, title, url, page_age };
 }
 
 function toolResultBlocksFromUserMessage(message: SDKMessage): Array<{
@@ -3141,8 +3216,12 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         });
         return;
       }
-      if (block.type === "advisor_tool_result") {
-        yield* completeAdvisorToolResult(context, block, {
+      if (
+        block.type === "advisor_tool_result" ||
+        block.type === "web_search_tool_result" ||
+        block.type === "web_fetch_tool_result"
+      ) {
+        yield* completeServerToolResult(context, block, {
           rawMethod: "claude/stream_event/content_block_start",
           rawPayload: message,
         });
@@ -3240,10 +3319,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     }
   });
 
-  // Closes an advisor consult on its answer. With includePartialMessages the
+  // Closes a server tool's row on its answer. With includePartialMessages the
   // block arrives twice (the stream's content_block_start, then the assistant
   // snapshot); whichever comes first closes it and the other finds nothing.
-  const completeAdvisorToolResult = Effect.fn("completeAdvisorToolResult")(function* (
+  const completeServerToolResult = Effect.fn("completeServerToolResult")(function* (
     context: ClaudeSessionContext,
     block: unknown,
     input: {
@@ -3251,7 +3330,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       readonly rawPayload: unknown;
     },
   ) {
-    const result = readAdvisorToolResultBlock(block);
+    const result = readServerToolResultBlock(block);
     if (!result) {
       return;
     }
@@ -3262,17 +3341,12 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       return;
     }
     const [index, tool] = toolEntry;
-    const failed = result.content.type === "advisor_tool_result_error";
-    const detail =
-      result.content.type === "advisor_redacted_result"
-        ? "The advisor answered; its reply is encrypted."
-        : failed
-          ? `The advisor did not answer: ${result.content.errorCode ?? "unknown error"}.`
-          : tool.detail;
+    const outcome = serverToolOutcome(result, block, tool.input);
+    const detail = outcome.detail ?? tool.detail;
     const toolData = {
       toolName: tool.toolName,
       input: tool.input,
-      result: block,
+      result: outcome.stored,
     };
     const raw = {
       source: "claude.sdk.message" as const,
@@ -3291,7 +3365,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       itemId: asRuntimeItemId(tool.itemId),
       payload: {
         itemType: tool.itemType,
-        status: failed ? "failed" : "inProgress",
+        status: outcome.failed ? "failed" : "inProgress",
         title: tool.title,
         ...(detail ? { detail } : {}),
         ...(tool.agentId ? { agentId: tool.agentId } : {}),
@@ -3315,7 +3389,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       itemId: asRuntimeItemId(tool.itemId),
       payload: {
         itemType: tool.itemType,
-        status: failed ? "failed" : "completed",
+        status: outcome.failed ? "failed" : "completed",
         title: tool.title,
         ...(detail ? { detail } : {}),
         ...(tool.agentId ? { agentId: tool.agentId } : {}),
@@ -3608,7 +3682,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         if (!block || typeof block !== "object") {
           continue;
         }
-        yield* completeAdvisorToolResult(context, block, {
+        yield* completeServerToolResult(context, block, {
           rawMethod: "claude/assistant",
           rawPayload: message,
         });
