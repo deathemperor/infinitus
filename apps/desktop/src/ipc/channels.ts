@@ -130,6 +130,8 @@ export const CANCEL_INFINITUS_OAUTH_SIGN_IN_CHANNEL = "desktop:infinitus-cancel-
 // Fork: deep links (#270 D).
 export const CONSUME_INFINITUS_DEEP_LINK_CHANNEL = "desktop:infinitus-consume-deep-link";
 export const INFINITUS_DEEP_LINK_PENDING_CHANNEL = "desktop:infinitus-deep-link-pending";
+// Fork: macOS's navigate-back/forward gesture on the main window (#1250).
+export const INFINITUS_HISTORY_GESTURE_CHANNEL = "desktop:infinitus-history-gesture";
 
 export const MAC_PERMISSION_HELPER_CHANNEL = "desktop:mac-permission-helper";
 

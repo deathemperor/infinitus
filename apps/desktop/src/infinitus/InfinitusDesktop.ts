@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as InfinitusCaptureGesture from "../captures/InfinitusCaptureGesture.ts";
 import * as InfinitusDeepLinks from "./InfinitusDeepLinks.ts";
 import * as InfinitusDesktopPrefs from "./InfinitusDesktopPrefs.ts";
+import * as InfinitusHistoryGesture from "./InfinitusHistoryGesture.ts";
 import * as InfinitusKeepAwake from "./InfinitusKeepAwake.ts";
 import * as InfinitusOAuthSignIn from "./InfinitusOAuthSignIn.ts";
 import * as InfinitusQuitWithApp from "./InfinitusQuitWithApp.ts";
@@ -20,4 +21,5 @@ export const layer = Layer.mergeAll(
   InfinitusCaptureGesture.layer,
   InfinitusDeepLinks.layer,
   InfinitusKeepAwake.layer,
+  InfinitusHistoryGesture.layer,
 ).pipe(Layer.provideMerge(InfinitusDesktopPrefs.layer));

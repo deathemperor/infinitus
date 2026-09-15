@@ -1417,6 +1417,13 @@ export interface DesktopBridge {
   consumePendingDeepLink?: () => Promise<DesktopDeepLink | null>;
   onDeepLinkPending?: (listener: () => void) => () => void;
   /**
+   * Fork (#1250): macOS's navigate-back/forward gesture on the main window —
+   * what Logi Options+ sends for a mouse's back/forward buttons in place of
+   * Chromium buttons 3/4. Optional: a browser, another platform or an older
+   * shell never emits it.
+   */
+  onHistoryGesture?: (listener: (direction: "left" | "right") => void) => () => void;
+  /**
    * Quit-confirmation hint pushes. Optional: older desktop builds never emit
    * them.
    */

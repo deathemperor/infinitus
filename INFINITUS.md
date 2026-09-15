@@ -833,7 +833,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `cancelInfinitusOAuthSignIn` (#1213), and `setInfinitusCaptureGestureEnabled`
   / `onCaptureGestureEvent` with the `DesktopCaptureGestureEvent` schema
   beside `DesktopSnapShotEvent` (#433 slice 2), and `consumePendingDeepLink`
-  / `onDeepLinkPending` with the `DesktopDeepLink` schema after it (#270 D).
+  / `onDeepLinkPending` with the `DesktopDeepLink` schema after it (#270 D),
+  and `onHistoryGesture` (#1250) after those.
   `packages/contracts/src/infinitus.ts`
   — `captureGestureEnabled` on `InfinitusDesktopPrefs`, and
   `InfinitusOAuthSignInInput` / `InfinitusOAuthSignInResult` after
@@ -2194,6 +2195,22 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `SET_KEEP_AWAKE_CHANNEL`, `setKeepAwake` in `ipc/methods/infinitus.ts`, the
   handler and preload lines, the layer in `InfinitusDesktop.layer`. No socket
   traffic, no Mac involvement.
+- `apps/desktop/src/infinitus/InfinitusHistoryGesture.ts` — the mouse's
+  back and forward buttons on a Mac whose driver sends them as the system's
+  page-swipe gesture (#1250; Logi Options+ maps them to `OSX_GESTURE_BACK` /
+  `_FORWARD`, not Chromium buttons 3/4, so #841's `mouseup` listener never
+  fires — Chrome turns that gesture into history itself, Electron drops it
+  unless a window listens). darwin only: `swipe` is attached to every
+  `BrowserWindow` on `browser-window-created` (and to a main window already
+  open), the direction forwarded from the main window only over
+  `INFINITUS_HISTORY_GESTURE_CHANNEL` (`onHistoryGesture` in the preload,
+  `left` / `right` checked there); `AppSidebarLayout`'s history effect runs
+  `swipeHistoryIntent` (`lib/backNavigation.ts`: right = back on a backable
+  page, left = forward anywhere, Safari's rule) through the same
+  `applyHistoryIntent` as the mouse buttons. One log line per gesture,
+  direction only. Not covered: a driver that delivers the gesture as a
+  scroll-phase swipe, which Electron never surfaces — the fallback then is
+  the driver's keystroke mapping.
 - `apps/desktop/src/shell/InfinitusPosixCliDirs.ts` (+ test) — the POSIX
   sibling of upstream's `knownWindowsCliDirs` (#1078): `~/.claude/local`,
   `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,

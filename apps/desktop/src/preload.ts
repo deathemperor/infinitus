@@ -198,6 +198,17 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.removeListener(IpcChannels.INFINITUS_DEEP_LINK_PENDING_CHANNEL, wrappedListener);
     };
   },
+  onHistoryGesture: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, direction: unknown) => {
+      if (direction !== "left" && direction !== "right") return;
+      listener(direction);
+    };
+
+    ipcRenderer.on(IpcChannels.INFINITUS_HISTORY_GESTURE_CHANNEL, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.INFINITUS_HISTORY_GESTURE_CHANNEL, wrappedListener);
+    };
+  },
   pickFolder: (options) => ipcRenderer.invoke(IpcChannels.PICK_FOLDER_CHANNEL, options),
   pickProjectFavicon: (initialPath) =>
     ipcRenderer.invoke(IpcChannels.PICK_PROJECT_FAVICON_CHANNEL, initialPath),
