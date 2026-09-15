@@ -13,6 +13,7 @@
       "vitest": { "entry": [".github/**/*.test.cjs"] },
     },
     "scripts": {
+<<<<<<< HEAD
       // Knip loads its preprocessor through a CLI option, not a source import;
       // the fork's visual pass (harness, fixture, check) is run by hand and by
       // .github/workflows/fork-visual-pass.yml (INFINITUS.md).
@@ -24,6 +25,10 @@
         "fold-changelog.mjs",
         "fold-changelog.d.mts",
       ],
+=======
+      // Knip loads its preprocessor through a CLI option; native verification runs directly.
+      "entry": ["knip-schemas.ts", "mobile-native-client.ts"],
+>>>>>>> upstream/main
     },
     "apps/server": {
       // Vite+ pack entries and the launcher used by installed background services.
