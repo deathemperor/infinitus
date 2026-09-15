@@ -2490,7 +2490,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   "withdrawn". A card iOS starts from a push-to-start while the app is in the
   background is seen through the patched `onExpoWidgetsActivityUpdate` event
   (#1277, above), which runs the same re-scan, so its token reaches the Mac
-  and the next push updates the card in place instead of starting another. A card dismissed while the app stays closed is caught on the
+  and the next push updates the card in place instead of starting another.
+  Every re-scan keeps ONE card — the one whose token the bridge holds, else
+  the first listed, as upstream's app does — and ends the others at once
+  (`cardsToEnd`), so a stack a dead-app window left collapses the next time
+  the app wakes. A card dismissed while the app stays closed is caught on the
   next foreground; the Mac's staleAfter fallback covers the gap. "Show a test card" starts the
   card locally with a fabricated state (`TEST_CARD_STATE`, one row per
   ranked phase, the working one dated against the press so its timer ticks —
