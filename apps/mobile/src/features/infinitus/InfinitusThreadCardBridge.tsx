@@ -13,18 +13,13 @@ import { environmentServerConfigsAtom } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import AgentActivity from "../../widgets/AgentActivity";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
-import {
-  AGENT_ACTIVITY_TOKEN_KINDS,
-  type LiveActivityTokenKind,
-  pusherMac,
-} from "./liveActivity.logic";
+import { AGENT_ACTIVITY_TOKEN_KINDS, pusherMac } from "./liveActivity.logic";
 import { localLiveActivityStartsAtom } from "./liveActivityStarts";
-import { syncWatchedCards } from "./cardSync.logic";
 import { noteAgentActivityWatching, noteSwitchOff, noteTokenWithdrawn } from "./pushDiagnostics";
 import { useForgetOnSwitchOff } from "./pushForget";
 import { forgetTokensOutcome } from "./pushForget.logic";
 import { tokenSender } from "./pushRegistration";
-import { nextRetry, NO_RETRY } from "./pushRetry.logic";
+import { startThreadCardBridge } from "./threadCardBridge.controller";
 
 /** Headless. Hands this phone's thread-card tokens to the Mac that pushes
     them (#1047): the push-to-start token as `agent-activity-start`, so the
@@ -82,63 +77,9 @@ export function InfinitusThreadCardBridge() {
 
   useEffect(() => {
     if (Platform.OS !== "ios" || !enabled || environmentId === null) return;
-    let cancelled = false;
-    const watched = new Map<string, { remove(): void }>();
-    const subscriptions: Array<{ remove(): void }> = [];
-    const send = tokenSender({ environmentId, run, isCancelled: () => cancelled });
-    /** The newest token iOS has handed over per kind, sent until it lands. */
-    const latest = new Map<LiveActivityTokenKind, string>();
-    /** No card is live and the Mac's card slot is still to be cleared. */
-    let withdraw = false;
-    /** The slot was cleared since the last card token was offered. */
-    let slotCleared = false;
-    let schedule = NO_RETRY;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let sending = false;
-    let again = false;
-
-    const clearTimer = () => {
-      if (timer !== null) clearTimeout(timer);
-      timer = null;
-    };
-
-    /** One round over every held token. Rounds never overlap: a second one
-        asked for mid-flight waits, since a throttled repeat answers "on file"
-        for a send whose failure has not been recorded yet, and would read as
-        a landing that cancels the retry the failing round is about to set. */
-    const flush = async (): Promise<void> => {
-      if (sending) {
-        again = true;
-        return;
-      }
-      sending = true;
-      clearTimer();
-      try {
-        const outcomes = await Promise.all([
-          ...[...latest].map(([kind, token]) => send(kind, token)),
-          ...(withdraw ? [forgetCard()] : []),
-        ]);
-        if (cancelled) return;
-        schedule = nextRetry({
-          attempt: schedule.attempt,
-          landed: outcomes.every(Boolean),
-          connected: connectedRef.current,
-        });
-        if (schedule.delayMs !== null) timer = setTimeout(() => void flush(), schedule.delayMs);
-      } finally {
-        sending = false;
-      }
-      if (again && !cancelled) {
-        again = false;
-        await flush();
-      }
-    };
-
-    /** The pending withdrawal, answered like a send: landed or not. A card
-        token offered meanwhile has already dropped it, so a landing then is
-        not recorded over the new card's registration. */
-    const forgetCard = async (): Promise<boolean> => {
-      const landed =
+    const bridge = startThreadCardBridge({
+      makeSend: (isCancelled) => tokenSender({ environmentId, run, isCancelled }),
+      forgetCardToken: async () =>
         (
           await forgetTokensOutcome({
             environmentId,
@@ -146,84 +87,20 @@ export function InfinitusThreadCardBridge() {
             run,
             loadDeviceId: loadOrCreateAgentAwarenessDeviceId,
           })
-        ).outcome === "withdrawn";
-      if (!landed || cancelled || !withdraw) return landed;
-      withdraw = false;
-      slotCleared = true;
-      noteTokenWithdrawn(new Date());
-      return true;
-    };
-
-    /** A token from iOS: a new one is a fresh chance, so the backoff resets. */
-    const offer = (kind: LiveActivityTokenKind, token: string) => {
-      if (cancelled || latest.get(kind) === token) return;
-      latest.set(kind, token);
-      if (kind === "agent-activity") {
-        withdraw = false;
-        slotCleared = false;
-      }
-      schedule = NO_RETRY;
-      void flush();
-    };
-
-    /** Re-reads the live cards: watches the new ones, lets the ended ones go,
-        and queues the withdrawal when none is left. */
-    const sync = () => {
-      const live = AgentActivity.getInstances();
-      const next = syncWatchedCards({
-        watched: new Set(watched.keys()),
-        live: live.map((activity) => activity.getId()),
-        slotCleared,
-      });
-      for (const id of next.gone) {
-        watched.get(id)?.remove();
-        watched.delete(id);
-      }
-      for (const activity of live) {
-        const id = activity.getId();
-        if (!next.added.includes(id)) continue;
-        watched.set(
-          id,
-          activity.addPushTokenListener((event) => offer("agent-activity", event.pushToken)),
-        );
-        void activity.getPushToken().then((token) => {
-          if (token) offer("agent-activity", token);
-        });
-      }
-      if (next.withdraw && !withdraw) {
-        withdraw = true;
-        latest.delete("agent-activity");
-        schedule = NO_RETRY;
-        void flush();
-      }
-    };
-
-    subscriptions.push(
-      addPushToStartTokenListener((event) =>
-        offer("agent-activity-start", event.activityPushToStartToken),
-      ),
-    );
-    sync();
-    noteAgentActivityWatching(new Date());
-    retryRef.current = () => {
-      schedule = NO_RETRY;
-      void flush();
-    };
-    const appState = AppState.addEventListener("change", (state) => {
-      if (state !== "active") return;
-      sync();
-      retryRef.current?.();
+        ).outcome === "withdrawn",
+      getInstances: () => AgentActivity.getInstances(),
+      addPushToStartTokenListener,
+      addAppStateListener: (listener) => AppState.addEventListener("change", listener),
+      subscribeLocalChanges: (listener) =>
+        appAtomRegistry.subscribe(localLiveActivityStartsAtom, listener),
+      isConnected: () => connectedRef.current,
+      now: () => new Date(),
+      notes: { watching: noteAgentActivityWatching, withdrawn: noteTokenWithdrawn },
     });
-    const localStarts = appAtomRegistry.subscribe(localLiveActivityStartsAtom, sync);
+    retryRef.current = bridge.retry;
     return () => {
-      cancelled = true;
       retryRef.current = null;
-      clearTimer();
-      noteAgentActivityWatching(null);
-      appState.remove();
-      localStarts();
-      for (const subscription of subscriptions) subscription.remove();
-      for (const subscription of watched.values()) subscription.remove();
+      bridge.stop();
     };
   }, [enabled, environmentId, run]);
 
