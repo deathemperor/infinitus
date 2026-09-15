@@ -394,6 +394,12 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `connectionCatalogRoamedHost`; `authorization/service.ts` —
   `authorizeBearer` takes `descriptorTimeoutMs` and returns the descriptor's
   alternates (#663).
+- `apps/mobile/src/connection/platform.ts` — the wakeups layer merges
+  `requestedConnectionWakeups` from
+  `apps/mobile/src/features/infinitus/connectionWakeups.ts` (#1277): a
+  fork feature can ask for the `application-active-reconnect` wakeup the
+  foreground sends, so the thread-card bridge brings the Mac's socket up in
+  the background window a push-to-start grants. One `Stream.merge` line.
 - `apps/mobile/src/components/AndroidScreenHeader.tsx` — `AndroidHeaderAction`
   gains an optional `menu` (`AndroidAnchoredMenuProps`' actions, title and
   `onPressAction`); an action carrying one renders the icon button inside
