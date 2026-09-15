@@ -66,6 +66,9 @@ const STATUS_LABEL_BY_STATUS: Partial<
   approval: { label: "Approval", className: "text-warning-foreground" },
   input: { label: "Input", className: "text-foreground-secondary" },
   working: { label: "Working", className: "text-adaptive-sky-600-400" },
+  // Monitoring is calm background presence, not active progress, so it takes
+  // no motion hue and keeps the label at full strength (web sidebar v2).
+  monitoring: { label: "Monitoring", className: "text-foreground" },
   failed: { label: "Failed", className: "text-danger-foreground" },
 };
 
@@ -473,10 +476,13 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const babysitting = babysitLabel(thread.babysit);
   // Infinitus (#832): a working row whose turn waits for the network says so.
   const reconnecting = status === "working" ? reconnectingRowLabel(thread.session) : null;
+  // A babysat row outranks "Monitoring": both say watch loops are live, and
+  // the babysit label carries the round count too.
+  const idleOrMonitoring = status === "ready" || status === "monitoring";
   const statusLabel =
     reconnecting !== null
       ? { label: reconnecting, className: "text-warning-foreground" }
-      : status === "ready" && variant === "card" && babysitting !== null
+      : idleOrMonitoring && variant === "card" && babysitting !== null
         ? { label: babysitting, className: "text-adaptive-sky-600-400" }
         : status === "ready" && variant === "card" && readyForReview
           ? READY_FOR_REVIEW_LABEL
