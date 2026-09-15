@@ -8682,6 +8682,9 @@ describe("web tool results (#1251)", () => {
         ],
       );
       assert.equal(completed?.payload.status, "completed");
+      // The server tool's underscored name still classifies as a web search,
+      // so clients title the row "Web search" rather than "Tool call".
+      assert.equal(completed?.payload.itemType, "web_search");
       assert.equal(completed?.payload.detail, "2 results for effect streams");
       const stored = (completed?.payload.data as { result?: { content?: unknown[] } } | undefined)
         ?.result?.content;
