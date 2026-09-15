@@ -549,6 +549,14 @@
         "value": true
       },
       {
+        "default": false,
+        "effect": "live",
+        "key": "dock_icon_enabled",
+        "section": "display",
+        "type": "bool",
+        "value": false
+      },
+      {
         "choices": ["wide", "stacked", "hstack"],
         "default": "wide",
         "effect": "live",

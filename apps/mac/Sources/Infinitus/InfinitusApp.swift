@@ -53,10 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `open Infinitus.app` on an already-running instance lands here: show
     /// the pinned window. This is the guaranteed way into the UI when the
     /// menu bar is too full to display the status item at all.
-    /// A Dock click lands here too — the icon exists only while Settings
-    /// is open (the app is `.regular` then) — and must raise Settings, not
-    /// the pop-out: returning false stops AppKit's own window-raising, so
-    /// a buried Settings never came back (user 2026-09-09).
+    /// `open Infinitus.app` lands here, as does a Dock click on a build
+    /// whose `dock_icon_enabled` is on (the app is `.regular` only while
+    /// Settings is open then; off — the default — there is no Dock icon at
+    /// all). It must raise Settings, not the pop-out: returning false stops
+    /// AppKit's own window-raising, so a buried Settings never came back
+    /// (user 2026-09-09).
     func applicationShouldHandleReopen(_ app: NSApplication,
                                        hasVisibleWindows: Bool) -> Bool {
         guard let controller = statusHolder?.controller else { return false }

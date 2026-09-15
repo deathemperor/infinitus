@@ -338,6 +338,9 @@ pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null || fail "swapd auto m
 "$CTL" prefs set menu_bar_enabled false | expect "d['value'] is False" || fail "prefs set menu_bar_enabled false"
 "$CTL" status | expect "d['badge']" || fail "the socket must keep answering with the menu bar off (#828)"
 "$CTL" prefs set menu_bar_enabled true | expect "d['value'] is True" || fail "prefs set menu_bar_enabled true"
+# The Dock icon is a pref too, default off: Settings takes one only when it is on.
+"$CTL" prefs set dock_icon_enabled true | expect "d['value'] is True" || fail "prefs set dock_icon_enabled true"
+"$CTL" prefs set dock_icon_enabled false | expect "d['value'] is False" || fail "prefs set dock_icon_enabled false"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
 echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 # #743: the interrupt mode says critical where hold says low, same line.
