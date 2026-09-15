@@ -11,7 +11,7 @@ before that the `native` branch). Split out of
   #756). swapd is one `AccountEngine` adapter among several; no feature,
   design, data format, CLI or publisher may depend on swapd existing.
   Anything cross-platform ships from THIS repo (InfinitusCore +
-  InfinitusCLI on Swift for macOS/Linux/Windows), never as an engine
+  InfinitusCLI on Swift for macOS/Linux; Windows unbuilt since #1268), never as an engine
   subcommand.
 - **Everything is Swift; the engine is fully isolated.** Every engine
   touchpoint is a `swapd … --json` subprocess (InfinitusCore/Engines/Swapd/SwapdCLI.swift).
@@ -52,7 +52,7 @@ before that the `native` branch). Split out of
 - **`main` takes commits only through pull requests** (GitHub ruleset
   "main via pull requests"; the native one retires with the branch):
   0 required approvals (solo repo); the Mac checks required on a PR head
-  are mac-test, mac-e2e, mac-linux (never mac-windows, 2026-09-06, #206) —
+  are mac-test, mac-e2e, mac-linux (the best-effort Windows build left with #1268) —
   path-filtered, so a server-only PR passes them at once. Work on a
   branch, `gh pr create` (base main), merge with `gh pr merge --squash`
   (or `--merge` when the branch history matters) once tests pass;

@@ -508,29 +508,3 @@ jobs:
   # Windows toolchain provides, so InfinitusCore does not build there
   # (apps/mac/docs/superpowers/specs/2026-09-05-team-design.md §9). The
   # job runs to show when that changes; failures don't block a merge.
-  mac-windows:
-    name: mac-windows
-    needs: mac_changes
-    runs-on: windows-2022
-    continue-on-error: true
-    defaults:
-      run:
-        working-directory: apps/mac
-    steps:
-      - uses: actions/checkout@v6
-        if: needs.mac_changes.outputs.changed != 'false'
-      - uses: compnerd/gha-setup-swift@v0.4.1
-        if: needs.mac_changes.outputs.changed != 'false'
-        with:
-          branch: swift-6.1-release
-          tag: 6.1-RELEASE
-      - run: vcpkg install zlib:x64-windows
-        if: needs.mac_changes.outputs.changed != 'false'
-      # vcpkg's paths ride the command line on purpose: never set INCLUDE
-      # or LIB for this step — a set LIB hides the MSVC lib directories
-      # from the link (2643ed93e3, the fact used to live only there).
-      - run: >
-          swift build --product infinitusctl
-          -Xcc -IC:/vcpkg/installed/x64-windows/include
-          -Xswiftc -LC:/vcpkg/installed/x64-windows/lib
-        if: needs.mac_changes.outputs.changed != 'false'
