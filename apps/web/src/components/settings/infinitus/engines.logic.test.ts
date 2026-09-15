@@ -170,10 +170,11 @@ describe("PROXY_ENGINES", () => {
 });
 
 describe("parseProxyEngineState routing fields (#1235)", () => {
-  it("carries the proxy's routing strategy, affinity, caveat and 9Router's dashboard", () => {
+  it("carries the proxy's routing strategy, affinity, caveat and either engine's dashboard", () => {
     expect(
       parseProxyEngineState({
         baseURL: "http://127.0.0.1:8317",
+        dashboardURL: "http://127.0.0.1:8317/management.html",
         keyPresent: true,
         enabled: true,
         routingStrategy: "round-robin",
@@ -184,7 +185,7 @@ describe("parseProxyEngineState routing fields (#1235)", () => {
       routingStrategy: "round-robin",
       sessionAffinity: false,
       caveat: "two credentials share one org",
-      dashboardURL: null,
+      dashboardURL: "http://127.0.0.1:8317/management.html",
     });
     expect(
       parseProxyEngineState({
@@ -196,10 +197,15 @@ describe("parseProxyEngineState routing fields (#1235)", () => {
     ).toMatchObject({ dashboardURL: "http://127.0.0.1:20128/dashboard" });
   });
 
-  it("reads an absent strategy and affinity as null, an older build's reply included", () => {
+  it("reads an absent strategy, affinity and dashboard as null, an older build's reply included", () => {
     expect(
       parseProxyEngineState({ baseURL: "http://127.0.0.1:8317", keyPresent: false }),
-    ).toMatchObject({ routingStrategy: null, sessionAffinity: null, caveat: null });
+    ).toMatchObject({
+      routingStrategy: null,
+      sessionAffinity: null,
+      caveat: null,
+      dashboardURL: null,
+    });
   });
 });
 
