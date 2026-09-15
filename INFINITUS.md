@@ -757,7 +757,10 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   and `renderCompactRow` draws a `Text` with `timerInterval` +
   `countsDown={false}` for such a row, so SwiftUI counts it up on the phone
   between pushes. Both bounds are derived from `startedAt` — the widget reads
-  no clock — and the upper one caps the display a day in. It lives here rather
+  no clock — and the upper one caps the display a day in. The timer text is
+  boxed in a fixed-width trailing `frame` with `multilineTextAlignment`: a
+  bare `Text(timerInterval:)` is greedy and swallowed the title and project
+  of every working row, so a sync that drops the frame brings that back. It lives here rather
   than in a fork file because the widget body carries the `"widget"` directive
   and is serialized into the widget extension's bundle: it can reference only
   imported view and modifier factories, never a module-scope helper of ours.

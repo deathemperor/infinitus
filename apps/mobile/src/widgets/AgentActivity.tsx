@@ -7,6 +7,7 @@ import {
   frame,
   layoutPriority,
   lineLimit,
+  multilineTextAlignment,
   padding,
   resizable,
   widgetURL,
@@ -194,8 +195,13 @@ export function AgentActivity(
   // SwiftUI on the phone, so the card counts up between pushes instead of going
   // stale. Both bounds come from the row's `startedAt` — the widget reads no
   // clock of its own — and the upper one stops the display a day in, past which
-  // a running row is a stuck turn rather than a long one.
+  // a running row is a stuck turn rather than a long one. A timer text is
+  // greedy: with no frame it takes every point the HStack has left and the
+  // title and project collapse to nothing, so it is boxed at the width of the
+  // widest value the cap allows ("23:59:59" at size 11) and right-aligned in
+  // that box (the text centers itself unless told otherwise).
   const elapsedCapMs = 24 * 60 * 60 * 1000;
+  const elapsedWidth = 50;
   const elapsedRange = (row: AgentActivityRowProps) => {
     if (row.phase !== "starting" && row.phase !== "running") return null;
     const startedMs = row.startedAt === undefined ? Number.NaN : Date.parse(row.startedAt);
@@ -239,6 +245,8 @@ export function AgentActivity(
               font({ size: 11 }),
               foregroundStyle(secondaryForeground),
               lineLimit(1),
+              frame({ width: elapsedWidth, alignment: "trailing" }),
+              multilineTextAlignment("trailing"),
               layoutPriority(1),
             ]}
           />
