@@ -17,6 +17,10 @@ public struct TeamReader {
         public var fleet: TeamDocs.FleetDoc?
         /// `TeamThreadSources.Transcript.key` → chunk store paths in seq order.
         public var transcripts: [String: [String]] = [:]
+        /// Store-lane control commands this sender addressed to me (paths).
+        public var commands: [String] = []
+        /// Store-lane acks from this sender, by command id.
+        public var acks: [String: TeamControl.Ack] = [:]
         public var lastPublished: Int?
         public var kinds: Set<String> = []
         /// Roster approval (#219); nil for a removed sender.
@@ -82,6 +86,10 @@ public struct TeamReader {
                 if let doc = decode(TeamDocs.FleetDoc.self, entry.path), doc.schema == 1 { member.fleet = doc }
             case TeamKinds.transcripts:
                 if let key = Self.transcriptKey(entry.path) { member.transcripts[key, default: []].append(entry.path) }
+            case TeamKinds.command:
+                member.commands.append(entry.path)
+            case TeamKinds.ack:
+                if let doc = decode(TeamControl.Ack.self, entry.path), doc.schema == 1 { member.acks[doc.id] = doc }
             default:
                 break
             }
@@ -105,6 +113,9 @@ public struct TeamReader {
         }
         return reader
     }
+
+    /// Every command id some grantor has answered, for the driver's reap.
+    public var ackIDs: Set<String> { Set(members.values.flatMap { $0.acks.keys }) }
 
     /// `m/<kid>/transcripts/<key…>/<seq>.jsonl` (or `t/`): the key.
     static func transcriptKey(_ path: String) -> String? {
