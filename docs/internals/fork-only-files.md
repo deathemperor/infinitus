@@ -587,29 +587,7 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@t3tools/client-runtime/state/infinitusAccounts`).
-- `packages/client-runtime/src/connection/roaming.ts`,
-  `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`,
-  `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN,
-  roam to the tunnel (#663). The server's descriptor names its other base
-  URLs (`alternateHttpBaseUrls`: the Cloudflare tunnel from
-  `status.forkTunnel` while it is up; a never-polled snapshot is refreshed
-  once for it). The phone keeps them on the bearer profile from the pairing
-  on and re-learns them on every connect, so a tunnel turned on after the
-  pairing is picked up by the next LAN connect; each is stored in the
-  profile's normalized shape (`normalizeHttpBaseUrl`), so a pairing made
-  over the tunnel itself has no alternate. The server's list replaces
-  the phone's on every connect — it is the authority on its own doors, and a
-  quick-tunnel hostname it no longer holds can be handed to anyone, so the
-  bearer token never follows a stale one (a host the profile no longer
-  names is not tried, last-good or not). A connect tries the host that
-  worked last, then the paired one, then the alternates (3 s descriptor
-  wait on every host but the last); a host where
-  the Mac is not — nothing answers (network, timeout), or something else
-  does (`remote-unavailable`, a 404 or another environment's id) — is
-  walked past, one that refuses the credential ends the walk. The bearer
-  session is not host-bound, so no re-pair. The environment row says
-  "Connected via <host>" while roamed, else "Also via <host> when you are
-  away".
+- `packages/client-runtime/src/connection/roaming.ts`, `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN, roam to the tunnel (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect and tried after the last-good and paired hosts. Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
   snippets (#270 G): `useProjectPromptSnippets(environmentId, projectId)`
@@ -776,64 +754,10 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
 - `scripts/infinitus-md-size.test.ts` — the INFINITUS.md byte cap (16 KB, #1339):
   every session loads that file whole, so a feature's narrative goes in a
   `docs/internals/<feature>.md` page and one ledger line here.
-- `scripts/fork-visual-pass.mjs` — the visual pass: one headless Chrome over
-  CDP pairs with a running web app, clicks through the first-run wizard, then
-  screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Mint a
-  token with `node apps/server/src/bin.ts pair` (from the server's worktree),
-  then
-  `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> /accounts /settings/infinitus`
-  (`--base-url`, `--cdp-port`, `--profile`, `--settle-ms`, `CHROME_BIN`; the
-  token is never printed). No dependencies; node ≥ 22.
-- `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`) — the
-  Infinitus control socket the visual pass runs against in CI: a Node net
-  server speaking the one-line protocol that answers `manifest`, `status`,
-  `fleets`, `forecast`, `prefs`, `stats`, `events`, `aws-logins`,
-  `client-activity` and `lock-status` with canned data. The manifest and
-  the pref catalog are `infinitusctl` captures (every value reset to its
-  default), trimmed with the Mac: the session-profile and past-session
-  verbs and the three retired push prefs went with #1091, the Team and
-  checkpoint blocks with #1139. The accounts
-  (`ada-fixture`…) and the stats are made up. Every write and every unknown verb is refused with `ok: false`;
-  only verb names are logged. `--socket <short /tmp path>`.
-  `fork-visual-fixture.guard.test.ts` keeps the capture honest against
-  `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift`
-  (#1139, the `PREF_COPY` guard's sibling from #1122): a verb it claims or
-  a pref key it carries after the Mac dropped one hands every capability
-  gate in the web a `true` no real build gives, and the pages render in CI
-  what a user cannot see. Commands are checked one way — the fixture
-  answers only what the pass exercises, so a Mac verb it omits is fine —
-  and it may answer no verb it does not claim; prefs and sections must
-  match the catalog exactly.
-- `scripts/fork-visual-routes.ts` (+ `.test.ts`) — the route table the pass
-  asserts: every fork page with the one text marker only its populated render
-  shows (a pref row's label or its value, "Thread priority", "Re-lock",
-  "Session lengths"…) and the empty-state phrases that must not appear
-  (`ALWAYS_ABSENT`: "not answering", "T3 Code" (#823: the upstream name never
-  reaches a screen), "Fork " (a Mac pref key with no web copy humanises to
-  "Fork …"), "Still connecting", "This Infinitus build has no", "could
-  not be read"; per route "No projection yet", "no engine reports
-  accounts"…). The test pins the route list, checks no marker is a substring
-  of a nav label or card title (those print on a dead page too), and mirrors the
-  harness's `text-<route>.txt` naming. `scripts/fork-visual-check.ts` applies
-  it: `--routes` prints the routes for the harness's argument list, `--out
-  <dir>` reads the captures and exits 1 on the first miss.
-
-- `.github/workflows/fork-visual-pass.yml` — "Fork visual pass", on every PR
-  to `main` and by hand: builds the web app, starts `fork-visual-fixture.mjs`
-  on `/tmp/inf-vp.sock`, runs the server from source (`bin.ts start
---no-browser`, `--base-dir` under the runner's temp dir,
-  `INFINITUS_CONTROL_SOCKET` at the fixture — the override also withholds the
-  companion's `open` and the port publish), mints a pairing URL with `bin.ts
-pair` (token masked, server log never uploaded), screenshots every route in
-  `fork-visual-routes.ts` with the runner's Chrome through
-  `fork-visual-pass.mjs`, then `fork-visual-check.ts` fails the job on a
-  missing marker or an empty state. The PNGs and text captures upload as the
-  `fork-visual-pass` artifact, on failure too. Runner fact (#825 hung 17 min
-  at the start step with nothing logged; #831 starts in 3 s): a step that
-  backgrounds a server must detach it — `setsid nohup … > log 2>&1
-< /dev/null &` — and probe with `curl --max-time`, or the step holds the job
-  to its timeout.
-
+- `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
+- `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`, `fork-visual-fixture.guard.test.ts`) — the canned Infinitus control socket the pass runs against in CI, kept honest against `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift` (#1091, #1139). Rules and traps: `docs/internals/fork-visual-pass.md`.
+- `scripts/fork-visual-routes.ts` (+ `.test.ts`), `scripts/fork-visual-check.ts` — the route table the pass asserts (one marker per populated page, `ALWAYS_ABSENT` phrases) and the checker that applies it. Rules and traps: `docs/internals/fork-visual-pass.md`.
+- `.github/workflows/fork-visual-pass.yml` — "Fork visual pass", on every PR to `main` and by hand: fixture, server from source, `fork-visual-pass.mjs`, `fork-visual-check.ts`; artifact `fork-visual-pass` (#825, #831). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `.github/workflows/infinitus-nightly.yml` — the nightly (#1042, "One
   release" above): a `version` job dates the root `VERSION`, `build` is
   `infinitus-release.yml` through `workflow_call` with that version
@@ -841,48 +765,7 @@ pair` (token masked, server log never uploaded), screenshots every route in
   `publish` — `main` only, on the schedule or a dispatch with `publish` —
   force-moves the `nightly` tag, clobbers the assets, removes older nights'
   versioned assets and edits the title.
-- `.github/workflows/infinitus-release.yml` — the one release (see
-  "One release" above). Its `desktop` job nests the menu bar app as a login
-  item (#777): the `mac` job of the same run uploads `Infinitus-Menu-Bar-<version>.zip`
-  (the nested build: CFBundleName "Infinitus Menu Bar", no `infinitus://` URL
-  type; the standalone `Infinitus-<version>.zip` and its Homebrew cask left
-  with #1238),
-  which `desktop` unpacks, checks (bundle id `run.infinitus`, version equal
-  to the release's; on signed builds Developer ID from team `Q783W6B4FA`,
-  hardened runtime, `stapler validate`) and hands to the build script as
-  `T3CODE_DESKTOP_NATIVE_HELPER` / `--native-helper`. The script `ditto`s it
-  into the stage (`NATIVE_HELPER_STAGE_DIR`), electron-builder's `extraFiles`
-  places it at `Contents/Library/LoginItems/Infinitus Menu Bar.app` (the one
-  path `SMAppService.loginItem` accepts) before the outer bundle is signed,
-  and `signIgnore` keeps `scripts/sign-macos.ts` off it, so the helper keeps
-  the native release's signature, entitlements and stapled ticket while the
-  outer seal records it as nested code; the one built-in notarization covers
-  both. "Verify nested helper" proves the nested seal survived packaging and
-  that Electron's `allow-jit` entitlement never reached it. Local and
-  upstream builds pass no helper and nest nothing. The helper is never
-  rebuilt in the desktop job (macOS 26 SDK, Swift toolchain and a second
-  sign/notarize path for a bundle the `mac` job already sealed).
-  Its `cli` job builds the self-contained CLI archives every runtime
-  installer downloads (#1192): `t3-<version>-linux-x64.tar.gz` and
-  `-linux-arm64.tar.gz`, which `publish` attaches along with the
-  `SHA256SUMS` `pinnedRuntime` verifies against. Linux only — that is where
-  SSH remote environments run; a Mac or Windows CLI has no archive and the
-  installers 404 plainly instead of reaching upstream (`CLI_RELEASE_REPOSITORY`
-  below). Its steps are upstream's `cli_archive` steps from
-  `.github/workflows/release-desktop.yml`, **copied rather than called**:
-  that workflow downloads a `js-bundle` artifact only upstream's
-  `build_bundle` produces, plus a relay tracing config and four required
-  clerk/relay inputs the fork has no source for, so calling it would mean
-  porting half of upstream's release pipeline. Re-diff the copied steps
-  against that file on every sync, like the runner swap. The job is skipped
-  for the nightly (`inputs.version` is set only by the nightly's
-  `workflow_call`), so a nightly desktop's SSH remotes fail cleanly; a
-  dispatch dry run still builds them. Known gap (#1196): the archive's
-  `client/` is the plain `t3#build` output, so it carries upstream's
-  favicons — the fork's `applyWebBrandAssets` pass runs only in
-  `scripts/build-desktop-artifact.ts`, and a remote runtime serves that
-  client on its own origin.
-
+- `.github/workflows/infinitus-release.yml` — the one release (INFINITUS.md "One release"): the `desktop` job nests the `mac` job's `Infinitus-Menu-Bar-<version>.zip` as a login item (#777, `--native-helper`), the `cli` job builds the Linux CLI archives and `SHA256SUMS` (#1192, upstream's `cli_archive` steps copied). Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,
   `apps/web/src/components/settings/ProxyProviderFields.tsx` — "Route through a
