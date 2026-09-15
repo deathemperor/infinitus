@@ -353,49 +353,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `workEntryRowLabel` (compact and expanded), `singleToolCallLabel` and
   `liveToolActivitySummary`; the expanded body already leads with the
   command block.
-- Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
-  exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
-turnId)` → `{durationMs, completedAt, runningShells, runningAgents}` for a
-  completed turn, `turnFooterLabel(footer, time)` → "Done in 49s · 12:59 PM
-  · 1 shell still running · 1 agent still running". Derived, no contract: the latest turn's `startedAt →
-completedAt`, an older turn's user message → last assistant `updatedAt`
-  (the on-screen durations' rule; overstates by a hold or queue wait — the
-  per-turn `durationMs` row never reaches the client, only the rollup),
-  shells from the turn's `task.started` bash/shell tasks that went
-  `isBackgrounded` and have no end (`endedAt`, a terminal status,
-  `task.completed`) anywhere in the thread, zero once the session stopped;
-  agents (#974) by the same rule for the turn's `agentKind: "agent"` tasks
-  (an unstamped row is classified from its task type) — a foreground agent
-  finished inside the turn, so only a backgrounded one can still run. For
-  that the Claude adapter (`ClaudeAdapter.ts`) forwards the SDK's
-  `is_backgrounded` on `task.started` (`TaskStartedPayload.isBackgrounded`
-  in `packages/contracts/src/providerRuntime.ts`, passed through by
-  `ProviderRuntimeIngestion.ts`), keeps each task's backgrounded/ambient
-  state, and on a session exit or the server's shutdown finalizer — never
-  an internal restart — emits one `runtime.error` ("Session ended with N
-  background agents running — their work is not finished",
-  `liveBackgroundAgentsMessage`) before the stopped rows: ingestion turns
-  that into the error activity and marks the session `error`, so the
-  thread stops reading as finished work. A killed server writes nothing,
-  so `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+
-  test; `infinitus/backgroundAgents.logic.ts` holds the wording and the
-  rows, shared with the adapter) runs as the `background-agents.reconcile`
-  startup phase right after `provider-sessions.reconcile` in
-  `serverRuntimeStartup.ts` (#977): one SQL statement over the sessions
-  table with correlated lookups on each thread's activity index finds the
-  ready/running/starting threads whose agent-kind `task.started` rows went
-  to the background and never ended, then — for the ones not live — writes
-  the stopped rows a graceful stop would have, the error row, and the
-  session's error state — except a thread the provider-sessions reconcile
-  just flipped to `starting` for the post-update continuation, which gets
-  the stopped rows only: the continuation prompt is its wake. The stopped
-  rows make it idempotent; a #974 error row after the start row excludes
-  the thread as well.
-  Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
-  while entries are equal, so a running turn's ticks repaint nothing),
-  `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity
-  context, drawn by `AssistantMessageMeta` in place of the bare time;
-  `ChatView.tsx` — the hook and the prop. The phone reuses the module.
+- Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test; `turnFooter`, `turnFooterLabel`, exported as `@t3tools/client-runtime/turnFooter`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`is_backgrounded` → `TaskStartedPayload.isBackgrounded` in `packages/contracts/src/providerRuntime.ts`, passed through by `ProviderRuntimeIngestion.ts`; `liveBackgroundAgentsMessage`, #974), `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+ test; `infinitus/backgroundAgents.logic.ts`; the `background-agents.reconcile` phase in `serverRuntimeStartup.ts`, #977), `apps/web/src/components/chat/useTurnFooters.ts`, `MessagesTimeline.tsx` (`turnFooters`, `AssistantMessageMeta`), `ChatView.tsx`. Rules and traps: `docs/internals/turn-footer.md`.
 - Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`; `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
 - Update idle gate (#829): a server update is gated on the server's own
   turn state, never on process heuristics. `packages/contracts/src/server.ts`
