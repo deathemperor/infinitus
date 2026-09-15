@@ -6,7 +6,9 @@ import type {
 import {
   InfinitusTeamCode,
   InfinitusTeamSnapshot,
+  type InfinitusTeamGrant,
   type InfinitusTeamMember,
+  type InfinitusTeamPending,
 } from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
@@ -39,6 +41,8 @@ export function teamCreateSupported(commands: ReadonlyArray<InfinitusManifestCom
 
 export type TeamStatus = InfinitusTeamSnapshot;
 export type TeamMember = InfinitusTeamMember;
+export type TeamGrant = InfinitusTeamGrant;
+export type TeamPending = InfinitusTeamPending;
 
 const decodeTeamStatus = Schema.decodeUnknownOption(InfinitusTeamSnapshot);
 
@@ -78,6 +82,18 @@ export const TEAM_SHARE_TARGETS: ReadonlyArray<{
   { target: "team", label: "Whole team" },
 ];
 
+/** Delegated control (spec §8): what a grant may let a teammate do to this Mac's threads. */
+export const TEAM_CAPABILITIES: ReadonlyArray<{
+  readonly capability: "view" | "send" | "interrupt" | "new";
+  readonly label: string;
+  readonly asks: boolean;
+}> = [
+  { capability: "view", label: "View a thread's transcript", asks: false },
+  { capability: "send", label: "Send a message to a thread", asks: false },
+  { capability: "interrupt", label: "Interrupt a running turn", asks: true },
+  { capability: "new", label: "Start a new thread", asks: true },
+];
+
 export type TeamAction =
   | { readonly type: "status" }
   | { readonly type: "fetch" }
@@ -90,7 +106,78 @@ export type TeamAction =
   | { readonly type: "share"; readonly kind: string; readonly target: "off" | "leaders" | "team" }
   | { readonly type: "exclude"; readonly slug: string; readonly on: boolean }
   | { readonly type: "policy"; readonly requests: "code" | "off" }
-  | { readonly type: "code"; readonly days: number; readonly invite: boolean };
+  | { readonly type: "code"; readonly days: number; readonly invite: boolean }
+  | { readonly type: "grant"; readonly draft: TeamGrantDraft }
+  | { readonly type: "revoke"; readonly id: string }
+  | { readonly type: "allow"; readonly id: string }
+  | { readonly type: "deny"; readonly id: string };
+
+export interface TeamGrantDraft {
+  readonly audience: "leaders" | "team" | string;
+  readonly capabilities: ReadonlyArray<string>;
+  readonly threads: ReadonlyArray<string>;
+  readonly preauthorized: ReadonlyArray<string>;
+}
+
+/**
+ * The grant form: an audience (`leaders`, `team`, or one member's kid), the
+ * capabilities ticked, thread ids typed as a comma list (blank = all), and
+ * which of the asking capabilities run without a tap. Null when nothing is
+ * ticked or the audience is blank.
+ */
+export function teamGrantDraft(
+  audience: string,
+  capabilities: ReadonlyArray<string>,
+  threadsRaw: string,
+  preauthorized: ReadonlyArray<string>,
+): TeamGrantDraft | null {
+  const who = audience.trim();
+  const caps = TEAM_CAPABILITIES.map((c) => c.capability).filter((c) => capabilities.includes(c));
+  if (who.length === 0 || who.length > 128 || caps.length === 0) return null;
+  const threads = threadsRaw
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0 && id.length <= 64 && !id.includes("/"));
+  const asking = TEAM_CAPABILITIES.filter((c) => c.asks).map((c) => c.capability);
+  return {
+    audience: who,
+    capabilities: caps,
+    threads,
+    preauthorized: asking.filter((c) => caps.includes(c) && preauthorized.includes(c)),
+  };
+}
+
+/** "leaders", "whole team", or the names of the kids a grant names. */
+export function teamGrantAudience(
+  audience: TeamGrant["audience"],
+  members: ReadonlyArray<TeamMember>,
+): string {
+  if (typeof audience === "string") return audience === "team" ? "whole team" : audience;
+  return audience
+    .map((kid) => members.find((member) => member.kid === kid)?.name ?? kid)
+    .join(", ");
+}
+
+/** One line per grant: capabilities, threads, what runs without a tap, expiry. */
+export function teamGrantSummary(grant: TeamGrant, nowMs: number): string {
+  const parts = [grant.capabilities.join(", ")];
+  parts.push(grant.threads === "all" ? "all threads" : `threads ${grant.threads.join(", ")}`);
+  if ((grant.preauthorized?.length ?? 0) > 0)
+    parts.push(`${grant.preauthorized!.join(", ")} without asking`);
+  if (grant.expires !== null && grant.expires !== undefined) {
+    const left = grant.expires - Math.floor(nowMs / 1000);
+    parts.push(left <= 0 ? "expired" : `expires in ${Math.max(1, Math.floor(left / 60))} min`);
+  }
+  return parts.join(" · ");
+}
+
+/** One line per waiting command: what, where, from whom, how long it keeps. */
+export function teamPendingSummary(pending: TeamPending, nowMs: number): string {
+  const left = Math.max(0, pending.expires - Math.floor(nowMs / 1000));
+  const where = pending.action === "new" ? `in ${pending.project ?? "?"}` : `on ${pending.thread}`;
+  const text = pending.text ? ` — "${pending.text}"` : "";
+  return `${pending.action} ${where}${text} · ${left}s left`;
+}
 
 /** The `infinitus.command` input for one secret-free action. */
 export function teamCommandInput(action: TeamAction): InfinitusCommandInput {
@@ -129,6 +216,18 @@ export function teamCommandInput(action: TeamAction): InfinitusCommandInput {
           ? { days: String(action.days), invite: "true" }
           : { days: String(action.days) },
       };
+    case "grant": {
+      const options: Record<string, string> = { cap: action.draft.capabilities.join(",") };
+      if (action.draft.threads.length > 0) options.threads = action.draft.threads.join(",");
+      if (action.draft.preauthorized.length > 0) options.pre = action.draft.preauthorized.join(",");
+      return { command: "team-grant", args: [action.draft.audience], options };
+    }
+    case "revoke":
+      return { command: "team-revoke", args: [action.id], options: {} };
+    case "allow":
+      return { command: "team-allow", args: [action.id], options: {} };
+    case "deny":
+      return { command: "team-deny", args: [action.id], options: {} };
   }
 }
 

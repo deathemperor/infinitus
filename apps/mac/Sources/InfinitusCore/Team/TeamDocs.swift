@@ -46,6 +46,24 @@ public enum TeamDocs {
         }
     }
 
+    /// One grant as `now.json` hints it (spec §8): what this member lets
+    /// an audience do to which threads. No ids; the grantor's file decides.
+    public struct GrantHint: Codable, Equatable, Sendable {
+        public var audience: TeamRoster.ShareTarget
+        /// nil = every thread.
+        public var threads: [String]?
+        public var capabilities: [String]
+        /// The capabilities the grantor is asked about first; absent when none.
+        public var approval: [String]?
+        /// Unix seconds; nil = until revoked.
+        public var expires: Int?
+        public init(audience: TeamRoster.ShareTarget, threads: [String]?, capabilities: [String],
+                    approval: [String]? = nil, expires: Int? = nil) {
+            self.audience = audience; self.threads = threads; self.capabilities = capabilities
+            self.approval = approval; self.expires = expires
+        }
+    }
+
     /// `now.json` — live state; deleted on quit.
     public struct Now: Codable, Equatable, Sendable {
         public var schema = 1
@@ -61,6 +79,11 @@ public enum TeamDocs {
         /// Whether Infinitus desktop answered when this was written: false
         /// means `live` and the threads index say nothing about the Mac.
         public var desktop: Bool
+        /// Where this Mac's desktop answers a driver (spec §8); absent
+        /// when nothing is reachable or nothing is granted.
+        public var endpoints: TeamControl.Endpoints?
+        /// What this member lets teammates do (`TeamGrants.hints`); absent when nothing.
+        public var grantsTo: [GrantHint]?
         public init(at: Int, machine: String, live: [LiveThread], fleets: [Fleet], blockers: [String], crashesToday: Int,
                     sharesTo: [String: TeamRoster.ShareTarget], desktop: Bool) {
             self.at = at; self.machine = machine; self.live = live; self.fleets = fleets; self.blockers = blockers

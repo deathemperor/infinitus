@@ -13,11 +13,15 @@ import {
   teamCreateSecretArgs,
   teamCreateSupported,
   teamExclusionSlug,
+  teamGrantAudience,
+  teamGrantDraft,
+  teamGrantSummary,
   teamJoinLink,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
   teamMemberSummary,
+  teamPendingSummary,
   teamStatusSupported,
 } from "./team.logic";
 
@@ -125,6 +129,75 @@ describe("team.logic (#1313)", () => {
       days: "1",
       invite: "true",
     });
+  });
+
+  it("builds the delegated-control verbs and words grants and waits (spec §8)", () => {
+    expect(teamGrantDraft("", ["send"], "", [])).toBeNull();
+    expect(teamGrantDraft("team", [], "", [])).toBeNull();
+    const draft = teamGrantDraft("k-bo", ["new", "send", "nope"], " t1, t2/x ,", ["new", "send"]);
+    expect(draft).toEqual({
+      audience: "k-bo",
+      capabilities: ["send", "new"],
+      threads: ["t1"],
+      preauthorized: ["new"],
+    });
+    expect(teamCommandInput({ type: "grant", draft: draft! })).toEqual({
+      command: "team-grant",
+      args: ["k-bo"],
+      options: { cap: "send,new", threads: "t1", pre: "new" },
+    });
+    expect(
+      teamCommandInput({
+        type: "grant",
+        draft: { audience: "leaders", capabilities: ["view"], threads: [], preauthorized: [] },
+      }).options,
+    ).toEqual({ cap: "view" });
+    expect(teamCommandInput({ type: "revoke", id: "g-1" }).command).toBe("team-revoke");
+    expect(teamCommandInput({ type: "allow", id: "c-1" })).toEqual({
+      command: "team-allow",
+      args: ["c-1"],
+      options: {},
+    });
+    expect(teamCommandInput({ type: "deny", id: "c-1" }).command).toBe("team-deny");
+    const members = [{ kid: "k-bo", name: "Bo", role: "member", isMe: false }];
+    expect(teamGrantAudience("team", members)).toBe("whole team");
+    expect(teamGrantAudience(["k-bo", "k-x"], members)).toBe("Bo, k-x");
+    const nowMs = 1_000_000 * 1000;
+    expect(
+      teamGrantSummary(
+        {
+          id: "g",
+          audience: "team",
+          threads: ["t1"],
+          capabilities: ["send", "new"],
+          since: 1,
+          preauthorized: ["new"],
+          expires: 1_000_000 + 600,
+        },
+        nowMs,
+      ),
+    ).toBe("send, new · threads t1 · new without asking · expires in 10 min");
+    expect(
+      teamGrantSummary(
+        { id: "g", audience: "leaders", threads: "all", capabilities: ["view"], since: 1 },
+        nowMs,
+      ),
+    ).toBe("view · all threads");
+    expect(
+      teamPendingSummary(
+        {
+          id: "c",
+          kid: "k-bo",
+          name: "Bo",
+          thread: "-",
+          action: "new",
+          text: "Fix",
+          project: "p",
+          expires: 1_000_000 + 90,
+        },
+        nowMs,
+      ),
+    ).toBe('new in p — "Fix" · 90s left');
   });
 
   it("keys the join's name by the manifest's `<your name>` and keeps the code off it", () => {

@@ -673,6 +673,43 @@ describe("InfinitusTeamSnapshot", () => {
     expect(team?.lockEnabled).toBe(true);
   });
 
+  it("decodes the grants, the waits and a member's controls (#1313, delegated control)", () => {
+    const team = decodeTeam({
+      ...TEAM_STATUS,
+      members: [
+        { kid: "k-bo", name: "Bo", role: "member", isMe: false, controls: ["send", "view"] },
+      ],
+      grants: [
+        { id: "g-1", audience: "leaders", threads: "all", capabilities: ["send"], since: 1 },
+        {
+          id: "g-2",
+          audience: ["k-bo"],
+          threads: ["t1"],
+          capabilities: ["interrupt", "new"],
+          since: 2,
+          preauthorized: ["new"],
+          expires: 99,
+        },
+      ],
+      pending: [
+        {
+          id: "c-1",
+          kid: "k-bo",
+          name: "Bo",
+          thread: "t1",
+          action: "interrupt",
+          text: null,
+          expires: 120,
+        },
+      ],
+    });
+    expect(team?.members[0]?.controls).toEqual(["send", "view"]);
+    expect(team?.grants?.map((g) => g.id)).toEqual(["g-1", "g-2"]);
+    expect(team?.grants?.[1]?.threads).toEqual(["t1"]);
+    expect(team?.pending?.[0]?.action).toBe("interrupt");
+    expect(decodeTeam(TEAM_STATUS)?.grants).toBeUndefined();
+  });
+
   it("decodes null for a Mac in no team, and a member without a publish yet", () => {
     expect(decodeTeam(null)).toBeNull();
     const team = decodeTeam({

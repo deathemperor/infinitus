@@ -14,6 +14,13 @@ public enum TeamKinds {
     public static let aggregates = "aggregates"
     /// `m/<kid>/fleet.json` — every account of every fleet (#221).
     public static let fleet = "fleet"
+    /// `m/<kid>/control/…` — addressed envelopes for delegated thread
+    /// control (spec §8): a driver's commands, a grantor's acks. Not in
+    /// `memberKinds`: they are sealed to one reader each, never to an
+    /// audience, and `team-share` has no say over them.
+    public static let command = "command"
+    public static let ack = "ack"
+    public static let controlKinds = [command, ack]
     /// The kinds a member publishes about itself (§7), in table order.
     public static let memberKinds = [stats, now, threads, transcripts, crashes, fleet]
 
@@ -65,6 +72,12 @@ public enum TeamKinds {
             return (owner, aggregates)
         case 3 where parts[0] == "transcripts" && parts[2].hasSuffix(".jsonl"):
             return (owner, transcripts)
+        case 3 where parts[0] == "control" && parts[2].hasSuffix(".json") && owner != nil:
+            switch parts[1] {
+            case "commands": return (owner, command)
+            case "acks": return (owner, ack)
+            default: return nil
+            }
         case 5 where parts[0] == "transcripts" && parts[2] == "subagents" && parts[4].hasSuffix(".jsonl"):
             return (owner, transcripts)
         default:

@@ -49,6 +49,13 @@ final class TeamModel: ObservableObject {
     var desktopCredential: () -> (origin: URL, token: String)? = { nil }
     /// Set by AppModel: the biometric lock's setting, for the snapshot.
     var lockEnabled: () -> Bool = { false }
+    /// Set by AppModel: the Mac's tunnel URL while it is up, one of the
+    /// doors a driver reaches this desktop through (spec §8).
+    var tunnelURL: () -> String? = { nil }
+    /// Delegated control (spec §8): this Mac's grants as last loaded.
+    @Published private(set) var grants = TeamGrants()
+    /// Drivers' commands waiting for this Mac's tap, as the snapshot lists them.
+    @Published private(set) var pendingCommands: [TeamSnapshot.Pending] = []
     /// Set by AppModel: true when this instance scans its transcripts for
     /// itself (StatsModel), in which case the publisher never scans on
     /// its own (#251) — it publishes from `scanEntries`, and waits a tick
@@ -91,6 +98,18 @@ final class TeamModel: ObservableObject {
     /// publish yields at its next source instead of making Approve wait
     /// for the whole corpus on a slow store.
     private let yieldRequested = OSAllocatedUnfairLock(initialState: false)
+
+    /// The control endpoint's in-memory half (spec §8): the waits and the
+    /// rate buckets. The replay set, outbox and handled set live on disk
+    /// beside `grants.json`. Every path that mutates them — the store
+    /// pass after a fetch, `team-inbox` off the desktop route, a tap —
+    /// runs on the team queue, so one endpoint at a time.
+    private struct ControlMemory: Sendable {
+        var pending: [String: TeamControl.PendingCommand] = [:]
+        var limit = TeamControl.RateLimit()
+        var heavyLimit = TeamControl.RateLimit.heavy
+    }
+    private let control = OSAllocatedUnfairLock(initialState: ControlMemory())
 
     private struct ScanFold: Sendable {
         var generation: Int
@@ -157,7 +176,8 @@ final class TeamModel: ObservableObject {
     /// reader + (leaders) the request list.
     private nonisolated static func snapshot(_ client: TeamClient, lastFetch: Int?, lastPublish: Int?, lastError: String?,
                                              shares: TeamShares, exclusions: TeamExclusions, lockEnabled: Bool,
-                                             docs: TeamReader.DocCache, scans: TeamReader.ScanCache) throws -> (TeamSnapshot, TeamReader?) {
+                                             docs: TeamReader.DocCache, scans: TeamReader.ScanCache,
+                                             grants: TeamGrants, pending: [TeamSnapshot.Pending]) throws -> (TeamSnapshot, TeamReader?) {
         let status = try client.status()
         // One store scan per tick — none while the store's refs are what
         // the last pass saw (#499).
@@ -165,7 +185,17 @@ final class TeamModel: ObservableObject {
         let requests = client.isLeader ? (try? client.requests()) ?? [] : []
         return (TeamSnapshot.make(status: status, roster: client.roster?.doc, reader: reader, requests: requests,
                                   today: Stats.dayKey(Date(), calendar: .current), lastFetch: lastFetch, lastPublish: lastPublish,
-                                  lastError: lastError, shares: shares, exclusions: exclusions, lockEnabled: lockEnabled), reader)
+                                  lastError: lastError, shares: shares, exclusions: exclusions, lockEnabled: lockEnabled,
+                                  grants: grants, pending: pending), reader)
+    }
+
+    /// The waits as the snapshot lists them: the driver named through the roster.
+    private nonisolated static func pendingRows(_ memory: ControlMemory, roster: TeamRoster?) -> [TeamSnapshot.Pending] {
+        memory.pending.values.map { entry in
+            let c = entry.command
+            return TeamSnapshot.Pending(id: c.id, kid: entry.driver, name: roster?.everyone.first { $0.keys.kid == entry.driver }?.name ?? entry.driver,
+                                        thread: c.thread, action: c.action, text: c.text, project: c.project, expires: entry.expires)
+        }.sorted { $0.expires == $1.expires ? $0.id < $1.id : $0.expires < $1.expires }
     }
 
     /// Every action ends here: reload the snapshot, settings and the kid.
@@ -175,23 +205,28 @@ final class TeamModel: ObservableObject {
     func load() -> Task<Void, Never> {
         guard enabled else { return Task {} }
         let fetch = lastFetchAt, publish = lastPublishAt, err = lastError, lock = lockEnabled()
-        let docs = docCache, scans = scanCache, memo = headerMemo
+        let docs = docCache, scans = scanCache, memo = headerMemo, control = control
         return Task {
             do {
-                let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?) = try await run { paths, secrets in
+                let result: (TeamSnapshot?, TeamReader?, TeamShares, TeamExclusions, String?, Signed<TeamRoster>?, TeamGrants) = try await run { paths, secrets in
                     // Non-creating: showing a kid must never mint (and, on
                     // a denied keychain read, clobber) an identity that
                     // exists but the process could not decrypt.
                     let kid = secrets.read(TeamClient.identitySecretName).flatMap { try? TeamIdentity(secret: $0) }?.kid
                     let exclusions = TeamExclusions.load(paths: paths)
-                    guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil) }
+                    guard let client = try Self.openClient(paths, secrets) else { return (nil, nil, TeamShares(), exclusions, kid, nil, TeamGrants()) }
                     client.headerMemo = memo
-                    let shares = TeamShares.load(teamDir: paths.teamDir(client.config.id))
+                    let dir = paths.teamDir(client.config.id)
+                    let shares = TeamShares.load(teamDir: dir)
+                    let grants = TeamGrants.load(teamDir: dir)
+                    let pending = Self.pendingRows(control.withLock { $0 }, roster: client.roster?.doc)
                     let (snap, reader) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err,
-                                                          shares: shares, exclusions: exclusions, lockEnabled: lock, docs: docs, scans: scans)
-                    return (snap, reader, shares, exclusions, kid, client.roster)
+                                                          shares: shares, exclusions: exclusions, lockEnabled: lock, docs: docs, scans: scans,
+                                                          grants: grants, pending: pending)
+                    return (snap, reader, shares, exclusions, kid, client.roster, grants)
                 }
                 snapshot = result.0; reader = result.1; shares = result.2; exclusions = result.3; kid = result.4; roster = result.5
+                grants = result.6; pendingCommands = result.0?.pending ?? []
             } catch {
                 lastError = Self.mask(error)
             }
@@ -231,6 +266,9 @@ final class TeamModel: ObservableObject {
         let fold = scanFold
         let fetched = transcriptsFetched
         let credential = desktopCredential()
+        let tunnel = tunnelURL()
+        let control = control
+        let home = NSHomeDirectory()
         let stop = stopRequested
         prepared.onProgress = { [weak self] p in Task { @MainActor in self?.progress = p } }
         // A user action queued behind this pass asks the publisher to
@@ -240,7 +278,7 @@ final class TeamModel: ObservableObject {
         prepared.shouldStop = { stop.withLock { $0 } || yield.withLock { $0 } }
         let sources = prepared
         defer { progress = nil }
-        let memo = headerMemo
+        let memo = headerMemo, docs = docCache
         struct Pass: Sendable {
             var fetched: Int?
             var published: Int?
@@ -251,6 +289,7 @@ final class TeamModel: ObservableObject {
             var scanWanted = false
             var handed: [String: Int] = [:]
             var desktopError: String?
+            var audits: [TeamControl.Audit] = []
         }
         do {
             let pass = try await run { paths, secrets -> Pass in
@@ -262,8 +301,22 @@ final class TeamModel: ObservableObject {
                 _ = try client.fetch(branches: client.isMember ? nil : TeamClient.joinBranches)
                 pass.fetched = Int(Date().timeIntervalSince1970)
                 if auto { try Self.autoApprove(client, paths: paths) }
-                guard publish, client.isMember else { return pass }
+                guard client.isMember else { return pass }
+                // Spec §8, the store lane: commands teammates left for this
+                // Mac, and the acks of this Mac's own commands (reaped once read).
+                let dir = paths.teamDir(client.config.id)
+                pass.audits = try Self.withEndpoint(client: client, teamDir: dir, control: control, credential: credential, home: home) { ep in
+                    var handled = TeamControl.Handled.load(teamDir: dir)
+                    defer { try? handled.save(teamDir: dir) }
+                    return try TeamControl.Store.grantorPass(client: client, endpoint: &ep, handled: &handled)
+                }
+                if let headers = try? client.readableHeaders(), let reader = try? TeamReader.load(client: client, headers: headers, cache: docs) {
+                    _ = try? TeamControl.Store.driverReap(client: client, acks: reader.ackIDs, headers: headers)
+                }
+                guard publish else { return pass }
                 var s = sources
+                let hints = TeamGrants.load(teamDir: dir).hints
+                s.grantsTo = hints.isEmpty ? nil : hints
                 var ready = true
                 if scan.owns {
                     // The app's scan, folded once per generation (#499). No
@@ -289,9 +342,15 @@ final class TeamModel: ObservableObject {
                 // Threads and transcripts are the desktop's; without it
                 // the index stays as last published and now.json says so.
                 if let credential {
-                    let dir = paths.teamDir(client.config.id)
+                    let api = DesktopAPI(origin: credential.origin, token: credential.token)
+                    // Where a driver reaches this desktop (spec §8): only
+                    // worth publishing while something is granted.
+                    if s.grantsTo != nil, let descriptor = try? api.descriptor() {
+                        s.endpoints = TeamControl.Endpoints(httpBaseUrl: credential.origin.absoluteString,
+                                                            lanHttpBaseUrls: descriptor.lanHttpBaseUrls, tunnel: tunnel)
+                    }
                     do {
-                        pass.handed = try TeamThreadSources.desktop(DesktopAPI(origin: credential.origin, token: credential.token), into: &s,
+                        pass.handed = try TeamThreadSources.desktop(api, into: &s,
                                                                     choices: TeamTranscriptChoices.load(teamDir: dir),
                                                                     exclusions: TeamExclusions.load(paths: paths), fetched: fetched,
                                                                     now: Int(Date().timeIntervalSince1970))
@@ -323,6 +382,7 @@ final class TeamModel: ObservableObject {
             if pass.foldBuilt { scanConsumed(scan.generation) }
             if pass.scanWanted { scanRequested() }
             if let why = pass.desktopError { onLog?("Infinitus desktop did not answer; threads left as last published (\(why))") }
+            for audit in pass.audits { onLog?(Self.auditLine(audit, roster: roster?.doc)) }
             if publish, credential == nil, pass.published != nil, !loggedNoDesktop {
                 loggedNoDesktop = true
                 onLog?("no Infinitus desktop credential: the team sees this Mac's stats, not its threads")
@@ -624,5 +684,158 @@ final class TeamModel: ObservableObject {
         code = nil
         transcriptsFetched = [:]
         return failure
+    }
+
+    // MARK: delegated control (spec §8)
+
+    /// Builds the endpoint over the disk half (replay set, outbox) and the
+    /// memory half, runs `body`, writes both back. Team queue only.
+    private nonisolated static func withEndpoint<T>(client: TeamClient, teamDir: URL, control: OSAllocatedUnfairLock<ControlMemory>,
+                                                    credential: (origin: URL, token: String)?, home: String,
+                                                    _ body: (inout TeamControl.Endpoint) throws -> T) rethrows -> T {
+        let api = credential.map { DesktopAPI(origin: $0.origin, token: $0.token) }
+        let memory = control.withLock { $0 }
+        var endpoint = TeamControl.Endpoint(
+            identity: client.identity, roster: { client.roster?.doc }, grants: { TeamGrants.load(teamDir: teamDir) },
+            threads: { api.map(TeamControlExecutor.threads) ?? [] },
+            execute: { command in
+                guard let api else { return TeamControl.Reply(outcome: TeamControl.Outcome.refused, detail: "no Infinitus desktop on this Mac") }
+                return TeamControlExecutor.execute(command, api: api, home: home)
+            },
+            seen: TeamControl.SeenIDs.load(teamDir: teamDir), limit: memory.limit)
+        endpoint.heavyLimit = memory.heavyLimit
+        endpoint.pending = memory.pending
+        endpoint.outbox = TeamControl.Outbox.load(teamDir: teamDir)
+        defer {
+            try? endpoint.seen.save(teamDir: teamDir)
+            try? endpoint.outbox.save(teamDir: teamDir)
+            control.withLock { $0 = ControlMemory(pending: endpoint.pending, limit: endpoint.limit, heavyLimit: endpoint.heavyLimit) }
+        }
+        return try body(&endpoint)
+    }
+
+    private nonisolated static func auditLine(_ audit: TeamControl.Audit, roster: TeamRoster?) -> String {
+        let who = roster?.everyone.first { $0.keys.kid == audit.driver }?.name ?? audit.driver
+        let target = audit.thread == TeamControl.machineThread ? "" : " on \(audit.thread)"
+        return "\(who): \(audit.action)\(target) → \(audit.outcome)\(audit.detail.map { " (\($0))" } ?? "")"
+    }
+
+    /// `team-inbox`: one sealed command off the desktop's route, answered
+    /// with the sealed ack, or nil when there is nobody to answer (not a
+    /// member, not even an envelope) — a stranger learns nothing.
+    func inbox(_ file: Data) async -> Data? {
+        guard enabled else { return nil }
+        let control = control, credential = desktopCredential(), home = NSHomeDirectory()
+        let answered: (ack: Data?, audit: TeamControl.Audit?) = (try? await run { paths, secrets in
+            guard let client = try Self.openClient(paths, secrets) else { return (nil, nil) }
+            let dir = paths.teamDir(client.config.id)
+            return Self.withEndpoint(client: client, teamDir: dir, control: control, credential: credential, home: home) { ep in
+                let (ack, audit, driverKeys) = TeamControl.handle(file, endpoint: &ep)
+                guard let driverKeys, !ack.id.isEmpty else { return (nil, audit) }
+                return (try? TeamControl.sealAck(ack, from: client.identity, to: driverKeys, at: ack.at), audit)
+            }
+        }) ?? (nil, nil)
+        if let audit = answered.audit, audit.driver != "?" { onLog?(Self.auditLine(audit, roster: roster?.doc)) }
+        if answered.audit != nil { load() }
+        return answered.ack
+    }
+
+    /// The grantor's tap on a waiting command: the answer rides the outbox
+    /// to the driver on the next store pass. nil ⇒ no such wait.
+    func decide(_ id: String, allow: Bool) async -> TeamControl.Ack? {
+        guard enabled else { return nil }
+        let control = control, credential = desktopCredential(), home = NSHomeDirectory()
+        let decided: (ack: TeamControl.Ack, audit: TeamControl.Audit)? = try? await run { paths, secrets in
+            guard let client = try Self.openClient(paths, secrets) else { return nil }
+            return Self.withEndpoint(client: client, teamDir: paths.teamDir(client.config.id), control: control, credential: credential, home: home) { ep in
+                TeamControl.decide(id, allow: allow, endpoint: &ep).map { ($0.ack, $0.audit) }
+            }
+        }
+        if let decided { onLog?(Self.auditLine(decided.audit, roster: roster?.doc)) }
+        await load().value
+        return decided?.ack
+    }
+
+    func addGrant(audience: TeamRoster.ShareTarget, threads: TeamGrants.Threads, capabilities: Set<String>,
+                  preauthorized: Set<String> = [], expires: Int? = nil) async -> TeamGrants.Grant? {
+        let saved = OSAllocatedUnfairLock<TeamGrants.Grant?>(initialState: nil)
+        await action("Granting…") { paths, _ in
+            guard let id = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
+            let dir = paths.teamDir(id)
+            var grants = TeamGrants.load(teamDir: dir)
+            let grant = grants.add(audience: audience, threads: threads, capabilities: capabilities,
+                                   preauthorized: preauthorized, expires: expires)
+            try grants.save(teamDir: dir)
+            saved.withLock { $0 = grant }
+        }
+        return saved.withLock { $0 }
+    }
+
+    func revokeGrant(id: String) async -> Bool {
+        let removed = OSAllocatedUnfairLock(initialState: false)
+        await action("Revoking…") { paths, _ in
+            guard let teamID = Self.teamID(paths) else { throw TeamClient.ClientError.notInTeam }
+            let dir = paths.teamDir(teamID)
+            var grants = TeamGrants.load(teamDir: dir)
+            let did = grants.remove(id: id)
+            try grants.save(teamDir: dir)
+            removed.withLock { $0 = did }
+        }
+        return removed.withLock { $0 }
+    }
+
+    /// One exchange with a grantor's desktop (LAN or tunnel); the lane's
+    /// own timeout caps a vanished peer.
+    private nonisolated static let urlHTTP: TeamControl.Deliver.HTTP = { method, url, headers, body, timeout in
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.httpBody = body
+        request.timeoutInterval = timeout
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        let done = DispatchSemaphore(value: 0)
+        let box = OSAllocatedUnfairLock<(Int, Data, Error?)>(initialState: (0, Data(), nil))
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            box.withLock { $0 = ((response as? HTTPURLResponse)?.statusCode ?? 0, data ?? Data(), error) }
+            done.signal()
+        }.resume()
+        done.wait()
+        let (status, data, failure) = box.withLock { $0 }
+        if let failure { throw failure }
+        return (status, data)
+    }
+
+    /// One command to a teammate's thread: their desktop's doors first
+    /// (as their last now.json hinted them), the store when none answers.
+    /// nil ⇒ `lastError` says why.
+    func drive(kid: String, thread: String, action: String, text: String?, project: String?) async -> TeamControl.Delivery? {
+        guard enabled, inTeam else { lastError = "not in a team"; return nil }
+        let endpoints = reader?.members[kid]?.now?.endpoints
+        let command = TeamControl.Command(id: TeamControl.newCommandID(), to: kid, thread: thread, action: action, text: text,
+                                          project: project, at: Int(Date().timeIntervalSince1970))
+        do {
+            let delivery = try await run { paths, secrets in
+                guard let client = try Self.openClient(paths, secrets) else { throw TeamControl.DriveError.noRoster }
+                return try TeamControl.Drive.send(command, client: client, endpoints: endpoints, deliver: TeamControl.Deliver(http: Self.urlHTTP))
+            }
+            lastError = nil
+            return delivery
+        } catch {
+            lastError = Self.mask(error)
+            return nil
+        }
+    }
+
+    struct AckRow: Encodable, Equatable {
+        var id: String; var from: String; var outcome: String; var detail: String?; var at: Int
+    }
+
+    /// The answers to this Mac's store-lane commands, newest first, off
+    /// the reader `load()` built.
+    var acks: [AckRow] {
+        var rows: [AckRow] = []
+        for m in reader?.members.values ?? [:].values {
+            for ack in m.acks.values { rows.append(AckRow(id: ack.id, from: m.kid, outcome: ack.outcome, detail: ack.detail, at: ack.at)) }
+        }
+        return rows.sorted { $0.at == $1.at ? $0.id < $1.id : $0.at > $1.at }
     }
 }

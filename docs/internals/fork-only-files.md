@@ -286,6 +286,13 @@ these bullets.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@t3tools/client-runtime/state/infinitusAccounts`).
+- `apps/server/src/infinitus/Layers/InfinitusTeamControlHttp.ts`,
+  `packages/contracts/src/infinitusTeamControl.ts` — delegated control's
+  network lane (#1313, spec §8): `POST /api/infinitus/team/command`,
+  unauthenticated like pairing, hands the sealed envelope to the Mac's
+  `team-inbox` and answers `{ack}`; never a reason. The Mac side
+  (`TeamControl*.swift`, the `team-grant`/`team-drive`/`team-pending` verbs) is
+  `apps/mac`'s.
 - `apps/mobile/src/features/team/` — Settings › Team (#1313): members, the
   leader's requests, join from a code or the site's `/join#<code>` invite
   link; the phone's subset of the web pane's `team.logic.ts`.

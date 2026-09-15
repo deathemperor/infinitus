@@ -211,6 +211,17 @@ final class ControlServer {
         return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
     }
 
+    /// A teammate by kid or roster name (spec §8: `team-grant`, `team-drive`).
+    private func teammate(_ word: String) throws -> String {
+        let everyone = model.team.roster?.doc.everyone ?? []
+        if everyone.contains(where: { $0.keys.kid == word }) { return word }
+        let named = everyone.filter { $0.name == word }
+        guard named.count == 1, let one = named.first else {
+            throw Fail(named.isEmpty ? "no teammate \(word)" : "several teammates named \(word); pass the kid")
+        }
+        return one.keys.kid
+    }
+
     /// Minting a code and approving a member need the biometric lock on
     /// (spec §2.2): a stolen unlocked Mac must not be able to let anyone in.
     private func requireLock() throws {
@@ -1060,6 +1071,85 @@ final class ControlServer {
                 out["exported"] = .string(sealed.base64EncodedString())
             }
             return ControlReply(ok: true, result: .object(out))
+
+        // MARK: delegated control (#1313, spec §8)
+
+        case "team-inbox":
+            // Never `Fail`: an unverifiable envelope answers `{ack: null}` so
+            // the desktop's unauthenticated route tells a stranger nothing.
+            guard let file = r.secret.flatMap({ Data(base64Encoded: $0) }), !file.isEmpty else {
+                return ControlReply(ok: true, result: .object(["ack": .null]))
+            }
+            let ack = await model.team.inbox(file)
+            return ControlReply(ok: true, result: .object(["ack": ack.map { .string($0.base64EncodedString()) } ?? .null]))
+
+        case "team-grants":
+            guard model.team.inTeam else { throw Fail("not in a team") }
+            return ControlReply(ok: true, result: try JSONValue.of(model.team.grants))
+
+        case "team-grant":
+            let usage = "usage: team-grant <leaders|team|kid,…> --cap <view,send,interrupt,new> [--threads <id,id>] [--pre <interrupt,new>] [--expires <seconds>]"
+            guard let first = r.args.first, let target = TeamShares.parseTarget([first]), target != .off else { throw Fail(usage) }
+            let audience: TeamRoster.ShareTarget
+            switch target {
+            case .members(let names): audience = .members(try names.map { try teammate($0) })
+            default: audience = target
+            }
+            let caps = (r.options["cap"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty }
+            guard !caps.isEmpty, caps.allSatisfy({ TeamGrants.capabilities.contains($0) }) else {
+                throw Fail("--cap takes a comma list of \(TeamGrants.capabilities.joined(separator: ", "))")
+            }
+            let threads: TeamGrants.Threads
+            if let t = r.options["threads"], t != "true", t != "*" {
+                threads = .some(t.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+            } else {
+                threads = .all
+            }
+            let preauthorized = Set((r.options["pre"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty })
+            var expires: Int?
+            if let e = r.options["expires"] {
+                guard let seconds = Int(e), seconds > 0 else { throw Fail("--expires takes seconds from now") }
+                expires = Int(Date().timeIntervalSince1970) + seconds
+            }
+            let grant = await model.team.addGrant(audience: audience, threads: threads, capabilities: Set(caps),
+                                                   preauthorized: preauthorized, expires: expires)
+            if let err = model.team.lastError { throw Fail(err) }
+            guard let grant else { throw Fail("grant not saved") }
+            return ControlReply(ok: true, result: try JSONValue.of(grant))
+
+        case "team-revoke":
+            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: team-revoke <id>") }
+            let removed = await model.team.revokeGrant(id: id)
+            if let err = model.team.lastError { throw Fail(err) }
+            return ControlReply(ok: true, result: .object(["removed": .bool(removed)]))
+
+        case "team-pending":
+            guard model.team.inTeam else { throw Fail("not in a team") }
+            return ControlReply(ok: true, result: try JSONValue.of(model.team.pendingCommands))
+
+        case "team-allow", "team-deny":
+            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: \(r.command) <command id>") }
+            guard let ack = await model.team.decide(id, allow: r.command == "team-allow") else {
+                throw Fail("no waiting command \(id); see team-pending")
+            }
+            return ControlReply(ok: true, result: try JSONValue.of(ack))
+
+        case "team-drive":
+            let usage = "usage: team-drive <kid|name> <thread|-> <view|send|interrupt|new> [text…] [--project <title|id>]"
+            guard r.args.count >= 3 else { throw Fail(usage) }
+            let kid = try teammate(r.args[0])
+            let action = r.args[2]
+            guard TeamGrants.capabilities.contains(action) else { throw Fail(usage) }
+            let text = r.args.dropFirst(3).joined(separator: " ")
+            guard let delivery = await model.team.drive(kid: kid, thread: r.args[1], action: action, text: text.isEmpty ? nil : text,
+                                                        project: r.options["project"].flatMap { $0 == "true" ? nil : $0 }) else {
+                throw Fail(model.team.lastError ?? "team-drive: not delivered")
+            }
+            return ControlReply(ok: true, result: try JSONValue.of(delivery))
+
+        case "team-acks":
+            guard model.team.inTeam else { throw Fail("not in a team") }
+            return ControlReply(ok: true, result: try JSONValue.of(model.team.acks))
 
         case "desktop-token":
             // The dispatcher has one entry, the Unix socket (the phone goes

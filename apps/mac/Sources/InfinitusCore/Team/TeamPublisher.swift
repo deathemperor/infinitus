@@ -96,6 +96,11 @@ public struct TeamPublisher {
         public var threads: [TeamDocs.ThreadRow] = []
         public var live: [TeamDocs.LiveThread] = []
         public var desktop = false
+        /// Delegated control (spec §8): where a driver reaches this Mac's
+        /// desktop, and what this Mac lets teammates do. Both ride
+        /// `now.json`; nil leaves the keys out.
+        public var endpoints: TeamControl.Endpoints?
+        public var grantsTo: [TeamDocs.GrantHint]?
         public var transcripts: [TeamThreadSources.Transcript] = []
         public var crashes: [CrashReport] = []
         public var fleets: [TeamDocs.Fleet] = []
@@ -370,7 +375,7 @@ public struct TeamPublisher {
             // once — the hash going away is what makes it once.
             if state.hashes.removeValue(forKey: "now.json") != nil { try client.unpublish(path: "now.json") }
         } else {
-            let doc = TeamDocs.Now(at: at, machine: sources.machine, live: sources.desktop ? live : [], fleets: sources.fleets,
+            var doc = TeamDocs.Now(at: at, machine: sources.machine, live: sources.desktop ? live : [], fleets: sources.fleets,
                                    blockers: sources.blockers, crashesToday: crashesToday,
                                    // An older client's ShareTarget decoder throws on "off";
                                    // the hint carries only kinds that actually travel.
@@ -379,6 +384,8 @@ public struct TeamPublisher {
                                    sharesTo: Dictionary(uniqueKeysWithValues: TeamKinds.memberKinds.map { ($0, shares.target(for: $0)) })
                                        .filter { $0.value != .off },
                                    desktop: sources.desktop)
+            doc.endpoints = sources.endpoints
+            doc.grantsTo = sources.grantsTo
             try stage(TeamKinds.now, "now.json", try CanonicalJSON.encode(doc), always: true)
         }
         if off(TeamKinds.fleet) {
