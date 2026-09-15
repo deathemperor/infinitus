@@ -37,6 +37,8 @@ function harness(input: {
   const forgetAnswers = [...(input.forgets ?? [true])];
   const next = (answers: boolean[]) => (answers.length > 1 ? answers.shift()! : answers[0]!);
   let connected = input.connected ?? true;
+  let appState = "active";
+  const requestReconnect = vi.fn();
   let cards = input.cards ?? [];
   let startListener: ((event: { readonly activityPushToStartToken: string }) => void) | null = null;
   let appStateListener: ((state: string) => void) | null = null;
@@ -45,7 +47,7 @@ function harness(input: {
     | null = null;
   let localListener: (() => void) | null = null;
   const instancesRead = vi.fn(() => cards);
-  const notes = { watching: vi.fn(), withdrawn: vi.fn() };
+  const notes = { watching: vi.fn(), withdrawn: vi.fn(), backgroundCard: vi.fn() };
   const deps: ThreadCardBridgeDeps = {
     makeSend: () => async (kind, token) => {
       sent.push({ kind, token, at: Date.now() });
@@ -73,6 +75,8 @@ function harness(input: {
       return () => undefined;
     },
     isConnected: () => connected,
+    appState: () => appState,
+    requestReconnect,
     now: () => new Date(),
     notes,
   };
@@ -82,6 +86,7 @@ function harness(input: {
     sent,
     forgets,
     notes,
+    requestReconnect,
     instancesRead,
     vendStartToken: (token: string) => startListener?.({ activityPushToStartToken: token }),
     appState: (state: string) => appStateListener?.(state),
@@ -90,6 +95,9 @@ function harness(input: {
     localChange: () => localListener?.(),
     setConnected: (value: boolean) => {
       connected = value;
+    },
+    setAppState: (value: string) => {
+      appState = value;
     },
     setCards: (value: ReadonlyArray<LiveCard>) => {
       cards = value;
@@ -261,6 +269,45 @@ describe("startThreadCardBridge — the re-scan (#1267)", () => {
     expect(d.ended).toHaveBeenCalledWith("immediate");
     expect(a.ended).not.toHaveBeenCalled();
     expect(h.sent).toHaveLength(1);
+    h.bridge.stop();
+  });
+
+  it("asks for a reconnect when a card starts in the background and records the token's wait (#1277)", async () => {
+    vi.setSystemTime(new Date("2026-09-15T06:17:34Z"));
+    const h = harness({ cards: [], connected: false, sends: [false, false, true] });
+    await settle();
+    h.setAppState("background");
+    h.setCards([card("p")]);
+    h.activityUpdate("p", "started");
+    await settle();
+    expect(h.requestReconnect).toHaveBeenCalledTimes(1);
+    expect(h.sent).toEqual([expect.objectContaining({ kind: "agent-activity", token: "tok-p" })]);
+    expect(h.notes.backgroundCard).toHaveBeenLastCalledWith({
+      startedAt: "2026-09-15T06:17:34.000Z",
+      outcome: "unreachable",
+      elapsedMs: 0,
+    });
+    // Still unreachable: no tighter loop, and the unreachable note is not repeated.
+    await vi.advanceTimersByTimeAsync(60_000);
+    h.bridge.retry();
+    await settle();
+    expect(h.notes.backgroundCard).toHaveBeenCalledTimes(1);
+    // The socket comes up (the wakeup worked, or the app was opened): the landing is recorded with the whole wait.
+    await vi.advanceTimersByTimeAsync(5_000);
+    h.setConnected(true);
+    h.bridge.retry();
+    await settle();
+    expect(h.notes.backgroundCard).toHaveBeenLastCalledWith({
+      startedAt: "2026-09-15T06:17:34.000Z",
+      outcome: "sent",
+      elapsedMs: 65_000,
+    });
+    // A card started while active asks for nothing.
+    h.setAppState("active");
+    h.setCards([card("p"), card("q")]);
+    h.activityUpdate("q", "started");
+    await settle();
+    expect(h.requestReconnect).toHaveBeenCalledTimes(1);
     h.bridge.stop();
   });
 });

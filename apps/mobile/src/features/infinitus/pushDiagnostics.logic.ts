@@ -33,6 +33,16 @@ export interface SwitchOffNote {
   readonly detail: string | null;
 }
 
+/** What became of a card iOS started while the app was in the background
+    (#1277): whether its token reached the Mac inside the background window
+    the push-to-start grants, and how long that took. */
+export interface BackgroundCardNote {
+  readonly startedAt: string;
+  readonly outcome: "sent" | "unreachable";
+  /** From the start to the send that landed, or to the failed attempt. */
+  readonly elapsedMs: number;
+}
+
 export interface AgentActivityPushState {
   /** When the thread-card bridge attached its listeners; null while it is not
       running at all (the switch is off, or no paired Mac runs Infinitus). */
@@ -40,12 +50,15 @@ export interface AgentActivityPushState {
   readonly registrations: PushRegistrations;
   /** The last switch-off's withdrawal; cleared when the bridge runs again. */
   readonly switchOff: SwitchOffNote | null;
+  /** The last card started in the background, and what its token did. */
+  readonly backgroundCard: BackgroundCardNote | null;
 }
 
 export const EMPTY_AGENT_ACTIVITY_PUSH_STATE: AgentActivityPushState = {
   watchingSince: null,
   registrations: {},
   switchOff: null,
+  backgroundCard: null,
 };
 
 export function withWatching(
@@ -55,6 +68,13 @@ export function withWatching(
   return since === null
     ? { ...state, watchingSince: null }
     : { ...state, watchingSince: since.toISOString(), switchOff: null };
+}
+
+export function withBackgroundCard(
+  state: AgentActivityPushState,
+  note: BackgroundCardNote,
+): AgentActivityPushState {
+  return { ...state, backgroundCard: note };
 }
 
 export function withSwitchOff(
@@ -98,6 +118,24 @@ export interface AgentActivityPushSummary {
  * a token, and the Mac cannot refuse a token that was never sent.
  */
 export function agentActivityPushSummary(state: AgentActivityPushState): AgentActivityPushSummary {
+  const summary = watchingSummary(state);
+  return state.backgroundCard === null || state.watchingSince === null
+    ? summary
+    : {
+        ...summary,
+        explanation: `${summary.explanation} ${backgroundCardLine(state.backgroundCard)}`,
+      };
+}
+
+/** The sentence that answers the #1277 window question without a debugger. */
+function backgroundCardLine(note: BackgroundCardNote): string {
+  const seconds = Math.round(note.elapsedMs / 1000);
+  return note.outcome === "sent"
+    ? `A card started in the background at ${timeOf(note.startedAt)} and its token reached the Mac ${seconds} s later.`
+    : `A card started in the background at ${timeOf(note.startedAt)}, but the Mac was unreachable ${seconds} s later; the token goes when the app is next opened.`;
+}
+
+function watchingSummary(state: AgentActivityPushState): AgentActivityPushSummary {
   if (state.watchingSince === null) {
     if (state.switchOff !== null) return switchOffSummary(state.switchOff);
     return {

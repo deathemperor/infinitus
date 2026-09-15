@@ -4,9 +4,11 @@ import { appAtomRegistry } from "../../state/atom-registry";
 import type { LiveActivityTokenKind } from "./liveActivity.logic";
 import {
   type AgentActivityPushState,
+  type BackgroundCardNote,
   EMPTY_AGENT_ACTIVITY_PUSH_STATE,
   type PushRegistrationOutcome,
   type SwitchOffNote,
+  withBackgroundCard,
   withRegistration,
   withSwitchOff,
   withWatching,
@@ -71,4 +73,10 @@ export function noteSwitchOff(
       detail: outcome.detail,
     }),
   );
+}
+
+/** A card iOS started while the app was in the background, and what its
+    token did inside that window (#1277). */
+export function noteBackgroundCard(note: BackgroundCardNote): void {
+  update((state) => withBackgroundCard(state, note));
 }
