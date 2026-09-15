@@ -29,6 +29,8 @@ export interface ProxyEngine {
   readonly secretNoun: "Key" | "Password";
   /** What the Mac uses when no url is stored (the verb's own default). */
   readonly defaultUrl: string;
+  /** The line under the Dashboard row, drawn when the read answered a URL. */
+  readonly dashboardNote: string;
 }
 
 export const PROXY_ENGINES: ReadonlyArray<ProxyEngine> = [
@@ -40,6 +42,7 @@ export const PROXY_ENGINES: ReadonlyArray<ProxyEngine> = [
     secretLabel: "Management key",
     secretNoun: "Key",
     defaultUrl: "http://127.0.0.1:8317",
+    dashboardNote: "The proxy's own management panel: credentials, config and logs.",
   },
   {
     key: "9router",
@@ -49,6 +52,7 @@ export const PROXY_ENGINES: ReadonlyArray<ProxyEngine> = [
     secretLabel: "Dashboard password",
     secretNoun: "Password",
     defaultUrl: "http://127.0.0.1:20128",
+    dashboardNote: "Providers → Connect Claude Code adds an account there.",
   },
 ];
 
@@ -92,7 +96,7 @@ export interface ProxyEngineState {
   readonly sessionAffinity: boolean | null;
   /** The Mac's routing caveat for the proxy's credentials, or null. */
   readonly caveat: string | null;
-  /** 9Router's dashboard, or null. */
+  /** The engine's own web UI, or null on a build that answers none. */
   readonly dashboardURL: string | null;
 }
 

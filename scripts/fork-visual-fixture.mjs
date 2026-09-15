@@ -453,6 +453,7 @@ function answer(request, socketPath) {
     case "proxy":
       return {
         baseURL: "http://127.0.0.1:8317",
+        dashboardURL: "http://127.0.0.1:8317/management.html",
         keyPresent: false,
         enabled: false,
         routingStrategy: "round-robin",

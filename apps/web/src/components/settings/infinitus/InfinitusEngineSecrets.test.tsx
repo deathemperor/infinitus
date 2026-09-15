@@ -256,7 +256,7 @@ describe("InfinitusEngineSecrets", () => {
     expect(rendered()).not.toContain("Session affinity");
   });
 
-  it("draws the affinity switch only with the verb and the field, and the 9Router dashboard link", async () => {
+  it("draws the affinity switch only with the verb and the field, and each engine's dashboard link", async () => {
     fake.snapshot = snapshot([
       ...ENGINE_COMMANDS,
       command("proxy-routing"),
@@ -267,6 +267,7 @@ describe("InfinitusEngineSecrets", () => {
       if (input.command === "proxy") {
         return reply({
           baseURL: "http://127.0.0.1:8317",
+          dashboardURL: "http://127.0.0.1:8317/management.html",
           keyPresent: true,
           routingStrategy: "round-robin",
           sessionAffinity: false,
@@ -288,6 +289,9 @@ describe("InfinitusEngineSecrets", () => {
     expect(output).toContain("Turn on session affinity so a conversation");
     expect(output).toContain("Two credentials share one organization.");
     expect(output).toContain("http://127.0.0.1:20128/dashboard");
+    expect(output).toContain("Open 9Router dashboard");
+    expect(output).toContain("http://127.0.0.1:8317/management.html");
+    expect(output).toContain("Open CLIProxyAPI dashboard");
     await act(async () => {
       byLabel("CLIProxyAPI session affinity").props.onCheckedChange(true);
     });

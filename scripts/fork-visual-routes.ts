@@ -88,6 +88,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
       "Routing strategy",
       "Round robin",
       "Session affinity",
+      "Open CLIProxyAPI dashboard",
       "Open 9Router dashboard",
       "Daemon running",
       // The About section's version line, drawn once `status` answered.

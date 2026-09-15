@@ -756,8 +756,12 @@ final class ControlServer {
             return ControlReply(ok: true, result: .object(["restarting": .bool(true)]), restarting: true)
 
         case "proxy":
+            // The proxy serves its own management panel at /management.html
+            // (its own docs); a build with the control panel disabled answers
+            // 404 there, which is the proxy's to say, not ours to guess.
             var out: [String: JSONValue] = [
                 "baseURL": .string(model.cliproxyBaseURL),
+                "dashboardURL": .string(model.cliproxyBaseURL + "/management.html"),
                 "keyPresent": .bool(model.cliproxyKeyPresent),
                 "enabled": .bool(model.cliproxyEnabled),
             ]

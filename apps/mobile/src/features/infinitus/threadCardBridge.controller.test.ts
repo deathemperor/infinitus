@@ -9,11 +9,17 @@ import {
 } from "./threadCardBridge.controller";
 
 /** A card as the bridge sees it: an id and a token it hands over on request. */
-function card(id: string, token: string | null = `tok-${id}`): LiveCard {
+function card(
+  id: string,
+  token: string | null = `tok-${id}`,
+): LiveCard & { readonly ended: ReturnType<typeof vi.fn> } {
+  const ended = vi.fn(() => Promise.resolve());
   return {
     getId: () => id,
     getPushToken: () => Promise.resolve(token),
     addPushTokenListener: () => ({ remove: vi.fn() }),
+    end: ended,
+    ended,
   };
 }
 
@@ -233,6 +239,28 @@ describe("startThreadCardBridge — the re-scan (#1267)", () => {
     h.activityUpdate("p", "ended");
     await settle();
     expect(h.forgets).toHaveLength(2);
+    h.bridge.stop();
+  });
+
+  it("keeps one card and ends the others at once (#1277)", async () => {
+    const a = card("a");
+    const b = card("b");
+    const c = card("c");
+    const h = harness({ cards: [a, b, c] });
+    await settle();
+    expect(a.ended).not.toHaveBeenCalled();
+    expect(b.ended).toHaveBeenCalledWith("immediate");
+    expect(c.ended).toHaveBeenCalledWith("immediate");
+    expect(h.sent).toEqual([expect.objectContaining({ kind: "agent-activity", token: "tok-a" })]);
+    expect(h.forgets).toHaveLength(0);
+    // A later stack keeps the card whose token the Mac holds, wherever it is listed.
+    const d = card("d");
+    h.setCards([d, a]);
+    h.activityUpdate("d", "started");
+    await settle();
+    expect(d.ended).toHaveBeenCalledWith("immediate");
+    expect(a.ended).not.toHaveBeenCalled();
+    expect(h.sent).toHaveLength(1);
     h.bridge.stop();
   });
 });

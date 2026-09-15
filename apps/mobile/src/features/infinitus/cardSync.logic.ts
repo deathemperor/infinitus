@@ -20,6 +20,21 @@ export interface CardSync {
   readonly withdraw: boolean;
 }
 
+/** One card at a time (#1277): the Mac tracks one card per phone, and a
+    push-to-start that raced the token handoff — or a dead-app window — can
+    leave a stack. Keeps the card whose token the bridge already holds (the
+    Mac can update that one), else the first `getInstances()` returns, as
+    upstream's app does; every other one is ended at once. */
+export function cardsToEnd(input: {
+  readonly live: ReadonlyArray<string>;
+  /** The card whose token was last offered, if it is still live. */
+  readonly held: string | null;
+}): { readonly keep: string | null; readonly end: ReadonlyArray<string> } {
+  if (input.live.length === 0) return { keep: null, end: [] };
+  const keep = input.held !== null && input.live.includes(input.held) ? input.held : input.live[0]!;
+  return { keep, end: input.live.filter((id) => id !== keep) };
+}
+
 export function syncWatchedCards(input: {
   readonly watched: ReadonlySet<string>;
   readonly live: ReadonlyArray<string>;
