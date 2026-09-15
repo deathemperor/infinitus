@@ -64,12 +64,8 @@ describe("swipeHistoryIntent", () => {
     // The driver sends the back button as a gesture (#1250); both paths must
     // agree on what the back button does.
     for (const pathname of ["/settings/general", "/env-1/thread-1", "/accounts"]) {
-      expect(swipeHistoryIntent("left", pathname), pathname).toBe(
-        mouseHistoryIntent(3, pathname),
-      );
-      expect(swipeHistoryIntent("right", pathname), pathname).toBe(
-        mouseHistoryIntent(4, pathname),
-      );
+      expect(swipeHistoryIntent("left", pathname), pathname).toBe(mouseHistoryIntent(3, pathname));
+      expect(swipeHistoryIntent("right", pathname), pathname).toBe(mouseHistoryIntent(4, pathname));
     }
   });
 });
