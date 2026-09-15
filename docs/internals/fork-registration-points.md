@@ -18,21 +18,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   pairing, #710) the same way, contracts in `infinitusPairing.ts`;
   `subscribeCaptures` / `captures.apply` (#433) the same way, contracts in
   `captures.ts`.
-- `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`,
-  `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding
-  (#270 A). `VcsRemoveWorktreeInput` gains `keepWork` (commit whatever the
-  worktree holds uncommitted to its branch, `wip: work saved when the thread
-was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
-  after the remove, skipped whenever `keepWork` had to commit: that commit
-  is the work's only copy), and answers `VcsRemoveWorktreeResult`
-  `{branch, savedWorkCommit, branchDeleted}`. The thread delete flow always
-  sends `keepWork`, asks "Also delete branch …?" as a second confirm (off by
-  default, like Conductor's delete-branch-on-archive) when the thread has a
-  branch, and toasts the saved commit. `createWorktree` seeds the new tree
-  with the parent's untracked files that `.worktreeinclude` at the project
-  root names (gitignore syntax, matched by `git ls-files --others --ignored
---exclude-from`), or `.env*` when the file is absent; best-effort, logged,
-  never rolls back the worktree, and runs before the setup script.
+- `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
   routes (#710), so the typed HTTP clients carry them.
@@ -160,31 +146,13 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   the menu's "Restore files only" between the full revert and the chat
   rewind, its own confirm text, and the mode skips the conversation-rollback
   check. Test beside the E1 one.
-- Bash description as the row's headline (#1231):
-  `apps/server/src/orchestration/ActivityPayloadProjection.ts` — the
-  client-bound projection rebuilds a tool row's `data` and drops `input`
-  whole, so for `command_execution` it now carries `data.description`
-  (Claude's Bash `input.description`, trimmed) beside `data.command`;
-  `apps/web/src/session-logic.ts` — `WorkLogEntry.commandDescription` from
-  it, merged forward like `command` (the started row can arrive before the
-  input finished streaming); `apps/web/src/components/chat/MessagesTimeline.logic.ts`
-  — `workEntryDisplayLabel`, `singleToolCallLabel` and `liveWorkEntryLabel`
-  prefer it over the command, and `buildToolCallExpandedBody` (unchanged)
-  then adds the command as the expanded row's first block, since it differs
-  from the visible label. Rows without a description are as before.
-  `apps/mobile/src/lib/threadActivity.ts` (an upstream file) mirrors it:
-  `WorkLogEntry.commandDescription` derived from `data.description` on a
-  `command_execution` row (whitespace collapsed), merged forward in
-  `mergeDerivedWorkLogEntries`, and preferred over the command in
-  `workEntryRowLabel` (compact and expanded), `singleToolCallLabel` and
-  `liveToolActivitySummary`; the expanded body already leads with the
-  command block.
+- Bash description as the row's headline (#1231): `apps/server/src/orchestration/ActivityPayloadProjection.ts` (`data.description` on `command_execution`), `apps/web/src/session-logic.ts` (`WorkLogEntry.commandDescription`), `apps/web/src/components/chat/MessagesTimeline.logic.ts`, `apps/mobile/src/lib/threadActivity.ts`. Rules and traps: `docs/internals/bash-description-headline.md`.
 - Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test; `turnFooter`, `turnFooterLabel`, exported as `@t3tools/client-runtime/turnFooter`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`is_backgrounded` → `TaskStartedPayload.isBackgrounded` in `packages/contracts/src/providerRuntime.ts`, passed through by `ProviderRuntimeIngestion.ts`; `liveBackgroundAgentsMessage`, #974), `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+ test; `infinitus/backgroundAgents.logic.ts`; the `background-agents.reconcile` phase in `serverRuntimeStartup.ts`, #977), `apps/web/src/components/chat/useTurnFooters.ts`, `MessagesTimeline.tsx` (`turnFooters`, `AssistantMessageMeta`), `ChatView.tsx`. Rules and traps: `docs/internals/turn-footer.md`.
 - Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`, `062` (`send_at`, #1318); `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
 - Update idle gate (#829): `packages/contracts/src/server.ts` (`ServerRunningTurn`, `ServerUpdateRunningTurnsPolicy`, `runningTurns?` on `ServerSelfUpdateInput` and `ServerSelfUpdateError`, the `waiting` progress stage), `packages/contracts/src/environmentHttp.ts` (`GET /api/infinitus/running-turns`), `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` + `Layers/InfinitusRunningTurns.ts` (served by `Layers/InfinitusHttp.ts`), `apps/server/src/cloud/selfUpdate.ts` (`awaitIdle`, `commitDesktopUpdate`), `ws.ts`, `server.ts`; `packages/client-runtime/src/state/server.ts`, `apps/web/src/components/ServerUpdateAction.tsx`, `apps/web/src/components/desktopUpdate.logic.ts` (`countRunningLocalTurns`), `sidebar/SidebarUpdatePill.tsx`, `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts` (`ThreadBabysit`, `BABYSIT_MAX_ROUNDS`, `babysit?`, `thread.meta.update`'s `babysit?` / `babysitRounds?`, `thread.meta-updated`'s `babysit?`), `apps/server/src/orchestration/decider.ts` (`babysitPatch`), `projector.ts`, `packages/client-runtime/src/state/threadReducer.ts`, `Migrations/052_ProjectionThreadsBabysit.ts` (`projection_threads.babysit_json`; `Layers/ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`), `PullRequestSyncReactor.ts` (`requestedSync`), `collectNeedsAttention`; fork-only `apps/server/src/infinitus/Layers/infinitusBabysit.logic.ts` (`babysitVerdict`, `settleBabysitMarks`, `seedBabysitMarks`, `babysitPrompt`), `InfinitusBabysit.ts` (`InfinitusBabysitLive`), `apps/web/src/components/ThreadBabysitToggle.tsx` (shown by `BranchToolbarBranchSelector.tsx`). Rules and traps: `docs/internals/babysit.md`.
-- Turn usage (#834): `packages/contracts/src/orchestration.ts` (`ThreadTurnUsage`, `ThreadUsageRollup`, `usage?`, `thread.turn.usage.record`, `thread.turn-usage-recorded`, `thread.usage.backfill`, `thread.usage-backfilled`), `packages/shared/src/threadUsage.ts`, `packages/contracts/src/providerRuntime.ts` (`turnCostUsd?`, `turnModels?`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (+ `claudeTurnUsage.logic.ts`), `Layers/ProviderRuntimeIngestion.ts` (+ `orchestration/threadTurnUsage.ts`), `decider.ts`, `projector.ts`, `Schemas.ts`, `threadReducer.ts`, `persistence/ProjectionTurnUsage.ts` (migrations `056`, `057`), `Layers/ProjectionPipeline.ts`, `ProjectionThreads.ts`, `ProjectionSnapshotQuery.ts`, `orchestration/Layers/ThreadUsageBackfill.ts` (+ `threadUsageBackfill.logic.ts`; `ThreadUsageBackfillLive` in `server.ts`), `apps/web/src/components/chat/ThreadUsagePopover.tsx` (+ `threadUsage.logic.ts`), `ChatHeader.tsx`'s `usage` prop from `ChatView.tsx`; `apps/server/src/usage/UsageService.ts` (`readSessionUsage`), and the upstream tests `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`, `UsageService.test.ts`. Rules and traps: `docs/internals/turn-usage.md`.
-- Side question (#269 C): `packages/contracts/src/orchestration.ts` (`sideOf?` on `thread.create`, `thread.created`, `OrchestrationThread`, `OrchestrationThreadShell`; column `side_of`, `Migrations/053_ProjectionThreadsSideOf.ts`; decider, projector, `threadReducer.ts`, `ProjectionThreads`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`), `packages/contracts/src/infinitus.ts` (`InfinitusThreadForkInput.side?`), `apps/server/src/infinitus/ThreadFork.ts` (`forkCreateFields`, `latestClaudeSessionEnd`); `apps/web/src/rightPanelStore.ts` (`side-question`, `openSideQuestion`, `openSideQuestionPending`, `failSideQuestionPending`), `apps/web/src/components/SideQuestionPanel.tsx` (+ `SideQuestionPanel.logic.ts`: `isSideQuestionMessage`, `isSideQuestionGone`), `ChatView.tsx` (`askSideQuestion`, `cleanupRightPanelSurfaces`), `ChatComposer.tsx` (`ComposerFooterModeControls`), `CompactComposerControlsMenu.tsx`, `Sidebar.tsx`, `CommandPalette.tsx`, `getLatestThreadForProject`, Settings › Archived. Rules and traps: `docs/internals/side-question.md`.
+- Turn usage (#834): `packages/contracts/src/orchestration.ts` (`ThreadTurnUsage`, `ThreadUsageRollup`, `thread.turn.usage.record`, `thread.usage.backfill`), `packages/shared/src/threadUsage.ts`, `providerRuntime.ts` (`turnCostUsd?`, `turnModels?`), `ClaudeAdapter.ts` (+ `claudeTurnUsage.logic.ts`), `ProviderRuntimeIngestion.ts` (+ `orchestration/threadTurnUsage.ts`), decider / projector / reducer, `persistence/ProjectionTurnUsage.ts` (migrations `056`, `057`), `orchestration/Layers/ThreadUsageBackfill.ts`, `apps/web/src/components/chat/ThreadUsagePopover.tsx`, `apps/server/src/usage/UsageService.ts`. Rules and traps: `docs/internals/turn-usage.md`.
+- Side question (#269 C): `packages/contracts/src/orchestration.ts` (`sideOf?`; column `side_of`, `Migrations/053_ProjectionThreadsSideOf.ts`), `packages/contracts/src/infinitus.ts` (`InfinitusThreadForkInput.side?`), `apps/server/src/infinitus/ThreadFork.ts`; `apps/web/src/rightPanelStore.ts`, `apps/web/src/components/SideQuestionPanel.tsx` (+ `.logic.ts`), `ChatView.tsx`, `ChatComposer.tsx`, `CompactComposerControlsMenu.tsx`, `Sidebar.tsx`, `CommandPalette.tsx`, Settings › Archived. Rules and traps: `docs/internals/side-question.md`.
 - **Best of N (#269 B).** `groupId` on `thread.create`, the created payload and the bootstrap's `createThread` (`apps/server/src/ws.ts`); `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts` (`group_id`, migration `054`); `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`, `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats`, `bestOfMemberChanges`), `BestOfPicker.tsx`, `apps/web/src/components/BestOfGroupCard.tsx`, `ChatView.tsx` (`onSend(…, bestOf)`). Rules and traps: `docs/internals/best-of.md`.
 - **Worktree limit (#269 H).** `packages/contracts/src/settings.ts` (`worktreeMaxCount`), `apps/server/src/ws.ts` (the bootstrap check, `worktreesInFlight`, the `vcs.createWorktree` check), `ProjectionSnapshotQuery.getWorktreeHolders`, `apps/server/src/orchestration/worktreeCap.logic.ts` (`worktreeCapRefusal`), `SettingsPanels.tsx` + `settingsSearch.ts` ("Worktree limit"). Rules and traps: `docs/internals/worktree-limit.md`.
 - **Reconnect a turn whose transport went away (#832).** `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`scheduleReconnect`, `reopenForReconnect`, `reconnectQueryOptions`, `RECONNECT_EXHAUSTED_MESSAGE`; + `claudeReconnect.logic.ts`), `apps/server/src/provider/turnContinuation.ts`, `ProviderService.processRuntimeEvent` (`continueAfterServerUpdate`), `packages/contracts/src/orchestration.ts` (`OrchestrationSession.statusReason`), `ProjectionThreadSessions` (`status_reason`, `Migrations/055_ProjectionThreadSessionsStatusReason.ts`), `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`, `apps/web/src/components/chat/ThreadReconnectingNotice.tsx` (mounted in `ChatView.tsx`). Rules and traps: `docs/internals/turn-reconnect.md`.
@@ -476,114 +444,15 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `SettingsInfinitusSection` (Accounts row, Mac alerts / thread card (with
   its test card, #1047) / reset alarms toggles, sending mode, the alerting
   Mac) after General.
-- `apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal
-  link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the
-  `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` /
-  `subscribe`, `features/connection/universalPairLink.logic.ts`, #724): the
-  Mac's origin travels in the fragment the site never sees, `to` is taken as
-  a bare http(s) origin only, and the sheet fills Host and code like a
-  scanned QR (#746) — the same rewrite runs on the in-app scanner's payload
-  and on the route's `pairingUrl`. Mounts `InfinitusAlarmsBridge`
-  (local reset / swap alarms), `InfinitusAlertPushBridge` (the `alert`
-  token, so the Mac's pushes reach the phone as banners; it withdraws the
-  kind with `activities-token --forget <deviceId>/<kind>` through
-  `pushForget.ts` / `pushForget.logic.ts` when its switch goes off, #702),
-  `InfinitusThreadCardBridge` (the lock-screen thread card's tokens, #1047:
-  the push-to-start token as `agent-activity-start` and each running
-  `AgentActivity` card's own token as `agent-activity`, re-read on every
-  foreground and after a local start; both withdrawn the same way when the
-  switch goes off) and `InfinitusNotificationPresenter` (the app's one
-  foreground notification handler: Infinitus notifications show as banners
-  in-app, T3's keep the no-handler default), and `InfinitusHoldsBridge` (#1278 finding 7: one
-  `subscribeInfinitusHolds` subscription per Infinitus Mac for the app's
-  lifetime, so the outbox drain's registry read of the holds atom sees a
-  delivered list instead of mounting the stream itself and reading null on
-  the first queued message).
+- `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusAlertPushBridge` (#702), `InfinitusThreadCardBridge` (#1047), `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusLiveActivityMac` (the Mac the alerts come from) /
   `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
   `infinitusThreadCardEnabled` (#1047, absent reads on) /
   `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
   `"queue" | "steer"`) keys (interface and sanitizer).
-- `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the optional
-  `infinitusReconnectingNotice` slot above the hold banner (#832: "Waiting
-  for the network. Reconnect attempt n of 5." while the session's
-  `statusReason` reads `reconnecting:<n>/<max>` on a running session;
-  `apps/mobile/src/features/infinitus/InfinitusReconnectingNotice.tsx` +
-  `reconnecting.logic.ts`, the web helper's copy; `ThreadRouteScreen.tsx`
-  builds it from the thread shell's session, and
-  `thread-list-v2-items.tsx` labels such a working row "Reconnecting n/max"
-  in amber instead of "Working"), the optional
-  `infinitusHoldBanner` slot (a `ReactNode` in the composer stack after the
-  feedback notices, #742) and the `infinitusQueuedTurns` slot right after it
-  (#806: the thread's server-side queue as a card — one row per queued
-  message with earlier/later, edit, send now, remove;
-  `apps/mobile/src/features/infinitus/InfinitusQueuedTurns.tsx`,
-  `useQueuedTurnActions.ts`, `queuedTurns.logic.ts` — the phone's copy of
-  the web's `composerSendQueue.logic.ts`, kept local so neither app edits
-  the other's file; edit puts the row's context records back with fresh ids
-  through `restoredQueuedTurn` + `insertComposerDraftContext`, #971, the
-  text alone when the draft's record cap refuses); `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`
-  builds `InfinitusHoldBanner` from the thread's detail for it (never for a
-  queued creation), `InfinitusQueuedTurns` from the thread shell's
-  `queuedTurns`, `InfinitusBestOfCard` (#269 B, read-only: the group's live
-  siblings from the shells by `groupId`, `features/infinitus/bestOf.logic.ts`
-  carrying the web `bestOf.logic.ts` sibling and status helpers kept local;
-  no "Keep this one", which removes worktrees) for the `infinitusBestOfCard`
-  slot first in the composer stack, `useTurnFooters(selectedThreadDetail)`
-  (#952, `features/infinitus/useTurnFooters.ts`, the web hook kept local)
-  for `infinitusTurnFooters`, which `ThreadDetailScreen.tsx` hands
-  `ThreadFeed.tsx`'s `turnFooters` so a completed turn's terminal assistant
-  message shows `turnFooterLabel` — "Done in 49s · 12:59 PM · 1 shell still
-  running", the time in the feed's own `formatMessageTime` — in place of its
-  time, and prepends the thread menu — `useThreadHeaderMenu`
-  (`features/infinitus/useThreadHeaderMenu.ts` + `threadHeaderMenu.logic.ts`,
-  #941: ONE menu button folding the PR's choices, "Ask a side question" and
-  "Thread usage", so the compact iOS header keeps upstream's three git
-  buttons instead of collapsing everything into "…"; the PR's icon and "#N"
-  on the button while the thread has one, else the plain more circle) — to
-  the iOS header's git items with its `version` in `optionsVersion`. The
-  PR part is `usePullRequestHeaderItem`'s `menu` (#269 F: the PR's phase
-  from the linked snapshot as an inert first line, Open pull request / View
-  checks / Mark ready for review over `pullRequests.runAction`, and on an
-  `infinitus` server "Babysit" / "Stop babysitting (r/10)" over
-  `thread.meta.update {babysit}` while the PR is open or the thread is
-  already babysat — the web toggle's gate, #269 A, the status line reading
-  "Babysitting r/10" while on); on Android the hook's `androidAction` is a
-  header button before the git controls opening the same choices as an
-  anchored menu; `apps/mobile/src/features/infinitus/prHeader.logic.ts`,
-  `pullRequestActions.ts`).
-- `apps/mobile/src/features/threads/ThreadFeed.tsx` — the optional
-  `infinitusMessageMenu` prop (#269 item 13 / #270 item 5: revert to a
-  message the user sent), threaded into `renderFeedEntry` and its deps: a
-  committed user message the callback names gets its bubble wrapped in a
-  `ControlPillMenu` on long-press — the bubble becomes a `Pressable`, since the
-  menu injects its press handlers into its child and a plain `View` drops
-  them; a pending message and a message with no checkpoint render as before.
-  `ThreadDetailScreen.tsx` passes the prop through beside the turn footers;
-  `ThreadRouteScreen.tsx` builds it with `useRevertMessageMenu`
-  (`features/infinitus/useRevertMessageMenu.ts` + `revertMessage.logic.ts`,
-  the web's `buildRevertTurnCountByUserMessageId` kept local: the checkpoint
-  before the turn a message started, from `detail.checkpoints` by
-  `assistantMessageId`, whatever the status, so both surfaces name the same
-  turn). The web menu's four modes, on an `infinitus` server, each behind
-  the web's confirm: "Edit from here" (`thread.checkpoint.revert`, files and
-  chat) and "Rewind chat only" (the same with `restoreFiles: false`, #270 E1)
-  — both only where the thread's provider snapshot does not say
-  `supportsConversationRollback: false`, the web's gate — hand the message
-  back to the thread's composer draft: the attachments are downloaded FIRST
-  (`restoreAttachments.ts` `downloadDraftAttachments`, the loop the queue's
-  "Edit" in `useQueuedTurnActions.ts` also runs, since the server prunes a
-  reverted message's uploads, #847), then the revert, then text
-  (`revertedMessageEditableText`: the effort prefix and trailing review
-  comments off, the phone's cut of the web's `recallableComposerPrompt`),
-  files and context records under fresh ids (`restoredRevertedMessage`, the
-  queue's #971 path; the text alone over the draft's record cap) land in the
-  draft. "Restore files only" (`keepChat`, #269 E) leaves the chat; on a
-  Claude Agent or Codex thread "Fork a new thread from here"
-  (`infinitus.forkThread` at that `turnCount`, #270 E2) opens the new thread.
-  A running or starting session gets the web's "Interrupt the current turn"
-  alert.
+- `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the fork's slots (`infinitusReconnectingNotice` #832, `infinitusHoldBanner` #742, `infinitusQueuedTurns` #806, `infinitusBestOfCard` #269 B, `infinitusTurnFooters` #952) and the thread header menu (`useThreadHeaderMenu`, #941; `usePullRequestHeaderItem`, #269 F), built in `ThreadRouteScreen.tsx`. Rules and traps: `docs/internals/phone-thread-screen.md`.
+- `apps/mobile/src/features/threads/ThreadFeed.tsx` — the optional `infinitusMessageMenu` prop (revert to a message the user sent; `useRevertMessageMenu` + `revertMessage.logic.ts`, `restoreAttachments.ts`). Rules and traps: `docs/internals/phone-thread-screen.md`.
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time
@@ -618,26 +487,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   calls and duration when the server counted them (#927), each non-zero
   token share, model(s), cost ("Cost not recorded" for null, never $0.00),
   last turn — every estimate prefixed "≈", and the caveat lines under them.
-- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` — mounts
-  `InfinitusPinAtCreationControl` after the Plan/Build pill in the composer's
-  control row (#742); `apps/mobile/src/state/use-thread-outbox-drain.ts` —
-  `usePinAtCreation` runs once a queued creation is delivered, right after the
-  "delivered" outcome is recorded (its test, `use-thread-outbox-drain.test.ts`,
-  mocks `./preferences` so the drain's module graph stays clear of
-  expo-secure-store). `threadsByKey` (a Map over the shells, #1278 finding 6) is the pass's
-  thread lookup; the live re-check keeps `findThread` over the registry's
-  array. The two `resolveThreadOutboxDeliveryAction` calls (the
-  pass and the live re-check before a send) are wrapped in
-  `queueBehindRunningTurn` (#807): an existing thread's follow-up waits while
-  its turn runs or the server holds it, the phone's copy of the desktop
-  composer's queue (#270 F); the test mocks `./threadOutboxHolds` too. Since
-  #812 that wait becomes a `thread.turn.queue` when the server advertises
-  `turnQueue` (`resolveThreadOutboxDelivery`, `queueTurnCommandInput`):
-  `sendQueuedMessage` takes `via: "start" | "queue"` and, for a queue, sends
-  `threadEnvironment.queueTurn` with the outbox's command id and a fresh
-  queue id after the same settings sync and uploads, and
-  `completeQueuedMessageDelivery` takes `{ retainInFeed: false }` so no
-  "Pending" feed row waits for an echo the timeline only gives at drain.
+- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/state/use-thread-outbox-drain.ts` (+ test) — `usePinAtCreation` after a delivered creation, `threadsByKey` (#1278), `queueBehindRunningTurn` around both `resolveThreadOutboxDeliveryAction` calls (#807) and its `thread.turn.queue` form on a `turnQueue` server (#812: `sendQueuedMessage` `via`, `completeQueuedMessageDelivery` `retainInFeed`). Rules and traps: `docs/internals/phone-outbox-drain.md`.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the header's
@@ -668,54 +518,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   Priority since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
-- `apps/web/src/lib/infinitusNotifications.logic.ts`,
-  `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`,
-  `apps/web/src/components/desktop/NotificationModeMigration.tsx`,
-  `apps/web/src/components/settings/DesktopBadgeSettings.tsx`,
-  `apps/desktop/src/electron/ElectronNotification.ts`,
-  `apps/desktop/src/ipc/methods/notifications.ts` — thread notifications
-  and sounds are upstream's (#11481: `notificationMode` on the client
-  settings, `ThreadNotificationCoordinator`, the `Notification` API and two
-  bundled sounds; ruling #1032, which retired the fork's #270 B banners over
-  the Electron main process and the #270 H per-window completion sound).
-  The fork layers a few things. In `ThreadNotificationCoordinator.tsx` (an
-  upstream file, one registration point): `held` and `limited` threads
-  notify like input does — the holds come from the environment's
-  `subscribeInfinitusHolds` stream, and `attentionNotificationTitle` is
-  what titles them, since upstream has no word for either. `failed` now
-  reads "Thread failed", upstream's word, so the fork carries no second
-  vocabulary for one banner. Upstream's two coordinator tests mock
-  `../state/environments`, so they also stub `useEnvironment`,
-  `../state/infinitus` and `../state/query`: without the capability the
-  holds path stays inert and their assertions read upstream's behaviour. Upstream now
-  notifies on `failed` itself (by the latest TURN's state; the fork's
-  resolver reads the SESSION, so both checks run and catch different
-  rows), and it now quiets its own banner while the window has focus,
-  showing an in-app toast instead — so the fork's remaining focus rule is
-  narrower than it was: `quietForViewer` keeps the thread ON SCREEN
-  silent, toast and bell included, where upstream still rings for it.
-  Mind the naming when merging this file: both sides bind `attention`
-  and mean different things by it — the fork's is the banner title,
-  upstream's is the dedupe key the fork calls `input`. Next, #270 B's
-  queue rule: a turn that completes while the thread still has
-  `queuedTurns` neither posts nor rings
-  (`notificationKind`), since the #806 drain sends the next row the moment
-  the turn ends; the completion still counts as seen, so removing the queued
-  row afterwards rings nothing for it, and an approval or question rings
-  queued or not because the drain cannot pass it. The Dock badge
-  (`desktopBadgeAttention`, on by default) counts the threads in approval
-  or input through the `setBadgeCount` bridge method, the one IPC left
-  (`SET_BADGE_COUNT_CHANNEL`), its switch the notifications route's `lead`
-  and the `desktop-badge` search item. `NotificationModeMigration`, mounted
-  from `__root.tsx`, maps a client's old settings onto `notificationMode`
-  once (`legacyNotificationMode`: the four banner toggles — absent counts
-  as on, and only on a desktop shell — and the old
-  `infinitus:completion-sound:v1` switch), only while the mode still reads
-  `off`, then marks `infinitus:notification-mode:migrated:v1`; the four
-  toggles stay in `ClientSettingsSchema` as optional inputs and are never
-  written again. Fork-thread events only: the account events (a limit,
-  every account dead, revived) stay the native app's Notification Center
-  items.
+- `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts`, and one block in upstream's `ThreadNotificationCoordinator.tsx` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
   Infinitus path and the capability filter that hides all eight where no
   connected server reaches an Infinitus app.
@@ -777,41 +580,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   push key and the registered phones, and the lock-screen thread card with
   its phone Settings rows (#1265). Upstream's T3 Connect text above it is
   untouched.
-- **The project file is `infinitus.json`** (#823 layer 1: the upstream name
-  never reaches a screen, and this one is on screen every time the scripts
-  menu or Settings › Projects names it). `packages/contracts/src/t3ProjectFile.ts`
-  is the pivot: `T3_PROJECT_FILE_NAME` is `infinitus.json`,
-  `LEGACY_T3_PROJECT_FILE_NAME` keeps upstream's `t3.json`, and
-  `T3_PROJECT_FILE_NAMES` is the order every read site walks — the first name
-  that answers decides, and a file that answered decides even when it fails to
-  decode, so a checkout carrying both never silently falls back to the older
-  one. No merge, no conversion: an unconverted repository is read from its
-  `t3.json` as before. The four read sites:
-  `apps/server/src/project/T3ProjectFileLoader.ts` (the loop, + its test's
-  fallback and preferred-wins cases), `apps/web/src/hooks/useT3ProjectFileScripts.ts`
-  (both names queried, `loading` until both settle so the status cannot flap),
-  `apps/web/src/lib/t3ProjectFileDefaults.ts` and
-  `apps/mobile/src/features/threads/new-task-flow-provider.tsx` (both queries
-  gated on the same boolean, so the hook count is stable). The copy follows:
-  "From infinitus.json" / "Import from infinitus.json"
-  (`ProjectScriptsControl.tsx`, `ProjectActionsSettings.tsx`, whose invalid-file
-  card names both), the Workspace rows in `ProjectDefaultsSettings.tsx`, the
-  `settingsSearch.ts` and `CommandPalette.tsx` search terms (both names) and
-  `docs/user/project-settings.md`.
-  `T3_PROJECT_FILE_SCHEMA_URL` is `https://infinitus.run/schema/infinitus.json`
-  — upstream's `apps/marketing/src/pages/schema/t3.json.ts` is left untouched
-  and now publishes a document whose `$id` names ours, which is harmless: it is
-  upstream's site, not ours. We serve the schema from `apps/mac/site`, which has
-  no build step, so `scripts/build-project-file-schema.ts` writes
-  `apps/mac/site/public/schema/infinitus.json` from
-  `buildT3ProjectFileJsonSchema()` and `--check` (with the test beside it)
-  fails when the checked-in asset drifts from the contract. Regenerate after any
-  change to the project file schema, and **the URL only resolves after a hand
-  `npx wrangler deploy` from `apps/mac/site`**.
-  The repository's own `infinitus.json` carries `iconPath`
-  `assets/infinitus/infinitus-web-apple-touch-180.png`, so the project row for
-  this checkout draws the Infinitus mark instead of upstream's T3 blueprint
-  icon; `ProjectFaviconResolver` reads it ahead of the well-known favicon paths.
+- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the four read sites (`T3ProjectFileLoader.ts`, `useT3ProjectFileScripts.ts`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch. The sync workflow
