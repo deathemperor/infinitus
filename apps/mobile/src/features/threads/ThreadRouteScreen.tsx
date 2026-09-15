@@ -84,6 +84,7 @@ import { InfinitusQueuedTurns } from "../infinitus/InfinitusQueuedTurns";
 import { InfinitusBestOfCard } from "../infinitus/InfinitusBestOfCard";
 import { InfinitusReconnectingNotice } from "../infinitus/InfinitusReconnectingNotice";
 import { useTurnFooters } from "../infinitus/useTurnFooters";
+import { useRevertMessageMenu } from "../infinitus/useRevertMessageMenu";
 import { reconnectingNotice } from "../infinitus/reconnecting.logic";
 import { projectThreadContentPresentation } from "./threadContentPresentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -682,6 +683,7 @@ function ThreadRouteContent(
   const usageHeader = useThreadUsageHeaderItem(selectedThread);
   // Infinitus (#952): the completed turns' footers for the feed.
   const turnFooters = useTurnFooters(selectedThreadDetail);
+  const messageMenu = useRevertMessageMenu(selectedThread, selectedThreadDetail);
   // Infinitus (#941): the three as one menu button, so the compact iOS
   // header keeps the git buttons visible instead of collapsing into "…".
   const threadHeaderMenu = useThreadHeaderMenu({
@@ -912,6 +914,7 @@ function ThreadRouteContent(
           isCompacting={composer.isCompacting}
           creationState={creationState}
           infinitusTurnFooters={turnFooters}
+          infinitusMessageMenu={creationState === null ? messageMenu : undefined}
           infinitusBestOfCard={
             creationState === null && selectedThread.groupId != null ? (
               <InfinitusBestOfCard thread={selectedThread} />

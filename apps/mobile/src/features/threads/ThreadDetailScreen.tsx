@@ -105,7 +105,7 @@ import {
   COMPOSER_TRANSITION_DURATION_MS,
   ThreadComposer,
 } from "./ThreadComposer";
-import { ThreadFeed } from "./ThreadFeed";
+import { ThreadFeed, type ThreadFeedProps } from "./ThreadFeed";
 import type { TurnFooters } from "../infinitus/useTurnFooters";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import { resolveThreadFeedSubmissionAnchor } from "./thread-feed-live-follow";
@@ -136,6 +136,8 @@ export interface ThreadDetailScreenProps {
   readonly infinitusBestOfCard?: ReactNode;
   /** Fork (#952): the completed turns' footers for the feed. */
   readonly infinitusTurnFooters?: TurnFooters;
+  /** Fork (#269 item 13): the feed's user-message long-press menu. */
+  readonly infinitusMessageMenu?: ThreadFeedProps["infinitusMessageMenu"];
   /** Fork (#832): the reconnecting line, above the hold banner. */
   readonly infinitusReconnectingNotice?: ReactNode;
   readonly infinitusHoldBanner?: ReactNode;
@@ -899,6 +901,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
             agentLabel={agentLabel}
             latestTurn={props.selectedThread.latestTurn}
             turnFooters={props.infinitusTurnFooters}
+            infinitusMessageMenu={props.infinitusMessageMenu}
             activeWorkStartedAt={props.activeWorkStartedAt}
             listRef={listRef}
             freeze={freeze}

@@ -1100,6 +1100,26 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   header button before the git controls opening the same choices as an
   anchored menu; `apps/mobile/src/features/infinitus/prHeader.logic.ts`,
   `pullRequestActions.ts`).
+- `apps/mobile/src/features/threads/ThreadFeed.tsx` — the optional
+  `infinitusMessageMenu` prop (#269 item 13 / #270 item 5: revert to a
+  message the user sent), threaded into `renderFeedEntry` and its deps: a
+  committed user message the callback names gets its bubble wrapped in a
+  `ControlPillMenu` on long-press — the bubble becomes a `Pressable`, since the
+  menu injects its press handlers into its child and a plain `View` drops
+  them; a pending message and a message with no checkpoint render as before.
+  `ThreadDetailScreen.tsx` passes the prop through beside the turn footers;
+  `ThreadRouteScreen.tsx` builds it with `useRevertMessageMenu`
+  (`features/infinitus/useRevertMessageMenu.ts` + `revertMessage.logic.ts`,
+  the web's `buildRevertTurnCountByUserMessageId` kept local: the checkpoint
+  before the turn a message started, from `detail.checkpoints` by
+  `assistantMessageId`, whatever the status, so both surfaces name the same
+  turn). Two of the web menu's modes, on an `infinitus` server: "Restore
+  files only" (`thread.checkpoint.revert` with `keepChat`, #269 E, behind the
+  web's confirm since it rewrites the worktree) and, on a Claude Agent or
+  Codex thread, "Fork a new thread from here" (`infinitus.forkThread` at that
+  `turnCount`, #270 E2, which opens the new thread). A running or starting
+  session gets the web's "Interrupt the current turn" alert. The composer
+  hand-back modes ("Edit from here", "Rewind chat only") stay on the desktop.
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
   active row whose current linked PR is open, out of draft, with green (or
   no) checks and no verdict reads "Ready for review" in place of its time
