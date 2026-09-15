@@ -6,6 +6,7 @@ import type {
   TurnId,
 } from "@t3tools/contracts";
 import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import * as Schema from "effect/Schema";
 
 /**
  * Resume-on-limit for the threads this server runs (#648): the pure half.
@@ -20,7 +21,13 @@ import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infin
 const CLAUDE_DRIVER = "claudeAgent";
 /** Fleets whose accounts are Claude ones, whatever engine runs them. */
 const CLAUDE_PROVIDER = "claude";
-/** The engine's word for an account that can take work. */
+/** The engine that writes the CLI's own credentials. A plain instance spends
+    that fleet's active account and no other: the proxy engines (cliproxy,
+    9router) are reached over `ANTHROPIC_BASE_URL`, which makes the instance a
+    proxied one (#1088) with a stop of its own kind. */
+const CLI_CREDENTIALS_ENGINE = "swapd";
+/** The engine's word for an account whose credentials work. It says nothing
+    about headroom: an account with a window at 100 % still reads `ok`. */
 const ACCOUNT_OK = "ok";
 /** The variable a proxied instance carries (`applyProxyDraft`, #1088): its
     requests never spend a swapd account, so its limit is the proxy's own. */
@@ -56,6 +63,9 @@ export interface LimitStop {
   /** When the window that rejected the turn resets (epoch ms), from the SDK's
       `rate_limit_info`; null for a failed turn, whose error names no reset. */
   readonly resetsAt: number | null;
+  /** The SDK's name for that window (`five_hour`, `seven_day`, `seven_day_opus`
+      …); null when the stop named none. */
+  readonly limitType: string | null;
   /** The proxied instance the thread runs on (#1088), else null: its limit
       belongs to the proxy's upstream, so no swapd account is named and no
       rotation resumes it. */
@@ -93,12 +103,14 @@ export function limitStopFromEvent(
       detail.status === "rejected"
     ) {
       const resetsAt = "resetsAt" in detail ? detail.resetsAt : undefined;
+      const limitType = "rateLimitType" in detail ? detail.rateLimitType : undefined;
       return {
         ...base,
         kind: "parked",
         // Epoch seconds on the wire, as the adapter reads it.
         resetsAt:
           typeof resetsAt === "number" && Number.isFinite(resetsAt) ? resetsAt * 1000 : null,
+        limitType: typeof limitType === "string" && limitType !== "" ? limitType : null,
       };
     }
     return null;
@@ -108,7 +120,7 @@ export function limitStopFromEvent(
     event.payload.state === "failed" &&
     event.payload.usageLimited === true
   ) {
-    return { ...base, kind: "failed", resetsAt: null };
+    return { ...base, kind: "failed", resetsAt: null, limitType: null };
   }
   return null;
 }
@@ -158,8 +170,53 @@ export function eventCancelsStop(event: ProviderRuntimeEvent, stop: LimitStop): 
   }
 }
 
+/** The fleets a plain Claude instance can run on: the CLI-credentials engine's. */
 function claudeFleets(snapshot: InfinitusSnapshot): ReadonlyArray<InfinitusFleet> {
-  return snapshot.fleets.filter((fleet) => fleet.provider === CLAUDE_PROVIDER);
+  return snapshot.fleets.filter(
+    (fleet) => fleet.provider === CLAUDE_PROVIDER && fleet.engineID === CLI_CREDENTIALS_ENGINE,
+  );
+}
+
+/** The engine's usage payload, opaque in the contract; read leniently, as the
+    Accounts page does, so an odd shape is "no reading" rather than a throw. */
+const UsageWindow = Schema.Struct({
+  name: Schema.optionalKey(Schema.String),
+  pct: Schema.Finite,
+});
+const UsagePayload = Schema.Struct({
+  fiveHour: Schema.optionalKey(UsageWindow),
+  sevenDay: Schema.optionalKey(UsageWindow),
+  scoped: Schema.optionalKey(Schema.Array(UsageWindow)),
+});
+const decodeUsage = Schema.decodeUnknownOption(UsagePayload);
+
+/** The scoped (per-model) window an SDK limit type names, by the word in it. */
+const SCOPED_WINDOW_WORDS: Readonly<Record<string, string>> = {
+  seven_day_opus: "opus",
+  seven_day_sonnet: "sonnet",
+};
+
+/**
+ * What the account's latest reading says of the window that stopped the
+ * turn, in percent used; null when the reading has no such window (or no
+ * reading at all), which is no evidence either way.
+ */
+export function stopWindowPct(
+  limitType: string | null,
+  account: InfinitusFleet["accounts"][number],
+): number | null {
+  if (limitType === null || account.usage === undefined) return null;
+  const decoded = decodeUsage(account.usage);
+  if (decoded._tag !== "Some") return null;
+  const usage = decoded.value;
+  if (limitType === "five_hour") return usage.fiveHour?.pct ?? null;
+  if (limitType === "seven_day") return usage.sevenDay?.pct ?? null;
+  const word = SCOPED_WINDOW_WORDS[limitType];
+  if (word === undefined) return null;
+  const window = (usage.scoped ?? []).find((scoped) =>
+    (scoped.name ?? "").toLowerCase().includes(word),
+  );
+  return window?.pct ?? null;
 }
 
 function accountLabel(account: InfinitusFleet["accounts"][number]): string {
@@ -184,12 +241,23 @@ export interface ResumeTarget {
 }
 
 /**
- * Native's ResumeGate: an active Claude account that reads `ok`, and that
- * reading taken after the stop — a probe from before it would only repeat the
- * account that just ran out. An engine that reports no probe time gets the
- * weaker test, a different account than the one at the stop.
+ * Native's ResumeGate, with headroom read where the engine reports it: an
+ * active account of the CLI-credentials fleet whose credentials read `ok`
+ * from a probe taken after the stop — a probe from before it would only
+ * repeat the account that just ran out. `ok` alone is not headroom (the
+ * account that hit the limit reads `ok` on the very next poll, which is how a
+ * turn was resumed on it every cooldown until its window reset), so:
+ * a reading that carries the stop's window decides — under 100 % counts,
+ * full does not, whichever account it is; without one, a different account
+ * counts, and the same account only once the stop's reset has passed. An
+ * engine that reports no probe time gets the weaker test, a different account
+ * than the one at the stop.
  */
-export function resumeTarget(stop: LimitStop, snapshot: InfinitusSnapshot): ResumeTarget | null {
+export function resumeTarget(
+  stop: LimitStop,
+  snapshot: InfinitusSnapshot,
+  now: number,
+): ResumeTarget | null {
   // A proxy's limit: no account on this Mac can lift it (#1088).
   if (stop.proxy !== null) return null;
   for (const fleet of claudeFleets(snapshot)) {
@@ -199,7 +267,15 @@ export function resumeTarget(stop: LimitStop, snapshot: InfinitusSnapshot): Resu
     const label = accountLabel(active);
     const fetchedAt = active.usageFetchedAt === undefined ? NaN : Date.parse(active.usageFetchedAt);
     const fresh = Number.isFinite(fetchedAt) ? fetchedAt > stop.stoppedAt : label !== from;
-    if (fresh) return { fleetKey: fleet.key, account: label, from };
+    if (!fresh) continue;
+    const target = { fleetKey: fleet.key, account: label, from };
+    const pct = stopWindowPct(stop.limitType, active);
+    if (pct !== null) {
+      if (pct < 100) return target;
+      continue;
+    }
+    if (label !== from) return target;
+    if (stop.resetsAt !== null && now >= stop.resetsAt) return target;
   }
   return null;
 }

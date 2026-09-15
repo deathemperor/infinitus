@@ -407,6 +407,43 @@ describe("InfinitusResumeOnLimitLive", () => {
     ),
   );
 
+  // The CLI ends a parked turn as a failed one: the same stop, ending. It
+  // used to be forgotten and recorded again (two "Limit hit" rows, and the
+  // second one knew no reset); the record and its window stay.
+  effectIt.effect("a parked turn's failed completion keeps the one record and its reset", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        const seen = yield* Ref.make<ReadonlyArray<ReadonlyArray<InfinitusHeldThread>>>([]);
+        yield* Effect.forkScoped(
+          Stream.runForEach(h.stopped, (list) => Ref.update(seen, (lists) => [...lists, list])),
+        );
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.emit(
+          runtimeEvent("turn.completed", {
+            state: "failed",
+            usageLimited: true,
+            errorMessage:
+              "Claude usage limit reached. Send the message again once the limit resets.",
+          }),
+        );
+        yield* Effect.yieldNow;
+        const rows = (yield* h.dispatched).filter(
+          (command) => command.type === "thread.activity.append",
+        );
+        expect(rows).toHaveLength(1);
+        const lists = yield* Ref.get(seen);
+        expect(lists.at(-1)).toMatchObject([{ threadId, resetsAt: "2025-09-11T14:13:20.000Z" }]);
+        yield* h.poll(swapped(at(150)));
+        yield* settle(h.turns, (list) => list.length === 1);
+        // Failed, so nothing to interrupt.
+        expect(yield* h.interrupts).toEqual([]);
+      }),
+    ),
+  );
+
   // A context-window failure is not a usage limit: nothing is recorded, so the
   // thread never reads "Limit hit" and no resume is armed for it.
   effectIt.effect("a turn that failed on the context window records no stop", () =>

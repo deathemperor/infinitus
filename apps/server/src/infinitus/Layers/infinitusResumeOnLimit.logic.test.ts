@@ -73,6 +73,7 @@ const stopAt = (snapshot: InfinitusSnapshot, kind: LimitStop["kind"] = "parked")
   stoppedAt: NOW,
   activeAtStop: activeClaudeAccounts(snapshot),
   resetsAt: null,
+  limitType: null,
   proxy: null,
 });
 
@@ -88,6 +89,7 @@ describe("limitStopFromEvent", () => {
       activeAtStop: new Map([["swapd/claude", "one@example.com"]]),
       // The SDK's epoch seconds, kept as milliseconds.
       resetsAt: 1_757_600_000_000,
+      limitType: "five_hour",
       proxy: null,
     });
     // A reset the SDK left out, or one that is not a number, is none.
@@ -140,6 +142,7 @@ describe("limitStopFromEvent", () => {
     expect(limitStopFromEvent(failed, NOW, snapshot)).toMatchObject({
       kind: "failed",
       resetsAt: null,
+      limitType: null,
     });
     expect(
       limitStopFromEvent(
@@ -222,6 +225,13 @@ describe("resumeTarget", () => {
     account(2, "two@example.com"),
   ]);
   const stop = stopAt(atStop);
+  const RESET = NOW + 60 * 60_000;
+  const parked: LimitStop = { ...stop, resetsAt: RESET, limitType: "five_hour" };
+  const usage = (fiveHour: number, scoped: ReadonlyArray<{ name: string; pct: number }> = []) => ({
+    fiveHour: { pct: fiveHour },
+    sevenDay: { pct: 10 },
+    scoped,
+  });
 
   it("waits for an active account that reads ok from a probe after the stop", () => {
     expect(
@@ -235,6 +245,7 @@ describe("resumeTarget", () => {
           }),
           account(2, "two@example.com"),
         ]),
+        NOW,
       ),
     ).toBeNull();
     expect(
@@ -244,25 +255,88 @@ describe("resumeTarget", () => {
           account(1, "one@example.com"),
           account(2, "two@example.com", { active: true, usageFetchedAt: after }),
         ]),
+        NOW,
       ),
     ).toEqual({ fleetKey: "swapd/claude", account: "two@example.com", from: "one@example.com" });
   });
 
-  it("the same account back after its reset counts, once probed", () => {
-    expect(
-      resumeTarget(
-        stop,
-        snapshotWith([account(1, "one@example.com", { active: true, usageFetchedAt: after })]),
-      ),
-    ).toEqual({ fleetKey: "swapd/claude", account: "one@example.com", from: "one@example.com" });
+  // swapd's `ok` is a credential status, not headroom: the account that just
+  // ran out reads `ok` on the very next poll. The same account only counts
+  // once its window reset, or once a probe shows that window with room.
+  it("the same account counts after its reset, once probed, never on ok alone", () => {
+    const same = snapshotWith([
+      account(1, "one@example.com", { active: true, usageFetchedAt: after }),
+    ]);
+    expect(resumeTarget(stop, same, NOW)).toBeNull();
+    expect(resumeTarget(parked, same, RESET - 1)).toBeNull();
+    expect(resumeTarget(parked, same, RESET)).toEqual({
+      fleetKey: "swapd/claude",
+      account: "one@example.com",
+      from: "one@example.com",
+    });
+    const roomy = snapshotWith([
+      account(1, "one@example.com", { active: true, usageFetchedAt: after, usage: usage(12) }),
+    ]);
+    expect(resumeTarget(parked, roomy, NOW)?.account).toBe("one@example.com");
+  });
+
+  it("a probe still showing the stop's window full does not count, even after the reset", () => {
+    const full = (pct: number, scoped: ReadonlyArray<{ name: string; pct: number }> = []) =>
+      snapshotWith([
+        account(1, "one@example.com"),
+        account(2, "two@example.com", {
+          active: true,
+          usageFetchedAt: after,
+          usage: usage(pct, scoped),
+        }),
+      ]);
+    expect(resumeTarget(parked, full(100), RESET)).toBeNull();
+    expect(resumeTarget(parked, full(99), NOW)?.account).toBe("two@example.com");
+    const opus: LimitStop = { ...parked, limitType: "seven_day_opus" };
+    expect(resumeTarget(opus, full(0, [{ name: "Opus", pct: 100 }]), NOW)).toBeNull();
+    expect(resumeTarget(opus, full(0, [{ name: "Opus", pct: 40 }]), NOW)?.account).toBe(
+      "two@example.com",
+    );
+    // A window the reading does not carry is no evidence either way.
+    expect(resumeTarget(opus, full(0), NOW)?.account).toBe("two@example.com");
+    const unknown: LimitStop = { ...parked, limitType: "seven_day_overage_included" };
+    expect(resumeTarget(unknown, full(100), NOW)?.account).toBe("two@example.com");
+  });
+
+  it("only the engine that writes the CLI's credentials counts", () => {
+    const proxyFleet: InfinitusSnapshot = {
+      available: true,
+      fleets: [
+        {
+          key: "cliproxy/claude",
+          engineID: "cliproxy",
+          provider: "claude",
+          capabilities: [],
+          accounts: [account(3, "three@example.com", { active: true, usageFetchedAt: after })],
+        },
+        {
+          key: "swapd/claude",
+          engineID: "swapd",
+          provider: "claude",
+          capabilities: [],
+          accounts: [account(1, "one@example.com", { active: true, usageFetchedAt: after })],
+        },
+      ],
+      commands: [],
+    };
+    expect(resumeTarget(stop, proxyFleet, NOW)).toBeNull();
+    expect(activeClaudeAccounts(proxyFleet)).toEqual(
+      new Map([["swapd/claude", "one@example.com"]]),
+    );
   });
 
   it("without a probe time only a different account counts", () => {
     expect(
-      resumeTarget(stop, snapshotWith([account(1, "one@example.com", { active: true })])),
+      resumeTarget(stop, snapshotWith([account(1, "one@example.com", { active: true })]), NOW),
     ).toBeNull();
     expect(
-      resumeTarget(stop, snapshotWith([account(2, "two@example.com", { active: true })]))?.account,
+      resumeTarget(stop, snapshotWith([account(2, "two@example.com", { active: true })]), NOW)
+        ?.account,
     ).toBe("two@example.com");
   });
 
@@ -277,6 +351,7 @@ describe("resumeTarget", () => {
             usageFetchedAt: after,
           }),
         ]),
+        NOW,
       ),
     ).toBeNull();
     expect(
@@ -286,6 +361,7 @@ describe("resumeTarget", () => {
           [account(2, "two@example.com", { active: true, usageFetchedAt: after })],
           "openai",
         ),
+        NOW,
       ),
     ).toBeNull();
     const target = resumeTarget(
@@ -293,6 +369,7 @@ describe("resumeTarget", () => {
       snapshotWith([
         account(2, "two@example.com", { active: true, alias: "work", usageFetchedAt: after }),
       ]),
+      NOW,
     );
     expect(target?.account).toBe("work");
     expect(resumeMarkerSummary(target!)).toBe("Turn resumed on work");
@@ -352,7 +429,7 @@ describe("proxied instances (#1088)", () => {
     const live = snapshotWith([
       account(2, "two@example.com", { active: true, usageFetchedAt: after }),
     ]);
-    expect(resumeTarget(plain, live)).not.toBeNull();
-    expect(resumeTarget(proxied, live)).toBeNull();
+    expect(resumeTarget(plain, live, NOW)).not.toBeNull();
+    expect(resumeTarget(proxied, live, NOW)).toBeNull();
   });
 });
