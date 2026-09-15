@@ -1465,7 +1465,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   the `proxy` reply carries `sessionAffinity` (a proxy without the route
   gets the YAML note instead), the notes worded as `RoutingNotes` in
   `EnginesPane.swift`, the proxy re-read after every write since its
-  settings are not in the snapshot; 9Router's `dashboardURL` as a link; and
+  settings are not in the snapshot; each engine's own `dashboardURL` as a
+  link (CLIProxyAPI's `/management.html`, 9Router's `/dashboard`); and
   the status list's `binaryPath` / `daemon` / `error` from `status.engines`
   (`InfinitusEngineState`, optional keys) — and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
