@@ -143,8 +143,7 @@ const withClient = <A, E>(
     Effect.flatMap(body),
     Effect.provide([NodeHttpServer.layerHttpServices, infinitusHttpApiLayer]),
     Effect.provideService(EnvironmentAuthenticatedAuth, authenticatedAuth(scopes)),
-    Effect.provide(services),
-    Effect.provide(settingsWith(envDefault)),
+    Effect.provide(Layer.mergeAll(services, settingsWith(envDefault))),
     Effect.scoped,
   );
 
