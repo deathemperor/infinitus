@@ -27,6 +27,7 @@ import {
   apnsSupported,
   isPemPrivateKey,
   parseApnsStatus,
+  lastPushLine,
   registrationLine,
   type ApnsStatus,
 } from "./apns.logic";
@@ -176,6 +177,9 @@ export function InfinitusApnsCard({
               <li key={`${row.deviceId}/${row.kind}`}>
                 {registrationLine(row)} ·{" "}
                 {formatDayAwareTimestamp(row.registeredAt, timestampFormat)}
+                {row.lastPush === undefined
+                  ? null
+                  : ` · ${lastPushLine(row.lastPush, formatDayAwareTimestamp(row.lastPush.at, timestampFormat))}`}
               </li>
             ))}
           </ul>
