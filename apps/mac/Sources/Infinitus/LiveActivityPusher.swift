@@ -255,6 +255,10 @@ final class LiveActivityPusher: ObservableObject {
                 self.inFlight.remove(key)
                 if code == 200 {
                     self.lastResult = "\(what) → \(device) ok \(Date().formatted(date: .omitted, time: .shortened))"
+                    if let line = LiveActivityPush.outcomeLine(what: what, device: device, status: code, body: body,
+                                                               error: nil, tokenDropped: false) {
+                        self.log?("📲", line)
+                    }
                     // The token lives on the gateway the phone did not
                     // declare: remember that, so the next push goes
                     // straight there (and a re-registration still wins).
@@ -269,9 +273,13 @@ final class LiveActivityPusher: ObservableObject {
                 } else {
                     let why = error?.localizedDescription ?? "HTTP \(code) \(body)"
                     self.lastResult = "\(what) → \(device) failed: \(why)"
-                    self.log?("⚠️", "Alert push failed: \(why)")
                     // A dead token will never work again — drop it.
-                    if LiveActivityPush.isDeadToken(status: code, body: body) {
+                    let dead = LiveActivityPush.isDeadToken(status: code, body: body)
+                    if let line = LiveActivityPush.outcomeLine(what: what, device: device, status: code, body: body,
+                                                               error: error?.localizedDescription, tokenDropped: dead) {
+                        self.log?("⚠️", line)
+                    }
+                    if dead {
                         self.registrations[slot] = nil
                         self.persist()
                     } else if body.contains("InvalidProviderToken") || body.contains("ExpiredProviderToken") {

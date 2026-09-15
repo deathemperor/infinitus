@@ -99,6 +99,27 @@ public enum LiveActivityPush {
         registeredAt <= lastUpdateAt && now.timeIntervalSince(lastUpdateAt) > staleAfter * 2
     }
 
+    /// The event line for a push's outcome, or nil when none is worth a
+    /// row (#941 follow-up): the log used to carry only "Alert push
+    /// failed: …" for every kind, and no success at all, so a thread
+    /// card's start could not be read from the Mac. A started or ended
+    /// card gets a line (one per card; its updates only refresh the
+    /// pane's last result), and a failure names what was being sent,
+    /// APNs's reason word, and whether the token was written off.
+    public static func outcomeLine(what: String, device: String, status: Int, body: String,
+                                   error: String?, tokenDropped: Bool) -> String? {
+        if status == 200 {
+            switch what {
+            case "start thread card": return "thread card started on \(device) (push-to-start)"
+            case "end thread card": return "thread card ended on \(device)"
+            default: return nil
+            }
+        }
+        let reason = (try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])?["reason"] as? String
+        let why = error ?? "HTTP \(status) \(reason ?? body)"
+        return "\(what) → \(device) failed: \(why)" + (tokenDropped ? " — token dropped" : "")
+    }
+
     /// APNs answers that mean the token will never work again, so the
     /// registration is dropped instead of retried every push: 410
     /// Unregistered, 400 BadDeviceToken (after its one resend on the
