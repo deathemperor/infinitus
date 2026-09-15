@@ -66,7 +66,7 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("prefs-set")?.effect, .write)
         XCTAssertEqual(ControlCommand.named("prefs-set")?.args, ["<key>", "<value>"])
         XCTAssertNil(ControlCommand.named("nope"))
-        XCTAssertNil(ControlCommand.named("team-status"), "the Team subsystem is gone")
+        XCTAssertEqual(ControlCommand.named("team-status")?.effect, .read, "the Team verbs are back (#1313)")
     }
 
     func testManifestEncodesForAgents() throws {
@@ -122,10 +122,22 @@ final class ControlProtocolTests: XCTestCase {
     /// anywhere else; payload readers are marked apart from them.
     func testTheManifestDeclaresWhichVerbsTakeASecret() {
         let secret = ControlCommand.all.filter { $0.stdin == "secret" }.map(\.name)
-        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "apns-key", "proxy-key", "9router-password", "desktop-credential"])
+        XCTAssertEqual(secret, ["aws-login-callback", "aws-login-code", "gcloud-login-code", "signin-code", "apns-key", "proxy-key", "9router-password", "desktop-credential",
+                                "team-create", "team-join", "team-identity"])
         let payload = ControlCommand.all.filter { $0.stdin == "payload" }.map(\.name)
         XCTAssertEqual(Set(payload), ["push"])
         XCTAssertNil(ControlCommand.all.first { $0.name == "status" }?.stdin)
+    }
+
+    /// #1313: the Team verbs are back, the code and the credential on stdin.
+    func testTeamVerbsAreDeclaredWithTheirSecrets() {
+        let byName = Dictionary(uniqueKeysWithValues: ControlCommand.all.map { ($0.name, $0) })
+        for name in ["team-status", "team-create", "team-join", "team-code", "team-fetch", "team-publish", "team-approve", "team-decline",
+                     "team-remove", "team-promote", "team-leave", "team-share", "team-exclude", "team-policy", "team-insights", "team-identity"] {
+            XCTAssertNotNil(byName[name], name)
+        }
+        XCTAssertEqual(byName["team-create"]?.stdin, "secret"); XCTAssertEqual(byName["team-join"]?.stdin, "secret")
+        XCTAssertNil(byName["team-code"]?.stdin)
     }
 
 }
