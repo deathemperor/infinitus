@@ -13,6 +13,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 import { HttpApiTest } from "effect/unstable/httpapi";
 import { describe, expect } from "vite-plus/test";
 
@@ -46,7 +47,7 @@ const setup = Effect.gen(function* () {
       Ref.update(requests, (list) => [...list, request]).pipe(
         Effect.andThen(Ref.get(answer)),
         Effect.flatMap((reply) =>
-          reply instanceof InfinitusUnavailable ? Effect.fail(reply) : Effect.succeed(reply),
+          Schema.is(InfinitusUnavailable)(reply) ? Effect.fail(reply) : Effect.succeed(reply),
         ),
       ),
   });

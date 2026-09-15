@@ -8,7 +8,10 @@
  * name as the argument, the team code or invite link on `infinitus.secret` —
  * and Create: team name, your name, an empty private repo's URL, and the
  * remote's write token on the secret channel when it needs one (an ssh remote
- * needs none and goes over `infinitus.command`). Every secret field is
+ * needs none and goes over `infinitus.command`). Delegated control (spec §8):
+ * the grants this Mac gave (add / revoke), the teammates' commands waiting
+ * for its tap (Allow / Deny), and on each member what they let you do; the
+ * driving itself is `infinitusctl team drive`, not a page. Every secret field is
  * `type="password"`, never remembered, cleared on submit; a minted code is
  * shown once and never logged; the Mac's own error verbatim, the value never
  * in it.
@@ -32,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "../../ui/alert-dialog";
 import { Button } from "../../ui/button";
+import { Checkbox } from "../../ui/checkbox";
 import { Input } from "../../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../../ui/select";
 import {
@@ -47,6 +51,7 @@ import {
   parseTeamCode,
   parseTeamStatus,
   relativeUnix,
+  TEAM_CAPABILITIES,
   TEAM_KINDS,
   TEAM_SHARE_TARGETS,
   teamCommandInput,
@@ -55,11 +60,15 @@ import {
   teamCreateSecretArgs,
   teamCreateSupported,
   teamExclusionSlug,
+  teamGrantAudience,
+  teamGrantDraft,
+  teamGrantSummary,
   teamJoinLink,
   teamJoinSecretArgs,
   teamJoinSupported,
   teamMemberName,
   teamMemberSummary,
+  teamPendingSummary,
   teamRoleLabel,
   teamStatusSupported,
   type TeamAction,
@@ -103,6 +112,10 @@ export function InfinitusTeamPanel() {
   const [minted, setMinted] = useState<string | null>(null);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const [exclusionDraft, setExclusionDraft] = useState("");
+  const [grantAudience, setGrantAudience] = useState("leaders");
+  const [grantCapabilities, setGrantCapabilities] = useState<ReadonlyArray<string>>(["view"]);
+  const [grantThreads, setGrantThreads] = useState("");
+  const [grantPreauthorized, setGrantPreauthorized] = useState<ReadonlyArray<string>>([]);
   const [leaveOpen, setLeaveOpen] = useState(false);
 
   const supported =
@@ -140,9 +153,17 @@ export function InfinitusTeamPanel() {
         setMinted(code.code);
         return;
       }
-      if (action.type === "publish" || action.type === "leave") {
-        // Publish answers what it pushed and leave answers {left}; a read
-        // follows so the page shows the state it changed.
+      if (
+        action.type === "publish" ||
+        action.type === "leave" ||
+        action.type === "grant" ||
+        action.type === "revoke" ||
+        action.type === "allow" ||
+        action.type === "deny"
+      ) {
+        // Publish answers what it pushed, leave {left}, grant the grant,
+        // revoke {removed}, allow/deny the ack; a read follows so the page
+        // shows the state it changed.
         const status = await runCommand({
           environmentId,
           input: teamCommandInput({ type: "status" }),
@@ -242,6 +263,24 @@ export function InfinitusTeamPanel() {
     }
   };
 
+  const addGrant = async () => {
+    const draft = teamGrantDraft(
+      grantAudience,
+      grantCapabilities,
+      grantThreads,
+      grantPreauthorized,
+    );
+    if (draft === null) {
+      setError("Pick who and at least one capability.");
+      return;
+    }
+    setGrantThreads("");
+    await run({ type: "grant", draft });
+  };
+
+  const toggle = (list: ReadonlyArray<string>, item: string, on: boolean) =>
+    on ? (list.includes(item) ? list : [...list, item]) : list.filter((c) => c !== item);
+
   const addExclusion = async () => {
     const slug = teamExclusionSlug(exclusionDraft);
     if (slug === null) {
@@ -334,7 +373,11 @@ export function InfinitusTeamPanel() {
               <SettingsRow
                 key={member.kid}
                 title={member.name}
-                description={teamMemberSummary(member, nowMs)}
+                description={
+                  (member.controls?.length ?? 0) > 0
+                    ? `${teamMemberSummary(member, nowMs)} · lets you ${member.controls!.join(", ")}`
+                    : teamMemberSummary(member, nowMs)
+                }
                 control={
                   isLeader && !member.isMe ? (
                     <>
@@ -585,6 +628,150 @@ export function InfinitusTeamPanel() {
               Keep private
             </Button>
           </form>
+        </SettingsSection>
+      )}
+      {!inTeam || team.role === "pending" ? null : (
+        <SettingsSection id="infinitus-team-grants" title="Delegated control">
+          {(team.grants ?? []).map((grant) => (
+            <SettingsRow
+              key={grant.id}
+              title={teamGrantAudience(grant.audience, team.members)}
+              description={teamGrantSummary(grant, nowMs)}
+              control={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy !== null}
+                  aria-label={`Revoke grant ${grant.id}`}
+                  onClick={() => void run({ type: "revoke", id: grant.id })}
+                >
+                  Revoke
+                </Button>
+              }
+            />
+          ))}
+          <form
+            className="flex flex-col gap-2 px-3 py-2 sm:px-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void addGrant();
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Select
+                disabled={busy !== null}
+                value={grantAudience}
+                onValueChange={(value) => {
+                  if (typeof value === "string") setGrantAudience(value);
+                }}
+              >
+                <SelectTrigger size="sm" className="w-full sm:w-48" aria-label="Grant to">
+                  <SelectValue>
+                    {grantAudience === "leaders"
+                      ? "Leaders"
+                      : grantAudience === "team"
+                        ? "Whole team"
+                        : (team.members.find((member) => member.kid === grantAudience)?.name ??
+                          grantAudience)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup align="start" alignItemWithTrigger={false}>
+                  <SelectItem hideIndicator value="leaders">
+                    Leaders
+                  </SelectItem>
+                  <SelectItem hideIndicator value="team">
+                    Whole team
+                  </SelectItem>
+                  {team.members
+                    .filter((member) => !member.isMe)
+                    .map((member) => (
+                      <SelectItem hideIndicator key={member.kid} value={member.kid}>
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                </SelectPopup>
+              </Select>
+              <Input
+                size="sm"
+                aria-label="Thread ids"
+                placeholder="Thread ids, comma-separated; blank = all"
+                autoComplete="off"
+                spellCheck={false}
+                value={grantThreads}
+                disabled={busy !== null}
+                onChange={(event) => setGrantThreads(event.currentTarget.value)}
+              />
+            </div>
+            {TEAM_CAPABILITIES.map(({ capability, label, asks }) => (
+              <div key={capability} className="flex items-center gap-4 text-[13px]">
+                <label className="flex items-center gap-2">
+                  <Checkbox
+                    aria-label={`Allow ${capability}`}
+                    checked={grantCapabilities.includes(capability)}
+                    disabled={busy !== null}
+                    onCheckedChange={(checked) =>
+                      setGrantCapabilities((list) => toggle(list, capability, checked === true))
+                    }
+                  />
+                  {label}
+                </label>
+                {!asks || !grantCapabilities.includes(capability) ? null : (
+                  <label className="flex items-center gap-2 text-muted-foreground">
+                    <Checkbox
+                      aria-label={`${capability} without asking`}
+                      checked={grantPreauthorized.includes(capability)}
+                      disabled={busy !== null}
+                      onCheckedChange={(checked) =>
+                        setGrantPreauthorized((list) => toggle(list, capability, checked === true))
+                      }
+                    />
+                    without asking
+                  </label>
+                )}
+              </div>
+            ))}
+            <div>
+              <Button type="submit" size="sm" variant="outline" disabled={busy !== null}>
+                {busy === "grant" ? "Granting…" : "Grant"}
+              </Button>
+            </div>
+          </form>
+          <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+            A teammate drives with <code>infinitusctl team drive</code>. Interrupt and new ask you
+            first unless ticked; view and send never ask.
+          </p>
+        </SettingsSection>
+      )}
+      {!inTeam || (team.pending ?? []).length === 0 ? null : (
+        <SettingsSection id="infinitus-team-pending" title="Waiting for you">
+          {(team.pending ?? []).map((pending) => (
+            <SettingsRow
+              key={pending.id}
+              title={pending.name}
+              description={teamPendingSummary(pending, nowMs)}
+              control={
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy !== null}
+                    aria-label={`Deny ${pending.id}`}
+                    onClick={() => void run({ type: "deny", id: pending.id })}
+                  >
+                    Deny
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={busy !== null}
+                    aria-label={`Allow ${pending.id}`}
+                    onClick={() => void run({ type: "allow", id: pending.id })}
+                  >
+                    Allow
+                  </Button>
+                </>
+              }
+            />
+          ))}
         </SettingsSection>
       )}
       {!inTeam ? null : (
