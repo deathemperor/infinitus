@@ -82,6 +82,7 @@ private func routeToApp(_ sub: String, positional: [String], options: [String: S
     case "approve", "decline":
         guard let kid = positional.first else { return nil }
         request = ControlRequest(command: "team-\(sub)", args: [kid])
+    case "publish": request = ControlRequest(command: "team-publish")
     case "create":
         guard let name = positional.first, let remote = options["remote"] else { return nil }
         request = ControlRequest(command: "team-create", args: [name, remote],
@@ -108,22 +109,6 @@ private func desktopFromApp(socket: String) -> DesktopAPI? {
     return DesktopAPI(origin: url, token: token)
 }
 #endif
-
-/// Threads, live rows and transcripts from the desktop server for one
-/// publish; only the threads whose transcript can travel are fetched
-/// whole (`turnLimit` covers any thread).
-private func desktopSources(_ api: DesktopAPI, into sources: inout TeamPublisher.Sources,
-                            choices: TeamTranscriptChoices, exclusions: TeamExclusions, now: Int) throws {
-    let shell = try api.shell()
-    let (rows, live) = TeamThreadSources.threads(shell, now: now)
-    sources.desktop = true
-    sources.threads = rows
-    sources.live = live
-    let floor = now - sources.historyDays * 86_400
-    for row in rows where row.updatedAt >= floor && choices.includes(row.id) && !exclusions.excludes(project: row.project) {
-        sources.transcripts.append(TeamThreadSources.transcript(try api.thread(row.id, turnLimit: 100_000), project: row.project))
-    }
-}
 
 private struct MemberRow: Encodable {
     var kid, name, role: String; var online: Bool
@@ -441,8 +426,8 @@ func runTeam(_ args: [String]) -> Int32 {
             // index stays as last published and now.json says so.
             #if os(macOS)
             if let api = desktopFromApp(socket: ControlProtocol.socketURL().path) {
-                try desktopSources(api, into: &sources, choices: TeamTranscriptChoices.load(teamDir: teamDir),
-                                   exclusions: TeamExclusions.load(paths: paths), now: Int(Date().timeIntervalSince1970))
+                try TeamThreadSources.desktop(api, into: &sources, choices: TeamTranscriptChoices.load(teamDir: teamDir),
+                                              exclusions: TeamExclusions.load(paths: paths), now: Int(Date().timeIntervalSince1970))
             }
             #endif
             emit(try TeamPublisher(client: c, paths: paths).publish(sources: sources))

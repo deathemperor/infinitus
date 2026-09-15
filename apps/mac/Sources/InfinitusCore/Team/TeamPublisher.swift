@@ -63,6 +63,18 @@ public struct TeamPublisher {
         return out
     }
 
+    /// The entries with a day inside the history window (`historyDays`
+    /// back from the start of today, as `publish` cuts it): what
+    /// `collect` folds, whoever calls it.
+    public static func inWindow(_ entries: [String: StatsScanner.FileEntry], floorDay: String) -> [String: StatsScanner.FileEntry] {
+        entries.filter { ($0.value.days.keys.max() ?? "") >= floorDay }
+    }
+
+    public static func floorDay(now: Date, historyDays: Int, calendar: Calendar) -> String {
+        let floor = calendar.date(byAdding: .day, value: -historyDays, to: calendar.startOfDay(for: now)) ?? .distantPast
+        return Stats.dayKey(floor, calendar: calendar)
+    }
+
     // MARK: publishing
 
     /// Everything a publish reads, injected so tests and the CLI point
@@ -78,6 +90,9 @@ public struct TeamPublisher {
         /// publishes no day files. Files without a day inside
         /// `historyDays` are dropped, as the scanner's `maxAge` drops them.
         public var entries: [String: StatsScanner.FileEntry]?
+        /// The fold of `entries` a caller already made (`collect`, the
+        /// app's per-scan memo, #499); set, `entries` is not read.
+        public var collected: Collected?
         public var threads: [TeamDocs.ThreadRow] = []
         public var live: [TeamDocs.LiveThread] = []
         public var desktop = false
@@ -278,8 +293,8 @@ public struct TeamPublisher {
         let calendar = sources.calendar
         let floor = calendar.date(byAdding: .day, value: -sources.historyDays, to: calendar.startOfDay(for: now)) ?? .distantPast
         let floorDay = Stats.dayKey(floor, calendar: calendar)
-        let collected = sources.entries.map { given in
-            Self.collect(entries: given.filter { ($0.value.days.keys.max() ?? "") >= floorDay }, exclusions: exclusions)
+        let collected = sources.collected ?? sources.entries.map { given in
+            Self.collect(entries: Self.inWindow(given, floorDay: floorDay), exclusions: exclusions)
         } ?? Collected()
         let choices = TeamTranscriptChoices.load(teamDir: teamDir)
         let threads = sources.threads.filter { !exclusions.excludes(project: $0.project) }

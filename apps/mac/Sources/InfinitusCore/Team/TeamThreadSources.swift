@@ -30,6 +30,10 @@ public enum TeamThreadSources {
     /// ones with a turn in flight as `now.json`'s live rows. The project
     /// is the workspace root's basename; an unknown project id stands
     /// as itself, so the row still names something.
+    /// Spec §4.2: the index carries the newest `indexCap` threads; older
+    /// ones fall off it (their transcripts, once published, stay).
+    public static let indexCap = 500
+
     public static func threads(_ shell: DesktopAPI.Shell, now: Int) -> (rows: [TeamDocs.ThreadRow], live: [TeamDocs.LiveThread]) {
         let projects = Dictionary(shell.projects.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var rows: [TeamDocs.ThreadRow] = []
@@ -53,7 +57,35 @@ public enum TeamThreadSources {
             }
         }
         rows.sort { $0.updatedAt == $1.updatedAt ? $0.id < $1.id : $0.updatedAt > $1.updatedAt }
-        return (rows, live)
+        return (Array(rows.prefix(indexCap)), live)
+    }
+
+    /// Threads, live rows and transcripts from Infinitus desktop for one
+    /// publish: the index off `shell()`, then each thread whose transcript
+    /// can travel (inside `historyDays`, chosen, not excluded) fetched
+    /// whole — unless `fetched` says it has not moved since the last pass,
+    /// so a 5-minute loop fetches nothing in steady state. A thread whose
+    /// detail read fails (deleted between the two reads) is skipped, not
+    /// the pass. Returns the `updatedAt` of every transcript handed over,
+    /// for the caller to fold into `fetched` once the publish landed.
+    @discardableResult
+    public static func desktop(_ api: DesktopAPI, into sources: inout TeamPublisher.Sources,
+                               choices: TeamTranscriptChoices, exclusions: TeamExclusions,
+                               fetched: [String: Int] = [:], now: Int) throws -> [String: Int] {
+        let shell = try api.shell()
+        let (rows, live) = threads(shell, now: now)
+        sources.desktop = true
+        sources.threads = rows
+        sources.live = live
+        let floor = now - sources.historyDays * 86_400
+        var handed: [String: Int] = [:]
+        for row in rows where row.updatedAt >= floor && choices.includes(row.id) && !exclusions.excludes(project: row.project) {
+            if fetched[row.id] == row.updatedAt { continue }
+            guard let thread = try? api.thread(row.id, turnLimit: 100_000) else { continue }
+            sources.transcripts.append(transcript(thread, project: row.project))
+            handed[row.id] = row.updatedAt
+        }
+        return handed
     }
 
     /// archived | failed | starting | waiting | running | idle — the
