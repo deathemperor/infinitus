@@ -1820,7 +1820,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   the server's capabilities carry `turnQueue` (fork capability in
   `packages/contracts/src/environment.ts`, set true in
   `apps/server/src/environment/ServerEnvironment.ts`); `queueTurnCommandInput`
-  is the `thread.turn.queue` an outbox message becomes.
+  is the `thread.turn.queue` an outbox message becomes. Steer on a server
+  that carries `turnQueueSendAt` (#1325, #1318's phone parity) is a queue
+  row too, with `sendAt: "tool-boundary"` (`queuedTurnSendAt`: a steer send
+  behind a running turn, never a held thread — no turn to steer there), so
+  the server sends it at the turn's next finished tool call or at idle;
+  without the flag steer sends into the turn at once, since an older server
+  would take the row and send it at idle without a word.
   `readHeldThreads` reads the environment's `infinitusEnvironment.holds` atom
   from the registry (the web sidebar's idiom), null without the `infinitus`
   capability and before the list's first delivery, so the first pass after

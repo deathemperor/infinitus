@@ -4,6 +4,7 @@ import type {
   MessageId,
   ModelSelection,
   OrchestrationMessageContext,
+  QueuedTurnSendAt,
   QueueId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -79,10 +80,40 @@ export type ThreadOutboxDelivery = ThreadOutboxDeliveryAction | "queue";
  * the thread's queue card. Servers without the capability keep the wait.
  */
 export function resolveThreadOutboxDelivery(
-  input: Parameters<typeof queueBehindRunningTurn>[0] & { readonly serverQueues: boolean },
+  input: Parameters<typeof queueBehindRunningTurn>[0] & {
+    readonly serverQueues: boolean;
+    readonly serverSendAt: boolean;
+  },
 ): ThreadOutboxDelivery {
+  if (queuedTurnSendAt(input) !== undefined) return "queue";
   const action = queueBehindRunningTurn(input);
   return action === "wait" && input.action === "send" && input.serverQueues ? "queue" : action;
+}
+
+/** The queued row's moment (#1325, #1318's phone parity): `tool-boundary`
+    for a steer send behind a running turn on a server that advertises
+    `turnQueueSendAt`, so the drain sends it at the turn's next finished tool
+    call or at idle. An older server would decode the row and send it at idle
+    without a word, which is not steer, so without the flag steer keeps
+    sending into the turn at once. A held thread has no running turn to
+    steer, so its row is an ordinary one; everything else is the default
+    (absent, which is idle). */
+export function queuedTurnSendAt(input: {
+  readonly action: ThreadOutboxDeliveryAction;
+  readonly isCreation: boolean;
+  readonly threadBusy: boolean;
+  readonly threadHeld: boolean;
+  readonly mode: OutboxQueueMode;
+  readonly serverSendAt: boolean;
+}): QueuedTurnSendAt | undefined {
+  return input.action === "send" &&
+    !input.isCreation &&
+    input.mode === "steer" &&
+    input.serverSendAt &&
+    input.threadBusy &&
+    !input.threadHeld
+    ? "tool-boundary"
+    : undefined;
 }
 
 /**
@@ -103,11 +134,13 @@ export function queueTurnCommandInput(input: {
   readonly attachments: PreparedTurnAttachments["attachments"];
   readonly modelSelection: ModelSelection;
   readonly queueId: QueueId;
+  readonly sendAt?: QueuedTurnSendAt | undefined;
 }) {
   return {
     commandId: input.message.commandId,
     threadId: input.message.threadId,
     queueId: input.queueId,
+    ...(input.sendAt === undefined ? {} : { sendAt: input.sendAt }),
     message: {
       messageId: input.message.messageId,
       role: "user" as const,

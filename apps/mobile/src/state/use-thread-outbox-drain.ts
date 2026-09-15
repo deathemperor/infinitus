@@ -64,6 +64,7 @@ import { readHeldThreads } from "./threadOutboxHolds";
 import {
   isThreadHeld,
   outboxQueueMode,
+  queuedTurnSendAt,
   queueTurnCommandInput,
   resolveThreadOutboxDelivery,
   type ThreadOutboxDelivery,
@@ -850,6 +851,20 @@ export function useThreadOutboxDrain(): void {
                 attachments: prepared.attachments,
                 modelSelection: sendSettings.modelSelection,
                 queueId: QueueId.make(uuidv4()),
+                // Infinitus (fork, #1325): a steer send behind the running
+                // turn goes at its next tool boundary where the server honours it.
+                sendAt: queuedTurnSendAt({
+                  action: "send",
+                  isCreation: false,
+                  threadBusy:
+                    thread.session?.status === "running" || thread.session?.status === "starting",
+                  threadHeld: isThreadHeld(
+                    readHeldThreads(queuedMessage.environmentId, serverConfigs),
+                    queuedMessage.threadId,
+                  ),
+                  mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
+                  serverSendAt: serverConfig.environment.capabilities.turnQueueSendAt === true,
+                }),
               }),
             })
           : await startTurn({
@@ -1162,6 +1177,7 @@ export function useThreadOutboxDrain(): void {
         ),
         mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
         serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
+        serverSendAt: serverConfig?.environment.capabilities.turnQueueSendAt === true,
       });
       // The delivery action resolves first; capability checks apply only to
       // a message that will send. Checking earlier would restore a
@@ -1287,6 +1303,7 @@ export function useThreadOutboxDrain(): void {
             ),
             mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
             serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
+            serverSendAt: serverConfig?.environment.capabilities.turnQueueSendAt === true,
           });
           if (liveDeliveryAction !== deliveryAction) {
             return true;
