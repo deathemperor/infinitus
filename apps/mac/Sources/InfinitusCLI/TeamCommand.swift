@@ -1,5 +1,8 @@
 import Foundation
 import InfinitusCore
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // `infinitusctl team …` runs in-process — no control socket, so a Linux
 // or Windows member needs only this binary (spec §9). State lives under
@@ -41,6 +44,13 @@ func teamUsage() -> String {
       put --kind <k> --path <p> --file <f> [--audience leaders|team|<kid,kid>]   one opaque file (debugging)
       list                                         envelopes addressed to me
       read <path> [--out <file>]                   decrypt one envelope
+      grant <leaders|team|kid,…> [--threads a,b] [--view] [--send] [--interrupt] [--new] [--pre a,b] [--expires N]
+                                                   let those people drive the threads named (default: all); interrupt and new ask first unless --pre
+      grants                                       the grants on this machine
+      revoke <grant id>                            take a grant back
+      drive <kid> <thread|-> <view|send|interrupt|new> [text…] [--project p]   one command under their grant (their desktop's doors, else the store)
+      acks                                         answers to my store-lane commands (and forgets the answered ones)
+      pending | allow <id> | deny <id>             (with the app) commands waiting for this Mac's tap
 
     Narrowing an audience cannot recall ciphertext teammates already fetched.
 
@@ -110,6 +120,26 @@ private func desktopFromApp(socket: String) -> DesktopAPI? {
 }
 #endif
 
+/// One exchange with a grantor's desktop (LAN or tunnel), for `team drive`;
+/// the lane's own timeout caps a vanished peer. Linux uses FoundationNetworking.
+private let controlHTTP: TeamControl.Deliver.HTTP = { method, url, headers, body, timeout in
+    var request = URLRequest(url: url)
+    request.httpMethod = method
+    request.httpBody = body
+    request.timeoutInterval = timeout
+    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+    let done = DispatchSemaphore(value: 0)
+    final class Box: @unchecked Sendable { var result: (Int, Data) = (0, Data()); var failure: Error? }
+    let box = Box()
+    URLSession.shared.dataTask(with: request) { data, response, error in
+        if let error { box.failure = error } else { box.result = ((response as? HTTPURLResponse)?.statusCode ?? 0, data ?? Data()) }
+        done.signal()
+    }.resume()
+    done.wait()
+    if let failure = box.failure { throw failure }
+    return box.result
+}
+
 private struct MemberRow: Encodable {
     var kid, name, role: String; var online: Bool
     var threadsNow: Int; var blockers: [String]; var crashes: Int; var lastPublished: Int?
@@ -128,7 +158,9 @@ func runTeam(_ args: [String]) -> Int32 {
     }
     var positional: [String] = []
     var options: [String: String] = [:]
-    let bareFlags: Set<String> = ["off", "show", "replace", "recovery", "rotate-identity"]
+    var bareFlags: Set<String> = ["off", "show", "replace", "recovery", "rotate-identity"]
+    // Capability names are bare flags on `grant` only (`team drive --send` is not a thing either way).
+    if sub == "grant" { bareFlags.formUnion(TeamGrants.capabilities) }
     var flags: Set<String> = []
     var i = 1
     while i < args.count {
@@ -157,6 +189,16 @@ func runTeam(_ args: [String]) -> Int32 {
         let socket = ControlProtocol.socketURL().path
         if let routed = routeToApp(sub, positional: positional, options: options, socket: socket) {
             return routed
+        }
+        // Delegated control (spec §8): the app owns the grants file and the
+        // control endpoint, so these go through its verbs when it answers.
+        if let request = TeamGrantsRouting.request(sub: sub, positional: positional, options: options, flags: flags),
+           let manifest = ControlClient.roundTrip(ControlRequest(command: "manifest"), path: socket),
+           TeamGrantsRouting.appAnswers(manifest: manifest.result),
+           let reply = ControlClient.roundTripRetrying(request, path: socket) {
+            guard reply.ok else { return fail(reply.error ?? "\(request.command) failed") }
+            emit(reply.result ?? .null)
+            return 0
         }
         // The app answers, this subcommand has no app verb, and no
         // in-process identity exists yet: minting one here would be
@@ -409,6 +451,69 @@ func runTeam(_ args: [String]) -> Int32 {
                 return fail("nothing readable from \(kid)")
             }
             emit(summary.compacted())
+        case "grant":
+            let c = try client()
+            let teamDir = paths.teamDir(c.config.id)
+            guard let audience = TeamShares.parseTarget(Array(positional.prefix(1))), audience != .off else { return fail(teamUsage(), code: 2) }
+            let capabilities = flags.intersection(TeamGrants.capabilities)
+            guard !capabilities.isEmpty else {
+                return fail("pick at least one of \(TeamGrants.capabilities.map { "--\($0)" }.joined(separator: " "))", code: 2)
+            }
+            if case .members(let kids) = audience {
+                let known = Set(c.roster?.doc.everyone.map(\.keys.kid) ?? [])
+                for kid in kids where !known.contains(kid) { return fail("unknown kid \(kid)", code: 2) }
+            }
+            let threads: TeamGrants.Threads = options["threads"].flatMap { $0 == "*" ? nil : $0 }
+                .map { .some($0.split(separator: ",").map(String.init).filter { !$0.isEmpty }) } ?? .all
+            let preauthorized: Set<String> = options["pre"]
+                .map { Set($0.split(separator: ",").map(String.init).filter { !$0.isEmpty }) } ?? []
+            var expires: Int?
+            if let text = options["expires"] {
+                guard let seconds = Int(text), seconds > 0 else { return fail("--expires takes seconds from now", code: 2) }
+                expires = Int(Date().timeIntervalSince1970) + seconds
+            }
+            var grants = TeamGrants.load(teamDir: teamDir)
+            let grant = grants.add(audience: audience, threads: threads, capabilities: capabilities,
+                                   preauthorized: preauthorized, expires: expires)
+            try grants.save(teamDir: teamDir)
+            emit(grant)
+        case "grants":
+            let c = try client()
+            emit(TeamGrants.load(teamDir: paths.teamDir(c.config.id)))
+        case "revoke":
+            let c = try client()
+            guard let id = positional.first else { return fail(teamUsage(), code: 2) }
+            let teamDir = paths.teamDir(c.config.id)
+            var grants = TeamGrants.load(teamDir: teamDir)
+            let removed = grants.remove(id: id)
+            if removed { try grants.save(teamDir: teamDir) }
+            emit(["removed": removed])
+        case "drive":
+            guard positional.count >= 3 else { return fail(teamUsage(), code: 2) }
+            let (kid, thread, action) = (positional[0], positional[1], positional[2])
+            guard TeamGrants.capabilities.contains(action) else { return fail(teamUsage(), code: 2) }
+            let text = positional.dropFirst(3).joined(separator: " ")
+            let c = try client()
+            _ = try c.fetch()
+            let endpoints = try TeamReader.load(client: c).members[kid]?.now?.endpoints
+            let command = TeamControl.Command(id: TeamControl.newCommandID(), to: kid, thread: thread, action: action,
+                                              text: text.isEmpty ? nil : text, project: options["project"],
+                                              at: Int(Date().timeIntervalSince1970))
+            emit(try TeamControl.Drive.send(command, client: c, endpoints: endpoints, deliver: TeamControl.Deliver(http: controlHTTP)))
+        case "acks":
+            let c = try client()
+            _ = try c.fetch()
+            let reader = try TeamReader.load(client: c)
+            struct Row: Encodable { var id: String; var from: String; var outcome: String; var detail: String?; var at: Int }
+            var rows: [Row] = []
+            for m in reader.members.values {
+                for ack in m.acks.values { rows.append(Row(id: ack.id, from: m.kid, outcome: ack.outcome, detail: ack.detail, at: ack.at)) }
+            }
+            rows.sort { $0.at == $1.at ? $0.id < $1.id : $0.at > $1.at }
+            _ = try TeamControl.Store.driverReap(client: c, acks: reader.ackIDs)
+            emit(rows)
+        case "pending", "allow", "deny":
+            return fail("team \(sub) needs the Infinitus app running on this Mac (its control socket answers it)")
         case "publish":
             let c = try client(); _ = try c.fetch()
             let teamDir = paths.teamDir(c.config.id)
