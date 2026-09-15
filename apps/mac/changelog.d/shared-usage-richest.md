@@ -1,1 +1,1 @@
-Mac: an account in two fleets shows the richer engine's usage reading instead of whichever engine answered first.
+Mac: An account in two fleets shows the richer engine's usage reading instead of whichever engine answered first.
