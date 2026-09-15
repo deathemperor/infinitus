@@ -543,46 +543,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
   `server.test.ts`, `settings.test.ts`.
 - **Reconnect a turn whose transport went away (#832).** `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`scheduleReconnect`, `reopenForReconnect`, `reconnectQueryOptions`, `RECONNECT_EXHAUSTED_MESSAGE`; + `claudeReconnect.logic.ts`), `apps/server/src/provider/turnContinuation.ts`, `ProviderService.processRuntimeEvent` (`continueAfterServerUpdate`), `packages/contracts/src/orchestration.ts` (`OrchestrationSession.statusReason`), `ProjectionThreadSessions` (`status_reason`, `Migrations/055_ProjectionThreadSessionsStatusReason.ts`), `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`, `apps/web/src/components/chat/ThreadReconnectingNotice.tsx` (mounted in `ChatView.tsx`). Rules and traps: `docs/internals/turn-reconnect.md`.
-- Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
-  `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
-  `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
-  `RpcAuthorization.ts`); `apps/server/src/ws.ts` — the handler;
-  `apps/server/src/provider/Layers/ClaudeAdapter.ts` — the resume cursor
-  carries `anchors` (`{turnId, at}`: per completed turn the uuid of the
-  first SDK message of its last assistant API message — Claude Code keeps
-  one transcript line per content block, all sharing the message id, and
-  `--resume-session-at` finds only the first — keyed by the orchestration
-  turn id, so a session restart cannot renumber them; ≤ 200, trimmed on
-  rollback) and `fork: true`; a forked thread's first start passes
-  `forkSession` + `resumeSessionAt` to the SDK and starts its own anchors.
-  An anchor the CLI cannot find (`No message found with message.uuid`;
-  every anchor recorded before this rule on a turn whose last message had
-  more than one block) is retried once without the anchor when the binding
-  says `resumeSessionAtLatest` (`ThreadFork.ts` sets it for a side question
-  and for a fork at the latest anchored turn: the session's end is that
-  turn, #941; `InfinitusForkAnchorGate` re-checks at every turn start and
-  drops the flag once the source's latest anchor moved past the fork point), with a `runtime.warning` row naming the repair; an earlier
-  turn's anchor fails the turn plainly instead
-  (`claudeForkFallback.logic.ts`); `packages/client-runtime/src/state/infinitus.ts` — `forkThread`;
-  `apps/web` `ChatView.tsx` — `supportsThreadFork` (Claude and Codex),
-  mode `fork` on `onRevertToTurnCount` (no confirm; navigates to the new
-  thread), `MessagesTimeline.tsx` — the third menu item. Fork-only:
-  `apps/server/src/infinitus/ThreadFork.ts` (+ test): `forkThreadAtTurn` —
-  binding first (insert-ignore: `resume` = the source session, the turn's
-  anchor as `resumeSessionAt`, `fork: true`), then `thread.create
-{historyImport: true}` on the source's branch and worktree, then
-  `thread.history.import` of a provenance marker ("Forked from **title** at
-  turn N") plus the source's user/assistant text up to that turn
-  (`forkSeedMessages`: by turn id, unattributed rows by time). The source
-  thread is never mutated. Codex (#819): the orchestration turn id on a
-  Codex thread is Codex's own (`CodexSessionRuntime` mints it from
-  `turn/started`), so no anchors: a fork's binding is `{threadId: <the
-source's Codex thread>, fork: true, lastTurnId: <the turn>}`
-  (`CodexResumeCursorSchema`), and `openCodexThread` calls `thread/fork`
-  in place of `thread/resume` on that cursor — no fresh-start fallback, a
-  refused fork is a failed start — after which the cursor is rewritten to
-  the new thread as on any open. A side question takes the detail's
-  `latestTurn` once completed. The other drivers have no fork point.
+- Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` (`InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`), `rpc.ts` (`infinitus.forkThread`; `AuthOrchestrationOperateScope` in `RpcAuthorization.ts`), `apps/server/src/ws.ts`, `apps/server/src/provider/Layers/ClaudeAdapter.ts` (the resume cursor's `anchors` and `fork`, `resumeSessionAtLatest`; `claudeForkFallback.logic.ts`), `CodexResumeCursorSchema` / `openCodexThread` (`thread/fork`, #819), `packages/client-runtime/src/state/infinitus.ts` (`forkThread`), `ChatView.tsx` (`supportsThreadFork`, mode `fork`), `MessagesTimeline.tsx`; fork-only `apps/server/src/infinitus/ThreadFork.ts` (+ test; `forkThreadAtTurn`, `forkSeedMessages`), `InfinitusForkAnchorGate`. Rules and traps: `docs/internals/fork-from-turn.md`.
 - `packages/contracts/src/settings.ts` — `infinitusResumeOnLimit` on
   `ServerSettings` (default on) and `ServerSettingsPatch` (#648); the
   `PromptSnippet` schema with its caps and `projectPromptSnippets`
