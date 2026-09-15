@@ -176,6 +176,105 @@ export function turnFooter(thread: FooterThread, turnId: TurnId): TurnFooter | n
   };
 }
 
+/**
+ * Every completed turn's footer in one pass, keyed by turn in the order of
+ * the turns' first assistant messages — what `turnFooter` answers for each
+ * of them, without walking the messages and activities once per turn. A
+ * thread mid-flight changes on every activity delta, so the callers fold
+ * it on every tick; O(T × (M + A)) per tick was the phone audit's first
+ * finding (2026-09-15).
+ */
+export function turnFooters(thread: FooterThread): ReadonlyMap<TurnId, TurnFooter> {
+  const order: TurnId[] = [];
+  const userAt = new Map<TurnId, string>();
+  const assistant = new Map<TurnId, OrchestrationMessage>();
+  for (const message of thread.messages) {
+    if (message.turnId === null) continue;
+    if (message.role === "user") {
+      if (!userAt.has(message.turnId)) userAt.set(message.turnId, message.createdAt);
+    } else if (message.role === "assistant") {
+      if (!assistant.has(message.turnId) && !order.includes(message.turnId)) {
+        order.push(message.turnId);
+      }
+      if (!message.streaming) assistant.set(message.turnId, message);
+    }
+  }
+  const running = runningTaskCountsByTurn(thread);
+  const footers = new Map<TurnId, TurnFooter>();
+  const latest = thread.latestTurn;
+  for (const turnId of order) {
+    let timing: { readonly startedAt: string | null; readonly completedAt: string } | null;
+    if (latest !== null && latest.turnId === turnId) {
+      timing =
+        latest.completedAt === null
+          ? null
+          : { startedAt: latest.startedAt ?? latest.requestedAt, completedAt: latest.completedAt };
+    } else {
+      const last = assistant.get(turnId);
+      timing =
+        last === undefined
+          ? null
+          : { startedAt: userAt.get(turnId) ?? null, completedAt: last.updatedAt };
+    }
+    if (timing === null) continue;
+    const counts = running.get(turnId) ?? { shells: 0, agents: 0 };
+    footers.set(turnId, {
+      durationMs: elapsedMs(timing.startedAt, timing.completedAt),
+      completedAt: timing.completedAt,
+      runningShells: counts.shells,
+      runningAgents: counts.agents,
+    });
+  }
+  return footers;
+}
+
+/** `runningTaskCounts` for every turn at once: two passes over the
+    activities instead of two per turn. */
+function runningTaskCountsByTurn(
+  thread: FooterThread,
+): ReadonlyMap<TurnId, { readonly shells: number; readonly agents: number }> {
+  const counts = new Map<TurnId, { shells: number; agents: number }>();
+  const status = thread.session?.status;
+  if (status === undefined || status === "stopped" || status === "error") return counts;
+  const tasks = new Map<string, { readonly turnId: TurnId; readonly shell: boolean }>();
+  const backgrounded = new Set<string>();
+  for (const activity of thread.activities) {
+    if (activity.kind !== "task.started" || activity.turnId === null) continue;
+    const task = taskPayload(activity);
+    if (task === null) continue;
+    if (task.taskType !== undefined && isShellTaskType(task.taskType)) {
+      tasks.set(task.taskId, { turnId: activity.turnId, shell: true });
+    } else if (isAgentTask(task)) {
+      tasks.set(task.taskId, { turnId: activity.turnId, shell: false });
+    } else continue;
+    if (task.isBackgrounded === true) backgrounded.add(task.taskId);
+  }
+  if (tasks.size === 0) return counts;
+  const ended = new Set<string>();
+  for (const activity of thread.activities) {
+    if (activity.kind !== "task.updated" && activity.kind !== "task.completed") continue;
+    const task = taskPayload(activity);
+    if (task === null || !tasks.has(task.taskId)) continue;
+    if (task.isBackgrounded === true) backgrounded.add(task.taskId);
+    if (
+      activity.kind === "task.completed" ||
+      task.endedAt !== undefined ||
+      (task.status !== undefined && ENDED_STATUSES.has(task.status))
+    ) {
+      ended.add(task.taskId);
+    }
+  }
+  for (const taskId of backgrounded) {
+    if (ended.has(taskId)) continue;
+    const task = tasks.get(taskId)!;
+    const entry = counts.get(task.turnId) ?? { shells: 0, agents: 0 };
+    if (task.shell) entry.shells += 1;
+    else entry.agents += 1;
+    counts.set(task.turnId, entry);
+  }
+  return counts;
+}
+
 /** `time` is `completedAt` in the user's timestamp format. */
 export function turnFooterLabel(footer: TurnFooter, time: string): string {
   const parts = [
