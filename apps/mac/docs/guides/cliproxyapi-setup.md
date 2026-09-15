@@ -65,7 +65,7 @@ You can use it alongside Infinitus; both speak the same Management API.
 From a shell (or let an agent do it, `docs/guides/infinitusctl-agent.md`):
 
 ```sh
-CTL=/Applications/Infinitus.app/Contents/MacOS/infinitusctl
+CTL="/Applications/Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/infinitusctl"
 printf '%s' '<management key>' | $CTL proxy-key   # app restarts
 $CTL engine cliproxy on                           # app restarts
 ```

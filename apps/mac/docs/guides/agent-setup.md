@@ -39,7 +39,7 @@ Nightly track: `deathemperor/tap/infinitus@nightly`.
 Put the control CLI on PATH (optional, used by the rest of this guide):
 
 ```sh
-ln -sf /Applications/Infinitus.app/Contents/MacOS/infinitusctl /usr/local/bin/infinitusctl
+ln -sf "/Applications/Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/infinitusctl" /usr/local/bin/infinitusctl
 infinitusctl status        # exit 3 = app not running
 ```
 

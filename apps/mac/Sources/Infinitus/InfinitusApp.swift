@@ -157,13 +157,14 @@ struct InfinitusApp: App {
     // desktop's Accounts page adds, re-logs, renames, reorders and
     // removes; the sign-in flow it drives stays native (SignInFlow.swift)
     // and account backup, a file panel over the keychain-backed store,
-    // moved to Devices.
+    // moved to Devices. Devices itself shrank on 2026-09-15 (#1178): this
+    // Mac's name, phone alerts and the iCloud toggle are the desktop's
+    // Devices page, over their prefs and the `apns` / `apns-key` verbs.
     [
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
-                    keywords: ["icloud", "sync", "settings", "drive", "devices",
-                               "phone", "iphone", "lan", "bonjour", "companion",
+                    keywords: ["settings", "file", "devices", "crash", "phone",
                                "cloudflare", "tunnel", "backup", "restore",
                                "accounts", "export", "import"],
                     view: AnyView(SyncPane(sync: model.sync, app: model))),
