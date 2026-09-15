@@ -74,6 +74,8 @@ const appLinking = {
     });
     return () => subscription.remove();
   },
+  // Keep the compact thread list available beneath a directly opened thread.
+  config: { initialRouteName: "Home" },
   // The Expo dev client launches the app via
   // <scheme>://expo-development-client/?url=<packager> — that URL addresses
   // the launcher, not app navigation. Without this filter it falls through

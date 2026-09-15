@@ -343,7 +343,17 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   (#270 F, pre-#806) to the server once, ids derived from the entry, a
   refused one becoming a plain stash entry (`promptStashStore.unqueueEntry`);
   `ComposerPrimaryActions.tsx` — `runningSendMode` keeps the send button
-  beside Stop while running, labelled "Queue message" / "Send now";
+  beside Stop while running, labelled "Queue message" / "Send now" (upstream
+  shows its own "Queue message" there since #11673, so the fork's prop only
+  changes the steer label); `ChatView.tsx` `onSend` — upstream's client-side
+  queue (#11673, `queuedMessageStore.ts`: a mid-turn send parked in memory
+  until the next tool boundary, drawn as a dashed bubble at the end of the
+  timeline, returned to the composer by Stop) is gated off on a server thread
+  (`!isServerThread` at its enqueue), where this setting decides: `queue`
+  dispatches `thread.turn.queue`, `steer` sends into the running turn at
+  once — one row, never two; the store, its timeline rows and the Stop drain
+  stay compiled and idle, and `docs/user/composer.md`'s "Send while the
+  agent is working" section is rewritten to the fork's rule at every sync;
   `SettingsPanels.tsx` + `settingsSearch.ts` — the "Sending while a turn
   runs" row. Client-runtime: `operations/commands.ts` + `state/threadCommands.ts`
   — `queueTurn` / `updateQueuedTurn` / `removeQueuedTurn` / `moveQueuedTurn`.
