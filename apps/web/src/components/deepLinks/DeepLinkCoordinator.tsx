@@ -12,6 +12,7 @@ import { environmentShell } from "../../state/shell";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
 import { resolveDeepLinkProject } from "./deepLink.logic";
+import { usePendingTeamJoinStore } from "./pendingTeamJoin";
 
 /**
  * Mounted once in the app shell (#270 D): the link the desktop was opened
@@ -19,7 +20,9 @@ import { resolveDeepLinkProject } from "./deepLink.logic";
  * environment is connected, and again on every ping, so a link that landed
  * during startup and one that lands while the window is up take the same
  * path. `thread` navigates; `new` opens the composer on the project's
- * default env mode with the prompt prefilled and never sends it.
+ * default env mode with the prompt prefilled and never sends it; `join`
+ * (#1313) parks the team code for the Team page's Join field and never
+ * joins on its own.
  */
 export function DeepLinkCoordinator() {
   const primaryEnvironment = usePrimaryEnvironment();
@@ -41,6 +44,15 @@ export function DeepLinkCoordinator() {
       const ref = resolveThreadRouteRef(link);
       if (ref === null) return;
       await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(ref) });
+      return;
+    }
+    if (link.kind === "join") {
+      // The code goes to the Team page's Join field and leaves only when the
+      // user presses Request to join; nothing joins on its own. Until the
+      // Team page lands (#1313 slice 3, the pane), this opens Settings ›
+      // Infinitus with the code parked in the store.
+      usePendingTeamJoinStore.getState().offer(link.link);
+      await navigate({ to: "/settings/infinitus" });
       return;
     }
     const project = resolveDeepLinkProject(readProjects(), link.project);
