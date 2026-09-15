@@ -1063,6 +1063,52 @@ describe("plus key parsing", () => {
   });
 });
 
+describe("thread traversal shortcuts", () => {
+  it("adds a newly shipped default key to a config that snapshotted the old one", () => {
+    // A config written before #840 added `mod+[` already names
+    // thread.previous under `mod+shift+[`. Keying the override on the command
+    // alone dropped the new default, so `mod+[` silently never existed.
+    const bindings = mergeWithDefaultKeybindings(
+      compileResolvedKeybindingsConfig([
+        { key: "mod+shift+[", command: "thread.previous" },
+        { key: "mod+shift+]", command: "thread.next" },
+      ]),
+    );
+    for (const [key, shiftKey, command] of [
+      ["[", false, "thread.previous"],
+      ["]", false, "thread.next"],
+      ["[", true, "thread.previous"],
+      ["]", true, "thread.next"],
+    ] as const) {
+      assert.strictEqual(
+        resolveShortcutCommand(event({ key, metaKey: true, shiftKey }), bindings, {
+          platform: "MacIntel",
+        }),
+        command,
+      );
+    }
+  });
+
+  it("still lets a real remap of the command suppress the shipped defaults", () => {
+    const bindings = mergeWithDefaultKeybindings(
+      compileResolvedKeybindingsConfig([{ key: "mod+alt+p", command: "thread.previous" }]),
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "p", metaKey: true, altKey: true }), bindings, {
+        platform: "MacIntel",
+      }),
+      "thread.previous",
+    );
+    for (const shiftKey of [false, true]) {
+      assert.isNull(
+        resolveShortcutCommand(event({ key: "[", metaKey: true, shiftKey }), bindings, {
+          platform: "MacIntel",
+        }),
+      );
+    }
+  });
+});
+
 describe("composer and pull request shortcuts", () => {
   it("fills missing number shortcuts without replacing the saved URL binding", () => {
     const olderServerBindings = DEFAULT_RESOLVED_KEYBINDINGS.filter(
