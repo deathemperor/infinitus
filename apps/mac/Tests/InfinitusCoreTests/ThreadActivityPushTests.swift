@@ -83,6 +83,26 @@ final class ThreadActivityPushTests: XCTestCase {
 }
 
 /// The `push` reply says what was addressed (`targets`, `kinds`).
+/// #1265: a live card token the phone stopped re-offering is written off
+/// once its last update is older than twice the stale window.
+final class LiveTokenLapsedTests: XCTestCase {
+    private let registered = Date(timeIntervalSince1970: 1_000_000)
+
+    func testAQuietTokenLapsesAfterTwiceTheStaleWindow() {
+        let updated = registered.addingTimeInterval(60)
+        XCTAssertFalse(LiveActivityPush.liveTokenLapsed(registeredAt: registered, lastUpdateAt: updated,
+                                                        now: updated.addingTimeInterval(LiveActivityPush.staleAfter * 2)))
+        XCTAssertTrue(LiveActivityPush.liveTokenLapsed(registeredAt: registered, lastUpdateAt: updated,
+                                                       now: updated.addingTimeInterval(LiveActivityPush.staleAfter * 2 + 1)))
+    }
+
+    func testATokenReOfferedSinceTheUpdateIsKept() {
+        let updated = registered.addingTimeInterval(60)
+        XCTAssertFalse(LiveActivityPush.liveTokenLapsed(registeredAt: updated.addingTimeInterval(1), lastUpdateAt: updated,
+                                                        now: updated.addingTimeInterval(LiveActivityPush.staleAfter * 3)))
+    }
+}
+
 final class PushReachTests: XCTestCase {
     func testNothingSentReadsZero() {
         let reach = PushReach()
