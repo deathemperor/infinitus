@@ -488,6 +488,10 @@ jobs:
     name: Build Linux tray
     needs: notes
     runs-on: ${{ matrix.runner }}
+    # Both architectures finish in about 4 minutes; without this the job
+    # fell to GitHub's 6-hour default and alpha.15 sat 98 minutes on a
+    # hung `swift test` (#1333).
+    timeout-minutes: 20
     strategy:
       matrix:
         include:
@@ -516,7 +520,10 @@ jobs:
             grep -q "\"$V\"" Sources/InfinitusTray/BuiltVersion.swift
           fi
       - run: swift build -c release -Xswiftc -static-stdlib
-      - run: swift test
+      # A per-process guard (#1333): the aarch64 runner once hung at a
+      # suite's start with its output buffered, and a cancelled job keeps
+      # a truncated log where a failed step keeps the partial one.
+      - run: timeout -k 30s 15m swift test
       - name: Stage artifacts
         run: |
           mkdir -p dist

@@ -11,6 +11,7 @@ import {
   queuedTurnEditableText,
   queuedTurnMoveKey,
   queuedTurnSnippet,
+  queuedTurnTiming,
   queuedTurnsTitle,
   restoredQueuedTurn,
 } from "./queuedTurns.logic";
@@ -71,6 +72,11 @@ describe("queuedTurnsTitle", () => {
   it("counts the rows and names what they wait on", () => {
     expect(queuedTurnsTitle(1, true)).toBe("1 queued message · sends when this turn finishes");
     expect(queuedTurnsTitle(2, false)).toBe("2 queued messages · sending when idle");
+  });
+
+  it("labels a steer row (#1318)", () => {
+    expect(queuedTurnTiming(row("a", "h"))).toBeNull();
+    expect(queuedTurnTiming({ ...row("a", "h"), sendAt: "tool-boundary" })).toBe("at next step");
   });
 });
 

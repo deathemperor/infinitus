@@ -36,7 +36,7 @@ Files: the spec, this plan, `apps/mac/changelog.d/team-rebuild-plan.md` (`Mac: T
 
 **Files:**
 - Modify: `apps/mac/Package.swift` (the `targets` array head)
-- Restore: `apps/mac/Sources/CZlib/module.modulemap`, `apps/mac/Sources/CZlib/shim.h`
+- Restore: `apps/mac/Sources/CZlib/module.modulemap`, `apps/mac/Sources/CZlib/shim.h`, `apps/mac/Sources/InfinitusCore/ASCIIScan.swift` (`TeamRedaction` calls `ASCIIScan.lowered`; the helper left with #1155, not #1061 — review note on #1313) and `apps/mac/Tests/InfinitusCoreTests/SkipPOSIX.swift` (`skipOffPOSIX()`, which `TeamMembershipTests` calls; gone the same way)
 - Restore under `apps/mac/Sources/InfinitusCore/Team/`: `Base32.swift`, `CanonicalJSON.swift`, `Deflate.swift`, `DrainingPool.swift`, `Envelope.swift`, `PBKDF2.swift`, `RecoveryKey.swift`, `Signed.swift`, `TeamIdentity.swift`, `TeamIdentityExport.swift`, `TeamSecrets.swift`, `TeamPaths.swift`, `TeamCode.swift`, `TeamRequest.swift`, `TeamRoster.swift`, `TeamKinds.swift`, `TeamStore.swift`, `TeamChunker.swift`, `TeamRedaction.swift`, `TeamPublishState.swift`, `TeamShares.swift`, `TeamTranscriptChoices.swift`, `TeamExclusions.swift`, `TeamFleetDoc.swift`, `TeamDocs.swift`
 - Restore tests under `apps/mac/Tests/InfinitusCoreTests/`: `PBKDF2Tests.swift`, `RecoveryKeyTests.swift`, `TeamChunkerTests.swift`, `TeamDeflateTests.swift`, `TeamEnvelopeTests.swift`, `TeamIdentityTests.swift`, `TeamIdentityExportTests.swift`, `TeamRosterTests.swift`, `TeamSecretsTests.swift`, `TeamSettingsTests.swift`, `TeamSharesTests.swift`, `TeamTranscriptChoicesTests.swift`, `TeamRedactionTests.swift`, `TeamFleetDocTests.swift` (its `TeamSnapshot`/`TeamReader`/`TeamInsights` cases cut; they return in Task 2.2)
 
@@ -47,7 +47,7 @@ Files: the spec, this plan, `apps/mac/changelog.d/team-rebuild-plan.md` (`Mac: T
 
 ```bash
 cd apps/mac
-git checkout 4947e663df -- Sources/CZlib
+git checkout 4947e663df -- Sources/CZlib Sources/InfinitusCore/ASCIIScan.swift Tests/InfinitusCoreTests/SkipPOSIX.swift
 for f in Base32 CanonicalJSON Deflate DrainingPool Envelope PBKDF2 RecoveryKey Signed TeamIdentity TeamIdentityExport TeamSecrets TeamPaths TeamCode TeamRequest TeamRoster TeamKinds TeamStore TeamChunker TeamRedaction TeamPublishState TeamShares TeamTranscriptChoices TeamExclusions TeamFleetDoc TeamDocs; do
   git checkout 4947e663df -- "Sources/InfinitusCore/Team/$f.swift"
 done
@@ -82,7 +82,7 @@ In `TeamDocs.swift` delete the `GrantHint` struct and, in `Now`, the two lines `
 cd apps/mac && swift build --product InfinitusCore 2>&1 | tail -20
 swift test --parallel --filter 'PBKDF2Tests|RecoveryKeyTests|TeamChunkerTests|TeamDeflateTests|TeamEnvelopeTests|TeamIdentityTests|TeamIdentityExportTests|TeamRosterTests|TeamSecretsTests|TeamSettingsTests|TeamSharesTests|TeamTranscriptChoicesTests|TeamRedactionTests|TeamFleetDocTests' 2>&1 | tail -15
 ```
-Expected: build succeeds; every listed suite passes. A compile error naming a removed symbol (`TeamControl`, `MirrorSnapshot`, `ClaudeSessions`, `SessionInput`) means a file from the "not restored" list slipped in or a doc field was missed in Step 3: fix that, never add a shim.
+Expected: build succeeds; every listed suite passes. A compile error naming a removed symbol (`TeamControl`, `MirrorSnapshot`, `ClaudeSessions`, `SessionInput`; `ASCIIScan` and `skipOffPOSIX` mean Step 1 missed the two helper files) means a file from the "not restored" list slipped in or a doc field was missed in Step 3: fix that, never add a shim.
 
 - [ ] **Step 5: Commit**
 

@@ -207,7 +207,7 @@ const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
 // Fork (#270 F)
 const COMPOSER_SEND_MODE_LABELS: Record<ComposerSendMode, string> = {
   queue: "Queue until it finishes",
-  steer: "Send into the running turn",
+  steer: "Send at its next step",
 };
 
 const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {

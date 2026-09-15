@@ -248,7 +248,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
                 : isSendBusy
                   ? "Sending"
                   : isRunning && runningSendMode === "steer"
-                    ? "Send now"
+                    ? "Send at next step"
                     : isRunning
                       ? "Queue message"
                       : "Send message"

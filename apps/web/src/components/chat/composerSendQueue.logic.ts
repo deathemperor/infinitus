@@ -64,6 +64,23 @@ export function restoredQueuedTurnText(
   });
 }
 
+/** The row's moment when it is not the queue's own (#1318): a steer row
+    goes at the running turn's next finished tool call. */
+export function queuedTurnTiming(row: Pick<OrchestrationQueuedTurn, "sendAt">): string | null {
+  return row.sendAt === "tool-boundary" ? "at next step" : null;
+}
+
+/** The list's header: what the rows are waiting on. */
+export function queuedTurnsHeader(
+  rows: ReadonlyArray<Pick<OrchestrationQueuedTurn, "sendAt">>,
+  isRunning: boolean,
+): string {
+  if (!isRunning) return "Sending when the thread is idle";
+  return rows.every((row) => row.sendAt === "tool-boundary")
+    ? "Sends at this turn's next step"
+    : "Sends when this turn finishes";
+}
+
 /** One line of the row for the list; attachments alone read as "N attachments". */
 export function queuedTurnSnippet(row: OrchestrationQueuedTurn): string {
   const text = queuedTurnEditableText(row.text).trim().replace(/\s+/g, " ");

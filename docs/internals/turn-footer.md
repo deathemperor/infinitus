@@ -9,3 +9,5 @@ A killed server writes nothing, so `apps/server/src/infinitus/Layers/BackgroundA
 ## Web
 
 Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept while entries are equal, so a running turn's ticks repaint nothing), `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity context, drawn by `AssistantMessageMeta` in place of the bare time; `ChatView.tsx` — the hook and the prop. The phone reuses the module.
+
+The phone's half is in `docs/internals/phone-thread-screen.md`.

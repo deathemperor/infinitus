@@ -25,6 +25,12 @@ import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.t
  * event; a row the provider failed to start after the send consumed it is
  * put back once, at the head, under `retryQueueId` — the marker that stops
  * a second round.
+ *
+ * A row queued with `sendAt: "tool-boundary"` (#1318, the composer's steer
+ * mode) is also due while the turn runs, at the moment one of its tool
+ * calls finishes (`toolBoundary`): the first such row in queue order goes,
+ * whatever idle rows sit ahead of it, so a steer typed behind an idle row
+ * is not held until the turn ends. At idle it is an ordinary row.
  */
 
 /** The thread fields the verdict reads; a shell or a detail both fit. */
@@ -94,9 +100,12 @@ export function queueDrainVerdict(
     readonly pendingStart: boolean;
     /** Signatures (`queuedTurnSignature`) of rows the decider refused. */
     readonly failed?: ReadonlySet<string> | undefined;
+    /** A tool call of the running turn just finished (#1318). */
+    readonly toolBoundary?: boolean | undefined;
   },
 ): QueueDrainVerdict {
-  const row = orderedQueuedTurns(thread.queuedTurns)[0];
+  const rows = orderedQueuedTurns(thread.queuedTurns);
+  const row = rows[0];
   if (row === undefined) return { kind: "wait", reason: "empty" };
   if (thread.archivedAt !== null) return { kind: "wait", reason: "archived" };
   if (gates.inFlight) return { kind: "wait", reason: "in-flight" };
@@ -109,7 +118,14 @@ export function queueDrainVerdict(
   if (session !== null) {
     if (session.status === "error") return { kind: "wait", reason: "error" };
     if (session.activeTurnId !== null || !IDLE_SESSION_STATUSES.has(session.status)) {
-      return { kind: "wait", reason: "busy" };
+      const due = gates.toolBoundary
+        ? rows.find((entry) => entry.sendAt === "tool-boundary")
+        : undefined;
+      if (due === undefined) return { kind: "wait", reason: "busy" };
+      if (gates.failed?.has(queuedTurnSignature(thread.id, due)) === true) {
+        return { kind: "wait", reason: "failed" };
+      }
+      return { kind: "send", row: due };
     }
   }
   if (gates.pendingStart) return { kind: "wait", reason: "pending-start" };

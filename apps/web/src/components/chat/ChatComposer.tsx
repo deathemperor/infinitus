@@ -3861,16 +3861,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         event?.preventDefault();
         return;
       }
-      // Fork (#270 F, #806): while a turn runs, "queue" hands the message to
-      // the server, which sends it once the thread is idle. Answers to the
+      // Fork (#270 F, #806, #1318): while a turn runs, the message goes to
+      // the server's queue — "queue" sends it once the thread is idle,
+      // "steer" at the turn's next finished tool call. Answers to the
       // running turn (a question, an approval) always go now.
       const resolvedIntent: ComposerSubmissionIntent =
         phase === "running" &&
         routeKind === "server" &&
-        sendMode === "queue" &&
         !activePendingProgress &&
         !isComposerApprovalState
-          ? "queue"
+          ? sendMode
           : intent;
       // A send while a pasted image is still compressing would strand that
       // image: the turn snapshot wouldn't include it, and it would surface
