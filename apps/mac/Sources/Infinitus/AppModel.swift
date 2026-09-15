@@ -838,6 +838,7 @@ final class AppModel: ObservableObject {
 
     /// App-side cache of our own subprocess output (never an engine
     /// internal file).
+    private var snapshotCacheWrite = WriteIfChanged()
     static let snapshotCacheURL: URL = {
         return AppSupport.root().appendingPathComponent("snapshot-cache.json")
     }()
@@ -1777,7 +1778,11 @@ final class AppModel: ObservableObject {
         }
         if !isPlayground {
             let cache = fleets.compactMap(\.lastFleet)
-            if let data = try? JSONEncoder().encode(cache) {
+            // Sorted keys so two passes over the same state are the same
+            // bytes, and the write is skipped when they are (#1310).
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            if let data = try? encoder.encode(cache), snapshotCacheWrite.take(data) {
                 try? FileManager.default.createDirectory(
                     at: Self.snapshotCacheURL.deletingLastPathComponent(),
                     withIntermediateDirectories: true)
