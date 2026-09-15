@@ -1,8 +1,11 @@
 import type {
   MessageId,
   OrchestrationCheckpointSummary,
+  OrchestrationMessageContext,
   OrchestrationThread,
 } from "@t3tools/contracts";
+
+import { reidentifyComposerContext, uploadedComposerContext } from "../../lib/composerContext";
 
 /**
  * Fork (#269 item 13, #270 item 5): which checkpoint a message the user sent
@@ -54,4 +57,76 @@ export const REVERT_WHILE_RUNNING = "Interrupt the current turn before reverting
 
 export function restoreFilesConfirmText(turnCount: number): string {
   return `Restore the files to checkpoint ${turnCount}? The chat stays as it is.`;
+}
+
+/** The two composer hand-back confirms, the web's lines: the first is the alert's title. */
+export const REWIND_CHAT_CONFIRM = {
+  title: "Rewind the chat to this message? Files stay as they are.",
+  body: "Newer messages leave this thread; the workspace is untouched.\nYour prompt and attachments return to the composer.",
+  button: "Rewind",
+} as const;
+
+export const EDIT_FROM_HERE_CONFIRM = {
+  title: "Edit from here?",
+  body: "Rewind files and chat to before this message.\nYour prompt and attachments return to the composer.",
+  button: "Edit",
+} as const;
+
+export type RevertMenuAction = "files" | "restore-files" | "chat" | "fork";
+
+/** The menu's rows in the web's order: the two rollback modes need the provider's rollback, the fork a fork point. */
+export function revertMenuActions(gates: {
+  readonly canRollback: boolean;
+  readonly canFork: boolean;
+}): ReadonlyArray<RevertMenuAction> {
+  return [
+    ...(gates.canRollback ? (["files"] as const) : []),
+    "restore-files",
+    ...(gates.canRollback ? (["chat"] as const) : []),
+    ...(gates.canFork ? (["fork"] as const) : []),
+  ];
+}
+
+const EFFORT_PREFIX = "Ultrathink:\n";
+const REVIEW_COMMENT_BLOCK_PATTERN = /<review_comment\b[^>]*>[\s\S]*?<\/review_comment>/g;
+
+/**
+ * A reverted message's text as the user typed it, the web's
+ * `recallableComposerPrompt` for what the phone sends: the effort prefix the
+ * send added and the review comments appended after the text come off, so
+ * the composer does not get another turn's context back as markup. Cuts at
+ * the start of the trailing run of blocks, so a block typed earlier stays.
+ */
+export function revertedMessageEditableText(text: string): string {
+  let prompt = text.trim();
+  if (prompt.startsWith(EFFORT_PREFIX)) prompt = prompt.slice(EFFORT_PREFIX.length);
+  let cut = prompt.length;
+  for (const match of [...prompt.matchAll(REVIEW_COMMENT_BLOCK_PATTERN)].reverse()) {
+    const blockEnd = match.index + match[0].length;
+    if (prompt.slice(blockEnd, cut).trim().length > 0) break;
+    cut = match.index;
+  }
+  return prompt.slice(0, cut).trim();
+}
+
+/**
+ * The reverted message's text and context records for the composer, the
+ * queue's `restoredQueuedTurn` (#971) for a message: fresh record ids with the
+ * text's references rewritten, and a file or image record following its
+ * attachment to the id the download gave it. Null for a message without
+ * context, which stays a plain text append.
+ */
+export function restoredRevertedMessage(
+  message: Pick<OrchestrationThread["messages"][number], "text" | "attachments" | "context">,
+  attachments: ReadonlyArray<{ readonly id: string }>,
+  createId: () => string,
+): { text: string; context: OrchestrationMessageContext } | null {
+  if (!message.context) return null;
+  const fresh = reidentifyComposerContext(
+    revertedMessageEditableText(message.text),
+    message.context.records,
+    createId,
+  );
+  const context = uploadedComposerContext(fresh.context, message.attachments ?? [], attachments);
+  return context ? { text: fresh.text, context } : null;
 }
