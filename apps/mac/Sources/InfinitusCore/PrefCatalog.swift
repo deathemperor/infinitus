@@ -84,6 +84,10 @@ public enum PrefCatalog {
         // app keeps running headless (#828). First because every other
         // Display pref only matters while it is on (#1184).
         Entry("menu_bar_enabled", .bool, .bool(true), display),
+        // Display: the Dock. Only the Settings window asks for a Dock icon
+        // (it makes the app `.regular` while it is up). Off — the default —
+        // Infinitus stays out of the Dock and Cmd+Tab entirely.
+        Entry("dock_icon_enabled", .bool, .bool(false), display),
         // Display: the menu bar title.
         Entry("show_account_name", .bool, .bool(true), display),
         Entry("title_pct", .string, .string("both"), display, choices: strings(TitlePrefs.pctChoices)),

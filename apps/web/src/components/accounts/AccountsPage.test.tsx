@@ -231,6 +231,40 @@ describe("AccountsPage", () => {
     expect(markup).toContain("Open Settings › Infinitus › Engines");
   });
 
+  it("draws the fleet of a freshly installed engine that holds no account yet", () => {
+    // What swapd prints the day it is installed: the provider it manages,
+    // no accounts. The page is the fleet's own Add account, never the copy
+    // telling the user to install the engine they just installed (#1319).
+    testState.snapshot = {
+      available: true,
+      fleets: [
+        {
+          key: "swapd/claude",
+          engineID: "swapd",
+          provider: "claude",
+          capabilities: ["switch", "hold", "rename", "remove", "addCurrent"],
+          accounts: [],
+        },
+      ],
+      commands: [
+        {
+          name: "add",
+          args: ["<fleet>"],
+          options: [],
+          effect: "human",
+          summary: "",
+          replyShape: "",
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+
+    expect(markup).not.toContain("no engine reports accounts");
+    expect(markup).toContain("claude (swapd)");
+    expect(markup).toContain("Add account");
+  });
+
   it("draws every fleet with its accounts, badges, windows and forecast", () => {
     testState.snapshot = readySnapshot;
 

@@ -454,6 +454,10 @@ final class AppModel: ObservableObject {
     // icon, so it no longer needs the popup to be reachable. Off, the app
     // runs headless — the socket, the mirror and the pinned window stay.
     @Published var menuBarIconShown: Bool { didSet { defaults.set(menuBarIconShown, forKey: "menu_bar_enabled") } }
+    // Off by default: the Dock icon only ever appeared while Settings was
+    // open, and a menu bar app in the Dock is what most asked to be rid of.
+    // On, Settings takes a Dock icon and a Cmd+Tab entry as it did before.
+    @Published var dockIconShown: Bool { didSet { defaults.set(dockIconShown, forKey: "dock_icon_enabled") } }
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
@@ -776,6 +780,7 @@ final class AppModel: ObservableObject {
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
+        dockIconShown = defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
             // Isolation is the contract: no demo script, no data at all
@@ -964,6 +969,7 @@ final class AppModel: ObservableObject {
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
+        set(\.dockIconShown, defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)

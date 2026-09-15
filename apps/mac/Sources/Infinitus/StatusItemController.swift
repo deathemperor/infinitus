@@ -158,6 +158,9 @@ final class StatusItemController {
         // Off = no status item at all; on = a fresh one (#828).
         if model.menuBarIconShown, item == nil { installItem() }
         if !model.menuBarIconShown { removeItem() }
+        // A live `dock_icon_enabled` toggle takes effect on the open
+        // Settings window; with no window up this is already accessory.
+        applyActivationPolicy(settingsShowing: settings?.isVisible == true)
         // The theme's color and icon on the item (#90), the template
         // loop under Off or with the toggle off.
         let theme = model.rowTheme
@@ -700,12 +703,8 @@ final class StatusItemController {
                 name: NSWindow.willCloseNotification, object: w)
             settings = w
         }
-        // An accessory app has no Cmd+Tab entry, so an open Settings
-        // window was unreachable once buried (user bug 2026-08-30).
-        // Become a regular app while it's open — Dock icon and Cmd+Tab
-        // appear — and drop back to accessory when it closes.
         model.lock.surfaceShown()
-        NSApp.setActivationPolicy(.regular)
+        applyActivationPolicy(settingsShowing: true)
         NSApp.activate(ignoringOtherApps: true)
         settings?.makeKeyAndOrderFront(nil)
     }
@@ -729,6 +728,20 @@ final class StatusItemController {
     @objc private func settingsClosed() {
         model.lock.surfaceHidden()
         NSApp.setActivationPolicy(.accessory)
+    }
+
+    /// An accessory app has no Cmd+Tab entry, so an open Settings window
+    /// was unreachable once buried (user bug 2026-08-30): becoming a
+    /// regular app while it is up brings a Dock icon and Cmd+Tab, and
+    /// `settingsClosed` drops back. `dock_icon_enabled` off — the default
+    /// — declines that, so the app is never in the Dock; the status item,
+    /// its Settings… item, `infinitusctl show settings` and the window's
+    /// floating level while key are how it is reached instead.
+    private func applyActivationPolicy(settingsShowing: Bool) {
+        let wanted: NSApplication.ActivationPolicy =
+            model.dockIconShown && settingsShowing ? .regular : .accessory
+        guard NSApp.activationPolicy() != wanted else { return }
+        NSApp.setActivationPolicy(wanted)
     }
 
     @objc private func settingsKeyChanged() {

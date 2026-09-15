@@ -55,6 +55,11 @@ export const PREF_COPY: Readonly<
     description:
       "Off, the icon stays hidden across relaunches. Infinitus keeps running in the background; this page and infinitusctl turn it back on.",
   },
+  dock_icon_enabled: {
+    label: "Show a Dock icon while Settings is open",
+    description:
+      "Off, Infinitus stays out of the Dock and Cmd+Tab entirely. Reach an open Settings window from the menu bar icon or `infinitusctl show settings` instead.",
+  },
   title_icon_only: { label: "Show only the icon" },
   show_account_name: { label: "Show the account name" },
   title_pct: {

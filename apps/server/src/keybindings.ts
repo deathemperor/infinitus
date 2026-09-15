@@ -470,7 +470,15 @@ const make = Effect.gen(function* () {
         return;
       }
       const customConfig = runtimeConfig.keybindings;
-      const existingCommands = new Set(customConfig.map((entry) => entry.command));
+      // A persisted rule identical to a shipped default is a snapshot of that
+      // default, not a customization of the command. Treating it as one means
+      // a config written before a command gained a second default -- `mod+[`
+      // alongside `mod+shift+[` (#840) -- never backfills the new key.
+      const isDefaultRule = (entry: KeybindingRule) =>
+        DEFAULT_KEYBINDINGS.some((defaultRule) => isSameKeybindingRule(entry, defaultRule));
+      const existingCommands = new Set(
+        customConfig.filter((entry) => !isDefaultRule(entry)).map((entry) => entry.command),
+      );
       const missingDefaults: KeybindingRule[] = [];
       const shortcutConflictWarnings: Array<{
         defaultCommand: KeybindingRule["command"];
@@ -480,6 +488,9 @@ const make = Effect.gen(function* () {
       }> = [];
       for (const defaultRule of DEFAULT_KEYBINDINGS) {
         if (existingCommands.has(defaultRule.command)) {
+          continue;
+        }
+        if (customConfig.some((entry) => isSameKeybindingRule(entry, defaultRule))) {
           continue;
         }
         const conflictingEntry = customConfig.find((entry) =>
