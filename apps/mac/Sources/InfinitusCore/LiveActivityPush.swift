@@ -115,9 +115,17 @@ public enum LiveActivityPush {
             default: return nil
             }
         }
-        let reason = (try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])?["reason"] as? String
-        let why = error ?? "HTTP \(status) \(reason ?? body)"
+        let why = failureDetail(status: status, body: body, error: error)
         return "\(what) → \(device) failed: \(why)" + (tokenDropped ? " — token dropped" : "")
+    }
+
+    /// A failed push in a few words: the transport error's text, else the
+    /// HTTP status with APNs's `reason` word (the raw body when it has
+    /// none). Shared by the event line and the `apns` read's `lastPush`.
+    public static func failureDetail(status: Int, body: String, error: String?) -> String {
+        if let error { return error }
+        let reason = (try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])?["reason"] as? String
+        return "HTTP \(status) \(reason ?? body)"
     }
 
     /// APNs answers that mean the token will never work again, so the
