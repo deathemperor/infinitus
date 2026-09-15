@@ -1,7 +1,7 @@
 import { TurnId, type OrchestrationThread } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { turnFooter, turnFooterLabel, type TurnFooter } from "./turnFooter.ts";
+import { turnFooter, turnFooterLabel, turnFooters, type TurnFooter } from "./turnFooter.ts";
 
 const turn1 = TurnId.make("turn-1");
 const turn2 = TurnId.make("turn-2");
@@ -223,5 +223,73 @@ describe("turnFooter (#952)", () => {
     expect(turnFooterLabel(footer({ runningShells: 1, runningAgents: 3 }), "12:59 PM")).toBe(
       "Done in 49s · 12:59 PM · 1 shell still running · 3 agents still running",
     );
+  });
+});
+
+describe("turnFooters (one pass)", () => {
+  it("answers what turnFooter answers for every turn with an assistant message, in message order", () => {
+    const turn3 = TurnId.make("turn-3");
+    const t = thread({
+      messages: [
+        message("u1", "user", turn1, "2026-09-12T12:00:00Z"),
+        message("a1", "assistant", turn1, "2026-09-12T12:00:30Z", "2026-09-12T12:00:49Z"),
+        message("u2", "user", turn2, "2026-09-12T12:05:00Z"),
+        message("a2", "assistant", turn2, "2026-09-12T12:05:10Z", "2026-09-12T12:06:00Z"),
+        { ...message("a2b", "assistant", turn2, "2026-09-12T12:06:01Z"), streaming: true },
+        message("a3", "assistant", turn3, "2026-09-12T12:10:00Z"),
+      ],
+      activities: [
+        activity("s1", "task.started", turn1, {
+          taskId: "sh-1",
+          taskType: "bash",
+          isBackgrounded: true,
+        }),
+        activity("s2", "task.started", turn2, {
+          taskId: "ag-1",
+          agentKind: "agent",
+          isBackgrounded: true,
+        }),
+        activity("s3", "task.started", turn2, { taskId: "sh-2", taskType: "shell" }),
+        activity("e1", "task.completed", turn3, { taskId: "sh-1" }),
+        activity("b1", "task.updated", null, { taskId: "sh-2", isBackgrounded: true }),
+      ],
+      latestTurn: {
+        turnId: turn3,
+        startedAt: "2026-09-12T12:09:00Z",
+        requestedAt: "2026-09-12T12:08:59Z",
+        completedAt: "2026-09-12T12:10:00Z",
+      },
+      session: { status: "ready" },
+    });
+    const folded = turnFooters(t);
+    expect([...folded.keys()]).toEqual([turn1, turn2, turn3]);
+    for (const turnId of [turn1, turn2, turn3]) {
+      expect(folded.get(turnId)).toEqual(turnFooter(t, turnId));
+    }
+    expect(folded.get(turn2)).toMatchObject({ runningShells: 1, runningAgents: 1 });
+    expect(folded.get(turn1)).toMatchObject({ runningShells: 0 });
+  });
+
+  it("leaves out a turn that is still running and counts nothing once the session stopped", () => {
+    const t = thread({
+      messages: [
+        message("u1", "user", turn1, "2026-09-12T12:00:00Z"),
+        message("a1", "assistant", turn1, "2026-09-12T12:00:30Z"),
+        message("a2", "assistant", turn2, "2026-09-12T12:05:00Z"),
+      ],
+      activities: [
+        activity("s1", "task.started", turn1, {
+          taskId: "sh-1",
+          taskType: "bash",
+          isBackgrounded: true,
+        }),
+      ],
+      latestTurn: { turnId: turn2, startedAt: "2026-09-12T12:04:00Z", completedAt: null },
+      session: { status: "stopped" },
+    });
+    const folded = turnFooters(t);
+    expect([...folded.keys()]).toEqual([turn1]);
+    expect(folded.get(turn1)).toEqual(turnFooter(t, turn1));
+    expect(folded.get(turn1)?.runningShells).toBe(0);
   });
 });
