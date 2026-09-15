@@ -315,6 +315,20 @@ export function compileResolvedKeybindingsConfig(
 
 export const DEFAULT_RESOLVED_KEYBINDINGS = compileResolvedKeybindingsConfig(DEFAULT_KEYBINDINGS);
 
+function resolvedKeybindingSignature(binding: ResolvedKeybindingRule): string {
+  const { key, metaKey, ctrlKey, shiftKey, altKey, modKey } = binding.shortcut;
+  return JSON.stringify([
+    binding.command,
+    key,
+    metaKey,
+    ctrlKey,
+    shiftKey,
+    altKey,
+    modKey,
+    binding.whenAst ?? null,
+  ]);
+}
+
 export function mergeWithDefaultKeybindings(
   custom: ResolvedKeybindingsConfig,
 ): ResolvedKeybindingsConfig {
@@ -322,9 +336,21 @@ export function mergeWithDefaultKeybindings(
     return [...DEFAULT_RESOLVED_KEYBINDINGS];
   }
 
-  const overriddenCommands = new Set(custom.map((binding) => binding.command));
+  // A user rule identical to a shipped default is a snapshot, not a
+  // customization. Keying the override on the command alone means a config
+  // written before a command gained a second default -- `mod+[` next to
+  // `mod+shift+[` (#840) -- suppresses that new default forever.
+  const defaultSignatures = new Set(DEFAULT_RESOLVED_KEYBINDINGS.map(resolvedKeybindingSignature));
+  const customSignatures = new Set(custom.map(resolvedKeybindingSignature));
+  const overriddenCommands = new Set(
+    custom
+      .filter((binding) => !defaultSignatures.has(resolvedKeybindingSignature(binding)))
+      .map((binding) => binding.command),
+  );
   const retainedDefaults = DEFAULT_RESOLVED_KEYBINDINGS.filter(
-    (binding) => !overriddenCommands.has(binding.command),
+    (binding) =>
+      !overriddenCommands.has(binding.command) &&
+      !customSignatures.has(resolvedKeybindingSignature(binding)),
   );
   const merged = [...retainedDefaults, ...custom];
 
