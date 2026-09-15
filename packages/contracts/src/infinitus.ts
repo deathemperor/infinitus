@@ -73,11 +73,17 @@ export const InfinitusManifest = Schema.Struct({
 export type InfinitusManifest = typeof InfinitusManifest.Type;
 
 /** One engine's line in the `status` reply. `keyPresent` only exists for the
-    engines that hold a key (cliproxy, 9router). */
+    engines that hold a key (cliproxy, 9router); `binaryPath` and `daemon`
+    (stopped | running | backingOff | refused | schemaMismatch, kept a string
+    so a word a newer build adds costs nothing) only for swapd; `error` is the
+    engine's own last error, verbatim (#1235). */
 export const InfinitusEngineState = Schema.Struct({
   enabled: Schema.Boolean,
   registered: Schema.Boolean,
   keyPresent: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(Schema.String),
+  daemon: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusEngineState = typeof InfinitusEngineState.Type;
 

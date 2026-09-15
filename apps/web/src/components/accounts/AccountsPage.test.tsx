@@ -580,12 +580,18 @@ describe("AccountsPage", () => {
     };
     // The poll keeps asking while the test looks at the page, so answer by verb:
     // waiting for the code until it is submitted over the secret RPC, then done.
+    // The waiting answer takes a moment (#1241): with the poll interval mocked
+    // to 0 an instant answer re-queues a state update inside every `act`, and
+    // on node 25, where that 0 ms timer is ready by the time `act` checks its
+    // queue, `act` flushes forever and the test times out (node 24 wins the
+    // race and CI is green). A pending reply is not act's to wait for.
     let codeSubmitted = false;
     testState.command = vi.fn().mockImplementation(async (call: { input: { command: string } }) => {
       switch (call.input.command) {
         case "signin-begin":
           return { _tag: "Success", value: { result: begun } };
         case "signin-status":
+          if (!codeSubmitted) await new Promise((resolve) => setTimeout(resolve, 20));
           return {
             _tag: "Success",
             value: {
@@ -611,19 +617,26 @@ describe("AccountsPage", () => {
     await act(async () => {
       button.props.onClick();
     });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    });
+    // The page moves on the poll's answers, so wait for what it shows rather
+    // than a fixed time.
+    const byLabel = (label: string) =>
+      renderer.root.findAll((node) => node.props["aria-label"] === label)[0];
+    const statusText = () =>
+      renderer.root.findAll((node) => node.props.role === "status")[0]?.children.join("") ?? "";
+    const settle = async (ready: () => boolean) => {
+      for (let tick = 0; tick < 100 && !ready(); tick += 1) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+      }
+    };
+    await settle(() => byLabel("Sign-in code: Claude (swapd)") !== undefined);
 
     // No shell: the page is a link for this device to open.
-    const link = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Open the sign-in page: Claude (swapd)",
-    )[0]!;
+    const link = byLabel("Open the sign-in page: Claude (swapd)")!;
     expect(link.props.href).toBe("https://claude.ai/oauth");
     expect(link.props.target).toBe("_blank");
-    const field = renderer.root.findAll(
-      (node) => node.props["aria-label"] === "Sign-in code: Claude (swapd)",
-    )[0]!;
+    const field = byLabel("Sign-in code: Claude (swapd)")!;
     expect(field.props.type).toBe("password");
     expect(field.props.autoComplete).toBe("off");
 
@@ -647,9 +660,7 @@ describe("AccountsPage", () => {
     const codeInput = { value: "the-code" };
     await submit(codeInput);
     expect(codeInput.value).toBe("");
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    });
+    await settle(() => statusText() === "Signed in as two@example.com.");
     const codeCall = testState.command.mock.calls.find(
       (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
     )![0] as { environmentId: string; input: { args: unknown; secret: Redacted.Redacted<string> } };
@@ -658,8 +669,7 @@ describe("AccountsPage", () => {
     expect(Redacted.value(codeCall.input.secret)).toBe("the-code");
     // The value never lands in the rendered page.
     expect(JSON.stringify(renderer.toJSON())).not.toContain("the-code");
-    const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
-    expect(status.children.join("")).toBe("Signed in as two@example.com.");
+    expect(statusText()).toBe("Signed in as two@example.com.");
     renderer.unmount();
     restore();
   });

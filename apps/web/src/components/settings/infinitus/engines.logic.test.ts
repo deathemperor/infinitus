@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  affinityInput,
+  affinitySupported,
   connectionTestInput,
   connectionTestLine,
   engineSecretInput,
@@ -8,6 +10,9 @@ import {
   parseConnectionTest,
   parseProxyEngineState,
   PROXY_ENGINES,
+  routingInput,
+  routingNotes,
+  routingSupported,
   testConnectionSupported,
 } from "./engines.logic";
 
@@ -46,6 +51,10 @@ describe("parseProxyEngineState", () => {
       baseURL: "http://127.0.0.1:8317",
       secretPresent: true,
       error: null,
+      routingStrategy: null,
+      sessionAffinity: null,
+      caveat: null,
+      dashboardURL: null,
     });
   });
 
@@ -61,6 +70,10 @@ describe("parseProxyEngineState", () => {
       baseURL: "http://127.0.0.1:20128",
       secretPresent: false,
       error: "connection refused",
+      routingStrategy: null,
+      sessionAffinity: null,
+      caveat: null,
+      dashboardURL: null,
     });
   });
 
@@ -153,5 +166,91 @@ describe("PROXY_ENGINES", () => {
       ["cliproxy", "proxy", "proxy-key"],
       ["9router", "9router", "9router-password"],
     ]);
+  });
+});
+
+describe("parseProxyEngineState routing fields (#1235)", () => {
+  it("carries the proxy's routing strategy, affinity, caveat and 9Router's dashboard", () => {
+    expect(
+      parseProxyEngineState({
+        baseURL: "http://127.0.0.1:8317",
+        keyPresent: true,
+        enabled: true,
+        routingStrategy: "round-robin",
+        sessionAffinity: false,
+        caveat: "two credentials share one org",
+      }),
+    ).toMatchObject({
+      routingStrategy: "round-robin",
+      sessionAffinity: false,
+      caveat: "two credentials share one org",
+      dashboardURL: null,
+    });
+    expect(
+      parseProxyEngineState({
+        baseURL: "http://127.0.0.1:20128",
+        dashboardURL: "http://127.0.0.1:20128/dashboard",
+        passwordPresent: true,
+        enabled: true,
+      }),
+    ).toMatchObject({ dashboardURL: "http://127.0.0.1:20128/dashboard" });
+  });
+
+  it("reads an absent strategy and affinity as null, an older build's reply included", () => {
+    expect(
+      parseProxyEngineState({ baseURL: "http://127.0.0.1:8317", keyPresent: false }),
+    ).toMatchObject({ routingStrategy: null, sessionAffinity: null, caveat: null });
+  });
+});
+
+describe("routing and affinity verbs (#1235)", () => {
+  it("gates each row on its own verb", () => {
+    expect(routingSupported([...SUPPORTED, command("proxy-routing")])).toBe(true);
+    expect(routingSupported(SUPPORTED)).toBe(false);
+    expect(affinitySupported([...SUPPORTED, command("proxy-affinity")])).toBe(true);
+    expect(affinitySupported([...SUPPORTED, command("proxy-routing")])).toBe(false);
+  });
+
+  it("builds the two write inputs", () => {
+    expect(routingInput("weighted-round-robin")).toEqual({
+      command: "proxy-routing",
+      args: ["weighted-round-robin"],
+      options: {},
+    });
+    expect(affinityInput(true)).toEqual({ command: "proxy-affinity", args: ["on"], options: {} });
+    expect(affinityInput(false)).toEqual({ command: "proxy-affinity", args: ["off"], options: {} });
+  });
+});
+
+describe("routingNotes (#1235, the Mac's RoutingNotes)", () => {
+  it("explains each strategy", () => {
+    expect(routingNotes("round-robin", true).explainer).toBe(
+      "Each request goes to the next credential in turn.",
+    );
+    expect(routingNotes("weighted-round-robin", true).explainer).toBe(
+      "Requests rotate in proportion to each credential's priority.",
+    );
+    expect(routingNotes(null, null).explainer).toBe("Read from the proxy on the next refresh.");
+    expect(routingNotes("fill-first", null).explainer).toContain("consume-first");
+  });
+
+  it("says nothing about affinity under fill-first or before the strategy is read", () => {
+    expect(routingNotes("fill-first", false).note).toBeNull();
+    expect(routingNotes(null, false).note).toBeNull();
+  });
+
+  it("warns about a rotating proxy without affinity, naming the YAML when the route is missing", () => {
+    expect(routingNotes("round-robin", null).note).toEqual({
+      tone: "warn",
+      text: expect.stringContaining("no management route for it yet"),
+    });
+    expect(routingNotes("round-robin", false).note).toEqual({
+      tone: "warn",
+      text: "Turn on session affinity so a conversation stays on one credential: without it every request lands on a different account and the prompt cache misses.",
+    });
+    expect(routingNotes("round-robin", true).note).toEqual({
+      tone: "muted",
+      text: "Under affinity, Switch only steers new sessions; bound ones keep their credential until the TTL lapses.",
+    });
   });
 });

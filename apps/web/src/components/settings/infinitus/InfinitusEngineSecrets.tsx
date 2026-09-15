@@ -20,8 +20,12 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../../ui/select";
+import { Switch } from "../../ui/switch";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 import {
+  affinityInput,
+  affinitySupported,
   connectionTestInput,
   connectionTestLine,
   engineSecretInput,
@@ -29,6 +33,10 @@ import {
   parseConnectionTest,
   parseProxyEngineState,
   PROXY_ENGINES,
+  ROUTING_STRATEGIES,
+  routingInput,
+  routingNotes,
+  routingSupported,
   testConnectionSupported,
   type ProxyEngine,
   type ProxyEngineKey,
@@ -67,6 +75,9 @@ export function InfinitusEngineSecrets({
     snapshot !== null && snapshot.available && engineSecretsSupported(snapshot.commands);
   const probeSupported =
     snapshot !== null && snapshot.available && testConnectionSupported(snapshot.commands);
+  const routingOn = snapshot !== null && snapshot.available && routingSupported(snapshot.commands);
+  const affinityOn =
+    snapshot !== null && snapshot.available && affinitySupported(snapshot.commands);
 
   const read = useCallback(
     async (engine: ProxyEngine) => {
@@ -161,6 +172,27 @@ export function InfinitusEngineSecrets({
       setProbes((current) => ({ ...current, [engine.key]: line }));
     },
     [environmentId, runCommand, urls],
+  );
+
+  // The routing knobs (#1235) are plain writes over `infinitus.command`; the
+  // engine's settings are not in the snapshot, so the proxy is read again
+  // after each one and the select or switch follows what it answers.
+  const route = useCallback(
+    async (engine: ProxyEngine, input: ReturnType<typeof routingInput>) => {
+      if (environmentId === null) return;
+      setBusy(engine.key);
+      const result = await runCommand({ environmentId, input });
+      setBusy(null);
+      if (result._tag === "Failure") {
+        setErrors((current) => ({
+          ...current,
+          [engine.key]: infinitusCommandFailure(result.cause).message,
+        }));
+        return;
+      }
+      await read(engine);
+    },
+    [environmentId, read, runCommand],
   );
 
   if (capability !== true || snapshot === null || !snapshot.available) return null;
@@ -265,6 +297,32 @@ export function InfinitusEngineSecrets({
                 </Button>
               }
             />
+            {engine.key === "cliproxy" && routingOn ? (
+              <ProxyRoutingRows
+                engine={engine}
+                state={state}
+                locked={locked}
+                affinityOn={affinityOn}
+                onStrategy={(strategy) => void route(engine, routingInput(strategy))}
+                onAffinity={(on) => void route(engine, affinityInput(on))}
+              />
+            ) : null}
+            {engine.key === "9router" && state?.dashboardURL ? (
+              <SettingsRow
+                title="Dashboard"
+                description="Providers → Connect Claude Code adds an account there."
+                control={
+                  <a
+                    href={state.dashboardURL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm underline underline-offset-4"
+                  >
+                    Open 9Router dashboard
+                  </a>
+                }
+              />
+            ) : null}
             {probes[engine.key] === undefined ? null : (
               <p role="status" className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">
                 {probes[engine.key]}
@@ -285,6 +343,92 @@ export function InfinitusEngineSecrets({
       })}
       {relaunching ? (
         <p className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">{RELAUNCHING}</p>
+      ) : null}
+    </>
+  );
+}
+
+/** CLIProxyAPI's routing strategy and session affinity (#1235), the Mac's
+    Routing section: the select is off until the proxy answered a strategy,
+    the switch is drawn only with the verb and only when the proxy has the
+    route (`sessionAffinity` present) — without it the note names the YAML. */
+function ProxyRoutingRows({
+  engine,
+  state,
+  locked,
+  affinityOn,
+  onStrategy,
+  onAffinity,
+}: {
+  readonly engine: ProxyEngine;
+  readonly state: ProxyEngineState | undefined;
+  readonly locked: boolean;
+  readonly affinityOn: boolean;
+  readonly onStrategy: (strategy: string) => void;
+  readonly onAffinity: (on: boolean) => void;
+}) {
+  const strategy = state?.routingStrategy ?? null;
+  const affinity = state?.sessionAffinity ?? null;
+  const notes = routingNotes(strategy, affinity);
+  return (
+    <>
+      <SettingsRow
+        serverScoped
+        title="Routing strategy"
+        description={notes.explainer}
+        control={
+          <Select
+            disabled={locked || strategy === null}
+            value={strategy ?? ""}
+            onValueChange={(value) => {
+              if (value !== null && value !== strategy) onStrategy(value);
+            }}
+          >
+            <SelectTrigger
+              size="sm"
+              className="w-full sm:w-56"
+              aria-label={`${engine.label} routing strategy`}
+            >
+              <SelectValue>
+                {ROUTING_STRATEGIES.find((option) => option.value === strategy)?.label ??
+                  strategy ??
+                  "Not read yet"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {ROUTING_STRATEGIES.map((option) => (
+                <SelectItem hideIndicator key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        }
+      />
+      {affinityOn && affinity !== null ? (
+        <SettingsRow
+          serverScoped
+          title="Session affinity"
+          description="A conversation stays on the credential it started on."
+          control={
+            <Switch
+              disabled={locked}
+              checked={affinity}
+              aria-label={`${engine.label} session affinity`}
+              onCheckedChange={(checked) => onAffinity(checked === true)}
+            />
+          }
+        />
+      ) : null}
+      {notes.note === null ? null : (
+        <p
+          className={`px-3 py-2 text-[13px] sm:px-4 ${notes.note.tone === "warn" ? "text-warning-foreground" : "text-muted-foreground"}`}
+        >
+          {notes.note.text}
+        </p>
+      )}
+      {state?.caveat ? (
+        <p className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">{state.caveat}</p>
       ) : null}
     </>
   );

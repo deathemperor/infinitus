@@ -94,7 +94,13 @@ makes wrong, in its own PR.
   recreated: the desktop updater takes the first entry of `releases.atom`,
   an edited `nightly` keeps its place below the newest versioned tag, a
   recreated one would not (#924). A dispatch of the nightly workflow is a
-  dry run unless its `publish` input is set from `main`. Desktop
+  dry run unless its `publish` input is set from `main`. GitHub delivers
+  the two cron slots (17:17 UTC and the 18:17 UTC retry) hours late on this
+  repository — 2 h 09 on 2026-09-13, over 3 h on 2026-09-14, both nights
+  green — so a watcher waits until at least 4 h past the retry slot before
+  treating a night as missed, and never hand-dispatches with `publish`
+  while a slot may still deliver: two publishes in one night edit the same
+  release, waste rather than breakage. Desktop
   updates follow electron-updater's own GitHub rule (#924): the client's
   channel is its version's prerelease id (`alpha` for `0.5.0-alpha.N`,
   `latest` for a plain version, `resolveElectronUpdaterFeed`), the provider
@@ -1428,7 +1434,15 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   4eaccb341c)"; Test connection sends `test-connection <engine> [--url]`
   (native #1216, read effect) at the typed url without saving and shows
   "Reachable in N ms" or the engine's own sentence, gated on the manifest
-  listing the verb — and the Devices
+  listing the verb; the Mac's Routing section (#1235): a Routing strategy
+  select over `proxy-routing` and a Session affinity switch over
+  `proxy-affinity`, each gated on its own verb, the switch drawn only while
+  the `proxy` reply carries `sessionAffinity` (a proxy without the route
+  gets the YAML note instead), the notes worded as `RoutingNotes` in
+  `EnginesPane.swift`, the proxy re-read after every write since its
+  settings are not in the snapshot; 9Router's `dashboardURL` as a link; and
+  the status list's `binaryPath` / `daemon` / `error` from `status.engines`
+  (`InfinitusEngineState`, optional keys) — and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
