@@ -1334,7 +1334,8 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
 - `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
   section appended at the end (#1178): Settings › Infinitus › Devices, the
-  push key and the registered phones. Upstream's T3 Connect text above it is
+  push key and the registered phones, and the lock-screen thread card with
+  its phone Settings rows (#1265). Upstream's T3 Connect text above it is
   untouched.
 - **The project file is `infinitus.json`** (#823 layer 1: the upstream name
   never reaches a screen, and this one is on screen every time the scripts
