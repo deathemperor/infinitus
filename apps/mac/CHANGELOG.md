@@ -10,6 +10,21 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.14
+
+### Mac
+- A thread card the phone dismissed no longer keeps its token on the Mac; the next card starts afresh instead of updating into nothing.
+- A thread card is started once and updated in place; a slow phone can no longer stack duplicate cards.
+- The phone list shows what the last push to each device did.
+- The event log records a thread card's start and end on the phone, and a failed push says what it was sending and why.
+
+### Desktop
+- Settings › Infinitus › Devices shows each phone's last push result.
+
+### Phone
+- A thread card's own token is withdrawn from the Mac once no card is live, so the next card starts fresh instead of updating an ended one.
+- A thread card the Mac starts while the app is in the background is updated in place instead of stacking a new card.
+
 ## 0.5.0-alpha.13
 
 ### Mac
