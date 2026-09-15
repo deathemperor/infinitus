@@ -27,6 +27,7 @@ import {
 import {
   DpopFailureReason,
   AuthSessionId,
+  ProjectId,
   ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
@@ -41,6 +42,7 @@ import { ServerRunningTurn } from "./server.ts";
 import {
   ClientOrchestrationCommand,
   DispatchResult,
+  ModelSelection,
   OrchestrationReadModel,
   OrchestrationShellSnapshot,
   OrchestrationThreadDetailSnapshot,
@@ -633,6 +635,19 @@ export const InfinitusHoldRow = Schema.Struct({
 });
 export type InfinitusHoldRow = typeof InfinitusHoldRow.Type;
 
+/** #1315: the model `infinitusctl thread new` creates a thread on — resolved
+    as the composer resolves it (`resolveProjectSettings`: the project's
+    override in the server settings, the project row's own default until the
+    fold, then the environment's default), which no other HTTP route exposes:
+    the composer reads the settings over the WebSocket config. */
+export const InfinitusThreadDefaultsQuery = Schema.Struct({
+  projectId: Schema.optional(ProjectId),
+});
+export const InfinitusThreadDefaults = Schema.Struct({
+  defaultModelSelection: Schema.NullOr(ModelSelection),
+});
+export type InfinitusThreadDefaults = typeof InfinitusThreadDefaults.Type;
+
 /** Infinitus fork (#822): the two reads `infinitusctl` has no WebSocket for.
     Both need the operate scope, like their WS twins. */
 class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
@@ -649,6 +664,15 @@ class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
     HttpApiEndpoint.get("runningTurns", "/api/infinitus/running-turns", {
       headers: OptionalBearerHeaders,
       success: Schema.Array(ServerRunningTurn),
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    // #1315: the model `thread new` creates on, resolved for `?projectId=`.
+    HttpApiEndpoint.get("threadDefaults", "/api/infinitus/thread-defaults", {
+      headers: OptionalBearerHeaders,
+      query: InfinitusThreadDefaultsQuery,
+      success: InfinitusThreadDefaults,
       error: EnvironmentScopedOperationErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )

@@ -1426,17 +1426,29 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   would never repair. The drift line names the foreign port, so two live
   publishers fighting over the pref read as the same port coming back every
   minute. Residual: a stale publisher that used the same port
-  leaves a credential this server cannot tell from its own. Two HTTP routes for a CLI with no WebSocket, both
-  behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
+  leaves a credential this server cannot tell from its own. HTTP routes for a CLI with no WebSocket, the
+  first two behind the operate scope: `GET /api/infinitus/holds` (the WS holds stream's
   list — held for headroom, stopped on a limit — plus `kind: "paused"` rows
   from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
-  #743) and `POST /api/infinitus/release-thread` (`{threadId}` →
-  `{released, reason?}`, the WS `infinitus.releaseThread` word for word).
+  #743), `POST /api/infinitus/release-thread` (`{threadId}` →
+  `{released, reason?}`, the WS `infinitus.releaseThread` word for word) and,
+  behind the read scope, `GET /api/infinitus/thread-defaults?projectId=`
+  (#1315: `{defaultModelSelection}` resolved as the composer resolves it,
+  `resolveProjectSettings` — the project's override in
+  `projectSettingsOverrides` (what Settings › General writes at a project
+  scope; the row's `defaultModelSelection` is the retired path, read until
+  the fold), then the environment default; no other HTTP route carries
+  the settings, the composer reads them over the WS config). `thread new`
+  creates on `--model <instanceId>/<model>` or a bare `<model>` on the
+  instance of the default that applies, else the route's answer, else the
+  project row (all a desktop without the route leaves it),
+  `DesktopRows.modelSelection`.
   Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the
   port layer (which is why that block sits below `AuthLayerLive` in
   `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. Queue-behind-a-
-  turn is #806, not this; `thread show`, `send`, `new`, `interrupt` and
-  `--wait` use routes that already existed.
+  turn is #806, not this; `thread show`, `send`, `interrupt` and
+  `--wait` use routes that already existed, and `new` too but for the
+  thread-defaults read above.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control
   client (one connection per request, one JSON line each way), the
   `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command`,
