@@ -295,7 +295,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "{slot} | with --forget {slot, forgotten}"),
         ControlCommand(name: "apns", effect: .read,
                        summary: "The phone-alert push setup (#1178): the APNs key id and team id (prefs apns_key_id / apns_team_id), whether the .p8 is in the keychain, and every registered phone by device and kind — never a token.",
-                       replyShape: "{keyPresent, teamId, keyId, registrations: [{deviceId, deviceName, kind, environment, registeredAt}]}"),
+                       replyShape: "{keyPresent, teamId, keyId, registrations: [{deviceId, deviceName, kind, environment, registeredAt, lastPush?: {at, kind, outcome: landed|failed, detail?}}]}"),
         ControlCommand(name: "apns-key", effect: .write, stdin: "secret",
                        summary: "Keep the APNs .p8 (PEM on stdin, never argv) in the keychain under apns_key_id, once it proves to sign; empty stdin forgets it. A dev instance's write evicts the installed app's key (#845).",
                        replyShape: "{stored}"),
