@@ -269,6 +269,8 @@ echo "aws: orphan login wrapper swept at launch"
 "$CTL" lock relock never >/dev/null 2>&1 && fail "lock relock must refuse an unknown choice"
 "$CTL" unlock 2>&1 | grep -q "the lock is off" || fail "unlock must say the lock is off"
 "$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
+# #1177: the swapd pane's read-only lines ride `status` (binary path, daemon word).
+"$CTL" status | expect "d['engines']['swapd']['binaryPath'].endswith('demo-swapd') and d['engines']['swapd']['daemon'] in ('stopped','running','backingOff','refused','schemaMismatch')" || fail "status swapd binary/daemon"
 sleep 4   # first demo snapshot
 N="$("$CTL" fleets | json "sum(len(f['accounts']) for f in d)")"
 [ "$N" -ge 5 ] || fail "expected the demo fleet (>=5 accounts), got $N"
@@ -380,6 +382,8 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs get popup_layout engine_swapd_enabled | expect "[p['key'] for p in d['prefs']]==['popup_layout','engine_swapd_enabled'] and d['prefs'][1]['effect']=='restart'" || fail "prefs get"
 # A key with no window behind it: a layout swap here would re-lay the
 # pop-out twice and leave ~45 MB resident before the RSS gate (2026-09-10).
+# The demo fleet this run turned on is a catalog pref now (#1177), restart-effect like the engine toggles.
+"$CTL" prefs get mock_mode | expect "d['prefs'][0]['value'] is True and d['prefs'][0]['effect']=='restart' and d['prefs'][0]['section']=='engines'" || fail "prefs get mock_mode"
 "$CTL" prefs set revive_lead_minutes 15 | expect "d['key']=='revive_lead_minutes' and d['value']==15" || fail "prefs set"
 "$CTL" prefs get revive_lead_minutes | expect "d['prefs'][0]['value']==15" || fail "prefs set did not stick"
 "$CTL" prefs set refresh_interval 45 >/dev/null 2>&1 && fail "prefs set accepted a value off the choices"
@@ -605,6 +609,11 @@ printf 'ping\n' | "$CTL" thread send t-idle - --wait | expect "d['text']=='echo:
 "$CTL" thread interrupt t-running | expect "d['ok'] is True and d['turnId']=='u-1'" || fail "thread interrupt"
 "$CTL" threads --status running | expect "d==[]" || fail "the interrupted thread is no longer running"
 desk_get /api/demo/dispatches | expect "[c['type'] for c in d]==['thread.turn.start','thread.turn.start','thread.turn.start','thread.turn.interrupt'] and d[0]['runtimeMode']=='full-access' and d[0]['message']['role']=='user' and d[0]['message']['attachments']==[] and d[1]['runtimeMode']=='approval-required' and d[2]['bootstrap']['createThread']['projectId']=='p-demo' and d[2]['bootstrap']['createThread']['modelSelection']=={'provider':'claude','model':'opus'} and d[2]['bootstrap']['prepareWorktree']['branch']=='fix/build' and d[2]['bootstrap']['prepareWorktree']['projectCwd']=='/tmp/demo-project' and d[2]['bootstrap']['prepareWorktree']['baseBranch']=='main' and d[2]['titleSeed']=='Fix the build' and d[3]['turnId']=='u-1'" || fail "the dispatched commands must carry the desktop's shapes"
+"$CTL" thread new --project "Bare project" "No default here" --wait | expect "d['text']=='echo: No default here'" || fail "thread new must fall back to the environment's default model (#1315)"
+"$CTL" thread new --project "Bare project" "Pick one" --model codex/gpt-5 --wait | expect "d['text']=='echo: Pick one'" || fail "thread new --model instance/model"
+"$CTL" thread new --project "Demo project" "Bare model" --model haiku --wait | expect "d['text']=='echo: Bare model'" || fail "thread new --model model"
+"$CTL" thread new --project "Bare project" "x" --model /haiku 2>&1 | grep -q "wants <instanceId>/<model>" || fail "thread new must refuse a malformed --model"
+desk_get /api/demo/dispatches | expect "[c['bootstrap']['createThread']['modelSelection'] for c in d[4:7]]==[{'instanceId':'claude','model':'sonnet'},{'instanceId':'codex','model':'gpt-5'},{'instanceId':'claude','model':'haiku'}]" || fail "the new threads must carry the environment default, the explicit instance/model and the project's instance with the bare model"
 printf 'wrong' | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" >/dev/null || fail "desktop-credential replace"
 rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && grep -q "no longer accepts this credential" "$LOG.desk" || fail "a revoked credential must exit 2 with the relaunch hint (got $rc: $(head -c 200 "$LOG.desk"))"

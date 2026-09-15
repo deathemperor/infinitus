@@ -58,7 +58,8 @@ secrets; never edit files under `~/.cli-proxy-api/*.json`.
    through the proxy from now on; if swapd is their active engine, the
    two fight over the same accounts — ask first.
 
-7. **Connect Infinitus** with its CLI (`Infinitus.app/Contents/MacOS/infinitusctl`;
+7. **Connect Infinitus** with its CLI (`infinitusctl`, inside the desktop app's
+   nested `Infinitus Menu Bar.app` — the path is in `docs/guides/infinitusctl-agent.md`;
    run `infinitusctl manifest` first, see `docs/guides/infinitusctl-agent.md`):
    ```sh
    sed -n 1p <secrets file> | infinitusctl proxy-key     # app restarts

@@ -1,8 +1,7 @@
 # Infinitus — project rules
 
-Native macOS menu bar app (`apps/mac` of the Infinitus repo since #823;
-before that the `native` branch). Split out of
-`~/death/claude-swap/swift/CswapBar` on 2026-08-29 with history.
+Native macOS menu bar app, `apps/mac` of the Infinitus repo (#823). The
+`native` branch is its frozen pre-#823 history, read-only.
 
 ## Non-negotiables
 - **Infinitus is not tied to any one engine — forever** (user 2026-09-05,
@@ -11,7 +10,7 @@ before that the `native` branch). Split out of
   #756). swapd is one `AccountEngine` adapter among several; no feature,
   design, data format, CLI or publisher may depend on swapd existing.
   Anything cross-platform ships from THIS repo (InfinitusCore +
-  InfinitusCLI on Swift for macOS/Linux/Windows), never as an engine
+  InfinitusCLI on Swift for macOS/Linux; Windows unbuilt since #1268), never as an engine
   subcommand.
 - **Everything is Swift; the engine is fully isolated.** Every engine
   touchpoint is a `swapd … --json` subprocess (InfinitusCore/Engines/Swapd/SwapdCLI.swift).
@@ -20,17 +19,12 @@ before that the `native` branch). Split out of
   `~/.claude/sessions/*.json` (+ `.key`), `~/.claude/projects/*/*.jsonl`.
 - **Bundle id is `run.infinitus`**, the phone's `run.infinitus.mobile`
   (+`.widgets`, `.share`), every derived service id under the same
-  prefix (user-approved explicit ask, 2026-09-05, with the paid Apple
-  team `Q783W6B4FA`; before it `com.huuloc.infinitus` from 2026-09-03,
-  `com.huuloc.limitless` from 2026-08-30, before that the CswapBar g2
-  id). Prefs copy-migrate from the previous id's domain on first launch
-  (AppModel.migrateLegacyDefaults). App Support is `Infinitus/`
-  (copy-migrated from `Limitless/`, which came from `CswapBar/`; legacy
-  dirs left for rollback). The local checkout may still live at
-  `~/death/limitless`. Notification Center and login-item grants key on
-  the id and must be re-granted once under it; keychain items are
-  ACL'd to the old signature, so the proxy key is re-entered. Never change the id casually again — the 2026-08-29
-  casual change cost a day of ControlCenter-ban debugging.
+  prefix (user ruling 2026-09-05, paid Apple team `Q783W6B4FA`). App
+  Support is `Infinitus/`; the local checkout may still live at
+  `~/death/limitless`. Never change the id: Notification Center and
+  login-item grants key on it and must be re-granted, keychain items are
+  ACL'd to the old signature (proxy key re-entered, phone re-paired), and
+  a casual change once cost a day of ControlCenter-ban debugging.
 - **Improvements ship by default** (user 2026-09-09: "all of these are
   just experimental. any better improvements are by default valid"):
   a measured, tested improvement merges without a per-PR go — no
@@ -38,32 +32,31 @@ before that the `native` branch). Split out of
   option. Still ask before destructive or irreversible actions (a
   history rewrite, a force-push, deleting user data).
 - **Push nothing to any remote** unless explicitly asked. Commit locally.
-- **Layout since #823 (layer 2):** the Mac app lives in `apps/mac` of
-  this repo's `main`, beside the T3 Code fork (TypeScript, never an
-  upstream PR). Before that (#555, 2026-09-10 → 2026-09-12) it was the
-  `native` branch; that branch is frozen and read-only for a fallback
-  window, then deleted. Base Mac work on `origin/main`; a Mac PR is an
-  ordinary main PR. Since #823 layer 3 the Mac app ships inside the one
+- **Layout (#823):** the Mac app lives in `apps/mac` of this repo's
+  `main`, beside the T3 Code fork (TypeScript, never an upstream PR).
+  Base Mac work on `origin/main`; a Mac PR is an ordinary main PR. The
+  Mac app ships inside the one
   `v<version>` release (`.github/workflows/infinitus-release.yml`, the
   root `VERSION` file, `apps/mac/docs/RELEASING.md`): both Mac zips, the
   desktop DMG nesting the Menu Bar bundle, the Linux tray. `releases/latest`
   and the `nightly` tag are what AboutPane polls; older Mac releases were
   tagged `mac-v<version>` (AboutPane still strips that prefix).
 - **`main` takes commits only through pull requests** (GitHub ruleset
-  "main via pull requests"; the native one retires with the branch):
+  "main via pull requests"):
   0 required approvals (solo repo); the Mac checks required on a PR head
-  are mac-test, mac-e2e, mac-linux (never mac-windows, 2026-09-06, #206) —
+  are mac-test, mac-e2e, mac-linux (the best-effort Windows build left with #1268) —
   path-filtered, so a server-only PR passes them at once. Work on a
   branch, `gh pr create` (base main), merge with `gh pr merge --squash`
   (or `--merge` when the branch history matters) once tests pass;
   `--auto` queues the merge behind the checks. PRs get `size:*` and
   `vouch:*` labels automatically.
-- **Every commit carries `Co-Authored-By: Claude Code
-  <noreply@anthropic.com>`** (user 2026-09-04: "some commits still
-  missing Claude in author"). `tools/githooks/prepare-commit-msg`
-  appends it; each clone/worktree owner runs `git config core.hooksPath
-  tools/githooks` once (shared across worktrees of one clone). Subagent
-  briefs still say it explicitly.
+- **Every commit carries a `Co-Authored-By: Claude … <noreply@anthropic.com>`
+  trailer** naming the model that did the work (user 2026-09-04: "some
+  commits still missing Claude in author"); the harness supplies the
+  name. `tools/githooks/prepare-commit-msg` appends one when a commit
+  has none and accepts any Claude trailer; each clone/worktree owner
+  runs `git config core.hooksPath tools/githooks` once. Subagent briefs
+  say it explicitly.
 - Secrets (tokens, sign-in codes) travel over stdin, never argv; shown
   masked only. Usage-cost figures are estimates, never billing truth.
 - **Release notes: one feature, one line** (user 2026-09-04). A CHANGELOG
@@ -100,7 +93,9 @@ before that the `native` branch). Split out of
   `fitPinned` applies it.
 - Never `cp` over the RUNNING unbundled binary — overwriting a signed
   executable in place gets the process killed on its next page-in
-  (the dev instance "mysteriously died" 2026-08-30). pkill first.
+  (the dev instance "mysteriously died" 2026-08-30). Stop the instance
+  first, by the PID you captured when you spawned it — never by name or
+  pattern (AGENTS.md's first rule: several dev servers share this Mac).
 - macOS 26 ControlCenter can stop adopting new bundled apps' status items
   after rapid relaunch churn — only a logout clears it; `run-unbundled.sh`
   is the workaround. Don't run the dev loop's kill/reopen cycle for hours.
@@ -142,9 +137,10 @@ before that the `native` branch). Split out of
   APNs key (#845): the `.p8` item's decrypt ACL names `Infinitus.app`
   only, `Keychain.read` skips UI, so the dev-signed binary reads nil and
   the pusher stays unconfigured — silently (no last-result line, no
-  event). Verify push changes on the tagged build; never paste the key
-  into the instance's Devices pane (`Keychain.write` deletes the shipped
-  app's item first).
+  event). Verify push changes on the tagged build; never send the key
+  to a dev instance's `apns-key` verb — through the desktop's Devices
+  page or `infinitusctl` (`Keychain.write` deletes the shipped app's
+  item first).
 - Every SwiftUI-driven frame (TimelineView tick, repeatForever
   `.animation`) commits a CA transaction: display-list diff, AppKit
   drag-region + tracking-area rebuild, a WindowServer fence — ~7 ms

@@ -15,13 +15,22 @@ import {
   type AddAccountFlow,
 } from "./addAccount.logic";
 import { ExhaustedBand } from "./ExhaustedBand";
-import { signInBusy, signInEnded, signInStatusText, type SignInFlow } from "./signIn.logic";
+import {
+  fleetSignInGate,
+  signInBusy,
+  signInEnded,
+  signInStatusText,
+  type SignInFlow,
+} from "./signIn.logic";
 
 /** The in-app sign-in (#677) as the page hands it to a fleet: whether the
     build offers it, whether this client can show it, the flow on this fleet. */
 export interface FleetSignIn {
   readonly offers: boolean;
   readonly inApp: boolean;
+  /** This shell can run the fleet's own `add-oauth` itself (#1213). Decided
+      per fleet: it needs the engine whose sign-in is a loopback flow. */
+  readonly shellOAuth: boolean;
   readonly flow: SignInFlow | null;
   readonly onStart: (target: AccountRowModel | null) => void;
   readonly onCancel: () => void;
@@ -57,17 +66,26 @@ export function FleetSection({
   /** Starts the fleet's sign-in: a new account, or the row to sign in again as. */
   readonly onAdd: (target: AccountRowModel | null) => void;
 }) {
-  // The in-app sign-in when the build has it (#677; every client since #747:
-  // the shell's window, or a link and the code over the secret RPC); an
-  // older build keeps the sign-in on the Mac (#672).
-  const inApp = signIn.offers && signIn.inApp && section.canAdd;
-  const canAdd = !signIn.offers && offersAdd && section.canAdd;
-  const busy = inApp
-    ? signInBusy(signIn.flow) || signInRunning
-    : addAccountBusy(addFlow, signInRunning);
+  // The sign-in this shell runs through the engine itself outranks them all
+  // (#1213: no code to paste, no app build to wait for, no capability to
+  // advertise). Then the in-app sign-in when the build has it (#677; every
+  // client since #747: the shell's window, or a link and the code over the
+  // secret RPC); an older build keeps the sign-in on the Mac (#672). The first
+  // two share this fleet's flow and render the same way, so they share the
+  // branch. `signInRunning` is the app's word about a flow of its own, so it
+  // does not bind the shell's either.
+  const { inApp, canAdd } = fleetSignInGate({
+    shellOAuth: signIn.shellOAuth,
+    offers: signIn.offers,
+    inApp: signIn.inApp,
+    offersAdd,
+    canAdd: section.canAdd,
+  });
+  const appBusy = !signIn.shellOAuth && signInRunning;
+  const busy = inApp ? signInBusy(signIn.flow) || appBusy : addAccountBusy(addFlow, signInRunning);
   const status = inApp
     ? signIn.flow === null
-      ? signInRunning
+      ? appBusy
         ? "A sign-in is already running in Infinitus."
         : null
       : signInStatusText(signIn.flow)

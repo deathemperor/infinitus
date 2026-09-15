@@ -2,10 +2,12 @@
 
 `infinitusctl` lets a coding agent read and drive the running Infinitus
 app from a shell: which accounts exist, their usage, switch/hold/rename,
-engine on/off, proxy setup, and starting a sign-in. It is bundled at
-`Infinitus.app/Contents/MacOS/infinitusctl` (and `ictl`, the same binary
-under a short name); symlink it onto `$PATH` or
-call it by that path.
+engine on/off, proxy setup, and starting a sign-in. It is bundled inside
+the desktop app's nested menu bar app, at
+`/Applications/Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/infinitusctl`
+(and `ictl`, the same binary under a short name; #1238 retired the
+standalone bundle it used to ship in); symlink it onto `$PATH` or call it
+by that path.
 
 Talks to the app over `~/Library/Application Support/Infinitus/control/control.sock`
 (a 0700 directory owned by you — that is the auth). The app must be running.
@@ -60,9 +62,10 @@ infinitusctl events [--limit 100]            the app's event log (switches, deat
 infinitusctl stats [--period week]          engineering metrics: commits, lines, PRs, messages by source, sessions, waiting, switches, cost
 infinitusctl perf                            cpuSeconds/rssBytes/heapBytes/threads — sample twice for an idle % and heap growth
 infinitusctl engine  swapd|cliproxy|9router on|off   restarts the app
-infinitusctl proxy                           base URL, key stored?, routing strategy
+infinitusctl proxy                           base URL, key stored?, routing strategy, session affinity
 infinitusctl proxy-key [--url U] < keyfile   key from stdin, never argv; restarts the app
 infinitusctl proxy-routing fill-first|round-robin|weighted-round-robin
+infinitusctl proxy-affinity on|off           a conversation stays on one credential
 ```
 
 `<fleet>` is a key from `fleets`, e.g. `swapd/claude` or `cliproxy/claude`.

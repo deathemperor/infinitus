@@ -241,11 +241,16 @@ public enum OAuthUsage {
                                    countdown: countdown, clock: clock)
         }
 
+        // Anthropic's raw usage body carries no pace of its own (swapd
+        // computes and ships it; this endpoint does not), so the
+        // ahead/behind signal is derived here — weekly windows only,
+        // `fiveHour` above stays calm.
         var sevenDay: UsageWindow?
         if let w = wire.sevenDay {
             let (countdown, clock) = resetFields(w.resetsAt)
-            sevenDay = UsageWindow(pct: w.utilization, resetsAt: w.resetsAt,
-                                   countdown: countdown, clock: clock)
+            sevenDay = Pace.applied(to: UsageWindow(pct: w.utilization, resetsAt: w.resetsAt,
+                                                    countdown: countdown, clock: clock),
+                                    fetchedAt: now)
         }
 
         var spend: Spend?
@@ -262,8 +267,10 @@ public enum OAuthUsage {
             guard let name = lim.scope?.model?.displayName, !name.isEmpty,
                   let pct = lim.percent else { continue }
             let (countdown, clock) = resetFields(lim.resetsAt)
-            scoped.append(UsageWindow(pct: pct, resetsAt: lim.resetsAt,
-                                      countdown: countdown, clock: clock, name: name))
+            scoped.append(Pace.applied(to: UsageWindow(pct: pct, resetsAt: lim.resetsAt,
+                                                       countdown: countdown, clock: clock,
+                                                       name: name),
+                                       fetchedAt: now))
         }
 
         if fiveHour == nil, sevenDay == nil, spend == nil, scoped.isEmpty { return nil }

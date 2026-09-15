@@ -9,6 +9,10 @@ import {
   setConnectionCatalog,
 } from "./methods/connectionCatalog.ts";
 import {
+  getLocalEnvironmentEnabled,
+  setLocalEnvironmentEnabled,
+} from "./methods/localEnvironment.ts";
+import {
   getAdvertisedEndpoints,
   getServerExposureState,
   setServerExposureMode,
@@ -67,8 +71,11 @@ import * as PreviewIpc from "./methods/preview.ts";
 import * as AppActivationIpc from "./methods/appActivation.ts";
 import { getWslState, setWslBackendEnabled, setWslDistro, setWslOnly } from "./methods/wsl.ts";
 import {
+  beginInfinitusOAuthSignIn,
+  cancelInfinitusOAuthSignIn,
   closeInfinitusSignIn,
   consumeInfinitusDeepLink,
+  consumePendingCaptureGestures,
   getInfinitusDesktopPrefs,
   openInfinitusSignIn,
   setInfinitusCaptureGestureEnabled,
@@ -90,6 +97,8 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handleSync(getSystemLocale);
   yield* ipc.handleSync(getWindowFullscreenState);
   yield* ipc.handleSync(getLocalEnvironmentBootstraps);
+  yield* ipc.handleSync(getLocalEnvironmentEnabled);
+  yield* ipc.handle(setLocalEnvironmentEnabled);
   yield* ipc.handle(getLocalEnvironmentBearerToken);
 
   yield* ipc.handle(getClientSettings);
@@ -133,9 +142,12 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(getInfinitusDesktopPrefs);
   yield* ipc.handle(setInfinitusQuitWithApp);
   yield* ipc.handle(setInfinitusCaptureGestureEnabled);
+  yield* ipc.handle(consumePendingCaptureGestures);
   yield* ipc.handle(openInfinitusSignIn);
   yield* ipc.handle(closeInfinitusSignIn);
   yield* ipc.handle(submitInfinitusSignInCode);
+  yield* ipc.handle(beginInfinitusOAuthSignIn);
+  yield* ipc.handle(cancelInfinitusOAuthSignIn);
   yield* ipc.handle(consumeInfinitusDeepLink);
   yield* ipc.handle(setBadgeCount);
   yield* ipc.handle(setKeepAwake);

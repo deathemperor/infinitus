@@ -42,6 +42,10 @@ final class PrefCatalogTests: XCTestCase {
         XCTAssertEqual(layout.effect, .live)
         XCTAssertEqual(layout.choices, [.string("wide"), .string("stacked"), .string("hstack")])
         XCTAssertEqual(reply.prefs.first { $0.key == "engine_swapd_enabled" }?.effect, .restart)
+        // #1177: the demo fleet is a restart-effect pref of the engines section.
+        let mock = reply.prefs.first { $0.key == "mock_mode" }
+        XCTAssertEqual(mock?.effect, .restart)
+        XCTAssertEqual(mock?.section, "engines")
     }
 
     /// The fork server's tunnel (#572) is a Devices pref pair: off, on T3's port.
@@ -200,12 +204,12 @@ final class PrefCatalogTests: XCTestCase {
     }
 
     func testTheReplyEncodesDefaultAndValueAsPlainJSON() throws {
-        defaults.set("nightly", forKey: "update_channel")
-        let data = try JSONEncoder().encode(try PrefCatalog.reply(from: defaults, keys: ["update_channel"]))
+        defaults.set("hold", forKey: "priority_mode")
+        let data = try JSONEncoder().encode(try PrefCatalog.reply(from: defaults, keys: ["priority_mode"]))
         let text = String(decoding: data, as: UTF8.self)
-        XCTAssertTrue(text.contains(#""default":"stable""#), text)
-        XCTAssertTrue(text.contains(#""value":"nightly""#), text)
-        XCTAssertTrue(text.contains(#""choices":["stable","nightly"]"#), text)
-        XCTAssertEqual(try JSONDecoder().decode(PrefCatalog.Reply.self, from: data).prefs.first?.value, .string("nightly"))
+        XCTAssertTrue(text.contains(#""default":"off""#), text)
+        XCTAssertTrue(text.contains(#""value":"hold""#), text)
+        XCTAssertTrue(text.contains(#""choices":["off","hold","interrupt"]"#), text)
+        XCTAssertEqual(try JSONDecoder().decode(PrefCatalog.Reply.self, from: data).prefs.first?.value, .string("hold"))
     }
 }

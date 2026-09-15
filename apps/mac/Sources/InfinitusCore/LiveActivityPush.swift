@@ -88,6 +88,46 @@ public enum LiveActivityPush {
     public static let dismissAfter: TimeInterval = 5 * 60
     public static let contentlessDismissAfter: TimeInterval = 15
 
+    /// Whether a live card's token is taken as ended on the phone (#1265):
+    /// APNs answers 200 to an update of an ended activity, so a card the
+    /// phone dismissed or aged out leaves a token the Mac would update
+    /// into nothing forever, never reaching for the push-to-start token.
+    /// The phone re-offers a running card's token on every foreground; a
+    /// token not re-offered since the last update, with that update
+    /// older than twice `staleAfter`, is written off.
+    public static func liveTokenLapsed(registeredAt: Date, lastUpdateAt: Date, now: Date = Date()) -> Bool {
+        registeredAt <= lastUpdateAt && now.timeIntervalSince(lastUpdateAt) > staleAfter * 2
+    }
+
+    /// The event line for a push's outcome, or nil when none is worth a
+    /// row (#941 follow-up): the log used to carry only "Alert push
+    /// failed: …" for every kind, and no success at all, so a thread
+    /// card's start could not be read from the Mac. A started or ended
+    /// card gets a line (one per card; its updates only refresh the
+    /// pane's last result), and a failure names what was being sent,
+    /// APNs's reason word, and whether the token was written off.
+    public static func outcomeLine(what: String, device: String, status: Int, body: String,
+                                   error: String?, tokenDropped: Bool) -> String? {
+        if status == 200 {
+            switch what {
+            case "start thread card": return "thread card started on \(device) (push-to-start)"
+            case "end thread card": return "thread card ended on \(device)"
+            default: return nil
+            }
+        }
+        let why = failureDetail(status: status, body: body, error: error)
+        return "\(what) → \(device) failed: \(why)" + (tokenDropped ? " — token dropped" : "")
+    }
+
+    /// A failed push in a few words: the transport error's text, else the
+    /// HTTP status with APNs's `reason` word (the raw body when it has
+    /// none). Shared by the event line and the `apns` read's `lastPush`.
+    public static func failureDetail(status: Int, body: String, error: String?) -> String {
+        if let error { return error }
+        let reason = (try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any])?["reason"] as? String
+        return "HTTP \(status) \(reason ?? body)"
+    }
+
     /// APNs answers that mean the token will never work again, so the
     /// registration is dropped instead of retried every push: 410
     /// Unregistered, 400 BadDeviceToken (after its one resend on the

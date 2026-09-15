@@ -65,7 +65,7 @@ You can use it alongside Infinitus; both speak the same Management API.
 From a shell (or let an agent do it, `docs/guides/infinitusctl-agent.md`):
 
 ```sh
-CTL=/Applications/Infinitus.app/Contents/MacOS/infinitusctl
+CTL="/Applications/Infinitus.app/Contents/Library/LoginItems/Infinitus Menu Bar.app/Contents/MacOS/infinitusctl"
 printf '%s' '<management key>' | $CTL proxy-key   # app restarts
 $CTL engine cliproxy on                           # app restarts
 ```
@@ -85,12 +85,9 @@ Turn swapd off unless the two engines hold different accounts.
 
 ## 4. Add accounts
 
-Settings → **Accounts** tab → the "Claude — CLIProxyAPI" section →
-**Add account…**. The same chooser as swapd appears: a private system
-sign-in sheet, or a per-account private window (its cookie jar is keyed
-by email and shared with swapd's sign-ins, so a second engine holding
-the same account doesn't ask you to log in twice). Your default browser
-is never used.
+In the Infinitus desktop app, open the Accounts page → the "Claude —
+CLIProxyAPI" section → **Add account**, and sign in in the window that
+opens.
 
 Sign in, approve, and the credential appears in the section within a
 few seconds (Infinitus polls the proxy's auth state; the proxy runs the

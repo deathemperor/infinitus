@@ -11,7 +11,13 @@ import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentQuery } from "../../state/query";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { type InfinitusMac, infinitusMacs } from "../accounts/accountsRoute.logic";
-import { alarmIsScheduled, type FleetAlarm, isInfinitusAlarmId, planAlarms } from "./alarms.logic";
+import {
+  alarmIsScheduled,
+  alarmPlanKey,
+  isInfinitusAlarmId,
+  planAlarms,
+  type FleetAlarm,
+} from "./alarms.logic";
 
 export const INFINITUS_ALARM_DEEP_LINK = "t3code://settings/accounts";
 
@@ -57,11 +63,19 @@ function MacAlarms(props: { readonly mac: InfinitusMac }) {
     infinitusEnvironment.snapshot({ environmentId: props.mac.environmentId, input: {} }),
   );
   const previous = useRef<InfinitusSnapshot | null>(null);
+  /** The plan last handed to the notification center; an identical one is
+      not handed over again (#1278 finding 8 — the center was asked twice per
+      push to learn nothing had moved). Reset with the bridge, so turning the
+      switch back on, which asks for the permission, schedules afresh. */
+  const scheduledPlan = useRef<string | null>(null);
   const snapshot = view.data;
   useEffect(() => {
     if (snapshot === null) return;
     const alarms = planAlarms(snapshot, previous.current, Date.now());
     previous.current = snapshot;
+    const key = alarmPlanKey(alarms);
+    if (key === scheduledPlan.current) return;
+    scheduledPlan.current = key;
     void scheduleInfinitusAlarms(props.mac.environmentId, alarms);
   }, [props.mac.environmentId, snapshot]);
   return null;

@@ -42,14 +42,6 @@ public struct FooterChips<M: FleetModel, Service: ViewModifier>: View {
                 .font(PopupFont.body)
                 .help("A newer build is on disk")
             }
-            if let v = model.appUpdateVersion {
-                Button { model.openSettings() } label: {
-                    Label("Update \(v)", systemImage: "arrow.down.circle.fill")
-                        .foregroundStyle(.orange)
-                }
-                .font(PopupFont.body)
-                .help("Infinitus \(v) is out — About → Updates")
-            }
         }
     }
 

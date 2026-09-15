@@ -1,7 +1,12 @@
 import { ThreadId, type OrchestrationThreadShell } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { bestOfCardShown, bestOfMemberStatus, bestOfSiblings } from "./bestOf.logic";
+import {
+  bestOfCardShown,
+  bestOfGroupKey,
+  bestOfMemberStatus,
+  bestOfSiblings,
+} from "./bestOf.logic";
 
 const shell = (
   id: string,
@@ -59,5 +64,31 @@ describe("best of N on the phone (#269 B)", () => {
     expect(bestOfMemberStatus({ ...base, latestTurn: turn("completed") })).toBe("done");
     expect(bestOfMemberStatus({ ...base, latestTurn: turn("error") })).toBe("failed");
     expect(bestOfMemberStatus({ ...base, latestTurn: turn("interrupted") })).toBe("stopped");
+  });
+});
+
+describe("bestOfGroupKey (phone audit 2026-09-15)", () => {
+  const shell = (id: string, extra: Record<string, unknown> = {}) =>
+    ({
+      id: ThreadId.make(id),
+      environmentId: "env-1",
+      groupId: "g1",
+      archivedAt: null,
+      createdAt: "2026-09-15T04:00:00Z",
+      ...extra,
+    }) as unknown as OrchestrationThreadShell & { readonly environmentId: string };
+
+  it("is unchanged by a tick on a shell outside the group, and changes when a member is kept away", () => {
+    const before = [shell("a"), shell("b"), shell("x", { groupId: null, status: "running" })];
+    const after = [shell("a"), shell("b"), shell("x", { groupId: null, status: "ready" })];
+    expect(bestOfGroupKey(before, "env-1", "g1")).toBe(bestOfGroupKey(after, "env-1", "g1"));
+    expect(
+      bestOfGroupKey(
+        [shell("a"), shell("b", { archivedAt: "2026-09-15T05:00:00Z" })],
+        "env-1",
+        "g1",
+      ),
+    ).not.toBe(bestOfGroupKey(before, "env-1", "g1"));
+    expect(bestOfGroupKey(before, "env-2", "g1")).toBe("");
   });
 });

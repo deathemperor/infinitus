@@ -47,8 +47,9 @@ export interface AccountRowModel {
   readonly scoped: ReadonlyArray<UsageWindowBar>;
   readonly freshness: string | null;
   readonly actions: ReadonlyArray<AccountAction>;
-  /** The engine says the stored sign-in expired and the fleet can run a new
-      one: the row offers "Sign in again" (native's "Sign-In Needed" chip). */
+  /** The engine says the stored sign-in expired (native's "Sign-In Needed"
+      chip). Whether a new one can be *run* is the page's to decide: the app's
+      own flow needs the fleet's `addOAuth`, the shell's own does not (#1213). */
   readonly reloginNeeded: boolean;
 }
 
@@ -57,6 +58,11 @@ export interface AccountRowModel {
 export interface FleetSectionModel {
   readonly key: string;
   readonly title: string;
+  /** The fleet's own provider and engine names, as the app reports them. A
+      sign-in run outside the app needs both: the provider names the flow to
+      run, the engine says which engine would run it. */
+  readonly provider: string;
+  readonly engineID: string;
   readonly caveat: string | null;
   readonly rows: ReadonlyArray<AccountRowModel>;
   /** The fleet runs an in-app sign-in (`add <fleet>`), so the section offers
@@ -200,19 +206,19 @@ function rowActions(
   return actions;
 }
 
-/** The capabilities the native `add <fleet>` and `signin-begin <fleet>` verbs
-    act on, in the order the app tries them: the engine's own OAuth sign-in
-    (the proxies), else the CLI's (swapd, which has no `addOAuth` — gating on
-    that alone left a swapd fleet with no way to add an account from the web,
-    #1319). A fleet with only `addToken` pastes a token in the Mac app and is
-    not offered here. */
-const ADD_CAPABILITIES = ["addOAuth", "addCurrent"] as const;
+/** The capabilities the native `add <fleet>` and `signin-begin` verbs act on
+    (#1213): `addOAuth` is the engine-driven OAuth sign-in (the proxy),
+    `addCurrent` the claude CLI's own flow whose code is pasted back (swapd —
+    every subscription account; it does not declare `addOAuth`). Either way
+    the Mac runs it and the page only watches. A fleet with only `addToken`
+    pastes a token in the Mac app and is not offered here. */
+const ADD_CAPABILITIES: ReadonlySet<string> = new Set(["addOAuth", "addCurrent"]);
 
 /** The usage status the engines report for a stored sign-in that expired. */
 const RELOGIN_USAGE_STATUS = "relogin_required";
 
 function fleetCanAdd(fleet: InfinitusFleet): boolean {
-  return ADD_CAPABILITIES.some((capability) => fleet.capabilities.includes(capability));
+  return fleet.capabilities.some((capability) => ADD_CAPABILITIES.has(capability));
 }
 
 function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowModel {
@@ -230,7 +236,7 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
     scoped,
     freshness: freshnessLabel(account),
     actions: rowActions(fleet, account),
-    reloginNeeded: fleetCanAdd(fleet) && account.usageStatus === RELOGIN_USAGE_STATUS,
+    reloginNeeded: account.usageStatus === RELOGIN_USAGE_STATUS,
   };
 }
 
@@ -291,6 +297,8 @@ export function buildFleetSection(fleet: InfinitusFleet): FleetSectionModel {
     key: fleet.key,
     title:
       fleet.provider === fleet.engineID ? fleet.provider : `${fleet.provider} (${fleet.engineID})`,
+    provider: fleet.provider,
+    engineID: fleet.engineID,
     caveat: fleet.caveat ?? null,
     rows: [...fleet.accounts]
       .sort((left, right) => left.number - right.number)

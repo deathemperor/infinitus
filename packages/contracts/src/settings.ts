@@ -561,6 +561,13 @@ export interface ProviderSettingsFormAnnotation {
   readonly clearWhenEmpty?: "omit" | "persist" | undefined;
   /** Choices for a `select` control. The first entry is the default. */
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
+  /** A `select` control that also takes a typed value: the extra choice's label and the input's placeholder. */
+  readonly customOption?: ProviderSettingsFormCustomOption | undefined;
+}
+
+export interface ProviderSettingsFormCustomOption {
+  readonly label: string;
+  readonly placeholder?: string | undefined;
 }
 
 export interface ProviderSettingsFormSchemaAnnotation {
@@ -705,9 +712,30 @@ export const ClaudeSettings = makeProviderSettingsSchema(
         },
       }),
     ),
+    // Passed to the SDK as `advisorModel` when set; empty leaves Claude Code's own
+    // setting in charge (#1232).
+    advisorModel: TrimmedString.pipe(
+      Schema.withDecodingDefault(Effect.succeed("")),
+      Schema.annotateKey({
+        title: "Advisor model",
+        description:
+          "A stronger model the agent can consult mid-turn. Must rank at or above the instance's model.",
+        providerSettingsForm: {
+          control: "select",
+          options: [
+            { value: "off", label: "Off" },
+            { value: "fable", label: "Fable" },
+            { value: "opus", label: "Opus" },
+            { value: "sonnet", label: "Sonnet" },
+          ],
+          customOption: { label: "Custom model ID…", placeholder: "claude-fable-5-1" },
+          clearWhenEmpty: "omit",
+        },
+      }),
+    ),
   },
   {
-    order: ["binaryPath", "homePath", "autoCompactWindow", "launchArgs"],
+    order: ["binaryPath", "homePath", "autoCompactWindow", "advisorModel", "launchArgs"],
   },
 );
 export type ClaudeSettings = typeof ClaudeSettings.Type;
@@ -1397,6 +1425,7 @@ const ClaudeSettingsPatch = Schema.Struct({
   autoCompactWindow: Schema.optionalKey(
     TrimmedString.check(Schema.isPattern(CLAUDE_AUTO_COMPACT_WINDOW_PATTERN)),
   ),
+  advisorModel: Schema.optionalKey(TrimmedString),
 });
 
 const CursorSettingsPatch = Schema.Struct({

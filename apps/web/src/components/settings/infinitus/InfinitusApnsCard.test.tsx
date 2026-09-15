@@ -170,6 +170,30 @@ describe("InfinitusApnsCard", () => {
     expect(text).toContain("Ada's iPhone · alert · production");
   });
 
+  it("shows what the last push to a phone did when the Mac reports it", async () => {
+    status = {
+      ...STORED,
+      registrations: [
+        {
+          deviceId: "d1",
+          deviceName: "Ada's iPhone",
+          kind: "agent-activity-start",
+          environment: "production",
+          registeredAt: "2026-09-14T09:00:00Z",
+          lastPush: {
+            at: "2026-09-14T09:05:00Z",
+            kind: "agent-activity-start",
+            outcome: "failed",
+            detail: "HTTP 410 Unregistered",
+          },
+        },
+      ],
+    };
+    await renderCard();
+    expect(rendered()).toContain("last push: ");
+    expect(rendered()).toContain(" · failed: HTTP 410 Unregistered");
+  });
+
   it("says when no phone is registered and no key is stored", async () => {
     status = { keyPresent: false, teamId: "", keyId: "", registrations: [] };
     await renderCard();

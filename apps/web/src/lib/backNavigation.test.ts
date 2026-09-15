@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { isBackablePathname, mouseHistoryIntent } from "./backNavigation";
+import { isBackablePathname, mouseHistoryIntent, swipeHistoryIntent } from "./backNavigation";
 
 describe("isBackablePathname", () => {
   it("matches the pages whose header shows the back arrow", () => {
@@ -46,5 +46,17 @@ describe("mouseHistoryIntent", () => {
     expect(mouseHistoryIntent(0, "/settings")).toBeNull();
     expect(mouseHistoryIntent(1, "/settings")).toBeNull();
     expect(mouseHistoryIntent(2, "/settings")).toBeNull();
+  });
+});
+
+describe("swipeHistoryIntent", () => {
+  it("a right swipe goes back on a backable page and nowhere else", () => {
+    expect(swipeHistoryIntent("right", "/settings/general")).toBe("back");
+    expect(swipeHistoryIntent("right", "/env-1/thread-1")).toBeNull();
+  });
+
+  it("a left swipe goes forward anywhere", () => {
+    expect(swipeHistoryIntent("left", "/env-1/thread-1")).toBe("forward");
+    expect(swipeHistoryIntent("left", "/accounts")).toBe("forward");
   });
 });

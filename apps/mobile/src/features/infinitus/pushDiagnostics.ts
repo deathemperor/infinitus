@@ -4,9 +4,13 @@ import { appAtomRegistry } from "../../state/atom-registry";
 import type { LiveActivityTokenKind } from "./liveActivity.logic";
 import {
   type AgentActivityPushState,
+  type BackgroundCardNote,
   EMPTY_AGENT_ACTIVITY_PUSH_STATE,
   type PushRegistrationOutcome,
+  type SwitchOffNote,
+  withBackgroundCard,
   withRegistration,
+  withSwitchOff,
   withWatching,
 } from "./pushDiagnostics.logic";
 
@@ -44,4 +48,35 @@ export function noteTokenFailed(
   detail: string | null,
 ): void {
   update((state) => withRegistration(state, kind, { outcome, at: at.toISOString(), detail }));
+}
+
+/** No card is live any more and the Mac took the card token back (#1265). */
+export function noteTokenWithdrawn(at: Date): void {
+  update((state) =>
+    withRegistration(state, "agent-activity", {
+      outcome: "withdrawn",
+      at: at.toISOString(),
+      detail: null,
+    }),
+  );
+}
+
+/** The switch went off and the withdrawal it sent ended this way (#1265). */
+export function noteSwitchOff(
+  outcome: { readonly outcome: SwitchOffNote["outcome"]; readonly detail: string | null },
+  at: Date,
+): void {
+  update((state) =>
+    withSwitchOff(state, {
+      outcome: outcome.outcome,
+      at: at.toISOString(),
+      detail: outcome.detail,
+    }),
+  );
+}
+
+/** A card iOS started while the app was in the background, and what its
+    token did inside that window (#1277). */
+export function noteBackgroundCard(note: BackgroundCardNote): void {
+  update((state) => withBackgroundCard(state, note));
 }

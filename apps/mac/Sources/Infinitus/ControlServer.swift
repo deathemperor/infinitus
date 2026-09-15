@@ -756,12 +756,18 @@ final class ControlServer {
             return ControlReply(ok: true, result: .object(["restarting": .bool(true)]), restarting: true)
 
         case "proxy":
+            // The proxy serves its own management panel at /management.html
+            // (its own docs); a build with the control panel disabled answers
+            // 404 there, which is the proxy's to say, not ours to guess.
             var out: [String: JSONValue] = [
                 "baseURL": .string(model.cliproxyBaseURL),
+                "dashboardURL": .string(model.cliproxyBaseURL + "/management.html"),
                 "keyPresent": .bool(model.cliproxyKeyPresent),
                 "enabled": .bool(model.cliproxyEnabled),
             ]
             if let s = model.proxyRoutingStrategy { out["routingStrategy"] = .string(s) }
+            if let a = model.proxySessionAffinity { out["sessionAffinity"] = .bool(a) }
+            if let c = model.fleetCaveats[CLIProxyEngine.engineID] { out["caveat"] = .string(c) }
             if let e = model.engineErrors[CLIProxyEngine.engineID] { out["error"] = .string(e) }
             return ControlReply(ok: true, result: .object(out))
 
@@ -772,6 +778,7 @@ final class ControlServer {
             // from the CLI, the phone or the desktop app at all.
             var out: [String: JSONValue] = [
                 "baseURL": .string(model.nineRouterBaseURL),
+                "dashboardURL": .string(model.nineRouterBaseURL + "/dashboard"),
                 "passwordPresent": .bool(model.nineRouterPasswordPresent),
                 "enabled": .bool(model.nineRouterEnabled),
             ]
@@ -799,6 +806,22 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: .object(["routingStrategy": .string(strategy)]))
 
+        case "proxy-affinity":
+            // #1177: the pane's session-affinity toggle as a verb, so the
+            // desktop's Engines page can draw it before the pane goes.
+            guard let word = r.args.first, ["on", "off"].contains(word) else {
+                throw Fail("usage: proxy-affinity on|off")
+            }
+            guard let proxy = model.registry.engine(id: CLIProxyEngine.engineID) as? CLIProxyEngine else {
+                throw Fail("the CLIProxyAPI engine is off")
+            }
+            guard await proxy.sessionAffinity != nil else {
+                throw Fail("this proxy has no session-affinity route; set it in the proxy's config")
+            }
+            try await proxy.setSessionAffinity(word == "on")
+            await model.refreshSnapshot()
+            return ControlReply(ok: true, result: .object(["sessionAffinity": .bool(word == "on")]))
+
         case "apns":
             // #1178: the push setup for the Devices page — the key ids,
             // whether the .p8 is in the keychain, the phones registered.
@@ -807,7 +830,7 @@ final class ControlServer {
             let pusher = model.liveActivityPusher
             return ControlReply(ok: true, result: .object(ApnsStatus.fields(
                 keyPresent: pusher.keyStored, teamId: pusher.teamID, keyId: pusher.keyID,
-                registrations: Array(pusher.registrations.values))))
+                registrations: Array(pusher.registrations.values), lastPushes: pusher.lastPushes)))
 
         case "apns-key":
             // #1178: the .p8 rides stdin, never argv; empty stdin forgets it.
@@ -991,6 +1014,22 @@ final class ControlServer {
 
     private struct EngineStatus: Encodable {
         let enabled: Bool, registered: Bool, keyPresent: Bool?
+        /// #1177: what the swapd pane showed under "Binary" — the located
+        /// binary and its `auto` daemon's state (while the engine is on) —
+        /// and each engine's last error, so the desktop's Engines page can
+        /// draw them.
+        let binaryPath: String?, daemon: String?, error: String?
+    }
+
+    /// `EngineSupervisor.State` as one stable word for `status`.
+    static func daemonWord(_ state: EngineSupervisor.State) -> String {
+        switch state {
+        case .stopped: return "stopped"
+        case .running: return "running"
+        case .backingOff: return "backingOff"
+        case .refused: return "refused"
+        case .schemaMismatch: return "schemaMismatch"
+        }
     }
     private struct Status: Encodable {
         let version: String, sha: String
@@ -1013,13 +1052,17 @@ final class ControlServer {
             sha: info["InfinitusGitSHA"] as? String ?? info["CFBundleVersion"] as? String ?? "dev",
             engines: [
                 "swapd": EngineStatus(enabled: model.swapdEnabled, registered: model.swapdRegistered,
-                                      keyPresent: nil),
+                                      keyPresent: nil, binaryPath: model.swapd?.binaryPath,
+                                      daemon: model.swapdEnabled ? Self.daemonWord(model.swapdState) : nil,
+                                      error: model.engineErrors[SwapdEngine.engineID]),
                 "cliproxy": EngineStatus(enabled: model.cliproxyEnabled,
                                          registered: model.registry.engine(id: CLIProxyEngine.engineID) != nil,
-                                         keyPresent: model.cliproxyKeyPresent),
+                                         keyPresent: model.cliproxyKeyPresent, binaryPath: nil, daemon: nil,
+                                         error: model.engineErrors[CLIProxyEngine.engineID]),
                 "9router": EngineStatus(enabled: model.nineRouterEnabled,
                                         registered: model.registry.engine(id: NineRouterEngine.engineID) != nil,
-                                        keyPresent: model.nineRouterPasswordPresent),
+                                        keyPresent: model.nineRouterPasswordPresent, binaryPath: nil, daemon: nil,
+                                        error: model.engineErrors[NineRouterEngine.engineID]),
             ],
             badge: model.engineBadge.map { "\($0)" } ?? "none",
             signInRunning: TokenFlow.shared.running || model.addingFirstAccount,

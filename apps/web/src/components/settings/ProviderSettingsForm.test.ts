@@ -66,7 +66,26 @@ describe("ProviderSettingsForm helpers", () => {
       "binaryPath",
       "homePath",
       "autoCompactWindow",
+      "advisorModel",
       "launchArgs",
+    ]);
+  });
+
+  it("derives the advisor model as a select with a custom entry (#1232)", () => {
+    const claude = DRIVER_OPTION_BY_VALUE[ProviderDriverKind.make("claudeAgent")];
+    const advisor = deriveProviderSettingsFields(claude!).find(
+      (field) => field.key === "advisorModel",
+    );
+    expect(advisor).toMatchObject({
+      control: "select",
+      clearWhenEmpty: "omit",
+      customOption: { label: "Custom model ID…" },
+    });
+    expect(advisor?.options?.map((option) => option.value)).toEqual([
+      "off",
+      "fable",
+      "opus",
+      "sonnet",
     ]);
   });
 

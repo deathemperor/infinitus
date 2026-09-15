@@ -2,10 +2,14 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import {
   type AuthEnvironmentScope,
   AuthSessionId,
+  DEFAULT_SERVER_SETTINGS,
   EnvironmentAuthenticatedAuth,
   EnvironmentAuthenticatedPrincipal,
   EnvironmentHttpApi,
   type InfinitusHoldRow,
+  ProjectId,
+  ProviderDriverKind,
+  ProviderInstanceId,
   ThreadId,
   TurnId,
 } from "@t3tools/contracts";
@@ -15,10 +19,13 @@ import type * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import { HttpApiTest } from "effect/unstable/httpapi";
 import { describe, expect } from "vite-plus/test";
 
+import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -43,6 +50,49 @@ const pausedRow = (threadId: string): InfinitusHoldRow => ({
 
 const HELD = ThreadId.make("t-held");
 const PAUSED = ThreadId.make("t-paused");
+
+const CLAUDE = ProviderInstanceId.make("claudeAgent");
+const CODEX = ProviderInstanceId.make("codex");
+const ENV_DEFAULT = { instanceId: CLAUDE, model: "opus" };
+const OVERRIDE = { instanceId: CLAUDE, model: "sonnet" };
+const ROW_DEFAULT = { instanceId: CODEX, model: "gpt-5" };
+const P_OVERRIDE = ProjectId.make("p-override");
+const P_ROW = ProjectId.make("p-row");
+
+/** #1315: the environment default the server settings carry, or none, with
+    one project's override in `projectSettingsOverrides`; the projection
+    knows one project whose row carries its own (pre-fold) default. */
+const settingsWith = (defaultModelSelection: typeof ENV_DEFAULT | null) =>
+  Layer.mergeAll(
+    Layer.mock(ServerSettingsService)({
+      getSettings: Effect.succeed({
+        ...DEFAULT_SERVER_SETTINGS,
+        defaultModelSelection,
+        // The resolver drops an override on a disabled instance, so both are on.
+        providerInstances: {
+          [CLAUDE]: { driver: ProviderDriverKind.make("claudeAgent"), config: {} },
+          [CODEX]: { driver: ProviderDriverKind.make("codex"), config: {} },
+        },
+        projectSettingsOverrides: { [P_OVERRIDE]: { defaultModelSelection: OVERRIDE } },
+      }),
+    }),
+    Layer.mock(ProjectionSnapshotQuery)({
+      getProjectShellById: (projectId) =>
+        Effect.succeed(
+          projectId === P_ROW
+            ? Option.some({
+                id: P_ROW,
+                title: "Row",
+                workspaceRoot: "/w/row",
+                defaultModelSelection: ROW_DEFAULT,
+                scripts: [],
+                createdAt: "2026-09-12T00:00:00.000Z",
+                updatedAt: "2026-09-12T00:00:00.000Z",
+              })
+            : Option.none(),
+        ),
+    }),
+  );
 
 const services = Layer.mergeAll(
   Layer.mock(InfinitusSessionHold)({
@@ -87,12 +137,13 @@ const setup = HttpApiTest.groups(EnvironmentHttpApi, ["infinitus"]);
 const withClient = <A, E>(
   scopes: ReadonlyArray<AuthEnvironmentScope>,
   body: (client: Effect.Success<typeof setup>) => Effect.Effect<A, E>,
+  envDefault: typeof ENV_DEFAULT | null = ENV_DEFAULT,
 ) =>
   setup.pipe(
     Effect.flatMap(body),
     Effect.provide([NodeHttpServer.layerHttpServices, infinitusHttpApiLayer]),
     Effect.provideService(EnvironmentAuthenticatedAuth, authenticatedAuth(scopes)),
-    Effect.provide(services),
+    Effect.provide(Layer.mergeAll(services, settingsWith(envDefault))),
     Effect.scoped,
   );
 
@@ -110,6 +161,32 @@ describe("infinitusHttpApiLayer (#822)", () => {
         ]);
       }),
     ),
+  );
+
+  effectIt.effect(
+    "thread defaults resolve the project's override, the row's default, then the environment's (#1315)",
+    () =>
+      Effect.gen(function* () {
+        const read = (projectId?: ProjectId, envDefault: typeof ENV_DEFAULT | null = ENV_DEFAULT) =>
+          withClient(
+            ["orchestration:read"],
+            (client) =>
+              client.infinitus.threadDefaults({
+                headers: {},
+                query: projectId === undefined ? {} : { projectId },
+              }),
+            envDefault,
+          );
+        expect(yield* read()).toEqual({ defaultModelSelection: ENV_DEFAULT });
+        expect(yield* read(P_OVERRIDE)).toEqual({ defaultModelSelection: OVERRIDE });
+        expect(yield* read(P_ROW)).toEqual({ defaultModelSelection: ROW_DEFAULT });
+        expect(yield* read(ProjectId.make("p-plain"))).toEqual({
+          defaultModelSelection: ENV_DEFAULT,
+        });
+        expect(yield* read(ProjectId.make("p-plain"), null)).toEqual({
+          defaultModelSelection: null,
+        });
+      }),
   );
 
   effectIt.effect("one read lists the held, limit-stopped and paused threads", () =>
