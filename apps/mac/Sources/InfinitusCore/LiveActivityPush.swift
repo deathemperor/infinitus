@@ -88,6 +88,17 @@ public enum LiveActivityPush {
     public static let dismissAfter: TimeInterval = 5 * 60
     public static let contentlessDismissAfter: TimeInterval = 15
 
+    /// Whether a live card's token is taken as ended on the phone (#1265):
+    /// APNs answers 200 to an update of an ended activity, so a card the
+    /// phone dismissed or aged out leaves a token the Mac would update
+    /// into nothing forever, never reaching for the push-to-start token.
+    /// The phone re-offers a running card's token on every foreground; a
+    /// token not re-offered since the last update, with that update
+    /// older than twice `staleAfter`, is written off.
+    public static func liveTokenLapsed(registeredAt: Date, lastUpdateAt: Date, now: Date = Date()) -> Bool {
+        registeredAt <= lastUpdateAt && now.timeIntervalSince(lastUpdateAt) > staleAfter * 2
+    }
+
     /// APNs answers that mean the token will never work again, so the
     /// registration is dropped instead of retried every push: 410
     /// Unregistered, 400 BadDeviceToken (after its one resend on the

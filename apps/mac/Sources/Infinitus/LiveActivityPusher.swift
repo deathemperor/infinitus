@@ -32,6 +32,8 @@ final class LiveActivityPusher: ObservableObject {
     /// The thread card each phone last got (#1047), by device id: a
     /// repeat of the same state is not sent again.
     private var lastAgentActivity: [String: AgentActivityState] = [:]
+    /// When that card was last started or updated, by device id (#1265).
+    private var lastAgentActivityAt: [String: Date] = [:]
 
     init() {
         let defaults = AppDefaults.standard
@@ -157,17 +159,27 @@ final class LiveActivityPusher: ObservableObject {
     /// `agent-activity` token gets the state as an update, a phone with
     /// only a push-to-start token gets it as a start; nil ends the card
     /// and drops the update token (the next start brings a new one).
-    /// The push-to-start token stays: it is good for the next card.
-    /// Answers what went out: a phone whose card already shows this
+    /// The push-to-start token stays: it is good for the next card, and
+    /// takes over when the live token lapsed (#1265, `liveTokenLapsed`)
+    /// with one event line. Answers what went out: a phone whose card already shows this
     /// state, or that holds no token for it, is not a target.
     @discardableResult
     func pushAgentActivity(_ state: AgentActivityState?) -> PushReach {
         var reach = PushReach()
         guard configured else { return reach }
         let devices = Set(registrations.values.filter { $0.kind.isLiveActivity }.map(\.deviceId))
+        let now = Date()
         for device in devices {
-            let live = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivity.rawValue]
+            var live = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivity.rawValue]
             let start = registrations[device + "/" + ActivityPushRegistration.Kind.agentActivityStart.rawValue]
+            if let lapsed = live, start != nil, let sentAt = lastAgentActivityAt[device],
+               LiveActivityPush.liveTokenLapsed(registeredAt: lapsed.registeredAt, lastUpdateAt: sentAt, now: now) {
+                registrations[lapsed.slot] = nil
+                persist()
+                lastAgentActivity[device] = nil
+                live = nil
+                log?("📲", "\(lapsed.deviceName)'s thread card token went quiet — the next card starts afresh")
+            }
             guard let state else {
                 if let live {
                     if send(LiveActivityPush.agentActivityEndPayload(lastAgentActivity[device]),
@@ -178,6 +190,7 @@ final class LiveActivityPusher: ObservableObject {
                     persist()
                 }
                 lastAgentActivity[device] = nil
+                lastAgentActivityAt[device] = nil
                 continue
             }
             if lastAgentActivity[device] == state { continue }
@@ -194,6 +207,7 @@ final class LiveActivityPusher: ObservableObject {
                 continue
             }
             lastAgentActivity[device] = state
+            lastAgentActivityAt[device] = now
         }
         return reach
     }
