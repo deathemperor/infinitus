@@ -52,3 +52,24 @@ export async function forgetTokens(input: {
     ),
   );
 }
+
+/** Withdraws one kind and says whether the Mac took the withdrawal (#1265):
+    the thread-card bridge retries a forget the Mac never saw, since a slot
+    left holding an ended card's token keeps the push-to-start token unused. */
+export async function forgetTokenLanded(input: {
+  readonly environmentId: EnvironmentId;
+  readonly kind: LiveActivityTokenKind;
+  readonly run: ForgetRun;
+  readonly loadDeviceId: () => Promise<string>;
+}): Promise<boolean> {
+  try {
+    const deviceId = await input.loadDeviceId();
+    const result = await input.run({
+      environmentId: input.environmentId,
+      input: forgetCommand(deviceId, input.kind),
+    });
+    return (result as { readonly _tag?: string } | null)?._tag === "Success";
+  } catch {
+    return false;
+  }
+}

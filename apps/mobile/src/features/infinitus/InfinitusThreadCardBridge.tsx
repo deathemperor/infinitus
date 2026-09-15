@@ -4,6 +4,7 @@ import { addPushToStartTokenListener } from "expo-widgets";
 import { useEffect, useMemo, useRef } from "react";
 import { AppState, Platform } from "react-native";
 
+import { loadOrCreateAgentAwarenessDeviceId } from "../../persistence/imperative";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { mobilePreferencesAtom } from "../../state/preferences";
@@ -18,8 +19,10 @@ import {
   pusherMac,
 } from "./liveActivity.logic";
 import { localLiveActivityStartsAtom } from "./liveActivityStarts";
-import { noteAgentActivityWatching } from "./pushDiagnostics";
+import { syncWatchedCards } from "./cardSync.logic";
+import { noteAgentActivityWatching, noteTokenWithdrawn } from "./pushDiagnostics";
 import { useForgetOnSwitchOff } from "./pushForget";
+import { forgetTokenLanded } from "./pushForget.logic";
 import { tokenSender } from "./pushRegistration";
 import { nextRetry, NO_RETRY } from "./pushRetry.logic";
 
@@ -39,7 +42,19 @@ import { nextRetry, NO_RETRY } from "./pushRetry.logic";
     with an unreachable RPC and the Mac was left with nothing to start a card
     with. A send that does not land backs off while the Mac is reachable, and
     the Mac becoming reachable — or the app coming to the foreground — sends
-    again at once. */
+    again at once.
+
+    A card's own token is withdrawn once no card is live (#1265): expo-widgets
+    surfaces no activity-state event, so every re-scan that finds
+    `getInstances()` empty — at mount, on a foreground, after a local start or
+    end — forgets `agent-activity` at the Mac, once per empty stretch and
+    never gated on what this run remembers offering (a reinstall replaces the
+    card whose token the Mac still holds). Without it the Mac keeps pushing
+    into an ended card and never starts the next one from the start token. A
+    stale card is still listed and updatable, so its token stays. The forget
+    rides the send loop: retried while the Mac is unreachable, dropped when a
+    new card's token is offered, so a card that starts while the forget is in
+    flight keeps its registration. */
 export function InfinitusThreadCardBridge() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const configs = useAtomValue(environmentServerConfigsAtom);
@@ -67,11 +82,15 @@ export function InfinitusThreadCardBridge() {
   useEffect(() => {
     if (Platform.OS !== "ios" || !enabled || environmentId === null) return;
     let cancelled = false;
-    const watched = new Set<string>();
+    const watched = new Map<string, { remove(): void }>();
     const subscriptions: Array<{ remove(): void }> = [];
     const send = tokenSender({ environmentId, run, isCancelled: () => cancelled });
     /** The newest token iOS has handed over per kind, sent until it lands. */
     const latest = new Map<LiveActivityTokenKind, string>();
+    /** No card is live and the Mac's card slot is still to be cleared. */
+    let withdraw = false;
+    /** The slot was cleared since the last card token was offered. */
+    let slotCleared = false;
     let schedule = NO_RETRY;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let sending = false;
@@ -94,7 +113,10 @@ export function InfinitusThreadCardBridge() {
       sending = true;
       clearTimer();
       try {
-        const outcomes = await Promise.all([...latest].map(([kind, token]) => send(kind, token)));
+        const outcomes = await Promise.all([
+          ...[...latest].map(([kind, token]) => send(kind, token)),
+          ...(withdraw ? [forgetCard()] : []),
+        ]);
         if (cancelled) return;
         schedule = nextRetry({
           attempt: schedule.attempt,
@@ -111,25 +133,64 @@ export function InfinitusThreadCardBridge() {
       }
     };
 
+    /** The pending withdrawal, answered like a send: landed or not. A card
+        token offered meanwhile has already dropped it, so a landing then is
+        not recorded over the new card's registration. */
+    const forgetCard = async (): Promise<boolean> => {
+      const landed = await forgetTokenLanded({
+        environmentId,
+        kind: "agent-activity",
+        run,
+        loadDeviceId: loadOrCreateAgentAwarenessDeviceId,
+      });
+      if (!landed || cancelled || !withdraw) return landed;
+      withdraw = false;
+      slotCleared = true;
+      noteTokenWithdrawn(new Date());
+      return true;
+    };
+
     /** A token from iOS: a new one is a fresh chance, so the backoff resets. */
     const offer = (kind: LiveActivityTokenKind, token: string) => {
       if (cancelled || latest.get(kind) === token) return;
       latest.set(kind, token);
+      if (kind === "agent-activity") {
+        withdraw = false;
+        slotCleared = false;
+      }
       schedule = NO_RETRY;
       void flush();
     };
 
-    const attach = () => {
-      for (const activity of AgentActivity.getInstances()) {
+    /** Re-reads the live cards: watches the new ones, lets the ended ones go,
+        and queues the withdrawal when none is left. */
+    const sync = () => {
+      const live = AgentActivity.getInstances();
+      const next = syncWatchedCards({
+        watched: new Set(watched.keys()),
+        live: live.map((activity) => activity.getId()),
+        slotCleared,
+      });
+      for (const id of next.gone) {
+        watched.get(id)?.remove();
+        watched.delete(id);
+      }
+      for (const activity of live) {
         const id = activity.getId();
-        if (watched.has(id)) continue;
-        watched.add(id);
-        subscriptions.push(
+        if (!next.added.includes(id)) continue;
+        watched.set(
+          id,
           activity.addPushTokenListener((event) => offer("agent-activity", event.pushToken)),
         );
         void activity.getPushToken().then((token) => {
           if (token) offer("agent-activity", token);
         });
+      }
+      if (next.withdraw && !withdraw) {
+        withdraw = true;
+        latest.delete("agent-activity");
+        schedule = NO_RETRY;
+        void flush();
       }
     };
 
@@ -138,7 +199,7 @@ export function InfinitusThreadCardBridge() {
         offer("agent-activity-start", event.activityPushToStartToken),
       ),
     );
-    attach();
+    sync();
     noteAgentActivityWatching(new Date());
     retryRef.current = () => {
       schedule = NO_RETRY;
@@ -146,10 +207,10 @@ export function InfinitusThreadCardBridge() {
     };
     const appState = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
-      attach();
+      sync();
       retryRef.current?.();
     });
-    const localStarts = appAtomRegistry.subscribe(localLiveActivityStartsAtom, attach);
+    const localStarts = appAtomRegistry.subscribe(localLiveActivityStartsAtom, sync);
     return () => {
       cancelled = true;
       retryRef.current = null;
@@ -158,6 +219,7 @@ export function InfinitusThreadCardBridge() {
       appState.remove();
       localStarts();
       for (const subscription of subscriptions) subscription.remove();
+      for (const subscription of watched.values()) subscription.remove();
     };
   }, [enabled, environmentId, run]);
 

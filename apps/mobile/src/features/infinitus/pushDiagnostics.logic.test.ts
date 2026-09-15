@@ -85,3 +85,17 @@ describe("agentActivityPushSummary", () => {
     expect(agentActivityPushSummary(state).value).toBe("Not running");
   });
 });
+
+describe("agentActivityPushSummary — withdrawn card token (#1265)", () => {
+  it("stays Registered and says the last card's token was taken back", () => {
+    const state = withRegistration(
+      withRegistration(WATCHING, "agent-activity-start", registered("2026-09-14T02:12:00Z")),
+      "agent-activity",
+      { outcome: "withdrawn", at: "2026-09-14T03:00:00Z", detail: null },
+    );
+    const summary = agentActivityPushSummary(state);
+    expect(summary.value).toBe("Registered");
+    expect(summary.explanation).toContain("withdrawn");
+    expect(summary.explanation).toContain("start token");
+  });
+});

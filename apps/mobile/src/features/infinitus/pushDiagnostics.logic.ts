@@ -10,8 +10,9 @@ import type { LiveActivityTokenKind } from "./liveActivity.logic";
  */
 
 /** What became of one attempt. `unreachable` is not a refusal: the Mac never
-    saw the token, because the phone could not reach it (#941). */
-export type PushRegistrationOutcome = "registered" | "refused" | "unreachable";
+    saw the token, because the phone could not reach it (#941). `withdrawn`
+    is the card token taken back once no card was live (#1265). */
+export type PushRegistrationOutcome = "registered" | "refused" | "unreachable" | "withdrawn";
 
 export interface PushRegistrationNote {
   readonly outcome: PushRegistrationOutcome;
@@ -92,7 +93,9 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
     { kind: "agent-activity" as LiveActivityTokenKind, note: card },
   ]
     .flatMap((entry) =>
-      entry.note !== undefined && entry.note.outcome !== "registered"
+      entry.note !== undefined &&
+      entry.note.outcome !== "registered" &&
+      entry.note.outcome !== "withdrawn"
         ? [{ kind: entry.kind, note: entry.note }]
         : [],
     )
@@ -119,7 +122,11 @@ export function agentActivityPushSummary(state: AgentActivityPushState): AgentAc
     const cardLine =
       card?.outcome === "registered"
         ? ` The card token followed at ${timeOf(card.at)}, so a card is live.`
-        : " No card is live yet, which is normal until the Mac starts one.";
+        : card?.outcome === "withdrawn"
+          ? ` The last card ended and its token was withdrawn at ${timeOf(
+              card.at,
+            )}, so the Mac starts the next card from the start token.`
+          : " No card is live yet, which is normal until the Mac starts one.";
     return {
       value: "Registered",
       explanation: `The Mac has this phone's start token, filed at ${timeOf(start.at)}.${cardLine}`,

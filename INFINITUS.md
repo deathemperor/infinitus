@@ -2463,7 +2463,18 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   push-to-start one and each running card's own — with the Mac it follows
   (`pusherMac`) through `activities-token`, the alert kind's path, and
   withdraws both kinds when Settings › Infinitus › "Thread card on the lock
-  screen" goes off (default on, iOS only). "Show a test card" starts the
+  screen" goes off (default on, iOS only). The card's own token is withdrawn
+  once no card is live (#1265, `cardSync.logic.ts`): expo-widgets surfaces no
+  activity-state event, so the bridge re-scans `getInstances()` — native
+  lists the active AND stale cards, a stale one being still on screen and
+  updatable — at mount, on every foreground and after a local start or end,
+  and an empty scan forgets `agent-activity` once per empty stretch, never
+  gated on what this run offered (a reinstall replaces the card whose token
+  the Mac still holds; forgetting an empty slot is the Mac's no-op). The
+  forget rides the bridge's send loop — retried while the Mac is unreachable,
+  dropped when a new card's token is offered — and the Settings row reads
+  "withdrawn". A card dismissed while the app stays closed is caught on the
+  next foreground; the Mac's staleAfter fallback covers the gap. "Show a test card" starts the
   card locally with a fabricated state (`TEST_CARD_STATE`, one row per
   ranked phase, the working one dated against the press so its timer ticks —
   `testCardState`), no APNs in the loop, so a blank card blames the widget and

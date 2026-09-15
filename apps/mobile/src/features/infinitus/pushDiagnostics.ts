@@ -45,3 +45,14 @@ export function noteTokenFailed(
 ): void {
   update((state) => withRegistration(state, kind, { outcome, at: at.toISOString(), detail }));
 }
+
+/** No card is live any more and the Mac took the card token back (#1265). */
+export function noteTokenWithdrawn(at: Date): void {
+  update((state) =>
+    withRegistration(state, "agent-activity", {
+      outcome: "withdrawn",
+      at: at.toISOString(),
+      detail: null,
+    }),
+  );
+}

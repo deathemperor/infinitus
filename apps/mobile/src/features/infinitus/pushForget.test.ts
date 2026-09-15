@@ -2,7 +2,7 @@ import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { forgetCommand } from "./liveActivity.logic";
-import { forgetTokens, macToForget } from "./pushForget.logic";
+import { forgetTokenLanded, forgetTokens, macToForget } from "./pushForget.logic";
 
 const mac = EnvironmentId.make("mac-1");
 
@@ -78,5 +78,36 @@ describe("forgetTokens", () => {
       },
     });
     expect(ran).toBe(0);
+  });
+});
+
+describe("forgetTokenLanded", () => {
+  it("answers whether the Mac took the withdrawal", async () => {
+    expect(
+      await forgetTokenLanded({
+        environmentId: mac,
+        kind: "agent-activity",
+        run: async () => ({ _tag: "Success" }),
+        loadDeviceId: async () => "dev-1",
+      }),
+    ).toBe(true);
+    expect(
+      await forgetTokenLanded({
+        environmentId: mac,
+        kind: "agent-activity",
+        run: async () => ({ _tag: "Failure" }),
+        loadDeviceId: async () => "dev-1",
+      }),
+    ).toBe(false);
+    expect(
+      await forgetTokenLanded({
+        environmentId: mac,
+        kind: "agent-activity",
+        run: async () => {
+          throw new Error("unreachable");
+        },
+        loadDeviceId: async () => "dev-1",
+      }),
+    ).toBe(false);
   });
 });
