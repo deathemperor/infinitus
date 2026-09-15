@@ -68,9 +68,24 @@ export function useRevertMessageMenu(
   const fork = useAtomCommand(infinitusEnvironment.forkThread, { reportFailure: false });
   const inFlight = useRef(false);
 
+  // A turn mid-flight hands the route a new detail every tick; like
+  // `useTurnFooters`, the map travels through one string key so the callback
+  // below — and with it every feed row — moves only when a mapping changes.
+  const messages = detail?.messages;
+  const checkpoints = detail?.checkpoints;
+  const turnCountsKey = useMemo(
+    () =>
+      supported && messages !== undefined && checkpoints !== undefined
+        ? JSON.stringify([...revertTurnCountByUserMessageId({ messages, checkpoints })])
+        : null,
+    [checkpoints, messages, supported],
+  );
   const turnCounts = useMemo(
-    () => (supported && detail !== null ? revertTurnCountByUserMessageId(detail) : null),
-    [detail, supported],
+    () =>
+      turnCountsKey === null
+        ? null
+        : new Map(JSON.parse(turnCountsKey) as Array<[MessageId, number]>),
+    [turnCountsKey],
   );
 
   const restoreFiles = useCallback(
