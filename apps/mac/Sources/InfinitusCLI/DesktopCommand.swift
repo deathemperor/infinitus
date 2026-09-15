@@ -28,7 +28,7 @@ func desktopUsage() -> String {
     `-` reads the message from stdin. `send` queues nothing: a running thread refuses
     unless --steer folds the message into the turn or --wait-idle sends it when the turn ends.
     --wait prints the assistant's answer when the turn ends (exit 1 when it errors or is interrupted).
-    `new` creates the thread on --model, else the project's default model, else the environment's.
+    `new` creates the thread on --model, else the project's default model (its Settings override first), else the environment's.
 
     """
 }
@@ -232,13 +232,13 @@ private struct DesktopVerbs {
             guard let project = shell.projects.first(where: { $0.id == wanted || $0.title == wanted }) else {
                 throw Refused(message: "no project \(wanted) in Infinitus desktop")
             }
-            // #1315: the environment's default is one more round trip, taken
-            // only when the project row answers nothing.
-            let projectDefault = project.defaultModelSelection.flatMap { $0 == .null ? nil : $0 }
-            let environmentDefault = projectDefault == nil ? try api.threadDefaults() : nil
+            // #1315: what the desktop's composer would pick for this project
+            // (its Settings override outranks the row); an older desktop
+            // without the route leaves the row.
             let model: JSONValue
             do {
-                model = try DesktopRows.modelSelection(option: options["model"], project: project, environment: environmentDefault)
+                model = try DesktopRows.modelSelection(option: options["model"], project: project,
+                                                       resolved: try api.threadDefaults(projectId: project.id))
             } catch let refusal as DesktopRows.NoModel { throw Refused(message: refusal.message) }
             var base = options["base"]
             if options["worktree"] != nil, base == nil {

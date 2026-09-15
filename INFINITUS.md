@@ -1422,12 +1422,17 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   from `InfinitusSessionInterrupt.paused`, the turns paused for headroom,
   #743), `POST /api/infinitus/release-thread` (`{threadId}` →
   `{released, reason?}`, the WS `infinitus.releaseThread` word for word) and,
-  behind the read scope, `GET /api/infinitus/thread-defaults` (#1315:
-  `{defaultModelSelection}`, the server settings' environment default — no
-  other HTTP route carries it, the composer reads it over the WS config —
-  which `thread new` takes when the project row has none; `--model
-<instanceId>/<model>` or a bare `<model>` on the instance of whichever
-  default names one comes first, `DesktopRows.modelSelection`).
+  behind the read scope, `GET /api/infinitus/thread-defaults?projectId=`
+  (#1315: `{defaultModelSelection}` resolved as the composer resolves it,
+  `resolveProjectSettings` — the project's override in
+  `projectSettingsOverrides` (what Settings › General writes at a project
+  scope; the row's `defaultModelSelection` is the retired path, read until
+  the fold), then the environment default; no other HTTP route carries
+  the settings, the composer reads them over the WS config). `thread new`
+  creates on `--model <instanceId>/<model>` or a bare `<model>` on the
+  instance of the default that applies, else the route's answer, else the
+  project row (all a desktop without the route leaves it),
+  `DesktopRows.modelSelection`.
   Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the
   port layer (which is why that block sits below `AuthLayerLive` in
   `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. Queue-behind-a-

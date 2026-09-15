@@ -27,6 +27,7 @@ import {
 import {
   DpopFailureReason,
   AuthSessionId,
+  ProjectId,
   ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
@@ -634,10 +635,14 @@ export const InfinitusHoldRow = Schema.Struct({
 });
 export type InfinitusHoldRow = typeof InfinitusHoldRow.Type;
 
-/** #1315: what `infinitusctl thread new` falls back on when the project row
-    carries no default model — the environment's default from the server
-    settings, which no other HTTP route exposes (the composer reads it over
-    the WebSocket config). */
+/** #1315: the model `infinitusctl thread new` creates a thread on — resolved
+    as the composer resolves it (`resolveProjectSettings`: the project's
+    override in the server settings, the project row's own default until the
+    fold, then the environment's default), which no other HTTP route exposes:
+    the composer reads the settings over the WebSocket config. */
+export const InfinitusThreadDefaultsQuery = Schema.Struct({
+  projectId: Schema.optional(ProjectId),
+});
 export const InfinitusThreadDefaults = Schema.Struct({
   defaultModelSelection: Schema.NullOr(ModelSelection),
 });
@@ -663,10 +668,10 @@ class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
-    // #1315: the environment's default model, for `thread new` on a project
-    // without one.
+    // #1315: the model `thread new` creates on, resolved for `?projectId=`.
     HttpApiEndpoint.get("threadDefaults", "/api/infinitus/thread-defaults", {
       headers: OptionalBearerHeaders,
+      query: InfinitusThreadDefaultsQuery,
       success: InfinitusThreadDefaults,
       error: EnvironmentScopedOperationErrors,
     }).middleware(EnvironmentAuthenticatedAuth),

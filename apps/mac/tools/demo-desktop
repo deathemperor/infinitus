@@ -69,8 +69,10 @@ class H(BaseHTTPRequestHandler):
             return self.reply(200, dict(THREADS[tid], messages=MESSAGES.get(tid, []), activities=[], proposedPlans=[], checkpoints=[]))
         if path == "/api/infinitus/holds":
             return self.reply(200, HOLDS)
-        if path == "/api/infinitus/thread-defaults":
-            return self.reply(200, {"defaultModelSelection": ENV_DEFAULT})
+        if path == "/api/infinitus/thread-defaults":   # resolved like the composer: override, the row, the environment
+            pid = self.path.partition("projectId=")[2]
+            row = next((p for p in (PROJECT, BARE) if p["id"] == pid), None)
+            return self.reply(200, {"defaultModelSelection": (row or {}).get("defaultModelSelection") or ENV_DEFAULT})
         if path == "/api/demo/dispatches":
             return self.reply(200, DISPATCHES)
         self.reply(404, {"error": "no route " + path})
