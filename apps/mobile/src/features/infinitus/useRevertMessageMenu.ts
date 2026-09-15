@@ -15,7 +15,8 @@ import { scopedThreadKey } from "../../lib/scopedEntities";
 import { uuidv4 } from "../../lib/uuid";
 import { assetEnvironment } from "../../state/assets";
 import { infinitusEnvironment } from "../../state/infinitus";
-import { environmentServerConfigsAtom } from "../../state/server";
+import { serverEnvironment } from "../../state/server";
+import { threadProviderSnapshot } from "./threadProvider.logic";
 import { usePreparedConnection } from "../../state/session";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -25,7 +26,6 @@ import {
   appendComposerDraftText,
   insertComposerDraftContext,
 } from "../../state/use-composer-drafts";
-import { resolveThreadProviderInstance } from "../threads/thread-provider-instance";
 import { downloadDraftAttachments } from "./restoreAttachments";
 import {
   EDIT_FROM_HERE_CONFIRM,
@@ -79,22 +79,24 @@ export function useRevertMessageMenu(
   detail: Pick<OrchestrationThread, "messages" | "checkpoints"> | null,
 ): (messageId: MessageId) => InfinitusMessageMenu | null {
   const navigation = useNavigation();
-  const configs = useAtomValue(environmentServerConfigsAtom);
-  const supported =
-    thread !== null &&
-    configs.get(thread.environmentId)?.environment.capabilities.infinitus === true;
-  const provider = thread === null ? null : resolveThreadProviderInstance(configs, thread);
-  const canFork = provider?.driverKind === "claudeAgent" || provider?.driverKind === "codex";
+  // Its environment's own config atom with selectors (#1278 finding 5), each
+  // answering one primitive so the hook wakes only when a gate flips.
+  const configAtom = serverEnvironment.configValueAtom(thread?.environmentId ?? null);
+  const supported = useAtomValue(
+    configAtom,
+    (config) => thread !== null && config?.environment.capabilities.infinitus === true,
+  );
+  const driver = useAtomValue(configAtom, (config) =>
+    thread === null ? null : (threadProviderSnapshot(config, thread)?.driver ?? null),
+  );
+  const canFork = driver === "claudeAgent" || driver === "codex";
   // The web's gate: a snapshot that says nothing supports rollback.
-  const canRollback =
-    thread === null ||
-    configs
-      .get(thread.environmentId)
-      ?.providers.find(
-        (candidate) =>
-          candidate.instanceId ===
-          (thread.session?.providerInstanceId ?? thread.modelSelection.instanceId),
-      )?.supportsConversationRollback !== false;
+  const canRollback = useAtomValue(
+    configAtom,
+    (config) =>
+      thread === null ||
+      threadProviderSnapshot(config, thread)?.supportsConversationRollback !== false,
+  );
   const running = thread?.session?.status === "running" || thread?.session?.status === "starting";
   const environmentId = thread?.environmentId ?? null;
   const threadId = thread?.id ?? null;
