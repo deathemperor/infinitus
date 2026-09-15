@@ -678,6 +678,55 @@ describe("DesktopUpdates", () => {
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });
 
+  it.effect("logs a failed check's cause code and HTTP status beside the tag", () => {
+    // The alpha.13 cut logged two check failures with only the error tag and
+    // the generic sentence, so the tag window could not be diagnosed from the
+    // files. The cause's own code (electron-updater's ERR_UPDATER_*) and an
+    // HttpError's status now ride along; its message never does (the test
+    // above: it quotes the feed URL).
+    const cause = Object.assign(
+      new Error(
+        "Unable to find latest version on GitHub (https://github.com/o/r/releases.atom?token=abc), please ensure a production release exists",
+      ),
+      { code: "ERR_UPDATER_LATEST_VERSION_NOT_FOUND", statusCode: 503 },
+    );
+    const harness = makeHarness({
+      checkForUpdates: Effect.fail(
+        new ElectronUpdater.ElectronUpdaterCheckForUpdatesError({ channel: "alpha", cause }),
+      ),
+    });
+    const logged: Array<Record<string, unknown>> = [];
+    const logger = Logger.make(({ fiber }) => {
+      const annotations = fiber.getRef(References.CurrentLogAnnotations);
+      if (annotations.errorTag !== undefined) logged.push({ ...annotations });
+    });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        yield* updates.check("manual");
+
+        const line = logged.find(
+          (entry) => entry.errorTag === "ElectronUpdaterCheckForUpdatesError",
+        );
+        assert.isDefined(line);
+        assert.equal(line!.channel, "alpha");
+        assert.equal(line!.causeCode, "ERR_UPDATER_LATEST_VERSION_NOT_FOUND");
+        assert.equal(line!.causeStatus, 503);
+        assert.notInclude(Object.values(line!).map(String).join(" "), "token=abc");
+      }),
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          TestClock.layer(),
+          harness.layer,
+          Logger.layer([logger], { mergeWithExisting: false }),
+        ),
+      ),
+    );
+  });
+
   it.effect("recovers download state after an unexpected setup failure", () => {
     let disableDifferentialCalls = 0;
     const harness = makeHarness({
