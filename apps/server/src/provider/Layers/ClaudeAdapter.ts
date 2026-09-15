@@ -5499,6 +5499,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(claudeSettings.autoCompactWindow
           ? { autoCompactWindow: Number(claudeSettings.autoCompactWindow) }
           : {}),
+        // Empty leaves the CLI on the user's own advisor setting (#1232).
+        ...(claudeSettings.advisorModel ? { advisorModel: claudeSettings.advisorModel } : {}),
       };
       const mcpSession = McpProviderSession.readMcpProviderSession(input.threadId);
       // The attachments dir grant lets the agent Read/copy pasted images at

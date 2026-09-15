@@ -798,6 +798,16 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `ServerSecretStore` (`infinitus-slack-app-token` / `-bot-token`), the marker
   sent back means keep, an empty string clears. The reactor (PR 2), the
   Settings row (PR 3) and the Socket Mode client (PR 4) follow.
+- `packages/contracts/src/settings.ts` — `advisorModel` on `ClaudeSettings`
+  and its patch (#1232: the SDK's `advisorModel` setting, passed by
+  `apps/server/src/provider/Layers/ClaudeAdapter.ts` when the instance names
+  one and left to Claude Code's own setting when empty), with the
+  `customOption` hook on `ProviderSettingsFormAnnotation` that
+  `apps/web/src/components/settings/ProviderSettingsForm.tsx`'s select draws
+  as a "Custom model ID…" choice opening an input; `ProviderInstanceCard.tsx`
+  and `AddProviderInstanceDialog.tsx` add one line under the form when the
+  instance routes through a proxy (`hasAnthropicBaseUrl` in
+  `proxyProvider.ts`), since the CLI adds the tool on first-party only.
 - `packages/contracts/src/settings.ts` — `ComposerSendMode` and
   `composerSendMode` (`queue` default, `steer`) on `ClientSettings` and its
   patch (#270 F); `settings.test.ts` covers the default.

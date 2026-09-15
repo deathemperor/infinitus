@@ -33,6 +33,7 @@ import { ProxyProviderFields } from "./ProxyProviderFields";
 import {
   applyProxyDraft,
   EMPTY_PROXY_DRAFT,
+  PROXY_ADVISOR_NOTE,
   validateProxyDraft,
   type ProxyDraft,
 } from "./proxyProvider";
@@ -416,6 +417,9 @@ export function AddProviderInstanceDialog({
                 variant="dialog"
                 onChange={setConfigDraft}
               />
+              {isClaude && proxyDraft.enabled ? (
+                <p className="text-xs text-muted-foreground">{PROXY_ADVISOR_NOTE}</p>
+              ) : null}
             </div>
           ) : wizardStep === 2 ? (
             <div className="grid gap-2">

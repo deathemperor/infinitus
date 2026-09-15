@@ -526,6 +526,46 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  it.effect("passes the instance's advisor model to Claude, none when unset (#1232)", () => {
+    const harness = makeHarness({ claudeConfig: { advisorModel: "fable" } });
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      assert.deepEqual(harness.getLastCreateQueryInput()?.options?.settings, {
+        advisorModel: "fable",
+      });
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("leaves the advisor model to Claude Code when the instance names none", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      const settings = harness.getLastCreateQueryInput()?.options?.settings;
+      assert.strictEqual(
+        typeof settings === "object" ? settings.advisorModel : undefined,
+        undefined,
+      );
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("forwards claude effort levels into query options", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {

@@ -53,6 +53,15 @@ You can also send `/compact` in an existing conversation. Web and desktop offer
 a large older thread. See [commands and skills](./composer.md#commands-and-skills)
 for using composer commands.
 
+## Consult a stronger model
+
+Set **Advisor model** in a Claude instance's Runtime settings to let the agent
+consult a stronger model mid-turn. Pick Fable, Opus or Sonnet, or enter a full
+model ID; the advisor must rank at or above the instance's model, or Claude
+skips it. Leave it **Off** to keep Claude Code's own setting. The advisor's
+answer stays inside the turn: the thread only shows that the agent consulted
+it. An instance that routes through a proxy has no advisor.
+
 ## Usage limits
 
 If your Claude subscription runs out of usage mid-turn, the thread shows which
