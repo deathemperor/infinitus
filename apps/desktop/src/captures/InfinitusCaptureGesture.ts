@@ -6,6 +6,12 @@
  * never reaches a log or a span, only its length. Turning the knob on asks
  * for the Accessibility grant (the same one SnapShot's context uses); a
  * launch with the knob already on checks it silently.
+ *
+ * Slice 3: the renderer pulls. A read is queued here and the page pinged;
+ * the coordinator drains the queue on mount and on every ping, so a read
+ * that lands while a fresh window is still loading — or after its load but
+ * before the coordinator mounts — waits here instead of being sent to a
+ * page with nobody listening.
  */
 import type { DesktopCaptureGestureEvent } from "@t3tools/contracts";
 import type { InfinitusDesktopPrefs } from "@t3tools/contracts/infinitus";
@@ -18,7 +24,7 @@ import * as Electron from "electron";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import { CAPTURE_GESTURE_EVENT_CHANNEL } from "../ipc/channels.ts";
+import { CAPTURE_GESTURE_PENDING_CHANNEL } from "../ipc/channels.ts";
 import {
   InfinitusDesktopPrefsService,
   type InfinitusDesktopPrefsWriteError,
@@ -40,6 +46,31 @@ export type CaptureGestureDeps = {
   readonly confirm: () => void;
   readonly log: (message: string, data?: Record<string, string | number>) => void;
 };
+
+export type CaptureGestureOutbox = {
+  /** Queues the read; pings the page unless it is still loading (it pulls on mount). */
+  readonly offer: (
+    event: DesktopCaptureGestureEvent,
+    page: { readonly loading: boolean; readonly ping: () => void },
+  ) => void;
+  /** The reads not yet pulled, oldest first; empties the queue. */
+  readonly drain: () => ReadonlyArray<DesktopCaptureGestureEvent>;
+};
+
+export function makeCaptureGestureOutbox(): CaptureGestureOutbox {
+  let pending: DesktopCaptureGestureEvent[] = [];
+  return {
+    offer: (event, page) => {
+      pending.push(event);
+      if (!page.loading) page.ping();
+    },
+    drain: () => {
+      const drained = pending;
+      pending = [];
+      return drained;
+    },
+  };
+}
 
 export type CaptureGesture = {
   readonly setEnabled: (enabled: boolean, options?: { readonly prompt?: boolean }) => Promise<void>;
@@ -123,6 +154,8 @@ export class InfinitusCaptureGestureService extends Context.Service<
     readonly setEnabled: (
       enabled: boolean,
     ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
+    /** The reads the renderer has not pulled yet, oldest first; empties the queue. */
+    readonly consumePending: Effect.Effect<ReadonlyArray<DesktopCaptureGestureEvent>>;
   }
 >()("@t3tools/desktop/captures/InfinitusCaptureGesture/InfinitusCaptureGestureService") {}
 
@@ -136,8 +169,9 @@ const make = Effect.gen(function* () {
   const context = yield* Effect.context<never>();
   const runPromise = Effect.runPromiseWith(context);
   const supported = environment.platform === "darwin";
+  const outbox = makeCaptureGestureOutbox();
 
-  // The user is in another app: an open window gets the event without being
+  // The user is in another app: an open window is pinged without being
   // revealed; with none open, one is revealed so the text is not lost.
   const dispatch = Effect.fn("infinitus.captureGesture.dispatch")(function* (
     event: DesktopCaptureGestureEvent,
@@ -146,14 +180,10 @@ const make = Effect.gen(function* () {
     const open = yield* electronWindow.main;
     const target = Option.isSome(open) ? open.value : yield* desktopWindow.revealOrCreateMain;
     if (target.isDestroyed()) return;
-    const send = () => {
-      if (!target.isDestroyed()) target.webContents.send(CAPTURE_GESTURE_EVENT_CHANNEL, event);
-    };
-    if (target.webContents.isLoadingMainFrame()) {
-      target.webContents.once("did-finish-load", send);
-      return;
-    }
-    send();
+    outbox.offer(event, {
+      loading: target.webContents.isLoadingMainFrame(),
+      ping: () => target.webContents.send(CAPTURE_GESTURE_PENDING_CHANNEL),
+    });
   });
 
   const gesture = makeCaptureGesture({
@@ -180,6 +210,7 @@ const make = Effect.gen(function* () {
       if (supported) yield* Effect.promise(() => gesture.setEnabled(enabled, { prompt: true }));
       return next;
     }),
+    consumePending: Effect.sync(outbox.drain),
   });
 });
 

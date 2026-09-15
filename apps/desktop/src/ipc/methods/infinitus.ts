@@ -1,4 +1,4 @@
-import { DesktopDeepLink } from "@t3tools/contracts";
+import { DesktopCaptureGestureEvent, DesktopDeepLink } from "@t3tools/contracts";
 import {
   InfinitusDesktopPrefs,
   InfinitusOAuthSignInInput,
@@ -96,6 +96,16 @@ export const cancelInfinitusOAuthSignIn = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.cancelOAuthSignIn")(function* (flowId) {
     const signIn = yield* InfinitusOAuthSignInService;
     yield* signIn.cancel(flowId);
+  }),
+});
+
+export const consumePendingCaptureGestures = makeIpcMethod({
+  channel: IpcChannels.CONSUME_CAPTURE_GESTURES_CHANNEL,
+  payload: Schema.Void,
+  result: Schema.Array(DesktopCaptureGestureEvent),
+  handler: Effect.fn("desktop.ipc.infinitus.consumePendingCaptureGestures")(function* () {
+    const gesture = yield* InfinitusCaptureGestureService;
+    return yield* gesture.consumePending;
   }),
 });
 

@@ -1407,8 +1407,14 @@ export interface DesktopBridge {
   pasteAsText?: () => Promise<void>;
   onMenuAction: (listener: (action: string) => void) => () => void;
   onSnapShotEvent?: (listener: (event: DesktopSnapShotEvent) => void) => () => void;
-  /** Fork (#433 slice 2): the capture gesture's reads. Optional: older shells never emit them. */
-  onCaptureGestureEvent?: (listener: (event: DesktopCaptureGestureEvent) => void) => () => void;
+  /**
+   * Fork (#433 slices 2–3): the capture gesture's reads, queued by the shell
+   * until pulled, oldest first; the shell pings `onCaptureGesturePending`
+   * when one lands while the page is up. Optional: a browser or an older
+   * shell has neither.
+   */
+  consumePendingCaptureGestures?: () => Promise<ReadonlyArray<DesktopCaptureGestureEvent>>;
+  onCaptureGesturePending?: (listener: () => void) => () => void;
   /**
    * Fork (#270 D): the link the shell was opened with, cleared on read; the
    * shell pings `onDeepLinkPending` when a new one lands while the window is

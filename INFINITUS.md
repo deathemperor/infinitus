@@ -837,8 +837,9 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
   `submitInfinitusSignInCode` (#677), `beginInfinitusOAuthSignIn` /
   `cancelInfinitusOAuthSignIn` (#1213), and `setInfinitusCaptureGestureEnabled`
-  / `onCaptureGestureEvent` with the `DesktopCaptureGestureEvent` schema
-  beside `DesktopSnapShotEvent` (#433 slice 2), and `consumePendingDeepLink`
+  / `consumePendingCaptureGestures` / `onCaptureGesturePending` with the
+  `DesktopCaptureGestureEvent` schema
+  beside `DesktopSnapShotEvent` (#433 slices 2–3), and `consumePendingDeepLink`
   / `onDeepLinkPending` with the `DesktopDeepLink` schema after it (#270 D),
   and `onHistoryGesture` (#1250) after those.
   `packages/contracts/src/infinitus.ts`
@@ -2169,9 +2170,13 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   `shell.beep()` confirms a read that got text, since the user is in another
   app. The text never reaches a log or a span, only its length. Merged into
   `InfinitusDesktop.layer`; the switch is `setInfinitusCaptureGestureEnabled`
-  (`ipc/methods/infinitus.ts`), the events `onCaptureGestureEvent`
-  (`preload.ts` guard). Both `osascript` scripts are spike-verified on the
-  developer's Mac (the tests mock `spawn`).
+  (`ipc/methods/infinitus.ts`). The reads are pulled, never pushed (slice 3):
+  the service queues each one (`makeCaptureGestureOutbox`) and pings
+  `desktop:infinitus-capture-gesture-pending` unless the page is still
+  loading, and the renderer drains `consumePendingCaptureGestures` on mount
+  and on every ping — a push at `did-finish-load` beat the coordinator's
+  mount and the text was lost after the beep. Both `osascript` scripts are
+  spike-verified on the developer's Mac (the tests mock `spawn`).
 - `apps/desktop/src/infinitus/InfinitusOAuthSignIn.ts` (+
   `InfinitusSwapdProcess.ts`, `infinitusSwapd.logic.ts`, test) — the sign-in
   the shell runs itself (#1213). **This is the one place the fork runs an

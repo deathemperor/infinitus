@@ -115,7 +115,8 @@ export const SET_INFINITUS_QUIT_WITH_APP_CHANNEL = "desktop:infinitus-set-quit-w
 // Fork: the double-tap-Shift capture gesture (#433 slice 2).
 export const SET_INFINITUS_CAPTURE_GESTURE_ENABLED_CHANNEL =
   "desktop:infinitus-set-capture-gesture-enabled";
-export const CAPTURE_GESTURE_EVENT_CHANNEL = "desktop:infinitus-capture-gesture-event";
+export const CAPTURE_GESTURE_PENDING_CHANNEL = "desktop:infinitus-capture-gesture-pending";
+export const CONSUME_CAPTURE_GESTURES_CHANNEL = "desktop:infinitus-consume-capture-gestures";
 // Fork: the Dock badge for threads waiting on the user (#270 B).
 export const SET_BADGE_COUNT_CHANNEL = "desktop:infinitus-set-badge-count";
 // Fork: sleep held off while a local thread's turn runs (#1075).
