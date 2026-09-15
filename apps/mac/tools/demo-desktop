@@ -17,6 +17,10 @@ def now():
 PROJECT = {"id": "p-demo", "title": "Demo project", "workspaceRoot": "/tmp/demo-project",
            "defaultModelSelection": {"provider": "claude", "model": "opus"}, "scripts": [],
            "createdAt": now(), "updatedAt": now()}
+# #1315: a project without a default model; `thread new` takes the environment's.
+BARE = {"id": "p-bare", "title": "Bare project", "workspaceRoot": "/tmp/bare-project", "defaultModelSelection": None,
+        "scripts": [], "createdAt": now(), "updatedAt": now()}
+ENV_DEFAULT = {"instanceId": "claude", "model": "sonnet"}
 THREADS = {
     "t-running": {"id": "t-running", "projectId": "p-demo", "title": "Running one", "runtimeMode": "full-access",
                   "interactionMode": "default", "branch": None, "worktreePath": None, "archivedAt": None,
@@ -58,13 +62,17 @@ class H(BaseHTTPRequestHandler):
             return self.reply(200, {"authenticated": ok, "auth": {"mode": "token"}})
         if not self.authed(): return
         if path == "/api/orchestration/shell":
-            return self.reply(200, {"snapshotSequence": SEQ[0], "projects": [PROJECT], "threads": list(THREADS.values()), "updatedAt": now()})
+            return self.reply(200, {"snapshotSequence": SEQ[0], "projects": [PROJECT, BARE], "threads": list(THREADS.values()), "updatedAt": now()})
         if path.startswith("/api/orchestration/threads/"):
             tid = path.rsplit("/", 1)[1]
             if tid not in THREADS: return self.reply(404, {"error": "no thread " + tid})
             return self.reply(200, dict(THREADS[tid], messages=MESSAGES.get(tid, []), activities=[], proposedPlans=[], checkpoints=[]))
         if path == "/api/infinitus/holds":
             return self.reply(200, HOLDS)
+        if path == "/api/infinitus/thread-defaults":   # resolved like the composer: override, the row, the environment
+            pid = self.path.partition("projectId=")[2]
+            row = next((p for p in (PROJECT, BARE) if p["id"] == pid), None)
+            return self.reply(200, {"defaultModelSelection": (row or {}).get("defaultModelSelection") or ENV_DEFAULT})
         if path == "/api/demo/dispatches":
             return self.reply(200, DISPATCHES)
         self.reply(404, {"error": "no route " + path})
