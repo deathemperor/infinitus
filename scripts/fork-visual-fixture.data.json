@@ -390,8 +390,8 @@
         "effect": "read",
         "name": "proxy",
         "options": [],
-        "replyShape": "{baseURL, keyPresent, routingStrategy?, error?}",
-        "summary": "CLIProxyAPI settings: base URL, whether a key is stored, routing strategy."
+        "replyShape": "{baseURL, keyPresent, enabled, routingStrategy?, sessionAffinity?, caveat?, error?}",
+        "summary": "CLIProxyAPI settings: base URL, whether a key is stored, whether the engine is on, routing strategy, session affinity (absent on a proxy without the route), the routing caveat and the last error."
       },
       {
         "args": [],
@@ -407,7 +407,7 @@
         "effect": "read",
         "name": "9router",
         "options": [],
-        "replyShape": "{baseURL, passwordPresent, enabled, error?}",
+        "replyShape": "{baseURL, dashboardURL, passwordPresent, enabled, error?}",
         "summary": "9Router settings: base URL, whether a password is stored, whether the engine is on, and the last error its refresh failed with."
       },
       {
@@ -451,6 +451,14 @@
         "options": [],
         "replyShape": "{routingStrategy}",
         "summary": "PUT the proxy's routing strategy."
+      },
+      {
+        "args": ["on|off"],
+        "effect": "write",
+        "name": "proxy-affinity",
+        "options": [],
+        "replyShape": "{sessionAffinity}",
+        "summary": "PUT the proxy's session affinity (a conversation stays on one credential). Refused on a proxy without the route."
       }
     ],
     "schemaVersion": 1

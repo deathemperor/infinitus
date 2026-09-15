@@ -1428,7 +1428,15 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
   4eaccb341c)"; Test connection sends `test-connection <engine> [--url]`
   (native #1216, read effect) at the typed url without saving and shows
   "Reachable in N ms" or the engine's own sentence, gated on the manifest
-  listing the verb — and the Devices
+  listing the verb; the Mac's Routing section (#1235): a Routing strategy
+  select over `proxy-routing` and a Session affinity switch over
+  `proxy-affinity`, each gated on its own verb, the switch drawn only while
+  the `proxy` reply carries `sessionAffinity` (a proxy without the route
+  gets the YAML note instead), the notes worded as `RoutingNotes` in
+  `EnginesPane.swift`, the proxy re-read after every write since its
+  settings are not in the snapshot; 9Router's `dashboardURL` as a link; and
+  the status list's `binaryPath` / `daemon` / `error` from `status.engines`
+  (`InfinitusEngineState`, optional keys) — and the Devices
   pane's "Pair a phone" card (`InfinitusPairPhoneCard` + `pairPhone.logic`):
   a QR of upstream's one-time pairing link whose host is the Mac's Cloudflare
   tunnel (`status.forkTunnel`, #572) while it is up, else the server's LAN
