@@ -201,7 +201,7 @@ const SCOPED_WINDOW_WORDS: Readonly<Record<string, string>> = {
  * turn, in percent used; null when the reading has no such window (or no
  * reading at all), which is no evidence either way.
  */
-export function stopWindowPct(
+function stopWindowPct(
   limitType: string | null,
   account: InfinitusFleet["accounts"][number],
 ): number | null {
