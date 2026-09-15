@@ -145,8 +145,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   routes (#710), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing` and `./captures` subpath exports.
-- `packages/contracts/src/environment.ts` — the `infinitus` and `turnQueue`
-  (#812) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
+- `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
+  (#812) and `turnQueueSendAt` (#1318) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
   beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,

@@ -175,6 +175,10 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
       (`thread.turn.queue`) and starts them itself once it is idle. Absent on
       builds that predate the queue, where the phone's outbox waits instead. */
   turnQueue: Schema.optionalKey(Schema.Boolean),
+  /** Fork (#1318): `thread.turn.queue` takes `sendAt: "tool-boundary"` and
+      the drain honours it. A server without this flag decodes the field and
+      silently sends the row at idle, so a steer client must gate on it. */
+  turnQueueSendAt: Schema.optionalKey(Schema.Boolean),
 });
 export type ExecutionEnvironmentCapabilities = typeof ExecutionEnvironmentCapabilities.Type;
 
