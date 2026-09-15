@@ -1112,7 +1112,12 @@ function classifyToolItemType(
   if (normalized.includes("mcp")) {
     return "mcp_tool_call";
   }
-  if (normalized.includes("websearch") || normalized.includes("web search")) {
+  // Claude Code's API-side server tool is named `web_search` (#1251).
+  if (
+    normalized.includes("websearch") ||
+    normalized.includes("web_search") ||
+    normalized.includes("web search")
+  ) {
     return "web_search";
   }
   if (normalized.includes("image")) {
