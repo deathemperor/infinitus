@@ -185,10 +185,6 @@ final class AppModel: ObservableObject {
     @Published var forecast: UsageForecast?
     /// Sessions whose AWS sign-in lapsed + logins in flight (AwsLogin.swift).
     @Published var awsLogins: [AwsLogin.Item] = []
-    /// Crash reports from the phone (MetricKit, over the mirror) and this
-    /// Mac's own diagnostic reports; newest first (CrashReport.swift).
-    @Published private(set) var crashReports: [CrashReport] = []
-    let crashStore = CrashStore(directory: CrashStore.defaultDirectory())
     private var awsLoginStates: [AwsLogin.State] = []
     private var awsAnnouncedRunKeys: Set<String> = []
     private var awsLoginQuitWatch: AnyCancellable?
@@ -1203,8 +1199,6 @@ final class AppModel: ObservableObject {
             self?.logEvent("other", icon: icon, "fork server: " + text)
         }
         liveActivityPusher.log = namedTunnel.log
-        crashReports = crashStore.list()
-        scanMacCrashReports()
         applyNamedTunnel()  // ends by applying the fork tunnel
         _ = awsLoginRunner
         // The playground gets a socket only where INFINITUS_CONTROL_SOCKET
@@ -1298,45 +1292,6 @@ final class AppModel: ObservableObject {
     /// The login landed: log the sign-in.
     private func awsLoginLanded(_ state: AwsLogin.State) {
         logMirrorInput("🔐", "\(state.providerOrAws.cliName) login for \(state.profile) signed in")
-    }
-
-    // MARK: crash reports (built-in, no third party — user 2026-09-04)
-
-    /// Stores a report, logs it, and — for the phone's — says so.
-    func ingestCrash(_ report: CrashReport, announce: Bool) {
-        guard !crashReports.contains(where: { $0.id == report.id }) else { return }
-        try? crashStore.save(report)
-        crashReports = crashStore.list()
-        logEvent("other", icon: "💥", "\(report.summary)")
-        if announce, !isPlayground { notify("phone app crashed — \(report.reason)") }
-    }
-
-    func removeCrash(_ id: String) {
-        crashStore.remove(id)
-        crashReports = crashStore.list()
-    }
-
-    /// This Mac's own crashes: `~/Library/Logs/DiagnosticReports/
-    /// Infinitus-*.ips` newer than the last look. The first look starts
-    /// the clock — old reports aren't news.
-    private func scanMacCrashReports() {
-        let key = "crash_scan_watermark"
-        let now = Date().timeIntervalSince1970
-        guard let since = defaults.object(forKey: key) as? Double else {
-            defaults.set(now, forKey: key)
-            return
-        }
-        defaults.set(now, forKey: key)
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/DiagnosticReports")
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return }
-        for name in names where name.hasPrefix("Infinitus-") && name.hasSuffix(".ips") {
-            let url = dir.appendingPathComponent(name)
-            guard let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
-                  mtime.timeIntervalSince1970 > since,
-                  let text = try? String(contentsOf: url, encoding: .utf8),
-                  let report = CrashReport.fromIPS(text, device: machineName) else { continue }
-            ingestCrash(report, announce: false)
-        }
     }
 
     private func logMirrorInput(_ icon: String, _ text: String) {

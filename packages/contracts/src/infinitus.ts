@@ -616,13 +616,14 @@ export const InfinitusDesktopPrefs = Schema.Struct({
 export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
 
 /*
- * Phone-only writes (#572). The native mirror's `POST /activities/token`,
- * `POST /client-activity` and `POST /crashes` bodies, carried unchanged as the
- * `--body` option of the `activities-token`, `client-activity` and
- * `crash-report` control commands so a paired phone reaches them through
- * `infinitus.command`. Every schema mirrors the Swift struct the native decoder
- * reads (LiveActivityPush.swift, LeaseTable.swift, CrashReport.swift); dates are
- * ISO 8601 strings because those decoders use `.iso8601`.
+ * Phone-only writes (#572). The native mirror's `POST /activities/token` and
+ * `POST /client-activity` bodies, carried unchanged as the `--body` option of
+ * the `activities-token` and `client-activity` control commands so a paired
+ * phone reaches them through `infinitus.command`. Every schema mirrors the
+ * Swift struct the native decoder reads (LiveActivityPush.swift,
+ * LeaseTable.swift); dates are ISO 8601 strings because those decoders use
+ * `.iso8601`. `POST /crashes` and its `crash-report` verb left with the Mac's
+ * crash reports (user 2026-09-15).
  */
 
 /** Which push a token takes: `alert` is an ordinary notification token;
@@ -680,23 +681,6 @@ export const InfinitusClientActivityReport = Schema.Struct({
   ttlMs: Schema.Number,
 });
 export type InfinitusClientActivityReport = typeof InfinitusClientActivityReport.Type;
-
-/** A crash or hang of the phone app as the Mac stores it: `platform` is `ios`
-    or `mac`, `kind` is `crash` or `hang`, `frames` are the faulting thread's
-    top frames, `raw` the diagnostic body (the Mac caps it at 512 KiB). */
-export const InfinitusCrashReport = Schema.Struct({
-  id: Schema.String,
-  platform: Schema.String,
-  device: Schema.String,
-  appVersion: Schema.String,
-  osVersion: Schema.String,
-  at: Schema.String,
-  kind: Schema.String,
-  reason: Schema.String,
-  frames: Schema.Array(Schema.String),
-  raw: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export type InfinitusCrashReport = typeof InfinitusCrashReport.Type;
 
 /** What a snapshot subscriber needs beyond the fast set (#587 step 2, #659):
     `stats` puts the `stats` scope in the server's lease while at least one

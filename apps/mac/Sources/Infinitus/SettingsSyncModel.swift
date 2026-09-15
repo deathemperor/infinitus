@@ -16,13 +16,13 @@ final class SettingsSyncModel: ObservableObject {
                 Task { await tick() }
             } else {
                 lastSeen = nil
-                status = nil
             }
         }
     }
-    @Published var status: String?
 
     private var lastSeen: SyncSnapshot?
+    /// The last line `report` logged, so a failing tick says it once.
+    private var lastReported: String?
     private let defaults = AppDefaults.standard
     private weak var model: AppModel?
 
@@ -71,14 +71,14 @@ final class SettingsSyncModel: ObservableObject {
     func tick() async {
         guard enabled, !Self.isDevInstance else { return }
         guard let dir = Self.containerDir() else {
-            status = "iCloud Drive not available on this Mac"
+            report("iCloud settings sync: iCloud Drive not available on this Mac")
             return
         }
         let url = dir.appendingPathComponent("settings-sync.json")
         let local = await localSnapshot()
-        // Re-check after the await: disabling mid-tick cleared the status,
-        // and a stale in-flight tick must not push anyway (observed as
-        // "pushed 00:23" under an off toggle, 2026-08-30).
+        // Re-check after the await: a stale in-flight tick must not push
+        // under a toggle switched off meanwhile (observed as "pushed
+        // 00:23" under an off toggle, 2026-08-30).
         guard enabled else { return }
         let remote = (try? Data(contentsOf: url)).flatMap(SyncSnapshot.decode)
         if let remote, remote != lastSeen, remote != local {
@@ -96,58 +96,30 @@ final class SettingsSyncModel: ObservableObject {
             } else {
                 lastSeen = remote
             }
-            status = "pulled \(Self.stamp())"
         } else if remote != local {
             do {
                 try FileManager.default.createDirectory(
                     at: dir, withIntermediateDirectories: true)
                 try local.encoded().write(to: url)
                 lastSeen = local
-                status = "pushed \(Self.stamp())"
             } catch {
-                status = "push failed: \(error.localizedDescription)"
+                report("iCloud settings sync: push failed — \(error.localizedDescription)")
             }
         } else if lastSeen == nil {
             lastSeen = remote
-            status = "in sync"
         }
     }
 
-    /// Manual export/import of the same snapshot the sync file carries
-    /// (user request 2026-08-30) — the sharing path for machines that
-    /// don't share an iCloud account. Same scope rules: never
-    /// credentials or push secrets.
-    func export(to url: URL) async {
-        do {
-            try await localSnapshot().encoded().write(to: url)
-            status = "exported \(Self.stamp())"
-        } catch {
-            status = "export failed: \(error.localizedDescription)"
-        }
-    }
-
-    func importConfig(from url: URL) async {
-        guard let snap = (try? Data(contentsOf: url)).flatMap(SyncSnapshot.decode)
-        else {
-            status = "import failed: not a Infinitus settings file"
-            return
-        }
-        await apply(snap)
-        // The imported state is now the local truth. Mark the sync file's
-        // CURRENT content as seen: the next tick then reads remote as
-        // unchanged and pushes the import, instead of treating the old
-        // remote as news and pulling it back over the import.
-        if let dir = Self.containerDir() {
-            let syncURL = dir.appendingPathComponent("settings-sync.json")
-            lastSeen = (try? Data(contentsOf: syncURL)).flatMap(SyncSnapshot.decode)
-        }
-        status = "imported \(Self.stamp())"
-    }
-
-    private static func stamp() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f.string(from: Date())
+    /// A tick that cannot do its job says so once in the event log. The
+    /// pane that used to show pulled/pushed/in sync went with the export
+    /// and import buttons beside it (user 2026-09-15) — the routine
+    /// outcomes are chatter, a failure is not. Repeats are dropped: the
+    /// tick runs on every snapshot refresh, and a Mac without iCloud
+    /// Drive would otherwise fill the log.
+    private func report(_ text: String) {
+        guard text != lastReported else { return }
+        lastReported = text
+        model?.logEvent("other", icon: "exclamationmark.triangle", text)
     }
 
     private func localSnapshot() async -> SyncSnapshot {

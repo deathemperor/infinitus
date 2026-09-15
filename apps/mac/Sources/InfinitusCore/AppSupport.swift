@@ -3,7 +3,7 @@ import Foundation
 /// Where the app keeps its state: `~/Library/Application Support/Infinitus`,
 /// or `$INFINITUS_APP_SUPPORT` when set (#506) — a dev or fixture
 /// instance then keeps everything it writes (stats caches, births, the
-/// owned ledger, events, attention, crash reports, themes) beside its
+/// owned ledger, events, attention, themes) beside its
 /// own, never the running bundle's. `tools/e2e.sh` and the fixtures
 /// set it next to `INFINITUS_CONTROL_SOCKET` and `CLAUDE_CONFIG_DIR`.
 public enum AppSupport {

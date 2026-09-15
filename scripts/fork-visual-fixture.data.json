@@ -94,14 +94,6 @@
         "summary": "Return account n to rotation."
       },
       {
-        "args": [],
-        "effect": "read",
-        "name": "crashes",
-        "options": [],
-        "replyShape": "{crashes: [{id, platform, device, at, kind, reason, frames}]}",
-        "summary": "Crash reports of the phone app (MetricKit, over the mirror) and this Mac app, newest first, without the raw diagnostic."
-      },
-      {
         "args": ["<fleet>", "[n]"],
         "effect": "write",
         "name": "randomize-names",
@@ -352,14 +344,6 @@
         "options": ["--body <json>"],
         "replyShape": "{clientId}",
         "summary": "A client's visibility report — the body `POST /client-activity` takes: {clientId, visible, focused, recentlyInteracted, scopes:[{type:sessions|session|fleets|stats, pid?}], ttlMs}. Leases the scopes it watches."
-      },
-      {
-        "args": [],
-        "effect": "write",
-        "name": "crash-report",
-        "options": ["--body <json>"],
-        "replyShape": "{id}",
-        "summary": "File a client's crash or hang — the body `POST /crashes` takes: {id, platform, device, appVersion, osVersion, at (ISO-8601), kind, reason, frames, raw?}; `crashes` lists it."
       },
       {
         "args": ["<key>", "<value>"],

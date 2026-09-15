@@ -362,11 +362,6 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
-        case "crashes":
-            return ControlReply(ok: true, result: try .of(["crashes": model.crashReports.map { r in
-                CrashListing(id: r.id, platform: r.platform, device: r.device, at: r.at, kind: r.kind,
-                             reason: r.reason, frames: r.frames) }]))
-
         case "aws-logins":
             return ControlReply(ok: true, result: try .of(["logins": model.awsLogins]))
 
@@ -693,11 +688,6 @@ final class ControlServer {
             let report = try ControlBody.decode(ClientActivity.Report.self, from: r)
             model.leases.report(report)
             return ControlReply(ok: true, result: .object(["clientId": .string(report.clientId)]))
-
-        case "crash-report":
-            let report = try ControlBody.decode(CrashReport.self, from: r, cap: 2 * CrashReport.rawCap)
-            model.ingestCrash(report, announce: true)
-            return ControlReply(ok: true, result: .object(["id": .string(report.id)]))
 
         case "prefs", "prefs-set":
             // `prefs` lists every entry; `prefs get k…` only those keys;
@@ -1084,9 +1074,4 @@ final class ControlServer {
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
     }
-}
-
-/// `crashes`: the reports without their raw diagnostic.
-private struct CrashListing: Encodable {
-    let id: String, platform: String, device: String, at: Date, kind: String, reason: String, frames: [String]
 }

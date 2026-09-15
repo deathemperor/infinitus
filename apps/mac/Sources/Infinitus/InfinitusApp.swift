@@ -164,14 +164,15 @@ struct InfinitusApp: App {
     // moved to Devices. Devices itself shrank on 2026-09-15 (#1178): this
     // Mac's name, phone alerts and the iCloud toggle are the desktop's
     // Devices page, over their prefs and the `apns` / `apns-key` verbs.
+    // The same day it lost settings-as-a-file and crash reports outright
+    // (user 2026-09-15), leaving the tunnel and account backup.
     [
         // "Sync" until 2026-09-02: the pane grew the phone companion and
-        // its routes, and syncing settings is now the smaller half.
+        // its routes, and only what cannot leave this Mac stayed.
         SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
-                    keywords: ["settings", "file", "devices", "crash", "phone",
-                               "cloudflare", "tunnel", "backup", "restore",
-                               "accounts", "export", "import"],
-                    view: AnyView(SyncPane(sync: model.sync, app: model))),
+                    keywords: ["devices", "phone", "cloudflare", "tunnel",
+                               "backup", "restore", "accounts"],
+                    view: AnyView(SyncPane(app: model))),
     ]
 }
 

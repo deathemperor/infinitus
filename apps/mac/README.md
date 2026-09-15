@@ -114,11 +114,10 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`), and its server rides the companion's quick or named Cloudflare tunnel (`fork_tunnel_*`).
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats**, on the desktop app's Stats page — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
-- **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
+- **This Mac's name** — Settings › Infinitus › Devices names the Mac for the phone and the widgets; the default drops macOS's "(7)" suffix.
 - **Dictate in any language** — Vietnamese in, an editable English draft out, with the session's own terms taught to the recognizer.
 - **All accounts limited, handled** — the popup, the desktop app and the phone count down to the first account back.
 - **Reset and swap alarms on the phone** — local notifications ten minutes before an exhausted account's reset and when a swap is near.
-- **Crash reports, on-device** — both apps record their own crashes.
 - **Randomize names** — `infinitusctl randomize-names` gives every account a fresh name from the theme's pool, or one account by number.
 - **Star & pause anywhere** — right-click a name in the popup, or swipe / long-press on the phone, to star an account or pause its rotation; a paused row shows a play button to resume.
 - **Ignite says what it did** — the plan line reports the window it started or why it failed, and the desktop app's Activity page keeps the log across relaunches.

@@ -10,7 +10,6 @@ import {
   InfinitusSecretInput,
   InfinitusCommandResult,
   InfinitusControlReply,
-  InfinitusCrashReport,
   InfinitusForecast,
   InfinitusFleet,
   InfinitusManifest,
@@ -474,7 +473,6 @@ describe("the phone-only write bodies", () => {
   const decodeRegistration = Schema.decodeUnknownSync(InfinitusActivityPushRegistration);
   const encodeRegistration = Schema.encodeUnknownSync(InfinitusActivityPushRegistration);
   const decodeActivity = Schema.decodeUnknownSync(InfinitusClientActivityReport);
-  const decodeCrash = Schema.decodeUnknownSync(InfinitusCrashReport);
 
   // The keys the native phone sends today (NetworkFleetMirror, ISO 8601 dates).
   const registration = {
@@ -540,22 +538,6 @@ describe("the phone-only write bodies", () => {
       ).toThrow();
     },
   );
-
-  it("decodes a crash report with and without its raw diagnostic", () => {
-    const report = {
-      id: "3E5C…",
-      platform: "ios",
-      device: "iPhone",
-      appVersion: "0.4.4",
-      osVersion: "iOS 26.0",
-      at: "2026-09-10T09:58:12Z",
-      kind: "crash",
-      reason: "EXC_BAD_ACCESS (SIGSEGV)",
-      frames: ["Infinitus +0x1234 -[Foo bar]"],
-    };
-    expect(decodeCrash(report).raw).toBeUndefined();
-    expect(decodeCrash({ ...report, raw: "{}" }).raw).toBe("{}");
-  });
 });
 
 describe("InfinitusAwsLogins", () => {

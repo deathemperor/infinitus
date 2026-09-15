@@ -1,15 +1,15 @@
 import XCTest
 @testable import InfinitusCore
 
-/// The `--body <json>` carrier (#572 N1): the three verbs decode exactly
-/// what their mirror routes decode.
+/// The `--body <json>` carrier (#572 N1): both verbs decode exactly what
+/// their mirror routes decode.
 final class ControlBodyTests: XCTestCase {
     private func request(_ command: String, body: String?) -> ControlRequest {
         ControlRequest(command: command, args: [], options: body.map { ["body": $0] } ?? [:], secret: nil)
     }
 
-    func testTheThreeVerbsAreWriteCommandsWithABodyOption() {
-        for name in ["activities-token", "client-activity", "crash-report"] {
+    func testBothVerbsAreWriteCommandsWithABodyOption() {
+        for name in ["activities-token", "client-activity"] {
             let command = ControlCommand.named(name)
             XCTAssertEqual(command?.effect, .write, name)
             XCTAssertEqual(command?.options.first, "--body <json>", name)   // activities-token also takes --forget (#572 G6)
@@ -31,17 +31,6 @@ final class ControlBodyTests: XCTestCase {
         XCTAssertEqual(r.clientId, "fork-1")
         XCTAssertEqual(r.scopes, [.sessions, .session(4242)])
         XCTAssertEqual(r.ttlMs, 30000)
-    }
-
-    func testACrashReportDecodesAndIsCappedLikeTheRoute() throws {
-        let body = #"{"id":"c1","platform":"ios","device":"iPhone","appVersion":"1.0","osVersion":"26.0","at":"2026-09-10T10:00:00Z","kind":"crash","reason":"SIGSEGV","frames":["a +1 b"]}"#
-        let r = try ControlBody.decode(CrashReport.self, from: request("crash-report", body: body), cap: 2 * CrashReport.rawCap)
-        XCTAssertEqual(r.id, "c1")
-        XCTAssertEqual(r.frames, ["a +1 b"])
-        let huge = String(repeating: "x", count: 2 * CrashReport.rawCap + 1)
-        XCTAssertThrowsError(try ControlBody.decode(CrashReport.self, from: request("crash-report", body: huge), cap: 2 * CrashReport.rawCap)) {
-            XCTAssertEqual(($0 as? ControlBody.Failure)?.message, "crash-report body is over \(2 * CrashReport.rawCap) bytes")
-        }
     }
 
     func testAMissingOrBrokenBodyIsRefusedWithAMessage() {

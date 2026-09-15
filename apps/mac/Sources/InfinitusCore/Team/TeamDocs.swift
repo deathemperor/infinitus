@@ -87,7 +87,10 @@ public enum TeamDocs {
         public init(at: Int, sessions: [SessionRow], fleets: [Fleet]) { self.at = at; self.sessions = sessions; self.fleets = fleets }
     }
 
-    /// `crashes.json` — `CrashReport.summary` lines, never the raw report.
+    /// `crashes.json` — one summary line per crash, never the raw report.
+    /// Nothing publishes this since the Mac's crash reports left
+    /// (user 2026-09-15); the kind stays for the envelopes already in
+    /// members' stores, and the Team rebuild (#1313) decides its fate.
     public struct Crashes: Codable, Equatable, Sendable {
         public var schema = 1
         public var crashes: [String]

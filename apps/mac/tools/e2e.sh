@@ -453,13 +453,14 @@ i=0; while /bin/kill -0 "$FORGET_PID" 2>/dev/null; do
 done
 exec 7>&-
 expect "d['forgotten'] is False" <"$LOG.forget" || fail "activities-token --forget with an open stdin"
-echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVersion":"0","at":"2026-09-10T00:00:00Z","kind":"crash","reason":"e2e","frames":[]}' | "$CTL" crash-report | expect "d['id']=='e2e-crash'" || fail "crash-report (stdin body)"
-"$CTL" crashes | expect "any(c['id']=='e2e-crash' for c in d['crashes'])" || fail "crash-report not listed by crashes"
+# The body may come on stdin instead of --body. A zero TTL releases, so
+# this check leaves no lease behind for the no-lease window below.
+echo '{"clientId":"e2e-stdin","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":0}' | "$CTL" client-activity | expect "d['clientId']=='e2e-stdin'" || fail "client-activity (stdin body)"
 # The #677 sign-in verbs are wired (the flow itself needs a human and the Claude CLI): a
 # flow nobody started is refused by id, and a fleet that does not exist by name.
 "$CTL" signin-status nope 2>&1 | grep -q "no sign-in nope" || fail "signin-status did not refuse an unknown flow"
 "$CTL" signin-begin no/such 2>&1 | grep -q "usage: signin-begin" || fail "signin-begin did not refuse an unknown fleet"
-"$CTL" crash-report --body '{nope' >/dev/null 2>&1 && fail "crash-report accepted a broken body"
+"$CTL" client-activity --body '{nope' >/dev/null 2>&1 && fail "client-activity accepted a broken body"
 echo "body verbs: ok"
 
 # --- scenarios: all-dead (no candidate, then recovers) -------------------
