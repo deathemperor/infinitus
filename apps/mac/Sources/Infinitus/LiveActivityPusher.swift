@@ -25,6 +25,9 @@ final class LiveActivityPusher: ObservableObject {
     @Published private(set) var registrations: [String: ActivityPushRegistration] = [:]
     /// One line for the pane: the last push's outcome.
     @Published private(set) var lastResult: String?
+    /// The last push's outcome per registration slot, for the `apns` read
+    /// (#1272 follow-up); in memory only, like `lastResult`.
+    @Published private(set) var lastPushes: [String: ApnsStatus.LastPush] = [:]
     var log: ((String, String) -> Void)?
 
     private var jwt: (token: String, mintedAt: Date)?
@@ -108,6 +111,7 @@ final class LiveActivityPusher: ObservableObject {
         let changed = registrations[fresh.slot]?.token != fresh.token
         registrations[fresh.slot] = fresh
         if changed {
+            lastPushes[fresh.slot] = nil
             log?("📲", "\(fresh.deviceName) registered a \(fresh.kind.rawValue) push token")
         }
         persist()
@@ -295,6 +299,7 @@ final class LiveActivityPusher: ObservableObject {
                 self.inFlight.remove(key)
                 if code == 200 {
                     self.lastResult = "\(what) → \(device) ok \(Date().formatted(date: .omitted, time: .shortened))"
+                    self.lastPushes[slot] = .init(at: Date(), outcome: .landed)
                     if let line = LiveActivityPush.outcomeLine(what: what, device: device, status: code, body: body,
                                                                error: nil, tokenDropped: false) {
                         self.log?("📲", line)
@@ -313,6 +318,8 @@ final class LiveActivityPusher: ObservableObject {
                 } else {
                     let why = error?.localizedDescription ?? "HTTP \(code) \(body)"
                     self.lastResult = "\(what) → \(device) failed: \(why)"
+                    self.lastPushes[slot] = .init(at: Date(), outcome: .failed, detail: LiveActivityPush.failureDetail(
+                        status: code, body: body, error: error?.localizedDescription))
                     if what == "start thread card" { self.startHolds[registration.deviceId] = nil }
                     // A dead token will never work again — drop it.
                     let dead = LiveActivityPush.isDeadToken(status: code, body: body)

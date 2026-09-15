@@ -23,12 +23,22 @@ export function apnsSupported(commands: ReadonlyArray<InfinitusManifestCommand>)
   return byName.has(APNS_READ_VERB) && byName.get(APNS_KEY_VERB)?.stdin === "secret";
 }
 
+/** What the Mac's last push to that phone and kind did (#1272 follow-up);
+    absent on a build before the field, or before any push since launch. */
+const ApnsLastPush = Schema.Struct({
+  at: Schema.String,
+  outcome: Schema.Literals(["landed", "failed"]),
+  detail: Schema.optionalKey(Schema.String),
+});
+export type ApnsLastPush = typeof ApnsLastPush.Type;
+
 const ApnsRegistration = Schema.Struct({
   deviceId: Schema.String,
   deviceName: Schema.String,
   kind: Schema.String,
   environment: Schema.String,
   registeredAt: Schema.String,
+  lastPush: Schema.optionalKey(ApnsLastPush),
 });
 export type ApnsRegistration = typeof ApnsRegistration.Type;
 
@@ -87,4 +97,14 @@ export function apnsKeyIdFromPrefs(prefs: InfinitusPrefs | undefined): string {
     environment its build uses. */
 export function registrationLine(row: ApnsRegistration): string {
   return `${row.deviceName} · ${row.kind} · ${row.environment}`;
+}
+
+/** The row's trailing last-push note, `time` already in the user's format:
+    "last push: 4:21 PM · landed" or "… · failed: HTTP 410 Unregistered". */
+export function lastPushLine(lastPush: ApnsLastPush, time: string): string {
+  const outcome =
+    lastPush.outcome === "landed"
+      ? "landed"
+      : `failed${lastPush.detail === undefined ? "" : `: ${lastPush.detail}`}`;
+  return `last push: ${time} · ${outcome}`;
 }

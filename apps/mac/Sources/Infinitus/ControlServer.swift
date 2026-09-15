@@ -826,7 +826,7 @@ final class ControlServer {
             let pusher = model.liveActivityPusher
             return ControlReply(ok: true, result: .object(ApnsStatus.fields(
                 keyPresent: pusher.keyStored, teamId: pusher.teamID, keyId: pusher.keyID,
-                registrations: Array(pusher.registrations.values))))
+                registrations: Array(pusher.registrations.values), lastPushes: pusher.lastPushes)))
 
         case "apns-key":
             // #1178: the .p8 rides stdin, never argv; empty stdin forgets it.
