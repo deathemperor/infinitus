@@ -1014,6 +1014,17 @@ source's Codex thread>, fork: true, lastTurnId: <the turn>}`
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs` and
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them).
+- `patches/expo-widgets@57.0.15.patch` — upstream's patch (#11604, system
+  glass for Live Activities) plus the fork's hunk (#1277): `WidgetsModule.swift`
+  observes `Activity<LiveActivityAttributes>.activityUpdates` and each
+  activity's `activityStateUpdates` and emits `onExpoWidgetsActivityUpdate`
+  `{activityId, name, state}` (`started`, then ActivityKit's own state names);
+  `addActivityUpdateListener` and `ActivityUpdateEvent` on the JS side (src,
+  build and index). One patch file per package version is pnpm's rule, so
+  the two live together; re-apply the fork's hunk with `pnpm patch` /
+  `pnpm patch-commit` when upstream bumps expo-widgets or rewrites its patch
+  (the lockfile's `patch_hash` follows). The thread-card bridge is its one
+  consumer.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
   upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
   resolves afresh, and once npm carried 57.0.5 the range resolved past the
@@ -2478,7 +2489,10 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   the Mac still holds; forgetting an empty slot is the Mac's no-op). The
   forget rides the bridge's send loop — retried while the Mac is unreachable,
   dropped when a new card's token is offered — and the Settings row reads
-  "withdrawn". A card dismissed while the app stays closed is caught on the
+  "withdrawn". A card iOS starts from a push-to-start while the app is in the
+  background is seen through the patched `onExpoWidgetsActivityUpdate` event
+  (#1277, above), which runs the same re-scan, so its token reaches the Mac
+  and the next push updates the card in place instead of starting another. A card dismissed while the app stays closed is caught on the
   next foreground; the Mac's staleAfter fallback covers the gap. "Show a test card" starts the
   card locally with a fabricated state (`TEST_CARD_STATE`, one row per
   ranked phase, the working one dated against the press so its timer ticks —

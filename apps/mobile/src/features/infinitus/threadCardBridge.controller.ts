@@ -33,6 +33,12 @@ export interface ThreadCardBridgeDeps {
     listener: (event: { readonly activityPushToStartToken: string }) => void,
   ) => Subscription;
   readonly addAppStateListener: (listener: (state: string) => void) => Subscription;
+  /** A Live Activity of this app started or changed state (#1277): the card
+      iOS starts from a push-to-start while the app is in the background is
+      only ever seen here, so every event re-reads the live cards. */
+  readonly addActivityUpdateListener: (
+    listener: (event: { readonly activityId: string; readonly state: string }) => void,
+  ) => Subscription;
   /** A local card start or end (the test card); answers the unsubscribe. */
   readonly subscribeLocalChanges: (listener: () => void) => () => void;
   readonly isConnected: () => boolean;
@@ -178,6 +184,7 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
       retry();
     }),
   );
+  subscriptions.push(deps.addActivityUpdateListener(() => sync()));
   const unsubscribeLocal = deps.subscribeLocalChanges(sync);
 
   return {
