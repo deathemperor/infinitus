@@ -39,12 +39,16 @@ contributor shorthand for this TypeScript tree and the Swift app.
   (upstream-channel tests start on a nightly feed via the harness `settings`
   option; the harness's `resourcesPath` option and the feed-swap test are
   the fork's, #1042; `DesktopShellEnvironment.test.ts`'s harness takes an
-  `existingPaths` fake filesystem for the known-CLI-dirs fallback, #1078)
+  `existingPaths` fake filesystem for the known-CLI-dirs fallback, #1078), and
+  `apps/desktop/src/updates/releaseNotes.test.ts` (the channel argument: the
+  notes are filtered by `resolveDefaultDesktopUpdateChannel`, which never
+  answers `latest` here)
   are re-flipped to `infinitus` after each merge, never the rule.
   An upstream migration whose number collides with the fork's own
   (`051`–`057` and `059`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
-  is the fork's `058`), so an existing fork database never skips it. Upstream commits
+  is the fork's `058`, its `052_ProjectionThreadTitleState` the fork's
+  `061`), so an existing fork database never skips it. Upstream commits
   `.pnpm-store/v11/index.db` (#11265) and rewrites it on every install; the
   fork ignores the file and drops it from the merge (`git rm --cached`), so
   each sync meets it as a modify/delete conflict resolved the same way.
@@ -168,7 +172,7 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   — `captures.toggle` (`mod+alt+c`) and `captures.add` (`mod+alt+shift+c`),
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
   `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way;
-  `thread.nextAttention` (`mod+shift+l`, `!terminalFocus`) in
+  `thread.nextAttention` (`mod+alt+n`, `!terminalFocus`; it was `mod+shift+l` until upstream's #11615 took that chord for `composer.previousWorktree` — the fork yields on a default-chord collision) in
   `THREAD_KEYBINDING_COMMANDS` (#270 C).
 - `apps/web/src/components/Sidebar.tsx` — `resolveNextAttentionThreadKey`
   (ranks the rendered list: approval, input, failed, held, unseen
@@ -908,7 +912,8 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
 - Upstream workflows that deploy or publish (Release, Deploy T3 Connect
   relay, Forward to Cursor hygiene, Mobile EAS Preview/Production, Publish
   AUR, Issue Labels, Desktop macOS Preview, Web Preview, Mobile Showcase
-  Screenshots, Thread Transfer Report) are disabled in the repository's
+  Screenshots, Thread Transfer Report, Desktop macOS Preview Publish — new
+  with the 0310cbf9 sync, `pull_request_target` on close/unlabel) are disabled in the repository's
   Actions settings, not deleted, so merges stay clean.
 
 ## Fork-only files

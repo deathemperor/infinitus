@@ -33,7 +33,6 @@ import { Route as SettingsConnectionsRouteImport } from './routes/settings.conne
 import { Route as SettingsArchivedRouteImport } from './routes/settings.archived'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
-import { Route as ConnectCallbackRouteImport } from './routes/connect_.callback'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as SettingsInfinitusIndexRouteImport } from './routes/settings.infinitus.index'
 import { Route as SettingsInfinitusThemesRouteImport } from './routes/settings.infinitus.themes'
@@ -166,11 +165,6 @@ const ProjectsProjectKeyRoute = ProjectsProjectKeyRouteImport.update({
   path: '/projects/$projectKey',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ConnectCallbackRoute = ConnectCallbackRouteImport.update({
-  id: '/connect_/callback',
-  path: '/connect/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
   id: '/pull-requests',
   path: '/pull-requests',
@@ -245,7 +239,6 @@ export interface FileRoutesByFullPath {
   '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
-  '/connect/callback': typeof ConnectCallbackRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
@@ -281,7 +274,6 @@ export interface FileRoutesByTo {
   '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
-  '/connect/callback': typeof ConnectCallbackRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
@@ -320,7 +312,6 @@ export interface FileRoutesById {
   '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
-  '/connect_/callback': typeof ConnectCallbackRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
@@ -360,7 +351,6 @@ export interface FileRouteTypes {
     | '/utilization'
     | '/welcome'
     | '/pull-requests'
-    | '/connect/callback'
     | '/projects/$projectKey'
     | '/settings/appearance'
     | '/settings/archived'
@@ -396,7 +386,6 @@ export interface FileRouteTypes {
     | '/utilization'
     | '/welcome'
     | '/pull-requests'
-    | '/connect/callback'
     | '/projects/$projectKey'
     | '/settings/appearance'
     | '/settings/archived'
@@ -434,7 +423,6 @@ export interface FileRouteTypes {
     | '/utilization'
     | '/welcome'
     | '/_chat/pull-requests'
-    | '/connect_/callback'
     | '/projects/$projectKey'
     | '/settings/appearance'
     | '/settings/archived'
@@ -472,7 +460,6 @@ export interface RootRouteChildren {
   UsageRoute: typeof UsageRoute
   UtilizationRoute: typeof UtilizationRoute
   WelcomeRoute: typeof WelcomeRoute
-  ConnectCallbackRoute: typeof ConnectCallbackRoute
   ProjectsProjectKeyRoute: typeof ProjectsProjectKeyRoute
 }
 
@@ -646,13 +633,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/connect_/callback': {
-      id: '/connect_/callback'
-      path: '/connect/callback'
-      fullPath: '/connect/callback'
-      preLoaderRoute: typeof ConnectCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_chat/pull-requests': {
       id: '/_chat/pull-requests'
       path: '/pull-requests'
@@ -810,7 +790,6 @@ const rootRouteChildren: RootRouteChildren = {
   UsageRoute: UsageRoute,
   UtilizationRoute: UtilizationRoute,
   WelcomeRoute: WelcomeRoute,
-  ConnectCallbackRoute: ConnectCallbackRoute,
   ProjectsProjectKeyRoute: ProjectsProjectKeyRoute,
 }
 export const routeTree = rootRouteImport
