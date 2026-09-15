@@ -406,8 +406,10 @@ jobs:
 
           # Release notes are prose the Swift build never reads: a PR whose only
           # apps/mac change is its changelog.d fragment (or CHANGELOG.md at a
-          # release cut) pays no macOS minutes.
-          paths=$(tr '\t' '\n' <<< "$rows" | grep -vE '^apps/mac/(changelog\.d/|CHANGELOG\.md$)')
+          # release cut) pays no macOS minutes. The `|| true` matters: the
+          # runner's shell is `bash -e`, and grep exits 1 when every row is
+          # a note — the very PR this exempts — which failed the step (#1261).
+          paths=$(tr '\t' '\n' <<< "$rows" | grep -vE '^apps/mac/(changelog\.d/|CHANGELOG\.md$)' || true)
 
           pattern='^apps/mac/|^\.github/workflows/ci\.yml$'
 
