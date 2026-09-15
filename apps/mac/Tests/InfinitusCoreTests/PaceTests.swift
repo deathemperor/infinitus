@@ -33,13 +33,17 @@ final class PaceTests: XCTestCase {
         XCTAssertEqual(pace?.elapsed, day)
     }
 
+    /// The reset second itself: no elapsed span, so no rate to read.
     func testExactBoundaryIsSuppressed() {
         XCTAssertNil(Pace.compute(pct: 50, resetsAt: iso(now), fetchedAt: now))
     }
 
-    func testSuppressionWindow() {
-        XCTAssertNotNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: day), fetchedAt: now))
-        XCTAssertNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: day - 60), fetchedAt: now))
+    /// A minute in is the floor — inside the first day, where swapd and this
+    /// port both used to stay quiet for a whole day.
+    func testMinimumElapsedSpan() {
+        XCTAssertNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: 59), fetchedAt: now))
+        XCTAssertNotNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: 60), fetchedAt: now))
+        XCTAssertNotNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: day / 2), fetchedAt: now))
     }
 
     func testUnusableInputs() {

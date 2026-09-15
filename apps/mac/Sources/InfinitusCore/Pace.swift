@@ -15,10 +15,14 @@ public enum Pace {
     /// Weekly windows reset on a fixed 7-day cadence.
     public static let weeklyPeriod: TimeInterval = 7 * 24 * 3600
 
-    /// Right after a reset, elapsed is tiny, so `expectedPct` is near zero
-    /// and almost any usage reads as "far ahead" — a false positive. Stay
-    /// quiet for this long into a window.
-    public static let suppressAfterReset: TimeInterval = 24 * 3600
+    /// Shortest elapsed span pace is read over. The rate below is `actual /
+    /// elapsed` and a fetch can land on the reset second itself, so there has
+    /// to be a span to measure. swapd suppressed a whole day here once, on the
+    /// grounds that expected is near zero right after a reset and any usage
+    /// reads as "far ahead" — but `aheadThresholdPct` is already that damper,
+    /// and scales with what was spent rather than with the clock, so the day
+    /// only cost every window its stripe (swapd, `MIN_ELAPSED_S`).
+    public static let minElapsed: TimeInterval = 60
 
     /// Minimum (actual − expected) gap in points before the window counts
     /// as ahead of pace. Below it, the difference is normal variance and
@@ -51,7 +55,7 @@ public enum Pace {
         let raw = reset.timeIntervalSince(fetchedAt).truncatingRemainder(dividingBy: period)
         let remaining = raw < 0 ? raw + period : raw
         let elapsed = remaining == 0 ? 0 : period - remaining
-        guard elapsed >= suppressAfterReset else { return nil }
+        guard elapsed >= minElapsed else { return nil }
 
         let expected = min(100, elapsed / period * 100)
         return Result(expectedPct: expected, actualPct: pct, elapsed: elapsed,
