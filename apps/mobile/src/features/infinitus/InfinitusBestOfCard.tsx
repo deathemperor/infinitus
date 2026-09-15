@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { CommonActions, useNavigation } from "@react-navigation/native";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
@@ -9,6 +9,7 @@ import { useThreadShells } from "../../state/entities";
 import {
   BEST_OF_STATUS_LABEL,
   bestOfCardShown,
+  bestOfGroupKey,
   bestOfMemberStatus,
   bestOfSiblings,
 } from "./bestOf.logic";
@@ -24,15 +25,21 @@ export function InfinitusBestOfCard(props: { readonly thread: EnvironmentThreadS
   const { thread } = props;
   const navigation = useNavigation();
   const shells = useThreadShells();
+  /** The shells array is new on every tick of any thread; the siblings are
+      rebuilt only when the group's own members change (`bestOfGroupKey`). */
+  const groupKey =
+    thread.groupId == null ? "" : bestOfGroupKey(shells, thread.environmentId, thread.groupId);
+  const shellsRef = useRef(shells);
+  shellsRef.current = shells;
   const siblings = useMemo(
     () =>
       thread.groupId == null
         ? []
         : bestOfSiblings(
-            shells.filter((shell) => shell.environmentId === thread.environmentId),
+            shellsRef.current.filter((shell) => shell.environmentId === thread.environmentId),
             thread.groupId,
           ),
-    [shells, thread.environmentId, thread.groupId],
+    [groupKey, thread.environmentId, thread.groupId],
   );
   if (!bestOfCardShown(siblings, thread.id)) return null;
   return (
