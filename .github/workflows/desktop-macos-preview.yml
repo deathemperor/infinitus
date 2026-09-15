@@ -40,7 +40,7 @@ jobs:
 =======
     name: Build preview JS bundle
     if: github.event.label.name == 'preview:mac'
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream/main
     timeout-minutes: 30
     steps:
