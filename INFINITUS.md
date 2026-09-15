@@ -353,140 +353,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `workEntryRowLabel` (compact and expanded), `singleToolCallLabel` and
   `liveToolActivitySummary`; the expanded body already leads with the
   command block.
-- Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test,
-  exported as `@t3tools/client-runtime/turnFooter`) — `turnFooter(thread,
-turnId)` → `{durationMs, completedAt, runningShells, runningAgents}` for a
-  completed turn, `turnFooterLabel(footer, time)` → "Done in 49s · 12:59 PM
-  · 1 shell still running · 1 agent still running". Derived, no contract: the latest turn's `startedAt →
-completedAt`, an older turn's user message → last assistant `updatedAt`
-  (the on-screen durations' rule; overstates by a hold or queue wait — the
-  per-turn `durationMs` row never reaches the client, only the rollup),
-  shells from the turn's `task.started` bash/shell tasks that went
-  `isBackgrounded` and have no end (`endedAt`, a terminal status,
-  `task.completed`) anywhere in the thread, zero once the session stopped;
-  agents (#974) by the same rule for the turn's `agentKind: "agent"` tasks
-  (an unstamped row is classified from its task type) — a foreground agent
-  finished inside the turn, so only a backgrounded one can still run. For
-  that the Claude adapter (`ClaudeAdapter.ts`) forwards the SDK's
-  `is_backgrounded` on `task.started` (`TaskStartedPayload.isBackgrounded`
-  in `packages/contracts/src/providerRuntime.ts`, passed through by
-  `ProviderRuntimeIngestion.ts`), keeps each task's backgrounded/ambient
-  state, and on a session exit or the server's shutdown finalizer — never
-  an internal restart — emits one `runtime.error` ("Session ended with N
-  background agents running — their work is not finished",
-  `liveBackgroundAgentsMessage`) before the stopped rows: ingestion turns
-  that into the error activity and marks the session `error`, so the
-  thread stops reading as finished work. A killed server writes nothing,
-  so `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+
-  test; `infinitus/backgroundAgents.logic.ts` holds the wording and the
-  rows, shared with the adapter) runs as the `background-agents.reconcile`
-  startup phase right after `provider-sessions.reconcile` in
-  `serverRuntimeStartup.ts` (#977): one SQL statement over the sessions
-  table with correlated lookups on each thread's activity index finds the
-  ready/running/starting threads whose agent-kind `task.started` rows went
-  to the background and never ended, then — for the ones not live — writes
-  the stopped rows a graceful stop would have, the error row, and the
-  session's error state — except a thread the provider-sessions reconcile
-  just flipped to `starting` for the post-update continuation, which gets
-  the stopped rows only: the continuation prompt is its wake. The stopped
-  rows make it idempotent; a #974 error row after the start row excludes
-  the thread as well.
-  Web: `apps/web/src/components/chat/useTurnFooters.ts` (identity kept
-  while entries are equal, so a running turn's ticks repaint nothing),
-  `MessagesTimeline.tsx` — `turnFooters` on the props and the row activity
-  context, drawn by `AssistantMessageMeta` in place of the bare time;
-  `ChatView.tsx` — the hook and the prop. The phone reuses the module.
-- Server-side message queue (#806, the server half of #270 F):
-  `packages/contracts/src/baseSchemas.ts` — `QueueId`;
-  `packages/contracts/src/orchestration.ts` — `OrchestrationQueuedTurn`,
-  `queuedTurns?` on `OrchestrationThread` and `OrchestrationThreadShell`
-  (optional; absent when empty so pre-queue payloads still decode), the
-  commands `thread.turn.queue` (client variant carries uploads like
-  `thread.turn.start`'s), `.queue.update`, `.queue.remove`, `.queue.move`,
-  `queuedFrom?` on both turn-start commands, and the events
-  `thread.turn-queued` / `-queue-updated` / `-queue-removed` (`reason:
-user | sent`) / `-queue-moved`; `packages/shared/src/orderKeys.ts` — the
-  fractional key helpers moved out of `client-runtime` `threadSort.ts` (which
-  re-exports them as `pinOrderKeyBetween` / `generateSpreadPinOrderKeys`) so
-  the decider validates and defaults a key; `apps/server/src/orchestration/decider.ts`
-  — the four cases (queue is idempotent by re-emission, update/move refuse a
-  missing row, remove re-emits) and the turn start's `queuedFrom` removal in
-  the same batch (a row already gone refuses the start, so "Send now" and
-  the idle drain racing on one row send it once); `projector.ts`,
-  `Schemas.ts`, `packages/client-runtime` `threadReducer.ts` — the events on
-  the in-memory thread; `Layers/ProjectionPipeline.ts` — the rows in
-  `projection_thread_queued_turns` (migration `051`, `persistence/ProjectionThreadQueuedTurns.ts`;
-  `context_json`, migration `059`, keeps the message's context records
-  upstream #11265 added, and the drain sends them with it — #969),
-  dropped with the thread; `Layers/ProjectionSnapshotQuery.ts` — the rows on
-  every thread read (snapshot, command read model, shells, detail);
-  `Normalizer.ts` — the queue commands' uploads stored like a sent
-  message's (and pruned like a reverted message's, #847: a row removed
-  without sending, or an edit that dropped an upload, schedules the
-  thread's attachment prune, whose retained set now counts queued rows'
-  uploads too; a `sent` removal prunes nothing, and the boot-time cleanup
-  replay covers reverts and deletes only, so a crash between the queue
-  event and its prune leaves the copy until the thread is deleted); `apps/server/src/server.ts` — `InfinitusTurnQueueLive` in
-  `ReactorLayerLive` above the interrupt and hold layers it consumes;
-  `Services/InfinitusSessionInterrupt.ts` — `paused` stream (like the
-  hold's `held`). Fork-only: `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts`
-  (+ `infinitusTurnQueue.logic.ts`, test) — the drain: sends a thread's
-  first row as `thread.turn.start {queuedFrom}` when the thread is idle
-  (`queueDrainVerdict`: no turn running, starting or pending, not held,
-  not paused, not archived, no send of its own in flight; `error` sessions
-  never, see #832), one send per thread at a time; wakes on session-set,
-  the queue events, unarchive, a failed start, a hold or pause letting the
-  thread go, and once at boot after the hold and interrupt layers have
-  published their first lists (5 s cap). A send the decider refuses stays
-  in the queue with an `error` activity `queue.send.failed` and is skipped
-  until edited, moved or removed (the queue blocks behind it; a row already
-  sent or removed only logs); a send the provider fails to start after the
-  row was consumed is put back once, at the head, as `<queueId>~retry` with
-  a fresh message id and an `info` activity `queue.requeued` — the drain's
-  own sends only, "Send now" stays a manual send.
-- Update idle gate (#829): a server update is gated on the server's own
-  turn state, never on process heuristics. `packages/contracts/src/server.ts`
-  — `ServerRunningTurn` (`threadId`, `turnId`), `ServerUpdateRunningTurnsPolicy`
-  (`refuse` | `wait` | `interrupt`; `runningTurns?` on `ServerSelfUpdateInput`,
-  missing = `refuse`), the `waiting` progress stage with `runningTurns?`
-  (count), and `runningTurns?` on `ServerSelfUpdateError` naming the turns a
-  refusal was over; `packages/contracts/src/environmentHttp.ts` — `GET
-/api/infinitus/running-turns` (read scope) for infinitusctl and the desktop;
-  `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` +
-  `Layers/InfinitusRunningTurns.ts` — every provider session with an
-  `activeTurnId` (a turn waiting on an approval counts: it dies with the
-  process too), served by `Layers/InfinitusHttp.ts`; `apps/server/src/cloud/selfUpdate.ts`
-  — `awaitIdle`: `refuse` fails at the entry (nothing downloaded for
-  nothing), `wait` downloads first and polls (5 s) at the install hook
-  reporting each change of count, `interrupt` passes; in desktop mode the
-  run itself never waits (the desktop app's update run has a timeout) and
-  `commitDesktopUpdate` gates under the policy the preparation used (an
-  unknown token = `refuse`); `ws.ts` streams the count, `server.ts` provides
-  the layer. Client: `packages/client-runtime/src/state/server.ts` —
-  `waiting` stage + `runningTurns?` on the running state;
-  `apps/web/src/components/ServerUpdateAction.tsx` — a refusal (error with
-  `runningTurns`) becomes a toast, "Update when they finish" resends with
-  `wait`, "Update now" with `interrupt`, dismiss = later; the progress row
-  reads "Waiting for N running threads to finish…". Desktop:
-  `apps/web/src/components/desktopUpdate.logic.ts` — `countRunningLocalTurns`
-  over the thread shells of local backends (primary or desktop-local,
-  `isLocalConnectionTarget` from `ProviderUpdateLaunchNotification.environments.ts`)
-  and the copy; `sidebar/SidebarUpdatePill.tsx` — the install click while
-  turns run opens `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, a modal in
-  the plain install confirm's shape (user ruling 2026-09-12: a dialog, not a
-  toast): Later / Install now / "Install when they finish", which arms
-  `desktopInstallWhenIdleAtom` in `state/desktopUpdate.ts`; the pill fires
-  the install once the count hits zero and the install action is back,
-  reads "Installs when N running threads finish. Click to cancel.", and a
-  click on it opens the same dialog to keep, cancel or skip the wait. The
-  arming is dropped only when no downloaded build is left — the 4-minute
-  poll reads as `checking` for a moment with the build kept, and disarming
-  on that made the wait silently lapse; shells not yet bootstrapped = an
-  unknown count, which offers only "Install now". No `apps/desktop` change:
-  the main process has no orchestration access, so the two quit paths are
-  gated at the renderer (the IPC install) and at the server (the commit of
-  a remote desktop update); a plain quit never installs (`DesktopUpdates.ts`
-  sets `autoInstallOnAppQuit` false), so those two are the only paths.
+- Turn footer (#952): `packages/client-runtime/src/turnFooter.ts` (+ test; `turnFooter`, `turnFooterLabel`, exported as `@t3tools/client-runtime/turnFooter`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`is_backgrounded` → `TaskStartedPayload.isBackgrounded` in `packages/contracts/src/providerRuntime.ts`, passed through by `ProviderRuntimeIngestion.ts`; `liveBackgroundAgentsMessage`, #974), `apps/server/src/infinitus/Layers/BackgroundAgentsReconcile.ts` (+ test; `infinitus/backgroundAgents.logic.ts`; the `background-agents.reconcile` phase in `serverRuntimeStartup.ts`, #977), `apps/web/src/components/chat/useTurnFooters.ts`, `MessagesTimeline.tsx` (`turnFooters`, `AssistantMessageMeta`), `ChatView.tsx`. Rules and traps: `docs/internals/turn-footer.md`.
+- Server-side message queue (#806, the server half of #270 F): `packages/contracts/src/baseSchemas.ts` (`QueueId`), `packages/contracts/src/orchestration.ts` (`OrchestrationQueuedTurn`, `queuedTurns?`, `thread.turn.queue` / `.queue.update` / `.queue.remove` / `.queue.move`, `queuedFrom?`, `thread.turn-queued` / `-queue-updated` / `-queue-removed` / `-queue-moved`), `packages/shared/src/orderKeys.ts`, `apps/server/src/orchestration/decider.ts`, `projector.ts`, `Schemas.ts`, `packages/client-runtime` `threadReducer.ts`, `Layers/ProjectionPipeline.ts` (`projection_thread_queued_turns`, migrations `051`, `059`; `persistence/ProjectionThreadQueuedTurns.ts`), `Layers/ProjectionSnapshotQuery.ts`, `Normalizer.ts`, `apps/server/src/server.ts` (`InfinitusTurnQueueLive`), `Services/InfinitusSessionInterrupt.ts` (`paused`); fork-only `apps/server/src/infinitus/Layers/InfinitusTurnQueue.ts` (+ `infinitusTurnQueue.logic.ts`, `queueDrainVerdict`). Rules and traps: `docs/internals/turn-queue.md`.
+- Update idle gate (#829): `packages/contracts/src/server.ts` (`ServerRunningTurn`, `ServerUpdateRunningTurnsPolicy`, `runningTurns?` on `ServerSelfUpdateInput` and `ServerSelfUpdateError`, the `waiting` progress stage), `packages/contracts/src/environmentHttp.ts` (`GET /api/infinitus/running-turns`), `apps/server/src/infinitus/Services/InfinitusRunningTurns.ts` + `Layers/InfinitusRunningTurns.ts` (served by `Layers/InfinitusHttp.ts`), `apps/server/src/cloud/selfUpdate.ts` (`awaitIdle`, `commitDesktopUpdate`), `ws.ts`, `server.ts`; `packages/client-runtime/src/state/server.ts`, `apps/web/src/components/ServerUpdateAction.tsx`, `apps/web/src/components/desktopUpdate.logic.ts` (`countRunningLocalTurns`), `sidebar/SidebarUpdatePill.tsx`, `sidebar/DesktopUpdateRunningTurnsDialog.tsx`, `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - Babysit (#269 A, on the #806 queue): `packages/contracts/src/orchestration.ts`
   — `ThreadBabysit` (`since`, `rounds`), `BABYSIT_MAX_ROUNDS` (10), `babysit?`
   on `OrchestrationThread` and `OrchestrationThreadShell` (optional, so
@@ -523,111 +392,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   next to the PR badge on fork servers with an open linked PR (or while
   on). Tests: `infinitusBabysit.logic.test.ts`, `InfinitusBabysit.test.ts`,
   `ProjectionPipeline.babysit.test.ts`, `threadReducer.test.ts`.
-- Turn usage (#834, server half): `packages/contracts/src/orchestration.ts`
-  — `ThreadTurnUsage` (one completed turn: main-agent tokens, `complete`,
-  `hasSubagents`, the provider's `costUsd` estimate or null, `model`),
-  `ThreadUsageRollup` (`source: runtime | transcript`, sums, `subagentTurns`,
-  `costUsd` null until a turn carried one, distinct `models`, `lastTurnAt`),
-  `usage?` on `OrchestrationThread` and `OrchestrationThreadShell` (absent
-  until a turn is recorded — never zero for "not recorded"), the server
-  command `thread.turn.usage.record` and the event
-  `thread.turn-usage-recorded {threadId, turnUsage, usage}`;
-  `packages/shared/src/threadUsage.ts` — `addTurnUsage` / `foldTurnUsage`,
-  the one fold. `packages/contracts/src/providerRuntime.ts` — `turnCostUsd?`
-  and `turnModels?` on `turn.completed`, which
-  `apps/server/src/provider/Layers/ClaudeAdapter.ts` fills from
-  `claudeTurnUsage.logic.ts`: the SDK's `total_cost_usd` / `modelUsage` are
-  cumulative per query() session, so each result is differenced from the
-  previous one (`lastResultTotals`, reset when the query reopens; a total
-  that went down means the session started over). The same module's
-  `promptCacheVerdict` (#974) counts, per session, the assistant calls that
-  sent ≥ 10k input tokens with no cache read or write — a subagent's too —
-  and five in a row raise one `runtime.warning` ("No prompt cache: …"),
-  once per session; a call that read or wrote the cache clears the run. Tokens come from the
-  per-turn `tokenUsage` every adapter normalizes, so Codex turns record too,
-  with no cost. `Layers/ProviderRuntimeIngestion.ts` — after the lifecycle
-  dispatch, a `turn.completed` naming its turn dispatches the command
-  (`orchestration/threadTurnUsage.ts`; a refusal is logged, never blocks)
-  when it reported usage, or when it completed and the ingestion counted
-  its tool calls and wall time: a turn whose provider reported none (Cursor
-  and Grok send no `tokenUsage`; the others answer `unavailable` for a turn
-  interrupted before any usage, which stays unrecorded) is a
-  `usageUnavailable: true` row with zero tokens, the
-  rollup counts it in `unreportedTurns`, and the popover shows tokens and
-  cost only while `threadUsageReported` (a turn reported, or a transcript
-  estimate), else "Usage not reported by this provider"; a turn with
-  neither usage nor a counted start is not recorded; `decider.ts` — folds the read model's
-  rollup into the event; `projector.ts`, `Schemas.ts`, `threadReducer.ts` —
-  assign it. `persistence/ProjectionTurnUsage.ts` + migration `056` — one
-  row per turn (`projection_turn_usage`, PK thread + turn) and
-  `projection_threads.usage_json`; `Layers/ProjectionPipeline.ts` —
-  upserts the row and refolds the stored rollup from the rows (a re-recorded
-  turn replaces, never adds), a revert / chat rewind drops the pruned
-  turns' rows and refolds, a delete or draft retry drops them all;
-  `ProjectionThreads.ts` and `ProjectionSnapshotQuery.ts` carry the column
-  on every thread read. Known drift: the in-memory read model and a
-  client's reducer keep the pre-revert sum until the next bootstrap; the
-  stored rollup is the truth. Tool calls and wall time (`toolCalls?`,
-  `durationMs?` on the turn record and, summed over the turns that carry
-  them, the rollup): `threadTurnUsage.ts`'s `TurnTelemetryTracker` in the
-  ingestion counts distinct tool-lifecycle item ids on `item.started` /
-  `item.completed` from the first `turn.started` it saw to the
-  `turn.completed` (a reconnect's second start keeps the first clock);
-  an aborted turn, a turn started before a server restart, or one whose
-  start the server never saw records neither, and the transcript backfill
-  has neither, so both stay absent — never zero for "not counted". All figures are estimates, never billing
-  truth — UIs show "≈". Web: `apps/web/src/components/chat/ThreadUsagePopover.tsx`
-  (+ `threadUsage.logic.ts`) — a badge at the head of the chat header's
-  action group ("≈ $0.35", or "N turns" while no turn carried a cost)
-  opening the thread-info popover: turns (with the subagent count), tool
-  calls and duration (wall time, waits included) when counted, the
-  token counts that moved, models, cost ("Cost not recorded", never
-  $0.00, for none) and the last turn in the user's timestamp format, plus
-  "Estimated from the transcript" for a `transcript` rollup; drawn only
-  when the thread has a rollup. Registration: `ChatHeader.tsx`'s optional
-  `usage` prop, fed `activeServerThread?.usage` from `ChatView.tsx`.
-  The phone sheet is PR #908. Transcript backfill (the `transcript`
-  rollup, for threads whose Claude turns ran before usage was recorded):
-  `orchestration/Layers/ThreadUsageBackfill.ts` (+ `threadUsageBackfill.logic.ts`)
-  — `ThreadUsageBackfillLive` in `server.ts` `ReactorLayerLive`: a boot
-  sweep (parked until activation, 500 threads a boot) over
-  `ProjectionTurnUsageRepository.listBackfillCandidates` — a
-  `claudeAgent` binding in `provider_session_runtime` whose cursor names
-  the session (`$.resume`), no rollup and no baseline, not deleted, no turn
-  pending or running — plus a re-check of one thread on a history import
-  (`thread.created` with the marker) and on a session going idle; a
-  candidate whose newest turn row of any state postdates boot is skipped
-  (the runtime records that turn; an interrupted or errored first turn
-  has its usage half-written; reading the transcript on top would count
-  it twice), and a thread is read at most once per process (marked after
-  a read that succeeded). It reads
-  `UsageService.readSessionUsage` (`<sessionId>.jsonl` under each configured
-  Claude account's projects tree, through the summary scan's file cache, summed, deduped
-  by `dedupeKey`, priced with the rate table and overrides — null when
-  nothing priced) and dispatches the server command `thread.usage.backfill`
-  → `thread.usage-backfilled {threadId, usage}` (decider refuses a thread
-  with a rollup; projector, `Schemas.ts`, `threadReducer.ts` assign).
-  Transcripts do not delimit turns, so the rollup is thread-level: turns
-  from the runtime's completed rows, tokens and cost from the transcript
-  total, `subagentTurns` and `reasoningTokens` 0. Migration `057` adds
-  `projection_threads.usage_baseline_json` (`ProjectionThreads`
-  `usageBaseline`, server-only): the pipeline stores the estimate there
-  and every refold (`foldTurnUsage(rows, base)`) folds the runtime rows
-  onto it, so a recorded turn or a revert never erases it, and the rollup
-  keeps `source: "transcript"`. Limits: a revert cannot prune
-  transcript-era turns (and a runtime thread reverted to zero turns has no
-  rollup, so after a restart the sweep estimates it from a transcript that
-  still holds the reverted turns); an imported session's `turns` is 0 (the
-  phone and web read "0 turns" while no turn carried a cost); only the
-  default Claude home is searched (an instance with its own `homePath`,
-  such as a proxy's, is not); Codex is not estimated. Only thread ids and
-  counts are logged. Tests:
-  `threadUsage.test.ts`, `claudeTurnUsage.logic.test.ts`,
-  `threadTurnUsage.test.ts`, `decider.turnUsage.test.ts`,
-  `ProjectionPipeline.usage.test.ts`, `ProviderRuntimeIngestion.test.ts`,
-  `threadReducer.test.ts`, `threadUsage.logic.test.ts`,
-  `threadUsageBackfill.logic.test.ts`, `ThreadUsageBackfill.test.ts`,
-  `UsageService.test.ts`.
+- Turn usage (#834): `packages/contracts/src/orchestration.ts` (`ThreadTurnUsage`, `ThreadUsageRollup`, `usage?`, `thread.turn.usage.record`, `thread.turn-usage-recorded`, `thread.usage.backfill`, `thread.usage-backfilled`), `packages/shared/src/threadUsage.ts`, `packages/contracts/src/providerRuntime.ts` (`turnCostUsd?`, `turnModels?`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (+ `claudeTurnUsage.logic.ts`), `Layers/ProviderRuntimeIngestion.ts` (+ `orchestration/threadTurnUsage.ts`), `decider.ts`, `projector.ts`, `Schemas.ts`, `threadReducer.ts`, `persistence/ProjectionTurnUsage.ts` (migrations `056`, `057`), `Layers/ProjectionPipeline.ts`, `ProjectionThreads.ts`, `ProjectionSnapshotQuery.ts`, `orchestration/Layers/ThreadUsageBackfill.ts` (+ `threadUsageBackfill.logic.ts`; `ThreadUsageBackfillLive` in `server.ts`), `apps/web/src/components/chat/ThreadUsagePopover.tsx` (+ `threadUsage.logic.ts`), `ChatHeader.tsx`'s `usage` prop from `ChatView.tsx`; `apps/server/src/usage/UsageService.ts` (`readSessionUsage`), and the upstream tests `ProviderRuntimeIngestion.test.ts`, `threadReducer.test.ts`, `UsageService.test.ts`. Rules and traps: `docs/internals/turn-usage.md`.
 - Side question (#269 C, Cursor's `/btw` on #820's fork-at-turn):
   `packages/contracts/src/orchestration.ts` — `sideOf?` on `thread.create`,
   `thread.created`, `OrchestrationThread` and `OrchestrationThreadShell`
@@ -671,24 +436,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `getLatestThreadForProject` skip `sideOf` threads. Tests:
   `ThreadFork.test.ts` (`forkCreateFields`), `ProjectionPipeline.babysit.test.ts`
   (the column), `rightPanelStore.test.ts`, `SideQuestionPanel.logic.test.ts`.
-- **Best of N (#269 B; Cursor's `/best-of-n`).** One prompt, two to four
-  models, one worktree each, no judge. Server: `groupId` on `thread.create`
-  (and the bootstrap's `createThread`, copied in `apps/server/src/ws.ts`), the
-  created payload and the thread projection (`group_id`, migration 054;
-  `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`).
-  Web: `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`:
-  the draft's id is the first member, the rest are minted, titles carry the
-  model; `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats` off the
-  usage rollup, `bestOfMemberChanges` — "5 files, +42 −7" — off the vcs
-  status stream the sidebar row for that worktree already holds); `BestOfPicker.tsx` — the
-  "Best of" control beside the model picker, checkboxes for the active
-  provider's models, "Run N"; `ChatView.tsx` `onSend(…, bestOf)` starts one
-  bootstrap turn per member (text only, no `titleSeed`) and pins each;
-  `apps/web/src/components/BestOfGroupCard.tsx` — the card at the top of every
-  member listing the live siblings with a status word, links, and "Keep this
-  one" (interrupts, archives, removes the worktree with the work kept on its
-  branch). Tests: `bestOf.logic.test.ts`, `ProjectionPipeline.babysit.test.ts`
-  (the column).
+- **Best of N (#269 B).** `groupId` on `thread.create`, the created payload and the bootstrap's `createThread` (`apps/server/src/ws.ts`); `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts` (`group_id`, migration `054`); `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`, `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats`, `bestOfMemberChanges`), `BestOfPicker.tsx`, `apps/web/src/components/BestOfGroupCard.tsx`, `ChatView.tsx` (`onSend(…, bestOf)`). Rules and traps: `docs/internals/best-of.md`.
 - **Worktree limit (#269 H; Cursor's max worktrees).** A server setting
   `worktreeMaxCount` (`packages/contracts/src/settings.ts`, default 25, 0
   lifts it) checked in `apps/server/src/ws.ts` before a bootstrap creates
@@ -710,39 +458,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
   `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
   `server.test.ts`, `settings.test.ts`.
-- **Reconnect a turn whose transport went away (#832).** The Claude adapter
-  (`apps/server/src/provider/Layers/ClaudeAdapter.ts`) keeps the turn open
-  when its stream fails with a socket-level error (or a process exit after
-  the CLI reported `api_retry`), when a result reports `api_error` with no
-  cause the turn already knows (login, usage limit), or when the stream ends
-  cleanly with the turn open; `scheduleReconnect` emits
-  `session.state.changed {running, reason: "reconnecting:<n>/5"}` and after
-  the attempt's backoff (`claudeReconnect.logic.ts`: 5 s, 15 s, 1 min, 3 min,
-  10 min) `reopenForReconnect` closes the old query, carries any queued
-  prompt over, and reopens the CLI on the reported session id
-  (`reconnectQueryOptions`, `context.reopenStream`) with the shared
-  continuation prompt (`apps/server/src/provider/turnContinuation.ts`, the
-  one the post-update boot continuation sends) or, when nothing answered
-  yet, the turn's own message again. An assistant message resets the count;
-  after the last attempt the turn fails with the message in
-  `RECONNECT_EXHAUSTED_MESSAGE`. A clean stream end with an open turn now
-  fails instead of reading as `interrupted`, which the #806 drain treats as
-  idle. A server that dies mid-backoff still picks the turn up: every
-  reconnecting state event writes the post-update continuation marker
-  (`continueAfterServerUpdate`, `ProviderService.processRuntimeEvent`), which
-  the boot reads before the `continueThreadsAfterServerUpdate` setting; a
-  left-over marker is inert (a finished turn is not orphaned) and the next
-  send or stop nulls it. The reason reaches the client as `OrchestrationSession.statusReason`
-  (`packages/contracts/src/orchestration.ts`; ingestion sets it from a
-  running `session.state.changed`, null on every other lifecycle event;
-  `ProjectionThreadSessions` column `status_reason`,
-  `Migrations/055_ProjectionThreadSessionsStatusReason.ts`, `ProjectionPipeline.ts`,
-  `ProjectionSnapshotQuery.ts`), and the web shows "Waiting for the network.
-  Reconnect attempt n of 5." under the thread's banners
-  (`apps/web/src/components/chat/ThreadReconnectingNotice.tsx`, mounted in
-  `ChatView.tsx`). Codex is out of scope. Tests:
-  `claudeReconnect.logic.test.ts`, `ClaudeAdapter.test.ts` "reconnect (#832)",
-  `ProviderRuntimeIngestion.test.ts`, `ThreadReconnectingNotice.test.ts`.
+- **Reconnect a turn whose transport went away (#832).** `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`scheduleReconnect`, `reopenForReconnect`, `reconnectQueryOptions`, `RECONNECT_EXHAUSTED_MESSAGE`; + `claudeReconnect.logic.ts`), `apps/server/src/provider/turnContinuation.ts`, `ProviderService.processRuntimeEvent` (`continueAfterServerUpdate`), `packages/contracts/src/orchestration.ts` (`OrchestrationSession.statusReason`), `ProjectionThreadSessions` (`status_reason`, `Migrations/055_ProjectionThreadSessionsStatusReason.ts`), `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`, `apps/web/src/components/chat/ThreadReconnectingNotice.tsx` (mounted in `ChatView.tsx`). Rules and traps: `docs/internals/turn-reconnect.md`.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
   `infinitus.forkThread` (`AuthOrchestrationOperateScope` in
@@ -1706,42 +1422,7 @@ registrations}`, never a token; each registration decoded alone) drawn as
   without the verb keeps the forecast and says what is missing; one whose
   reply carries no telemetry keeps the chart and the run rate, and the two
   sections are simply absent. Sidebar "Utilization" beside Activity.
-- Live token rate (#1127): the run-rate section's "Live:" line comes from this
-  server, not the Mac. `packages/contracts/src/infinitus.ts` —
-  `InfinitusLiveTokenRate` (`windowMinutes`, `turns`, `outputPerMinute`,
-  `totalPerMinute`); `rpc.ts` — `infinitus.liveTokenRate` (empty payload,
-  `AuthOrchestrationReadScope` in `RpcAuthorization.ts`: counts only, no thread
-  named). `apps/server/src/persistence/ProjectionTurnUsage.ts` —
-  `listCompletedSince` reads the window's rows whole (minutes wide, so the row
-  count is small); `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test)
-  is the fold — five minutes, taking the window's end as `{nowMs}`; each turn's
-  tokens are spread over its `durationMs` and only the part of that span inside
-  the window counts, so a thirty-minute turn that finished a minute ago no
-  longer drops all of its output into five minutes and reads ~6× the true rate
-  (the clip came from the withdrawn #1148). A row with no `durationMs` — a turn
-  this server never saw start — counts whole at its completion, and a
-  `usageUnavailable` row is skipped entirely, since its zero tokens mean "not
-  reported" and would read as a turn that burned nothing. `ws.ts` pulls the
-  repository and answers; a read that fails is logged and answers
-  `EMPTY_LIVE_TOKEN_RATE` (no turns, so no line) rather than failing a
-  cosmetic call. Client: `infinitus.ts`'s `liveTokenRate` query atom on the
-  Utilization page's own cadence, and `infinitusUtilization.ts`'s
-  `liveRateText` — the line reads "Live: ≈ N output tokens/min …
-  across N turns on this server" (the #834 "≈" rule: a five-minute
-  extrapolation is an estimate; the Mac's own line is left as it is, being
-  transitional). The server's rate wins whenever it has turns
-  behind it, since the Mac's `liveRate` tails the terminal transcripts the
-  session sweep (#1041) retires and goes permanently null. Zero turns is
-  unknown, not zero, so it stands aside for a Mac that still reports one.
-  The line is drawn by `LiveRateLine`, a sibling of the run-rate section rather
-  than a child of it: the table is the Mac's transcript scan and this is the
-  turns this server recorded, so it survives a build whose Mac has no
-  `utilization` verb and a reply that could not be read. Hence
-  `liveRateText(server, u)` — the server's rate first, the Mac's reply second
-  and nullable. Limit: the per-fleet split #1127 mentions (#779's attribution)
-  is not done, and needs a ruling first — the join reaches into swapd's own
-  switch log to decorate one cosmetic line, and account policy lives in the
-  engines here.
+- Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table
   on upstream's `/usage` (#779): Claude spend split by the account that was
   active when each record was written. The server joins at scan time:
@@ -2496,7 +2177,11 @@ fork_server_port`, on an app whose manifest lists `desktop-credential` with
   "withdrawn". A card iOS starts from a push-to-start while the app is in the
   background is seen through the patched `onExpoWidgetsActivityUpdate` event
   (#1277, above), which runs the same re-scan, so its token reaches the Mac
-  and the next push updates the card in place instead of starting another. A card dismissed while the app stays closed is caught on the
+  and the next push updates the card in place instead of starting another.
+  Every re-scan keeps ONE card — the one whose token the bridge holds, else
+  the first listed, as upstream's app does — and ends the others at once
+  (`cardsToEnd`), so a stack a dead-app window left collapses the next time
+  the app wakes. A card dismissed while the app stays closed is caught on the
   next foreground; the Mac's staleAfter fallback covers the gap. "Show a test card" starts the
   card locally with a fabricated state (`TEST_CARD_STATE`, one row per
   ranked phase, the working one dated against the press so its timer ticks —

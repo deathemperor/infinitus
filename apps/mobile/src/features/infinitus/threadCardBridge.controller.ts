@@ -1,5 +1,5 @@
 import type { LiveActivityTokenKind } from "./liveActivity.logic";
-import { syncWatchedCards } from "./cardSync.logic";
+import { cardsToEnd, syncWatchedCards } from "./cardSync.logic";
 import { nextRetry, NO_RETRY } from "./pushRetry.logic";
 
 /**
@@ -19,6 +19,8 @@ export interface LiveCard {
   getId(): string;
   getPushToken(): Promise<string | null>;
   addPushTokenListener(listener: (event: { readonly pushToken: string }) => void): Subscription;
+  /** Ends the card; `"immediate"` takes it off the lock screen at once. */
+  end(dismissalPolicy: "immediate"): Promise<void>;
 }
 
 export interface ThreadCardBridgeDeps {
@@ -66,6 +68,8 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
   let withdraw = false;
   /** The slot was cleared since the last card token was offered. */
   let slotCleared = false;
+  /** The card whose token was last offered — the one the Mac can update. */
+  let heldCard: string | null = null;
   let schedule = NO_RETRY;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let sending = false;
@@ -121,21 +125,28 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
   };
 
   /** A token from iOS: a new one is a fresh chance, so the backoff resets. */
-  const offer = (kind: LiveActivityTokenKind, token: string) => {
+  const offer = (kind: LiveActivityTokenKind, token: string, from?: string) => {
     if (cancelled || latest.get(kind) === token) return;
     latest.set(kind, token);
     if (kind === "agent-activity") {
       withdraw = false;
       slotCleared = false;
+      heldCard = from ?? heldCard;
     }
     schedule = NO_RETRY;
     void flush();
   };
 
-  /** Re-reads the live cards: watches the new ones, lets the ended ones go,
-      and queues the withdrawal when none is left. */
+  /** Re-reads the live cards: keeps one (#1277) and ends the others at once,
+      watches the new one, lets the ended ones go, and queues the withdrawal
+      when none is left. */
   const sync = () => {
-    const live = deps.getInstances();
+    const all = deps.getInstances();
+    const extra = cardsToEnd({ live: all.map((activity) => activity.getId()), held: heldCard });
+    for (const activity of all) {
+      if (extra.end.includes(activity.getId())) void activity.end("immediate").catch(() => {});
+    }
+    const live = all.filter((activity) => activity.getId() === extra.keep);
     const next = syncWatchedCards({
       watched: new Set(watched.keys()),
       live: live.map((activity) => activity.getId()),
@@ -150,10 +161,10 @@ export function startThreadCardBridge(deps: ThreadCardBridgeDeps): ThreadCardBri
       if (!next.added.includes(id)) continue;
       watched.set(
         id,
-        activity.addPushTokenListener((event) => offer("agent-activity", event.pushToken)),
+        activity.addPushTokenListener((event) => offer("agent-activity", event.pushToken, id)),
       );
       void activity.getPushToken().then((token) => {
-        if (token) offer("agent-activity", token);
+        if (token) offer("agent-activity", token, id);
       });
     }
     if (next.withdraw && !withdraw) {

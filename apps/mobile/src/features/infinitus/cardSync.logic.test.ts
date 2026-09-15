@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { syncWatchedCards } from "./cardSync.logic";
+import { cardsToEnd, syncWatchedCards } from "./cardSync.logic";
 
 describe("syncWatchedCards", () => {
   it("names the ended cards and the new ones", () => {
@@ -33,5 +33,21 @@ describe("syncWatchedCards", () => {
     expect(
       syncWatchedCards({ watched: new Set(["a"]), live: ["a"], slotCleared: false }).withdraw,
     ).toBe(false);
+  });
+});
+
+describe("cardsToEnd (#1277)", () => {
+  it("keeps the card whose token the bridge holds and ends the rest", () => {
+    expect(cardsToEnd({ live: ["a", "b", "c"], held: "b" })).toEqual({
+      keep: "b",
+      end: ["a", "c"],
+    });
+  });
+
+  it("keeps the first listed card when none is held or the held one is gone", () => {
+    expect(cardsToEnd({ live: ["a", "b"], held: null })).toEqual({ keep: "a", end: ["b"] });
+    expect(cardsToEnd({ live: ["a", "b"], held: "z" })).toEqual({ keep: "a", end: ["b"] });
+    expect(cardsToEnd({ live: ["a"], held: null })).toEqual({ keep: "a", end: [] });
+    expect(cardsToEnd({ live: [], held: null })).toEqual({ keep: null, end: [] });
   });
 });
