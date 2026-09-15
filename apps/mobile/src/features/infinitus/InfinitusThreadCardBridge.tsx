@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { addPushToStartTokenListener } from "expo-widgets";
+import { addActivityUpdateListener, addPushToStartTokenListener } from "expo-widgets";
 import { useEffect, useMemo, useRef } from "react";
 import { AppState, Platform } from "react-native";
 
@@ -39,8 +39,16 @@ import { startThreadCardBridge } from "./threadCardBridge.controller";
     the Mac becoming reachable — or the app coming to the foreground — sends
     again at once.
 
-    A card's own token is withdrawn once no card is live (#1265): expo-widgets
-    surfaces no activity-state event, so every re-scan that finds
+    A card iOS starts from the Mac's push-to-start while the app is in the
+    background is seen through the fork's `onExpoWidgetsActivityUpdate` event
+    (patched into expo-widgets, #1277): every activity start or state change
+    re-reads the live cards, so the new card's own token reaches the Mac and
+    the next push updates it in place instead of starting another. Without
+    that event the scan ran only at mount, on a foreground and after a local
+    start or end, and five pushes made five cards.
+
+    A card's own token is withdrawn once no card is live (#1265): the scan
+    is the phone's mechanism, so every re-scan that finds
     `getInstances()` empty — at mount, on a foreground, after a local start or
     end — forgets `agent-activity` at the Mac, once per empty stretch and
     never gated on what this run remembers offering (a reinstall replaces the
@@ -91,6 +99,7 @@ export function InfinitusThreadCardBridge() {
       getInstances: () => AgentActivity.getInstances(),
       addPushToStartTokenListener,
       addAppStateListener: (listener) => AppState.addEventListener("change", listener),
+      addActivityUpdateListener,
       subscribeLocalChanges: (listener) =>
         appAtomRegistry.subscribe(localLiveActivityStartsAtom, listener),
       isConnected: () => connectedRef.current,

@@ -146,6 +146,26 @@ export class DesktopUpdaterReportedError extends Schema.TaggedError<DesktopUpdat
  * assets (#924). That check is a miss to retry on the next poll, not an error
  * the pill should show.
  */
+/**
+ * What a failed check's cause says about itself, for the log line and the
+ * span: electron-updater's `code` (`ERR_UPDATER_*`) and an HttpError's status
+ * — never its message, which quotes the feed URL and can carry credentials
+ * (the test "without exposing the cause" pins that). The alpha.13 cut
+ * (2026-09-15) logged two check failures with only the error tag, and the
+ * window could not be diagnosed from the files.
+ */
+function describeCheckFailureCause(cause: unknown): {
+  readonly causeCode?: string;
+  readonly causeStatus?: number;
+} {
+  if (typeof cause !== "object" || cause === null) return {};
+  const { code, statusCode } = cause as { code?: unknown; statusCode?: unknown };
+  return {
+    ...(typeof code === "string" ? { causeCode: code } : {}),
+    ...(typeof statusCode === "number" ? { causeStatus: statusCode } : {}),
+  };
+}
+
 function isReleaseStillBuilding(cause: unknown): boolean {
   return (
     typeof cause === "object" &&
@@ -488,9 +508,12 @@ export const make = Effect.gen(function* () {
             yield* updateState((current) =>
               reduceDesktopUpdateStateOnCheckFailure(current, error.message, failedAt),
             );
+            const described = describeCheckFailureCause(error.cause);
+            yield* Effect.annotateCurrentSpan(described);
             yield* logUpdaterError(error.message, {
               errorTag: error._tag,
               channel: error.channel,
+              ...described,
             });
             return true;
           }),
