@@ -1,5 +1,9 @@
 import type { AccountsPageState } from "@t3tools/client-runtime/state/infinitusAccounts";
-import type { InfinitusSnapshot, InfinitusStatus } from "@t3tools/contracts/infinitus";
+import type {
+  InfinitusEngineState,
+  InfinitusSnapshot,
+  InfinitusStatus,
+} from "@t3tools/contracts/infinitus";
 import * as Cause from "effect/Cause";
 
 import { formatEnvironmentQueryError } from "~/state/query";
@@ -112,9 +116,42 @@ export interface EngineStatusRow {
   /** `none` for an engine that holds no key at all — only the proxies do
       (their form is `InfinitusEngineSecrets`, #1177). */
   readonly keyState: "present" | "missing" | "none";
+  /** swapd's daemon word and binary path ("Daemon running · /opt/…"), null
+      for an engine that reports neither (#1235). */
+  readonly detail: string | null;
+  /** The engine's own last error, verbatim, or null. */
+  readonly error: string | null;
+}
+
+const DAEMON_WORDS: Readonly<Record<string, string>> = {
+  stopped: "Daemon stopped",
+  running: "Daemon running",
+  backingOff: "Daemon backing off",
+  refused: "Daemon refused",
+  schemaMismatch: "Daemon schema mismatch",
+};
+
+function engineDetail(engine: InfinitusEngineState): string | null {
+  const parts = [
+    engine.daemon === undefined ? null : (DAEMON_WORDS[engine.daemon] ?? `Daemon ${engine.daemon}`),
+    engine.binaryPath ?? null,
+  ].filter((part) => part !== null);
+  return parts.length === 0 ? null : parts.join(" · ");
 }
 
 /** One row per engine the app reports, in key order so the list never jumps. */
+/** The menu bar app's version line for the Engines page's About section:
+    "Menu bar app 0.5.0-alpha.7 (1d90390896)". It ships inside the desktop
+    bundle and updates with it, so the line carries no updater; undefined
+    until the app has answered `status`. */
+export function menuBarAppVersionLine(status: InfinitusStatus | undefined): string | undefined {
+  if (status === undefined) return undefined;
+  const sha = status.sha.trim();
+  return sha.length === 0
+    ? `Menu bar app ${status.version}`
+    : `Menu bar app ${status.version} (${sha.slice(0, 10)})`;
+}
+
 export function buildEngineStatusRows(
   status: InfinitusStatus | undefined,
 ): ReadonlyArray<EngineStatusRow> {
@@ -131,6 +168,8 @@ export function buildEngineStatusRows(
           : engine.keyPresent
             ? ("present" as const)
             : ("missing" as const),
+      detail: engineDetail(engine),
+      error: engine.error ?? null,
     }))
     .toSorted((left, right) => left.key.localeCompare(right.key));
 }

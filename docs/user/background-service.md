@@ -47,8 +47,9 @@ threads and settings under `~/.infinitus/userdata` intact.
 
 `t3 update` moves a script-installed `t3` to the newest release: it downloads
 and verifies it, points `t3` at it, and asks before restarting a background
-service (pass `--yes` from a script; a server you started by hand is left for
-you to restart). Pass an exact version to pin one, or `--allow-downgrade` to
+service (pass `--yes` from a script; decline and the service keeps running its
+current version until `t3 service restart`; a server you started by hand is
+left for you to restart). Pass an exact version to pin one, or `--allow-downgrade` to
 move backwards. Install and update use the version of the `t3` you run; an
 older `t3` refuses to replace a newer service unless you add
 `--allow-downgrade`. `t3 uninstall` reverses the install script — the service,
@@ -102,6 +103,7 @@ and keep that session open.
 | `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                             |
 | `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support. |
 | `service-disabled` or `service-stopped` | Read the log and `systemctl --user status t3code.service`, then use the repair command printed by the server.                  |
+| `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `t3 service restart`.                            |
 
 For failures after signing in to T3 Connect, see
 [connection troubleshooting](./remote-access.md#t3-connect-troubleshooting).

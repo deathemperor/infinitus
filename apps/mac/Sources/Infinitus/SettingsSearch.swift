@@ -23,8 +23,7 @@ enum SettingsSearchCatalog {
     @MainActor
     private static func rows(of pane: String) -> [SettingsSearchEntry] {
         switch pane {
-        case "About": return AboutPane.searchEntries
-        // Accounts, Devices and the engine panes carry their title and
+        // Devices and the engine panes carry their title and
         // keywords only, until they publish their own searchEntries.
         default: return []
         }

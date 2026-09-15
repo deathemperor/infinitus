@@ -5,7 +5,7 @@ import worker, { latestRelease, downloadResponse } from "./worker.js";
 const asset = (name, tag) => ({ name, browser_download_url: `https://github.com/deathemperor/infinitus/releases/download/${tag}/${name}` });
 const release = (tag, extra = {}) => ({
   tag_name: tag, draft: false, prerelease: true,
-  assets: [asset(`Infinitus-${tag.slice(1)}.zip`, tag), asset(`Infinitus-${tag.slice(1)}-arm64.dmg`, tag), asset("infinitus-tray-linux-x86_64", tag)],
+  assets: [asset(`Infinitus-${tag.slice(1)}-arm64.dmg`, tag), asset("infinitus-tray-linux-x86_64", tag)],
   ...extra,
 });
 
@@ -13,7 +13,7 @@ test("the newest v-tag wins; nightly and drafts never do", () => {
   const found = latestRelease([release("nightly"), release("v0.5.0-alpha.4", { draft: true }), release("v0.5.0-alpha.3"), release("v0.5.0-alpha.2")]);
   assert.equal(found.tag, "v0.5.0-alpha.3");
   assert.equal(found.version, "0.5.0-alpha.3");
-  assert.equal(found.assets["Infinitus-0.5.0-alpha.3.zip"], "https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.3/Infinitus-0.5.0-alpha.3.zip");
+  assert.equal(found.assets["Infinitus-0.5.0-alpha.3-arm64.dmg"], "https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.3/Infinitus-0.5.0-alpha.3-arm64.dmg");
   assert.equal(latestRelease([release("nightly")]), null);
   assert.equal(latestRelease([]), null);
 });
@@ -23,7 +23,10 @@ test("a kind redirects to its asset, a missing asset is a 404", () => {
   const dmg = downloadResponse(found, "dmg");
   assert.equal(dmg.status, 302);
   assert.equal(dmg.headers.get("location"), "https://github.com/deathemperor/infinitus/releases/download/v0.5.0-alpha.3/Infinitus-0.5.0-alpha.3-arm64.dmg");
-  assert.equal(downloadResponse(found, "mac").status, 302);
+  // `mac` is the DMG too since #1238 (the standalone zip is gone).
+  const mac = downloadResponse(found, "mac");
+  assert.equal(mac.status, 302);
+  assert.equal(mac.headers.get("location"), dmg.headers.get("location"));
   assert.equal(downloadResponse(found, "linux-x86_64").status, 302);
   assert.equal(downloadResponse(found, "linux-aarch64").status, 404);
   assert.equal(downloadResponse(found, "windows").status, 404);

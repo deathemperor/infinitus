@@ -10,8 +10,9 @@ import { infinitusEnvironment } from "./infinitus";
  * The threads an Infinitus environment currently holds (#741), read straight
  * from the holds atom for the outbox drain (#807) — the same read the web
  * sidebar's next-attention key does. Null for an environment without the
- * `infinitus` capability and until the list's first delivery, so the first
- * pass after the app opens may not yet see a hold.
+ * `infinitus` capability and until the list's first delivery;
+ * `InfinitusHoldsBridge` keeps the stream mounted from the app's start, so
+ * that window is the first connect, not every queued message (#1278).
  */
 export function readHeldThreads(
   environmentId: EnvironmentId,

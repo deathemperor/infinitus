@@ -451,7 +451,6 @@ extension FleetState: FleetModel {
                    caveat: host.fleetCaveats[engineID])
     }
     var appUpdatePending: Bool { host.appUpdatePending }
-    var appUpdateVersion: String? { host.appUpdateVersion }
     var engineMissing: Bool { host.engineMissing }
     var introTick: Int { host.introTick }
     var introStyle: String { host.introStyle }

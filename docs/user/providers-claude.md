@@ -53,6 +53,15 @@ You can also send `/compact` in an existing conversation. Web and desktop offer
 a large older thread. See [commands and skills](./composer.md#commands-and-skills)
 for using composer commands.
 
+## Consult a stronger model
+
+Set **Advisor model** in a Claude instance's Runtime settings to let the agent
+consult a stronger model mid-turn. Pick Fable, Opus or Sonnet, or enter a full
+model ID; the advisor must rank at or above the instance's model, or Claude
+skips it. Leave it **Off** to keep Claude Code's own setting. The advisor's
+answer stays inside the turn: the thread only shows that the agent consulted
+it. An instance that routes through a proxy has no advisor.
+
 ## Usage limits
 
 If your Claude subscription runs out of usage mid-turn, the thread shows which
@@ -88,8 +97,15 @@ If that Claude config directory has a cached Anthropic login, run `/logout` in a
 Claude Code session using that directory before starting the router setup. Cached
 login credentials can conflict with the router token.
 
-Verify requests in OpenRouter's activity dashboard. For model-role overrides and
-current compatibility requirements, use the
+Select the model you want in T3 Code. For an OpenRouter model outside the built-in
+list, open that Claude instance in **Settings > Providers** and add its full model
+ID with **Add custom model**. Then select it in the chat model picker.
+`ANTHROPIC_DEFAULT_*_MODEL` variables map Claude Code aliases such as `sonnet`; they
+do not replace the explicit model ID selected in T3 Code. Custom models may have
+fewer effort, thinking, or context controls than built-in models.
+
+Verify the model used in OpenRouter's activity dashboard. For current compatibility
+requirements, use the
 [OpenRouter Claude Code guide](https://openrouter.ai/docs/cookbook/coding-agents/claude-code-integration).
 
 ## Other routers

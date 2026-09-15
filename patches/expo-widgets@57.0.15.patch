@@ -1,5 +1,43 @@
+diff --git a/build/Widgets.d.ts b/build/Widgets.d.ts
+index d4b5aacee380c056855f68c5ca62c9af24304745..5237d077a55ed3958e16e531de30a85c2b010d8e 100644
+--- a/build/Widgets.d.ts
++++ b/build/Widgets.d.ts
+@@ -117,6 +117,13 @@ export declare function addUserInteractionListener(listener: ExpoWidgetsEvents['
+  * @return An event subscription that can be used to remove the listener.
+  */
+ export declare function addPushToStartTokenListener(listener: ExpoWidgetsEvents['onExpoWidgetsPushToStartTokenReceived']): EventSubscription;
++/**
++ * Infinitus fork (#1277): adds a listener for Live Activity lifecycle events —
++ * an activity started (locally or from a push-to-start) or changed state.
++ * @param listener Callback function to handle activity update events.
++ * @return An event subscription that can be used to remove the listener.
++ */
++export declare function addActivityUpdateListener(listener: ExpoWidgetsEvents['onExpoWidgetsActivityUpdate']): EventSubscription;
+ /**
+  * A directory that can be used to store shared images for widgets.
+  * The contents of this directory are accessible by both the main app and widgets.
+diff --git a/build/Widgets.js b/build/Widgets.js
+index 9099a1bb3c10eaddc41518ba5b82117284f82135..f336aa9e1334744add2de219df253540a93e7604 100644
+--- a/build/Widgets.js
++++ b/build/Widgets.js
+@@ -163,6 +163,15 @@ export function addUserInteractionListener(listener) {
+ export function addPushToStartTokenListener(listener) {
+     return ExpoWidgetsModule.addListener('onExpoWidgetsPushToStartTokenReceived', listener);
+ }
++/**
++ * Infinitus fork (#1277): adds a listener for Live Activity lifecycle events —
++ * an activity started (locally or from a push-to-start) or changed state.
++ * @param listener Callback function to handle activity update events.
++ * @return An event subscription that can be used to remove the listener.
++ */
++export function addActivityUpdateListener(listener) {
++    return ExpoWidgetsModule.addListener('onExpoWidgetsActivityUpdate', listener);
++}
+ /**
+  * A directory that can be used to store shared images for widgets.
+  * The contents of this directory are accessible by both the main app and widgets.
 diff --git a/build/Widgets.types.d.ts b/build/Widgets.types.d.ts
-index 15e026868625ce20a3e359e5cc8e5c7e937c4650..f5cc83174ede4fb6e01cbce494f61e088eb4eed8 100644
+index 15e026868625ce20a3e359e5cc8e5c7e937c4650..890f48bdc124a392c360c35c8261dbe94e35575a 100644
 --- a/build/Widgets.types.d.ts
 +++ b/build/Widgets.types.d.ts
 @@ -90,6 +90,10 @@ export type LiveActivityEnvironment = {
@@ -13,6 +51,47 @@ index 15e026868625ce20a3e359e5cc8e5c7e937c4650..f5cc83174ede4fb6e01cbce494f61e08
      /**
       * Whether the activity is displayed in a context with reduced luminance.
       * @platform iOS 16+
+@@ -227,6 +231,18 @@ export type PushToStartTokenEvent = {
+      */
+     activityPushToStartToken: string;
+ };
++/**
++ * Infinitus fork (#1277): a Live Activity of this app started, or changed state.
++ * `started` is emitted for every activity the system starts — locally or from a
++ * push-to-start — and the later values are ActivityKit's own state names.
++ */
++export type ActivityUpdateEvent = {
++    /** The activity's id, as `LiveActivity.getId()` reports it. */
++    activityId: string;
++    /** The live activity layout the activity was started with. */
++    name: string;
++    state: 'started' | 'active' | 'stale' | 'ended' | 'dismissed' | 'pending' | (string & {});
++};
+ /**
+  * Dismissal policy for ending a live activity.
+  * - `'default'` - The system’s default dismissal policy for the Live Activity.
+@@ -245,6 +261,11 @@ export type ExpoWidgetsEvents = {
+      * @param event Token event details.
+      */
+     onExpoWidgetsPushToStartTokenReceived: (event: PushToStartTokenEvent) => void;
++    /**
++     * Infinitus fork (#1277): a Live Activity started or changed state.
++     * @param event The activity and its state.
++     */
++    onExpoWidgetsActivityUpdate: (event: ActivityUpdateEvent) => void;
+ };
+ export type LiveActivityEvents = {
+     /**
+diff --git a/build/index.d.ts b/build/index.d.ts
+index 297b87427f45a55ab11b854b1b0244e636fa7e58..fff53c2b318421e9fc072f098de0890dc831ff31 100644
+--- a/build/index.d.ts
++++ b/build/index.d.ts
+@@ -1,3 +1,3 @@
+ export * from './Widgets';
+-export type { ExpoWidgetsEvents, LevelOfDetail, LiveActivityComponent, LiveActivityDismissalPolicy, LiveActivityEnvironment, LiveActivityEvents, LiveActivityLayout, PushTokenEvent, PushToStartTokenEvent, UserInteractionEvent, WidgetEnvironment, WidgetFamily, WidgetRenderingMode, WidgetTimelineEntry, } from './Widgets.types';
++export type { ActivityUpdateEvent, ExpoWidgetsEvents, LevelOfDetail, LiveActivityComponent, LiveActivityDismissalPolicy, LiveActivityEnvironment, LiveActivityEvents, LiveActivityLayout, PushTokenEvent, PushToStartTokenEvent, UserInteractionEvent, WidgetEnvironment, WidgetFamily, WidgetRenderingMode, WidgetTimelineEntry, } from './Widgets.types';
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
 diff --git a/ios/Widgets/Utils.swift b/ios/Widgets/Utils.swift
 index 2b4c044b597de7e0fab42dbc47af14d8bb521838..801f0aed65ea2659f221d477dd841787d9146c26 100644
 --- a/ios/Widgets/Utils.swift
@@ -131,8 +210,120 @@ index 24d4571a52d3ebe9d785b5d049d8e134a149d513..7051c23b17ac91552e5b5c54606c5708
      if #available(iOS 18.0, *) {
        LiveActivityBanner(context: context, nodes: nodes)
      } else if let node = nodes["banner"] as? [String: Any] {
+diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
+index b1b4295e22726e6fe501aa5e514b56061dea57a1..d58e1aef47c3eb5d06e80ca9b64fa72fec3ca68f 100644
+--- a/ios/WidgetsModule.swift
++++ b/ios/WidgetsModule.swift
+@@ -7,15 +7,20 @@ let pushNotificationsEnabledKey: String = "ExpoWidgets_EnablePushNotifications"
+ let onUserInteraction = "onExpoWidgetsUserInteraction"
+ let onPushToStartTokenReceived = "onExpoWidgetsPushToStartTokenReceived"
+ let onTokenReceived = "onExpoWidgetsTokenReceived"
++// Infinitus fork (#1277): a Live Activity's lifecycle, so the app learns of a
++// card iOS started from a push-to-start while it sat in the background.
++let onActivityUpdate = "onExpoWidgetsActivityUpdate"
+ let onUserInteractionNotification = Notification.Name(onUserInteraction)
+ 
+ public final class WidgetsModule: Module {
+   var pushToStartTokenObserverTask: Task<Void, Never>?
++  var activityUpdatesObserverTask: Task<Void, Never>?
++  var activityStateObserverTasks: [String: Task<Void, Never>] = [:]
+ 
+   public func definition() -> ModuleDefinition {
+     Name("ExpoWidgets")
+ 
+-    Events(onPushToStartTokenReceived, onTokenReceived, onUserInteraction)
++    Events(onPushToStartTokenReceived, onTokenReceived, onUserInteraction, onActivityUpdate)
+ 
+     OnStartObserving(onUserInteraction) {
+       NotificationCenter.default.addObserver(
+@@ -45,6 +50,17 @@ public final class WidgetsModule: Module {
+       pushToStartTokenObserverTask = nil
+     }
+ 
++    OnStartObserving(onActivityUpdate) {
++      observeActivityUpdates()
++    }
++
++    OnStopObserving(onActivityUpdate) {
++      activityUpdatesObserverTask?.cancel()
++      activityUpdatesObserverTask = nil
++      for task in activityStateObserverTasks.values { task.cancel() }
++      activityStateObserverTasks = [:]
++    }
++
+     Constant("widgetsDirectory") { () -> String? in
+       guard let appGroupIdentifier = WidgetsStorage.appGroupIdentifier,
+             let containerUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
+@@ -147,6 +163,44 @@ public final class WidgetsModule: Module {
+     }
+   }
+ 
++  // Infinitus fork (#1277). `activityUpdates` yields every activity the system
++  // starts for this app — a local `start` and a push-to-start alike — and each
++  // one's `activityStateUpdates` its later states (`active`, `stale`, `ended`,
++  // `dismissed`), which `getInstances()` cannot report as they happen.
++  private func observeActivityUpdates() {
++    guard #available(iOS 16.2, *) else { return }
++    guard activityUpdatesObserverTask == nil else { return }
++    activityUpdatesObserverTask = Task {
++      for await activity in Activity<LiveActivityAttributes>.activityUpdates {
++        sendActivityUpdate(activity: activity, state: "started")
++        observeActivityState(activity)
++      }
++    }
++  }
++
++  @available(iOS 16.2, *)
++  private func observeActivityState(_ activity: Activity<LiveActivityAttributes>) {
++    guard activityStateObserverTasks[activity.id] == nil else { return }
++    activityStateObserverTasks[activity.id] = Task {
++      for await state in activity.activityStateUpdates {
++        sendActivityUpdate(activity: activity, state: String(describing: state))
++      }
++      activityStateObserverTasks[activity.id] = nil
++    }
++  }
++
++  @available(iOS 16.2, *)
++  private func sendActivityUpdate(activity: Activity<LiveActivityAttributes>, state: String) {
++    sendEvent(
++      onActivityUpdate,
++      [
++        "activityId": activity.id,
++        "name": activity.content.state.name,
++        "state": state
++      ]
++    )
++  }
++
+   private var pushNotificationsEnabled: Bool {
+     Bundle.main.object(forInfoDictionaryKey: pushNotificationsEnabledKey) as? Bool ?? false
+   }
+diff --git a/src/Widgets.ts b/src/Widgets.ts
+index 51ea140b4309c347d6f98290051be1c5062bff70..8f8ad295433dd4e31220eb35555a93b3495818a5 100644
+--- a/src/Widgets.ts
++++ b/src/Widgets.ts
+@@ -237,6 +237,18 @@ export function addPushToStartTokenListener(
+   return ExpoWidgetsModule.addListener('onExpoWidgetsPushToStartTokenReceived', listener);
+ }
+ 
++/**
++ * Infinitus fork (#1277): adds a listener for Live Activity lifecycle events —
++ * an activity started (locally or from a push-to-start) or changed state.
++ * @param listener Callback function to handle activity update events.
++ * @return An event subscription that can be used to remove the listener.
++ */
++export function addActivityUpdateListener(
++  listener: ExpoWidgetsEvents['onExpoWidgetsActivityUpdate']
++): EventSubscription {
++  return ExpoWidgetsModule.addListener('onExpoWidgetsActivityUpdate', listener);
++}
++
+ /**
+  * A directory that can be used to store shared images for widgets.
+  * The contents of this directory are accessible by both the main app and widgets.
 diff --git a/src/Widgets.types.ts b/src/Widgets.types.ts
-index fee5c7475b52218fa0e192a1d347dd32cb0fe1f8..1d3a097b45d8eb5d13e5cedd26f0414caa83a5d6 100644
+index fee5c7475b52218fa0e192a1d347dd32cb0fe1f8..d44f3230bfcb507235aebfa794d002a400d8666b 100644
 --- a/src/Widgets.types.ts
 +++ b/src/Widgets.types.ts
 @@ -104,6 +104,10 @@ export type LiveActivityEnvironment = {
@@ -146,3 +337,46 @@ index fee5c7475b52218fa0e192a1d347dd32cb0fe1f8..1d3a097b45d8eb5d13e5cedd26f0414c
    /**
     * Whether the activity is displayed in a context with reduced luminance.
     * @platform iOS 16+
+@@ -252,6 +256,19 @@ export type PushToStartTokenEvent = {
+   activityPushToStartToken: string;
+ };
+ 
++/**
++ * Infinitus fork (#1277): a Live Activity of this app started, or changed state.
++ * `started` is emitted for every activity the system starts — locally or from a
++ * push-to-start — and the later values are ActivityKit's own state names.
++ */
++export type ActivityUpdateEvent = {
++  /** The activity's id, as `LiveActivity.getId()` reports it. */
++  activityId: string;
++  /** The live activity layout the activity was started with. */
++  name: string;
++  state: 'started' | 'active' | 'stale' | 'ended' | 'dismissed' | 'pending' | (string & {});
++};
++
+ /**
+  * Dismissal policy for ending a live activity.
+  * - `'default'` - The system’s default dismissal policy for the Live Activity.
+@@ -271,6 +288,11 @@ export type ExpoWidgetsEvents = {
+    * @param event Token event details.
+    */
+   onExpoWidgetsPushToStartTokenReceived: (event: PushToStartTokenEvent) => void;
++  /**
++   * Infinitus fork (#1277): a Live Activity started or changed state.
++   * @param event The activity and its state.
++   */
++  onExpoWidgetsActivityUpdate: (event: ActivityUpdateEvent) => void;
+ };
+ 
+ export type LiveActivityEvents = {
+diff --git a/src/index.ts b/src/index.ts
+index 340c747c8e9758ef3fe62939eace831dfe13c19d..bcbac8ab882d4b11c19787474bd8543f5811897a 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,5 +1,6 @@
+ export * from './Widgets';
+ export type {
++  ActivityUpdateEvent,
+   ExpoWidgetsEvents,
+   LevelOfDetail,
+   LiveActivityComponent,

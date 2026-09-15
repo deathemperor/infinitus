@@ -5,6 +5,7 @@ import {
   apnsSupported,
   isPemPrivateKey,
   parseApnsStatus,
+  lastPushLine,
   registrationLine,
 } from "./apns.logic";
 
@@ -109,6 +110,42 @@ describe("apnsKeyIdFromPrefs", () => {
     expect(apnsKeyIdFromPrefs({ sections: [], prefs: [pref("")] })).toBe("");
     expect(apnsKeyIdFromPrefs({ sections: [], prefs: [pref(3)] })).toBe("");
     expect(apnsKeyIdFromPrefs(undefined)).toBe("");
+  });
+});
+
+describe("lastPushLine", () => {
+  it("keeps a row's last push when the Mac reports one", () => {
+    const status = parseApnsStatus({
+      keyPresent: true,
+      teamId: "T",
+      keyId: "K",
+      registrations: [
+        {
+          deviceId: "d1",
+          deviceName: "Ada's iPhone",
+          kind: "agent-activity-start",
+          environment: "production",
+          registeredAt: "2026-09-15T04:21:15Z",
+          lastPush: { at: "2026-09-15T04:22:00Z", kind: "agent-activity-start", outcome: "landed" },
+        },
+      ],
+    });
+    expect(status?.registrations[0]?.lastPush).toEqual({
+      at: "2026-09-15T04:22:00Z",
+      outcome: "landed",
+    });
+  });
+
+  it("words a landed and a failed push", () => {
+    expect(lastPushLine({ at: "2026-09-15T04:22:00Z", outcome: "landed" }, "4:22 AM")).toBe(
+      "last push: 4:22 AM · landed",
+    );
+    expect(
+      lastPushLine(
+        { at: "2026-09-15T04:22:00Z", outcome: "failed", detail: "HTTP 410 Unregistered" },
+        "4:22 AM",
+      ),
+    ).toBe("last push: 4:22 AM · failed: HTTP 410 Unregistered");
   });
 });
 

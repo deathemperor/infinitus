@@ -417,7 +417,12 @@ function answer(request, socketPath) {
         playground: false,
         signInRunning: false,
         engines: {
-          swapd: { enabled: true, registered: true },
+          swapd: {
+            enabled: true,
+            registered: true,
+            binaryPath: "/opt/homebrew/bin/swapd",
+            daemon: "running",
+          },
           cliproxy: { enabled: false, registered: false, keyPresent: false },
           "9router": { enabled: false, registered: false, keyPresent: false },
         },
@@ -446,9 +451,21 @@ function answer(request, socketPath) {
     case "lock-status":
       return { enabled: true, locked: false, relock: "5 min" };
     case "proxy":
-      return { baseURL: "http://127.0.0.1:8317", keyPresent: false };
+      return {
+        baseURL: "http://127.0.0.1:8317",
+        dashboardURL: "http://127.0.0.1:8317/management.html",
+        keyPresent: false,
+        enabled: false,
+        routingStrategy: "round-robin",
+        sessionAffinity: true,
+      };
     case "9router":
-      return { baseURL: "http://127.0.0.1:20128", passwordPresent: false, enabled: false };
+      return {
+        baseURL: "http://127.0.0.1:20128",
+        dashboardURL: "http://127.0.0.1:20128/dashboard",
+        passwordPresent: false,
+        enabled: false,
+      };
     case "apns":
       return { keyPresent: false, teamId: "", keyId: "", registrations: [] };
     case "test-connection":

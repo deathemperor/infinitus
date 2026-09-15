@@ -109,8 +109,7 @@ final class InfinitusLoopbackListener: @unchecked Sendable {
   }
 
   private func receive(_ connection: NWConnection, head: Data) {
-    connection.receive(minimumIncompleteLength: 1, maximumLength: 16 * 1024) {
-      [weak self] data, _, isComplete, error in
+    connection.receive(minimumIncompleteLength: 1, maximumLength: 16 * 1024) { [weak self] data, _, isComplete, error in
       guard let self else {
         connection.cancel()
         return

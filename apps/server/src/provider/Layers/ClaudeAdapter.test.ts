@@ -526,6 +526,46 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  it.effect("passes the instance's advisor model to Claude, none when unset (#1232)", () => {
+    const harness = makeHarness({ claudeConfig: { advisorModel: "fable" } });
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      assert.deepEqual(harness.getLastCreateQueryInput()?.options?.settings, {
+        advisorModel: "fable",
+      });
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
+  it.effect("leaves the advisor model to Claude Code when the instance names none", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+
+      const settings = harness.getLastCreateQueryInput()?.options?.settings;
+      assert.strictEqual(
+        typeof settings === "object" ? settings.advisorModel : undefined,
+        undefined,
+      );
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  });
+
   it.effect("forwards claude effort levels into query options", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
@@ -8423,4 +8463,377 @@ describe("fork fallback (side questions)", () => {
       Effect.provide(harness.layer),
     );
   });
+});
+
+describe("advisor tool result (#1247)", () => {
+  const SESSION_ID = "sdk-session-advisor";
+  const TOOL_USE_ID = "srvtoolu-advisor-1";
+
+  const consult = (query: FakeClaudeQuery) => {
+    query.emit({
+      type: "stream_event",
+      session_id: SESSION_ID,
+      uuid: "stream-advisor-start",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "server_tool_use",
+          id: TOOL_USE_ID,
+          name: "advisor",
+          input: {},
+        },
+      },
+    } as unknown as SDKMessage);
+    query.emit({
+      type: "stream_event",
+      session_id: SESSION_ID,
+      uuid: "stream-advisor-stop",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_stop",
+        index: 0,
+      },
+    } as unknown as SDKMessage);
+  };
+
+  // The advisor's answer arrives twice with includePartialMessages: as the
+  // stream's own content_block_start and inside the assistant snapshot.
+  const answer = (query: FakeClaudeQuery, content: Record<string, unknown>) => {
+    const block = {
+      type: "advisor_tool_result",
+      tool_use_id: TOOL_USE_ID,
+      content,
+    };
+    query.emit({
+      type: "stream_event",
+      session_id: SESSION_ID,
+      uuid: "stream-advisor-result",
+      parent_tool_use_id: null,
+      event: {
+        type: "content_block_start",
+        index: 1,
+        content_block: block,
+      },
+    } as unknown as SDKMessage);
+    query.emit({
+      type: "assistant",
+      session_id: SESSION_ID,
+      uuid: "assistant-advisor-result",
+      parent_tool_use_id: null,
+      message: {
+        id: "msg-advisor",
+        role: "assistant",
+        model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+        content: [{ type: "server_tool_use", id: TOOL_USE_ID, name: "advisor", input: {} }, block],
+      },
+    } as unknown as SDKMessage);
+  };
+
+  const finish = (query: FakeClaudeQuery) =>
+    query.emit({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      errors: [],
+      session_id: SESSION_ID,
+      uuid: "result-advisor",
+    } as unknown as SDKMessage);
+
+  const run = (content: Record<string, unknown>) => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({ threadId: session.threadId, input: "hello", attachments: [] });
+
+      consult(harness.query);
+      answer(harness.query, content);
+      finish(harness.query);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      assert.deepEqual(
+        runtimeEvents.map((event) => event.type),
+        [
+          "session.started",
+          "session.configured",
+          "session.state.changed",
+          "turn.started",
+          "thread.started",
+          "item.started",
+          "item.updated",
+          "item.completed",
+          "turn.completed",
+        ],
+      );
+      const started = runtimeEvents.find((event) => event.type === "item.started");
+      assert.equal(started?.type, "item.started");
+      if (started?.type === "item.started") {
+        assert.equal(started.payload.itemType, "dynamic_tool_call");
+        assert.equal(started.payload.detail, "Consulted the advisor");
+      }
+      const completed = runtimeEvents.find((event) => event.type === "item.completed");
+      assert.equal(completed?.type, "item.completed");
+      return completed?.type === "item.completed" ? completed : undefined;
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  };
+
+  it.effect("closes the consult on the redacted answer, once, before the turn ends", () =>
+    Effect.gen(function* () {
+      const completed = yield* run({
+        type: "advisor_redacted_result",
+        encrypted_content: "opaque",
+      });
+      assert.equal(completed?.payload.status, "completed");
+      // Closed by the answer itself, not by the end-of-turn sweep.
+      assert.equal(completed?.raw?.method, "claude/stream_event/content_block_start");
+      assert.equal(
+        (completed?.payload.data as { result?: { type?: string } } | undefined)?.result?.type,
+        "advisor_tool_result",
+      );
+      assert.equal(completed?.payload.detail, "The advisor answered; its reply is encrypted.");
+    }),
+  );
+
+  it.effect("a failed consult is a failed item naming the error", () =>
+    Effect.gen(function* () {
+      const completed = yield* run({
+        type: "advisor_tool_result_error",
+        error_code: "overloaded",
+      });
+      assert.equal(completed?.payload.status, "failed");
+      assert.equal(completed?.payload.detail, "The advisor did not answer: overloaded.");
+    }),
+  );
+
+  it.effect("a plain answer completes with its text in the result", () =>
+    Effect.gen(function* () {
+      const completed = yield* run({ type: "advisor_result", text: "Use the cursor." });
+      assert.equal(completed?.payload.status, "completed");
+      assert.equal(completed?.payload.detail, "Consulted the advisor");
+      assert.equal(
+        (completed?.payload.data as { result?: { content?: { text?: string } } } | undefined)
+          ?.result?.content?.text,
+        "Use the cursor.",
+      );
+    }),
+  );
+});
+
+describe("web tool results (#1251)", () => {
+  const SESSION_ID = "sdk-session-web-tools";
+  const TOOL_USE_ID = "srvtoolu-web-1";
+
+  const run = (
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    resultType: string,
+    content: unknown,
+  ) => {
+    const harness = makeHarness();
+    const block = { type: resultType, tool_use_id: TOOL_USE_ID, content };
+    return Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      const runtimeEventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      const session = yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        runtimeMode: "full-access",
+      });
+      yield* adapter.sendTurn({ threadId: session.threadId, input: "hello", attachments: [] });
+
+      harness.query.emit({
+        type: "stream_event",
+        session_id: SESSION_ID,
+        uuid: "stream-web-start",
+        parent_tool_use_id: null,
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "server_tool_use",
+            id: TOOL_USE_ID,
+            name: toolName,
+            input: toolInput,
+          },
+        },
+      } as unknown as SDKMessage);
+      harness.query.emit({
+        type: "stream_event",
+        session_id: SESSION_ID,
+        uuid: "stream-web-stop",
+        parent_tool_use_id: null,
+        event: { type: "content_block_stop", index: 0 },
+      } as unknown as SDKMessage);
+      // Both delivery paths: the stream's block and the assistant snapshot.
+      harness.query.emit({
+        type: "stream_event",
+        session_id: SESSION_ID,
+        uuid: "stream-web-result",
+        parent_tool_use_id: null,
+        event: { type: "content_block_start", index: 1, content_block: block },
+      } as unknown as SDKMessage);
+      harness.query.emit({
+        type: "assistant",
+        session_id: SESSION_ID,
+        uuid: "assistant-web-result",
+        parent_tool_use_id: null,
+        message: {
+          id: "msg-web",
+          role: "assistant",
+          model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+          content: [
+            { type: "server_tool_use", id: TOOL_USE_ID, name: toolName, input: toolInput },
+            block,
+          ],
+        },
+      } as unknown as SDKMessage);
+      harness.query.emit({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        errors: [],
+        session_id: SESSION_ID,
+        uuid: "result-web",
+      } as unknown as SDKMessage);
+
+      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
+      assert.deepEqual(
+        runtimeEvents.map((event) => event.type),
+        [
+          "session.started",
+          "session.configured",
+          "session.state.changed",
+          "turn.started",
+          "thread.started",
+          "item.started",
+          "item.updated",
+          "item.completed",
+          "turn.completed",
+        ],
+      );
+      const completed = runtimeEvents.find((event) => event.type === "item.completed");
+      assert.equal(completed?.type, "item.completed");
+      if (completed?.type !== "item.completed") {
+        return undefined;
+      }
+      assert.equal(completed.raw?.method, "claude/stream_event/content_block_start");
+      return completed;
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+  };
+
+  it.effect("a web search closes with its result count and the blobs dropped", () =>
+    Effect.gen(function* () {
+      const completed = yield* run(
+        "web_search",
+        { query: "effect streams" },
+        "web_search_tool_result",
+        [
+          {
+            type: "web_search_result",
+            title: "Streams",
+            url: "https://effect.website/docs/stream",
+            page_age: null,
+            encrypted_content: "opaque-1",
+          },
+          {
+            type: "web_search_result",
+            title: "Sinks",
+            url: "https://effect.website/docs/sink",
+            page_age: "2 days",
+            encrypted_content: "opaque-2",
+          },
+        ],
+      );
+      assert.equal(completed?.payload.status, "completed");
+      // The server tool's underscored name still classifies as a web search,
+      // so clients title the row "Web search" rather than "Tool call".
+      assert.equal(completed?.payload.itemType, "web_search");
+      assert.equal(completed?.payload.detail, "2 results for effect streams");
+      const stored = (completed?.payload.data as { result?: { content?: unknown[] } } | undefined)
+        ?.result?.content;
+      assert.deepEqual(stored, [
+        {
+          type: "web_search_result",
+          title: "Streams",
+          url: "https://effect.website/docs/stream",
+          page_age: null,
+        },
+        {
+          type: "web_search_result",
+          title: "Sinks",
+          url: "https://effect.website/docs/sink",
+          page_age: "2 days",
+        },
+      ]);
+    }),
+  );
+
+  it.effect("a failed web search is a failed item naming the error", () =>
+    Effect.gen(function* () {
+      const completed = yield* run("web_search", { query: "x" }, "web_search_tool_result", {
+        type: "web_search_tool_result_error",
+        error_code: "max_uses_exceeded",
+      });
+      assert.equal(completed?.payload.status, "failed");
+      assert.equal(completed?.payload.detail, "Web search failed: max_uses_exceeded.");
+    }),
+  );
+
+  it.effect("a web fetch closes naming the fetched url", () =>
+    Effect.gen(function* () {
+      const completed = yield* run(
+        "web_fetch",
+        { url: "https://example.com/doc" },
+        "web_fetch_tool_result",
+        {
+          type: "web_fetch_result",
+          url: "https://example.com/doc",
+          retrieved_at: null,
+          content: {
+            type: "document",
+            source: { type: "text", media_type: "text/plain", data: "hi" },
+          },
+        },
+      );
+      assert.equal(completed?.payload.status, "completed");
+      assert.equal(completed?.payload.detail, "Fetched https://example.com/doc");
+    }),
+  );
+
+  it.effect("a failed web fetch is a failed item naming the error", () =>
+    Effect.gen(function* () {
+      const completed = yield* run(
+        "web_fetch",
+        { url: "https://example.com" },
+        "web_fetch_tool_result",
+        {
+          type: "web_fetch_tool_result_error",
+          error_code: "url_not_allowed",
+        },
+      );
+      assert.equal(completed?.payload.status, "failed");
+      assert.equal(completed?.payload.detail, "Web fetch failed: url_not_allowed.");
+    }),
+  );
 });

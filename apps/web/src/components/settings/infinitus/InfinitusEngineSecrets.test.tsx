@@ -222,6 +222,85 @@ describe("InfinitusEngineSecrets", () => {
     expect(rendered()).toContain("Only the desktop app on this Mac can change engine secrets.");
   });
 
+  it("changes the routing strategy over proxy-routing and re-reads the proxy (#1235)", async () => {
+    fake.snapshot = snapshot([...ENGINE_COMMANDS, command("proxy-routing")]);
+    let strategy = "fill-first";
+    fake.run = vi.fn(async ({ input }: { input: { command: string; args: string[] } }) => {
+      if (input.command === "proxy-routing") {
+        strategy = input.args[0]!;
+        return reply({ routingStrategy: strategy });
+      }
+      if (input.command === "proxy") {
+        return reply({
+          baseURL: "http://127.0.0.1:8317",
+          keyPresent: true,
+          routingStrategy: strategy,
+        });
+      }
+      return answerReads(input);
+    });
+    await renderSection();
+    expect(rendered()).toContain("consume-first");
+    await act(async () => {
+      // The label is on the trigger; the handler on the Select around it.
+      byLabel("CLIProxyAPI routing strategy").parent!.props.onValueChange("round-robin");
+    });
+    expect(fake.run).toHaveBeenCalledWith({
+      environmentId: "env-1",
+      input: { command: "proxy-routing", args: ["round-robin"], options: {} },
+    });
+    const output = rendered();
+    expect(output).toContain("next credential in turn");
+    expect(output).toContain("no management route for it yet");
+    // No proxy-affinity verb: the switch is not drawn.
+    expect(rendered()).not.toContain("Session affinity");
+  });
+
+  it("draws the affinity switch only with the verb and the field, and each engine's dashboard link", async () => {
+    fake.snapshot = snapshot([
+      ...ENGINE_COMMANDS,
+      command("proxy-routing"),
+      command("proxy-affinity"),
+    ]);
+    fake.run = vi.fn(async ({ input }: { input: { command: string } }) => {
+      if (input.command === "proxy-affinity") return reply({ sessionAffinity: true });
+      if (input.command === "proxy") {
+        return reply({
+          baseURL: "http://127.0.0.1:8317",
+          dashboardURL: "http://127.0.0.1:8317/management.html",
+          keyPresent: true,
+          routingStrategy: "round-robin",
+          sessionAffinity: false,
+          caveat: "Two credentials share one organization.",
+        });
+      }
+      if (input.command === "9router") {
+        return reply({
+          baseURL: "http://127.0.0.1:20128",
+          dashboardURL: "http://127.0.0.1:20128/dashboard",
+          passwordPresent: true,
+        });
+      }
+      return answerReads(input);
+    });
+    await renderSection();
+    const output = rendered();
+    expect(output).toContain("Session affinity");
+    expect(output).toContain("Turn on session affinity so a conversation");
+    expect(output).toContain("Two credentials share one organization.");
+    expect(output).toContain("http://127.0.0.1:20128/dashboard");
+    expect(output).toContain("Open 9Router dashboard");
+    expect(output).toContain("http://127.0.0.1:8317/management.html");
+    expect(output).toContain("Open CLIProxyAPI dashboard");
+    await act(async () => {
+      byLabel("CLIProxyAPI session affinity").props.onCheckedChange(true);
+    });
+    expect(fake.run).toHaveBeenCalledWith({
+      environmentId: "env-1",
+      input: { command: "proxy-affinity", args: ["on"], options: {} },
+    });
+  });
+
   it("keeps Test Connection off until the Mac has the verb", async () => {
     await renderSection();
     const button = byLabel("Test CLIProxyAPI connection");

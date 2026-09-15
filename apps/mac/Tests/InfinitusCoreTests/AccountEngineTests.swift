@@ -53,4 +53,31 @@ final class AccountEngineTests: XCTestCase {
         XCTAssertEqual(Provider.allCases.first, .claude)
         XCTAssertEqual(Provider.codex.displayName, "Codex")
     }
+
+    // Cross-engine usage sharing: two engines holding one email used to
+    // race, and the loser's pace-less copy rendered the row.
+    func testRichestDonationPrefersPaceOverArrivalOrder() {
+        let stamp = Date()
+        let bare = SharedUsage(usage: Usage(sevenDay: UsageWindow(pct: 40)), at: stamp)
+        let paced = SharedUsage(
+            usage: Usage(sevenDay: UsageWindow(pct: 40, expectedPct: 25, aheadOfPace: true)),
+            at: stamp)
+        XCTAssertEqual(bare.richest(with: paced).usage.sevenDay?.expectedPct, 25)
+        XCTAssertEqual(paced.richest(with: bare).usage.sevenDay?.expectedPct, 25)
+    }
+
+    func testRichestDonationBreaksTiesOnWindowCount() {
+        let stamp = Date()
+        let thin = SharedUsage(usage: Usage(sevenDay: UsageWindow(pct: 40)), at: stamp)
+        let wide = SharedUsage(usage: Usage(fiveHour: UsageWindow(pct: 10),
+                                            sevenDay: UsageWindow(pct: 40),
+                                            scoped: [UsageWindow(pct: 5, name: "Opus")]),
+                               at: stamp)
+        XCTAssertEqual(thin.richest(with: wide).usage.scoped?.count, 1)
+        XCTAssertEqual(wide.richest(with: thin).usage.scoped?.count, 1)
+        // Equal readings keep the one already held, so the walk's order
+        // decides only between equals.
+        let other = SharedUsage(usage: Usage(sevenDay: UsageWindow(pct: 99)), at: stamp)
+        XCTAssertEqual(thin.richest(with: other).usage.sevenDay?.pct, 40)
+    }
 }

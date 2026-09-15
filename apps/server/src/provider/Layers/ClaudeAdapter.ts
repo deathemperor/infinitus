@@ -1112,7 +1112,12 @@ function classifyToolItemType(
   if (normalized.includes("mcp")) {
     return "mcp_tool_call";
   }
-  if (normalized.includes("websearch") || normalized.includes("web search")) {
+  // Claude Code's API-side server tool is named `web_search` (#1251).
+  if (
+    normalized.includes("websearch") ||
+    normalized.includes("web_search") ||
+    normalized.includes("web search")
+  ) {
     return "web_search";
   }
   if (normalized.includes("image")) {
@@ -1552,6 +1557,11 @@ function workflowAgentStatus(entry: ClaudeWorkflowAgentEntry): RuntimeTaskStatus
 }
 
 function summarizeToolRequest(toolName: string, input: Record<string, unknown>): string {
+  // The server-side advisor takes no input; its raw form is an empty object.
+  if (toolName === "advisor") {
+    return "Consulted the advisor";
+  }
+
   const imagePath = readToolImagePath(toolName, input);
   if (imagePath) {
     return imagePath;
@@ -1929,6 +1939,120 @@ function toolResultStreamKind(itemType: CanonicalItemType): ClaudeToolResultStre
     default:
       return undefined;
   }
+}
+
+type ServerToolResultBlockType =
+  | "advisor_tool_result"
+  | "web_search_tool_result"
+  | "web_fetch_tool_result";
+
+interface ServerToolResultBlock {
+  readonly type: ServerToolResultBlockType;
+  readonly toolUseId: string;
+  readonly content: unknown;
+}
+
+// A server tool's answer (advisor, web search, web fetch) is an assistant
+// content block keyed by tool_use_id (#1247, #1251), never a user tool_result.
+function readServerToolResultBlock(block: unknown): ServerToolResultBlock | undefined {
+  if (!block || typeof block !== "object") {
+    return undefined;
+  }
+  const candidate = block as { type?: unknown; tool_use_id?: unknown; content?: unknown };
+  if (typeof candidate.tool_use_id !== "string") {
+    return undefined;
+  }
+  switch (candidate.type) {
+    case "advisor_tool_result":
+    case "web_search_tool_result":
+    case "web_fetch_tool_result":
+      return { type: candidate.type, toolUseId: candidate.tool_use_id, content: candidate.content };
+    default:
+      return undefined;
+  }
+}
+
+interface ServerToolOutcome {
+  readonly failed: boolean;
+  // Replaces the request's detail on the closed row; undefined keeps it.
+  readonly detail: string | undefined;
+  // What data.result carries: the block, minus what no client can read.
+  readonly stored: unknown;
+}
+
+function serverToolOutcome(
+  block: ServerToolResultBlock,
+  raw: unknown,
+  requestInput: Record<string, unknown>,
+): ServerToolOutcome {
+  const keep: ServerToolOutcome = { failed: false, detail: undefined, stored: raw };
+  const errorCode = (code: unknown) => (typeof code === "string" ? code : "unknown error");
+
+  if (Array.isArray(block.content)) {
+    if (block.type !== "web_search_tool_result") {
+      return keep;
+    }
+    const results: ReadonlyArray<unknown> = block.content;
+    const query = typeof requestInput.query === "string" ? requestInput.query.trim() : "";
+    const count =
+      results.length === 0
+        ? "No results"
+        : `${results.length} result${results.length === 1 ? "" : "s"}`;
+    return {
+      failed: false,
+      detail: query ? `${count} for ${query}` : count,
+      // Every result carries an encrypted blob only the model can read; a
+      // ten-result search is tens of KB per row to every client without this.
+      stored: { ...(raw as object), content: results.map(webSearchResultForClients) },
+    };
+  }
+
+  const content = block.content as
+    | { type?: unknown; error_code?: unknown; url?: unknown }
+    | null
+    | undefined;
+  switch (content?.type) {
+    case "advisor_redacted_result":
+      return { ...keep, detail: "The advisor answered; its reply is encrypted." };
+    case "advisor_tool_result_error":
+      return {
+        failed: true,
+        detail: `The advisor did not answer: ${errorCode(content.error_code)}.`,
+        stored: raw,
+      };
+    case "web_search_tool_result_error":
+      return {
+        failed: true,
+        detail: `Web search failed: ${errorCode(content.error_code)}.`,
+        stored: raw,
+      };
+    case "web_fetch_result":
+      return {
+        ...keep,
+        detail: typeof content.url === "string" ? `Fetched ${content.url}` : undefined,
+      };
+    case "web_fetch_tool_result_error":
+      return {
+        failed: true,
+        detail: `Web fetch failed: ${errorCode(content.error_code)}.`,
+        stored: raw,
+      };
+    default:
+      return keep;
+  }
+}
+
+function webSearchResultForClients(result: unknown): unknown {
+  if (!result || typeof result !== "object") {
+    return result;
+  }
+  const { type, title, url, page_age } = result as {
+    type?: unknown;
+    title?: unknown;
+    url?: unknown;
+    page_age?: unknown;
+  };
+  return { type, title, url, page_age };
 }
 
 function toolResultBlocksFromUserMessage(message: SDKMessage): Array<{
@@ -3098,6 +3222,17 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         return;
       }
       if (
+        block.type === "advisor_tool_result" ||
+        block.type === "web_search_tool_result" ||
+        block.type === "web_fetch_tool_result"
+      ) {
+        yield* completeServerToolResult(context, block, {
+          rawMethod: "claude/stream_event/content_block_start",
+          rawPayload: message,
+        });
+        return;
+      }
+      if (
         block.type !== "tool_use" &&
         block.type !== "server_tool_use" &&
         block.type !== "mcp_tool_use"
@@ -3187,6 +3322,91 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         return;
       }
     }
+  });
+
+  // Closes a server tool's row on its answer. With includePartialMessages the
+  // block arrives twice (the stream's content_block_start, then the assistant
+  // snapshot); whichever comes first closes it and the other finds nothing.
+  const completeServerToolResult = Effect.fn("completeServerToolResult")(function* (
+    context: ClaudeSessionContext,
+    block: unknown,
+    input: {
+      readonly rawMethod: string;
+      readonly rawPayload: unknown;
+    },
+  ) {
+    const result = readServerToolResultBlock(block);
+    if (!result) {
+      return;
+    }
+    const toolEntry = Array.from(context.inFlightTools.entries()).find(
+      ([, tool]) => tool.itemId === result.toolUseId,
+    );
+    if (!toolEntry) {
+      return;
+    }
+    const [index, tool] = toolEntry;
+    const outcome = serverToolOutcome(result, block, tool.input);
+    const detail = outcome.detail ?? tool.detail;
+    const toolData = {
+      toolName: tool.toolName,
+      input: tool.input,
+      result: outcome.stored,
+    };
+    const raw = {
+      source: "claude.sdk.message" as const,
+      method: input.rawMethod,
+      payload: input.rawPayload,
+    };
+
+    const updatedStamp = yield* makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "item.updated",
+      eventId: updatedStamp.eventId,
+      provider: PROVIDER,
+      createdAt: updatedStamp.createdAt,
+      threadId: context.session.threadId,
+      ...(context.turnState ? { turnId: asCanonicalTurnId(context.turnState.turnId) } : {}),
+      itemId: asRuntimeItemId(tool.itemId),
+      payload: {
+        itemType: tool.itemType,
+        status: outcome.failed ? "failed" : "inProgress",
+        title: tool.title,
+        ...(detail ? { detail } : {}),
+        ...(tool.agentId ? { agentId: tool.agentId } : {}),
+        ...(tool.parentToolUseId ? { parentToolUseId: tool.parentToolUseId } : {}),
+        data: toolData,
+      },
+      providerRefs: nativeProviderRefs(context, {
+        providerItemId: tool.itemId,
+      }),
+      raw,
+    });
+
+    const completedStamp = yield* makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "item.completed",
+      eventId: completedStamp.eventId,
+      provider: PROVIDER,
+      createdAt: completedStamp.createdAt,
+      threadId: context.session.threadId,
+      ...(context.turnState ? { turnId: asCanonicalTurnId(context.turnState.turnId) } : {}),
+      itemId: asRuntimeItemId(tool.itemId),
+      payload: {
+        itemType: tool.itemType,
+        status: outcome.failed ? "failed" : "completed",
+        title: tool.title,
+        ...(detail ? { detail } : {}),
+        ...(tool.agentId ? { agentId: tool.agentId } : {}),
+        ...(tool.parentToolUseId ? { parentToolUseId: tool.parentToolUseId } : {}),
+        data: toolData,
+      },
+      providerRefs: nativeProviderRefs(context, {
+        providerItemId: tool.itemId,
+      }),
+      raw,
+    });
+    context.inFlightTools.delete(index);
   });
 
   const handleUserMessage = Effect.fn("handleUserMessage")(function* (
@@ -3467,6 +3687,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         if (!block || typeof block !== "object") {
           continue;
         }
+        yield* completeServerToolResult(context, block, {
+          rawMethod: "claude/assistant",
+          rawPayload: message,
+        });
         const toolUse = block as {
           type?: unknown;
           id?: unknown;
@@ -5282,6 +5506,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(claudeSettings.autoCompactWindow
           ? { autoCompactWindow: Number(claudeSettings.autoCompactWindow) }
           : {}),
+        // Empty leaves the CLI on the user's own advisor setting (#1232).
+        ...(claudeSettings.advisorModel ? { advisorModel: claudeSettings.advisorModel } : {}),
       };
       const mcpSession = McpProviderSession.readMcpProviderSession(input.threadId);
       // The attachments dir grant lets the agent Read/copy pasted images at

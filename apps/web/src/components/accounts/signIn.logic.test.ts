@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  fleetRunsShellOAuth,
+  fleetSignInGate,
+  oauthSignInBridge,
+  shellOAuthWindowLabel,
   signInBeginCommandArgs,
   signInBeginReply,
   signInBridge,
@@ -16,6 +20,7 @@ import {
 } from "./signIn.logic";
 
 const flow = (over: Partial<SignInFlow>): SignInFlow => ({
+  kind: "app",
   fleetKey: "swapd/claude",
   target: null,
   flowId: "f1",
@@ -41,6 +46,53 @@ describe("snapshotOffersSignIn / signInBridge", () => {
       submitInfinitusSignInCode: async () => ({ ok: true }),
     });
     expect(full).not.toBeNull();
+  });
+});
+
+describe("the shell's own sign-in (#1213)", () => {
+  it("needs both shell methods, and only the loopback engine takes the path", () => {
+    expect(oauthSignInBridge(undefined)).toBeNull();
+    expect(oauthSignInBridge({ beginInfinitusOAuthSignIn: async () => ({ ok: true }) })).toBeNull();
+    expect(oauthSignInBridge({ cancelInfinitusOAuthSignIn: async () => {} })).toBeNull();
+    expect(
+      oauthSignInBridge({
+        beginInfinitusOAuthSignIn: async () => ({ ok: true }),
+        cancelInfinitusOAuthSignIn: async () => {},
+      }),
+    ).not.toBeNull();
+    expect(fleetRunsShellOAuth("swapd")).toBe(true);
+    // The proxy engine declares addOAuth too; its sign-in is not this flow.
+    expect(fleetRunsShellOAuth("proxy")).toBe(false);
+  });
+
+  it("runs whatever the fleet advertises, since it asks the app for nothing", () => {
+    const gate = (over: Parameters<typeof fleetSignInGate>[0]) => fleetSignInGate(over);
+    // The bug this feature is for: the fleet advertises no `addOAuth`, so both
+    // of the app's paths are shut and the page drew no button at all.
+    const shut = { shellOAuth: false, offers: true, inApp: true, offersAdd: true, canAdd: false };
+    expect(gate(shut)).toEqual({ inApp: false, canAdd: false });
+    expect(gate({ ...shut, shellOAuth: true })).toEqual({ inApp: true, canAdd: false });
+    // With the capability the app's own flow runs, and the shell's still wins.
+    expect(gate({ ...shut, canAdd: true })).toEqual({ inApp: true, canAdd: false });
+    // No `signin-begin` in the manifest: the hand-off to the Mac (#672).
+    expect(gate({ ...shut, offers: false, canAdd: true })).toEqual({
+      inApp: false,
+      canAdd: true,
+    });
+    expect(gate({ ...shut, offers: false, canAdd: true, shellOAuth: true })).toEqual({
+      inApp: true,
+      canAdd: false,
+    });
+  });
+
+  it("sends the user to the window, since there is no page link and no code", () => {
+    const shell = flow({ kind: "shell", url: null, pasteCode: false, phase: "waitingForToken" });
+    expect(signInStatusText(shell)).toBe("Sign in in the window.");
+    expect(signInStatusText({ ...shell, target: "two@example.com" })).toBe(
+      "Sign in as two@example.com in the window.",
+    );
+    expect(shellOAuthWindowLabel("claude", null)).toBe("Sign in to claude");
+    expect(shellOAuthWindowLabel("claude", "two@example.com")).toBe("Sign in as two@example.com");
   });
 });
 
@@ -124,6 +176,7 @@ describe("signInStatusText / signInBusy", () => {
 
   it("says where to sign in: the shell's window, or the page this device opened", () => {
     const flow = {
+      kind: "app" as const,
       fleetKey: "claude",
       target: null,
       flowId: "f1",

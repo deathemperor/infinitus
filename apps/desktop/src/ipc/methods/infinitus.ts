@@ -1,6 +1,8 @@
-import { DesktopDeepLink } from "@t3tools/contracts";
+import { DesktopCaptureGestureEvent, DesktopDeepLink } from "@t3tools/contracts";
 import {
   InfinitusDesktopPrefs,
+  InfinitusOAuthSignInInput,
+  InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
   InfinitusSignInWindowInput,
@@ -12,6 +14,7 @@ import { InfinitusCaptureGestureService } from "../../captures/InfinitusCaptureG
 import { InfinitusDeepLinksService } from "../../infinitus/InfinitusDeepLinks.ts";
 import { InfinitusDesktopPrefsService } from "../../infinitus/InfinitusDesktopPrefs.ts";
 import { InfinitusKeepAwakeService } from "../../infinitus/InfinitusKeepAwake.ts";
+import { InfinitusOAuthSignInService } from "../../infinitus/InfinitusOAuthSignIn.ts";
 import { InfinitusSignInService } from "../../infinitus/InfinitusSignIn.ts";
 import * as IpcChannels from "../channels.ts";
 import { makeIpcMethod } from "../DesktopIpc.ts";
@@ -73,6 +76,36 @@ export const submitInfinitusSignInCode = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.submitSignInCode")(function* (input) {
     const signIn = yield* InfinitusSignInService;
     return yield* signIn.submitCode(input);
+  }),
+});
+
+export const beginInfinitusOAuthSignIn = makeIpcMethod({
+  channel: IpcChannels.BEGIN_INFINITUS_OAUTH_SIGN_IN_CHANNEL,
+  payload: InfinitusOAuthSignInInput,
+  result: InfinitusOAuthSignInResult,
+  handler: Effect.fn("desktop.ipc.infinitus.beginOAuthSignIn")(function* (input) {
+    const signIn = yield* InfinitusOAuthSignInService;
+    return yield* signIn.begin(input);
+  }),
+});
+
+export const cancelInfinitusOAuthSignIn = makeIpcMethod({
+  channel: IpcChannels.CANCEL_INFINITUS_OAUTH_SIGN_IN_CHANNEL,
+  payload: Schema.String,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.infinitus.cancelOAuthSignIn")(function* (flowId) {
+    const signIn = yield* InfinitusOAuthSignInService;
+    yield* signIn.cancel(flowId);
+  }),
+});
+
+export const consumePendingCaptureGestures = makeIpcMethod({
+  channel: IpcChannels.CONSUME_CAPTURE_GESTURES_CHANNEL,
+  payload: Schema.Void,
+  result: Schema.Array(DesktopCaptureGestureEvent),
+  handler: Effect.fn("desktop.ipc.infinitus.consumePendingCaptureGestures")(function* () {
+    const gesture = yield* InfinitusCaptureGestureService;
+    return yield* gesture.consumePending;
   }),
 });
 
