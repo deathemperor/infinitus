@@ -706,7 +706,9 @@ was deleted`, before the forced remove) and `deleteBranch` (`git branch -D`
   `usePinAtCreation` runs once a queued creation is delivered, right after the
   "delivered" outcome is recorded (its test, `use-thread-outbox-drain.test.ts`,
   mocks `./preferences` so the drain's module graph stays clear of
-  expo-secure-store). The two `resolveThreadOutboxDeliveryAction` calls (the
+  expo-secure-store). `threadsByKey` (a Map over the shells, #1278 finding 6) is the pass's
+  thread lookup; the live re-check keeps `findThread` over the registry's
+  array. The two `resolveThreadOutboxDeliveryAction` calls (the
   pass and the live re-check before a send) are wrapped in
   `queueBehindRunningTurn` (#807): an existing thread's follow-up waits while
   its turn runs or the server holds it, the phone's copy of the desktop
