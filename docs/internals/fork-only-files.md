@@ -44,47 +44,8 @@ these bullets.
   Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
   the app's text verbatim; the pane holds no secret. Gated on the manifest
   carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
-- `apps/web/src/components/captures/` and `apps/web/src/state/captures.ts` —
-  the composer's Captures popover (#433, PR B): `ComposerCapturesBadge` (the
-  shoulder tab beside the stash badge, open count), `ComposerCapturesMenu`
-  (the list in the composer's anchored layer: Enter adds — a multi-line
-  paste is one capture — per item Send to composer / Copy / done / remove,
-  "Clear done"; Escape or a pointer outside closes, a Send that landed
-  closes, a busy composer toasts), `captures.logic` (ordering, selection and
-  paste normalisation, failure copy), `capturesUiStore` (the open state
-  the badge, the shortcuts and the palette share), `useCaptures`
-  (`useActiveProjectRef` — the routed thread's or draft's project;
-  `useCapturesShortcuts` — `captures.toggle` opens/closes, `captures.add`
-  captures the app's own selection, else opens with the input focused).
-  `state/captures.ts` is the web instance of the client-runtime atoms.
-  `CaptureGestureCoordinator` (+ `captureGesture.logic`, #433 slice 2) is
-  the desktop gesture's landing: mounted once from `__root.tsx` beside
-  `SnapShotCoordinator`, it adds a `captured` event's text to the routed
-  thread's project, else the last project a gesture reached, else holds it
-  until a thread with a project is open, and toasts `empty` / `failed`
-  (the Accessibility fix by name). `useAddCapture` is shared with the
-  shortcuts.
-- `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G):
-  `promptSnippets.logic` (the project's list from server settings, draft
-  trimming against the schema caps, name-derived ids, upsert/remove under
-  the 50-per-project cap, the settings patch — an empty list stores `null` —
-  and the one-line preview), `promptsUiStore` (the popover's open state),
-  `ComposerPromptsBadge` (the shoulder tab after Captures, saved count),
-  `ComposerPromptsMenu` (one row per snippet in the composer's anchored
-  layer; a click puts the body at the end of the composer via
-  `insertComposerTextAtEnd` and closes; "Edit prompts…" opens Settings ›
-  Projects for the project; Escape or a pointer outside closes),
-  `useProjectPromptSnippets` (the routed project's list plus its settings
-  group key), and `ProjectPromptSnippetsSection` (Settings › Projects ›
-  Prompts: add / edit / remove, read from the representative checkout and
-  saved to every checkout of the group through
-  `serverEnvironment.updateSettings`, like the panel's overrides). Snippet text
-  is user prose: toasts and labels show the name, never the body. The `/`
-  menu offers them too (`promptSnippetSlashItems`: filtered by name, a
-  leading `/` or `prompt:` ignored, listed after the commands and skills;
-  picking one replaces the `/query` with the body where it was typed, via
-  `applyPromptReplacement`). The phone lists the same snippets from its
-  server config's settings (see `apps/mobile/src/features/threads/promptSnippetItems.ts`).
+- `apps/web/src/components/captures/`, `apps/web/src/state/captures.ts` — the composer's Captures popover (#433, PR B): `ComposerCapturesBadge`, `ComposerCapturesMenu`, `captures.logic`, `capturesUiStore`, `useCaptures`, and `CaptureGestureCoordinator` (+ `captureGesture.logic`), the desktop gesture's landing. Rules and traps: `docs/internals/captures.md`.
+- `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G): `promptSnippets.logic`, `promptsUiStore`, `ComposerPromptsBadge`, `ComposerPromptsMenu`, `useProjectPromptSnippets`, `ProjectPromptSnippetsSection`, `promptSnippetSlashItems`; the phone's half is `apps/mobile/src/features/threads/promptSnippetItems.ts`. Rules and traps: `docs/internals/prompt-snippets.md`.
 - `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
   event the palette uses to ask the sidebar for the next waiting thread
   (#270 C); `Sidebar.logic.ts` `resolveAttentionRank` /
@@ -112,21 +73,7 @@ these bullets.
   opens Settings › Infinitus; the Team page's Join field takes it when that
   page lands, and nothing joins on its own. Only the link's kind is ever
   logged; `pair` stays the native app's.
-- `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`,
-  `packages/client-runtime/src/state/captures.ts` (exported as
-  `@t3tools/client-runtime/state/captures`) — captures (#433): one list per
-  project of `CaptureItem {id, text, createdAt, doneAt}` (≤ 200 items, ≤ 8 KiB
-  each; `add` / `edit` / `setDone` / `remove` / `clearDone`, a command naming
-  a gone id is a no-op), kept by the server as
-  `<stateDir>/captures/<percent-encoded projectId>.json` — never in the
-  workspace — written atomically under one lock and streamed whole after every
-  change (`subscribeCaptures`, `orchestration:read`; `captures.apply`,
-  `orchestration:operate`). A file the server cannot decode fails the
-  project's reads and writes with `CaptureStoreError` (the issue, never the
-  contents) rather than being overwritten. The client-runtime atoms are the
-  `list` subscription family keyed `{environmentId, input: {projectId}}` and
-  the `apply` command; the web popover (PR B) and the phone read the same
-  stream.
+- `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`, `packages/client-runtime/src/state/captures.ts` (exported as `@t3tools/client-runtime/state/captures`) — captures (#433): one list per project, kept as `<stateDir>/captures/<projectId>.json`, streamed by `subscribeCaptures`, written by `captures.apply`. Rules and traps: `docs/internals/captures.md`.
 - `packages/client-runtime/src/state/infinitusExhausted.ts` (exported as
   `@t3tools/client-runtime/state/infinitusExhausted`) — the all-accounts-
   exhausted band's verdict (#659): a fleet whose every unheld account has a
@@ -448,98 +395,10 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   under an older shell). `InfinitusLaunchButton.tsx` is the launch button on
   the Accounts offline card and every Infinitus pane's unavailable notice,
   drawn only when the server's host is a Mac.
-- `apps/desktop/src/captures/` — the capture gesture (#433 slice 2, macOS
-  only): with `captureGestureEnabled` on (the card's second row, drawn only
-  on a Mac shell; turning it on asks for the Accessibility grant, the one
-  SnapShot's context uses), a double tap of Shift in any app captures that
-  app's selected text. `MacDoubleTapShiftProcess.ts` is the SnapShot
-  modifier-pair poller's sibling (`osascript` sampling
-  `CGEventSourceFlagsState` at 30 Hz, `ready` / `trigger` on stderr) reading
-  two sub-350 ms presses with no character typed between them
-  (`CGEventSourceCounterForEventType` for key-downs; both Shifts held is
-  SnapShot's pair and never fires). `MacSelectedText.ts` is one `osascript`
-  read of the frontmost app's focused element's `AXSelectedText` (3 s
-  deadline, text cut to `MAX_CAPTURE_TEXT_LENGTH` in the helper; `failed`
-  names `accessibility` / `no-focus` / `unsupported` / `timeout` / `helper`).
-  `InfinitusCaptureGesture.ts` is the service (`setEnabled` writes the knob,
-  then starts or stops the poller; one read at a time; a launch with the
-  knob on checks the grant silently) and the renderer dispatch on
-  `desktop:infinitus-capture-gesture-event`: an open window is not revealed,
-  with none open one is (`revealOrCreateMain`) so the text is not lost.
-  `shell.beep()` confirms a read that got text, since the user is in another
-  app. The text never reaches a log or a span, only its length. Merged into
-  `InfinitusDesktop.layer`; the switch is `setInfinitusCaptureGestureEnabled`
-  (`ipc/methods/infinitus.ts`). The reads are pulled, never pushed (slice 3):
-  the service queues each one (`makeCaptureGestureOutbox`) and pings
-  `desktop:infinitus-capture-gesture-pending` unless the page is still
-  loading, and the renderer drains `consumePendingCaptureGestures` on mount
-  and on every ping — a push at `did-finish-load` beat the coordinator's
-  mount and the text was lost after the beep. Both `osascript` scripts are
-  spike-verified on the developer's Mac (the tests mock `spawn`).
-- `apps/desktop/src/infinitus/InfinitusOAuthSignIn.ts` (+
-  `InfinitusSwapdProcess.ts`, `infinitusSwapd.logic.ts`, test) — the sign-in
-  the shell runs itself (#1213). **This is the one place the fork runs an
-  engine's binary instead of talking to the Mac over the control socket**,
-  and it bends "One API" on purpose: the OAuth client has to be whoever
-  holds the PKCE verifier, and for a loopback redirect that is the engine.
-  Signed off by the developer (2026-09-14), who put the consumer in the
-  desktop app rather than `apps/mac`. `infinitusSwapd.logic.ts` is the pure
-  half: `resolveSwapdBinary` (the `INFINITUS_SWAPD_CLI` override answers
-  whole — a path only if it exists, empty meaning "no engine here" — then
-  `/opt/homebrew/bin`, `/usr/local/bin`, `~/.cargo/bin`, `~/.local/bin`,
-  then the menu-bar helper nested in the packaged bundle, #777) and
-  `parseAddOauthLine`, which reads the two-line protocol
-  `swapd --json --provider <p> add-oauth` streams: the URL line the loopback
-  listener flushes when it binds, then the `{slot, email, created}` envelope
-  the stored account prints, or the engine's own `{error:{code,message}}`.
-  `InfinitusSwapdProcess.ts` is the spawn boundary (one `SwapdAddOAuthRun`
-  with a `result` promise and a `stop`). `InfinitusOAuthSignIn.ts` is the
-  service: `begin` resolves the binary, spawns the run, opens the URL in a
-  child window with `signInWindowOptions` (#677's, so the two sign-ins look
-  alike) and races the announcement against a run that died before it, so a
-  failure before the listener bound can never hang the page; closing the
-  window, or `cancel`, kills the run. One promise for the whole flow. The
-  account is stored inactive (`slots::claim(activate = false)`), so a
-  sign-in never switches the live login. Merged into
-  `InfinitusDesktop.layer`; the methods are `beginInfinitusOAuthSignIn` /
-  `cancelInfinitusOAuthSignIn` (`ipc/methods/infinitus.ts`, `channels.ts`,
-  `DesktopIpcHandlers.ts`, `preload.ts`), their contracts
-  `InfinitusOAuthSignInInput` / `-Result` in `packages/contracts/src/infinitus.ts`
-  and the two optional `DesktopBridge` methods in `ipc.ts`. No token, no
-  code and no email reaches a log or a span.
-- `apps/desktop/src/infinitus/InfinitusKeepAwake.ts` — sleep held off while a
-  turn runs (#1075), the desktop's replacement for the Mac app's retired
-  `keep_awake` (#1041 d5). The renderer decides from the thread shells it
-  already holds (`apps/web/src/lib/desktopKeepAwake.logic.ts`
-  `keepAwakeWanted`: the `desktopKeepAwake` client setting on, default on,
-  and any thread on the primary environment with its session `starting` or
-  `running`; remote environments never count) and sends the verdict over the
-  optional bridge method `setKeepAwake`; the shell holds one
-  `powerSaveBlocker('prevent-app-suspension')` while asked, idempotent, and
-  releases it when its scope closes with the app. Registration points:
-  `DesktopKeepAwakeCoordinator` mounted from `__root.tsx` after the badge
-  coordinator (it sends once on mount, so a reload cannot leave the blocker
-  held), `DesktopKeepAwakeSettings` closing the Behavior section of Settings › General
-  with its dirty label and reset entry, the `desktop-keep-awake` search item,
-  `SET_KEEP_AWAKE_CHANNEL`, `setKeepAwake` in `ipc/methods/infinitus.ts`, the
-  handler and preload lines, the layer in `InfinitusDesktop.layer`. No socket
-  traffic, no Mac involvement.
-- `apps/desktop/src/infinitus/InfinitusHistoryGesture.ts` — the mouse's
-  back and forward buttons on a Mac whose driver sends them as the system's
-  page-swipe gesture (#1250; Logi Options+ maps them to `OSX_GESTURE_BACK` /
-  `_FORWARD`, not Chromium buttons 3/4, so #841's `mouseup` listener never
-  fires — Chrome turns that gesture into history itself, Electron drops it
-  unless a window listens). darwin only: `swipe` is attached to every
-  `BrowserWindow` on `browser-window-created` (and to a main window already
-  open), the direction forwarded from the main window only over
-  `INFINITUS_HISTORY_GESTURE_CHANNEL` (`onHistoryGesture` in the preload,
-  `left` / `right` checked there); `AppSidebarLayout`'s history effect runs
-  `swipeHistoryIntent` (`lib/backNavigation.ts`: right = back on a backable
-  page, left = forward anywhere, Safari's rule) through the same
-  `applyHistoryIntent` as the mouse buttons. One log line per gesture,
-  direction only. Not covered: a driver that delivers the gesture as a
-  scroll-phase swipe, which Electron never surfaces — the fallback then is
-  the driver's keystroke mapping.
+- `apps/desktop/src/captures/` — the capture gesture, a double tap of Shift capturing the frontmost app's selected text (#433 slices 2 and 3): `MacDoubleTapShiftProcess.ts`, `MacSelectedText.ts`, `InfinitusCaptureGesture.ts`, `setInfinitusCaptureGestureEnabled` / `consumePendingCaptureGestures`. Rules and traps: `docs/internals/captures.md`.
+- `apps/desktop/src/infinitus/InfinitusOAuthSignIn.ts` (+ `InfinitusSwapdProcess.ts`, `infinitusSwapd.logic.ts`, test) — the sign-in the shell runs itself by spawning `swapd add-oauth` (#1213); methods `beginInfinitusOAuthSignIn` / `cancelInfinitusOAuthSignIn`, contracts `InfinitusOAuthSignInInput` / `-Result`. Rules and traps: `docs/internals/accounts-page.md`.
+- `apps/desktop/src/infinitus/InfinitusKeepAwake.ts` — sleep held off while a turn runs (#1075): `apps/web/src/lib/desktopKeepAwake.logic.ts` `keepAwakeWanted`, the `setKeepAwake` bridge method, `DesktopKeepAwakeCoordinator`, `DesktopKeepAwakeSettings`. Rules and traps: `docs/internals/desktop-keep-awake.md`.
+- `apps/desktop/src/infinitus/InfinitusHistoryGesture.ts` — the mouse's back and forward buttons arriving as the system page-swipe gesture (#1250): `INFINITUS_HISTORY_GESTURE_CHANNEL`, `onHistoryGesture`, `swipeHistoryIntent` in `lib/backNavigation.ts`. Rules and traps: `docs/internals/desktop-history-gesture.md`.
 - `apps/desktop/src/shell/InfinitusPosixCliDirs.ts` (+ test) — the POSIX
   sibling of upstream's `knownWindowsCliDirs` (#1078): `~/.claude/local`,
   `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
@@ -549,28 +408,7 @@ reason?}`, never an error) answered by `ws.ts` from the same service, falling
   `claude` (`resolvePosixCliDirFallback`, pure over `exists` /
   `listDirectory`); one info line names the dirs added and the one holding
   `claude`. darwin only; a probe that answers in time still wins.
-- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links (#270 D):
-  `<scheme>://thread/<environmentId>/<threadId>` and
-  `<scheme>://new?project=<id|title|folder>&prompt=<text>` on the renderer's
-  own scheme (`infinitus` / `infinitus-dev`), and `<scheme>://join/<code>`
-  (#1313: the whole link is the code, carried untouched, never logged);
-  `app` stays the renderer origin and the Clerk callback, `pair` is the
-  native app's. The standalone Mac build declares no URL type any more
-  (`make-app.sh`, #1313), so LaunchServices has one claimant for
-  `infinitus://` on a Mac. `deepLinkIntake` is attached before Electron
-  is ready (a cold launch's `open-url` lands before `ready`; Windows and
-  Linux carry the URL in argv and `second-instance`) and holds the latest
-  URL until the service drains it; the service keeps the latest parsed link
-  (`consume` clears it), opens or reveals the main window once the backend
-  is ready (`createMainIfBackendReady`, the "activate without windows" gate)
-  and pings `desktop:infinitus-deep-link-pending` when the page is loaded —
-  a loading page pulls on mount. The prompt is cut at
-  `MAX_DEEP_LINK_PROMPT_LENGTH` and never logged, only its length. Merged
-  into `InfinitusDesktop.layer`; `consumeInfinitusDeepLink` in
-  `ipc/methods/infinitus.ts`. On a Mac, LaunchServices sends `infinitus://`
-  to one app: the native `Infinitus.app` also claims the scheme for
-  `join` / `pair`, so whichever registered last gets every link (#270).
-
+- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new` and `join` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
 - `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the
