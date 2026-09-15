@@ -521,27 +521,7 @@ boolean` (on is idempotent) and `babysitRounds?` (the layer's bump, ignored
   `ThreadFork.test.ts` (`forkCreateFields`), `ProjectionPipeline.babysit.test.ts`
   (the column), `rightPanelStore.test.ts`, `SideQuestionPanel.logic.test.ts`.
 - **Best of N (#269 B).** `groupId` on `thread.create`, the created payload and the bootstrap's `createThread` (`apps/server/src/ws.ts`); `ProjectionThreads.ts`, `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts` (`group_id`, migration `054`); `apps/web/src/components/chat/bestOf.logic.ts` (`planBestOfMembers`, `bestOfSiblings`, `bestOfMemberStatus`, `bestOfMemberStats`, `bestOfMemberChanges`), `BestOfPicker.tsx`, `apps/web/src/components/BestOfGroupCard.tsx`, `ChatView.tsx` (`onSend(…, bestOf)`). Rules and traps: `docs/internals/best-of.md`.
-- **Worktree limit (#269 H; Cursor's max worktrees).** A server setting
-  `worktreeMaxCount` (`packages/contracts/src/settings.ts`, default 25, 0
-  lifts it) checked in `apps/server/src/ws.ts` before a bootstrap creates
-  anything: `ProjectionSnapshotQuery.getWorktreeHolders` counts live threads
-  with a `worktree_path` and lists the oldest archived ones;
-  `apps/server/src/orchestration/worktreeCap.logic.ts` (`worktreeCapRefusal`)
-  words the one-line refusal, which names those threads (deleting one frees
-  its worktree) and the setting. The direct `vcs.createWorktree` RPC runs the
-  same check (refused as a `GitCommandError`), and bootstraps reserve a slot
-  in `worktreesInFlight` before the reads, so Best-of members starting
-  together count each other. Reserving is not refusing (#1190): since
-  upstream's staged worktree setup (#11372), `prepareWorktree` only means a
-  worktree _may_ be created — a project that is no repository, or a base
-  branch naming no commit, runs the thread in the project checkout instead —
-  so the refusal is taken once `shouldPrepareWorktree` is final and the
-  reservation is given back when it reads false, while the check still sits
-  above the `thread.create` so an over-limit send costs no thread.
-  Settings → General "Worktree limit"
-  (`SettingsPanels.tsx`, `settingsSearch.ts`). Tests:
-  `worktreeCap.logic.test.ts`, `ProjectionSnapshotQuery.test.ts`,
-  `server.test.ts`, `settings.test.ts`.
+- **Worktree limit (#269 H).** `packages/contracts/src/settings.ts` (`worktreeMaxCount`), `apps/server/src/ws.ts` (the bootstrap check, `worktreesInFlight`, the `vcs.createWorktree` check), `ProjectionSnapshotQuery.getWorktreeHolders`, `apps/server/src/orchestration/worktreeCap.logic.ts` (`worktreeCapRefusal`), `SettingsPanels.tsx` + `settingsSearch.ts` ("Worktree limit"). Rules and traps: `docs/internals/worktree-limit.md`.
 - **Reconnect a turn whose transport went away (#832).** `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`scheduleReconnect`, `reopenForReconnect`, `reconnectQueryOptions`, `RECONNECT_EXHAUSTED_MESSAGE`; + `claudeReconnect.logic.ts`), `apps/server/src/provider/turnContinuation.ts`, `ProviderService.processRuntimeEvent` (`continueAfterServerUpdate`), `packages/contracts/src/orchestration.ts` (`OrchestrationSession.statusReason`), `ProjectionThreadSessions` (`status_reason`, `Migrations/055_ProjectionThreadSessionsStatusReason.ts`), `ProjectionPipeline.ts`, `ProjectionSnapshotQuery.ts`, `apps/web/src/components/chat/ThreadReconnectingNotice.tsx` (mounted in `ChatView.tsx`). Rules and traps: `docs/internals/turn-reconnect.md`.
 - Fork from a turn (#270 E2): `packages/contracts/src/infinitus.ts` —
   `InfinitusThreadForkInput/Result`, `InfinitusThreadForkRefused`; `rpc.ts` —
