@@ -4941,8 +4941,15 @@ engineLayer("OrchestrationProjectionPipeline turn queue (#806)", (it) => {
         queueId: QueueId.make("q3"),
         message: message("m3", "third"),
         createdAt,
+        sendAt: "tool-boundary",
       });
       assert.strictEqual(yield* countRows(), 1);
+      // #1318: the steer moment survives the row and the shell read.
+      assert.strictEqual(
+        Option.getOrThrow(yield* snapshotQuery.getThreadShellById(threadId)).queuedTurns?.[0]
+          ?.sendAt,
+        "tool-boundary",
+      );
       yield* engine.dispatch({
         type: "thread.delete",
         commandId: CommandId.make("queue-delete"),

@@ -3,8 +3,9 @@
  * to a thread, `<scheme>://new?project=<id|title|folder>&prompt=<text>` opens
  * the composer on that project with the prompt prefilled, never sent. The
  * scheme is the renderer's own (`infinitus` / `infinitus-dev`), so the `app`
- * host stays the renderer origin and the Clerk bridge's OAuth callback; only
- * the `thread` and `new` hosts are claimed here.
+ * host stays the renderer origin and the Clerk bridge's OAuth callback; the
+ * `thread`, `new` and `join` (#1313: a team invite, the whole link is the
+ * code) hosts are claimed here.
  *
  * Two halves: an intake attached before Electron is ready (macOS delivers a
  * cold launch's `open-url` before `ready`, Windows and Linux put the URL in
@@ -64,6 +65,14 @@ export function parseDesktopDeepLink(url: string, scheme: string): DesktopDeepLi
     if (project.length === 0) return null;
     const prompt = (parsed.searchParams.get("prompt") ?? "").slice(0, MAX_DEEP_LINK_PROMPT_LENGTH);
     return { kind: "new", project, prompt };
+  }
+  // A team invite (#1313). The whole link text is the code (the Mac's
+  // TeamModel takes it verbatim), so it travels untouched and is never
+  // logged: only its kind is.
+  if (parsed.host === "join") {
+    const segments = parsed.pathname.split("/").filter((segment) => segment.length > 0);
+    if (segments.length === 0) return null;
+    return { kind: "join", link: url };
   }
   return null;
 }

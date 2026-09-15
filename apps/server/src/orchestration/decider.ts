@@ -1658,6 +1658,8 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
               ? { modelSelection: command.modelSelection }
               : {}),
             ...(command.message.context !== undefined ? { context: command.message.context } : {}),
+            // Only the non-default moment is stored (#1318).
+            ...(command.sendAt === "tool-boundary" ? { sendAt: command.sendAt } : {}),
             orderKey,
             createdAt: command.createdAt,
             updatedAt: command.createdAt,
@@ -1696,6 +1698,7 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
             ...(existing.modelSelection !== undefined
               ? { modelSelection: existing.modelSelection }
               : {}),
+            ...(existing.sendAt !== undefined ? { sendAt: existing.sendAt } : {}),
             orderKey: existing.orderKey,
             createdAt: existing.createdAt,
             messageId: command.message.messageId,

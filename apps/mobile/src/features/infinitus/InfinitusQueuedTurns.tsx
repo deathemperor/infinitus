@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text } from "../../components/AppText";
-import { queuedTurnSnippet, queuedTurnsTitle } from "./queuedTurns.logic";
+import { queuedTurnSnippet, queuedTurnTiming, queuedTurnsTitle } from "./queuedTurns.logic";
 import { useQueuedTurnActions } from "./useQueuedTurnActions";
 
 /**
@@ -37,6 +37,11 @@ export function InfinitusQueuedTurns(props: {
           >
             {queuedTurnSnippet(row)}
           </Text>
+          {queuedTurnTiming(row) ? (
+            <Text className="font-sans text-xs text-adaptive-neutral-600-400">
+              {queuedTurnTiming(row)}
+            </Text>
+          ) : null}
           {canMove ? (
             <>
               <IconButton

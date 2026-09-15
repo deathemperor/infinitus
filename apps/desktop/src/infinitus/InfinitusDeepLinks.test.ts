@@ -43,6 +43,15 @@ describe("parseDesktopDeepLink (#270 D)", () => {
     expect(link?.kind === "new" ? link.prompt.length : null).toBe(MAX_DEEP_LINK_PROMPT_LENGTH);
   });
 
+  it("carries a team join link whole, as the code (#1313)", () => {
+    expect(parseDesktopDeepLink("infinitus://join/ABCD-1234", "infinitus")).toEqual({
+      kind: "join",
+      link: "infinitus://join/ABCD-1234",
+    });
+    expect(parseDesktopDeepLink("infinitus://join/", "infinitus")).toBeNull();
+    expect(parseDesktopDeepLink("infinitus://join", "infinitus")).toBeNull();
+  });
+
   it("claims nothing else", () => {
     expect(parseDesktopDeepLink("infinitus://app/index.html", "infinitus")).toBeNull();
     expect(parseDesktopDeepLink("infinitus-dev://thread/e/t", "infinitus")).toBeNull();

@@ -103,6 +103,43 @@ describe("queueDrainVerdict (#806)", () => {
   });
 });
 
+describe("queueDrainVerdict: a tool boundary (#1318)", () => {
+  const busy = { session: { status: "running", activeTurnId: "turn-1" } };
+  const steer = { ...row("q2", "t"), sendAt: "tool-boundary" as const };
+
+  it("sends the first tool-boundary row while the turn runs, past idle rows ahead of it", () => {
+    const rows = [row("q1", "m"), steer, { ...row("q3", "z"), sendAt: "tool-boundary" as const }];
+    expect(queueDrainVerdict(thread({ ...busy, queuedTurns: rows }), open)).toEqual({
+      kind: "wait",
+      reason: "busy",
+    });
+    expect(
+      queueDrainVerdict(thread({ ...busy, queuedTurns: rows }), { ...open, toolBoundary: true }),
+    ).toEqual({ kind: "send", row: steer });
+    // No such row: a boundary is nothing to an idle-only queue.
+    expect(
+      queueDrainVerdict(thread({ ...busy, queuedTurns: [row("q1", "m")] }), {
+        ...open,
+        toolBoundary: true,
+      }),
+    ).toEqual({ kind: "wait", reason: "busy" });
+  });
+
+  it("treats the row as ordinary at idle and honours its refusal at a boundary", () => {
+    expect(queueDrainVerdict(thread({ queuedTurns: [steer, row("q3", "z")] }), open)).toEqual({
+      kind: "send",
+      row: steer,
+    });
+    expect(
+      queueDrainVerdict(thread({ ...busy, queuedTurns: [row("q1", "m"), steer] }), {
+        ...open,
+        toolBoundary: true,
+        failed: new Set([queuedTurnSignature(threadId, steer)]),
+      }),
+    ).toEqual({ kind: "wait", reason: "failed" });
+  });
+});
+
 describe("queueDrainVerdict: a refused row (#806)", () => {
   it("skips a refused row by its signature until an edit, move or removal changes it", () => {
     const failed = new Set([queuedTurnSignature(threadId, row("q1", "m"))]);

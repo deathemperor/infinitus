@@ -361,6 +361,20 @@ public enum AccountVitals {
         }
     }
 
+    /// Whether a dead per-model window rolls with the account's weekly
+    /// one — Fable's quota IS a 7d window, so its dead line would repeat
+    /// the clock the weekly cell already counts down (user 2026-09-15:
+    /// "fable has reset time of 7d so when fable is down no needs to show
+    /// its reset time"). Sub-minute drift is the same instant; a model
+    /// window on a schedule of its own keeps its time.
+    public static func resetEchoesWeekly(_ cause: DeadCause, in usage: Usage?) -> Bool {
+        guard cause.kind == .scoped,
+              let scoped = WeeklyRoll.parse(cause.resetsAt),
+              let weekly = WeeklyRoll.parse(usage?.sevenDay?.resetsAt)
+        else { return false }
+        return abs(scoped.timeIntervalSince(weekly)) < 60
+    }
+
     public static func cause(_ usage: Usage?) -> DeadCause? {
         guard let usage else { return nil }
         var dead: [(DeadCause, Date?)] = []

@@ -840,6 +840,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             attachments: queued.attachments,
             modelSelection: queued.modelSelection ?? null,
             context: queued.context ?? null,
+            sendAt: queued.sendAt ?? null,
             orderKey: queued.orderKey,
             createdAt: queued.createdAt,
             updatedAt: queued.updatedAt,

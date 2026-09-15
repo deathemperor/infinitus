@@ -15,6 +15,10 @@
           {
             "/": "/pair",
             "comment": "the Devices QR: infinitus.run/pair#token=\u2026&for=phone&to=<origin> (#724)"
+          },
+          {
+            "/": "/join",
+            "comment": "a team invite: infinitus.run/join#<code> (#1313)"
           }
         ]
       }

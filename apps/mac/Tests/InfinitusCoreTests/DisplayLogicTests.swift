@@ -197,6 +197,30 @@ final class DeadCauseTests: XCTestCase {
         XCTAssertFalse(session.blocks(session: false))
         XCTAssertFalse(session.blocks(scoped: nil))
     }
+
+    func testScopedResetEchoesTheWeeklyOne() {
+        let usage = Usage(sevenDay: window(66, resetsAt: "2026-09-15T11:00:00Z"),
+                          scoped: [window(100, resetsAt: "2026-09-15T11:00:12Z",
+                                          name: "Fable")])
+        let fable = AccountVitals.cause(usage)!
+        XCTAssertTrue(AccountVitals.resetEchoesWeekly(fable, in: usage))
+    }
+
+    func testAModelOnItsOwnScheduleKeepsItsReset() {
+        let usage = Usage(sevenDay: window(66, resetsAt: "2026-09-15T11:00:00Z"),
+                          scoped: [window(100, resetsAt: "2026-09-17T06:00:00Z",
+                                          name: "Fable")])
+        let fable = AccountVitals.cause(usage)!
+        XCTAssertFalse(AccountVitals.resetEchoesWeekly(fable, in: usage))
+        // No weekly window, or a dead 5h/7d cause: nothing to echo.
+        let lone = Usage(scoped: [window(100, resetsAt: "2026-09-15T11:00:00Z",
+                                         name: "Fable")])
+        XCTAssertFalse(AccountVitals.resetEchoesWeekly(
+            AccountVitals.cause(lone)!, in: lone))
+        let weekly = Usage(sevenDay: window(100, resetsAt: "2026-09-15T11:00:00Z"))
+        XCTAssertFalse(AccountVitals.resetEchoesWeekly(
+            AccountVitals.cause(weekly)!, in: weekly))
+    }
 }
 
 final class SentinelNotesTests: XCTestCase {
