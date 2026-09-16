@@ -291,7 +291,7 @@ actor AwsLoginRunner {
             let last = run.output.replacingOccurrences(of: "\r", with: "\n")
                 .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
                 .last { !$0.isEmpty && !$0.hasPrefix("https://") && !$0.lowercased().hasPrefix("enter the authorization") }
-            run.state.message = last.map { String($0.prefix(160)) } ?? "\(run.state.providerOrAws.cliName) exited \(status)"
+            run.state.message = last.map { String($0.prefix(400)) } ?? "\(run.state.providerOrAws.cliName) exited \(status)"
         }
         try? run.stdin.fileHandleForWriting.close()
         runs[key] = nil

@@ -1391,6 +1391,8 @@ final class AppModel: ObservableObject {
             return AwsLogin.Reply(ok: state != nil, state: state, error: state == nil ? "no login in flight for \(profile)" : nil)
         }
         let configText = (try? String(contentsOf: AwsLogin.defaultConfigURL(), encoding: .utf8)) ?? ""
+        // A credential_process profile signs in through the login profile it names.
+        let profile = provider == .aws ? AwsLogin.loginProfile(profile: profile, configText: configText) : profile
         var flow: AwsLogin.Flow = local ? .local : provider.flow(profile: profile, configText: configText)
         if remote == true, flow == .relay { flow = .remote }
         let reply = await awsLoginRunner.start(provider: provider, profile: profile, flow: flow)
