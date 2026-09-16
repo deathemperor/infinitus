@@ -35,37 +35,49 @@ export interface ThreadUsageRow {
   readonly value: string;
 }
 
-/** The popover's label/value rows: turns first, the tool calls and the
-    wall time when the server counted them, then the token counts that
-    moved (a zero row is left out), then the models. */
-export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
+/** The popover's rows in the three groups it rules between: what the
+    thread did (turns first, the tool calls and the wall time when the
+    server counted them), the token counts that moved (a zero row is left
+    out), then the models. A group with nothing to say is empty. */
+export function threadUsageRowGroups(
+  usage: ThreadUsageRollup,
+): ReadonlyArray<ReadonlyArray<ThreadUsageRow>> {
   const turns =
     usage.subagentTurns > 0
       ? `${usage.turns} (${usage.subagentTurns} with subagents)`
       : `${usage.turns}`;
-  const rows: ThreadUsageRow[] = [{ label: "Turns", value: turns }];
+  const work: ThreadUsageRow[] = [{ label: "Turns", value: turns }];
   if (usage.toolCalls !== undefined)
-    rows.push({ label: "Tool calls", value: `${usage.toolCalls}` });
+    work.push({ label: "Tool calls", value: `${usage.toolCalls}` });
   if (usage.durationMs !== undefined) {
-    rows.push({ label: "Duration", value: formatDuration(usage.durationMs) });
+    work.push({ label: "Duration", value: formatDuration(usage.durationMs) });
   }
-  const tokens: ReadonlyArray<readonly [string, number]> = [
+  const counts: ReadonlyArray<readonly [string, number]> = [
     ["Input tokens", usage.inputTokens],
     ["Output tokens", usage.outputTokens],
     ["Cached input", usage.cachedInputTokens],
     ["Cache creation", usage.cacheCreationTokens],
     ["Reasoning", usage.reasoningTokens],
   ];
-  for (const [label, count] of tokens) {
-    if (count > 0) rows.push({ label, value: formatContextWindowTokens(count) });
+  const tokens: ThreadUsageRow[] = [];
+  for (const [label, count] of counts) {
+    if (count > 0) tokens.push({ label, value: formatContextWindowTokens(count) });
   }
-  if (usage.models.length > 0) {
-    rows.push({
-      label: usage.models.length === 1 ? "Model" : "Models",
-      value: usage.models.join(", "),
-    });
-  }
-  return rows;
+  const models: ThreadUsageRow[] =
+    usage.models.length > 0
+      ? [
+          {
+            label: usage.models.length === 1 ? "Model" : "Models",
+            value: usage.models.join(", "),
+          },
+        ]
+      : [];
+  return [work, tokens, models];
+}
+
+/** The same rows flat, in reading order. */
+export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
+  return threadUsageRowGroups(usage).flat();
 }
 
 /** In place of the cost row when no recorded turn reported usage (a
