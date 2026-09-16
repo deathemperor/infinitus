@@ -84,12 +84,15 @@ final class ProxyMappingTests: XCTestCase {
 
     // MARK: - Status derivation
 
-    func testDisabledFileIsDisabledStatus() throws {
+    /// Hold is policy, carried by `disabled` alone: the row wears a pause
+    /// button and keeps a readable status, so its windows still render
+    /// (user 2026-09-16).
+    func testDisabledFileKeepsAReadableStatus() throws {
         let files = try JSONDecoder().decode(ProxyAuthFileList.self, from: fixture("auth-files.json")).files
         let (fleets, _) = ProxyMapping.fleets(engineID: "cliproxy", files: files, usage: [:], profiles: [:])
         let held = fleets.first { $0.provider == .claude }!.accounts[1]
         XCTAssertEqual(held.disabled, true)
-        XCTAssertEqual(held.usageStatus, "disabled")
+        XCTAssertEqual(held.usageStatus, "ok")
         XCTAssertNil(held.alias)  // note: "" clears
     }
 
