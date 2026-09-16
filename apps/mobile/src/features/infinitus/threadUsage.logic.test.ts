@@ -1,4 +1,4 @@
-import type { ThreadUsageRollup } from "@t3tools/contracts";
+import type { ThreadUsageRollup } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { threadUsageNotes, threadUsageRows } from "./threadUsage.logic";

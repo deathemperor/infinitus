@@ -13,7 +13,7 @@ export function ThreadCreationFailedCard(props: {
 }) {
   return (
     <View className="gap-2.5 rounded-[20px] border border-adaptive-neutral-200-white-a6 bg-adaptive-neutral-100-900 p-4">
-      <Text className="font-t3-bold text-2xs uppercase tracking-[1.1px] text-adaptive-rose-700-300">
+      <Text className="font-infinitus-bold text-2xs uppercase tracking-[1.1px] text-adaptive-rose-700-300">
         Could not start task
       </Text>
       <Text className="font-sans text-sm leading-normal text-adaptive-neutral-600-400">
@@ -28,7 +28,7 @@ export function ThreadCreationFailedCard(props: {
           className="items-center justify-center rounded-[14px] bg-blue-500 px-3.5 py-3"
           onPress={props.onEditTask}
         >
-          <Text className="text-sm font-t3-extrabold text-white">Edit task</Text>
+          <Text className="text-sm font-infinitus-extrabold text-white">Edit task</Text>
         </Pressable>
       </View>
     </View>

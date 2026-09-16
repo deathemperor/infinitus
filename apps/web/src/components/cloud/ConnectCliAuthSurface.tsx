@@ -1,5 +1,5 @@
 import { useAuth, useClerk } from "@clerk/react";
-import { readConnectAuthorizeRequest } from "@t3tools/shared/connectAuth";
+import { readConnectAuthorizeRequest } from "@infinitus/shared/connectAuth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -10,7 +10,7 @@ import { isElectron } from "../../env";
 import { AuthSurfaceShell } from "../auth/AuthSurfaceShell";
 import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { Button } from "../ui/button";
-import { CONNECT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 function ConnectCliAuthMessage({
   eyebrow,

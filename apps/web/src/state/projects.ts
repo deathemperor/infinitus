@@ -1,7 +1,7 @@
-import { createEnvironmentProjectAtoms } from "@t3tools/client-runtime/state/projects";
-import { createProjectEnvironmentAtoms } from "@t3tools/client-runtime/state/projects";
-import { createEnvironmentRpcQueryAtomFamily } from "@t3tools/client-runtime/state/runtime";
-import { WS_METHODS } from "@t3tools/contracts";
+import { createEnvironmentProjectAtoms } from "@infinitus/client-runtime/state/projects";
+import { createProjectEnvironmentAtoms } from "@infinitus/client-runtime/state/projects";
+import { createEnvironmentRpcQueryAtomFamily } from "@infinitus/client-runtime/state/runtime";
+import { WS_METHODS } from "@infinitus/contracts";
 
 import { environmentCatalog } from "../connection/catalog";
 import { connectionAtomRuntime } from "../connection/runtime";

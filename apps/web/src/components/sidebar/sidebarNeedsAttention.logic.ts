@@ -1,5 +1,5 @@
-import { BABYSIT_MAX_ROUNDS, type EnvironmentId } from "@t3tools/contracts";
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+import { BABYSIT_MAX_ROUNDS, type EnvironmentId } from "@infinitus/contracts";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 
 import type { SidebarThreadSummary } from "../../types";
 import { resolveSidebarThreadStatus } from "../Sidebar.logic";

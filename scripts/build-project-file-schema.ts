@@ -5,7 +5,7 @@ import * as NodePath from "node:path";
 import * as NodeProcess from "node:process";
 import * as NodeURL from "node:url";
 
-import { buildT3ProjectFileJsonSchema } from "@t3tools/shared/t3ProjectFile";
+import { buildT3ProjectFileJsonSchema } from "@infinitus/shared/t3ProjectFile";
 
 /**
  * Where infinitus.run serves the project file's JSON Schema from: a static

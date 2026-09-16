@@ -4,11 +4,11 @@ import {
   type ThreadId,
   type ThreadPullRequestLink,
   type ThreadPullRequestSnapshot,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   threadPullRequestKeyOf,
   visibleThreadPullRequests,
-} from "@t3tools/shared/threadPullRequests";
+} from "@infinitus/shared/threadPullRequests";
 
 /**
  * Babysit (#269 A): the pure half. A babysat thread gets a fix round queued

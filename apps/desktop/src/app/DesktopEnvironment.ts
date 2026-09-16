@@ -3,7 +3,7 @@ import type {
   DesktopAppStageLabel,
   DesktopRuntimeArch,
   DesktopRuntimeInfo,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -15,19 +15,19 @@ import {
   adoptsLegacyDesktopUserDataDir,
   DESKTOP_DEV_USER_DATA_DIR_NAME,
   DESKTOP_USER_DATA_DIR_NAME,
-} from "@t3tools/shared/desktopIdentity";
+} from "@infinitus/shared/desktopIdentity";
 
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
   isInfinitusDesktopVersion,
   isInfinitusNightlyDesktopVersion,
   isNightlyDesktopVersion,
 } from "../updates/updateChannels.ts";
-import type { OtlpProtocol } from "@t3tools/shared/observability";
+import type { OtlpProtocol } from "@infinitus/shared/observability";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -98,7 +98,7 @@ export class DesktopEnvironment extends Context.Service<
     /**
      * Whether `legacyUserDataDirName` is a directory this build may adopt. The
      * fork never adopts one: `T3 Code (Alpha)` is the installed app's live
-     * state, lock included (see @t3tools/shared/desktopIdentity).
+     * state, lock included (see @infinitus/shared/desktopIdentity).
      */
     readonly adoptsLegacyUserDataDir: boolean;
     readonly defaultDesktopSettings: DesktopAppSettings.DesktopSettings;
@@ -106,7 +106,7 @@ export class DesktopEnvironment extends Context.Service<
     readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
     readonly resolveResourcePathCandidates: (fileName: string) => readonly string[];
   }
->()("@t3tools/desktop/app/DesktopEnvironment") {}
+>()("@infinitus/desktop/app/DesktopEnvironment") {}
 
 function resolveDesktopAppStageLabel(input: {
   readonly isDevelopment: boolean;

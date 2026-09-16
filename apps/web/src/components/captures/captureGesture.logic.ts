@@ -1,4 +1,4 @@
-import type { DesktopCaptureGestureFailure } from "@t3tools/contracts";
+import type { DesktopCaptureGestureFailure } from "@infinitus/contracts";
 
 import type { ActiveProjectRef } from "./useCaptures";
 

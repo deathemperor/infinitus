@@ -1,4 +1,4 @@
-import type { ThreadId, TurnId } from "@t3tools/contracts";
+import type { ThreadId, TurnId } from "@infinitus/contracts";
 
 /**
  * Fork (#269 C, #863): a thread with `sideOf` set is a hidden side question

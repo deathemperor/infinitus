@@ -3,12 +3,12 @@ import {
   type EnvironmentId,
   type OrchestrationQueuedTurn,
   QUEUED_TURN_GONE,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
   type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@infinitus/client-runtime/state/runtime";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { resolveAssetUrl } from "../../assets/assetUrls";

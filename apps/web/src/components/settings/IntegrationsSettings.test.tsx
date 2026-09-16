@@ -2,7 +2,7 @@ import {
   DEFAULT_CLIENT_SETTINGS,
   DEFAULT_UNIFIED_SETTINGS,
   type DeviceServiceState,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   createMemoryHistory,
   createRootRoute,

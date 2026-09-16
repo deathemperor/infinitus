@@ -5,7 +5,7 @@ import { Platform, View } from "react-native";
 import { AppText as Text } from "./AppText";
 import { IPAD_HOME_TITLE_OFFSET } from "../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../lib/mobileBranding";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /**
  * Horizontal correction applied to content rendered in the brand title slot,
@@ -38,14 +38,14 @@ export function CompactBrandTitle(
     >
       <Text
         allowFontScaling={props.allowFontScaling}
-        className="font-t3-medium text-[21px] tracking-[-0.5px] text-foreground"
+        className="font-infinitus-medium text-[21px] tracking-[-0.5px] text-foreground"
       >
         {PRODUCT_NAME}
       </Text>
       <View className="rounded-full bg-subtle px-1.5 py-0.5">
         <Text
           allowFontScaling={props.allowFontScaling}
-          className="font-t3-bold text-[9px] tracking-[0.9px] text-foreground-muted uppercase"
+          className="font-infinitus-bold text-[9px] tracking-[0.9px] text-foreground-muted uppercase"
         >
           {stageLabel}
         </Text>

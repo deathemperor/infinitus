@@ -7,7 +7,7 @@ import {
   EnvironmentHttpApi,
   ProviderDriverKind,
   type RepositoryIdentity,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
@@ -176,11 +176,11 @@ import {
   persistServerRuntimeState,
 } from "./serverRuntimeState.ts";
 import { orchestrationHttpApiLayer } from "./orchestration/http.ts";
-import * as NetService from "@t3tools/shared/Net";
-import * as RelayClient from "@t3tools/shared/relayClient";
-import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";
+import * as NetService from "@infinitus/shared/Net";
+import * as RelayClient from "@infinitus/shared/relayClient";
+import { disableTailscaleServe, ensureTailscaleServe } from "@infinitus/tailscale";
 import { forkParked, ServerActivation } from "./serverActivation.ts";
-import { CONNECT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 // MCP handoff thread IDs include escaped provenance and can exceed find-my-way's
 // 100-character default for one path segment.

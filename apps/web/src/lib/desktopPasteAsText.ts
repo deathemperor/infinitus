@@ -1,4 +1,4 @@
-import type { DesktopBridge } from "@t3tools/contracts";
+import type { DesktopBridge } from "@infinitus/contracts";
 
 export const DESKTOP_PASTE_AS_TEXT_EVENT = "t3:paste-as-text";
 

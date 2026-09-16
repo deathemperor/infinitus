@@ -1,4 +1,4 @@
-import { InfinitusCommandFailed, InfinitusUnavailable } from "@t3tools/contracts/infinitus";
+import { InfinitusCommandFailed, InfinitusUnavailable } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Ref from "effect/Ref";

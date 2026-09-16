@@ -4,9 +4,9 @@ import {
   EnvironmentHttpForbiddenError,
   EnvironmentHttpInternalServerError,
   EnvironmentHttpUnauthorizedError,
-} from "@t3tools/contracts";
-import { RelayProtectedError } from "@t3tools/contracts/relay";
-import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
+} from "@infinitus/contracts";
+import { RelayProtectedError } from "@infinitus/contracts/relay";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

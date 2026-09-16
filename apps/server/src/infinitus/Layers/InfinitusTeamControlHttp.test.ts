@@ -5,8 +5,8 @@ import {
   EnvironmentAuthenticatedAuth,
   EnvironmentAuthenticatedPrincipal,
   EnvironmentHttpApi,
-} from "@t3tools/contracts";
-import { InfinitusUnavailable } from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts";
+import { InfinitusUnavailable } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import type * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";

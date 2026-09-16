@@ -2,14 +2,14 @@ import type {
   InfinitusCommandInput,
   InfinitusManifestCommand,
   InfinitusSecretInput,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import {
   InfinitusTeamCode,
   InfinitusTeamSnapshot,
   type InfinitusTeamGrant,
   type InfinitusTeamMember,
   type InfinitusTeamPending,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

@@ -1,4 +1,4 @@
-import { ThreadId, type ProviderDriverKind } from "@t3tools/contracts";
+import { ThreadId, type ProviderDriverKind } from "@infinitus/contracts";
 import { it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";

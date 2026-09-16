@@ -1,4 +1,4 @@
-import { compareSemverVersions } from "@t3tools/shared/semver";
+import { compareSemverVersions } from "@infinitus/shared/semver";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";

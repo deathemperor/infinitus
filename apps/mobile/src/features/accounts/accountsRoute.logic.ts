@@ -8,13 +8,13 @@ import {
   buildForecast,
   type FleetSectionModel,
   type ForecastModel,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   exhaustedBand,
   type ExhaustedBandModel,
-} from "@t3tools/client-runtime/state/infinitusExhausted";
-import type { EnvironmentId } from "@t3tools/contracts";
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+} from "@infinitus/client-runtime/state/infinitusExhausted";
+import type { EnvironmentId } from "@infinitus/contracts";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 
 /** One paired Mac that runs Infinitus: an environment advertising the

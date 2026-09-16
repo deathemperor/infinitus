@@ -11,12 +11,12 @@ import {
   type ProviderRuntimeEvent,
   ThreadId,
   TurnId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import type {
   InfinitusAccount,
   InfinitusHeldThread,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

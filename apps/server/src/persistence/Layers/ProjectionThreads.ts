@@ -21,7 +21,7 @@ import {
   ThreadId,
   ThreadTitleState,
   ThreadLinkedPullRequest,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 const ProjectionThreadDbRow = ProjectionThread.mapFields(
   Struct.assign({

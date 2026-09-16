@@ -7,7 +7,7 @@ import {
   EnvironmentAuthenticatedAuth,
   EnvironmentAuthenticatedPrincipal,
   EnvironmentHttpApi,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { it as effectIt } from "@effect/vitest";
 import type * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";

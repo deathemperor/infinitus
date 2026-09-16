@@ -1,7 +1,7 @@
 import type {
   RelayAgentActivityAggregateState,
   RelayAgentActivityState,
-} from "@t3tools/contracts/relay";
+} from "@infinitus/contracts/relay";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import {
@@ -10,7 +10,7 @@ import {
   MAX_ACTIVITY_ROWS,
   sanitizeAgentActivityAggregateState,
 } from "./agentActivityPayloads.ts";
-import { PRODUCT_NAME } from "@t3tools/contracts/productName";
+import { PRODUCT_NAME } from "@infinitus/contracts/productName";
 
 export function statusForPhase(phase: RelayAgentActivityState["phase"]): string {
   switch (phase) {

@@ -1,6 +1,6 @@
 import { DownloadIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
-import type { RelayClientInstallProgressStage } from "@t3tools/contracts";
+import type { RelayClientInstallProgressStage } from "@infinitus/contracts";
 
 import {
   completeRelayClientInstallDialogClose,
@@ -18,7 +18,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "../ui/dialog";
-import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 const installSteps: ReadonlyArray<{
   readonly stage: RelayClientInstallProgressStage;
   readonly label: string;

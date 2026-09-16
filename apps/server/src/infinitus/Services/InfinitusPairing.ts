@@ -1,4 +1,4 @@
-import type { AuthEnvironmentScope, EnvironmentAuthorizationError } from "@t3tools/contracts";
+import type { AuthEnvironmentScope, EnvironmentAuthorizationError } from "@infinitus/contracts";
 import type {
   PairingApprovalCreated,
   PairingApprovalDecideResult,
@@ -7,7 +7,7 @@ import type {
   PairingApprovalPollResult,
   PairingApprovalRefused,
   PairingApprovalRequest,
-} from "@t3tools/contracts/infinitusPairing";
+} from "@infinitus/contracts/infinitusPairing";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type * as Stream from "effect/Stream";

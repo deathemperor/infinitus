@@ -6,8 +6,8 @@ import {
   type PullRequestState,
   type ThreadBabysit,
   type ThreadPullRequestLink,
-} from "@t3tools/contracts";
-import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
+} from "@infinitus/contracts";
+import { resolveThreadCurrentPullRequestLink } from "@infinitus/shared/threadPullRequests";
 
 /** What the phone knows about a thread's pull request, from the linked
     snapshot the server pushes or from the row's live summary (#269). Every

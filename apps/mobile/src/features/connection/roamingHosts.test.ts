@@ -1,8 +1,8 @@
 import {
   BearerConnectionProfile,
   BearerConnectionTarget,
-} from "@t3tools/client-runtime/connection";
-import { EnvironmentId } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/connection";
+import { EnvironmentId } from "@infinitus/contracts";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
 

@@ -12,8 +12,8 @@ import {
   ProviderInstanceId,
   ThreadId,
   TurnId,
-} from "@t3tools/contracts";
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import type * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";

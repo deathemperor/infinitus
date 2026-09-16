@@ -16,7 +16,7 @@
 import {
   type InfinitusOAuthSignInInput,
   type InfinitusOAuthSignInResult,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -39,7 +39,7 @@ export class InfinitusOAuthSignInService extends Context.Service<
     readonly begin: (input: InfinitusOAuthSignInInput) => Effect.Effect<InfinitusOAuthSignInResult>;
     readonly cancel: (flowId: string) => Effect.Effect<void>;
   }
->()("@t3tools/desktop/infinitus/InfinitusOAuthSignIn/InfinitusOAuthSignInService") {}
+>()("@infinitus/desktop/infinitus/InfinitusOAuthSignIn/InfinitusOAuthSignInService") {}
 
 const { logInfo, logWarning } = makeComponentLogger("infinitus-oauth-sign-in");
 

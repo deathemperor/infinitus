@@ -1,4 +1,4 @@
-import type { OrchestrationLatestTurn, OrchestrationThreadActivity } from "@t3tools/contracts";
+import type { OrchestrationLatestTurn, OrchestrationThreadActivity } from "@infinitus/contracts";
 
 /**
  * Session priority mode's held state, read from the thread (#616). The server

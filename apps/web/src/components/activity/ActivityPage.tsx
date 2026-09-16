@@ -2,14 +2,14 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   infinitusCapabilityOf,
   infinitusPageState,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   ACTIVITY_KIND_LABELS,
   activityRows,
   decodeEventRows,
   isPollRow,
-} from "@t3tools/client-runtime/state/infinitusActivity";
-import type { InfinitusEvent } from "@t3tools/contracts/infinitus";
+} from "@infinitus/client-runtime/state/infinitusActivity";
+import type { InfinitusEvent } from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 

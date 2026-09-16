@@ -1,4 +1,4 @@
-import type { InfinitusAccount, InfinitusFleet } from "@t3tools/contracts/infinitus";
+import type { InfinitusAccount, InfinitusFleet } from "@infinitus/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
 import { exhaustedBand } from "./infinitusExhausted.ts";

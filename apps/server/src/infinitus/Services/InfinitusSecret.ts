@@ -5,8 +5,8 @@ import type {
   InfinitusSecretRefused,
   InfinitusSecretResult,
   InfinitusUnavailable,
-} from "@t3tools/contracts/infinitus";
-import type { AuthEnvironmentScope } from "@t3tools/contracts";
+} from "@infinitus/contracts/infinitus";
+import type { AuthEnvironmentScope } from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 

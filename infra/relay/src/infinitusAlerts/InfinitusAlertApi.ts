@@ -5,7 +5,7 @@ import {
   RelayAuthInvalidError,
   RelayEnvironmentPrincipal,
   RelayInternalError,
-} from "@t3tools/contracts/relay";
+} from "@infinitus/contracts/relay";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 

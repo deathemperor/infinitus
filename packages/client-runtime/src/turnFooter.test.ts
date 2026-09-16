@@ -1,4 +1,4 @@
-import { TurnId, type OrchestrationThread } from "@t3tools/contracts";
+import { TurnId, type OrchestrationThread } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { turnFooter, turnFooterLabel, turnFooters, type TurnFooter } from "./turnFooter.ts";

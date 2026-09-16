@@ -6,7 +6,7 @@
  * the engine compacts, emails do not. Nothing here logs; the callers keep the
  * emails out of spans and log lines.
  */
-import type { InfinitusAccount } from "@t3tools/contracts/infinitus";
+import type { InfinitusAccount } from "@infinitus/contracts/infinitus";
 
 export interface SwitchRow {
   readonly atMs: number;

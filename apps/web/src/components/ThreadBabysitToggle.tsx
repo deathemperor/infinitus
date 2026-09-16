@@ -1,4 +1,4 @@
-import { BABYSIT_MAX_ROUNDS, type ThreadBabysit } from "@t3tools/contracts";
+import { BABYSIT_MAX_ROUNDS, type ThreadBabysit } from "@infinitus/contracts";
 import { BabyIcon } from "lucide-react";
 
 import { Button } from "./ui/button";

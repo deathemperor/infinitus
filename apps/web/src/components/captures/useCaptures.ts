@@ -1,5 +1,5 @@
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, ProjectId, ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
+import type { EnvironmentId, ProjectId, ResolvedKeybindingsConfig } from "@infinitus/contracts";
 import { useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo } from "react";
 

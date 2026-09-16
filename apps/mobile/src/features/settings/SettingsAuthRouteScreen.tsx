@@ -5,8 +5,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { View } from "react-native";
 
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
-import { T3ConnectProfilePage } from "../cloud/T3ConnectProfilePage";
-import { CONNECT_NAME } from "@t3tools/shared/productName";
+import { InfinitusConnectProfilePage } from "../cloud/InfinitusConnectProfilePage";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 // Custom rows in Clerk's native profile. Mirrors the web UserButton pages.
 const USER_PROFILE_CUSTOM_PAGES = [
@@ -14,7 +14,7 @@ const USER_PROFILE_CUSTOM_PAGES = [
     path: "t3-connect",
     label: CONNECT_NAME,
     icon: "globe",
-    content: <T3ConnectProfilePage />,
+    content: <InfinitusConnectProfilePage />,
   },
 ] satisfies UserProfileCustomPage[];
 

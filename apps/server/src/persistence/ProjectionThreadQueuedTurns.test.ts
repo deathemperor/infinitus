@@ -1,4 +1,4 @@
-import { MessageId, OrchestrationMessageContext, QueueId, ThreadId } from "@t3tools/contracts";
+import { MessageId, OrchestrationMessageContext, QueueId, ThreadId } from "@infinitus/contracts";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

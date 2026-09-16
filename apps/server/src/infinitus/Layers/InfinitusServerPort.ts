@@ -1,7 +1,7 @@
-import type { AuthEnvironmentScope } from "@t3tools/contracts";
-import { InfinitusManifest, InfinitusPrefs } from "@t3tools/contracts/infinitus";
-import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
-import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
+import type { AuthEnvironmentScope } from "@infinitus/contracts";
+import { InfinitusManifest, InfinitusPrefs } from "@infinitus/contracts/infinitus";
+import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
+import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 import * as NodeOS from "node:os";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";

@@ -1,9 +1,9 @@
-import { WS_METHODS } from "@t3tools/contracts";
+import { WS_METHODS } from "@infinitus/contracts";
 import type {
   InfinitusAccount,
   InfinitusFleet,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import type { Atom } from "effect/unstable/reactivity";
 
 import {

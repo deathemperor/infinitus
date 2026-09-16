@@ -5,7 +5,7 @@ import {
   NIRI_CAPTURE_INTERFACE as INTERFACE,
   NIRI_CAPTURE_PATH as PATH,
 } from "./linuxCaptureSession.ts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /** Niri owns the keybinding; this endpoint triggers capture without first focusing T3. */
 export async function startNiriCaptureShortcut(

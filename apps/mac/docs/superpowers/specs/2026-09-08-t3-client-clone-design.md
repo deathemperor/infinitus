@@ -211,7 +211,7 @@ One Swift view per T3 primitive, same name, same props where sensible:
 - mobile `components/*` (phone): `T3ControlPill`, `T3StatusPill`,
   `T3GlassSurface` (UIVisualEffect `.systemMaterial` + tint from
   `glassSurface`/`glassTint`), `T3EmptyState`, `T3LoadingStrip`,
-  `T3ErrorBanner`, `T3BrandMark` / `T3Wordmark` (the `T3 Code` +
+  `T3ErrorBanner`, `T3BrandMark` / `InfinitusWordmark` (the `T3 Code` +
   variant badge header), `T3ComposerToolbar`, `T3ComposerAttachmentStrip`,
   `T3ThemedSwitch`, `T3AndroidAnchoredMenu` (not ported),
   `T3ProjectFavicon`, `T3ProviderIcon` (the Claude asterisk glyph;

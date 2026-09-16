@@ -14,14 +14,14 @@ import {
   type InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
   type InfinitusSignInWindowInput,
-} from "@t3tools/contracts/infinitus";
-import { PRODUCT_NAME } from "@t3tools/contracts/productName";
-import { resolveInfinitusControlSocketPath } from "@t3tools/shared/infinitusControl";
+} from "@infinitus/contracts/infinitus";
+import { PRODUCT_NAME } from "@infinitus/contracts/productName";
+import { resolveInfinitusControlSocketPath } from "@infinitus/shared/infinitusControl";
 import {
   type InfinitusControlError,
   type InfinitusControlRequestInput,
   requestInfinitusControl,
-} from "@t3tools/shared/infinitusControlSocket";
+} from "@infinitus/shared/infinitusControlSocket";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -100,7 +100,7 @@ export class InfinitusSignInService extends Context.Service<
       input: InfinitusSignInCodeInput,
     ) => Effect.Effect<InfinitusSignInCodeResult>;
   }
->()("@t3tools/desktop/infinitus/InfinitusSignIn/InfinitusSignInService") {}
+>()("@infinitus/desktop/infinitus/InfinitusSignIn/InfinitusSignInService") {}
 
 const { logInfo, logWarning } = makeComponentLogger("infinitus-sign-in");
 

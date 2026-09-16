@@ -8,12 +8,12 @@ import {
   type MobileThemeId as SharedMobileThemeId,
   type ThemeAppearance,
   type ThemeColors,
-} from "@t3tools/shared/themePalettes";
+} from "@infinitus/shared/themePalettes";
 import {
   STANDARD_THEME_PREVIEW_COLORS,
   type ThemePreviewColors,
-} from "@t3tools/shared/themePreview";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+} from "@infinitus/shared/themePreview";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const DEFAULT_MOBILE_THEME_ID = MOBILE_DEFAULT_THEME_ID;
 export const MOBILE_THEME_IDS = [...SHARED_MOBILE_THEME_IDS, "material-you"] as const;

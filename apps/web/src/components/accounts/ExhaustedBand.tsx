@@ -1,4 +1,4 @@
-import type { ExhaustedBandModel } from "@t3tools/client-runtime/state/infinitusExhausted";
+import type { ExhaustedBandModel } from "@infinitus/client-runtime/state/infinitusExhausted";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { useNowMinute } from "../../hooks/useNowMinute";

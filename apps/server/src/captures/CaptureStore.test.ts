@@ -1,5 +1,5 @@
-import { ProjectId } from "@t3tools/contracts";
-import { MAX_CAPTURES_PER_PROJECT, type CaptureId } from "@t3tools/contracts/captures";
+import { ProjectId } from "@infinitus/contracts";
+import { MAX_CAPTURES_PER_PROJECT, type CaptureId } from "@infinitus/contracts/captures";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";

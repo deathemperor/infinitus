@@ -134,7 +134,7 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
               {server.infinitus ? `Infinitus · ${server.host}` : server.host}
             </Text>
           </View>
-          <Text className="text-xs font-t3-bold text-foreground-muted">Use</Text>
+          <Text className="text-xs font-infinitus-bold text-foreground-muted">Use</Text>
         </Pressable>
       ))}
       {phase === "done" && found.length === 0 ? (

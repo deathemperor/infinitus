@@ -1,4 +1,4 @@
-import type { PromptSnippet } from "@t3tools/contracts";
+import type { PromptSnippet } from "@infinitus/contracts";
 import { useMemo } from "react";
 
 import { useClientSettings, useEnvironmentSettings } from "../../hooks/useSettings";

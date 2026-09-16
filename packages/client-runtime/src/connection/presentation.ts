@@ -1,4 +1,4 @@
-import type { ServerConfig } from "@t3tools/contracts";
+import type { ServerConfig } from "@infinitus/contracts";
 import * as Option from "effect/Option";
 
 import type { BearerConnectionProfile, ConnectionCatalogEntry } from "./catalog.ts";

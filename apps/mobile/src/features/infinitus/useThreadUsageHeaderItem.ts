@@ -1,4 +1,4 @@
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
 import { useNavigation } from "@react-navigation/native";
 import { useMemo } from "react";
 

@@ -1,5 +1,5 @@
-import type { ExecutionEnvironmentDescriptor } from "@t3tools/contracts";
-import { deriveWsBaseUrl, normalizeHttpBaseUrl } from "@t3tools/shared/advertisedEndpoint";
+import type { ExecutionEnvironmentDescriptor } from "@infinitus/contracts";
+import { deriveWsBaseUrl, normalizeHttpBaseUrl } from "@infinitus/shared/advertisedEndpoint";
 
 import { BearerConnectionProfile } from "./catalog.ts";
 import type { ConnectionAttemptError } from "./model.ts";

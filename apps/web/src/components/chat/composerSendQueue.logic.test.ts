@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
-import { EnvironmentId, QueueId, ThreadId, type OrchestrationQueuedTurn } from "@t3tools/contracts";
-import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
+import {
+  EnvironmentId,
+  QueueId,
+  ThreadId,
+  type OrchestrationQueuedTurn,
+} from "@infinitus/contracts";
+import { pinOrderKeyBetween } from "@infinitus/client-runtime/state/thread-sort";
 
 import { formatInlineContextReference } from "../../lib/composerContextReferences";
 import type { PromptStashEntry } from "../../promptStashStore";

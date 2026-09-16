@@ -1,4 +1,4 @@
-import { RotatingFileSink } from "@t3tools/shared/logging";
+import { RotatingFileSink } from "@infinitus/shared/logging";
 import * as Effect from "effect/Effect";
 import * as Logger from "effect/Logger";
 

@@ -1,5 +1,5 @@
-import { EnvironmentHttpApi } from "@t3tools/contracts";
-import { TeamControlUnavailable } from "@t3tools/contracts/infinitusTeamControl";
+import { EnvironmentHttpApi } from "@infinitus/contracts";
+import { TeamControlUnavailable } from "@infinitus/contracts/infinitusTeamControl";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 

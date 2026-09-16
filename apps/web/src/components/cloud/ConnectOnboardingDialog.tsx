@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/react";
-import { AuthAdministrativeScopes, AuthRelayWriteScope } from "@t3tools/contracts";
+import { AuthAdministrativeScopes, AuthRelayWriteScope } from "@infinitus/contracts";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -19,7 +19,7 @@ import { Dialog } from "../ui/dialog";
 import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { WizardSteps, WizardPopup, WizardHeader, WizardPanel, WizardFooter } from "../ui/wizard";
-import { CONNECT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 /**
  * Post-sign-in onboarding wizard for T3 Connect. Opens on every in-session

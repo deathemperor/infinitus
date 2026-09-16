@@ -1,4 +1,4 @@
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 /**
  * The shape of an expo-updates log entry we care about. Mirrors
  * `UpdatesLogEntry` structurally so the model needs no native module at test

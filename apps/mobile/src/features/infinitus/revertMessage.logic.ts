@@ -3,7 +3,7 @@ import type {
   OrchestrationCheckpointSummary,
   OrchestrationMessageContext,
   OrchestrationThread,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import { reidentifyComposerContext, uploadedComposerContext } from "../../lib/composerContext";
 

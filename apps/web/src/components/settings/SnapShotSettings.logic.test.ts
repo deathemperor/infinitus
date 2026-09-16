@@ -1,5 +1,5 @@
 import { assert, expect, it } from "vite-plus/test";
-import { DEFAULT_CLIENT_SETTINGS, type DesktopSnapShotState } from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS, type DesktopSnapShotState } from "@infinitus/contracts";
 
 import {
   createRecordingRequestTracker,
@@ -14,7 +14,7 @@ import {
   snapShotDescription,
   snapShotAccessibilityUnavailableMessage,
 } from "./SnapShotSettings.logic";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 it.each([
   ["off", { snapShotPlaySound: false }],

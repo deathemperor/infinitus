@@ -1,4 +1,4 @@
-import { InfinitusCommandFailed, type InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import { InfinitusCommandFailed, type InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import { act, StrictMode, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";

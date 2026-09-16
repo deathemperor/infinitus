@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/oxlint-plugin-t3code",
+  "name": "@infinitus/oxlint-plugin-t3code",
   "private": true,
   "type": "module",
   "scripts": {

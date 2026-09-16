@@ -56,7 +56,7 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/mobile...
+              - --filter=@infinitus/mobile...
 
       - name: Expose pnpm
         run: |
@@ -79,7 +79,7 @@ jobs:
           # Re-sync node_modules to the base commit's lockfile before
           # fingerprinting — a dep-changing PR must not fingerprint the base
           # against head's installed packages.
-          pnpm install --filter=@t3tools/mobile...
+          pnpm install --filter=@infinitus/mobile...
           cd apps/mobile
           for platform in ios android; do
             npx expo-updates fingerprint:generate --platform "$platform" > "$RUNNER_TEMP/fp/base/$platform.json"

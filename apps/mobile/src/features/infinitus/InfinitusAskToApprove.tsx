@@ -98,7 +98,7 @@ export function InfinitusAskToApprove(props: {
         </View>
         <Text
           accessibilityLabel={`Match code ${phase.matchCode.split("").join(" ")}`}
-          className="text-center text-3xl font-t3-bold tracking-[6px] text-foreground"
+          className="text-center text-3xl font-infinitus-bold tracking-[6px] text-foreground"
         >
           {phase.matchCode}
         </Text>

@@ -8,7 +8,7 @@ import {
   QueuedTurnSendAt,
   ThreadId,
   TrimmedNonEmptyString,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -21,7 +21,7 @@ import { toPersistenceSqlError, type ProjectionRepositoryError } from "./Errors.
 
 /**
  * Fork (#806): the server-side message queue's rows. One per message queued
- * on a thread; `orderKey` is a fractional key (`@t3tools/shared/orderKeys`)
+ * on a thread; `orderKey` is a fractional key (`@infinitus/shared/orderKeys`)
  * and rows sort by plain string comparison of it.
  */
 export const ProjectionThreadQueuedTurn = Schema.Struct({

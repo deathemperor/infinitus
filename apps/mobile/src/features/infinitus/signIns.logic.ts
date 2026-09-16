@@ -1,9 +1,9 @@
-import type { InfinitusCommandInput, InfinitusSecretInput } from "@t3tools/contracts/infinitus";
+import type { InfinitusCommandInput, InfinitusSecretInput } from "@infinitus/contracts/infinitus";
 import type {
   InfinitusAwsLogin,
   InfinitusAwsLoginAccount,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 
 /** One lapsed sign-in as the phone shows it (#572 task 7). Every one of the
     Mac's flows reaches the phone: `--remote` (the page opens in Safari and

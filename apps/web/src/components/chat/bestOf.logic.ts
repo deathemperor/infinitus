@@ -3,8 +3,8 @@ import type {
   ThreadId,
   ThreadUsageRollup,
   VcsStatusLocalResult,
-} from "@t3tools/contracts";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+} from "@infinitus/contracts";
+import { formatDuration } from "@infinitus/shared/orchestrationTiming";
 
 /**
  * Best of N (#269 B): one prompt, two to four Claude models, one worktree

@@ -3,10 +3,10 @@ import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
-} from "@t3tools/contracts";
-import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@t3tools/shared/desktopIdentity";
-import { isDevProxiedPath } from "@t3tools/shared/devProxy";
-import { decodeOtlpTraceRecords } from "@t3tools/shared/observability";
+} from "@infinitus/contracts";
+import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@infinitus/shared/desktopIdentity";
+import { isDevProxiedPath } from "@infinitus/shared/devProxy";
+import { decodeOtlpTraceRecords } from "@infinitus/shared/observability";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";

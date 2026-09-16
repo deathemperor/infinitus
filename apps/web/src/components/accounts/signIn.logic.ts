@@ -1,4 +1,4 @@
-import type { DesktopBridge } from "@t3tools/contracts";
+import type { DesktopBridge } from "@infinitus/contracts";
 import type {
   InfinitusCommandInput,
   InfinitusOAuthSignInInput,
@@ -8,7 +8,7 @@ import type {
   InfinitusSignInCodeResult,
   InfinitusSignInWindowInput,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
 
 /**

@@ -6,8 +6,8 @@ import {
   type ProviderRuntimeEvent,
   ThreadId,
   TurnId,
-} from "@t3tools/contracts";
-import type { InfinitusAccount, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts";
+import type { InfinitusAccount, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

@@ -1,4 +1,4 @@
-import type { InfinitusForkTunnel, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusForkTunnel, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as DateTime from "effect/DateTime";
 import { act, StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";

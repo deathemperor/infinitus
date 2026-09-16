@@ -4,8 +4,8 @@ import type {
   ProviderRuntimeEvent,
   ThreadId,
   TurnId,
-} from "@t3tools/contracts";
-import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts";
+import type { InfinitusFleet, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
 
 /**

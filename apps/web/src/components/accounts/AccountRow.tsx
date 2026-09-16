@@ -2,7 +2,7 @@ import type {
   AccountAction,
   AccountRowModel,
   UsageWindowBar,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   ArrowLeftRightIcon,
   ChevronDownIcon,

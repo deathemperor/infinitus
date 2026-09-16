@@ -1,4 +1,4 @@
-import type { ExhaustedBandModel } from "@t3tools/client-runtime/state/infinitusExhausted";
+import type { ExhaustedBandModel } from "@infinitus/client-runtime/state/infinitusExhausted";
 import { View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
@@ -12,7 +12,7 @@ export function ExhaustedBand(props: {
 }) {
   return (
     <View accessibilityRole="alert" className="bg-danger px-4 py-2">
-      <Text className="text-xs font-t3-medium text-danger-foreground">
+      <Text className="text-xs font-infinitus-medium text-danger-foreground">
         {exhaustedCopy(props.band, props.nowMs)}
       </Text>
     </View>

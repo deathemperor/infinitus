@@ -16,7 +16,7 @@ import {
   type InfinitusControlClientConfigShape,
   type InfinitusControlRequestInput,
 } from "../Services/InfinitusControlClient.ts";
-import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 
 import {
   InfinitusControlClientConfigLive,

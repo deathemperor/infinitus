@@ -22,7 +22,9 @@ import * as NodeProcess from "node:process";
  * (`T3CODE_*` env vars, `t3code:` storage keys, the `t3` binary, the
  * `t3-code` MCP id, service labels, wire formats) is NOT here: those take a
  * legacy read at each site, one slice each (#1368 C–E), never a blind
- * rewrite. `--check` fails while any old name is still in the tree, which
+ * rewrite. Nor are the server's `t3/…` service tags: the Effect language
+ * service's `deterministicKeys` rule derives them from the package name,
+ * so they rename with `apps/server`'s `t3` package (slice D). `--check` fails while any old name is still in the tree, which
  * is the guard once the rename has landed.
  *
  *   node scripts/infinitus-rename.ts            rewrite and `git mv` in place
@@ -49,13 +51,6 @@ export const RENAMES: ReadonlyArray<Rename> = [
     replacement: "@infinitus/",
   },
   {
-    what: "Effect service and reference tags rooted at t3/ (apps/server, packages)",
-    // The tag is the first argument of `()(` or `<…>(`, on the same line or
-    // the next; a branch name or a path quoted elsewhere never follows `(`.
-    pattern: /(?<=\(\s*)"t3\//g,
-    replacement: '"infinitus/',
-  },
-  {
     what: "CSS custom properties --t3-* (theme palette, the desktop's preview annotations)",
     pattern: /--t3-(?=[a-z])/g,
     replacement: "--infinitus-",
@@ -66,9 +61,11 @@ export const RENAMES: ReadonlyArray<Rename> = [
     replacement: "font-infinitus-",
   },
   {
-    what: "the wordmark components (T3Wordmark, T3Mark)",
-    pattern: /\bT3(Wordmark|Mark)\b/g,
-    replacement: "Infinitus$1",
+    what: "the wordmark component (T3Wordmark)",
+    // Not T3Mark: that is T3's own artwork, which the upstream mobile
+    // variants keep (`withWidgetLogoAsset.cjs`, #1188).
+    pattern: /\bT3Wordmark\b/g,
+    replacement: "InfinitusWordmark",
   },
   {
     what: "the Connect surfaces (T3Connect*, useT3ConnectAuthPrompt)",
@@ -80,8 +77,8 @@ export const RENAMES: ReadonlyArray<Rename> = [
 /**
  * Files whose names carry an identifier the table renames; the identifier
  * rule above rewrites the imports, this moves the file. Paths are
- * repository-relative; the test checks each still exists on `main` (an
- * entry outlives its file otherwise).
+ * repository-relative; the test checks each destination exists on `main`
+ * (an entry outlives its file otherwise).
  */
 export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = [
   ["apps/web/src/components/T3Wordmark.tsx", "apps/web/src/components/InfinitusWordmark.tsx"],
@@ -98,8 +95,6 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
     "apps/web/src/components/clerk/T3ConnectUserProfilePage.test.tsx",
     "apps/web/src/components/clerk/InfinitusConnectUserProfilePage.test.tsx",
   ],
-  // The widget's logo asset: the imageset and the plugin that copies it name it.
-  ["apps/mobile/assets/widget/T3Mark.svg", "apps/mobile/assets/widget/InfinitusMark.svg"],
   [
     "apps/web/src/components/clerk/useT3ConnectAuthPrompt.tsx",
     "apps/web/src/components/clerk/useInfinitusConnectAuthPrompt.tsx",

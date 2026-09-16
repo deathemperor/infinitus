@@ -1,4 +1,4 @@
-import type { StatsTile, StatsTileGroup } from "@t3tools/client-runtime/state/infinitusStats";
+import type { StatsTile, StatsTileGroup } from "@infinitus/client-runtime/state/infinitusStats";
 
 /** A tile group: the section title, then tiles in a responsive grid. */
 export function StatsTileGroupView({ group }: { readonly group: StatsTileGroup }) {

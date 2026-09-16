@@ -1,5 +1,5 @@
-import type { ProviderRuntimeEvent } from "@t3tools/contracts";
-import type { InfinitusManifestCommand } from "@t3tools/contracts/infinitus";
+import type { ProviderRuntimeEvent } from "@infinitus/contracts";
+import type { InfinitusManifestCommand } from "@infinitus/contracts/infinitus";
 
 /**
  * Lapsed AWS / gcloud sign-in detection (#1076), the pure half: the Mac's

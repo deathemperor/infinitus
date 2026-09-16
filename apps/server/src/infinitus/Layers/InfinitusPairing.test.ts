@@ -2,7 +2,7 @@ import {
   AuthAccessWriteScope,
   AuthAdministrativeScopes,
   AuthOrchestrationReadScope,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";

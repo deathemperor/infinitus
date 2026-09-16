@@ -1,4 +1,4 @@
-import type { ServerRunningTurn } from "@t3tools/contracts";
+import type { ServerRunningTurn } from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 

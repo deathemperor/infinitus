@@ -1,4 +1,4 @@
-import type { OrchestrationThreadShell } from "@t3tools/contracts";
+import type { OrchestrationThreadShell } from "@infinitus/contracts";
 
 /**
  * Best of N on the phone (#269 B), read-only: the web's `bestOf.logic.ts`

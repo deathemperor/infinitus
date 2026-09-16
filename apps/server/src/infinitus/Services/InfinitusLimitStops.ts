@@ -1,4 +1,4 @@
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import type * as Stream from "effect/Stream";
 

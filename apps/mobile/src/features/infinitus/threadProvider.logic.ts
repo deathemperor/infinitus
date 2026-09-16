@@ -1,5 +1,5 @@
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import type { ServerConfig } from "@t3tools/contracts";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
+import type { ServerConfig } from "@infinitus/contracts";
 
 /** The provider snapshot a thread runs on, from ITS environment's config: the
     session's instance while one runs, else the thread's model selection. Takes

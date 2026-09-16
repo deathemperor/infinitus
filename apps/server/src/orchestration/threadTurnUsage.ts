@@ -1,4 +1,4 @@
-import type { ThreadId, ThreadTurnUsage, TurnCompletedPayload, TurnId } from "@t3tools/contracts";
+import type { ThreadId, ThreadTurnUsage, TurnCompletedPayload, TurnId } from "@infinitus/contracts";
 
 /** What the ingestion counted while the turn ran (`TurnTelemetryTracker`). */
 export interface TurnTelemetry {

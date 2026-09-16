@@ -7,9 +7,9 @@ import {
   type ChatFileAttachment,
   type OrchestrationQueuedTurn,
   type UploadChatImageAttachment,
-} from "@t3tools/contracts";
-import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
-import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
+} from "@infinitus/contracts";
+import { pinOrderKeyBetween } from "@infinitus/client-runtime/state/thread-sort";
+import { replaceComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 
 import { formatInlineContextReference } from "../../lib/composerContextReferences";
 

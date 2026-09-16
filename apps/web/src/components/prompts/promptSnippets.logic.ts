@@ -5,7 +5,7 @@ import {
   type ProjectId,
   type PromptSnippet,
   type ServerSettings,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 /** The project's saved snippets, empty when it has none or was cleared. */
 export function snippetsForProject(

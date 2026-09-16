@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { EnvironmentId } from "@t3tools/contracts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { EnvironmentId } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { isRelayManagedConnection, toStableSavedRemoteConnection } from "./connection";
 import { authClientMetadata } from "./authClientMetadata";

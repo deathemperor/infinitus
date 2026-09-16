@@ -1,4 +1,4 @@
-import { DEFAULT_SERVER_SETTINGS, ProjectId, type PromptSnippet } from "@t3tools/contracts";
+import { DEFAULT_SERVER_SETTINGS, ProjectId, type PromptSnippet } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

@@ -1,4 +1,4 @@
-import type { EnvironmentId, OrchestrationSessionStatus } from "@t3tools/contracts";
+import type { EnvironmentId, OrchestrationSessionStatus } from "@infinitus/contracts";
 
 /**
  * Fork (#1075): whether the desktop shell should hold off sleep. True while

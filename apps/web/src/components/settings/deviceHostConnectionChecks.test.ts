@@ -1,6 +1,6 @@
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
-import { EnvironmentId, type DeviceHostSummary } from "@t3tools/contracts";
+import { EnvironmentId, type DeviceHostSummary } from "@infinitus/contracts";
 import {
   checkDeviceHostConnections,
   parseDeviceHostDraft,

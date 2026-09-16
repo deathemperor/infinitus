@@ -10,7 +10,7 @@ import {
   PROVIDER_DISPLAY_NAMES,
   type ProviderDriverKind,
   type ServerProvider,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 /**
  * Title-case a slug: splits on `_` / `-` and camelCase boundaries, so

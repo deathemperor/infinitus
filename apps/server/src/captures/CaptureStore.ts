@@ -9,7 +9,7 @@
  *
  * @module CaptureStore
  */
-import type { ProjectId } from "@t3tools/contracts";
+import type { ProjectId } from "@infinitus/contracts";
 import {
   CaptureList,
   CaptureListFull,
@@ -17,8 +17,8 @@ import {
   MAX_CAPTURES_PER_PROJECT,
   type CaptureCommand,
   type CaptureId,
-} from "@t3tools/contracts/captures";
-import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
+} from "@infinitus/contracts/captures";
+import { fromJsonStringPretty } from "@infinitus/shared/schemaJson";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

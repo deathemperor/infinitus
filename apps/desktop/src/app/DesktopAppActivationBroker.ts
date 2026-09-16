@@ -4,8 +4,8 @@ import {
   type DesktopAppActivationFailure,
   type DesktopAppActivationRequest,
   type DesktopAppActivationResponse,
-} from "@t3tools/contracts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+} from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 interface PendingActivation {
   readonly request: DesktopAppActivationRequest;

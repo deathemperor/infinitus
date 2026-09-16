@@ -1,9 +1,9 @@
-import type { OrchestrationQueuedTurn } from "@t3tools/contracts";
-import { ComposerContextId, MessageId, QueueId } from "@t3tools/contracts";
+import type { OrchestrationQueuedTurn } from "@infinitus/contracts";
+import { ComposerContextId, MessageId, QueueId } from "@infinitus/contracts";
 import {
   collectComposerContextReferences,
   formatComposerContextReference,
-} from "@t3tools/shared/composerContextReferences";
+} from "@infinitus/shared/composerContextReferences";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

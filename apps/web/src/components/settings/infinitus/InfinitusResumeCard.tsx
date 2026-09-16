@@ -1,4 +1,4 @@
-import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts";
+import { DEFAULT_UNIFIED_SETTINGS } from "@infinitus/contracts";
 
 import { usePrimarySettings, useUpdatePrimarySettings } from "../../../hooks/useSettings";
 import { Switch } from "../../ui/switch";

@@ -4,8 +4,8 @@ import {
   type OrchestrationThread,
   type OrchestrationThreadActivity,
   type TurnId,
-} from "@t3tools/contracts";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+} from "@infinitus/contracts";
+import { formatDuration } from "@infinitus/shared/orchestrationTiming";
 
 /**
  * The turn footer (#952): "Done in 49s · 12:59 PM · 1 shell still running"

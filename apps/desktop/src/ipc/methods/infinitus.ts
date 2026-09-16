@@ -1,4 +1,4 @@
-import { DesktopCaptureGestureEvent, DesktopDeepLink } from "@t3tools/contracts";
+import { DesktopCaptureGestureEvent, DesktopDeepLink } from "@infinitus/contracts";
 import {
   InfinitusDesktopPrefs,
   InfinitusOAuthSignInInput,
@@ -6,7 +6,7 @@ import {
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
   InfinitusSignInWindowInput,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 

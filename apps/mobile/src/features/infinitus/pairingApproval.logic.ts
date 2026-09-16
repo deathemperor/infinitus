@@ -13,7 +13,7 @@
 import {
   PairingApprovalCreated,
   PairingApprovalPollResult,
-} from "@t3tools/contracts/infinitusPairing";
+} from "@infinitus/contracts/infinitusPairing";
 import { Option, Schema } from "effect";
 
 import { buildPairingUrl } from "../connection/pairing";

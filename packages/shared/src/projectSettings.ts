@@ -6,7 +6,7 @@ import {
   type ProjectSettingsOverrides,
   type ServerSettings,
   type ThreadEnvMode,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { isModelSelectionProviderEnabled } from "./serverSettings.ts";
 
 export type ProjectSettingSource = "environment" | "project";

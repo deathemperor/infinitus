@@ -1,11 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
-import { threadHold } from "@t3tools/client-runtime/state/infinitusThreadHold";
+import { threadHold } from "@infinitus/client-runtime/state/infinitusThreadHold";
 import type {
   EnvironmentId,
   OrchestrationLatestTurn,
   OrchestrationThreadActivity,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 
@@ -66,7 +66,7 @@ export function InfinitusHoldBanner(props: {
 
   return (
     <View className="gap-2.5 rounded-[20px] border border-adaptive-neutral-200-white-a6 bg-adaptive-neutral-100-900 p-4">
-      <Text className="font-t3-bold text-2xs uppercase tracking-[1.1px] text-adaptive-neutral-600-400">
+      <Text className="font-infinitus-bold text-2xs uppercase tracking-[1.1px] text-adaptive-neutral-600-400">
         {holdBannerTitle(hold.kind)}
       </Text>
       <Text
@@ -89,7 +89,7 @@ export function InfinitusHoldBanner(props: {
               );
             }}
           >
-            <Text className="text-sm font-t3-extrabold text-white">{runNow}</Text>
+            <Text className="text-sm font-infinitus-extrabold text-white">{runNow}</Text>
           </Pressable>
           {supportsPinning ? (
             <Pressable
@@ -104,7 +104,9 @@ export function InfinitusHoldBanner(props: {
                 );
               }}
             >
-              <Text className="text-sm font-t3-extrabold text-foreground">{pinLabel(phase)}</Text>
+              <Text className="text-sm font-infinitus-extrabold text-foreground">
+                {pinLabel(phase)}
+              </Text>
             </Pressable>
           ) : null}
         </View>

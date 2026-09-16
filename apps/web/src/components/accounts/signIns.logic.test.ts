@@ -1,4 +1,4 @@
-import type { SignInRowModel } from "@t3tools/client-runtime/state/infinitusAccounts";
+import type { SignInRowModel } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { signInButtonLabel, signInStatus } from "./signIns.logic";

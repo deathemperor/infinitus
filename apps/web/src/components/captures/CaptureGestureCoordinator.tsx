@@ -1,4 +1,4 @@
-import type { DesktopCaptureGestureEvent } from "@t3tools/contracts";
+import type { DesktopCaptureGestureEvent } from "@infinitus/contracts";
 import { useCallback, useEffect, useRef } from "react";
 
 import { toastManager } from "../ui/toast";

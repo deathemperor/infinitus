@@ -1,4 +1,4 @@
-import type { InfinitusEventRow } from "@t3tools/contracts/infinitus";
+import type { InfinitusEventRow } from "@infinitus/contracts/infinitus";
 
 export interface EventToast {
   readonly type: "error" | "info";

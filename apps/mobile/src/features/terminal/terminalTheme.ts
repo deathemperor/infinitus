@@ -2,7 +2,7 @@ import {
   BUILT_IN_THEMES,
   T3_CHAT_THEME,
   getThemeColorsForAppearance,
-} from "@t3tools/shared/themePalettes";
+} from "@infinitus/shared/themePalettes";
 
 import {
   getMobileThemeVariables,

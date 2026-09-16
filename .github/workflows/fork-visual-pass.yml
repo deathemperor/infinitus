@@ -46,16 +46,16 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/scripts...
+              - --filter=@infinitus/scripts...
               - --filter=t3...
-              - --filter=@t3tools/web...
+              - --filter=@infinitus/web...
 
       - name: Check the route table
         working-directory: scripts
         run: vp test run fork-visual-routes.test.ts
 
       - name: Build the web app
-        run: vp run --filter @t3tools/web build
+        run: vp run --filter @infinitus/web build
 
       - name: Start the fixture and the server
         shell: bash

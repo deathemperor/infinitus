@@ -1,4 +1,4 @@
-import { DEFAULT_HOME_DIR_NAME } from "@t3tools/shared/homeDir";
+import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
 import * as Option from "effect/Option";
 
 export type JoinPath = (first: string, ...segments: string[]) => string;

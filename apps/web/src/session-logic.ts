@@ -1,14 +1,14 @@
 import {
   requestKindFromRequestType,
   type PendingApproval,
-} from "@t3tools/client-runtime/pending-requests";
-import { UserInputAttachmentAnswerPayload } from "@t3tools/contracts";
-import { foldUserInputActivities } from "@t3tools/client-runtime/work-log/user-input";
+} from "@infinitus/client-runtime/pending-requests";
+import { UserInputAttachmentAnswerPayload } from "@infinitus/contracts";
+import { foldUserInputActivities } from "@infinitus/client-runtime/work-log/user-input";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Arr from "effect/Array";
 import { shallow } from "zustand/vanilla/shallow";
-import { isBackgroundTaskActivity } from "@t3tools/client-runtime/state/subagentRuntime";
+import { isBackgroundTaskActivity } from "@infinitus/client-runtime/state/subagentRuntime";
 import {
   commandDetailRepeatsCommand,
   extractCommandOutputText,
@@ -18,8 +18,8 @@ import {
   workEntryIndicatesToolSuccess,
   workLogEntryIsToolLike,
   type WorkLogToolLifecycleStatus,
-} from "@t3tools/client-runtime/work-log/presentation";
-import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
+} from "@infinitus/client-runtime/work-log/presentation";
+import { extractToolActivityPresentation } from "@infinitus/client-runtime/work-log/tool-presentation";
 import {
   isToolLifecycleItemType,
   type AssetResource,
@@ -29,7 +29,7 @@ import {
   type ToolLifecycleItemType,
   type ThreadId,
   type TurnId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   isImageAttachment,
@@ -42,16 +42,16 @@ import {
   type TurnDiffSummary,
 } from "./types";
 
-export type { PendingApproval, PendingUserInput } from "@t3tools/client-runtime/pending-requests";
+export type { PendingApproval, PendingUserInput } from "@infinitus/client-runtime/pending-requests";
 
-export { formatDuration } from "@t3tools/shared/orchestrationTiming";
+export { formatDuration } from "@infinitus/shared/orchestrationTiming";
 
 export {
   workEntryDisplayIndicatesToolFailure,
   workEntryIndicatesToolSuccess,
   workLogEntryIsToolLike,
   type WorkLogToolLifecycleStatus,
-} from "@t3tools/client-runtime/work-log/presentation";
+} from "@infinitus/client-runtime/work-log/presentation";
 
 export interface WorkLogEntry {
   questionAnswer?: UserInputAttachmentAnswerPayload;
@@ -69,9 +69,9 @@ export interface WorkLogEntry {
   changedFiles?: ReadonlyArray<string>;
   tone: "thinking" | "tool" | "info" | "error";
   toolTitle?: string;
-  toolSurface?: import("@t3tools/contracts").ToolActivitySurface;
-  toolIcon?: import("@t3tools/contracts").ToolActivityIcon;
-  toolSource?: import("@t3tools/contracts").ToolActivitySource;
+  toolSurface?: import("@infinitus/contracts").ToolActivitySurface;
+  toolIcon?: import("@infinitus/contracts").ToolActivityIcon;
+  toolSource?: import("@infinitus/contracts").ToolActivitySource;
   toolData?: unknown;
   itemType?: ToolLifecycleItemType;
   requestKind?: PendingApproval["requestKind"];

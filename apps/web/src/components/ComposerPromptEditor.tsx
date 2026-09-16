@@ -10,12 +10,12 @@ import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin";
 import {
   type ComposerContextClipboardFragment,
   type ServerProviderSkill,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
   encodeComposerContextClipboardHtml,
-} from "@t3tools/shared/composerContextClipboard";
-import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
+} from "@infinitus/shared/composerContextClipboard";
+import { serializeComposerFileLink } from "@infinitus/shared/composerTrigger";
 import {
   $applyNodeReplacement,
   $createRangeSelectionFromDom,
@@ -100,7 +100,7 @@ import {
   ComposerContextRecordsContext,
   type ComposerDraftContextRecords,
 } from "./composerContextPresentation";
-import { formatProviderSkillDisplayName } from "@t3tools/client-runtime/providerSkills";
+import { formatProviderSkillDisplayName } from "@infinitus/client-runtime/providerSkills";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { registerComposerInlineTokenPaste } from "./composerInlineTokenPaste";
 import { didComposerSelectionChangeVisibly } from "./composerSelection";

@@ -1,7 +1,7 @@
 import * as NodeOS from "node:os";
 
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
-import { QrCode } from "@t3tools/shared/qrCode";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { QrCode } from "@infinitus/shared/qrCode";
 import * as Effect from "effect/Effect";
 import { HttpServer } from "effect/unstable/http";
 

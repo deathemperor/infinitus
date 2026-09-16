@@ -1,4 +1,4 @@
-import { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
+import { pinOrderKeyBetween } from "@infinitus/client-runtime/state/thread-sort";
 
 /** What a server lets a client do with pins, from its capability flags. */
 export interface PinningSupport {

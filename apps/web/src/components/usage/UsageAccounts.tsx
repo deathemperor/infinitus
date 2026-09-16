@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
-import { infinitusCapabilityOf } from "@t3tools/client-runtime/state/infinitusAccounts";
-import type { UsageAccountAttribution } from "@t3tools/contracts";
-import { formatCount, formatPercent, formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
+import { infinitusCapabilityOf } from "@infinitus/client-runtime/state/infinitusAccounts";
+import type { UsageAccountAttribution } from "@infinitus/contracts";
+import { formatCount, formatPercent, formatTokens, formatUsd } from "@infinitus/shared/usageFormat";
 import { CircleHelpIcon } from "lucide-react";
 
 import { usePrimaryEnvironmentId } from "../../state/environments";

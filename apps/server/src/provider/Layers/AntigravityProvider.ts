@@ -6,9 +6,9 @@ import {
   type ServerProvider,
   type ServerProviderModel,
   type ServerProviderSlashCommand,
-} from "@t3tools/contracts";
-import { createModelCapabilities } from "@t3tools/shared/model";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+} from "@infinitus/contracts";
+import { createModelCapabilities } from "@infinitus/shared/model";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

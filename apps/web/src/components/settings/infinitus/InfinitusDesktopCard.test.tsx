@@ -1,4 +1,4 @@
-import type { InfinitusDesktopPrefs } from "@t3tools/contracts/infinitus";
+import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";
 import { act, StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";

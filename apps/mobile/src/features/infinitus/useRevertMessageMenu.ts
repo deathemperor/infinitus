@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import type { MessageId, OrchestrationThread } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/runtime";
+import type { MessageId, OrchestrationThread } from "@infinitus/contracts";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { MenuAction } from "@react-native-menu/menu";
 import * as Option from "effect/Option";

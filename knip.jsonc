@@ -39,7 +39,7 @@
       ],
       // Keep the transitive Effect runtime pinned for standalone npm installs.
       // Native msgpack acceleration and the Vite+ web build prerequisite.
-      "ignoreDependencies": ["@effect/platform-node-shared", "msgpackr-extract", "@t3tools/web"],
+      "ignoreDependencies": ["@effect/platform-node-shared", "msgpackr-extract", "@infinitus/web"],
     },
     "apps/desktop": {
       // Electron loads these bundles by filename rather than importing them.
@@ -74,8 +74,8 @@
       // Fonts are configured as asset paths; Expo autolinks the native packages.
       "ignoreDependencies": [
         "@expo-google-fonts/dm-sans",
-        "@t3tools/mobile-review-diff-native",
-        "@t3tools/mobile-terminal-native",
+        "@infinitus/mobile-review-diff-native",
+        "@infinitus/mobile-terminal-native",
       ],
     },
     "apps/mobile/modules/t3-markdown-text": {

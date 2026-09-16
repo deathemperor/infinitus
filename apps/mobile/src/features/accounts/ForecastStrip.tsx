@@ -1,4 +1,4 @@
-import type { ForecastModel } from "@t3tools/client-runtime/state/infinitusAccounts";
+import type { ForecastModel } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
@@ -18,7 +18,7 @@ export function ForecastStrip(props: { readonly forecast: ForecastModel }) {
   if (forecast.allDeadAt === null && forecast.drainOrder.length === 0) return null;
   return (
     <View className="gap-1.5 rounded-[24px] border-continuous bg-card p-4">
-      <Text className="text-sm font-t3-medium text-foreground">Forecast</Text>
+      <Text className="text-sm font-infinitus-medium text-foreground">Forecast</Text>
       {forecast.allDeadAt ? (
         <Text className="text-sm text-foreground-muted">
           All accounts limited by {clock(forecast.allDeadAt)} at the current pace.

@@ -1,7 +1,7 @@
-import { EnvironmentId } from "@t3tools/contracts";
-import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
+import { EnvironmentId } from "@infinitus/contracts";
+import type { ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 // Pinned so the direction cases below read as fixed versions instead of
 // arithmetic on whatever version this checkout happens to be at.

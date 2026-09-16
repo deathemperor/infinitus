@@ -4,4 +4,4 @@
  * through this constant so upstream-sync conflicts collapse to import
  * lines; see INFINITUS.md.
  */
-export { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/contracts/productName";
+export { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/contracts/productName";

@@ -10,8 +10,8 @@ import {
   type OrchestrationEvent,
   type OrchestrationQueuedTurn,
   type OrchestrationThreadShell,
-} from "@t3tools/contracts";
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -22,7 +22,7 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import { orderKeyBetween } from "@t3tools/shared/orderKeys";
+import { orderKeyBetween } from "@infinitus/shared/orderKeys";
 import { describe, expect } from "vite-plus/test";
 
 import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.ts";

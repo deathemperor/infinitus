@@ -19,7 +19,7 @@
  */
 import * as NodeCrypto from "node:crypto";
 
-import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
+import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 
 import * as Effect from "effect/Effect";
 import * as Encoding from "effect/Encoding";

@@ -1092,7 +1092,7 @@ git commit -m "t3kit: lucide icons as Swift paths, T3Symbol, generated-file chec
 ### Task 5: Component kit — web set (Mac) and mobile set (phone)
 
 **Files:**
-- Create under `Sources/InfinitusUI/T3/Components/`: `T3Button.swift`, `T3Badge.swift`, `T3Input.swift`, `T3Separator.swift`, `T3Kbd.swift`, `T3Skeleton.swift`, `T3Spinner.swift`, `T3Tooltip.swift`, `T3ScrollArea.swift`, `T3SidebarPrimitives.swift` (web set); `T3ControlPill.swift`, `T3StatusPill.swift`, `T3GlassSurface.swift`, `T3EmptyState.swift`, `T3LoadingStrip.swift`, `T3ErrorBanner.swift`, `T3Wordmark.swift`, `T3ThemedSwitch.swift`, `T3ProviderIcon.swift` (mobile set, `#if canImport(UIKit)` where they use UIKit materials)
+- Create under `Sources/InfinitusUI/T3/Components/`: `T3Button.swift`, `T3Badge.swift`, `T3Input.swift`, `T3Separator.swift`, `T3Kbd.swift`, `T3Skeleton.swift`, `T3Spinner.swift`, `T3Tooltip.swift`, `T3ScrollArea.swift`, `T3SidebarPrimitives.swift` (web set); `T3ControlPill.swift`, `T3StatusPill.swift`, `T3GlassSurface.swift`, `T3EmptyState.swift`, `T3LoadingStrip.swift`, `T3ErrorBanner.swift`, `InfinitusWordmark.swift`, `T3ThemedSwitch.swift`, `T3ProviderIcon.swift` (mobile set, `#if canImport(UIKit)` where they use UIKit materials)
 - Create: `Sources/InfinitusUI/T3/Components/T3Previews.swift` — one `#Preview` per component in both schemes, used by the harness for component crops
 
 **Interfaces (all `public`, SwiftUI `View`s):**
@@ -1113,7 +1113,7 @@ T3GlassSurface { content }          // UIVisualEffectView(.systemThinMaterial) +
 T3EmptyState(title:, message:, action: (String, () -> Void)?)
 T3LoadingStrip()                    // the 2 px indeterminate bar, LayerEffect
 T3ErrorBanner(_ text: String)
-T3Wordmark(badge: String?)          // "T3 Code" layout with the Infinitus name; `T3Wordmark.mark` = the bold first token
+InfinitusWordmark(badge: String?)          // "T3 Code" layout with the Infinitus name; `InfinitusWordmark.mark` = the bold first token
 T3ThemedSwitch(isOn:)               // Toggle with switchActiveTrack / thumb tokens
 T3ProviderIcon(size: Double = 16)   // the Claude asterisk; tint per §3.4 samples
 ```
@@ -1214,7 +1214,7 @@ struct MaterialView: UIViewRepresentable {
 }
 #endif
 ```
-`T3Wordmark`: `HStack(spacing: 6) { Text("Infinitus").font(mobile(.xxl, .bold)) ; badge.map { Text($0).font(mobile(.xxxs, .bold)).padding(.horizontal, 6).padding(.vertical, 2).background(subtleStrong, in: Capsule()) } }` — the reference (`t3-ios-7.png`) shows "T3" bold + "Code" regular + "DEV" pill; ours is one bold word + the machine badge; `T3Wordmark.mark`/`.rest` split lets B/C match the two-tone treatment if a two-word name is configured.
+`InfinitusWordmark`: `HStack(spacing: 6) { Text("Infinitus").font(mobile(.xxl, .bold)) ; badge.map { Text($0).font(mobile(.xxxs, .bold)).padding(.horizontal, 6).padding(.vertical, 2).background(subtleStrong, in: Capsule()) } }` — the reference (`t3-ios-7.png`) shows "T3" bold + "Code" regular + "DEV" pill; ours is one bold word + the machine badge; `InfinitusWordmark.mark`/`.rest` split lets B/C match the two-tone treatment if a two-word name is configured.
 
 - [ ] **Step 5: Previews file and build both platforms**
 

@@ -1,4 +1,4 @@
-import { createInfinitusEnvironmentAtoms } from "@t3tools/client-runtime/state/infinitus";
+import { createInfinitusEnvironmentAtoms } from "@infinitus/client-runtime/state/infinitus";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 

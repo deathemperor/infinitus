@@ -1,5 +1,5 @@
-import type { CustomModelEntry } from "@t3tools/contracts";
-import { readCustomModelEntries } from "@t3tools/shared/model";
+import type { CustomModelEntry } from "@infinitus/contracts";
+import { readCustomModelEntries } from "@infinitus/shared/model";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

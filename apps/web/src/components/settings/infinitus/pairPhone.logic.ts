@@ -1,5 +1,5 @@
-import type { DesktopServerExposureState } from "@t3tools/contracts";
-import type { InfinitusForkTunnel } from "@t3tools/contracts/infinitus";
+import type { DesktopServerExposureState } from "@infinitus/contracts";
+import type { InfinitusForkTunnel } from "@infinitus/contracts/infinitus";
 
 import { resolveDesktopPairingUrl } from "../pairingUrls";
 

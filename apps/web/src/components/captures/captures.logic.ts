@@ -1,4 +1,4 @@
-import type { CaptureItem } from "@t3tools/contracts/captures";
+import type { CaptureItem } from "@infinitus/contracts/captures";
 
 /**
  * The composer's Captures popover (#433), as pure state: which order the

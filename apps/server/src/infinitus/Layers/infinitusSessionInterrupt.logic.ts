@@ -1,4 +1,4 @@
-import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusFleet, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 
 /**
  * Session priority mode, interrupt (#743): the pure half. In interrupt mode

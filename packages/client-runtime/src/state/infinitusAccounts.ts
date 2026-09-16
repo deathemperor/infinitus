@@ -1,10 +1,10 @@
-import type { ExecutionEnvironmentCapabilities } from "@t3tools/contracts";
+import type { ExecutionEnvironmentCapabilities } from "@infinitus/contracts";
 import type {
   InfinitusAccount,
   InfinitusAwsLogin,
   InfinitusFleet,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 

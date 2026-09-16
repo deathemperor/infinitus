@@ -1,5 +1,5 @@
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import type { DesktopDeepLink } from "@t3tools/contracts";
+import { scopeProjectRef } from "@infinitus/client-runtime/environment";
+import type { DesktopDeepLink } from "@infinitus/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef } from "react";
 

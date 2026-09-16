@@ -683,7 +683,7 @@ export type ThreadTitleRegeneration = typeof ThreadTitleRegeneration.Type;
 
 /**
  * Legacy single-PR link. Still emitted as the thread's derived current pull
- * request (see `@t3tools/shared/threadPullRequests`) so clients from before
+ * request (see `@infinitus/shared/threadPullRequests`) so clients from before
  * `pullRequests` keep working independently of their release schedule.
  */
 export const ThreadLinkedPullRequest = Schema.Struct({
@@ -772,7 +772,7 @@ export type ThreadPullRequestLink = typeof ThreadPullRequestLink.Type;
  * Fork (#806): a message queued on the server for a thread. Not a timeline
  * message: nothing of it shows as sent until the queue drain dispatches
  * `thread.turn.start` for it (with `queuedFrom`), which removes the row in
- * the same event batch. Rows sort by `orderKey` (`@t3tools/shared/orderKeys`).
+ * the same event batch. Rows sort by `orderKey` (`@infinitus/shared/orderKeys`).
  */
 /** Fork (#1318): the moment a queued row is due. The default, `idle`, is
     the absent field so older rows and clients decode. */
@@ -860,7 +860,7 @@ export const ThreadTurnUsage = Schema.Struct({
 export type ThreadTurnUsage = typeof ThreadTurnUsage.Type;
 
 /**
- * Fork (#834): a thread's completed turns summed (`@t3tools/shared/threadUsage`
+ * Fork (#834): a thread's completed turns summed (`@infinitus/shared/threadUsage`
  * folds them). `runtime` rollups come from the turns this server ran;
  * `transcript` ones are estimated from the provider's transcript after the
  * fact. Estimates, never billing truth — show them as such.

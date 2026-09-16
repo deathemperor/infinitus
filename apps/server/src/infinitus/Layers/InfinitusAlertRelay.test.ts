@@ -1,10 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import {
   RELAY_INFINITUS_ALERT_TYP,
   RelayInfinitusAlertProofPayload,
-} from "@t3tools/contracts/relayInfinitusAlert";
-import { verifyRelayJwt } from "@t3tools/shared/relayJwt";
+} from "@infinitus/contracts/relayInfinitusAlert";
+import { verifyRelayJwt } from "@infinitus/shared/relayJwt";
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

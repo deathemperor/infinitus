@@ -1,4 +1,4 @@
-import { InfinitusSecretRefused } from "@t3tools/contracts/infinitus";
+import { InfinitusSecretRefused } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 

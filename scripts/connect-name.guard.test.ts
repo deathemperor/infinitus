@@ -14,7 +14,7 @@ import { describe, expect, it } from "vite-plus/test";
 /** Lines that keep a bare "T3", with the reason. */
 const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // The wordmark glyph itself (the work log's own-step icon keeps it, #601).
-  ["apps/mobile/src/components/T3Wordmark.tsx", 'accessibilityLabel="T3"'],
+  ["apps/mobile/src/components/InfinitusWordmark.tsx", 'accessibilityLabel="T3"'],
   // A column default in the relay's live database; changing it is a migration.
   ["infra/relay/src/persistence/schema.ts", '.default("T3 Environment")'],
   // Byte-identical to upstream's `.github/triage/PLAYBOOK.md` (its test), which

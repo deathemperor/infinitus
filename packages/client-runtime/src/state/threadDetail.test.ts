@@ -7,12 +7,12 @@ import {
   ProviderInstanceId,
   QueueId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import type {
   OrchestrationQueuedTurn,
   OrchestrationThread,
   OrchestrationThreadShell,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import type { EnvironmentThread, EnvironmentThreadShell } from "./models.ts";
 import { mergeEnvironmentThread } from "./threadDetail.ts";

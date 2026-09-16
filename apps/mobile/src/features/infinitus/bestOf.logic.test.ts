@@ -1,4 +1,4 @@
-import { ThreadId, type OrchestrationThreadShell } from "@t3tools/contracts";
+import { ThreadId, type OrchestrationThreadShell } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

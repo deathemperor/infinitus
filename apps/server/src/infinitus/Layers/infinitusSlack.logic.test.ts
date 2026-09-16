@@ -1,4 +1,4 @@
-import { ApprovalRequestId, ThreadId, type OrchestrationProjectShell } from "@t3tools/contracts";
+import { ApprovalRequestId, ThreadId, type OrchestrationProjectShell } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

@@ -1,4 +1,4 @@
-import { EnvironmentId, ThreadId, WS_METHODS } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId, WS_METHODS } from "@infinitus/contracts";
 import type {
   InfinitusAccount,
   InfinitusCommandInput,
@@ -6,11 +6,11 @@ import type {
   InfinitusHeldThread,
   InfinitusSecretInput,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import type {
   PairingApprovalDecideInput,
   PairingApprovalRequest,
-} from "@t3tools/contracts/infinitusPairing";
+} from "@infinitus/contracts/infinitusPairing";
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

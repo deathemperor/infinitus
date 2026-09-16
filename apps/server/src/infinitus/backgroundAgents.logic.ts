@@ -1,4 +1,4 @@
-import type { OrchestrationThreadActivity, ThreadId, TurnId } from "@t3tools/contracts";
+import type { OrchestrationThreadActivity, ThreadId, TurnId } from "@infinitus/contracts";
 
 /**
  * Background subagents a Claude session left running (#974): the words of

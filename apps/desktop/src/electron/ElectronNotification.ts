@@ -10,7 +10,7 @@ export class ElectronNotification extends Context.Service<
   {
     readonly setBadgeCount: (count: number) => Effect.Effect<void>;
   }
->()("@t3tools/desktop/electron/ElectronNotification") {}
+>()("@infinitus/desktop/electron/ElectronNotification") {}
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = ElectronNotification.of({

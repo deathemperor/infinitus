@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import type { OrchestrationThread } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/runtime";
+import type { OrchestrationThread } from "@infinitus/contracts";
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useMemo, useRef } from "react";
 import { Alert } from "react-native";

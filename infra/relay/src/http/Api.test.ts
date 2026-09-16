@@ -18,14 +18,14 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpServer from "effect/unstable/http/HttpServer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import * as HttpApi from "effect/unstable/httpapi/HttpApi";
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import {
   RelayApi,
   RelayClientAuth,
   RelayClientPrincipal,
   RelayEnvironmentAuth,
   type RelayClientDeviceRecord,
-} from "@t3tools/contracts/relay";
+} from "@infinitus/contracts/relay";
 
 import {
   RELAY_REQUEST_DEADLINE_MS,

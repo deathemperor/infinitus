@@ -1,5 +1,5 @@
-import type { ServerProvider, ServerProviderVersionAdvisory } from "@t3tools/contracts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import type { ServerProvider, ServerProviderVersionAdvisory } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /**
  * Visual treatment for each server-reported provider status. Centralized so

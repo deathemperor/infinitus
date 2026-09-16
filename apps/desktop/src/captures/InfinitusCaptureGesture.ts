@@ -13,8 +13,8 @@
  * before the coordinator mounts — waits here instead of being sent to a
  * page with nobody listening.
  */
-import type { DesktopCaptureGestureEvent } from "@t3tools/contracts";
-import type { InfinitusDesktopPrefs } from "@t3tools/contracts/infinitus";
+import type { DesktopCaptureGestureEvent } from "@infinitus/contracts";
+import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -157,7 +157,7 @@ export class InfinitusCaptureGestureService extends Context.Service<
     /** The reads the renderer has not pulled yet, oldest first; empties the queue. */
     readonly consumePending: Effect.Effect<ReadonlyArray<DesktopCaptureGestureEvent>>;
   }
->()("@t3tools/desktop/captures/InfinitusCaptureGesture/InfinitusCaptureGestureService") {}
+>()("@infinitus/desktop/captures/InfinitusCaptureGesture/InfinitusCaptureGestureService") {}
 
 const { logInfo } = makeComponentLogger("infinitus-capture-gesture");
 

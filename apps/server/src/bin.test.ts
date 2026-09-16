@@ -12,10 +12,10 @@ import {
   EnvironmentOrchestrationHttpApi,
   ProviderInstanceId,
   ThreadId,
-} from "@t3tools/contracts";
-import * as NetService from "@t3tools/shared/Net";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
-import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
+} from "@infinitus/contracts";
+import * as NetService from "@infinitus/shared/Net";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";

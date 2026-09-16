@@ -1,4 +1,4 @@
-import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
+import type { RelayClientDeviceRecord } from "@infinitus/contracts/relay";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -6,7 +6,7 @@ import {
   mobileClientPlatformLabel,
   mobileClientUpdatedAtLabel,
 } from "./MobileClientsUserProfilePage.logic";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 function device(overrides: Partial<RelayClientDeviceRecord> = {}): RelayClientDeviceRecord {
   return {

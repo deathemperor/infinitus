@@ -2,8 +2,8 @@ import type {
   CustomModelSetting,
   ProviderInstanceEnvironmentVariable,
   ProviderOptionDescriptor,
-} from "@t3tools/contracts";
-import { createModelCapabilities } from "@t3tools/shared/model";
+} from "@infinitus/contracts";
+import { createModelCapabilities } from "@infinitus/shared/model";
 
 /**
  * Fork: "Route through a proxy" on the Claude Config step of the add-instance

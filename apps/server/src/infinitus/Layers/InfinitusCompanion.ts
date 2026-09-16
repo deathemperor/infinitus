@@ -1,6 +1,6 @@
-import type { InfinitusLaunchResult } from "@t3tools/contracts/infinitus";
-import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
-import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import type { InfinitusLaunchResult } from "@infinitus/contracts/infinitus";
+import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
+import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

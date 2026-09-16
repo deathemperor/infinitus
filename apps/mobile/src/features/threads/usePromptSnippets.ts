@@ -1,4 +1,4 @@
-import type { EnvironmentId, ProjectId, PromptSnippet } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, PromptSnippet } from "@infinitus/contracts";
 import { useMemo } from "react";
 
 import { useServerConfigs } from "../../state/entities";

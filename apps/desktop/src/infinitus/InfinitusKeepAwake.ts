@@ -18,7 +18,7 @@ export class InfinitusKeepAwakeService extends Context.Service<
   {
     readonly set: (active: boolean) => Effect.Effect<void>;
   }
->()("@t3tools/desktop/infinitus/InfinitusKeepAwake/InfinitusKeepAwakeService") {}
+>()("@infinitus/desktop/infinitus/InfinitusKeepAwake/InfinitusKeepAwakeService") {}
 
 interface PowerSaveBlocker {
   readonly start: (type: "prevent-app-suspension") => number;

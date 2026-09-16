@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
 
 import { serverEnvironment } from "../../state/server";
 import { threadReadyForReview } from "./prHeader.logic";

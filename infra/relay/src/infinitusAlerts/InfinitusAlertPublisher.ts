@@ -3,10 +3,10 @@ import {
   RelayInfinitusAlertProofPayload,
   type RelayInfinitusAlert,
   type RelayInfinitusAlertRequest,
-} from "@t3tools/contracts/relayInfinitusAlert";
-import type { RelayDeliveryResult, RelayPublishResponse } from "@t3tools/contracts/relay";
-import { decodeRelayJwt, normalizeRelayIssuer, verifyRelayJwt } from "@t3tools/shared/relayJwt";
-import { stableStringify } from "@t3tools/shared/relaySigning";
+} from "@infinitus/contracts/relayInfinitusAlert";
+import type { RelayDeliveryResult, RelayPublishResponse } from "@infinitus/contracts/relay";
+import { decodeRelayJwt, normalizeRelayIssuer, verifyRelayJwt } from "@infinitus/shared/relayJwt";
+import { stableStringify } from "@infinitus/shared/relaySigning";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

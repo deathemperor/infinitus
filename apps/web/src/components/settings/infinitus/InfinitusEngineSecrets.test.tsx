@@ -1,4 +1,4 @@
-import { InfinitusSecretRefused, type InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import { InfinitusSecretRefused, type InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
 import { act, StrictMode, type ReactNode } from "react";

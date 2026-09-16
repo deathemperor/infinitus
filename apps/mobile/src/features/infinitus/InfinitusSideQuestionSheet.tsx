@@ -1,8 +1,8 @@
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/runtime";
+import { EnvironmentId, MessageId, ThreadId } from "@infinitus/contracts";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import * as Option from "effect/Option";
 import { useMemo, useState } from "react";

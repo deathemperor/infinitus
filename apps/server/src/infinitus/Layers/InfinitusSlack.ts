@@ -8,10 +8,10 @@ import {
   type OrchestrationEvent,
   type OrchestrationThreadShell,
   type ProviderRuntimeEvent,
-} from "@t3tools/contracts";
-import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
+} from "@infinitus/contracts";
+import { buildTemporaryWorktreeBranchName } from "@infinitus/shared/git";
+import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
+import { fromJsonStringPretty } from "@infinitus/shared/schemaJson";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";

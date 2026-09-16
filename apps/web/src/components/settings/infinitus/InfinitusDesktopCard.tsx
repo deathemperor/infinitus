@@ -1,4 +1,4 @@
-import type { InfinitusDesktopPrefs } from "@t3tools/contracts/infinitus";
+import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";
 import { useEffect, useMemo, useState } from "react";
 
 import { Switch } from "../../ui/switch";

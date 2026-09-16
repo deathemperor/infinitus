@@ -1,4 +1,4 @@
-import type { ThreadId, TurnId } from "@t3tools/contracts";
+import type { ThreadId, TurnId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

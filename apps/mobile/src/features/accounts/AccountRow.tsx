@@ -3,8 +3,8 @@ import {
   type AccountRowModel,
   accountCommandArgs,
   type UsageWindowBar,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
-import type { EnvironmentId } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
+import type { EnvironmentId } from "@infinitus/contracts";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
 
@@ -132,7 +132,7 @@ export function AccountRow(props: {
   const content = (
     <View className={cn("gap-2 px-4 py-3", props.last ? null : "border-b border-separator")}>
       <View className="flex-row items-center gap-2">
-        <Text className="shrink text-base font-t3-medium text-foreground" numberOfLines={1}>
+        <Text className="shrink text-base font-infinitus-medium text-foreground" numberOfLines={1}>
           {row.label}
         </Text>
         {badges.map((badge) => (
@@ -182,7 +182,7 @@ function WindowBar(props: { readonly window: UsageWindowBar }) {
   const { window } = props;
   return (
     <View className="flex-row items-center gap-2">
-      <Text className="w-8 text-2xs font-t3-medium text-foreground-muted" numberOfLines={1}>
+      <Text className="w-8 text-2xs font-infinitus-medium text-foreground-muted" numberOfLines={1}>
         {window.name}
       </Text>
       <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-subtle">

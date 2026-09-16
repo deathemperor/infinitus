@@ -1,6 +1,6 @@
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 vi.mock("~/state/device", () => ({

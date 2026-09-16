@@ -1,4 +1,4 @@
-import type { ServerConfig } from "@t3tools/contracts";
+import type { ServerConfig } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { threadProviderSnapshot } from "./threadProvider.logic";

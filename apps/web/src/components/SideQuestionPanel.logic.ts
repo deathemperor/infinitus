@@ -1,4 +1,4 @@
-import type { ThreadId, TurnId } from "@t3tools/contracts";
+import type { ThreadId, TurnId } from "@infinitus/contracts";
 
 /**
  * Fork (#269 C): whether a message of a side thread was asked or answered

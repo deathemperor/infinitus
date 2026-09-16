@@ -1,4 +1,4 @@
-import { derivePendingRequests } from "@t3tools/client-runtime/pending-requests";
+import { derivePendingRequests } from "@infinitus/client-runtime/pending-requests";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {
@@ -11,7 +11,7 @@ import {
   TurnId,
   type OrchestrationThread,
   type OrchestrationThreadActivity,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   agentSpawnSummary,
@@ -2065,7 +2065,7 @@ describe("buildThreadFeed", () => {
       createdAt: string,
       status: ThreadFeedActivity["status"] = "success",
       toolSurface?: "browser" | "computer",
-      toolIcon?: import("@t3tools/contracts").ToolActivityIcon,
+      toolIcon?: import("@infinitus/contracts").ToolActivityIcon,
     ): ThreadFeedActivity => ({
       id,
       createdAt,

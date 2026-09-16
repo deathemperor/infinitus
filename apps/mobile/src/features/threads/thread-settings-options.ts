@@ -1,4 +1,4 @@
-import type { ProviderOptionDescriptor, RuntimeMode } from "@t3tools/contracts";
+import type { ProviderOptionDescriptor, RuntimeMode } from "@infinitus/contracts";
 
 /**
  * Desktop-oriented effort keywords that don't belong in the phone picker.

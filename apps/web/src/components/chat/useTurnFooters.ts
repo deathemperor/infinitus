@@ -1,5 +1,5 @@
-import type { OrchestrationThread, TurnId } from "@t3tools/contracts";
-import { turnFooters, type TurnFooter } from "@t3tools/client-runtime/turnFooter";
+import type { OrchestrationThread, TurnId } from "@infinitus/contracts";
+import { turnFooters, type TurnFooter } from "@infinitus/client-runtime/turnFooter";
 import { useMemo } from "react";
 
 export type TurnFooters = ReadonlyMap<TurnId, TurnFooter>;

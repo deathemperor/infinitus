@@ -1,4 +1,4 @@
-import type { SignInRowModel } from "@t3tools/client-runtime/state/infinitusAccounts";
+import type { SignInRowModel } from "@infinitus/client-runtime/state/infinitusAccounts";
 
 import { formatRelativeTimeLabel } from "../../timestampFormat";
 

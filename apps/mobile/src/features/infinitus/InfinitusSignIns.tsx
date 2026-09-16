@@ -205,7 +205,9 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
 
   return (
     <View className="gap-2 rounded-[22px] border border-warning-border bg-warning p-4">
-      <Text className="text-sm font-t3-medium text-warning-foreground">{signInHeadline(item)}</Text>
+      <Text className="text-sm font-infinitus-medium text-warning-foreground">
+        {signInHeadline(item)}
+      </Text>
       <Text className="text-xs text-warning-foreground">{helper}</Text>
       {item.provider === "aws" && item.account !== null ? (
         <View className="gap-1.5 rounded-xl bg-subtle px-3 py-2">
@@ -214,7 +216,10 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
         </View>
       ) : null}
       {item.userCode ? (
-        <Text selectable className="text-lg font-t3-bold tabular-nums text-warning-foreground">
+        <Text
+          selectable
+          className="text-lg font-infinitus-bold tabular-nums text-warning-foreground"
+        >
           {item.userCode}
         </Text>
       ) : null}
@@ -226,7 +231,7 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
             onPress={() => openPage(item.url ?? "")}
             className="rounded-full bg-primary px-4 py-2 active:opacity-70"
           >
-            <Text className="text-sm font-t3-bold text-primary-foreground">
+            <Text className="text-sm font-infinitus-bold text-primary-foreground">
               {busy && catchPort !== null ? "Waiting for the sign-in…" : "Open sign-in page"}
             </Text>
           </Pressable>
@@ -243,7 +248,7 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
           >
             <Text
               className={cn(
-                "text-sm font-t3-bold",
+                "text-sm font-infinitus-bold",
                 item.url ? "text-foreground" : "text-primary-foreground",
               )}
             >
@@ -262,7 +267,7 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
             onPress={() => void start("code")}
             className="rounded-full bg-subtle px-4 py-2 active:opacity-70"
           >
-            <Text className="text-sm font-t3-bold text-foreground">Use a code instead</Text>
+            <Text className="text-sm font-infinitus-bold text-foreground">Use a code instead</Text>
           </Pressable>
         ) : null}
       </View>
@@ -295,7 +300,7 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
               onPress={() => void pasteCode()}
               className="rounded-full bg-subtle px-4 py-2 active:opacity-70"
             >
-              <Text className="text-sm font-t3-bold text-foreground">Paste</Text>
+              <Text className="text-sm font-infinitus-bold text-foreground">Paste</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -306,7 +311,7 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
                 code.trim() === "" && "opacity-50",
               )}
             >
-              <Text className="text-sm font-t3-bold text-primary-foreground">
+              <Text className="text-sm font-infinitus-bold text-primary-foreground">
                 {busy ? "Sending…" : "Send code"}
               </Text>
             </Pressable>

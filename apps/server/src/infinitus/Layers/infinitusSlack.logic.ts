@@ -5,7 +5,7 @@ import {
   type OrchestrationProjectShell,
   type ProviderApprovalDecision,
   type RuntimeMode,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 
 /**

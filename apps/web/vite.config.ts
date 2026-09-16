@@ -9,8 +9,8 @@ import "vite-plus/test/config";
 import { defineConfig, type Connect, type Plugin } from "vite-plus";
 import pkg from "./package.json" with { type: "json" };
 
-import { DEV_PROXIED_PATH_PREFIXES } from "@t3tools/shared/devProxy";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { DEV_PROXIED_PATH_PREFIXES } from "@infinitus/shared/devProxy";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config";
 import { thirdPartyLicensesPlugin } from "../../scripts/lib/third-party-licenses";

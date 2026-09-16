@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ThreadId, TurnId } from "@t3tools/contracts";
+import { ThreadId, TurnId } from "@infinitus/contracts";
 
 import {
   appendAnswerToDraft,

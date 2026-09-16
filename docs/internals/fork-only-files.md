@@ -77,9 +77,9 @@ these bullets.
   opens Settings › Infinitus; the Team page's Join field takes it when that
   page lands, and nothing joins on its own. Only the link's kind is ever
   logged; `pair` stays the native app's.
-- `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`, `packages/client-runtime/src/state/captures.ts` (exported as `@t3tools/client-runtime/state/captures`) — captures (#433): one list per project, kept as `<stateDir>/captures/<projectId>.json`, streamed by `subscribeCaptures`, written by `captures.apply`. Rules and traps: `docs/internals/captures.md`.
+- `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`, `packages/client-runtime/src/state/captures.ts` (exported as `@infinitus/client-runtime/state/captures`) — captures (#433): one list per project, kept as `<stateDir>/captures/<projectId>.json`, streamed by `subscribeCaptures`, written by `captures.apply`. Rules and traps: `docs/internals/captures.md`.
 - `packages/client-runtime/src/state/infinitusExhausted.ts` (exported as
-  `@t3tools/client-runtime/state/infinitusExhausted`) — the all-accounts-
+  `@infinitus/client-runtime/state/infinitusExhausted`) — the all-accounts-
   exhausted band's verdict (#659): a fleet whose every unheld account has a
   usage window at its limit that has not rolled yet, and the earliest revival
   (each account's LAST maxed reset; the engine's `nextRecovery` when no reset
@@ -97,7 +97,7 @@ these bullets.
   minute after the page leaves) and then folds in `snapshot.events` deltas
   from the shared subscription, deduped by id
   (`packages/client-runtime/src/state/infinitusActivity.ts`, exported as
-  `@t3tools/client-runtime/state/infinitusActivity`) — no polling of its own.
+  `@infinitus/client-runtime/state/infinitusActivity`) — no polling of its own.
   The engine poller's per-minute `poll` / `no switch — …` lines (kind `other`
   on native; `isPollRow` reads the text) stay in the store but are hidden until
   the header's "Show polls" toggle, persisted like the Stats period (#696).
@@ -118,7 +118,7 @@ these bullets.
 - `packages/contracts/src/productName.ts` — `PRODUCT_NAME`, the one constant
   every user-facing string routes through (#601 phase 2); contracts holds it
   because shared depends on contracts, and `packages/shared/src/productName.ts`
-  re-exports it so `@t3tools/shared/productName` imports keep working.
+  re-exports it so `@infinitus/shared/productName` imports keep working.
 - `apps/server` — rule: any string the user reads (CLI help and command
   descriptions, log lines, errors, HTTP/HTML pages, pairing and service copy,
   MCP tool descriptions, the git author name, the prompts and runtime
@@ -300,7 +300,7 @@ these bullets.
   derived from them with ImageMagick. Regenerate by hand when the mark changes.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
-  `@t3tools/client-runtime/state/infinitusAccounts`).
+  `@infinitus/client-runtime/state/infinitusAccounts`).
 - `apps/server/src/infinitus/Layers/InfinitusTeamControlHttp.ts`,
   `packages/contracts/src/infinitusTeamControl.ts` — delegated control's
   network lane (#1313, spec §8): `POST /api/infinitus/team/command`,
@@ -361,7 +361,7 @@ these bullets.
   answered) and **Pin** (capability-gated; pins like the thread list does,
   top-of-run order key on reordering servers, and pinning releases the hold on
   the server). Derived from the work-log marker rows via
-  `@t3tools/client-runtime/state/infinitusThreadHold`; nothing persisted.
+  `@infinitus/client-runtime/state/infinitusThreadHold`; nothing persisted.
   A turn interrupt mode paused (#743) gets the same card as "Paused for
   headroom" with **Resume now**; a limit stop (#270 I) has no button and
   adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the

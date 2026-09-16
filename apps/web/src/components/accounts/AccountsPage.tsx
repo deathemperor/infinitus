@@ -15,10 +15,10 @@ import {
   type AccountAction,
   type AccountRowModel,
   type SignInRowModel,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
-import { exhaustedBand } from "@t3tools/client-runtime/state/infinitusExhausted";
-import type { EnvironmentId } from "@t3tools/contracts";
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
+import { exhaustedBand } from "@infinitus/client-runtime/state/infinitusExhausted";
+import type { EnvironmentId } from "@infinitus/contracts";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { Link } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
@@ -111,7 +111,7 @@ function commandErrorMessage(cause: Cause.Cause<unknown>): string {
 
 /**
  * Every account the selected environment's engines report, one section per
- * fleet. The row model does the deriving (`@t3tools/client-runtime/state/infinitusAccounts`);
+ * fleet. The row model does the deriving (`@infinitus/client-runtime/state/infinitusAccounts`);
  * this page only picks the environment, draws the models and forwards each
  * button to the control socket.
  */

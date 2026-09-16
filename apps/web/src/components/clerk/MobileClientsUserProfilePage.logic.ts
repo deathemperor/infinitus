@@ -1,5 +1,5 @@
-import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import type { RelayClientDeviceRecord } from "@infinitus/contracts/relay";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const mobileClientUpdatedAtFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",

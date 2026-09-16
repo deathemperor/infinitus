@@ -1,4 +1,4 @@
-import { CommandId, EventId, ThreadId, TurnId } from "@t3tools/contracts";
+import { CommandId, EventId, ThreadId, TurnId } from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

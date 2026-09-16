@@ -1,4 +1,4 @@
-import type { InfinitusFleet } from "@t3tools/contracts/infinitus";
+import type { InfinitusFleet } from "@infinitus/contracts/infinitus";
 import * as DateTime from "effect/DateTime";
 
 import {

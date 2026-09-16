@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
 
 import { runServicePreflight } from "./servicePreflight.ts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
 

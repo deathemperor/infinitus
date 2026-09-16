@@ -1,4 +1,4 @@
-import type { ThreadTurnUsage, ThreadUsageRollup } from "@t3tools/contracts";
+import type { ThreadTurnUsage, ThreadUsageRollup } from "@infinitus/contracts";
 
 /**
  * Fork (#834): a thread's usage rollup, folded one completed turn at a time.

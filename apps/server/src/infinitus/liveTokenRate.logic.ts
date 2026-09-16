@@ -1,5 +1,5 @@
-import type { InfinitusLiveTokenRate } from "@t3tools/contracts/infinitus";
-import type { ThreadTurnUsage } from "@t3tools/contracts";
+import type { InfinitusLiveTokenRate } from "@infinitus/contracts/infinitus";
+import type { ThreadTurnUsage } from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 

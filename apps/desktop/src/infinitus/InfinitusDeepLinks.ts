@@ -14,7 +14,7 @@
  * the link over IPC once its environment is connected, so a link that lands
  * during startup is never lost to a page that has not mounted yet.
  */
-import type { DesktopDeepLink } from "@t3tools/contracts";
+import type { DesktopDeepLink } from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -152,7 +152,7 @@ export class InfinitusDeepLinksService extends Context.Service<
     /** The latest link, cleared on read. */
     readonly consume: Effect.Effect<DesktopDeepLink | null>;
   }
->()("@t3tools/desktop/infinitus/InfinitusDeepLinks/InfinitusDeepLinksService") {}
+>()("@infinitus/desktop/infinitus/InfinitusDeepLinks/InfinitusDeepLinksService") {}
 
 const { logInfo } = makeComponentLogger("infinitus-deep-links");
 

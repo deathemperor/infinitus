@@ -185,7 +185,7 @@ function MacTeam(props: {
   return (
     <View className="gap-3">
       {props.titled ? (
-        <Text className="px-2 text-sm font-t3-medium text-foreground-muted">
+        <Text className="px-2 text-sm font-infinitus-medium text-foreground-muted">
           {mac.connected ? mac.label : `${mac.label} · disconnected`}
         </Text>
       ) : null}

@@ -1,4 +1,4 @@
-import type { CaptureItem } from "@t3tools/contracts/captures";
+import type { CaptureItem } from "@infinitus/contracts/captures";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 

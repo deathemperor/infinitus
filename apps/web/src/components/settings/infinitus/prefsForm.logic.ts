@@ -1,4 +1,4 @@
-import type { InfinitusPref, InfinitusPrefs } from "@t3tools/contracts/infinitus";
+import type { InfinitusPref, InfinitusPrefs } from "@infinitus/contracts/infinitus";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 

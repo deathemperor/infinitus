@@ -1,5 +1,5 @@
-import type { ExecutionEnvironmentDescriptor } from "@t3tools/contracts";
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { ExecutionEnvironmentDescriptor } from "@infinitus/contracts";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Effect from "effect/Effect";
 
 import { InfinitusService } from "../Services/Infinitus.ts";

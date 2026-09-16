@@ -2,7 +2,7 @@ import {
   connectionCatalogAlternateHosts,
   connectionCatalogRoamedHost,
   type ConnectionCatalogEntry,
-} from "@t3tools/client-runtime/connection";
+} from "@infinitus/client-runtime/connection";
 
 /**
  * Fork (#663): the line under a saved environment's host. While the phone is

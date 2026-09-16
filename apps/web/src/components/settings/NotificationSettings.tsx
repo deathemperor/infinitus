@@ -1,4 +1,4 @@
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useState } from "react";
 
 import {

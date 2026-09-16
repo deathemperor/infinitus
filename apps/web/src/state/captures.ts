@@ -1,4 +1,4 @@
-import { createCaptureAtoms } from "@t3tools/client-runtime/state/captures";
+import { createCaptureAtoms } from "@infinitus/client-runtime/state/captures";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 

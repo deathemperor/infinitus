@@ -4,7 +4,7 @@ import {
   type DesktopUpdateState,
   EnvironmentId,
   TurnId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   canCheckForUpdate,
@@ -24,7 +24,7 @@ import {
   shouldShowArm64IntelBuildWarning,
   shouldToastDesktopUpdateActionResult,
 } from "./desktopUpdate.logic";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const baseState: DesktopUpdateState = {
   enabled: true,

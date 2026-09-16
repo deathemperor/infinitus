@@ -10,7 +10,7 @@
  *
  * @module InfinitusPairingRequestsCard
  */
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import { useCallback, useState } from "react";
 
 import { usePrimaryEnvironment } from "~/state/environments";

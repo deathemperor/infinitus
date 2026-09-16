@@ -1,5 +1,5 @@
-import type { ThreadId } from "@t3tools/contracts";
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+import type { ThreadId } from "@infinitus/contracts";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 
 /** What the server says about this thread: `held` for headroom (#741) or
     `limited`, parked on a usage limit (#270 I), with the row's line — or

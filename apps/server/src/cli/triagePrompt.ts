@@ -1,4 +1,4 @@
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /**
  * All text `t3 triage` hands to the coding agent. Kept as bare template strings

@@ -5,8 +5,8 @@ import {
   type ProviderRuntimeEvent,
   type ThreadId,
   type TurnId,
-} from "@t3tools/contracts";
-import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts";
+import type { InfinitusFleet, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -18,7 +18,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";

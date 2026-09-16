@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { AsyncResult } from "effect/unstable/reactivity";
 import * as Notifications from "expo-notifications";
 import { useEffect, useMemo, useRef } from "react";

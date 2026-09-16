@@ -110,9 +110,9 @@ export default defineConfig({
         {
           paths: [
             {
-              name: "@t3tools/client-runtime",
+              name: "@infinitus/client-runtime",
               message:
-                "Import from an explicit @t3tools/client-runtime/* subpath. The package has no root export.",
+                "Import from an explicit @infinitus/client-runtime/* subpath. The package has no root export.",
             },
             {
               name: "@pierre/diffs/react",

@@ -1,12 +1,12 @@
 import * as NodeCrypto from "node:crypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import type { RelayDeliveryResult } from "@t3tools/contracts/relay";
+import type { RelayDeliveryResult } from "@infinitus/contracts/relay";
 import {
   RELAY_INFINITUS_ALERT_TYP,
   type RelayInfinitusAlert,
   type RelayInfinitusAlertProofPayload,
   type RelayInfinitusAlertRequest,
-} from "@t3tools/contracts/relayInfinitusAlert";
+} from "@infinitus/contracts/relayInfinitusAlert";
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

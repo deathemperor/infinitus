@@ -1,5 +1,5 @@
-import { MessageId, QUEUED_TURN_GONE, QueueId, ThreadId } from "@t3tools/contracts";
-import { orderKeyBetween } from "@t3tools/shared/orderKeys";
+import { MessageId, QUEUED_TURN_GONE, QueueId, ThreadId } from "@infinitus/contracts";
+import { orderKeyBetween } from "@infinitus/shared/orderKeys";
 import { describe, expect, it } from "vite-plus/test";
 
 import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.ts";

@@ -12,7 +12,7 @@ import * as Tracer from "effect/Tracer";
 import { OtlpExporter, OtlpSerialization, OtlpTracer } from "effect/unstable/observability";
 
 import { relayResourceNameForStage } from "./deploymentConfig.ts";
-import { PRODUCT_NAME } from "@t3tools/contracts/productName";
+import { PRODUCT_NAME } from "@infinitus/contracts/productName";
 
 const relayRecentSpansQuery = (dataset: string) =>
   [

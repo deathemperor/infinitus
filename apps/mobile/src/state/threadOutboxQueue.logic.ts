@@ -1,4 +1,4 @@
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import type {
   CommandId,
   MessageId,
@@ -7,7 +7,7 @@ import type {
   QueuedTurnSendAt,
   QueueId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { AsyncResult } from "effect/unstable/reactivity";
 
 import type { PreparedTurnAttachments } from "../lib/attachmentUpload";

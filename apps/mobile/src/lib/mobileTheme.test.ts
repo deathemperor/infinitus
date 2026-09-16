@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
-import { BUILT_IN_THEME_IDS, BUILT_IN_THEMES, T3_CHAT_THEME } from "@t3tools/shared/themePalettes";
+import {
+  BUILT_IN_THEME_IDS,
+  BUILT_IN_THEMES,
+  T3_CHAT_THEME,
+} from "@infinitus/shared/themePalettes";
 import { readDefaultMobileThemeVariables } from "./mobileTheme.test-support";
 
 import {

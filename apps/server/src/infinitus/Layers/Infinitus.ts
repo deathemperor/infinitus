@@ -15,7 +15,7 @@ import {
   type InfinitusSnapshot,
   type InfinitusSubscribeInput,
   type InfinitusUnavailable,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";

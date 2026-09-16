@@ -59,7 +59,7 @@ import {
   ProjectId,
   ProviderInstanceId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   DEFAULT_INTERACTION_MODE,

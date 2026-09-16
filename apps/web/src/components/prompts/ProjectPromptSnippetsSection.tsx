@@ -1,7 +1,7 @@
 import {
   mapAtomCommandResult,
   type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@infinitus/client-runtime/state/runtime";
 import {
   MAX_PROMPT_SNIPPETS_PER_PROJECT,
   MAX_PROMPT_SNIPPET_NAME_LENGTH,
@@ -9,7 +9,7 @@ import {
   type EnvironmentId,
   type ProjectId,
   type PromptSnippet,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 

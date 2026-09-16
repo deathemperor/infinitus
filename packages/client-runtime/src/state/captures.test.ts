@@ -1,5 +1,5 @@
-import { EnvironmentId, ProjectId, WS_METHODS } from "@t3tools/contracts";
-import type { CaptureList, CapturesApplyInput } from "@t3tools/contracts/captures";
+import { EnvironmentId, ProjectId, WS_METHODS } from "@infinitus/contracts";
+import type { CaptureList, CapturesApplyInput } from "@infinitus/contracts/captures";
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

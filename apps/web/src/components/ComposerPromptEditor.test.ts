@@ -1,8 +1,8 @@
-import { upgradeLegacyContextMessage } from "@t3tools/shared/composerContextLegacy";
+import { upgradeLegacyContextMessage } from "@infinitus/shared/composerContextLegacy";
 import { elementContextToPreviewAnnotation } from "../lib/elementContext";
 import { previewAnnotationContextRecord } from "../lib/composerContextRecords";
-import { EnvironmentId, MessageId, ThreadId, type AssistantCitation } from "@t3tools/contracts";
-import { serializeAssistantCitation } from "@t3tools/shared/assistantCitations";
+import { EnvironmentId, MessageId, ThreadId, type AssistantCitation } from "@infinitus/contracts";
+import { serializeAssistantCitation } from "@infinitus/shared/assistantCitations";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   $createParagraphNode,
@@ -519,7 +519,7 @@ describe("context reference paste", () => {
       );
       const imported: string[] = [];
       const importFragment = (
-        fragment: import("@t3tools/contracts").ComposerContextClipboardFragment,
+        fragment: import("@infinitus/contracts").ComposerContextClipboardFragment,
       ) => {
         imported.push(...fragment.records.map((record) => record.contextId));
         return new Map([["img-old", "img-new"]]);

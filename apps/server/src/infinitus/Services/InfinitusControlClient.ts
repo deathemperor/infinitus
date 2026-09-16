@@ -2,11 +2,11 @@ import type {
   InfinitusCommandFailed,
   InfinitusProtocolError,
   InfinitusUnavailable,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 
-import type { InfinitusControlRequestInput } from "@t3tools/shared/infinitusControlSocket";
+import type { InfinitusControlRequestInput } from "@infinitus/shared/infinitusControlSocket";
 
 export type { InfinitusControlRequestInput };
 

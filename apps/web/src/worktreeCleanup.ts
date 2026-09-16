@@ -1,4 +1,4 @@
-import type { VcsRemoveWorktreeResult } from "@t3tools/contracts";
+import type { VcsRemoveWorktreeResult } from "@infinitus/contracts";
 
 import type { ThreadShell } from "./types";
 

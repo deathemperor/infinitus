@@ -3,7 +3,7 @@ import * as NodeEvents from "node:events";
 import { DBusError, Message, MessageType, Variant, type MessageBus } from "dbus-next";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 import { PortalCaptureShortcut, portalShortcutTrigger } from "./PortalCaptureShortcut.ts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const chord = {
   key: "2",

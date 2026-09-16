@@ -6,7 +6,7 @@ import {
   type ForecastLineModel,
   type ForecastModel,
   type ForecastWindowModel,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   compactTokens,
   decodeUtilization,
@@ -24,9 +24,9 @@ import {
   type FiveHourWindowRow,
   type HistoryLine,
   type WasteRow,
-} from "@t3tools/client-runtime/state/infinitusUtilization";
-import type { InfinitusLiveTokenRate, InfinitusUtilization } from "@t3tools/contracts/infinitus";
-import type { TimestampFormat } from "@t3tools/contracts/settings";
+} from "@infinitus/client-runtime/state/infinitusUtilization";
+import type { InfinitusLiveTokenRate, InfinitusUtilization } from "@infinitus/contracts/infinitus";
+import type { TimestampFormat } from "@infinitus/contracts/settings";
 import * as Schema from "effect/Schema";
 import { useMemo, useState, type ReactNode } from "react";
 

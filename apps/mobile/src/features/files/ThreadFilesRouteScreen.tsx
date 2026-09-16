@@ -5,14 +5,14 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { EnvironmentId, type ProjectReadFileResult, ThreadId } from "@t3tools/contracts";
-import { videoMimeType } from "@t3tools/shared/video";
+import { EnvironmentId, type ProjectReadFileResult, ThreadId } from "@infinitus/contracts";
+import { videoMimeType } from "@infinitus/shared/video";
 import {
   isWorkspaceBrowserPreviewPath,
   isWorkspaceImagePreviewPath,
   mediaMimeTypeFromExtension,
-} from "@t3tools/shared/filePreview";
-import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
+} from "@infinitus/shared/filePreview";
+import { mediaFileReference } from "@infinitus/client-runtime/media-reference";
 
 import { AndroidHeaderIconButton, AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { SymbolView } from "../../components/AppSymbol";
@@ -204,7 +204,7 @@ function FileContent(props: {
     <View className="flex-1 bg-sheet">
       {props.truncated ? (
         <View className="border-b border-warning-border bg-warning px-4 py-2">
-          <Text className="text-2xs font-t3-bold uppercase text-warning-foreground">
+          <Text className="text-2xs font-infinitus-bold uppercase text-warning-foreground">
             Partial file
           </Text>
           <Text className="text-xs leading-snug text-warning-foreground">

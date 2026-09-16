@@ -1,4 +1,4 @@
-import type { CaptureItem } from "@t3tools/contracts/captures";
+import type { CaptureItem } from "@infinitus/contracts/captures";
 import { CheckIcon, CopyIcon, ListTodoIcon, SendIcon, XIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,7 +17,7 @@ import {
   orderCaptures,
 } from "./captures.logic";
 import type { ActiveProjectRef } from "./useCaptures";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 
 /**
  * The composer's Captures popover (#433): the project's list, an input that

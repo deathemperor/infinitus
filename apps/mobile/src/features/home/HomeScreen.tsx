@@ -8,17 +8,17 @@ import {
 import {
   type EnvironmentProject,
   type EnvironmentThreadShell,
-} from "@t3tools/client-runtime/state/shell";
+} from "@infinitus/client-runtime/state/shell";
 import {
   threadSearchMatchKey,
   type EnvironmentThreadSearchMatch,
-} from "@t3tools/client-runtime/state/thread-search";
+} from "@infinitus/client-runtime/state/thread-search";
 import {
   type EnvironmentId,
   resolveEnvironmentMachineKind,
   type SidebarProjectGroupingMode,
   type SidebarThreadSortOrder,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useFocusEffect } from "@react-navigation/native";
@@ -1205,7 +1205,7 @@ export function HomeScreen(props: HomeScreenProps) {
                     className="mx-4 mt-2 items-center rounded-lg border border-dashed border-border py-2.5"
                     style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
                   >
-                    <Text className="text-xs font-t3-medium text-foreground-muted">
+                    <Text className="text-xs font-infinitus-medium text-foreground-muted">
                       Show more ({threadListV2Layout.hiddenSettledCount} settled hidden)
                     </Text>
                   </Pressable>

@@ -6,7 +6,7 @@ import {
   formatLicenseBundles,
   thirdPartyLicenseEntryKey,
   type ThirdPartyLicenseEntry,
-} from "@t3tools/shared/thirdPartyLicenses";
+} from "@infinitus/shared/thirdPartyLicenses";
 import { useCallback, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -46,7 +46,7 @@ function LicenseRow(props: {
     >
       <View className="flex-row items-start gap-3">
         <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-base font-t3-medium text-foreground" numberOfLines={2}>
+          <Text className="text-base font-infinitus-medium text-foreground" numberOfLines={2}>
             {props.entry.name}
           </Text>
           <Text className="text-sm text-foreground-muted" numberOfLines={2}>
@@ -244,7 +244,7 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
         showsVerticalScrollIndicator={false}
       >
         <View className="gap-2 px-1">
-          <Text className="text-2xl font-t3-bold text-foreground">{entry.name}</Text>
+          <Text className="text-2xl font-infinitus-bold text-foreground">{entry.name}</Text>
           <Text className="text-base leading-normal text-foreground-muted">
             {[entry.version, entry.license, formatLicenseBundles(entry.bundles)]
               .filter((value): value is string => Boolean(value))
@@ -257,7 +257,7 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
               onPress={() => void Linking.openURL(sourceUrl)}
               className="min-h-12 flex-row items-center gap-2 self-start py-2 active:opacity-60"
             >
-              <Text className="font-t3-medium text-primary">Project source</Text>
+              <Text className="font-infinitus-medium text-primary">Project source</Text>
               <SymbolView
                 name="arrow.up.right"
                 size={16}

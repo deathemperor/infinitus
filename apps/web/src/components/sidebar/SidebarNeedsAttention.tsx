@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
-import { EnvironmentId, type ScopedThreadRef } from "@t3tools/contracts";
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
-import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
+import { EnvironmentId, type ScopedThreadRef } from "@infinitus/contracts";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
+import { scopeThreadRef, scopedThreadKey } from "@infinitus/client-runtime/environment";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { ChevronDownIcon } from "lucide-react";

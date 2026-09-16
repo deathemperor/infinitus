@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
-import { LEGACY_T3_PROJECT_FILE_NAME, T3_PROJECT_FILE_NAME } from "@t3tools/contracts";
+import { LEGACY_T3_PROJECT_FILE_NAME, T3_PROJECT_FILE_NAME } from "@infinitus/contracts";
 
 import * as T3ProjectFileLoader from "./T3ProjectFileLoader.ts";
 

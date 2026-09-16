@@ -7,13 +7,13 @@
  */
 import * as NodeOS from "node:os";
 
-import { InfinitusManifest } from "@t3tools/contracts/infinitus";
-import { resolveInfinitusControlSocketPath } from "@t3tools/shared/infinitusControl";
+import { InfinitusManifest } from "@infinitus/contracts/infinitus";
+import { resolveInfinitusControlSocketPath } from "@infinitus/shared/infinitusControl";
 import {
   type InfinitusControlError,
   type InfinitusControlRequestInput,
   requestInfinitusControl,
-} from "@t3tools/shared/infinitusControlSocket";
+} from "@infinitus/shared/infinitusControlSocket";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";

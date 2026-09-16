@@ -1,4 +1,4 @@
-import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { captureGestureFailureMessage, resolveCaptureGestureProject } from "./captureGesture.logic";

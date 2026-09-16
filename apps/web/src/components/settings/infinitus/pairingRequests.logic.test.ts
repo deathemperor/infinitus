@@ -1,4 +1,4 @@
-import type { PairingApprovalRequest } from "@t3tools/contracts/infinitusPairing";
+import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 

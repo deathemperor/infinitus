@@ -3,8 +3,8 @@ import {
   ThreadId,
   type ThreadPullRequestLink,
   type ThreadPullRequestSnapshot,
-} from "@t3tools/contracts";
-import { threadPullRequestKeyOf } from "@t3tools/shared/threadPullRequests";
+} from "@infinitus/contracts";
+import { threadPullRequestKeyOf } from "@infinitus/shared/threadPullRequests";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

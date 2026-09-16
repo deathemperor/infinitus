@@ -6,8 +6,8 @@
  *
  * @module InfinitusPrefsPanel
  */
-import type { EnvironmentId } from "@t3tools/contracts";
-import type { InfinitusPref, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { EnvironmentId } from "@infinitus/contracts";
+import type { InfinitusPref, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
 import { usePrimaryEnvironment, type EnvironmentPresentation } from "~/state/environments";

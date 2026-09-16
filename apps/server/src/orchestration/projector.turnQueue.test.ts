@@ -6,7 +6,7 @@ import {
   QueueId,
   ThreadId,
   type OrchestrationEvent,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 

@@ -33,8 +33,8 @@ import {
   ProviderDriverKind,
   type ProviderInstanceConfigMap,
   ProviderInstanceId,
-} from "@t3tools/contracts";
-import { isHostWindows } from "@t3tools/shared/hostProcess";
+} from "@infinitus/contracts";
+import { isHostWindows } from "@infinitus/shared/hostProcess";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";

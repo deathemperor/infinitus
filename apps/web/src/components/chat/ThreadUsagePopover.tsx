@@ -1,4 +1,4 @@
-import type { ThreadUsageRollup } from "@t3tools/contracts";
+import type { ThreadUsageRollup } from "@infinitus/contracts";
 import { CoinsIcon } from "lucide-react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";

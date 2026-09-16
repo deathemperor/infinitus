@@ -1,6 +1,6 @@
-import type { ThreadUsageRollup } from "@t3tools/contracts";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
-import { threadUsageReported } from "@t3tools/shared/threadUsage";
+import type { ThreadUsageRollup } from "@infinitus/contracts";
+import { formatDuration } from "@infinitus/shared/orchestrationTiming";
+import { threadUsageReported } from "@infinitus/shared/threadUsage";
 
 import { formatContextWindowTokens } from "~/lib/contextWindow";
 

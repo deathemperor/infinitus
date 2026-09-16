@@ -1,4 +1,4 @@
-import type { PairingApprovalRequest } from "@t3tools/contracts/infinitusPairing";
+import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 
 /**
  * The "Pairing requests" card on Settings › Infinitus › Devices (#710), as pure

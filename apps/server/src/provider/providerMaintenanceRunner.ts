@@ -6,9 +6,9 @@ import {
   type ServerProvider,
   type ServerProviderUpdatedPayload,
   type ServerProviderUpdateState,
-} from "@t3tools/contracts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
-import { resolveSpawnCommand } from "@t3tools/shared/shell";
+} from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";

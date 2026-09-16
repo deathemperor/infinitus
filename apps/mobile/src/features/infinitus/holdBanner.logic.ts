@@ -1,5 +1,5 @@
-import type { ThreadHold } from "@t3tools/client-runtime/state/infinitusThreadHold";
-import type { InfinitusReleaseThreadResult } from "@t3tools/contracts/infinitus";
+import type { ThreadHold } from "@infinitus/client-runtime/state/infinitusThreadHold";
+import type { InfinitusReleaseThreadResult } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 
 /**

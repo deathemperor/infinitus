@@ -1,4 +1,4 @@
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import type { PullRequestRef } from "@t3tools/contracts";
-import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
+import type { PullRequestRef } from "@infinitus/contracts";
+import { resolveThreadCurrentPullRequestLink } from "@infinitus/shared/threadPullRequests";
 import * as Cause from "effect/Cause";
 import { useMemo } from "react";
 import { Alert } from "react-native";

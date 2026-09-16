@@ -4,7 +4,7 @@
  * than inside it: this is fork state, and the upstream settings document
  * stays byte-for-byte upstream's.
  */
-import { InfinitusDesktopPrefs as InfinitusDesktopPrefsSchema } from "@t3tools/contracts/infinitus";
+import { InfinitusDesktopPrefs as InfinitusDesktopPrefsSchema } from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -71,7 +71,7 @@ export class InfinitusDesktopPrefsService extends Context.Service<
       enabled: boolean,
     ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
   }
->()("@t3tools/desktop/infinitus/InfinitusDesktopPrefs/InfinitusDesktopPrefsService") {}
+>()("@infinitus/desktop/infinitus/InfinitusDesktopPrefs/InfinitusDesktopPrefsService") {}
 
 const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;

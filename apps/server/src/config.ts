@@ -17,7 +17,7 @@ import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import { sweepStalePendingAttachments } from "./attachmentStore.ts";
-import { OtlpProtocol } from "@t3tools/shared/observability";
+import { OtlpProtocol } from "@infinitus/shared/observability";
 
 export const DEFAULT_PORT = 3773;
 

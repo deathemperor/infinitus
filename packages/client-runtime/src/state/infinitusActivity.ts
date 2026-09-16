@@ -1,4 +1,4 @@
-import { InfinitusEventRow, type InfinitusEvent } from "@t3tools/contracts/infinitus";
+import { InfinitusEventRow, type InfinitusEvent } from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
 
 /**

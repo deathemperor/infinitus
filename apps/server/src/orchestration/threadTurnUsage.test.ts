@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ThreadId, TurnId } from "@t3tools/contracts";
+import { ThreadId, TurnId } from "@infinitus/contracts";
 
 import { TurnTelemetryTracker, turnUsageFromCompletedTurn } from "./threadTurnUsage.ts";
 

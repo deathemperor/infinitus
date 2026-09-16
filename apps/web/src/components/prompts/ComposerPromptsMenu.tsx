@@ -1,4 +1,4 @@
-import type { PromptSnippet } from "@t3tools/contracts";
+import type { PromptSnippet } from "@infinitus/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { BookmarkIcon, SettingsIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";

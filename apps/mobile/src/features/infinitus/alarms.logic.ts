@@ -1,9 +1,9 @@
-import { infinitusAccountLabel } from "@t3tools/client-runtime/state/infinitus";
+import { infinitusAccountLabel } from "@infinitus/client-runtime/state/infinitus";
 import type {
   InfinitusAccount,
   InfinitusFleet,
   InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
 
 /** A port of native `FleetAlarms` (#86): the phone's own alarms, planned from

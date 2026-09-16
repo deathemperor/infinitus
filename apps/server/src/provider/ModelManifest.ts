@@ -18,8 +18,8 @@ import {
   TrimmedNonEmptyString,
   type ProviderDriverKind,
   type ServerProviderModel,
-} from "@t3tools/contracts";
-import { codexModelFamily } from "@t3tools/shared/model";
+} from "@infinitus/contracts";
+import { codexModelFamily } from "@infinitus/shared/model";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";

@@ -1,8 +1,8 @@
 // @effect-diagnostics globalTimers:off -- The helper deadline runs at a child-process callback boundary outside any Effect fiber.
 // @effect-diagnostics nodeBuiltinImport:off -- This macOS platform boundary spawns the Accessibility reader with Node.
 
-import type { DesktopCaptureGestureEvent } from "@t3tools/contracts";
-import { MAX_CAPTURE_TEXT_LENGTH } from "@t3tools/contracts/captures";
+import type { DesktopCaptureGestureEvent } from "@infinitus/contracts";
+import { MAX_CAPTURE_TEXT_LENGTH } from "@infinitus/contracts/captures";
 import * as NodeChildProcess from "node:child_process";
 
 /**

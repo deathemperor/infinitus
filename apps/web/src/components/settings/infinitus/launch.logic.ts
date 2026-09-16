@@ -1,4 +1,4 @@
-import type { InfinitusLaunchResult } from "@t3tools/contracts/infinitus";
+import type { InfinitusLaunchResult } from "@infinitus/contracts/infinitus";
 import type * as Cause from "effect/Cause";
 
 import { infinitusCommandFailure } from "./panel.logic";

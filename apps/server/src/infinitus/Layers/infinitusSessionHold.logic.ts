@@ -1,4 +1,4 @@
-import type { InfinitusFleet, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { InfinitusFleet, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 
 /**
  * Session priority mode for the threads this server runs (#616): the pure

@@ -1,9 +1,9 @@
-import { CommandId, MessageId, ThreadId, TurnId } from "@t3tools/contracts";
+import { CommandId, MessageId, ThreadId, TurnId } from "@infinitus/contracts";
 import {
   InfinitusThreadForkInput,
   InfinitusThreadForkRefused,
   InfinitusThreadForkResult,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

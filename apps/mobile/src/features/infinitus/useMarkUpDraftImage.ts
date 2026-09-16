@@ -1,4 +1,4 @@
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ThreadId } from "@infinitus/contracts";
 import { useCallback } from "react";
 import { Alert } from "react-native";
 

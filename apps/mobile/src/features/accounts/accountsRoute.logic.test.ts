@@ -1,6 +1,6 @@
-import type { AccountRowModel } from "@t3tools/client-runtime/state/infinitusAccounts";
-import { EnvironmentId } from "@t3tools/contracts";
-import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import type { AccountRowModel } from "@infinitus/client-runtime/state/infinitusAccounts";
+import { EnvironmentId } from "@infinitus/contracts";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vite-plus/test";
 

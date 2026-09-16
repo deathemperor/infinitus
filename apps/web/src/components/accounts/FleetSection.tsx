@@ -2,8 +2,8 @@ import type {
   AccountAction,
   AccountRowModel,
   FleetSectionModel,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
-import type { ExhaustedBandModel } from "@t3tools/client-runtime/state/infinitusExhausted";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
+import type { ExhaustedBandModel } from "@infinitus/client-runtime/state/infinitusExhausted";
 
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";

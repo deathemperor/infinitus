@@ -1,4 +1,4 @@
-import type { DesktopUpdateChannel } from "@t3tools/contracts";
+import type { DesktopUpdateChannel } from "@infinitus/contracts";
 
 /** The version's first prerelease id (`alpha` for `0.5.0-alpha.1`), or
     undefined for a plain version. electron-updater and electron-builder key

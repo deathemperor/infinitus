@@ -3,7 +3,7 @@
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 
-import type { InfinitusOAuthSignInResult } from "@t3tools/contracts/infinitus";
+import type { InfinitusOAuthSignInResult } from "@infinitus/contracts/infinitus";
 
 import { parseAddOauthLine } from "./infinitusSwapd.logic.ts";
 

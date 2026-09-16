@@ -1,4 +1,4 @@
-import type { ClientSettings } from "@t3tools/contracts";
+import type { ClientSettings } from "@infinitus/contracts";
 
 import type { SidebarThreadStatus } from "../components/Sidebar.logic";
 

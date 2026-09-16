@@ -1,9 +1,9 @@
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopeThreadRef } from "@infinitus/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/runtime";
+import type { EnvironmentId, ProjectId, ThreadId } from "@infinitus/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckIcon, FlaskConicalIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";

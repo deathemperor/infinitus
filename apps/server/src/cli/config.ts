@@ -1,8 +1,8 @@
-import * as NetService from "@t3tools/shared/Net";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
-import { OtlpHeadersFromString, OtlpProtocol } from "@t3tools/shared/observability";
-import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
-import { DesktopBackendBootstrap, PortSchema } from "@t3tools/contracts";
+import * as NetService from "@infinitus/shared/Net";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { OtlpHeadersFromString, OtlpProtocol } from "@infinitus/shared/observability";
+import { parsePersistedServerObservabilitySettings } from "@infinitus/shared/serverSettings";
+import { DesktopBackendBootstrap, PortSchema } from "@infinitus/contracts";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";

@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { useEnvironment } from "../state/environments";

@@ -1,4 +1,4 @@
-import type { EnvironmentId, OrchestrationSessionStatus } from "@t3tools/contracts";
+import type { EnvironmentId, OrchestrationSessionStatus } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { keepAwakeWanted } from "./desktopKeepAwake.logic";

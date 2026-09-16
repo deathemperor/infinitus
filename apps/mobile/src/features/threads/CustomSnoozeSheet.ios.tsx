@@ -28,7 +28,7 @@ import {
   localSnoozeTime,
   resolveCustomSnooze,
   type CustomSnoozeInput,
-} from "@t3tools/client-runtime/state/thread-settled";
+} from "@infinitus/client-runtime/state/thread-settled";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { AppText } from "../../components/AppText";
@@ -89,7 +89,7 @@ export function CustomSnoozeSheet(props: {
             <Pressable accessibilityRole="button" onPress={props.onClose} hitSlop={10}>
               <AppText className="text-base">Cancel</AppText>
             </Pressable>
-            <AppText accessibilityRole="header" className="text-base font-t3-semibold">
+            <AppText accessibilityRole="header" className="text-base font-infinitus-semibold">
               Custom snooze
             </AppText>
             <Pressable accessibilityRole="button" onPress={submit} hitSlop={10}>

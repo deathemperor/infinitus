@@ -3,13 +3,13 @@ import {
   TurnId,
   type OrchestrationCommand,
   type ProviderRuntimeEvent,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   InfinitusCommandFailed,
   type InfinitusCommandInput,
   type InfinitusManifestCommand,
   type InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Crypto from "effect/Crypto";
 import * as Duration from "effect/Duration";

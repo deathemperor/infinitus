@@ -251,7 +251,7 @@ jobs:
           run-install: true
 
       - name: Ensure Electron runtime is installed
-        run: vp run --filter @t3tools/desktop ensure:electron
+        run: vp run --filter @infinitus/desktop ensure:electron
 
       - name: Check
         run: vp check
@@ -407,7 +407,7 @@ jobs:
       - name: Install bundle dependencies
         env:
           pnpm_config_cache_dir: ${{ runner.temp }}/pnpm-metadata
-        run: vp install --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+        run: vp install --filter=t3... --filter=@infinitus/web... --filter=@infinitus/desktop... --filter=@infinitus/scripts...
 
       - name: Download relay client tracing config
         uses: actions/download-artifact@v8
@@ -428,13 +428,13 @@ jobs:
 
       - uses: ./.github/actions/setup-apt-mirrors
 
-      # @t3tools/desktop#build compiles the Linux browser secret helper on a
+      # @infinitus/desktop#build compiles the Linux browser secret helper on a
       # Linux host before packing, and that needs libsecret headers.
       - name: Install browser secret helper build libraries
         run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
 
-      # Runs t3#build (which depends on @t3tools/web#build) and
-      # @t3tools/desktop#build, so apps/server/dist holds the server bundle
+      # Runs t3#build (which depends on @infinitus/web#build) and
+      # @infinitus/desktop#build, so apps/server/dist holds the server bundle
       # plus the web client and apps/desktop/dist-electron the Electron main.
       - name: Build JS bundle
         run: vp run build:desktop
@@ -644,7 +644,7 @@ jobs:
           run-install: |
             args:
               - --filter=t3...
-              - --filter=@t3tools/scripts...
+              - --filter=@infinitus/scripts...
 
       - name: Download all CLI archives
         uses: actions/download-artifact@v8
@@ -704,7 +704,7 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/scripts...
+              - --filter=@infinitus/scripts...
 
       - name: Download all desktop artifacts
         uses: actions/download-artifact@v8
@@ -898,8 +898,8 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/scripts...
-              - --filter=@t3tools/web...
+              - --filter=@infinitus/scripts...
+              - --filter=@infinitus/web...
 
       - name: Download relay client tracing config
         uses: actions/download-artifact@v8
@@ -1009,7 +1009,7 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/marketing...
+              - --filter=@infinitus/marketing...
 
       - name: Deploy marketing site to Vercel
         shell: bash
@@ -1080,8 +1080,8 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/scripts...
-              - --filter=@t3tools/oxlint-plugin-t3code...
+              - --filter=@infinitus/scripts...
+              - --filter=@infinitus/oxlint-plugin-t3code...
 
       - id: update_versions
         name: Update version strings
@@ -1145,7 +1145,7 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=@t3tools/scripts...
+              - --filter=@infinitus/scripts...
 
       - name: Announce prerelease on Discord
         if: needs.preflight.outputs.is_prerelease == 'true'

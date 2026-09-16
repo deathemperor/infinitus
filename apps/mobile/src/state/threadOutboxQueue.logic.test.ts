@@ -1,4 +1,4 @@
-import { CommandId, MessageId, ProviderInstanceId, QueueId, ThreadId } from "@t3tools/contracts";
+import { CommandId, MessageId, ProviderInstanceId, QueueId, ThreadId } from "@infinitus/contracts";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { describe, expect, it } from "vite-plus/test";
 

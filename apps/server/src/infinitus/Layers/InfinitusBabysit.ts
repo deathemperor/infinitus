@@ -8,12 +8,12 @@ import {
   type OrchestrationThreadShell,
   type ThreadId,
   type ThreadPullRequestLink,
-} from "@t3tools/contracts";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+} from "@infinitus/contracts";
+import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 import {
   threadPullRequestKeyOf,
   visibleThreadPullRequests,
-} from "@t3tools/shared/threadPullRequests";
+} from "@infinitus/shared/threadPullRequests";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

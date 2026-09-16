@@ -1,5 +1,5 @@
-import { CommandId, type OrchestrationEvent, type ThreadId } from "@t3tools/contracts";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+import { CommandId, type OrchestrationEvent, type ThreadId } from "@infinitus/contracts";
+import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

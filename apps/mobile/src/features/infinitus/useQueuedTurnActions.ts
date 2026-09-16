@@ -2,12 +2,12 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
   type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@infinitus/client-runtime/state/runtime";
 import type {
   EnvironmentId,
   OrchestrationQueuedTurn,
   OrchestrationThreadShell,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert } from "react-native";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ThreadId, TurnId, type OrchestrationThreadShell } from "@t3tools/contracts";
+import { ThreadId, TurnId, type OrchestrationThreadShell } from "@infinitus/contracts";
 
 import {
   bestOfMemberChanges,

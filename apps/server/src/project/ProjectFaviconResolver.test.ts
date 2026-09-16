@@ -8,7 +8,7 @@ import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import { TestClock } from "effect/testing";
 
-import { T3_PROJECT_FILE_NAME } from "@t3tools/contracts";
+import { T3_PROJECT_FILE_NAME } from "@infinitus/contracts";
 
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 import * as ProjectFaviconResolver from "./ProjectFaviconResolver.ts";

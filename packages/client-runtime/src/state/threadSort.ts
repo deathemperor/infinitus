@@ -1,5 +1,8 @@
-import type { OrchestrationThreadShell, ProjectId } from "@t3tools/contracts";
-import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
+import type { OrchestrationThreadShell, ProjectId } from "@infinitus/contracts";
+import type {
+  SidebarProjectSortOrder,
+  SidebarThreadSortOrder,
+} from "@infinitus/contracts/settings";
 
 export interface ThreadSortInput {
   readonly createdAt: string;
@@ -160,13 +163,13 @@ export function getLatestThreadForProject<
 
 // ── Pinned reorder: fractional index keys ──────────────────────────────
 // Pinned threads carry an optional pinOrderKey (a base-26 string, see
-// `@t3tools/shared/orderKeys`). The pinned block sorts keyed threads by plain
+// `@infinitus/shared/orderKeys`). The pinned block sorts keyed threads by plain
 // string comparison, so a drag (web) or Move up/down (mobile) writes ONE key
 // to ONE thread on that thread's own server.
 import {
   generateSpreadOrderKeys as generateSpreadPinOrderKeys,
   orderKeyBetween as pinOrderKeyBetween,
-} from "@t3tools/shared/orderKeys";
+} from "@infinitus/shared/orderKeys";
 
 export { generateSpreadPinOrderKeys, pinOrderKeyBetween };
 

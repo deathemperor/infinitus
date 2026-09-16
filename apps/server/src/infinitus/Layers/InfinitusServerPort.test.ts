@@ -1,9 +1,9 @@
-import { type AuthClientSession, AuthSessionId } from "@t3tools/contracts";
+import { type AuthClientSession, AuthSessionId } from "@infinitus/contracts";
 import {
   InfinitusCommandFailed,
   InfinitusUnavailable,
   type InfinitusSnapshot,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as NodeOS from "node:os";
 import * as Context from "effect/Context";

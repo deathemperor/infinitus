@@ -1,15 +1,15 @@
-import { ComposerContextId } from "@t3tools/contracts";
-import type { AssistantCitation, ComposerContextClipboardFragment } from "@t3tools/contracts";
+import { ComposerContextId } from "@infinitus/contracts";
+import type { AssistantCitation, ComposerContextClipboardFragment } from "@infinitus/contracts";
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
   decodeComposerContextFragment,
   decodeComposerContextClipboardHtml,
-} from "@t3tools/shared/composerContextClipboard";
+} from "@infinitus/shared/composerContextClipboard";
 import {
   collectComposerContextReferences,
   formatComposerContextReference,
   replaceComposerContextReferences,
-} from "@t3tools/shared/composerContextReferences";
+} from "@infinitus/shared/composerContextReferences";
 import {
   $createLineBreakNode,
   $createTextNode,

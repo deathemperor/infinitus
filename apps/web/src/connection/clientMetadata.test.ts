@@ -6,7 +6,7 @@ import {
   browserFamily,
   clientPresentationMetadata,
 } from "./clientMetadata";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const desktopChrome = {
   userAgent:

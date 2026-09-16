@@ -1,8 +1,8 @@
-import type { AssistantCitation, ComposerSendMode } from "@t3tools/contracts";
+import type { AssistantCitation, ComposerSendMode } from "@infinitus/contracts";
 import {
   serializeAssistantCitation,
   withAssistantCitationComment,
-} from "@t3tools/shared/assistantCitations";
+} from "@infinitus/shared/assistantCitations";
 import {
   splitPromptIntoComposerSegments,
   type ComposerPromptSegment,

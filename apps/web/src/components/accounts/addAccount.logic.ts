@@ -1,7 +1,7 @@
 import {
   WAIT_ADD_STILL_RUNNING,
   waitAddOutcome,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 
 /**
  * Add account / re-login as the page runs it: `add <fleet>` puts the app's own

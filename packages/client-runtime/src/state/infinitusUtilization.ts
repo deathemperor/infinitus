@@ -7,7 +7,7 @@ import {
   type InfinitusUtilizationSample,
   type InfinitusUtilizationTotals,
   type InfinitusUtilizationWindow,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
 
 /**

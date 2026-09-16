@@ -2,8 +2,8 @@
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import type { MenuAction } from "@react-native-menu/menu";
-import { EnvironmentId } from "@t3tools/contracts";
-import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
+import { EnvironmentId } from "@infinitus/contracts";
+import { formatAttachmentSize } from "@infinitus/client-runtime/state/attachments";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, ScrollView, View } from "react-native";
 
@@ -92,7 +92,7 @@ function AttachmentDocumentBody(props: {
       <View className="flex-1 bg-sheet">
         {content.truncated ? (
           <View className="border-b border-warning-border bg-warning px-4 py-2">
-            <Text className="text-2xs font-t3-bold uppercase text-warning-foreground">
+            <Text className="text-2xs font-infinitus-bold uppercase text-warning-foreground">
               Partial file
             </Text>
             <Text className="text-xs leading-snug text-warning-foreground">
@@ -125,7 +125,7 @@ function AttachmentDocumentBody(props: {
                           selectable
                           className={
                             rowIndex === 0
-                              ? "text-sm font-t3-semibold text-foreground"
+                              ? "text-sm font-infinitus-semibold text-foreground"
                               : "text-sm text-foreground"
                           }
                         >

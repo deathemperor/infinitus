@@ -1,4 +1,4 @@
-import type { OrchestrationQueuedTurn } from "@t3tools/contracts";
+import type { OrchestrationQueuedTurn } from "@infinitus/contracts";
 import { ArrowDownIcon, ArrowUpIcon, ClockIcon, PenLineIcon, SendIcon, XIcon } from "lucide-react";
 import { memo } from "react";
 

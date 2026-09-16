@@ -1,6 +1,6 @@
-import { type ServerLifecycleWelcomePayload } from "@t3tools/contracts";
-import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { type ServerLifecycleWelcomePayload } from "@infinitus/contracts";
+import { scopedProjectKey, scopeProjectRef } from "@infinitus/client-runtime/environment";
+import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import {
   Outlet,
   Link,

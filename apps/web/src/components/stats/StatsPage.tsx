@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   infinitusCapabilityOf,
   infinitusPageState,
-} from "@t3tools/client-runtime/state/infinitusAccounts";
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   ACTIVITY_FOOTNOTE,
   activityRows,
@@ -18,7 +18,7 @@ import {
   type EffortRow,
   type StatsPeriod,
   type StatsSummary,
-} from "@t3tools/client-runtime/state/infinitusStats";
+} from "@infinitus/client-runtime/state/infinitusStats";
 import * as Schema from "effect/Schema";
 import { useMemo, type ReactNode } from "react";
 

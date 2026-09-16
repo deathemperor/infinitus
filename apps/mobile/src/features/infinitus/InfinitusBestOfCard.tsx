@@ -1,4 +1,4 @@
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import { useMemo, useRef } from "react";
 import { Pressable, View } from "react-native";
@@ -44,7 +44,7 @@ export function InfinitusBestOfCard(props: { readonly thread: EnvironmentThreadS
   if (!bestOfCardShown(siblings, thread.id)) return null;
   return (
     <View className="rounded-[18px] border border-border bg-card px-4 py-3">
-      <Text className="text-foreground-muted text-2xs font-t3-bold tracking-[0.9px] uppercase">
+      <Text className="text-foreground-muted text-2xs font-infinitus-bold tracking-[0.9px] uppercase">
         Best of {siblings.length}
       </Text>
       {siblings.map((sibling) => {
@@ -68,7 +68,7 @@ export function InfinitusBestOfCard(props: { readonly thread: EnvironmentThreadS
             <Text
               className={
                 current
-                  ? "text-foreground flex-1 text-sm font-t3-bold"
+                  ? "text-foreground flex-1 text-sm font-infinitus-bold"
                   : "text-foreground flex-1 text-sm"
               }
               numberOfLines={1}

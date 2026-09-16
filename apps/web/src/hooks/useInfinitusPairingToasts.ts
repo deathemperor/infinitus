@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@infinitus/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 

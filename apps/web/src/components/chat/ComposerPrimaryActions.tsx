@@ -1,5 +1,5 @@
 import { memo, type PointerEventHandler } from "react";
-import type { ComposerSendMode } from "@t3tools/contracts";
+import type { ComposerSendMode } from "@infinitus/contracts";
 import { ChevronDownIcon, ChevronLeftIcon } from "lucide-react";
 import { useEnvironmentIdentificationMode } from "~/hooks/useSettings";
 import { cn } from "~/lib/utils";

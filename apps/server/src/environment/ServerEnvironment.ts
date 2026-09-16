@@ -5,13 +5,13 @@ import {
   ORCHESTRATION_PROTOCOL_VERSION,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   type ExecutionEnvironmentDescriptor,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   HostProcessArchitecture,
   HostProcessEnvironment,
   HostProcessPlatform,
-} from "@t3tools/shared/hostProcess";
-import { resolveInfinitusControlSocketPath } from "@t3tools/shared/infinitusControl";
+} from "@infinitus/shared/hostProcess";
+import { resolveInfinitusControlSocketPath } from "@infinitus/shared/infinitusControl";
 import { lanHttpBaseUrls } from "../infinitus/Layers/LanBaseUrls.ts";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";

@@ -268,7 +268,7 @@ jobs:
           run-install: false
 
       - name: Install desktop dependencies
-        run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+        run: vp install --filter=@infinitus/desktop... --filter=t3... --filter=@infinitus/scripts...
 
       - name: Cache resource monitor
         id: resource_monitor_cache
@@ -685,7 +685,7 @@ jobs:
       # desktop package's dependency closure has to be installed even though
       # nothing Electron is built here.
       - name: Install CLI dependencies
-        run: vp install --filter=@t3tools/desktop... --filter=t3... --filter=@t3tools/scripts...
+        run: vp install --filter=@infinitus/desktop... --filter=t3... --filter=@infinitus/scripts...
 
       - name: Cache resource monitor
         id: resource_monitor_cache

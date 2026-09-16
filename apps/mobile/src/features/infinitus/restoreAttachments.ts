@@ -1,10 +1,10 @@
-import { resolveAssetUrl } from "@t3tools/client-runtime/state/assets";
+import { resolveAssetUrl } from "@infinitus/client-runtime/state/assets";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
   type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
-import type { AssetCreateUrlInput, ChatAttachment, EnvironmentId } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/runtime";
+import type { AssetCreateUrlInput, ChatAttachment, EnvironmentId } from "@infinitus/contracts";
 import { Alert } from "react-native";
 
 import { downloadAttachmentForPreview } from "../../lib/attachmentDownload";

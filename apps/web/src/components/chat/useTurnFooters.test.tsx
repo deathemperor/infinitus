@@ -1,5 +1,5 @@
-import { TurnId, type OrchestrationThread } from "@t3tools/contracts";
-import { turnFooter } from "@t3tools/client-runtime/turnFooter";
+import { TurnId, type OrchestrationThread } from "@infinitus/contracts";
+import { turnFooter } from "@infinitus/client-runtime/turnFooter";
 import { act, StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";

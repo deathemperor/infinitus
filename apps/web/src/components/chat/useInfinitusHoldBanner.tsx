@@ -1,5 +1,5 @@
-import { threadHold } from "@t3tools/client-runtime/state/infinitusThreadHold";
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import { threadHold } from "@infinitus/client-runtime/state/infinitusThreadHold";
+import type { ScopedThreadRef } from "@infinitus/contracts";
 import { CirclePauseIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 

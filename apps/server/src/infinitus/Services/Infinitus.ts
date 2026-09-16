@@ -5,7 +5,7 @@ import type {
   InfinitusSnapshot,
   InfinitusSubscribeInput,
   InfinitusUnavailable,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type * as Stream from "effect/Stream";

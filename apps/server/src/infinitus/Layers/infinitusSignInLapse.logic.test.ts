@@ -1,4 +1,4 @@
-import type { ProviderRuntimeEvent } from "@t3tools/contracts";
+import type { ProviderRuntimeEvent } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

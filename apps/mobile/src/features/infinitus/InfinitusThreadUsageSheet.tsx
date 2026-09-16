@@ -1,4 +1,4 @@
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId } from "@infinitus/contracts";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useMemo } from "react";
 import { Platform, ScrollView, View } from "react-native";

@@ -1,4 +1,4 @@
-import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export type LoopbackAuthorizationStage = "dev" | "nightly" | "latest";
 

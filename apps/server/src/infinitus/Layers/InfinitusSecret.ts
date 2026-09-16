@@ -1,9 +1,9 @@
-import { AuthAccessWriteScope } from "@t3tools/contracts";
+import { AuthAccessWriteScope } from "@infinitus/contracts";
 import {
   type InfinitusManifestCommand,
   InfinitusSecretRefused,
   InfinitusUnavailable,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";

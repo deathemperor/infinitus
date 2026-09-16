@@ -1,9 +1,9 @@
-import { RelayApi } from "@t3tools/contracts/relay";
+import { RelayApi } from "@infinitus/contracts/relay";
 import {
   RELAY_INFINITUS_ALERT_TYP,
   type RelayInfinitusAlertProofPayload,
-} from "@t3tools/contracts/relayInfinitusAlert";
-import { normalizeRelayIssuer, signRelayJwt } from "@t3tools/shared/relayJwt";
+} from "@infinitus/contracts/relayInfinitusAlert";
+import { normalizeRelayIssuer, signRelayJwt } from "@infinitus/shared/relayJwt";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

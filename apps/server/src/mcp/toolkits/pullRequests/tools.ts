@@ -4,8 +4,8 @@ import {
   PullRequestState,
   ThreadPullRequestLinkSource,
   TrimmedNonEmptyString,
-} from "@t3tools/contracts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+} from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Schema from "effect/Schema";
 import * as Tool from "effect/unstable/ai/Tool";
 import * as Toolkit from "effect/unstable/ai/Toolkit";

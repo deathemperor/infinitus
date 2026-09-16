@@ -3,8 +3,8 @@ import {
   QueueId,
   type OrchestrationQueuedTurn,
   type ThreadId,
-} from "@t3tools/contracts";
-import { orderKeyBetween } from "@t3tools/shared/orderKeys";
+} from "@infinitus/contracts";
+import { orderKeyBetween } from "@infinitus/shared/orderKeys";
 import * as Schema from "effect/Schema";
 
 import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.ts";

@@ -1,4 +1,4 @@
-import type { InfinitusSlackSettings } from "@t3tools/contracts";
+import type { InfinitusSlackSettings } from "@infinitus/contracts";
 
 /**
  * Slack bridge settings (#574, PR 3): the pure half of the card. The two

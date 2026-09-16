@@ -1,5 +1,5 @@
-import { AuthAdministrativeScopes, AuthStandardClientScopes } from "@t3tools/contracts";
-import type { InfinitusManifestCommand, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
+import { AuthAdministrativeScopes, AuthStandardClientScopes } from "@infinitus/contracts";
+import type { InfinitusManifestCommand, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";

@@ -22,10 +22,10 @@ import {
   EnvironmentThemeFile,
   EnvironmentThemeId,
   environmentThemeFileHasColors,
-} from "@t3tools/contracts";
-import { fromJsonStringPretty, fromLenientJson } from "@t3tools/shared/schemaJson";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
-import { BUILT_IN_THEME_IDS, UNPUBLISHABLE_THEME_IDS } from "@t3tools/shared/themePalettes";
+} from "@infinitus/contracts";
+import { fromJsonStringPretty, fromLenientJson } from "@infinitus/shared/schemaJson";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { BUILT_IN_THEME_IDS, UNPUBLISHABLE_THEME_IDS } from "@infinitus/shared/themePalettes";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";
 import * as DateTime from "effect/DateTime";

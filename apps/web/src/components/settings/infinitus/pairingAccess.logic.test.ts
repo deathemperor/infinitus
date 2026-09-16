@@ -1,4 +1,4 @@
-import type { PairingApprovalRequest } from "@t3tools/contracts/infinitusPairing";
+import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { describe, expect, it } from "vite-plus/test";

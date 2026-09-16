@@ -1,4 +1,4 @@
-import type { ThreadUsageRollup } from "@t3tools/contracts";
+import type { ThreadUsageRollup } from "@infinitus/contracts";
 
 import type { ThreadUsageBackfillCandidate } from "../../persistence/ProjectionTurnUsage.ts";
 import type { SessionUsage } from "../../usage/UsageService.ts";

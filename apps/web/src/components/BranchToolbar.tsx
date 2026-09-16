@@ -1,5 +1,5 @@
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { scopeProjectRef, scopeThreadRef } from "@infinitus/client-runtime/environment";
+import type { EnvironmentId, ThreadId } from "@infinitus/contracts";
 import {
   ChevronDownIcon,
   FolderGit2Icon,

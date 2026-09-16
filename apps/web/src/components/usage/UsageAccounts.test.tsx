@@ -3,7 +3,7 @@ import {
   UsageDay,
   USAGE_CONTRACT_VERSION,
   type UsageSummary,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 

@@ -2,14 +2,14 @@ import {
   AuthStandardClientScopes,
   EnvironmentAuthorizationError,
   type AuthEnvironmentScope,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   PairingApprovalIssueFailed,
   PairingApprovalNotFound,
   PairingApprovalRefused,
   type PairingApprovalPollResult,
   type PairingApprovalRequest,
-} from "@t3tools/contracts/infinitusPairing";
+} from "@infinitus/contracts/infinitusPairing";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";

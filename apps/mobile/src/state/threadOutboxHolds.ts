@@ -1,5 +1,5 @@
-import type { EnvironmentId, ServerConfig } from "@t3tools/contracts";
-import type { InfinitusHeldThread } from "@t3tools/contracts/infinitus";
+import type { EnvironmentId, ServerConfig } from "@infinitus/contracts";
+import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 

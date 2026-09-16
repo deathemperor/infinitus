@@ -1,4 +1,4 @@
-import type { ActivityRow } from "@t3tools/client-runtime/state/infinitusActivity";
+import type { ActivityRow } from "@infinitus/client-runtime/state/infinitusActivity";
 
 /** The log sectioned by local calendar day, newest day first, in row order. */
 export interface ActivityDay {

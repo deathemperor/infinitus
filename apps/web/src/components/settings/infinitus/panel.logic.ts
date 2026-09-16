@@ -1,9 +1,9 @@
-import type { AccountsPageState } from "@t3tools/client-runtime/state/infinitusAccounts";
+import type { AccountsPageState } from "@infinitus/client-runtime/state/infinitusAccounts";
 import type {
   InfinitusEngineState,
   InfinitusSnapshot,
   InfinitusStatus,
-} from "@t3tools/contracts/infinitus";
+} from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 
 import { formatEnvironmentQueryError } from "~/state/query";

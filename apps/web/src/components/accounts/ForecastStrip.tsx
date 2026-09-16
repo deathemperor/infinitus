@@ -1,4 +1,4 @@
-import type { ForecastModel } from "@t3tools/client-runtime/state/infinitusAccounts";
+import type { ForecastModel } from "@infinitus/client-runtime/state/infinitusAccounts";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { formatRelativeTimeLabel, formatUpcomingTimestamp } from "../../timestampFormat";

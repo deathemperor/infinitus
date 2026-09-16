@@ -1,7 +1,7 @@
-import type { ThreadUsageRollup } from "@t3tools/contracts";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
-import { threadUsageReported } from "@t3tools/shared/threadUsage";
-import { formatDateTimeShort, formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
+import type { ThreadUsageRollup } from "@infinitus/contracts";
+import { formatDuration } from "@infinitus/shared/orchestrationTiming";
+import { threadUsageReported } from "@infinitus/shared/threadUsage";
+import { formatDateTimeShort, formatTokens, formatUsd } from "@infinitus/shared/usageFormat";
 
 /** One card of the thread usage sheet. */
 export interface ThreadUsageRow {

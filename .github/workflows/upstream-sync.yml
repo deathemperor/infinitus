@@ -70,6 +70,7 @@ jobs:
              && node scripts/infinitus-rename.ts --check 2>/dev/null | grep -q "no old identifier remains"; then
             git checkout -q -b "$branch-upstream-renamed" upstream/main
             node /tmp/infinitus-rename.ts
+            git diff --name-only | xargs vp fmt
             git add -A && git commit -qm "chore: upstream renamed by scripts/infinitus-rename.ts"
             git checkout -q "$branch"
             merge_from="$branch-upstream-renamed"
