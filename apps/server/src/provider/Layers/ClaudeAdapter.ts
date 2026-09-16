@@ -123,6 +123,7 @@ import { discoverClaudeSkills } from "../Drivers/ClaudeSkills.ts";
 import { buildRuntimeInstructions } from "../RuntimeInstructions.ts";
 import {
   BUNDLED_CLAUDE_MODEL_CATALOG,
+  type ClaudeCatalogApiModelIdOptions,
   type ClaudeModelCatalog,
   getClaudeCatalogModelCapabilities,
   isClaudeCatalogUltracodeEffort,
@@ -400,6 +401,13 @@ interface ClaudeSessionContext {
   readonly startedAt: string;
   readonly basePermissionMode: PermissionMode | undefined;
   currentApiModelId: string | undefined;
+  /**
+   * The betas the query was opened with (`claudeQueryBetas`). The CLI reads
+   * them once at launch, so a model set mid-session cannot gain or lose the
+   * 1M window — `setModel` says so rather than leaving the meter lying.
+   */
+  readonly queryBetas: ClaudeQueryOptions["betas"] | undefined;
+  betaMismatchWarned: boolean;
   /** Effective effort for the session's turns; subagents without an explicit
    * effort override inherit this. */
   currentEffort: string | undefined;
@@ -718,6 +726,30 @@ function selectedClaudeContextWindow(
   modelSelection: ModelSelection | undefined,
 ): number | undefined {
   return resolveClaudeCatalogContextWindowTokens(catalog, modelSelection);
+}
+
+/** The window the long-context beta buys, as the catalog counts it. */
+const LONG_CONTEXT_WINDOW_TOKENS = 1_000_000;
+
+/**
+ * Fork (#1088 follow-up): the betas a query opens with. The `[1m]` suffix a
+ * proxied instance leaves off the model name is also what buys the CLI its 1M
+ * context window — without it the CLI plans against 200k and refuses a longer
+ * prompt before the API sees it. The long-context beta buys the same window,
+ * and travels as a header the proxy forwards rather than a model name it
+ * answers 400 to. Sent only when the selection resolves the 1M window, so a
+ * 200k pick still gets 200k, and only for a proxied instance — the CLI drops
+ * caller-supplied betas for an OAuth login, which is every unproxied one.
+ */
+function claudeQueryBetas(
+  catalog: ClaudeModelCatalog,
+  modelSelection: ModelSelection | undefined,
+  options: ClaudeCatalogApiModelIdOptions,
+): ClaudeQueryOptions["betas"] | undefined {
+  if (options.modelSuffixes !== false) return undefined;
+  return selectedClaudeContextWindow(catalog, modelSelection) === LONG_CONTEXT_WINDOW_TOKENS
+    ? ["context-1m-2025-08-07"]
+    : undefined;
 }
 
 function finiteNonNegativeInteger(value: unknown): number | undefined {
@@ -5464,6 +5496,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       const apiModelId = modelSelection
         ? resolveClaudeCatalogApiModelId(modelCatalog, modelSelection, apiModelIdOptions)
         : undefined;
+      const queryBetas = claudeQueryBetas(modelCatalog, modelSelection, apiModelIdOptions);
       const initialContextWindow = selectedClaudeContextWindow(modelCatalog, modelSelection);
       const rawEffort = getModelSelectionStringOptionValue(modelSelection, "effort");
       const effort =
@@ -5529,6 +5562,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
           append: buildRuntimeInstructions({ harness: "Claude Code" }),
         },
         settingSources: [...CLAUDE_SETTING_SOURCES],
+        ...(queryBetas ? { betas: queryBetas } : {}),
         // `ultracode` is a Claude Code setting, not an API effort level. It is
         // normalized to `xhigh` above and paired with `settings.ultracode`.
         ...(effectiveEffort
@@ -5717,6 +5751,8 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         startedAt,
         basePermissionMode: permissionMode,
         currentApiModelId: apiModelId,
+        queryBetas,
+        betaMismatchWarned: false,
         currentEffort: effectiveEffort ?? undefined,
         resumeSessionId: sessionId,
         pendingApprovals,
@@ -5842,6 +5878,23 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       if (context.currentApiModelId !== apiModelId) {
         yield* onSessionQuery(context, "turn/setModel", (query) => query.setModel(apiModelId));
         context.currentApiModelId = apiModelId;
+      }
+      // The window the CLI plans against was fixed by the betas this query
+      // opened with, so a selection that now wants a different one is not
+      // honored until the thread starts a new session.
+      const wantedBetas = claudeQueryBetas(modelCatalog, modelSelection, apiModelIdOptions);
+      if ((wantedBetas !== undefined) !== (context.queryBetas !== undefined)) {
+        if (!context.betaMismatchWarned) {
+          context.betaMismatchWarned = true;
+          yield* emitRuntimeWarning(
+            context,
+            wantedBetas
+              ? "This session runs with a 200K context window. The 1M window applies from the next session on this thread."
+              : "This session runs with a 1M context window. The 200K window applies from the next session on this thread.",
+          );
+        }
+      } else {
+        context.betaMismatchWarned = false;
       }
       context.session = {
         ...context.session,
