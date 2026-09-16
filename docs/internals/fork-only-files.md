@@ -382,6 +382,7 @@ these bullets.
 - `scripts/infinitus-md-size.test.ts` — the INFINITUS.md byte cap (16 KB, #1339):
   every session loads that file whole, so a feature's narrative goes in a
   `docs/internals/<feature>.md` page and one ledger line here.
+- `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (`@t3tools/*`, `t3/` service tags, `--t3-*`, `font-t3-*`, the wordmark and Connect components) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`, `fork-visual-fixture.guard.test.ts`) — the canned Infinitus control socket the pass runs against in CI, kept honest against `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift` (#1091, #1139). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`), `scripts/fork-visual-check.ts` — the route table the pass asserts (one marker per populated page, `ALWAYS_ABSENT` phrases) and the checker that applies it. Rules and traps: `docs/internals/fork-visual-pass.md`.

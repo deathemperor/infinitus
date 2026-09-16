@@ -571,7 +571,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch. The sync workflow
-  re-applies the runner swap after every merge. It pushes with the
+  re-applies the runner swap after every merge, and once
+  `scripts/infinitus-rename.ts --check` passes on `main` it renames
+  upstream's tip on its own branch before merging (#1368 C,
+  `docs/internals/infinitus-rename.md`). It pushes with the
   `UPSTREAM_SYNC_TOKEN` secret when present (a fine-grained PAT: contents,
   workflows, pull requests — write), since the default token cannot push a
   branch that touches `.github/workflows` (#658); without it such a sync

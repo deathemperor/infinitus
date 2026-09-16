@@ -27,6 +27,8 @@ contributor shorthand for this TypeScript tree and the Swift app.
   new files, new routes, new settings sections; edits to upstream files stay
   at registration points so merges stay small. The list of upstream files we
   edit on purpose is `docs/internals/fork-registration-points.md` — keep it current.
+  Identifiers are renamed by `scripts/infinitus-rename.ts` (#1368 C), run on
+  upstream's side of each sync once it has landed: `docs/internals/infinitus-rename.md`.
   Expected on every sync (#823 layer 3): upstream's tests assume a plain
   `x.y.z` is a `latest` build titled "(Alpha)"; here every non-nightly
   version is an `infinitus` build, so their fixture expectations in

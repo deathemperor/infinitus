@@ -25,6 +25,7 @@
         "fork-visual-check.ts",
         "fold-changelog.mjs",
         "fold-changelog.d.mts",
+        "infinitus-rename.ts",
       ],
     },
     "apps/server": {

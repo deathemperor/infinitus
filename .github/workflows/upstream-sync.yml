@@ -57,7 +57,20 @@ jobs:
             echo "state=uptodate" >> "$GITHUB_OUTPUT"; exit 0
           fi
           git checkout -b "$branch"
-          if git merge --no-edit upstream/main; then
+          # The identifier rename (#1368 C, docs/internals/infinitus-rename.md):
+          # once main carries no old identifier, upstream's tip is renamed on
+          # its own branch first, so the merge meets the same names on both
+          # sides. Before the rename lands, `--check` fails and this is skipped.
+          if git show main:scripts/infinitus-rename.ts > /tmp/infinitus-rename.ts 2>/dev/null              && node scripts/infinitus-rename.ts --check >/dev/null 2>&1; then
+            git checkout -q -b "$branch-upstream-renamed" upstream/main
+            node /tmp/infinitus-rename.ts
+            git add -A && git commit -qm "chore: upstream renamed by scripts/infinitus-rename.ts"
+            git checkout -q "$branch"
+            merge_from="$branch-upstream-renamed"
+          else
+            merge_from=upstream/main
+          fi
+          if git merge --no-edit "$merge_from"; then
             echo "state=clean" >> "$GITHUB_OUTPUT"
           else
             git diff --name-only --diff-filter=U > /tmp/conflicts.txt
