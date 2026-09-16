@@ -10,6 +10,19 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.19
+
+### Mac
+- Signing in to a gcloud account that still holds credentials no longer hangs at "starting"; gcloud's overwrite prompt is skipped.
+- A paused account wears one pause icon — press it to resume — and keeps its 5h, 7d and per-model limits.
+- Account alerts stop double-posting — the menu bar app stays quiet while the desktop app is open and shows them there instead.
+
+### Desktop
+- Account alerts land here now — a toast for every one, and a system notification when the fleet runs out while you are away.
+
+### Phone
+- Account alerts from a Mac now arrive through Infinitus Connect under the Device Notifications switch; the Alerts from Mac, Thread card and Card push registration rows left Settings › Infinitus.
+
 ## 0.5.0-alpha.18
 
 ### Mac

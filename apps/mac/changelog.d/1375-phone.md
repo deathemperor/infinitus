@@ -1,1 +1,0 @@
-Phone: Account alerts from a Mac now arrive through Infinitus Connect under the Device Notifications switch; the Alerts from Mac, Thread card and Card push registration rows left Settings › Infinitus.
