@@ -124,7 +124,13 @@ these bullets.
   (`productName.ts`, "Infinitus Connect", #1368 slice A) on every surface —
   web, mobile, server, `packages/*`, `docs/user` — and the web and desktop
   guard tests, `scripts/connect-name.guard.test.ts` (server, phone, packages,
-  relay) and the visual pass fail on a new literal.
+  relay) and the visual pass fail on a new literal. The same three guards
+  fail on a bare "T3" used as the product noun ("T3 Account", "Open T3",
+  "a T3 thread"; #1368 follow-up) — identifiers never match — with an
+  allowlist for the wordmark glyph, the relay's live column default and the
+  triage playbook that must stay byte-identical to upstream's file. The
+  lock-screen widgets say a literal "Infinitus": a widget body serializes
+  into the extension and cannot reach an imported constant.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/

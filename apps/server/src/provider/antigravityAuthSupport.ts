@@ -22,6 +22,7 @@ import {
   antigravityUserSkillDirectories,
   resolveAntigravityUserHome,
 } from "./Drivers/AntigravitySkills.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 export const ANTIGRAVITY_AUTH_STDOUT_PREFIX =
   "Open the following link to authenticate the ACP server: ";
@@ -320,7 +321,7 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
     helperExecutable.includes("%s")
   ) {
     return yield* authSupportError(
-      "The T3 runtime path cannot be used to suppress Antigravity browser launches.",
+      `The ${PRODUCT_NAME} runtime path cannot be used to suppress Antigravity browser launches.`,
     );
   }
 

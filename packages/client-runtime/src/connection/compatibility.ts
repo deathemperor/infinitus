@@ -5,6 +5,7 @@ import {
 } from "@t3tools/contracts";
 
 import { ConnectionBlockedError } from "./model.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 export function orchestrationProtocolCompatibilityError(
   descriptor: ExecutionEnvironmentDescriptor,
@@ -19,7 +20,7 @@ export function orchestrationProtocolCompatibilityError(
     detail:
       serverProtocolVersion > ORCHESTRATION_PROTOCOL_VERSION
         ? `This client is not supported by this server. Update your app or use a compatible release to connect to ${descriptor.label}.`
-        : `This client requires a newer server. Update T3 Code on ${descriptor.label} to connect.`,
+        : `This client requires a newer server. Update ${PRODUCT_NAME} on ${descriptor.label} to connect.`,
   });
 }
 

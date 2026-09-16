@@ -11,6 +11,17 @@ import { describe, expect, it } from "vite-plus/test";
  * packages and the relay, where no product-name guard existed. Comments are
  * free to say "T3 Connect"; a string that still does is a regression.
  */
+/** Lines that keep a bare "T3", with the reason. */
+const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
+  // The wordmark glyph itself (the work log's own-step icon keeps it, #601).
+  ["apps/mobile/src/components/T3Wordmark.tsx", 'accessibilityLabel="T3"'],
+  // A column default in the relay's live database; changing it is a migration.
+  ["infra/relay/src/persistence/schema.ts", '.default("T3 Environment")'],
+  // Byte-identical to upstream's `.github/triage/PLAYBOOK.md` (its test), which
+  // upstream's own triage workflow reads; it names upstream's issue tracker.
+  ["apps/server/src/cli/triagePrompt.ts", "T3 Code"],
+];
+
 const ROOTS = [
   "apps/server/src",
   "apps/mobile/src",
@@ -20,6 +31,10 @@ const ROOTS = [
   "packages/ssh/src",
   "infra/relay/src",
 ];
+
+/** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.
+    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match. */
+const BARE_T3 = /\bT3\b(?![_A-Za-z0-9])/;
 
 const REPO = NodeURL.fileURLToPath(new URL("..", import.meta.url));
 
@@ -37,12 +52,18 @@ function withoutComments(source: string): string {
 }
 
 describe("connect name", () => {
-  it("routes every user-facing T3 Connect through CONNECT_NAME", () => {
+  it("routes every user-facing T3 Connect and bare T3 through the name constants", () => {
     const leftovers = ROOTS.flatMap((root) =>
       sourceFiles(NodePath.join(REPO, root)).flatMap((file) =>
         withoutComments(NodeFS.readFileSync(file, "utf8"))
           .split("\n")
-          .filter((line) => line.includes("T3 Connect"))
+          .filter((line) => line.includes("T3 Connect") || BARE_T3.test(line))
+          .filter(
+            (line) =>
+              !LITERAL_ALLOWED.some(
+                ([f, text]) => NodePath.relative(REPO, file) === f && line.includes(text),
+              ),
+          )
           .map((line) => `${NodePath.relative(REPO, file)}: ${line.trim()}`),
       ),
     );

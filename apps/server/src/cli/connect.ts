@@ -646,7 +646,7 @@ const connectPublishCommand = Command.make("publish", {
         }
         yield* CliState.setCliDesiredCloudLink(true, "publish_only");
         yield* Console.log(
-          "Restart T3 to finish authorizing this environment to publish (no managed tunnel is created).",
+          `Restart ${PRODUCT_NAME} to finish authorizing this environment to publish (no managed tunnel is created).`,
         );
       }),
     ),

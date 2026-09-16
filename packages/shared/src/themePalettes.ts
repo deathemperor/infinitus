@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 export const BUILT_IN_THEME_IDS = ["t3-chat", "grove", "ocean", "ember", "iris"] as const;
 
 /** The mobile app's own hand-tuned palette, which is not part of the built-in library. */
@@ -123,7 +124,7 @@ export type ThemeDefinition = Readonly<{
 
 export const T3_CHAT_THEME: ThemeDefinition = {
   id: "t3-chat",
-  label: "T3 Chat",
+  label: `${PRODUCT_NAME} Chat`,
   appearance: "light",
   colors: {
     canvas: "oklch(0.982446 0.010114 325.653)",

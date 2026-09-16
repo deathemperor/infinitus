@@ -16,6 +16,10 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   ["lib/bootError.ts", "T3 Code could not load."],
 ];
 
+/** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.
+    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match. */
+const BARE_T3 = /\bT3\b(?![_A-Za-z0-9])/;
+
 const SRC = NodeURL.fileURLToPath(new URL(".", import.meta.url));
 
 function sourceFiles(dir: string): string[] {
@@ -36,7 +40,9 @@ describe("product name", () => {
       const relative = NodePath.relative(SRC, file);
       return withoutComments(NodeFS.readFileSync(file, "utf8"))
         .split("\n")
-        .filter((line) => line.includes("T3 Code") || line.includes("T3 Connect"))
+        .filter(
+          (line) => line.includes("T3 Code") || line.includes("T3 Connect") || BARE_T3.test(line),
+        )
         .filter(
           (line) => !LITERAL_ALLOWED.some(([f, text]) => relative === f && line.includes(text)),
         )
