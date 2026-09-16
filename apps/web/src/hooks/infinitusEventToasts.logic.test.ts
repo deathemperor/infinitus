@@ -75,9 +75,9 @@ describe("the app's own announcements", () => {
   });
 
   it("makes a notice an info toast that does not interrupt", () => {
-    expect(eventToast({ kind: "notice", icon: "heart.fill", text: "all accounts are back" })).toEqual(
-      { type: "info", title: "all accounts are back", kind: "notice", urgent: false },
-    );
+    expect(
+      eventToast({ kind: "notice", icon: "heart.fill", text: "all accounts are back" }),
+    ).toEqual({ type: "info", title: "all accounts are back", kind: "notice", urgent: false });
   });
 
   it("keeps an em dash inside the detail — the first one splits", () => {
