@@ -5,9 +5,11 @@ import * as Neon from "alchemy/Neon";
 import * as Alchemy from "alchemy";
 import * as RemovalPolicy from "alchemy/RemovalPolicy";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import { relayDatabaseMode } from "./dbConfig.ts";
 
@@ -52,12 +54,15 @@ export const NeonDatabase = Effect.gen(function* () {
 
   const mode = relayDatabaseMode(stage);
   const migrations = { dir: schema.out, table: "relay_migrations" };
+  // Through Config like the zone names: the deploy script's `.env` provider
+  // never reaches `process.env`, and `orgId` cannot be changed after creation.
+  const orgId = yield* Config.nonEmptyString("NEON_ORG_ID").pipe(Config.option);
   const project =
     mode === "shared-database"
       ? yield* Neon.Project("RelayNeonProject", {
           name: "infinitus-relay",
           region: "aws-ap-southeast-1",
-          ...(process.env.NEON_ORG_ID ? { orgId: process.env.NEON_ORG_ID } : {}),
+          ...(Option.isSome(orgId) ? { orgId: orgId.value } : {}),
           migrations,
         }).pipe(RemovalPolicy.retain())
       : yield* Neon.Project.ref("RelayNeonProject", { stage: "prod" });
