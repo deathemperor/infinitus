@@ -9,6 +9,7 @@ import {
   HostProcessIsExecutable,
   HostProcessPlatform,
 } from "@t3tools/shared/hostProcess";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -218,5 +219,5 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
     }
   }
   yield* Console.log("");
-  yield* Console.log("t3 is uninstalled. Thanks for trying T3 Code.");
+  yield* Console.log(`t3 is uninstalled. Thanks for trying ${PRODUCT_NAME}.`);
 });

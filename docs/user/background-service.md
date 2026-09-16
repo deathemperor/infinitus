@@ -106,4 +106,4 @@ and keep that session open.
 | `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `t3 service restart`.                            |
 
 For failures after signing in to Infinitus Connect, see
-[connection troubleshooting](./remote-access.md#t3-connect-troubleshooting).
+[connection troubleshooting](./remote-access.md#infinitus-connect-troubleshooting).
