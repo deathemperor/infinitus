@@ -107,8 +107,8 @@ A maintainer with access to the existing Alchemy state and deployment credential
 3. From the repository root, inspect the deployment plan, then deploy the same stage:
 
    ```sh
-   vp run --filter infinitus-relay deploy --stage dev_ryan_android --env-file .env.android-dev --dry-run
-   vp run --filter infinitus-relay deploy --stage dev_ryan_android --env-file .env.android-dev
+   vp run --filter t3code-relay deploy --stage dev_ryan_android --env-file .env.android-dev --dry-run
+   vp run --filter t3code-relay deploy --stage dev_ryan_android --env-file .env.android-dev
    ```
 
 4. Give the tester the deployed relay URL and matching public Clerk configuration. The deploy wrapper also writes the relay URL and public tracing configuration into that checkout's root `.env`. Rebuild the private APK with this `T3CODE_RELAY_URL`, the existing Firebase Android file, and OTA updates disabled. If using the separate development package, authorize its Clerk callback as described above.

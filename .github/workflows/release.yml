@@ -309,13 +309,13 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=infinitus-relay...
+              - --filter=t3code-relay...
 
       - id: relay_state
         name: Read production relay tracing config
         shell: bash
         run: |
-          vp run --filter infinitus-relay deploy \
+          vp run --filter t3code-relay deploy \
             --stage prod \
             --read-state \
             --github-output \

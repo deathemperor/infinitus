@@ -320,6 +320,17 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   deploy of #1366 dropped the two rows the first deploys had left `creating`
   in the state store (Alchemy dies on a persisted row whose provider is not
   registered, which is why they stayed for that one deploy).
+- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`,
+  every `infra/relay/src` service tag, `docs/operations/connect-setup.md` —
+  the package is `infinitus-relay` (#1368 B): its name, the `--filter` in
+  `deploy-relay.yml` and the README, the `infinitus-relay/<dir>/<Name>`
+  service tags, and the Clerk template and audience (`infinitus-relay`) the
+  setup doc, example env and test fixtures name. The Alchemy stack stays
+  `T3CodeRelay`: state rows key on it and a fresh stack looks the retained
+  Neon project up by a generated name, so a rename orphans the database.
+  Axiom names stay `t3-code-relay-*`: their tokens are baked into shipped
+  builds. Upstream's `release.yml` (disabled) and the two operations docs
+  still say `t3code-relay`; the codemod sync (#1368 C) renames them.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
   #1375) added to `RelayApi` beside upstream's server group, and its handler
