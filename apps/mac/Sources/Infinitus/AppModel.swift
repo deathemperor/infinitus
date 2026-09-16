@@ -118,7 +118,10 @@ final class AppModel: ObservableObject {
 
     /// Every event goes through here: the Activity pane's tail and the
     /// durable log Stats reads. `kind` is StatsEvents' vocabulary
-    /// (switch/death/limit/revival/ignite/resume/nudge/pairing/other).
+    /// (switch/death/limit/revival/ignite/resume/nudge/pairing/other),
+    /// plus `alert`/`notice` for the app's own announcements (`announce`),
+    /// deliberately outside that vocabulary so a said line never lands in
+    /// a tally.
     func logEvent(_ kind: String, icon: String, _ text: String) {
         eventLog.append(EventEntry(kind: kind, icon: icon, text: text))
         if eventLog.count > 100 { eventLog.removeFirst(eventLog.count - 100) }
@@ -614,6 +617,26 @@ final class AppModel: ObservableObject {
         notify(msg)
     }
 
+    /// A line the app says out loud — the one call every banner site makes.
+    ///
+    /// It logs the line as its own event row before pushing it, so the
+    /// desktop shows the same news from `snapshot.events` wherever the
+    /// user actually is (#1032 finished: one notifier per machine). The
+    /// row's kind is the announcement itself, not the observation: `death`
+    /// / `revival` / `limit` rows keep meaning "this is what the fleet
+    /// did", `alert` and `notice` mean "this is what the app would have
+    /// said". Both are outside StatsEvents' vocabulary, so months of
+    /// tallies are untouched.
+    ///
+    /// `urgent` is the difference between a banner that interrupts (every
+    /// account dead, the last one nearly dead, a crash) and one that
+    /// informs (a switch, an account back).
+    @discardableResult
+    func announce(_ body: String, icon: String, urgent: Bool = false) -> PushReach {
+        logEvent(urgent ? "alert" : "notice", icon: icon, body)
+        return notify(body)
+    }
+
     /// The alias every live session runs on right now — one active
     /// account per engine, so it is the fleet's, not the session's (#612).
     var activeAccountName: String? {
@@ -651,10 +674,25 @@ final class AppModel: ObservableObject {
     private var awsNeedRefresh: Task<Void, Never>?
 
     /// Answers the phones the line reached (the `push` verb reports it).
+    ///
+    /// One notifier per machine (#1032 finished): while a desktop holds a
+    /// `fleets` lease it shows this news itself, from `snapshot.events`
+    /// through its own `notificationMode` — so Notification Center here
+    /// would be the second banner for one event. The phone channel is
+    /// unaffected: a desktop on this Mac says nothing to a phone away
+    /// from it, so `pushAlert` always runs.
     @discardableResult
     func notify(_ body: String) -> PushReach {
-        Notifier.post(title: "Infinitus", body: body)
+        if !desktopIsWatching { Notifier.post(title: "Infinitus", body: body) }
         return liveActivityPusher.pushAlert(title: "Infinitus", body: body)
+    }
+
+    /// Is some client other than this app's own UI holding a `fleets`
+    /// lease — i.e. a desktop that will show the account news itself?
+    /// The Mac's own popup reports `.fleets` too (`reportLocalActivity`)
+    /// and is not one, hence the exclusion.
+    var desktopIsWatching: Bool {
+        leases.holds(.fleets, excluding: ClientActivity.localClientId)
     }
     /// Seeded with what the triggers remembered before the last relaunch
     /// (#98, #231): the last-alive warning.
@@ -1358,7 +1396,9 @@ final class AppModel: ObservableObject {
         try? crashStore.save(report)
         crashReports = crashStore.list()
         logEvent("other", icon: "💥", "\(report.summary)")
-        if announce, !isPlayground { notify("phone app crashed — \(report.reason)") }
+        if announce, !isPlayground {
+            self.announce("phone app crashed — \(report.reason)", icon: "💥", urgent: true)
+        }
     }
 
     func removeCrash(_ id: String) {
@@ -1559,6 +1599,12 @@ final class AppModel: ObservableObject {
     /// the durable log until the reason changes (Infi4, 2026-09-11).
     private var lastNoSwitch: String?
 
+    /// When the engine last logged a `switch` row of its own. The display
+    /// -feed diff below announces the switch the desktop shows, and that
+    /// row already is one — so the diff only carries the news when the
+    /// engine was parked (or a person swapped by hand) and logged nothing.
+    private var lastEngineSwitchLog: Date?
+
     private func consume(_ line: EventLine) {
         switch line {
         case .event(let event):
@@ -1572,6 +1618,7 @@ final class AppModel: ObservableObject {
             logEvent(Self.eventKind(event.kind), icon: event.icon, event.summary)
             switch event.kind {
             case "switch":
+                lastEngineSwitchLog = Date()
                 Task { await refreshSnapshot() }  // the snapshot diff posts the notification
             // Logged only (#231). "all-exhausted" arrives on every engine
             // re-probe (~10 min while dead): the latched PushTriggers message
@@ -1803,11 +1850,12 @@ final class AppModel: ObservableObject {
                     }
                     if !change.firstLoad, !change.newlyAlive.isEmpty, pushRevived, !isPlayground {
                         if wasAllDead && noneDeadNow {
-                            push("all accounts are back" + (early ? " — Anthropic reset early" : ""))
+                            announce("all accounts are back" + (early ? " — Anthropic reset early" : ""),
+                                     icon: "heart.fill")
                         } else {
                             for n in change.newlyAlive {
                                 let name = fleet.accounts.first { $0.number == n }.map { $0.alias ?? $0.email } ?? "#\(n)"
-                                push("\(name) is back" + (early ? " — reset early" : ""))
+                                announce("\(name) is back" + (early ? " — reset early" : ""), icon: "heart.fill")
                             }
                         }
                     }
@@ -1921,7 +1969,16 @@ final class AppModel: ObservableObject {
             lastNotifiedActive = current
             let name = accounts.first(where: { $0.number == current })
                 .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "#\(current)"
-            notify("switched to account \(current) (\(name))")
+            let line = "switched to account \(current) (\(name))"
+            // The engine's own `switch` row is already the switch the
+            // desktop shows; a second row here would toast one swap twice.
+            // A parked engine — or a manual swap — logs nothing, and then
+            // this diff is the only witness and carries the news itself.
+            if let logged = lastEngineSwitchLog, Date().timeIntervalSince(logged) < 30 {
+                notify(line)
+            } else {
+                announce(line, icon: "arrow.triangle.2.circlepath")
+            }
         }
         controlServer.heal()
         // Same display-feed vantage as the switch diff above: these
@@ -1941,7 +1998,12 @@ final class AppModel: ObservableObject {
             persistedPushMemory = pushTriggers.memory
             if let data = try? JSONEncoder().encode(persistedPushMemory) { defaults.set(data, forKey: Self.pushMemoryKey) }
         }
-        for msg in pushes where !isPlayground { push(msg) }
+        // Both lines read "<headline> — <detail>", the shape Notifier splits
+        // into a banner subtitle and body — and the shape `eventToast` splits
+        // into a desktop notification's title and text.
+        for msg in pushes where !isPlayground {
+            announce(msg, icon: "exclamationmark.triangle", urgent: true)
+        }
         if !isPlayground { await sync.tick() }
     }
 

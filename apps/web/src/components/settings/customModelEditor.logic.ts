@@ -80,6 +80,17 @@ export const DESCRIPTOR_PRESETS_BY_KIND: Partial<
     },
     { id: "fastMode", label: "Fast Mode", type: "boolean" },
     { id: "thinking", label: "Thinking", type: "boolean" },
+    {
+      // The ids are the manifest's own: the Claude catalog maps them to token
+      // counts, and only those two mean anything to the adapter.
+      id: "contextWindow",
+      label: "Context Window",
+      type: "select",
+      choices: [
+        { id: "200k", label: "200k", isDefault: true },
+        { id: "1m", label: "1M" },
+      ],
+    },
   ],
   [ProviderDriverKind.make("cursor")]: [
     { id: "reasoning", label: "Reasoning", type: "select", choices: EFFORT_CHOICES },
@@ -178,14 +189,10 @@ export function draftFromDefinition(entry: CustomModelDefinition): CustomModelDr
   };
 }
 
-/** Claude context choices require runtime suffix mappings that custom entries do not carry. */
 export function descriptorsFromCapabilities(
   capabilities: ModelCapabilities | null | undefined,
-  driverKind: ProviderDriverKind | null,
 ): EditorDescriptor[] {
-  return (capabilities?.optionDescriptors ?? [])
-    .filter((descriptor) => driverKind !== "claudeAgent" || descriptor.id !== "contextWindow")
-    .map(descriptorToEditor);
+  return (capabilities?.optionDescriptors ?? []).map(descriptorToEditor);
 }
 
 /**

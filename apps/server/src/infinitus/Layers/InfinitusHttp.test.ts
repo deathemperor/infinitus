@@ -26,6 +26,10 @@ import { describe, expect } from "vite-plus/test";
 
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import {
+  InfinitusAlertRelay,
+  InfinitusAlertRelayUnlinked,
+} from "../Services/InfinitusAlertRelay.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -94,7 +98,18 @@ const settingsWith = (defaultModelSelection: typeof ENV_DEFAULT | null) =>
     }),
   );
 
+/** #1375: the relay publisher, linked unless the alert body says otherwise. */
+const alerts: Array<{ title: string; body: string }> = [];
 const services = Layer.mergeAll(
+  Layer.mock(InfinitusAlertRelay)({
+    publish: (input) =>
+      input.body === "unlinked"
+        ? Effect.fail(new InfinitusAlertRelayUnlinked())
+        : Effect.sync(() => {
+            alerts.push(input);
+            return { deliveries: 2 };
+          }),
+  }),
   Layer.mock(InfinitusSessionHold)({
     held: Stream.succeed([row("t-held", "held")]),
     release: (threadId) =>
@@ -153,6 +168,35 @@ const OPERATE: ReadonlyArray<AuthEnvironmentScope> = [
 ];
 
 describe("infinitusHttpApiLayer (#822)", () => {
+  effectIt.effect(
+    "forwards the Mac's account alert to the relay on the operate scope (#1375)",
+    () =>
+      withClient(OPERATE, (client) =>
+        Effect.gen(function* () {
+          const alert = { title: "Infinitus", body: "switched to account 2 (work)" };
+          expect(yield* client.infinitus.alert({ headers: {}, payload: alert })).toEqual({
+            deliveries: 2,
+          });
+          expect(alerts).toEqual([alert]);
+          const unlinked = yield* Effect.flip(
+            client.infinitus.alert({ headers: {}, payload: { ...alert, body: "unlinked" } }),
+          );
+          expect(unlinked._tag).toBe("InfinitusAlertRelayUnlinked");
+        }),
+      ).pipe(
+        Effect.andThen(
+          withClient(["orchestration:read"], (client) =>
+            Effect.gen(function* () {
+              const denied = yield* Effect.flip(
+                client.infinitus.alert({ headers: {}, payload: { title: "Infinitus", body: "x" } }),
+              );
+              expect(denied._tag).toBe("EnvironmentScopeRequiredError");
+            }),
+          ),
+        ),
+      ),
+  );
+
   effectIt.effect("lists the running turns an update would cut off (#829)", () =>
     withClient(["orchestration:read"], (client) =>
       Effect.gen(function* () {

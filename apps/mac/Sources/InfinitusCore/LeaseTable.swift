@@ -63,10 +63,20 @@ public final class LeaseTable: @unchecked Sendable {
     }
 
     public func holds(_ scope: ClientActivity.Scope, now: Date = Date()) -> Bool {
+        holds(scope, excluding: nil, now: now)
+    }
+
+    /// The same question asked about everyone but one client — "is someone
+    /// ELSE watching this". The notification gate asks it excluding
+    /// `ClientActivity.localClientId`: this Mac's own popup being open is
+    /// not a desktop that will show the line.
+    public func holds(_ scope: ClientActivity.Scope, excluding clientId: String?,
+                      now: Date = Date()) -> Bool {
         lock.lock(); defer { lock.unlock() }
         sweep(now)
-        return leases.values.contains { lease in
-            lease.scopes.contains(scope) || (scope.type == .session && lease.scopes.contains(.sessions))
+        return leases.contains { id, lease in
+            guard id != clientId else { return false }
+            return lease.scopes.contains(scope) || (scope.type == .session && lease.scopes.contains(.sessions))
         }
     }
 

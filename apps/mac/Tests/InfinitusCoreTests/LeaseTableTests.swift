@@ -53,6 +53,24 @@ final class LeaseTableTests: XCTestCase {
         XCTAssertEqual(t.held(now: t0.addingTimeInterval(60)), [:])
     }
 
+    /// The notification gate (#1032 finished): "is a DESKTOP watching the
+    /// fleet", which this app's own popup reporting `.fleets` must not
+    /// answer yes to — it is not a window that will show the line.
+    func testExcludingIgnoresOneClientsOwnLease() {
+        let t = LeaseTable()
+        t.report(report(ClientActivity.localClientId, [.fleets]), now: t0)
+        XCTAssertTrue(t.holds(.fleets, now: t0))
+        XCTAssertFalse(t.holds(.fleets, excluding: ClientActivity.localClientId, now: t0))
+        t.report(report("t3-server-ab12", [.fleets]), now: t0)
+        XCTAssertTrue(t.holds(.fleets, excluding: ClientActivity.localClientId, now: t0))
+        // The desktop going away (a zero-TTL release, or its TTL lapsing)
+        // hands the banners back to this Mac.
+        t.report(report("t3-server-ab12", [.fleets], ttlMs: 0), now: t0)
+        XCTAssertFalse(t.holds(.fleets, excluding: ClientActivity.localClientId, now: t0))
+        t.report(report("t3-server-ab12", [.fleets]), now: t0)
+        XCTAssertFalse(t.holds(.fleets, excluding: ClientActivity.localClientId, now: t0 + 46))
+    }
+
     func testNoLeasesMeansNothingIsHeld() {
         let t = LeaseTable()
         XCTAssertFalse(t.holds(.sessions, now: t0))

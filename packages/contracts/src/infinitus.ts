@@ -581,8 +581,10 @@ export type InfinitusTeamInsights = typeof InfinitusTeamInsights.Type;
     native #630 (#615) a row also carries `id`, the app's own UUID for the
     entry (stable per app run), and `kind`, the durable log's vocabulary
     (switch, limit, revival, resume, nudge, team, team-control, hook, pairing,
-    other). Both are absent on older builds, where a client falls back to the
-    icon and text. */
+    alert, notice, other). Both are absent on older builds, where a client
+    falls back to the icon and text. `alert` and `notice` are the app's own
+    announcements: it logs the line instead of banner-ing it whenever a client
+    holds a `fleets` lease, so the row IS the notification. */
 export const InfinitusEventRow = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   at: Schema.String,
