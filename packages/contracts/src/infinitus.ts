@@ -897,12 +897,16 @@ export type InfinitusSecretResult = typeof InfinitusSecretResult.Type;
 
 /** Why a secret call never reached the socket: the manifest has not been
     read, the verb takes no secret, an argument the verb does not name (or one
-    it needs is missing), or this session asked too often. */
+    it needs is missing), this session asked too often, or the session's scopes
+    do not reach the verb (`scope`: a standard client — a phone, a `t3 pair`
+    browser — may feed a sign-in code or callback; every other secret verb
+    needs `access:write`). */
 export const InfinitusSecretRefusal = Schema.Literals([
   "no_manifest",
   "no_secret",
   "bad_args",
   "too_many_attempts",
+  "scope",
 ]);
 export class InfinitusSecretRefused extends Schema.TaggedError<InfinitusSecretRefused>()(
   "InfinitusSecretRefused",

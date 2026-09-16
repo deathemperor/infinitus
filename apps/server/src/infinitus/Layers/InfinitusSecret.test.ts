@@ -1,3 +1,4 @@
+import { AuthAdministrativeScopes, AuthStandardClientScopes } from "@t3tools/contracts";
 import type { InfinitusManifestCommand, InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -97,6 +98,9 @@ const makeHarness = (initial: InfinitusSnapshot = snapshotWith(manifest)) =>
       ) =>
         secret.forward({
           sessionId: "session-1",
+          // The desktop's own session; a phone's standard scopes are the
+          // sign-in case, passed where a test means them.
+          scopes: AuthAdministrativeScopes,
           args: {},
           secret: Redacted.make("s3cret"),
           ...input,
@@ -169,6 +173,29 @@ describe("InfinitusSecretLive", () => {
         const missing = yield* h.forward({ command: "signin-code" }).pipe(Effect.flip);
         expect(missing).toMatchObject({ reason: "bad_args", detail: "flowId" });
         expect(yield* h.requests).toEqual([]);
+      }),
+    ),
+  );
+
+  effectIt.effect("holds every secret verb but a sign-in's to access:write", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness();
+        // A phone's standard scopes: the sign-in code goes through …
+        yield* h.forward({
+          command: "signin-code",
+          args: { flowId: "f" },
+          scopes: AuthStandardClientScopes,
+        });
+        // … the engine key does not, and the socket never hears of it.
+        const refused = yield* h
+          .forward({ command: "proxy-key", scopes: AuthStandardClientScopes })
+          .pipe(Effect.flip);
+        expect(refused).toMatchObject({ reason: "scope", command: "proxy-key" });
+        expect((yield* h.requests).map((request) => request.command)).toEqual(["signin-code"]);
+        // The desktop's own session reaches it.
+        yield* h.forward({ command: "proxy-key" });
+        expect((yield* h.requests).length).toBe(2);
       }),
     ),
   );

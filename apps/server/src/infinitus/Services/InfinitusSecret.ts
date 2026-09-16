@@ -6,12 +6,15 @@ import type {
   InfinitusSecretResult,
   InfinitusUnavailable,
 } from "@t3tools/contracts/infinitus";
+import type { AuthEnvironmentScope } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 
 export interface InfinitusSecretForwardInput extends InfinitusSecretInput {
   /** The auth session asking; the attempt counter is per session. */
   readonly sessionId: string;
+  /** Its scopes: a sign-in verb takes a standard client, the rest `access:write`. */
+  readonly scopes: ReadonlyArray<AuthEnvironmentScope>;
 }
 
 export interface InfinitusSecretShape {

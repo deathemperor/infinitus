@@ -346,6 +346,8 @@ export function infinitusSecretFailure(cause: Cause.Cause<unknown>): string {
           return "The server refused the request's arguments.";
         case "too_many_attempts":
           return "Too many attempts; wait a minute and try again.";
+        case "scope":
+          return "Only the desktop app on the Mac can do this.";
       }
     }
   }

@@ -3808,7 +3808,11 @@ const makeWsRpcLayer = (
         [WS_METHODS.infinitusSecret]: (input) =>
           observeRpcEffect(
             WS_METHODS.infinitusSecret,
-            infinitusSecret.forward({ ...input, sessionId: currentSession.sessionId }),
+            infinitusSecret.forward({
+              ...input,
+              sessionId: currentSession.sessionId,
+              scopes: currentSession.scopes,
+            }),
             // The verb only: never the args, never the value (#747).
             { "rpc.aggregate": "infinitus", "infinitus.command": input.command },
           ),

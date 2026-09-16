@@ -181,7 +181,9 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.subscribeInfinitusHolds]: AuthOrchestrationReadScope,
   // A secret to the app (a sign-in code, a key, a token) is administrative:
   // the same scope that mints a pairing credential, never a paired browser's.
-  [WS_METHODS.infinitusSecret]: AuthAccessWriteScope,
+  // A standard client reaches the sign-in verbs only; the layer holds every
+  // other secret verb to `access:write` per verb.
+  [WS_METHODS.infinitusSecret]: AuthOrchestrationOperateScope,
   // Forking a thread creates one, like dispatching thread.create (#270 E2).
   [WS_METHODS.infinitusForkThread]: AuthOrchestrationOperateScope,
   // Pending pairing requests are pairing metadata, like the pairing-links

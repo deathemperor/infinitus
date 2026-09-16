@@ -63,6 +63,14 @@ describe("RPC authorization scopes", () => {
     );
   });
 
+  it("lets a standard client feed a sign-in code over the secret channel", () => {
+    // A phone pairs with the standard scopes; the layer holds the other
+    // secret verbs to access:write per verb.
+    expect(requiredScopeForRpcMethod(WS_METHODS.infinitusSecret)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+  });
+
   it("rejects unknown RPC method names", () => {
     for (const method of ["server.notRegistered", "toString", "constructor"]) {
       expect(() => requiredScopeForRpcMethod(method)).toThrow(
