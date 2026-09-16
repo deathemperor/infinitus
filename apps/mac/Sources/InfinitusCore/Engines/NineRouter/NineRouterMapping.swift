@@ -308,10 +308,10 @@ public enum NineRouterMapping {
         return date > now
     }
 
-    /// disabled → relogin_required (a 401/403 last error) → error
-    /// (cooling down) → ok.
+    /// relogin_required (a 401/403 last error) → error (cooling down) → ok.
+    /// A held connection is policy, not a status — see `ProxyMapping`'s
+    /// note; `Account.disabled` carries it and the row draws its windows.
     static func usageStatus(for c: NineRouterConnection, now: Date) -> String {
-        if c.isActive == false { return "disabled" }
         if let status = c.lastError?.status, status == 401 || status == 403 { return "relogin_required" }
         if inCooldown(c, now: now) { return "error" }
         return "ok"

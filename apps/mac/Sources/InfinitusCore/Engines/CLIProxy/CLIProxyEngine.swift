@@ -195,18 +195,22 @@ public actor CLIProxyEngine: AccountEngine {
         routingStrategy = try? await fetchStrategy()
         sessionAffinity = try? await fetchSessionAffinity()
 
-        // Gauges: only Claude credentials expose oauth/usage; held ones
-        // are skipped (nothing routes to them). One Anthropic call per
-        // ACCOUNT per usageTTL, not per credential per refresh: a fresh
-        // cache entry, or usage another engine fetched for the same
-        // email, is reused, and two credentials with one email share a
-        // call — the 429 budget is per account (user 2026-09-02).
+        // Gauges: only Claude credentials expose oauth/usage. A HELD one
+        // is measured like any other — its windows are exactly what the
+        // user reads to decide when to resume it (user 2026-09-16
+        // "paused accounts must show session, 7d, fable limit"); the
+        // extra cost is one call per held account per usageTTL. One
+        // Anthropic call per ACCOUNT per usageTTL, not per credential per
+        // refresh: a fresh cache entry, or usage another engine fetched
+        // for the same email, is reused, and two credentials with one
+        // email share a call — the 429 budget is per account (user
+        // 2026-09-02).
         func fresh(_ at: Date) -> Bool { now.timeIntervalSince(at) < usageTTL }
         var usage: [String: Usage] = [:]
         var wanted: [ProxyAuthFile] = []
         var leaderByEmail: [String: String] = [:]
         var followers: [String: [String]] = [:]
-        for f in files where ProxyMapping.provider(for: f.provider ?? "") == .claude && f.disabled != true {
+        for f in files where ProxyMapping.provider(for: f.provider ?? "") == .claude {
             let email = f.email?.lowercased()
             if let email, let shared = sharedUsage[email], fresh(shared.at) {
                 usage[f.name] = shared.usage

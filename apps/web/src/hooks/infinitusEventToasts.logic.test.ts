@@ -9,6 +9,7 @@ describe("eventToast", () => {
       title: "All accounts exhausted",
       description: "all exhausted",
       kind: "limit",
+      urgent: true,
     });
     expect(
       eventToast({
@@ -20,6 +21,7 @@ describe("eventToast", () => {
       title: "Switched accounts",
       description: "switched one@example.com → two@example.com",
       kind: "switch",
+      urgent: false,
     });
   });
 
@@ -31,6 +33,8 @@ describe("eventToast", () => {
     expect(
       eventToast({ icon: "hand.raised", text: "headless session 4243 is waiting for an answer" }),
     ).toBeNull();
+    // One account of several hitting its limit is the Accounts page's news,
+    // not a banner's — the app announces the fleet going out, not each death.
     expect(eventToast({ icon: "heart.slash", text: "one@example.com hit a limit" })).toBeNull();
     expect(eventToast({ icon: "", text: "" })).toBeNull();
   });
@@ -50,6 +54,36 @@ describe("eventToast with the row's own kind (#630)", () => {
     expect(
       eventToast({ kind: "other", icon: "hand.raised", text: "no switch — already consuming" }),
     ).toBeNull();
+  });
+});
+
+describe("the app's own announcements", () => {
+  it("carries an alert whole, split the way the app's banner is", () => {
+    expect(
+      eventToast({
+        kind: "alert",
+        icon: "exclamationmark.triangle",
+        text: "all 3 accounts exhausted — nothing left to switch to",
+      }),
+    ).toEqual({
+      type: "error",
+      title: "all 3 accounts exhausted",
+      description: "nothing left to switch to",
+      kind: "alert",
+      urgent: true,
+    });
+  });
+
+  it("makes a notice an info toast that does not interrupt", () => {
+    expect(
+      eventToast({ kind: "notice", icon: "heart.fill", text: "all accounts are back" }),
+    ).toEqual({ type: "info", title: "all accounts are back", kind: "notice", urgent: false });
+  });
+
+  it("keeps an em dash inside the detail — the first one splits", () => {
+    expect(
+      eventToast({ kind: "notice", icon: "heart.fill", text: "a is back — reset early — by 2h" }),
+    ).toMatchObject({ title: "a is back", description: "reset early — by 2h" });
   });
 });
 

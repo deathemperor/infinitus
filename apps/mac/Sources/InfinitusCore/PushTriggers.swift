@@ -3,8 +3,10 @@ import Foundation
 /// Away-push triggers beyond account switches (user requests 2026-08-30):
 /// all accounts exhausted, and a warning when the last alive account is
 /// close to dying. Pure state machine — snapshot ticks in, message strings
-/// out — so the episode/dedup rules run under `swift test`; the app posts
-/// each message to Notification Center and through `cswap notify push`.
+/// out — so the episode/dedup rules run under `swift test`. The app
+/// `announce`s each message: a row in the event log the desktop turns into
+/// its own notification, a phone alert, and Notification Center here only
+/// when no desktop is watching (#1032 finished).
 ///
 /// Episode rules:
 ///  - the all-dead latch seeds silently on the first look instead, which

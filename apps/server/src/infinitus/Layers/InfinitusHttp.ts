@@ -10,9 +10,14 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 
-import { annotateEnvironmentRequest, requireEnvironmentScope } from "../../auth/http.ts";
+import {
+  annotateEnvironmentRequest,
+  failEnvironmentInternal,
+  requireEnvironmentScope,
+} from "../../auth/http.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
@@ -41,6 +46,7 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
     const runningTurns = yield* InfinitusRunningTurns;
     const settings = yield* ServerSettingsService;
     const projection = yield* ProjectionSnapshotQuery;
+    const alerts = yield* InfinitusAlertRelay;
     return handlers
       .handle(
         "threadDefaults",
@@ -95,6 +101,23 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
           return paused.released
             ? paused
             : { released: false, reason: "nothing is held or paused" };
+        }),
+      )
+      .handle(
+        "alert",
+        // #1375: the Mac's account alert, on the desktop credential's operate
+        // scope. Unlinked is the Mac's to handle (503); a relay that refused
+        // is this server's link gone wrong — logged with its cause, 500.
+        Effect.fn("environment.infinitus.alert")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationOperateScope);
+          return yield* alerts
+            .publish(args.payload)
+            .pipe(
+              Effect.catchTag("InfinitusAlertRelayFailed", (error) =>
+                failEnvironmentInternal("internal_error", error),
+              ),
+            );
         }),
       );
   }),

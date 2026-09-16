@@ -112,13 +112,15 @@ public actor NineRouterEngine: AccountEngine {
 
         // One quota call per account per usageTTL, shared across engines
         // holding the same email — the Anthropic 429 budget is per
-        // account (same rules as CLIProxyEngine).
+        // account (same rules as CLIProxyEngine). Held connections are
+        // measured too: their windows are what says when to resume them
+        // (user 2026-09-16).
         func fresh(_ at: Date) -> Bool { now.timeIntervalSince(at) < usageTTL }
         var usage: [String: Usage] = [:]
         var wanted: [NineRouterConnection] = []
         var leaderByEmail: [String: String] = [:]
         var followers: [String: [String]] = [:]
-        for c in known where c.isActive != false {
+        for c in known {
             let email = c.email?.lowercased()
             // Usage another engine fetched is Anthropic's per-account
             // window: only a Claude connection may wear it. A Codex login

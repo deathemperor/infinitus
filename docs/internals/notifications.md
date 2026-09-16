@@ -12,4 +12,12 @@ Next, #270 B's queue rule: a turn that completes while the thread still has `que
 
 ## The mode migration
 
-`NotificationModeMigration`, mounted from `__root.tsx`, maps a client's old settings onto `notificationMode` once (`legacyNotificationMode`: the four banner toggles — absent counts as on, and only on a desktop shell — and the old `infinitus:completion-sound:v1` switch), only while the mode still reads `off`, then marks `infinitus:notification-mode:migrated:v1`; the four toggles stay in `ClientSettingsSchema` as optional inputs and are never written again. Fork-thread events only: the account events (a limit, every account dead, revived) stay the native app's Notification Center items.
+`NotificationModeMigration`, mounted from `__root.tsx`, maps a client's old settings onto `notificationMode` once (`legacyNotificationMode`: the four banner toggles — absent counts as on, and only on a desktop shell — and the old `infinitus:completion-sound:v1` switch), only while the mode still reads `off`, then marks `infinitus:notification-mode:migrated:v1`; the four toggles stay in `ClientSettingsSchema` as optional inputs and are never written again.
+
+## Account events: one notifier per machine
+
+The Mac app used to post the account news (a limit, every account dead, a revival, a crash) to its own Notification Center while a desktop on the same machine showed the same line — two banners for one event, the last piece of #1032 left undone. It now `announce`s instead (`AppModel.announce`): the line goes to the event log as an `alert` (interrupting) or `notice` (informing) row, and `notify` posts to Notification Center only while `AppModel.desktopIsWatching` is false — that is, while no client other than the app's own popup holds a `fleets` lease (`LeaseTable.holds(_:excluding:)`; the popup reports `.fleets` too, hence the exclusion). A Mac with no desktop beside it keeps every banner.
+
+The desktop reads those rows off `snapshot.events` where it already read `limit` and `switch`: `eventToast` maps `alert`/`notice` too and marks the interrupting ones `urgent`, and `useInfinitusEventToasts` gives an urgent one the `input` sound and a real `Notification` when the window is away, both through the client's own `notificationMode`. `alert` and `notice` are new kinds on purpose — `StatsEvents.days()` ignores what it does not know, so a new kind is free while reusing `death`/`limit`/`revival` would corrupt months of tallies.
+
+The phone channel is untouched: the relay alert (`DesktopAPI.alert`, #1375) goes either way, since a desktop on this Mac says nothing to a phone away from it. Which account events are worth saying at all is still the Mac's (`push_all_dead` / `push_last_alive` / `push_revived`); how they arrive is the client's.

@@ -85,12 +85,15 @@ final class NineRouterEngineTests: XCTestCase {
         XCTAssertEqual(fleet.accounts[1].alias, "Claude Code")
         XCTAssertEqual(fleet.accounts[1].plan, "Claude Code")
         XCTAssertEqual(fleet.accounts[1].usage?.fiveHour?.countdown?.isEmpty, false)
+        // A held connection is policy, not a status: it keeps a readable
+        // usageStatus and its windows, which are what says when to resume
+        // it (user 2026-09-16).
         XCTAssertEqual(fleet.accounts[2].disabled, true)
-        XCTAssertEqual(fleet.accounts[2].usageStatus, "disabled")
-        XCTAssertNil(fleet.accounts[2].usage, "held connections aren't polled")
+        XCTAssertEqual(fleet.accounts[2].usageStatus, "ok")
+        XCTAssertEqual(fleet.accounts[2].usage?.fiveHour?.pct, 63.2)
         let seen = ProxyStubProtocol.seen
         XCTAssertEqual(seen.filter { $0.path == "/api/auth/login" }.count, 1, "one login after the first 401")
-        XCTAssertEqual(seen.filter { $0.path.hasPrefix("/api/usage/") }.count, 4, "one usage call per enabled connection")
+        XCTAssertEqual(seen.filter { $0.path.hasPrefix("/api/usage/") }.count, 5, "one usage call per connection, held ones too")
 
         // Kiro (2026-09-03): a credit pool on the row's credit gauge, in
         // credits; the plan name rides the subscription tip.

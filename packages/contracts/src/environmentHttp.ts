@@ -37,6 +37,11 @@ import {
   InfinitusReleaseThreadInput,
   InfinitusReleaseThreadResult,
 } from "./infinitus.ts";
+import {
+  InfinitusAlertInput,
+  InfinitusAlertRelayUnlinked,
+  InfinitusAlertResult,
+} from "./infinitusAlert.ts";
 import { InfinitusPairingHttpApi } from "./infinitusPairing.ts";
 import { InfinitusTeamControlHttpApi } from "./infinitusTeamControl.ts";
 import { ServerRunningTurn } from "./server.ts";
@@ -683,6 +688,15 @@ class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
       payload: InfinitusReleaseThreadInput,
       success: InfinitusReleaseThreadResult,
       error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    // #1375: the Mac's account alert, signed here and pushed by the relay.
+    HttpApiEndpoint.post("alert", "/api/infinitus/alert", {
+      headers: OptionalBearerHeaders,
+      payload: InfinitusAlertInput,
+      success: InfinitusAlertResult,
+      error: [InfinitusAlertRelayUnlinked, ...EnvironmentScopedOperationErrors],
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}
 

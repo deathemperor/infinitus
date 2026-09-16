@@ -21,6 +21,7 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                     .fontWeight(.bold)
                     .foregroundStyle(Color.accentColor)
                     .instantTip(cells.slotTip)
+                AccountPauseButton(model: model, account: account)
                 cells.nameLabel
                     .font(PopupFont.body.weight(.bold))
                     .foregroundStyle(cells.showAsDead ? AnyShapeStyle(.secondary)

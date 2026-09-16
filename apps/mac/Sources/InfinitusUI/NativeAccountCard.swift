@@ -34,6 +34,7 @@ public struct AccountHeaderLine<M: FleetModel, U: UsageSource>: View {
             Text(cells.slotDisplay)
                 .font(.subheadline).fontWeight(.bold)
                 .foregroundStyle(account.active ? Color.accentColor : Color.secondary)
+            AccountPauseButton(model: model, account: account)
             name(cells)
                 .lineLimit(1)
                 .truncationMode(.middle)

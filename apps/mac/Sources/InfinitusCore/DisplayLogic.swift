@@ -202,8 +202,13 @@ public enum SentinelNotes {
 
     /// nil for "ok" (rows render their usage windows); otherwise the note,
     /// falling back to the raw status for values this build doesn't know.
+    ///
+    /// "disabled" is nil too: a hold is policy, carried by `Account.disabled`
+    /// and worn as the row's pause button. An engine that still reports it as
+    /// a status must not cost the row its windows (user 2026-09-16 "paused
+    /// accounts must show session, 7d, fable limit").
     public static func note(for usageStatus: String) -> String? {
-        if usageStatus == "ok" { return nil }
+        if usageStatus == "ok" || usageStatus == "disabled" { return nil }
         return notes[usageStatus] ?? usageStatus.replacingOccurrences(of: "_", with: " ")
     }
 
