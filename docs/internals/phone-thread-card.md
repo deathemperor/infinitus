@@ -2,7 +2,7 @@
 
 ## Server half
 
-Retired with #1375. The server used to fold every live thread's `projectThreadAwareness` into the aggregate card and hand it to the Mac's `push` verb as `thread.activity` (`InfinitusAgentActivity.ts`, #1047 part 3), standing down while a relay link was stored (#1322). With the relay self-hosted the link is always there, so the Infinitus Connect relay's own pusher (`AgentAwarenessRelay` → `infra/relay`) draws the card with the relay's key and the Mac-key fold is gone. The Mac's battle plan read the fold's active count as its busy-session signal (`desktopActiveThreads`); it reads `GET /api/infinitus/running-turns` with its desktop credential instead.
+Retired with #1375. The server used to fold every live thread's `projectThreadAwareness` into the aggregate card and hand it to the Mac's `push` verb as `thread.activity` (`InfinitusAgentActivity.ts`, #1047 part 3), standing down while a relay link was stored (#1322). With the relay self-hosted the link is always there, so the Infinitus Connect relay's own pusher (`AgentAwarenessRelay` → `infra/relay`) draws the card with the relay's key and the Mac-key fold is gone. The Mac's battle plan read the fold's active count as its busy-session signal (`desktopActiveThreads`); slice C of #1375 has it read `GET /api/infinitus/running-turns` with its desktop credential instead (until then the plan draws as busy).
 
 ## Phone half
 
