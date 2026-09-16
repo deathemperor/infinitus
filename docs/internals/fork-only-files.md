@@ -124,8 +124,8 @@ these bullets.
   MCP tool descriptions, the git author name, the prompts and runtime
   instructions the assistant echoes) says `${PRODUCT_NAME}`, never a literal
   "T3 Code"; identifiers stay (`t3` binary and package, `T3CODE_*` env vars,
-  the `t3-code` MCP server id, the `t3code/<version>` UA token, upstream URLs)
-  until #1368's later slices rename them; "T3 Connect" is `CONNECT_NAME`
+  the `t3code/<version>` UA token, upstream URLs) until #1368's later
+  slices rename them (the MCP server id is `infinitus` since slice E); "T3 Connect" is `CONNECT_NAME`
   (`productName.ts`, "Infinitus Connect", #1368 slice A) on every surface —
   web, mobile, server, `packages/*`, `docs/user` — and the web and desktop
   guard tests, `scripts/connect-name.guard.test.ts` (server, phone, packages,
