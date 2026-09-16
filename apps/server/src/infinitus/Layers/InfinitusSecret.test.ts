@@ -36,6 +36,10 @@ const manifest: ReadonlyArray<InfinitusManifestCommand> = [
   // Spelled the way native's manifest spells them (ControlProtocol.swift):
   // positionals in angle brackets, options as their usage line.
   command("signin-code", { args: ["<flowId>"], stdin: "secret" }),
+  command("gcloud-login-code", {
+    args: ["<account|default|application-default>"],
+    stdin: "secret",
+  }),
   command("proxy-key", {
     options: ["--url <base URL, default http://127.0.0.1:8317>"],
     stdin: "secret",
@@ -165,6 +169,25 @@ describe("InfinitusSecretLive", () => {
         const missing = yield* h.forward({ command: "signin-code" }).pipe(Effect.flip);
         expect(missing).toMatchObject({ reason: "bad_args", detail: "flowId" });
         expect(yield* h.requests).toEqual([]);
+      }),
+    ),
+  );
+
+  effectIt.effect("names a positional spelled as a choice by its first alternative", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness();
+        yield* h.forward({ command: "gcloud-login-code", args: { account: "me@example.com" } });
+        expect(yield* h.requests).toMatchObject([
+          { command: "gcloud-login-code", args: ["me@example.com"] },
+        ]);
+        const whole = yield* h
+          .forward({
+            command: "gcloud-login-code",
+            args: { "account|default|application-default": "x" },
+          })
+          .pipe(Effect.flip);
+        expect(whole).toMatchObject({ reason: "bad_args" });
       }),
     ),
   );

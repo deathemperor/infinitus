@@ -2,11 +2,14 @@ import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  isValidSignInCode,
   lapsedSignIns,
   signInCallbackPort,
   signInCallbackSecretArgs,
+  signInCodeSecretArgs,
   signInHeadline,
   signInModel,
+  signInTakesCode,
   startSignInCommand,
 } from "./signIns.logic";
 
@@ -38,13 +41,36 @@ describe("signInModel / lapsedSignIns", () => {
       provider: "aws",
       providerLabel: "AWS",
       phase: "idle",
+      flow: "relay",
       url: null,
+      account: null,
     });
     expect(models[1]).toMatchObject({
       provider: "gcloud",
       phase: "waiting",
+      flow: "deviceCode",
       url: "https://accounts.example/device",
       userCode: "ABCD-EFGH",
+    });
+  });
+
+  it("reads the running login's flow over the item's, and the page's account", () => {
+    // The item says what the Mac would start; a login already running says
+    // what it did start — the phone asked for a code over the relay.
+    const model = signInModel({
+      profile: "papaya",
+      flow: "relay",
+      account: { accountId: "123456789012", userName: "deathemperor" },
+      state: { profile: "papaya", flow: "remote", phase: "waitingForCode", startedAt: 1 },
+    });
+    expect(model).toMatchObject({
+      flow: "remote",
+      phase: "waiting",
+      account: { accountId: "123456789012", userName: "deathemperor" },
+    });
+    expect(signInModel({ profile: "p", flow: "sso", account: { accountId: "1" } })).toMatchObject({
+      flow: "unknown",
+      account: { accountId: "1", userName: null },
     });
   });
 
@@ -122,24 +148,57 @@ describe("signInHeadline / startSignInCommand", () => {
     );
   });
 
-  it("sends the person to the Mac's own browser when this phone cannot catch the redirect", () => {
-    expect(startSignInCommand(item, false)).toEqual({
+  it("asks for the code flow by default: the page ends with a code pasted back here", () => {
+    expect(startSignInCommand(item, "code")).toEqual({
       command: "aws-login",
       args: ["papaya"],
-      options: { local: "true" },
+      options: { remote: "true" },
     });
-    expect(startSignInCommand({ ...item, provider: "gcloud" }, false)).toEqual({
+    expect(startSignInCommand({ ...item, provider: "gcloud" }, "code")).toEqual({
       command: "gcloud-login",
       args: ["papaya"],
-      options: { local: "true" },
+      options: { remote: "true" },
     });
   });
 
-  it("leaves the Mac its own flow — the relay one — when the phone can catch the redirect", () => {
-    expect(startSignInCommand(item, true)).toEqual({
+  it("leaves the Mac its own flow — the relay one — when the phone catches the redirect", () => {
+    expect(startSignInCommand(item, "catch")).toEqual({
       command: "aws-login",
       args: ["papaya"],
       options: {},
+    });
+  });
+
+  it("offers the code flow to every row but an SSO profile's", () => {
+    expect(signInTakesCode(item)).toBe(true);
+    expect(signInTakesCode({ ...item, flow: "local" })).toBe(true);
+    expect(signInTakesCode({ ...item, flow: "remote" })).toBe(true);
+    expect(signInTakesCode({ ...item, flow: "deviceCode" })).toBe(false);
+  });
+});
+
+describe("isValidSignInCode / signInCodeSecretArgs", () => {
+  const item = signInModel({ profile: "papaya", flow: "relay" });
+
+  it("takes what the Mac's own check takes", () => {
+    expect(isValidSignInCode("abc-DEF_123+/=")).toBe(true);
+    expect(isValidSignInCode("a".repeat(8192))).toBe(true);
+    expect(isValidSignInCode("")).toBe(false);
+    expect(isValidSignInCode("a".repeat(8193))).toBe(false);
+    expect(isValidSignInCode("abc def")).toBe(false);
+    expect(isValidSignInCode("héllo")).toBe(false);
+  });
+
+  it("names the CLI's own code verb, with gcloud's positional as the manifest spells it", () => {
+    expect(signInCodeSecretArgs(item)).toEqual({
+      command: "aws-login-code",
+      args: { profile: "papaya" },
+    });
+    expect(
+      signInCodeSecretArgs({ ...item, provider: "gcloud", profile: "me@example.com" }),
+    ).toEqual({
+      command: "gcloud-login-code",
+      args: { account: "me@example.com" },
     });
   });
 });
