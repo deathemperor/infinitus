@@ -61,10 +61,8 @@ const ALIASES: Readonly<Record<string, ReadonlyArray<string>>> = {
   // Where these notifications land: the Mac posts them to the phone (#702).
   // The rows name the account event, never the device.
   "infinitus-push": ["phone"],
-  // The route's "Pair a phone" card draws the code as a QR; its "Phone
-  // alerts" card (#1178) takes the .p8 push key and lists the phones
-  // registered for alerts.
-  "infinitus-devices": ["qr", "p8", "registered", "alerts"],
+  // The route's "Pair a phone" card draws the code as a QR.
+  "infinitus-devices": ["qr"],
   // The route's About section: the menu bar app's version and build, with a
   // link to the releases (the Mac's About pane, folded in 2026-09-14).
   "infinitus-engines": [
