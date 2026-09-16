@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Infinitus signing wizard — Developer ID + notarization for the Mac app,
-# the paid team for the phone app, the APNs key for the phone's alert push.
+# the paid team for the phone app.
 # Walks the human through the portal steps and runs the local checks
 # (docs/RELEASING.md). Re-runnable; values persist outside the repo.
 #

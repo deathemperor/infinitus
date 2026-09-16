@@ -11,7 +11,6 @@ enum Keychain {
     static let tunnelService = "run.infinitus.cloudflare-tunnel"
     /// 9Router's dashboard password (third engine), account = base URL.
     static let nineRouterService = "run.infinitus.9router"
-    /// The APNs auth key (.p8) for Live Activity pushes, account = key id.
     /// The team identity secret and store tokens (#1313), account = secret name.
     static let teamService = "run.infinitus.team"
 

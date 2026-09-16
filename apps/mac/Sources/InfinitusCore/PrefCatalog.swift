@@ -123,7 +123,7 @@ public enum PrefCatalog {
         Entry("fork_tunnel_enabled", .bool, .bool(false), devices),
         Entry("fork_server_port", .int, .number(Double(ForkTunnelStatus.defaultPort)), devices),
         Entry("fork_tunnel_hostname", .string, .string(""), devices),
-        // Devices: this Mac's name, the APNs key ids and iCloud sync (#1178).
+        // Devices: this Mac's name and iCloud sync (#1178).
         Entry("machine_name", .string, .string(""), devices),
         Entry("icloud_sync", .bool, .bool(false), devices),
         // Engines: the `engine` command relaunches the app for these.

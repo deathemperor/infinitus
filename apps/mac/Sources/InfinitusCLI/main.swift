@@ -77,7 +77,7 @@ while i < args.count {
 // A secret or a body comes on stdin only when something is piped in: an
 // interactive terminal (or an e2e run whose stdin is a live pipe) must
 // not sit in readDataToEndOfFile forever for a verb that has nothing to
-// read (`activities-token --forget` hung a run for 90 min, 2026-09-11).
+// read (a body-less verb hung a run for 90 min, 2026-09-11).
 let stdinPiped = isatty(0) == 0
 var secret: String?
 if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "push", "desktop-credential", "team-create", "team-join", "team-inbox"].contains(command) {
@@ -87,10 +87,9 @@ if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login
 
 // A JSON body verb (#572 N1) takes `--body <json>`; without it the JSON
 // comes from stdin, so `infinitusctl crash-report < report.json` works.
-// `activities-token --forget <slot>` carries no body: reading stdin there
-// waits on a pipe the caller never closes (#835).
-if stdinPiped, ["activities-token", "client-activity", "crash-report"].contains(command), options[ControlBody.option] == nil,
-   options["forget"] == nil {
+// With `--body` given nothing is read: waiting on stdin there hangs on a
+// pipe the caller never closes (#835).
+if stdinPiped, ["client-activity", "crash-report"].contains(command), options[ControlBody.option] == nil {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     options[ControlBody.option] = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }

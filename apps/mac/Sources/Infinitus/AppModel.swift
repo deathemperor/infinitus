@@ -619,16 +619,23 @@ final class AppModel: ObservableObject {
         return DesktopAPI(origin: url, token: token)
     }
 
+    /// The desktop calls run here, one at a time: `DesktopAPI` blocks a
+    /// thread per request (its transport is synchronous, like the CLI's),
+    /// so it stays off the cooperative pool, as TeamModel does.
+    private let desktopQueue = DispatchQueue(label: "run.infinitus.desktop-api", qos: .utility)
+
     /// The busy-session count for the battle plan (#1375): the desktop's
-    /// running turns, asked at most once a minute, off the main actor.
+    /// running turns, asked at most once a minute, off the main actor. The
+    /// throttle runs before the keychain read the credential costs.
     func refreshDesktopActiveThreads() {
-        guard !isPlayground, let api = desktopAPI else { return }
+        guard !isPlayground else { return }
         let now = Date()
         if let last = desktopActiveThreadsReadAt, now.timeIntervalSince(last) < 60 { return }
+        guard let api = desktopAPI else { return }
         desktopActiveThreadsReadAt = now
-        Task.detached(priority: .utility) { [weak self] in
+        desktopQueue.async { [weak self] in
             guard let count = try? api.runningTurns().count else { return }
-            await MainActor.run { self?.desktopActiveThreads = count }
+            Task { @MainActor in self?.desktopActiveThreads = count }
         }
     }
 
@@ -676,9 +683,9 @@ final class AppModel: ObservableObject {
     func notify(_ body: String) {
         Notifier.post(title: "Infinitus", body: body)
         guard !isPlayground, let api = desktopAPI else { return }
-        Task.detached(priority: .utility) { [weak self] in
+        desktopQueue.async { [weak self] in
             do { _ = try api.alert(title: "Infinitus", body: body) } catch {
-                await MainActor.run {
+                Task { @MainActor in
                     self?.logEvent("other", icon: "exclamationmark.triangle", "phone alert not sent: \(error)")
                 }
             }

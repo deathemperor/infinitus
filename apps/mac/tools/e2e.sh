@@ -411,7 +411,7 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs set fork_tunnel_enabled false | expect "d['value'] is False" || fail "prefs set fork_tunnel_enabled back"
 "$CTL" prefs set fork_tunnel_hostname code.e2e.invalid | expect "d['value']=='code.e2e.invalid'" || fail "prefs set fork_tunnel_hostname"
 "$CTL" prefs get fork_tunnel_hostname | expect "d['prefs'][0]['value']=='code.e2e.invalid'" || fail "prefs get fork_tunnel_hostname"
-# #1178: the Devices page's prefs and the push setup verbs.
+# #1178: the Devices page's prefs.
 "$CTL" prefs set machine_name "E2E Mac" | expect "d['value']=='E2E Mac' and d['section']=='devices'" || fail "prefs set machine_name"
 "$CTL" prefs set machine_name "" | expect "d['value']==''" || fail "prefs set machine_name back"
 "$CTL" prefs get icloud_sync | expect "[p['value'] for p in d['prefs']]==[False]" || fail "prefs get icloud_sync"
@@ -434,17 +434,17 @@ echo "prefs: ok"
 # #1375: the thread card left the push verb with the Mac's APNs key; a
 # stray shape is still refused, never pushed.
 printf '{"kind":"thread.activity","state":null}' | "$CTL" push 2>&1 | grep -q "thread.phase" || fail "push refuses a stray shape"
-# #835: a verb with no body must not wait on a stdin pipe nobody closes
-# (a fifo opened read-write never reaches EOF).
+# #835: a body verb given --body must not wait on a stdin pipe nobody
+# closes (a fifo opened read-write never reaches EOF).
 mkfifo "$SOCKDIR/hold.fifo"; exec 7<>"$SOCKDIR/hold.fifo"
-"$CTL" prefs get icloud_sync <&7 >"$LOG.hold" 2>&1 &
+"$CTL" client-activity --body '{"clientId":"e2e-hold","visible":true,"focused":false,"recentlyInteracted":false,"scopes":[{"type":"fleets"}],"ttlMs":5000}' <&7 >"$LOG.hold" 2>&1 &
 HOLD_PID=$!
 i=0; while /bin/kill -0 "$HOLD_PID" 2>/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 100 ] || { kill "$HOLD_PID" 2>/dev/null; fail "prefs get waited on stdin (#835)"; }
+    i=$((i + 1)); [ "$i" -lt 100 ] || { kill "$HOLD_PID" 2>/dev/null; fail "client-activity --body waited on stdin (#835)"; }
     sleep 0.1
 done
 exec 7>&-
-expect "d['prefs'][0]['value'] is False" <"$LOG.hold" || fail "prefs get with an open stdin"
+expect "d['clientId']=='e2e-hold'" <"$LOG.hold" || fail "client-activity --body with an open stdin"
 echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVersion":"0","at":"2026-09-10T00:00:00Z","kind":"crash","reason":"e2e","frames":[]}' | "$CTL" crash-report | expect "d['id']=='e2e-crash'" || fail "crash-report (stdin body)"
 "$CTL" crashes | expect "any(c['id']=='e2e-crash' for c in d['crashes'])" || fail "crash-report not listed by crashes"
 # The #677 sign-in verbs are wired (the flow itself needs a human and the Claude CLI): a
