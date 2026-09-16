@@ -13,7 +13,7 @@ import type * as Effect from "effect/Effect";
 export interface InfinitusSecretForwardInput extends InfinitusSecretInput {
   /** The auth session asking; the attempt counter is per session. */
   readonly sessionId: string;
-  /** Its scopes: a sign-in verb takes a standard client, the rest `access:write`. */
+  /** Its scopes: a sign-in or team-join verb takes a standard client, the rest `access:write`. */
   readonly scopes: ReadonlyArray<AuthEnvironmentScope>;
 }
 

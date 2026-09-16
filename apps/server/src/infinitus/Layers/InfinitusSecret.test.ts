@@ -37,6 +37,7 @@ const manifest: ReadonlyArray<InfinitusManifestCommand> = [
   // Spelled the way native's manifest spells them (ControlProtocol.swift):
   // positionals in angle brackets, options as their usage line.
   command("signin-code", { args: ["<flowId>"], stdin: "secret" }),
+  command("team-join", { args: ["<your name>"], stdin: "secret" }),
   command("gcloud-login-code", {
     args: ["<account|default|application-default>"],
     stdin: "secret",
@@ -177,7 +178,7 @@ describe("InfinitusSecretLive", () => {
     ),
   );
 
-  effectIt.effect("holds every secret verb but a sign-in's to access:write", () =>
+  effectIt.effect("holds every secret verb but a sign-in's and team-join to access:write", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const h = yield* makeHarness();
@@ -187,15 +188,24 @@ describe("InfinitusSecretLive", () => {
           args: { flowId: "f" },
           scopes: AuthStandardClientScopes,
         });
+        // … so does a team invite code, the phone's own flow …
+        yield* h.forward({
+          command: "team-join",
+          args: { "your name": "Ada" },
+          scopes: AuthStandardClientScopes,
+        });
         // … the engine key does not, and the socket never hears of it.
         const refused = yield* h
           .forward({ command: "proxy-key", scopes: AuthStandardClientScopes })
           .pipe(Effect.flip);
         expect(refused).toMatchObject({ reason: "scope", command: "proxy-key" });
-        expect((yield* h.requests).map((request) => request.command)).toEqual(["signin-code"]);
+        expect((yield* h.requests).map((request) => request.command)).toEqual([
+          "signin-code",
+          "team-join",
+        ]);
         // The desktop's own session reaches it.
         yield* h.forward({ command: "proxy-key" });
-        expect((yield* h.requests).length).toBe(2);
+        expect((yield* h.requests).length).toBe(3);
       }),
     ),
   );

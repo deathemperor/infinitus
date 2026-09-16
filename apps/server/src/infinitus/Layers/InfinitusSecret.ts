@@ -25,17 +25,20 @@ import { isNotPolled } from "./Infinitus.ts";
     refused call holds nothing. */
 export const SECRET_ATTEMPTS_PER_MINUTE = 5;
 
-/** The secret verbs a standard client may reach: a sign-in's code or
-    callback, which the client itself obtained by signing in, for a login it
-    can start over `infinitus.command` anyway. Every other secret verb (an
-    engine key, the APNs key, a team identity, the desktop credential) is the
-    Mac's configuration and keeps needing `access:write` — the desktop app's
-    own session, never a phone's or a `t3 pair` browser's. */
-const SIGN_IN_SECRET_VERBS: ReadonlySet<string> = new Set([
+/** The secret verbs a standard client may reach: a code the user was handed
+    out of band and the Mac validates — a sign-in's code or callback, for a
+    login the client can start over `infinitus.command` anyway, and a team
+    invite code, since joining a team is the phone's own flow. Every other
+    secret verb (an engine key, the APNs key, the team's identity and inbox,
+    the desktop credential) is the Mac's configuration and keeps needing
+    `access:write` — the desktop app's own session, never a phone's or a
+    `t3 pair` browser's. */
+const STANDARD_CLIENT_SECRET_VERBS: ReadonlySet<string> = new Set([
   "aws-login-code",
   "gcloud-login-code",
   "aws-login-callback",
   "signin-code",
+  "team-join",
 ]);
 const ATTEMPT_WINDOW_MS = 60_000;
 
@@ -161,7 +164,7 @@ export const InfinitusSecretLive = Layer.effect(
         // The verb only: never the args, never the value.
         yield* Effect.annotateCurrentSpan({ "infinitus.command": input.command });
         if (
-          !SIGN_IN_SECRET_VERBS.has(input.command) &&
+          !STANDARD_CLIENT_SECRET_VERBS.has(input.command) &&
           !input.scopes.includes(AuthAccessWriteScope)
         ) {
           return yield* new InfinitusSecretRefused({

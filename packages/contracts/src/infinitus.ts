@@ -897,8 +897,8 @@ export type InfinitusSecretResult = typeof InfinitusSecretResult.Type;
     read, the verb takes no secret, an argument the verb does not name (or one
     it needs is missing), this session asked too often, or the session's scopes
     do not reach the verb (`scope`: a standard client — a phone, a `t3 pair`
-    browser — may feed a sign-in code or callback; every other secret verb
-    needs `access:write`). */
+    browser — may feed a sign-in code or callback, or a team invite code;
+    every other secret verb needs `access:write`). */
 export const InfinitusSecretRefusal = Schema.Literals([
   "no_manifest",
   "no_secret",
