@@ -1,0 +1,221 @@
+diff --git a/.DS_Store b/.DS_Store
+index 95b1b0e..5806c29 100644
+Binary files a/.DS_Store and b/.DS_Store differ
+diff --git a/Sources/Infinitus/AppModel.swift b/Sources/Infinitus/AppModel.swift
+index 33e9ba3..dcb90cf 100644
+--- a/Sources/Infinitus/AppModel.swift
++++ b/Sources/Infinitus/AppModel.swift
+@@ -405,6 +405,14 @@ final class AppModel: ObservableObject {
+         }
+     }
+     private lazy var revivalPanel = RevivalPanelController()
++    /// Haiku names unnamed sessions (SessionNamer). On by default; one
++    /// short Haiku turn per session on the active account.
++    @Published var sessionAutoNames: Bool {
++        didSet {
++            defaults.set(sessionAutoNames, forKey: "session_auto_names")
++            sessionProgress.namer?.enabled = sessionAutoNames
++        }
++    }
+     /// Hold a power assertion while any session is mid-turn (KeepAwake).
+     /// Display-only: rows sorted most-headroom-first with the active
+     /// account and the next candidate pinned on top (todo 2026-09-01).
+@@ -584,6 +592,7 @@ final class AppModel: ObservableObject {
+         titleIconOnly = defaults.object(forKey: "title_icon_only") as? Bool ?? false
+         popoverPinned = defaults.object(forKey: "popover_pinned") as? Bool ?? false
+         revivalPanelShown = defaults.object(forKey: "revival_panel") as? Bool ?? true
++        sessionAutoNames = defaults.object(forKey: "session_auto_names") as? Bool ?? true
+         popupLayout = defaults.string(forKey: "popup_layout") ?? "wide"
+         popupTextSize = defaults.string(forKey: "popup_text_size") ?? "default"
+         glassFocused = defaults.object(forKey: "glass_focused") as? Double ?? 0.7
+@@ -672,6 +681,13 @@ final class AppModel: ObservableObject {
+         // backfill or write real App Support caches under
+         // Infinitus/stats/ (matches the historyRecorder guard above).
+         statsModel.enabled = !isPlayground && !mockMode
++        if !isPlayground, !mockMode {
++            let namer = SessionNamer(appSupport: FileManager.default
++                .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
++                .appendingPathComponent("Infinitus", isDirectory: true))
++            namer.enabled = sessionAutoNames
++            sessionProgress.namer = namer
++        }
+     }
+ 
+     /// App-side cache of our own subprocess output (never an engine
+diff --git a/Sources/Infinitus/DisplayPane.swift b/Sources/Infinitus/DisplayPane.swift
+index 535248f..c2b63c3 100644
+--- a/Sources/Infinitus/DisplayPane.swift
++++ b/Sources/Infinitus/DisplayPane.swift
+@@ -112,6 +112,10 @@ struct DisplayPane: View {
+                 .help("A small always-on-top panel: who recovers first and "
+                       + "when. Click it for the popup; ✕ hides it until the "
+                       + "next revival.")
++            Toggle("Name unnamed sessions with Claude Haiku", isOn: $model.sessionAutoNames)
++                .help("One short Haiku turn per session on the active account, "
++                      + "re-asked when the work moves on; the title shows in "
++                      + "the sessions list and on the phone.")
+             Toggle("Show menu bar icon", isOn: $model.menuBarIconShown)
+                 .help("Hide lasts until quit — it always returns on the next "
+                       + "launch, so the app can never strand itself with no UI.")
+diff --git a/Sources/Infinitus/SessionProgressModel.swift b/Sources/Infinitus/SessionProgressModel.swift
+index dadaba7..71580e4 100644
+--- a/Sources/Infinitus/SessionProgressModel.swift
++++ b/Sources/Infinitus/SessionProgressModel.swift
+@@ -22,6 +22,12 @@ final class SessionProgressModel: SessionProgressSource {
+     private var stamps: [String: Stamp] = [:]
+     private var cached: [String: SessionProgress] = [:]
+     private var busy = false
++    /// Haiku names for unnamed sessions (SessionNamer.swift); nil on
++    /// playground/mock instances.
++    var namer: SessionNamer? {
++        didSet { namer?.onChange = { [weak self] in self?.applyAutoNames() } }
++    }
++    private var sessionIDByPid: [Int: String] = [:]
+ 
+     /// `sessions`: the engine's current per-session detail (busy-first,
+     /// capped) — only those get matched to a transcript and read.
+@@ -42,7 +48,9 @@ final class SessionProgressModel: SessionProgressSource {
+             var newByPid: [Int: SessionProgress] = [:]
+             var newStamps = stampsCopy
+             var newCached = cachedCopy
++            var ids: [Int: String] = [:]
+             for (session, record) in pairs {
++                ids[session.pid] = record.sessionId
+                 let url = Transcript.locate(cwd: record.cwd, sessionId: record.sessionId, claudeDir: claudeDir)
+                 let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                 let size = (attrs?[.size] as? Int) ?? -1
+@@ -58,19 +66,40 @@ final class SessionProgressModel: SessionProgressSource {
+                 newStamps[record.sessionId] = stamp
+                 newCached[record.sessionId] = progress
+             }
+-            await self?.finish(byPid: newByPid, stamps: newStamps, cached: newCached)
++            await self?.finish(byPid: newByPid, stamps: newStamps, cached: newCached, ids: ids)
+         }
+     }
+ 
+     private func finish(byPid: [Int: SessionProgress], stamps: [String: Stamp],
+-                        cached: [String: SessionProgress]) {
++                        cached: [String: SessionProgress], ids: [Int: String]) {
+         busy = false
++        sessionIDByPid = ids
+         self.byPid = byPid
+         self.stamps = stamps
+         self.cached = cached
++        applyAutoNames()
++        if let namer {
++            namer.consider(byPid.compactMap { pid, p in ids[pid].map { ($0, p) } })
++            namer.prune(keeping: Set(ids.values))
++        }
+         let perMinute = TokenRate.perMinute(byPid)
+         tokenRate = TokenRate(perMinute: perMinute,
+                               peakPerMinute: TokenRate.nextPeak(tokenRate?.peakPerMinute ?? 0,
+                                                                 seeing: perMinute))
+     }
++
++    /// Stamp Haiku's titles onto the unnamed rows (SessionNamer's
++    /// cache is keyed by session id; rows are keyed by pid).
++    private func applyAutoNames() {
++        guard let namer else { return }
++        var changed = false
++        var next = byPid
++        for (pid, p) in next where p.name == nil {
++            guard let id = sessionIDByPid[pid], let title = namer.title(for: id), !title.isEmpty,
++                  p.autoName != title else { continue }
++            next[pid]!.autoName = title
++            changed = true
++        }
++        if changed { byPid = next }
++    }
+ }
+diff --git a/Sources/InfinitusCore/SessionProgress.swift b/Sources/InfinitusCore/SessionProgress.swift
+index d680e4b..76a7140 100644
+--- a/Sources/InfinitusCore/SessionProgress.swift
++++ b/Sources/InfinitusCore/SessionProgress.swift
+@@ -45,6 +45,10 @@ public struct SessionProgress: Sendable, Equatable, Codable {
+     /// sessions use their names?") — rows show it instead of the repo.
+     /// New optional field; absent in old cached JSON.
+     public let name: String?
++    /// Haiku's title for a session with no name of its own (user
++    /// 2026-09-04) — the app's SessionNamer fills it; rows show it after
++    /// `name` and before the repo. New optional field.
++    public var autoName: String?
+     /// Git branch and model from the newest transcript entry that carries
+     /// them (user 2026-09-03: "populate other metadata into the session
+     /// list"). New optional fields; absent in old cached JSON.
+diff --git a/Sources/InfinitusCore/StatsScanner.swift b/Sources/InfinitusCore/StatsScanner.swift
+index 8423067..2344966 100644
+--- a/Sources/InfinitusCore/StatsScanner.swift
++++ b/Sources/InfinitusCore/StatsScanner.swift
+@@ -325,6 +325,9 @@ public enum StatsScanner {
+             candidates.append(Candidate(url: url, size: size, mtime: mtime, subagent: subagent, sessionID: sessionID))
+         }
+         for project in (try? fm.contentsOfDirectory(at: projectsDir, includingPropertiesForKeys: nil)) ?? [] {
++            // The app's own Haiku session-namer runs `claude -p` in
++            // Infinitus/namer — its transcripts are not your work.
++            if project.lastPathComponent.hasSuffix("-Infinitus-namer") { continue }
+             for url in (try? fm.contentsOfDirectory(at: project, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isDirectoryKey])) ?? [] {
+                 if url.pathExtension == "jsonl" {
+                     addCandidate(url, subagent: false, sessionID: url.deletingPathExtension().lastPathComponent)
+diff --git a/Sources/InfinitusUI/SessionListCard.swift b/Sources/InfinitusUI/SessionListCard.swift
+index a920ae4..76e8ae7 100644
+--- a/Sources/InfinitusUI/SessionListCard.swift
++++ b/Sources/InfinitusUI/SessionListCard.swift
+@@ -42,7 +42,7 @@ public struct SessionListCard<P: SessionProgressSource>: View {
+                             Circle()
+                                 .fill(color(for: s.status))
+                                 .frame(width: 7, height: 7)
+-                            Text(progress.byPid[s.pid]?.name ?? shortCwd(s.cwd))
++                            Text(progress.byPid[s.pid]?.name ?? progress.byPid[s.pid]?.autoName ?? shortCwd(s.cwd))
+                                 .font(PopupFont.caption)
+                                 .lineLimit(1)
+                                 .truncationMode(.head)
+diff --git a/Tests/InfinitusCoreTests/DisplayLogicTests.swift b/Tests/InfinitusCoreTests/DisplayLogicTests.swift
+index fb5c1fc..eda6b62 100644
+--- a/Tests/InfinitusCoreTests/DisplayLogicTests.swift
++++ b/Tests/InfinitusCoreTests/DisplayLogicTests.swift
+@@ -301,3 +301,31 @@ final class RecoveryCountdownTests: XCTestCase {
+         XCTAssertEqual(RecoveryCountdown.label(until: until, now: now), "00:00:00")
+     }
+ }
++
++final class SessionNamingTests: XCTestCase {
++    func testCleanStripsFlourishes() {
++        XCTAssertEqual(SessionNaming.clean("\"Theming iOS Bottom Bars.\"\n"), "Theming iOS Bottom Bars")
++        XCTAssertEqual(SessionNaming.clean("\n\nTitle: Stats tab backfill"), "Stats tab backfill")
++        XCTAssertNil(SessionNaming.clean("   \n"))
++        XCTAssertNil(SessionNaming.clean(String(repeating: "x", count: 81)))
++    }
++
++    func testFingerprintMovesWithGoalTodosAndPhase() {
++        let a = SessionProgress(goal: "fix the popup", phase: "building")
++        let b = SessionProgress(todos: .init(done: 1, total: 3, activeForm: "Editing"), goal: "fix the popup", phase: "building")
++        let c = SessionProgress(goal: "fix the popup", phase: "verifying")
++        XCTAssertNotEqual(SessionNaming.fingerprint(a), SessionNaming.fingerprint(b))
++        XCTAssertNotEqual(SessionNaming.fingerprint(a), SessionNaming.fingerprint(c))
++        XCTAssertEqual(SessionNaming.fingerprint(a), SessionNaming.fingerprint(SessionProgress(goal: "fix the popup", phase: "building")))
++    }
++
++    func testPromptCarriesTheInfinitusPrefixAndTheGoal() {
++        let p = SessionProgress(nowDoing: "Editing RowTheme.swift", todos: .init(done: 0, total: 2, activeForm: "Theming tabs"),
++                                goal: String(repeating: "g", count: 700), phase: "building")
++        let prompt = SessionNaming.prompt(p)
++        XCTAssertTrue(prompt.hasPrefix("[Infinitus] "))
++        XCTAssertTrue(prompt.contains("Goal: " + String(repeating: "g", count: 600) + "\n"))
++        XCTAssertTrue(prompt.contains("Todos: 0 of 2 done — now: Theming tabs"))
++        XCTAssertTrue(prompt.contains("Phase: building"))
++    }
++}
+diff --git a/ios/InfinitusMobile/SessionsScreen.swift b/ios/InfinitusMobile/SessionsScreen.swift
+index c5a1830..e4e6e03 100644
+--- a/ios/InfinitusMobile/SessionsScreen.swift
++++ b/ios/InfinitusMobile/SessionsScreen.swift
+@@ -203,7 +203,8 @@ struct SessionsScreen: View {
+ 
+     private func title(_ session: SessionDetail) -> String {
+         let repo = repoName(session.cwd)
+-        guard let name = progress.byPid[session.pid]?.name, !name.isEmpty, name != repo else { return repo }
++        let p = progress.byPid[session.pid]
++        guard let name = p?.name ?? p?.autoName, !name.isEmpty, name != repo else { return repo }
+         return "\(name) · \(repo)"
+     }
+ 

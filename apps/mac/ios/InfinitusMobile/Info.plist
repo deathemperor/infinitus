@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>run.infinitus.mobile.refresh</string>
+	</array>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>run.infinitus.mobile.pair</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>infinitus</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_infinitus._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Infinitus scans the pairing QR your Mac shows, and takes photos you attach to a session message.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Infinitus unlocks the Team tab with Face ID.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Infinitus finds the Mac running your fleet on this Wi-Fi and reads its latest snapshot.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Infinitus listens while you dictate a message to a session.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Infinitus attaches photos you pick to a message sent into a session, and offers screenshots you just took for one-tap sending.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Infinitus turns what you say into a message for a session, on this phone where it can.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>DMSans-Regular.ttf</string>
+		<string>DMSans-Medium.ttf</string>
+		<string>DMSans-Bold.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+</dict>
+</plist>
