@@ -254,6 +254,25 @@ public enum AwsLogin {
         return nil
     }
 
+    /// The profile `aws login` can sign in for `profile`. A profile that
+    /// gets its credentials from a `credential_process` (the user's
+    /// broker: `[default]` → `aws-cred-broker.py default-login`) is one
+    /// `aws login` refuses to take over ("you must first manually remove
+    /// the existing credentials", 2026-09-16), so a lapse the server
+    /// pins on it — every expired result with no `--profile` — could
+    /// never sign in. The login belongs to the `login_session` profile
+    /// the process names: the first word of the command line that is
+    /// such a profile in the same config. Anything else is its own
+    /// login profile.
+    public static func loginProfile(profile: String, configText: String) -> String {
+        let values = profileValues(profile: profile, configText: configText)
+        guard values["login_session"] == nil, let process = values["credential_process"] else { return profile }
+        for word in process.split(separator: " ").map(String.init) where word != profile {
+            if profileValues(profile: word, configText: configText)["login_session"] != nil { return word }
+        }
+        return profile
+    }
+
     /// The `key = value` pairs of one profile section (`[profile X]`, or
     /// `[default]` for "default").
     static func profileValues(profile: String, configText: String) -> [String: String] {

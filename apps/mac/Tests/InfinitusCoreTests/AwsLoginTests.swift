@@ -21,6 +21,26 @@ final class AwsLoginTests: XCTestCase {
         XCTAssertEqual(AwsLogin.flow(profile: "missing", configText: config), .relay)
     }
 
+    func testLoginProfileFollowsTheCredentialProcess() {
+        let config = """
+        [default]
+        credential_process = /x/aws-cred-broker.py  default-login
+        [profile papaya]
+        credential_process = /x/aws-cred-broker.py papaya-login --quiet
+        [profile static]
+        credential_process = /x/vault read
+        [profile default-login]
+        login_session = arn:aws:iam::089192911254:user/me
+        [profile papaya-login]
+        login_session = arn:aws:iam::089192911254:user/me
+        """
+        XCTAssertEqual(AwsLogin.loginProfile(profile: "default", configText: config), "default-login")
+        XCTAssertEqual(AwsLogin.loginProfile(profile: "papaya", configText: config), "papaya-login")
+        XCTAssertEqual(AwsLogin.loginProfile(profile: "static", configText: config), "static")
+        XCTAssertEqual(AwsLogin.loginProfile(profile: "papaya-login", configText: config), "papaya-login")
+        XCTAssertEqual(AwsLogin.loginProfile(profile: "missing", configText: config), "missing")
+    }
+
     func testAccountComesFromTheProfileConfig() {
         let config = """
             [default]
