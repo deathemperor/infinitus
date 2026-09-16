@@ -397,6 +397,20 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (`useThreadReadyForReview`, #269 F); settled rows keep their stamp. A
   babysat idle row reads "Babysitting r/10" ahead of that (`babysitLabel`,
   #269 A).
+- `apps/mobile/src/features/threads/threadListV2.ts`,
+  `thread-list-v2-items.tsx`, `threadPresentation.ts` — the `Monitoring`
+  status the phone was dropping: the server ships `backgroundLiveness` on
+  every thread shell and upstream's web sidebar reads it
+  (`resolveSidebarThreadStatus`, `resolveThreadStatusPill`), but both mobile
+  resolvers stopped at the session row, so a thread whose turn settled while
+  watch loops ran read as a plain timestamp. Both now end in the web's two
+  branches (working fleets, then monitoring watch loops) after the failed
+  check, each taking its own web counterpart's treatment: the v2 list label
+  is full-strength and hueless like `Sidebar.tsx`'s, the v1 row's pill keeps
+  Working's hue like `resolveThreadStatusPill`'s, and neither pulses —
+  monitoring is background presence, not progress. A babysat row still
+  labels ahead of it, since `babysitLabel` says the same thing with the
+  round count.
 - `apps/mobile/src/state/entities.ts` — `useThreadShells` drops side
   questions (`sideOf != null`, #269 C) and `useThreadShell` answers null for
   one, so a side question is in no phone list and never opens as a page;

@@ -8,7 +8,8 @@ export type ThreadStatusKind =
   | "working"
   | "connecting"
   | "error"
-  | "plan-ready";
+  | "plan-ready"
+  | "monitoring";
 
 export interface ThreadStatusPresentation extends StatusTone {
   readonly kind: ThreadStatusKind;
@@ -110,6 +111,34 @@ export function resolveThreadStatus(
       textClassName: "text-foreground-secondary",
       iconColor: "#bf5af2",
       iconBackground: "rgba(191,90,242,0.22)",
+      pulse: false,
+    };
+  }
+
+  // The turn can settle while background work runs on. Subagent and workflow
+  // fleets read as plain Working (the session row still says running);
+  // Monitoring is reserved for watch loops with no other live work, so it
+  // borrows Working's hue without the pulse.
+  if (thread.backgroundLiveness === "working") {
+    return {
+      kind: "working",
+      label: "Working",
+      pillClassName: "bg-primary/10",
+      textClassName: "text-adaptive-sky-600-400",
+      iconColor: "#0a84ff",
+      iconBackground: "rgba(10,132,255,0.22)",
+      pulse: true,
+    };
+  }
+
+  if (thread.backgroundLiveness === "monitoring") {
+    return {
+      kind: "monitoring",
+      label: "Monitoring",
+      pillClassName: "bg-primary/10",
+      textClassName: "text-adaptive-sky-600-400",
+      iconColor: "#0a84ff",
+      iconBackground: "rgba(10,132,255,0.22)",
       pulse: false,
     };
   }

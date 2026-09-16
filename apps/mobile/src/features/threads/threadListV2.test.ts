@@ -168,6 +168,43 @@ describe("resolveThreadListV2Status", () => {
       "ready",
     );
   });
+
+  it("reads watch loops left after the turn as monitoring", () => {
+    const thread = makeThread({
+      id: ThreadId.make("t"),
+      title: "t",
+      backgroundLiveness: "monitoring",
+    });
+    expect(resolveThreadListV2Status(thread)).toBe("monitoring");
+  });
+
+  it("reads live subagents left after the turn as working", () => {
+    const thread = makeThread({
+      id: ThreadId.make("t"),
+      title: "t",
+      backgroundLiveness: "working",
+    });
+    expect(resolveThreadListV2Status(thread)).toBe("working");
+  });
+
+  it("keeps a failed session ahead of lingering background work", () => {
+    const thread = makeThread({
+      id: ThreadId.make("t"),
+      title: "t",
+      backgroundLiveness: "monitoring",
+      session: {
+        threadId: ThreadId.make("t"),
+        status: "error",
+        providerName: "Codex",
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        runtimeMode: "full-access",
+        activeTurnId: null,
+        lastError: "boom",
+        updatedAt: NOW,
+      },
+    });
+    expect(resolveThreadListV2Status(thread)).toBe("failed");
+  });
 });
 
 describe("queued messages keep a settled thread active", () => {
