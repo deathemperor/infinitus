@@ -6,7 +6,6 @@ import * as Drizzle from "alchemy/Drizzle";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Neon from "alchemy/Neon";
-import * as Planetscale from "alchemy/Planetscale";
 
 import * as RelayDb from "./src/db.ts";
 import { RelayObservability } from "./src/observability.ts";
@@ -21,9 +20,6 @@ export default Alchemy.Stack(
       Cloudflare.providers(),
       Drizzle.providers(),
       Neon.providers(),
-      // Only for the orphaned PlanetScale rows of the first deploys (#1322);
-      // drop with the PLANETSCALE_* workflow env once a deploy has cleaned them.
-      Planetscale.providers(),
     ),
     state: Cloudflare.state(),
   },

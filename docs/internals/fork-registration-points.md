@@ -311,10 +311,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   runtime role (#1322: PlanetScale's cheapest cluster needs a card on file).
   Same shape, Neon's owner role, Hyperdrive on the project's direct origin.
   The workflow feeds `NEON_API_KEY` (repository secret) and `NEON_ORG_ID`
-  (repository variable). Transitional: `Planetscale.providers()` and the
-  `PLANETSCALE_*` workflow env stay until one deploy has dropped the two
-  PlanetScale rows the first deploys left `creating` in the state store —
-  Alchemy dies on a persisted row whose provider is not registered.
+  (repository variable). The PlanetScale provider and env are gone: the
+  deploy of #1366 dropped the two rows the first deploys had left `creating`
+  in the state store (Alchemy dies on a persisted row whose provider is not
+  registered, which is why they stayed for that one deploy).
 - `infra/relay/scripts/deploy.ts` — the `AlchemyContext` the deploy runs
   under carries `updateStateStore: options.yes` beside `adopt` (#1322).
   Upstream forwards only `adopt`, so on a Cloudflare account with no Alchemy

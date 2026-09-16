@@ -41,9 +41,6 @@ export class RelayTransactions extends Context.Service<
 // PlanetScale database (whose cheapest cluster needs a card on file). The
 // shape is upstream's — `prod` owns the retained project, every other stage
 // branches off it — with Neon's own owner role in place of a runtime role.
-// Fresh logical ids: the two PlanetScale rows the first deploys left in the
-// state store are orphans, which is why `Planetscale.providers()` is still
-// registered in `alchemy.run.ts` until one deploy has dropped them.
 export const NeonDatabase = Effect.gen(function* () {
   const { stage } = yield* Alchemy.Stack;
   const schema = yield* Drizzle.Schema("RelaySchema", {
