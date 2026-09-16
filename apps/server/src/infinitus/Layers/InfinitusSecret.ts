@@ -31,7 +31,7 @@ export const SECRET_ATTEMPTS_PER_MINUTE = 5;
     engine key, the APNs key, a team identity, the desktop credential) is the
     Mac's configuration and keeps needing `access:write` — the desktop app's
     own session, never a phone's or a `t3 pair` browser's. */
-export const SIGN_IN_SECRET_VERBS: ReadonlySet<string> = new Set([
+const SIGN_IN_SECRET_VERBS: ReadonlySet<string> = new Set([
   "aws-login-code",
   "gcloud-login-code",
   "aws-login-callback",
