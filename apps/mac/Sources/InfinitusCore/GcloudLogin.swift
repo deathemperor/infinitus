@@ -32,11 +32,14 @@ public enum GcloudLogin {
     /// The CLI invocation. `.remote` is the paste-back prompt; `.relay`
     /// and `.local` keep the localhost listener (the runner suppresses
     /// the browser for the relay); `.deviceCode` is AWS-only and falls
-    /// back to the paste-back.
+    /// back to the paste-back. A named account gets `--force`: an
+    /// account that still holds credentials makes gcloud ask "Do you
+    /// wish to proceed and overwrite?" on the tty, which nobody answers
+    /// here, and the login sat at "starting" until the timeout.
     public static func arguments(profile: String, flow: AwsLogin.Flow) -> [String] {
         var args = profile == adcProfile
             ? ["auth", "application-default", "login"]
-            : ["auth", "login"] + (profile == "default" ? [] : [profile])
+            : ["auth", "login"] + (profile == "default" ? [] : [profile, "--force"])
         switch flow {
         case .remote, .deviceCode: args.append("--no-launch-browser")
         case .relay, .local: break
