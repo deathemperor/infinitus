@@ -13,12 +13,21 @@ final class SingleFlightTests: XCTestCase {
         var peak = 0
         var finished = 0
         private var waiters: [CheckedContinuation<Void, Never>] = []
+        /// A test waiting for `waiters` to reach a count, and the count it wants.
+        /// One slot: a test only ever waits from one place at a time.
+        private var arrival: (want: Int, signal: CheckedContinuation<Void, Never>)?
 
         func begin() async {
             started += 1
             running += 1
             peak = max(peak, running)
-            await withCheckedContinuation { waiters.append($0) }
+            await withCheckedContinuation { waiter in
+                waiters.append(waiter)
+                if let arrival, waiters.count >= arrival.want {
+                    self.arrival = nil
+                    arrival.signal.resume()
+                }
+            }
             running -= 1
             finished += 1
         }
@@ -31,12 +40,42 @@ final class SingleFlightTests: XCTestCase {
         }
 
         func waitingCount() -> Int { waiters.count }
+
+        /// Returns once `want` passes have parked.
+        func parked(_ want: Int) async {
+            if waiters.count >= want { return }
+            await withCheckedContinuation { arrival = (want, $0) }
+        }
+
+        /// Wakes a `parked` waiter that is never going to get its passes, so
+        /// the test fails on the count instead of hanging.
+        func giveUp() {
+            guard let arrival else { return }
+            self.arrival = nil
+            arrival.signal.resume()
+        }
     }
 
-    private func settle(_ probe: Probe, waiting: Int) async {
-        for _ in 0..<200 where await probe.waitingCount() < waiting {
-            await Task.yield()
+    /// Waits for `waiting` passes to park, on the signal `begin` sends — not
+    /// a yield budget. A bounded spin (`for _ in 0..<200 where …`) gave up
+    /// early on a loaded Linux runner, and the `release` that followed then
+    /// resumed nobody: the test hung on a continuation no one would ever
+    /// resume and `mac-linux` died on its 20-minute timeout (#1387).
+    ///
+    /// The deadline is not how the test passes — a passing run cancels it
+    /// unused. It is there so a genuine stall reports the count it never
+    /// reached rather than hanging the job.
+    private func settle(_ probe: Probe, waiting: Int,
+                        file: StaticString = #filePath, line: UInt = #line) async {
+        let deadline = Task {
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            if Task.isCancelled { return }  // a cancelled deadline must not wake a later `settle`
+            await probe.giveUp()
         }
+        await probe.parked(waiting)
+        deadline.cancel()
+        let parked = await probe.waitingCount()
+        XCTAssertGreaterThanOrEqual(parked, waiting, "passes never parked", file: file, line: line)
     }
 
     func testPassesRunOneAfterAnotherWhenNothingOverlaps() async {
