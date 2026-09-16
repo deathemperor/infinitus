@@ -10,6 +10,23 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.17
+
+### Mac
+- Teammates you grant can send to, view, interrupt or start your threads (#1313).
+- Team publishes threads from Infinitus desktop and answers team-* over the control socket (#1313).
+
+### Desktop
+- A thread stopped on a usage limit now resumes on an account with headroom instead of the one that just ran out.
+- Builds and the phone take the Infinitus relay's public config, ready for a self-hosted T3 Connect (#1322).
+- Settings › Infinitus › Team is back — create or join a team, approve requests, mint invite links, choose what you share (#1313).
+
+### Phone
+- A paired phone dials your Mac's domain before its Wi-Fi address, so it connects off the LAN without the long wait.
+- A thread whose watch loops are still running shows Monitoring, as the desktop does.
+- An expired AWS or gcloud sign-in shows the account to copy and takes the code pasted back, as before.
+- Settings › Team joins a team from an invite link and approves requests on your Mac (#1313).
+
 ## 0.5.0-alpha.16
 
 ### Mac
