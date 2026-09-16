@@ -2,21 +2,24 @@ import XCTest
 @testable import InfinitusCore
 
 final class PrefCatalogTests: XCTestCase {
-    private var suite = ""
+    /// One suite for the whole process, not one per test. `removePersistentDomain`
+    /// empties a domain but leaves its plist in ~/Library/Preferences, and
+    /// cfprefsd owns that file: it flushes its cached copy back seconds after
+    /// the test process exits, so unlinking in `tearDown` cannot win either
+    /// (`defaults delete` is no help — an empty domain reads as "does not
+    /// exist"). A fresh UUID per test therefore left a file per test behind,
+    /// 1133 of them on one dev Mac. Keyed by pid, the leftovers are a bounded
+    /// set instead, and concurrent `swift test` runs in sibling worktrees still
+    /// get a suite each.
+    private static let suite = "run.infinitus.prefs-test-\(ProcessInfo.processInfo.processIdentifier)"
+    private var suite: String { Self.suite }
     private var defaults: UserDefaults!
 
     override func setUp() {
-        suite = "run.infinitus.prefs-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
+        defaults.removePersistentDomain(forName: suite)
     }
 
-    /// `removePersistentDomain` empties the domain but leaves its plist on
-    /// disk, and the suite name is fresh per test — so every `swift test`
-    /// left one more empty file in ~/Library/Preferences (1133 of them on
-    /// one dev Mac). `defaults delete` cannot clear them either: an empty
-    /// domain reads as "does not exist". Unlink the file too. The per-test
-    /// UUID stays — worktrees run `swift test` concurrently, and one shared
-    /// suite name would have them writing over each other.
     override func tearDown() {
         defaults.removePersistentDomain(forName: suite)
         defaults = nil
