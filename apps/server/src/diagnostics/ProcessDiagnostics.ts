@@ -12,6 +12,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import * as ResourceTelemetry from "../resourceTelemetry/ResourceTelemetry.ts";
+import { PRODUCT_NAME } from "@t3tools/shared/productName";
 
 export class ProcessSignalFailed extends Schema.TaggedError<ProcessSignalFailed>()(
   "ProcessSignalFailed",
@@ -94,7 +95,7 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           pid: input.pid,
           signal: input.signal,
           signaled: false,
-          message: Option.some("Refusing to signal the T3 server process."),
+          message: Option.some(`Refusing to signal the ${PRODUCT_NAME} server process.`),
         };
       }
       const current = yield* telemetry.refresh.pipe(Effect.option);
@@ -127,7 +128,9 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           pid: input.pid,
           signal: input.signal,
           signaled: false,
-          message: Option.some(`Process ${input.pid} is not a signalable T3 backend descendant.`),
+          message: Option.some(
+            `Process ${input.pid} is not a signalable ${PRODUCT_NAME} backend descendant.`,
+          ),
         };
       }
       return yield* Effect.try({

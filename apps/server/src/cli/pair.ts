@@ -128,7 +128,7 @@ export class ServePortOccupiedError extends Schema.TaggedError<ServePortOccupied
   { servePort: Schema.Number },
 ) {
   override get message(): string {
-    return `HTTPS port ${String(this.servePort)} on the tailnet already serves something that is not a ${PRODUCT_NAME} server. Pass --tailscale-serve-port to publish this one on another port.`;
+    return `HTTPS port ${String(this.servePort)} on the tailnet already serves something that is not an ${PRODUCT_NAME} server. Pass --tailscale-serve-port to publish this one on another port.`;
   }
 }
 

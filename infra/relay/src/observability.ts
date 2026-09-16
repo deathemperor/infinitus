@@ -12,6 +12,7 @@ import * as Tracer from "effect/Tracer";
 import { OtlpExporter, OtlpSerialization, OtlpTracer } from "effect/unstable/observability";
 
 import { relayResourceNameForStage } from "./deploymentConfig.ts";
+import { PRODUCT_NAME } from "@t3tools/contracts/productName";
 
 const relayRecentSpansQuery = (dataset: string) =>
   [
@@ -29,7 +30,7 @@ export const RelayObservability = Effect.gen(function* () {
   const traces = yield* Axiom.Dataset("RelayTracesDataset", {
     name: relayResourceNameForStage("t3-code-relay-traces", stage),
     kind: "otel:traces:v1",
-    description: "T3 Code relay Worker HTTP request spans.",
+    description: `${PRODUCT_NAME} relay Worker HTTP request spans.`,
     retentionDays: 30,
     useRetentionPeriod: true,
   });
@@ -44,7 +45,7 @@ export const RelayObservability = Effect.gen(function* () {
 
   const mobileIngestToken = yield* Axiom.ApiToken("RelayMobileAxiomIngestToken", {
     name: relayResourceNameForStage("t3-code-mobile-otel-ingest", stage),
-    description: "Owned by Alchemy. Scoped OTLP ingest token for T3 Code mobile spans.",
+    description: `Owned by Alchemy. Scoped OTLP ingest token for ${PRODUCT_NAME} mobile spans.`,
     datasetCapabilities: Output.map(traces.name, (dataset) => ({
       [dataset]: { ingest: ["create" as const] },
     })),

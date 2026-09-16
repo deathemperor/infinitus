@@ -33,7 +33,7 @@
           },
           "command": {
             "type": "string",
-            "description": "Shell command executed in a Infinitus terminal at the project root. The environment carries T3CODE_PROJECT_ROOT, T3CODE_WORKTREE_PATH (worktree threads) and T3CODE_PORT…T3CODE_PORT_END, ten ports derived from the checkout.",
+            "description": "Shell command executed in an Infinitus terminal at the project root. The environment carries T3CODE_PROJECT_ROOT, T3CODE_WORKTREE_PATH (worktree threads) and T3CODE_PORT…T3CODE_PORT_END, ten ports derived from the checkout.",
             "minLength": 1
           },
           "icon": {

@@ -10,6 +10,7 @@ import {
   MAX_ACTIVITY_ROWS,
   sanitizeAgentActivityAggregateState,
 } from "./agentActivityPayloads.ts";
+import { PRODUCT_NAME } from "@t3tools/contracts/productName";
 
 export function statusForPhase(phase: RelayAgentActivityState["phase"]): string {
   switch (phase) {
@@ -48,7 +49,7 @@ function aggregateRowForState(state: RelayAgentActivityState) {
 
 function terminalAggregateState(state: RelayAgentActivityState): RelayAgentActivityAggregateState {
   return sanitizeAgentActivityAggregateState({
-    title: "T3 Code",
+    title: `${PRODUCT_NAME}`,
     subtitle: state.phase === "failed" ? "Agent work failed" : "Agent work completed",
     activeCount: 0,
     updatedAt: state.updatedAt,
@@ -100,7 +101,7 @@ export function makeAggregateState(input: {
       return null;
     }
     return sanitizeAgentActivityAggregateState({
-      title: "T3 Code",
+      title: `${PRODUCT_NAME}`,
       subtitle: newest.phase === "failed" ? "Agent work failed" : "Agent work completed",
       activeCount: 0,
       updatedAt: newest.updatedAt,
@@ -123,7 +124,7 @@ export function makeAggregateState(input: {
     state.updatedAt.localeCompare(latest.updatedAt) > 0 ? state : latest,
   ).updatedAt;
   return sanitizeAgentActivityAggregateState({
-    title: "T3 Code",
+    title: `${PRODUCT_NAME}`,
     subtitle: "Agent work in progress",
     activeCount: activeStates.length,
     updatedAt,

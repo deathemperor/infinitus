@@ -161,8 +161,9 @@ function ActiveSshPasswordPrompt({
         <DialogHeader>
           <DialogTitle>SSH Password Required</DialogTitle>
           <DialogDescription>
-            T3 needs your SSH password to connect to <code>{target}</code>. The password is passed
-            to the local SSH process for this connection attempt and is not saved by {PRODUCT_NAME}.
+            {PRODUCT_NAME} needs your SSH password to connect to <code>{target}</code>. The password
+            is passed to the local SSH process for this connection attempt and is not saved by{" "}
+            {PRODUCT_NAME}.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="space-y-3" scrollFade={false}>

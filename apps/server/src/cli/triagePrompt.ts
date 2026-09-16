@@ -151,7 +151,7 @@ export const buildTriageLaunchPrompt = (promptFilePath: string) =>
   `Read the file "${promptFilePath}" and follow its instructions exactly: it is your ${PRODUCT_NAME} triage playbook, and it starts with asking the user what went wrong.`;
 
 /** The full seed prompt, written to `prompt.md` in the triage scratch dir. */
-export const buildTriageSeedPrompt = (contextFilePath: string) => `A ${PRODUCT_NAME} user is \
+export const buildTriageSeedPrompt = (contextFilePath: string) => `An ${PRODUCT_NAME} user is \
 having a problem with their install and started this session with \`t3 triage\`.
 
 Machine facts (version, OS, paths, server liveness) are in the triage context file:
