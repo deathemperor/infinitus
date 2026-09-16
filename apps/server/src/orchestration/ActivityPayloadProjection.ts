@@ -248,7 +248,7 @@ function projectPreviewToolMetadata(data: Record<string, unknown>, status: unkno
   const name = item ? `mcp__${item.server}__${item.tool}` : (data.toolName ?? data.tool);
   if (
     typeof name !== "string" ||
-    !/^(?:mcp__)?(?:t3-code|t3_code|t3code)_{1,2}preview_(?:open|navigate|status|snapshot|click|type|press|scroll|resize|set_appearance|evaluate|wait_for|recording_start|recording_stop)$/.test(
+    !/^(?:mcp__)?(?:infinitus|t3-code|t3_code|t3code)_{1,2}preview_(?:open|navigate|status|snapshot|click|type|press|scroll|resize|set_appearance|evaluate|wait_for|recording_start|recording_stop)$/.test(
       name,
     )
   )

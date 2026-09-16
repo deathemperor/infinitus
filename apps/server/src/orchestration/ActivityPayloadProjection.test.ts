@@ -277,6 +277,14 @@ describe("projectActivityPayload", () => {
   it.each([
     {
       item: {
+        server: "infinitus",
+        tool: "preview_open",
+        result: { structuredContent: { url: "https://example.com/" } },
+      },
+    },
+    // The id before #1368 E, as a thread's history still spells it.
+    {
+      item: {
         server: "t3-code",
         tool: "preview_open",
         result: { structuredContent: { url: "https://example.com/" } },

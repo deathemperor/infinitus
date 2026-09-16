@@ -207,6 +207,9 @@ describe("summarizeToolGroup", () => {
 
 describe("resolveWorkEntryToolPresentation", () => {
   it.each([
+    "mcp__infinitus__preview_click",
+    "infinitus · preview_click completed",
+    // The id before #1368 E, as a thread's history still spells it.
     "mcp__t3-code__preview_click",
     "mcp__t3_code__preview_click",
     "mcp__t3code__preview_click",
