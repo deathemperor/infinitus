@@ -75,7 +75,7 @@ const readField = (stdout: string, field: string) => {
   return line.slice(field.length + 1).trim();
 };
 
-// Stands in for the release's self-contained `t3` executable: the install
+// Stands in for the release's self-contained `infinitus` executable: the install
 // script only asks it for `--version`.
 const SERVER_ENTRY_SOURCE = '#!/bin/sh\necho "t3code wsl runtime test server 0.0.0"\n';
 
@@ -178,7 +178,7 @@ describe("WSL runtime cache", () => {
     expect(script).toContain('mv -T "$runtime_root" "$runtime_stale"');
     expect(script).toContain('mktemp -d "$runtime_parent/.1.2.3-x64.tmp.XXXXXX"');
     // The release archive wraps everything in one `t3-<version>-linux-x64/`
-    // directory; stripping it puts the executable at `$runtime_root/t3`.
+    // directory; stripping it puts the executable at `$runtime_root/infinitus`.
     expect(script).toContain(
       "tar -xzf '/mnt/c/Program Files/T3 Code/wsl-runtime.tar.gz' -C \"$runtime_tmp\" --strip-components=1",
     );
@@ -262,7 +262,7 @@ describe("WSL runtime cache", () => {
     // The same proof the SSH runner and CLI installers use: executable, and
     // `--version` exits 0. That is what decides arch and loadability, so no
     // separate native probe is needed.
-    expect(script).toContain('  [ -x "$1/t3" ] && "$1/t3" --version >/dev/null 2>&1');
+    expect(script).toContain('  [ -x "$1/infinitus" ] && "$1/infinitus" --version >/dev/null 2>&1');
 
     // Readiness gates the short-circuit, so a cache whose executable broke
     // reinstalls from the archive instead of being reused forever.
@@ -274,7 +274,7 @@ describe("WSL runtime cache", () => {
     expect(readinessDefined).toBeLessThan(readyShortCircuit);
   });
 
-  // A swapped or half-written `t3` can still exist and even still answer
+  // A swapped or half-written `infinitus` can still exist and even still answer
   // `--version`, and launch then runs something this install never verified.
   // The digest the install records is what turns that into a miss.
   it("re-hashes the executable against the digest the install recorded", () => {
@@ -284,7 +284,7 @@ describe("WSL runtime cache", () => {
       "b".repeat(64),
     );
 
-    expect(script).toContain(`  sha256sum "$1/t3" 2>/dev/null | cut -d ' ' -f 1`);
+    expect(script).toContain(`  sha256sum "$1/infinitus" 2>/dev/null | cut -d ' ' -f 1`);
     expect(script).toContain(
       '    [ "$recorded_entry_digest" = "$(runtime_server_entry_digest "$runtime_root")" ]',
     );
@@ -348,7 +348,7 @@ describe("WSL runtime cache", () => {
   it("never deletes a runtime another backend is running from", () => {
     const script = buildWslRuntimePruneScript("1.2.3/x64");
 
-    // The running backend's argv holds `<runtime>/t3`, so
+    // The running backend's argv holds `<runtime>/infinitus`, so
     // the process itself is the lease and exiting releases it. Nothing has to be
     // registered up front, which is what makes this cover backends already
     // running from an older version that knows nothing about pruning.
@@ -411,8 +411,8 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         // holds the executable and its native addons.
         'stage="$work/stage/t3-0.0.0-linux-x64"',
         'mkdir -p "$stage/node_modules/node-pty/build/Release" "$work/home"',
-        `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$stage/t3"`,
-        'chmod +x "$stage/t3"',
+        `printf '%s' ${sh(SERVER_ENTRY_SOURCE)} > "$stage/infinitus"`,
+        'chmod +x "$stage/infinitus"',
         `printf '%s' 'pty-native-payload' > "$stage/node_modules/node-pty/build/Release/pty.node"`,
         `tar -czf "$work/wsl-runtime.tar.gz" -C "$work/stage" t3-0.0.0-linux-x64`,
         `printf 'work:%s\\n' "$work"`,
@@ -712,7 +712,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         `runtime_root=${sh(fixture.runtimeRoot)}`,
         `runtime_parent=${sh(fixture.runtimeParent)}`,
         'rm "$runtime_root/.t3code-wsl-runtime-ready"',
-        'sh -c "sleep 30" "$runtime_root/t3" >/dev/null 2>&1 &',
+        'sh -c "sleep 30" "$runtime_root/infinitus" >/dev/null 2>&1 &',
         "active_pid=$!",
         "sleep 0.1",
         fixture.installScript(),
@@ -750,7 +750,7 @@ describe.skipIf(posixShellRunner === null)("WSL runtime install script (executed
         'touch -d "4 minutes ago" "$runtime_parent/sha256-active"',
         'touch -d "3 minutes ago" "$runtime_parent/sha256-old"',
         'touch -d "2 minutes ago" "$runtime_parent/sha256-locked"',
-        'sh -c "sleep 30" "$runtime_parent/sha256-active/t3" >/dev/null 2>&1 &',
+        'sh -c "sleep 30" "$runtime_parent/sha256-active/infinitus" >/dev/null 2>&1 &',
         "active_pid=$!",
         "(",
         '  exec 9> "$runtime_parent/.sha256-locked.install.lock"',

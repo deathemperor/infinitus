@@ -24,7 +24,7 @@ One command installs the server as a self-contained executable — no Node.js:
 curl -fsSL https://infinitus.run/install.sh | sh
 ```
 
-It takes the newest release's `t3-<version>-linux-<arch>.tar.gz` (releases cut
+It takes the newest release's `infinitus-<version>-linux-<arch>.tar.gz` (releases cut
 after 0.5.0-alpha.11 attach them, with `SHA256SUMS`), verifies it, unpacks it
 under `~/.infinitus/runtime` and links `t3` into `~/.local/bin`. Then run:
 
@@ -32,8 +32,8 @@ under `~/.infinitus/runtime` and links `t3` into `~/.local/bin`. Then run:
 t3
 ```
 
-This starts the server and opens the local web app. Run `t3 --help` for
-command-line options, `t3 update` for a newer release, and see
+This starts the server and opens the local web app. Run `infinitus --help` for
+command-line options, `infinitus update` for a newer release, and see
 [Running in the background](./background-service.md) to keep it running as a
 service. You can also download an archive from a
 [release](https://github.com/deathemperor/infinitus/releases) yourself and run
@@ -67,7 +67,7 @@ update can take longer.
 
 ### Open a project from a terminal
 
-`t3 app` opens a new thread for the current directory in a running desktop
+`infinitus app` opens a new thread for the current directory in a running desktop
 app. It needs a `t3` on the Mac, and no macOS server archive is published yet,
 so this is not available on Infinitus for now.
 

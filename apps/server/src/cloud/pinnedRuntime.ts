@@ -64,7 +64,7 @@ export function pinnedRuntimePaths(
   const versionDir = path.join(pinnedRuntimeVersionsDir(path, baseDir), version);
   return {
     versionDir,
-    entryPath: path.join(versionDir, platform === "win32" ? "t3.exe" : "t3"),
+    entryPath: path.join(versionDir, platform === "win32" ? "infinitus.exe" : "infinitus"),
     sentinelPath: path.join(versionDir, ".install-complete"),
   };
 }
@@ -200,7 +200,7 @@ const installFromArchive = Effect.fn("cloud.pinned_runtime.install_archive")(fun
         (cause) => new PinnedRuntimeInstallError({ step: "writing the t3 release archive", cause }),
       ),
     );
-  const extractStep = "extracting the t3 release archive";
+  const extractStep = "extracting the release archive";
   // The archive wraps everything in one directory named after its stem;
   // strip it so the executable lands at <versionDir>/t3.
   yield* input.runner

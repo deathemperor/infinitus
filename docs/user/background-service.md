@@ -13,7 +13,7 @@ the machine first:
 curl -fsSL https://infinitus.run/install.sh | sh
 ```
 
-It downloads the newest release's `t3-<version>-linux-<arch>.tar.gz`, checks
+It downloads the newest release's `infinitus-<version>-linux-<arch>.tar.gz`, checks
 it against the release's `SHA256SUMS`, unpacks it under `~/.infinitus/runtime`
 and links `t3` into `~/.local/bin`. It needs only `sh`, `tar`, `curl` or
 `wget`, and `sha256sum`; no Node.js. Set `T3CODE_VERSION` to pin a release
@@ -32,12 +32,12 @@ desktop puts the matching server on it by itself.
 
 Run these on the machine that will host the server:
 
-| Task                            | Command                |
-| ------------------------------- | ---------------------- |
-| Install and start               | `t3 service install`   |
-| Inspect status and log location | `t3 service status`    |
-| Update or repair                | `t3 service update`    |
-| Stop and remove from startup    | `t3 service uninstall` |
+| Task                            | Command                       |
+| ------------------------------- | ----------------------------- |
+| Install and start               | `infinitus service install`   |
+| Inspect status and log location | `infinitus service status`    |
+| Update or repair                | `infinitus service update`    |
+| Stop and remove from startup    | `infinitus service uninstall` |
 
 The service reuses the copy the install script put under
 `~/.infinitus/runtime`; a hand-unpacked `./t3` downloads that version's
@@ -45,14 +45,14 @@ archive there first, so the machine needs to reach the releases (or
 `T3CODE_RELEASE_BASE_URL`). Uninstalling the service leaves your projects,
 threads and settings under `~/.infinitus/userdata` intact.
 
-`t3 update` moves a script-installed `t3` to the newest release: it downloads
+`infinitus update` moves a script-installed `infinitus` to the newest release: it downloads
 and verifies it, points `t3` at it, and asks before restarting a background
 service (pass `--yes` from a script; decline and the service keeps running its
-current version until `t3 service restart`; a server you started by hand is
+current version until `infinitus service restart`; a server you started by hand is
 left for you to restart). Pass an exact version to pin one, or `--allow-downgrade` to
 move backwards. Install and update use the version of the `t3` you run; an
 older `t3` refuses to replace a newer service unless you add
-`--allow-downgrade`. `t3 uninstall` reverses the install script — the service,
+`--allow-downgrade`. `infinitus uninstall` reverses the install script — the service,
 the `t3` link, every downloaded version — and keeps `~/.infinitus/userdata`.
 
 Updating restarts the server. Finish active work first, and wait for any remote
@@ -76,7 +76,7 @@ separately. Signing out of Infinitus Connect does not stop or uninstall the serv
 
 ## Troubleshooting
 
-Start with `t3 service status` on the host. It prints the log path and checks
+Start with `infinitus service status` on the host. It prints the log path and checks
 whether the installed service is running, enabled, and allowed to survive
 logout.
 
@@ -103,7 +103,7 @@ and keep that session open.
 | `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                             |
 | `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support. |
 | `service-disabled` or `service-stopped` | Read the log and `systemctl --user status t3code.service`, then use the repair command printed by the server.                  |
-| `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `t3 service restart`.                            |
+| `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `infinitus service restart`.                     |
 
 For failures after signing in to Infinitus Connect, see
 [connection troubleshooting](./remote-access.md#infinitus-connect-troubleshooting).

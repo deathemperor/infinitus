@@ -190,9 +190,9 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
       ? "pending server startup"
       : "not provisioned";
   const nextStep = !status.authenticated
-    ? `Run \`t3 connect link\` to authorize and enable ${CONNECT_NAME}.`
+    ? `Run \`infinitus connect link\` to authorize and enable ${CONNECT_NAME}.`
     : !status.desired
-      ? `Run \`t3 connect link\` to enable ${CONNECT_NAME}.`
+      ? `Run \`infinitus connect link\` to enable ${CONNECT_NAME}.`
       : !status.linked
         ? `Start ${PRODUCT_NAME} to provision the environment link and launch its managed tunnel.`
         : undefined;
@@ -206,7 +206,7 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
     `  Publish agent activity: ${status.publishAgentActivity ? "enabled" : "disabled"}`,
     ...formatRelayClientStatus(status.relayClient),
     "",
-    "This is saved setup, not a live connection check. Check the background service with `t3 service status`.",
+    "This is saved setup, not a live connection check. Check the background service with `infinitus service status`.",
     ...(nextStep ? ["", `Next: ${nextStep}`] : []),
   ].join("\n");
 }
@@ -273,7 +273,7 @@ const withCloudCliSessionToken = <A, E, R>(
     environmentAuth.issueSession({
       scopes: [AuthRelayWriteScope],
       subject: "cloud-cli",
-      label: "t3 connect cli",
+      label: "infinitus connect cli",
     }),
     (issued) => run(issued.token),
     (issued) => environmentAuth.revokeSession(issued.sessionId).pipe(Effect.ignore({ log: true })),
@@ -382,7 +382,7 @@ export const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconne
       yield* Console.warn(
         input.clearAuthorization
           ? "Could not revoke the relay-side environment record before signing out.\nThe stored CLI authorization was still removed locally."
-          : "Could not revoke the relay-side environment record yet.\nRun `t3 connect unlink` again when the relay is reachable.",
+          : "Could not revoke the relay-side environment record yet.\nRun `infinitus connect unlink` again when the relay is reachable.",
       );
     } else if (input.relayResult.value.status === "revoked") {
       yield* Console.log("Revoked the relay-side environment record.");
@@ -411,7 +411,7 @@ const disconnectCloud = Effect.fn("cloud.cli.disconnect")(function* (options: {
 
   if (options.clearAuthorization) {
     yield* Console.log(
-      `Signed out of ${CONNECT_NAME} locally.\nThe background service is managed separately with \`t3 service\`.`,
+      `Signed out of ${CONNECT_NAME} locally.\nThe background service is managed separately with \`infinitus service\`.`,
     );
   }
 });
@@ -630,11 +630,11 @@ const connectPublishCommand = Command.make("publish", {
         // out of band without T3 Connect.
         if (!(yield* tokens.hasCredential)) {
           yield* Console.log(
-            "Run `t3 connect login` first so this environment can be authorized to publish.",
+            "Run `infinitus connect login` first so this environment can be authorized to publish.",
           );
           return;
         }
-        // A link may already be desired (e.g. `t3 connect link` before the
+        // A link may already be desired (e.g. `infinitus connect link` before the
         // server's first start). Never downgrade it: a desired managed link
         // also covers publishing, so only request a publish-only link when no
         // link is pending at all.

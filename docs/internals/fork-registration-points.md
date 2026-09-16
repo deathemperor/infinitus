@@ -558,6 +558,25 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
+- The server binary and its release archive are named `infinitus` (#1368 D):
+  `scripts/build-cli-archive.ts` (stem, executable, and for one window a `t3`
+  symlink beside it), `scripts/smoke-cli-archive.ts`,
+  `scripts/build-desktop-artifact.ts` (`wslRuntimeArchiveStem`, the WSL
+  runtime's entry), `packages/shared/src/cliRelease.ts`
+  (`cliArchiveFileName`), `apps/server/src/cloud/pinnedRuntime.ts`
+  (`entryPath`), `packages/ssh/src/tunnel.ts` (the remote runner script),
+  `apps/desktop/src/wsl/DesktopWslEnvironment.ts` (the probe and install
+  scripts), `apps/server/src/cli/update.ts` (`infinitus.cmd`, and with
+  `service.ts`, `connect.ts`, `pair.ts`, `uninstall.ts`, `cloud/bootService.ts`,
+  `cloud/selfUpdate.ts` the command names in user-facing copy), the
+  installers below, and `infinitus-release.yml`'s `publish` job, which
+  attaches each archive under both names and lists both in `SHA256SUMS`
+  until the window closes. The `t3` package name and `bin` in
+  `apps/server/package.json` stay: they are the npm identity, and the Effect
+  service tags follow them. Re-applied on every sync with the fixtures
+  (`cliRelease.test.ts`, `pinnedRuntime.test.ts`, `selfUpdate.test.ts`,
+  `service.test.ts`, `tunnel.test.ts`, `DesktopWslEnvironment.test.ts`,
+  `build-desktop-artifact.test.ts`).
 - `scripts/install.sh`, `scripts/install.ps1` — `repo` is this repository and
   the home `~/.infinitus`, the same flip as `CLI_RELEASE_REPOSITORY` (#1192);
   the shell script installs on Linux only and says plainly that no macOS or

@@ -100,7 +100,7 @@ export function cliArchivePlatformKey(platform: BuildPlatform, arch: BuildArch):
 }
 
 export function cliArchiveStem(version: string, platform: BuildPlatform, arch: BuildArch): string {
-  return `t3-${version}-${cliArchivePlatformKey(platform, arch)}`;
+  return `infinitus-${version}-${cliArchivePlatformKey(platform, arch)}`;
 }
 
 export function cliArchiveFileName(version: string, platform: BuildPlatform, arch: BuildArch) {
@@ -469,7 +469,7 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   const path = yield* Path.Path;
   const repoRoot = yield* RepoRoot;
   const serverDir = path.join(repoRoot, "apps/server");
-  const executableName = input.platform === "win" ? "t3.exe" : "t3";
+  const executableName = input.platform === "win" ? "infinitus.exe" : "infinitus";
   // tsdown suffixes cross-built executables with their target (t3-darwin-x64);
   // a host build is plain t3. Prefer the exact target when both exist.
   const targetKey = `${input.platform === "mac" ? "darwin" : input.platform}-${input.arch}`;
@@ -538,6 +538,11 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   }
   if (input.platform !== "win") {
     yield* fs.chmod(executablePath, 0o755);
+    // The name before #1368 D, for one window: an install from before the
+    // rename downloads this archive under its old name (`publish` attaches
+    // it under both) and runs `t3` inside it. After the signing pass, which
+    // walks the stage for Mach-O files. Drop with the old archive name.
+    yield* fs.symlink(executableName, path.join(contentDir, "t3"));
   }
 
   yield* fs.makeDirectory(input.outputDir, { recursive: true });
@@ -594,7 +599,9 @@ const command = Command.make(
     ),
   },
   (input) => buildCliArchive(input).pipe(Effect.scoped),
-).pipe(Command.withDescription("Package the t3 single-executable into a per-platform archive."));
+).pipe(
+  Command.withDescription("Package the infinitus single-executable into a per-platform archive."),
+);
 
 if (import.meta.main) {
   Command.run(command, { version: "0.0.0" }).pipe(

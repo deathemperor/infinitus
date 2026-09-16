@@ -460,11 +460,11 @@ export function formatBootServiceProblem(problem: BootServiceProblem): string {
     case "linger-disabled":
       return `Lingering is disabled. ${PRODUCT_NAME} will stop when your last login session ends and will not start at boot. Run \`sudo loginctl enable-linger "$(id -un)"\` on this machine, then retry the service command as your normal user.`;
     case "service-disabled":
-      return "The service is not enabled to start automatically. Run `t3 service install` to repair it.";
+      return "The service is not enabled to start automatically. Run `infinitus service install` to repair it.";
     case "service-stopped":
-      return "The service is not running. Check the service log and `systemctl --user status t3code.service`, then run `t3 service install`.";
+      return "The service is not running. Check the service log and `systemctl --user status t3code.service`, then run `infinitus service install`.";
     case "restart-pending":
-      return "A newer version is installed but the service is still running the previous one. Run `t3 service restart` to switch.";
+      return "A newer version is installed but the service is still running the previous one. Run `infinitus service restart` to switch.";
   }
 }
 
@@ -494,7 +494,7 @@ export class BootServiceDowngradeRefusedError extends Schema.TaggedError<BootSer
   },
 ) {
   override get message(): string {
-    return `Refusing to replace t3@${this.installedVersion} with older t3@${this.targetVersion}. Run the command again with --allow-downgrade to continue.`;
+    return `Refusing to replace infinitus ${this.installedVersion} with older infinitus ${this.targetVersion}. Run the command again with --allow-downgrade to continue.`;
   }
 }
 
@@ -514,7 +514,7 @@ export interface BootServiceStatus {
   /**
    * The T3 home the installed unit serves. The unit name is fixed per user,
    * so a caller working against another base dir must not treat this service
-   * as its own; `t3 update --base-dir` learned that by restarting the live
+   * as its own; `infinitus update --base-dir` learned that by restarting the live
    * server of the machine it ran on.
    */
   readonly installedBaseDir?: string;
@@ -530,8 +530,8 @@ export class BootService extends Context.Service<
       readonly allowDowngrade?: boolean;
       /**
        * Write the unit for this version but leave the service on whatever it
-       * is running now. `t3 update` uses this when the user declines the
-       * restart, so a later `t3 service restart` lands on the new version.
+       * is running now. `infinitus update` uses this when the user declines the
+       * restart, so a later `infinitus service restart` lands on the new version.
        */
       readonly start?: boolean;
     }) => Effect.Effect<BootServicePlan, BootServiceError>;
@@ -781,7 +781,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             Effect.mapError(
               (cause) =>
                 new PinnedRuntimeInstallError({
-                  step: "verifying the pinned t3 runtime",
+                  step: "verifying the pinned infinitus runtime",
                   cause,
                 }),
             ),
@@ -791,7 +791,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
                 ? Effect.void
                 : Effect.fail(
                     new PinnedRuntimeInstallError({
-                      step: "verifying the pinned t3 runtime",
+                      step: "verifying the pinned infinitus runtime",
                       exitCode: Number(result.code),
                       stdoutLength: result.stdout.length,
                       stderrLength: result.stderr.length,
