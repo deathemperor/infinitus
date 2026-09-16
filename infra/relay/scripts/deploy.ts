@@ -410,7 +410,16 @@ const runRelayDeploy = Effect.fn("relay.deploy.run")(
         Layer.mergeAll(
           Layer.effect(
             AlchemyContext,
-            AlchemyContext.pipe(Effect.map((context) => ({ ...context, adopt: options.adopt }))),
+            AlchemyContext.pipe(
+              Effect.map((context) => ({
+                ...context,
+                adopt: options.adopt,
+                // `--yes` also bootstraps a missing Cloudflare state store
+                // (alchemy's own `deploy --yes` does the same); without it a
+                // fresh account's first CI deploy dies before applying.
+                updateStateStore: options.yes,
+              })),
+            ),
           ),
           Layer.succeed(AdoptPolicy, options.adopt),
           Layer.succeed(AuthProviders, {}),

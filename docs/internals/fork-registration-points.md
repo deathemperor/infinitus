@@ -304,6 +304,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` re-letters the stable DMG artwork ("Drag T3 Code
   into Applications") for the `infinitus` channel before rasterizing (#601).
+- `infra/relay/scripts/deploy.ts` — the `AlchemyContext` the deploy runs
+  under carries `updateStateStore: options.yes` beside `adopt` (#1322).
+  Upstream forwards only `adopt`, so on a Cloudflare account with no Alchemy
+  state store yet (ours; upstream's has had one for months) the CI deploy
+  died at `Cloudflare State store not found … or pass --yes` although the
+  workflow passes `--yes`. Alchemy's own `deploy --yes` sets the same field,
+  and with it the first deploy bootstraps the store itself.
 - `scripts/build-cli-archive.ts` — one call before the stage is copied:
   `applyWebBrandAssets(resolveWebAssetBrandForPackageVersion(version),
 "apps/server/dist/client")`, so a runtime unpacked from the archive serves
@@ -530,9 +537,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   workflows, pull requests — write), since the default token cannot push a
   branch that touches `.github/workflows` (#658); without it such a sync
   is done by hand.
-- Upstream workflows that deploy or publish (Release, Deploy T3 Connect
-  relay, Forward to Cursor hygiene, Mobile EAS Preview/Production, Publish
-  AUR, Issue Labels, Desktop macOS Preview, Web Preview, Mobile Showcase
-  Screenshots, Thread Transfer Report, Desktop macOS Preview Publish — new
-  with the 0310cbf9 sync, `pull_request_target` on close/unlabel) are disabled in the repository's
-  Actions settings, not deleted, so merges stay clean.
+- Upstream workflows that deploy or publish (Release, Forward to Cursor
+  hygiene, Mobile EAS Preview/Production, Publish AUR, Issue Labels, Desktop
+  macOS Preview, Web Preview, Mobile Showcase Screenshots, Thread Transfer
+  Report, Desktop macOS Preview Publish — new with the 0310cbf9 sync,
+  `pull_request_target` on close/unlabel) are disabled in the repository's
+  Actions settings, not deleted, so merges stay clean. Upstream's Deploy T3
+  Connect relay (`deploy-relay.yml`) is the exception since #1322
+  (2026-09-16): enabled unchanged, it deploys `infra/relay` as the
+  Infinitus relay (`relay.infinitus.run`, the `production` environment's
+  vars and secrets) on every push to `main`, and
+  `infinitus-release.yml`'s `connect` job reads that environment so builds
+  carry the relay's Clerk config.
