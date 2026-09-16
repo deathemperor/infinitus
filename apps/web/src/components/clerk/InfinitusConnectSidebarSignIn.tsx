@@ -17,10 +17,10 @@ export function InfinitusConnectSidebarSignIn() {
 export function InfinitusConnectSidebarAvatar() {
   if (!hasCloudPublicConfig()) return null;
 
-  return <ConfiguredT3ConnectSidebarAvatar />;
+  return <ConfiguredInfinitusConnectSidebarAvatar />;
 }
 
-function ConfiguredT3ConnectSidebarAvatar() {
+function ConfiguredInfinitusConnectSidebarAvatar() {
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded || !isSignedIn) return null;

@@ -68,9 +68,15 @@ export const RENAMES: ReadonlyArray<Rename> = [
     replacement: "InfinitusWordmark",
   },
   {
-    what: "the Connect surfaces (T3Connect*, useT3ConnectAuthPrompt)",
-    pattern: /\b(use)?T3Connect(?=[A-Z])/g,
+    what: "the Connect surfaces (T3Connect*, useT3ConnectAuthPrompt, Configured…T3Connect*)",
+    // No leading \b: the name sits inside compounds (ConfiguredT3ConnectSidebarAvatar).
+    pattern: /(use)?T3Connect(?=[A-Z])/g,
     replacement: "$1InfinitusConnect",
+  },
+  {
+    what: "Expo autolinking's gradle project names, derived from the package scope (':t3tools-* → ':infinitus-*)",
+    pattern: /':t3tools-/g,
+    replacement: "':infinitus-",
   },
 ];
 
@@ -141,6 +147,7 @@ const TEXT_EXTENSIONS = new Set([
   ".sh",
   ".toml",
   ".txt",
+  ".gradle",
 ]);
 
 export function isCandidate(path: string): boolean {

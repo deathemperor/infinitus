@@ -14,13 +14,15 @@ import {
 
 const REPO = NodeURL.fileURLToPath(new URL("..", import.meta.url));
 
-/** One line per table entry, each carrying its old name once. */
+/** One line per table entry, each carrying its old name at least once. */
 const SAMPLE = [
   'import { PRODUCT_NAME } from "@t3tools/shared/productName";',
   "  --t3-primary: oklch(0.488 0.217 264); color: var(--t3-primary-foreground);",
   '<span className="font-t3-mono text-sm">',
   "import { T3Wordmark } from './T3Wordmark';",
   "import { useT3ConnectAuthPrompt } from './useT3ConnectAuthPrompt'; <T3ConnectSidebarSignIn />",
+  "return <ConfiguredT3ConnectSidebarAvatar />;",
+  "  implementation project(':t3tools-mobile-markdown-text')",
 ].join("\n");
 
 describe("infinitus-rename", () => {
@@ -33,6 +35,8 @@ describe("infinitus-rename", () => {
     expect(out).toContain("InfinitusWordmark");
     expect(out).toContain("useInfinitusConnectAuthPrompt");
     expect(out).toContain("<InfinitusConnectSidebarSignIn />");
+    expect(out).toContain("<ConfiguredInfinitusConnectSidebarAvatar />");
+    expect(out).toContain("project(':infinitus-mobile-markdown-text')");
     expect(remainingRenames(out)).toEqual([]);
   });
 
@@ -42,7 +46,7 @@ describe("infinitus-rename", () => {
   });
 
   it("never lets one entry's output feed another's pattern", () => {
-    // Each replacement, with its capture groups filled by a plausible tail,
+    // Each replacement, with its capture groups filled by a plausible value,
     // must match no pattern in the table — including its own.
     for (const rename of RENAMES) {
       const produced = rename.replacement.replace(/\$1/g, "Wordmark").replace(/\$\d/g, "X");
@@ -90,6 +94,7 @@ describe("infinitus-rename", () => {
     expect(isCandidate("apps/mobile/modules/t3-markdown-text/package.json")).toBe(true);
     expect(isCandidate("apps/web/src/components/InfinitusWordmark.tsx")).toBe(true);
     expect(isCandidate("pnpm-lock.yaml")).toBe(true);
+    expect(isCandidate("apps/mobile/modules/t3-composer-editor/android/build.gradle")).toBe(true);
     expect(isCandidate("assets/icon.png")).toBe(false);
   });
 });
