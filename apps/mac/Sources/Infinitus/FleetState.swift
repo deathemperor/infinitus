@@ -264,8 +264,8 @@ final class FleetState: ObservableObject, Identifiable {
         perform { try await engine.rotate(fleet: provider) }
     }
 
-    /// Hold an account out of rotation / return it (engine-side flag;
-    /// the row renders as "disabled" either way).
+    /// Hold an account out of rotation / return it (engine-side flag; a
+    /// held row wears the pause button and keeps its usage windows).
     func setRotation(_ number: Int, enabled: Bool) {
         let engine = engine, provider = provider
         perform { try await engine.setHold(fleet: provider, number: number, held: !enabled) }
