@@ -186,7 +186,7 @@ export interface CodexSessionRuntimeOptions {
   readonly serviceTier?: CodexServiceTier | undefined;
   readonly resumeCursor?: CodexResumeCursor;
   readonly appServerArgs?: ReadonlyArray<string>;
-  /** Capabilities the session's `t3-code` MCP credential grants; drives the prompt blocks. */
+  /** Capabilities the session's `infinitus` MCP credential grants; drives the prompt blocks. */
   readonly mcpCapabilities?: ReadonlySet<string>;
 }
 
