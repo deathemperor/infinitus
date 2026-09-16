@@ -6964,6 +6964,55 @@ describe("ClaudeAdapterLive", () => {
     );
   });
 
+  // The suffix dropped just above is also what the CLI reads the 1M context
+  // window off, so a proxied instance would resolve 200k and refuse a long
+  // thread locally. The beta buys the same window as a header.
+  const startWithContextWindow = (harness: ReturnType<typeof makeHarness>, contextWindow: string) =>
+    Effect.gen(function* () {
+      const adapter = yield* ClaudeAdapter;
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: ProviderDriverKind.make("claudeAgent"),
+        modelSelection: createModelSelection(
+          ProviderInstanceId.make("claudeAgent"),
+          SYNTHETIC_CLAUDE_CAPABLE_MODEL,
+          [{ id: "contextWindow", value: contextWindow }],
+        ),
+        runtimeMode: "full-access",
+      });
+      return harness.getLastCreateQueryInput()?.options.betas;
+    }).pipe(
+      Effect.provideService(Random.Random, makeDeterministicRandomService()),
+      Effect.provide(harness.layer),
+    );
+
+  it.effect("asks a proxied instance for the long-context beta", () => {
+    const harness = makeHarness({
+      environment: { ...process.env, ANTHROPIC_BASE_URL: "http://127.0.0.1:8317" },
+    });
+    return Effect.gen(function* () {
+      assert.deepEqual(yield* startWithContextWindow(harness, "expanded"), [
+        "context-1m-2025-08-07",
+      ]);
+    });
+  });
+
+  it.effect("leaves a proxied instance's 200k selection at 200k", () => {
+    const harness = makeHarness({
+      environment: { ...process.env, ANTHROPIC_BASE_URL: "http://127.0.0.1:8317" },
+    });
+    return Effect.gen(function* () {
+      assert.equal(yield* startWithContextWindow(harness, "standard"), undefined);
+    });
+  });
+
+  it.effect("leaves a direct instance's betas alone", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      assert.equal(yield* startWithContextWindow(harness, "expanded"), undefined);
+    });
+  });
+
   it.effect("updates model on sendTurn for the adapter's bound custom instance id", () => {
     const customInstanceId = ProviderInstanceId.make("claude_openrouter");
     const harness = makeHarness({ instanceId: customInstanceId });
