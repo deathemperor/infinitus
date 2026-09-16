@@ -400,12 +400,17 @@ public enum ProxyMapping {
         return (fleets, ordinals)
     }
 
-    /// disabled → relogin_required (a specific, actionable diagnosis beats
+    /// relogin_required (a specific, actionable diagnosis beats
     /// the generic error branch — the popup's re-login row keys on this
     /// exact string) → error (unavailable, or a status the proxy itself
     /// flagged as non-"active"/"ok") → ok.
+    ///
+    /// A held credential is NOT a status: hold is policy (`Account.disabled`,
+    /// its own field), usageStatus says how readable the measurement is.
+    /// Saying "disabled" here replaced the whole usage strip with a sentinel
+    /// word, so a paused account showed no 5h, 7d or scoped limit at all
+    /// (user 2026-09-16 "paused accounts must show session, 7d, fable limit").
     static func usageStatus(for file: ProxyAuthFile) -> String {
-        if file.disabled == true { return "disabled" }
         if let message = file.statusMessage?.lowercased(),
            message.contains("refresh") || message.contains("token") {
             return "relogin_required"
