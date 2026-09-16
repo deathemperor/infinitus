@@ -581,12 +581,18 @@ describe("InfinitusAwsLogins", () => {
             startedAt: 1_800_000_000,
             pid: 4243,
           },
-          account: { number: 1, email: "a@x.com" },
+          // `AwsLogin.Account`: the page's account id and IAM user name, off the
+          // profile's config; `userName` is omitted when the config names none.
+          account: { accountId: "123456789012", userName: "deathemperor" },
         },
         { profile: "default", provider: "gcloud", flow: "deviceCode", pid: null, state: null },
       ],
     });
     expect(decoded.logins[0]?.state?.userCode).toBe("ABCD-1234");
+    expect(decoded.logins[0]?.account).toEqual({
+      accountId: "123456789012",
+      userName: "deathemperor",
+    });
     expect(decoded.logins[1]?.provider).toBe("gcloud");
     expect(decoded.logins[1]?.state).toBeNull();
   });
