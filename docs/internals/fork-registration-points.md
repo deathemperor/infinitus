@@ -560,10 +560,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and
   `docs/operations/observability.md`'s two `npx t3` examples follow (#1207).
 - `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
-  section appended at the end (#1178): Settings › Infinitus › Devices, the
-  push key and the registered phones, and the lock-screen thread card with
-  its phone Settings rows (#1265). Upstream's text above it says Infinitus
-  Connect (#1368) and is otherwise untouched.
+  section appended at the end (#1178, rewritten for #1375): a Mac's account
+  alerts ride Infinitus Connect's Device Notifications and open Settings ›
+  Accounts; the Devices page names the Mac and pairs a phone. Upstream's
+  text above it says Infinitus Connect (#1368) and is otherwise untouched.
 - **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the four read sites (`T3ProjectFileLoader.ts`, `useT3ProjectFileScripts.ts`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
