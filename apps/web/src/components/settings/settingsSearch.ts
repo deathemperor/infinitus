@@ -845,12 +845,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-devices",
     infinitusOnly: true,
     // "live activity" went with the Mac's cards and the phone mirror with its
-    // server (#1041); the page is this Mac's name, the tunnel fronting this
-    // server, its push key and iCloud sync, and the pairing cards under it.
-    searchTerms: [
-      "phone tunnel cloudflare pair qr port hostname name apns icloud",
-      "machine push key p8 team sync registered phones alerts",
-    ],
+    // server (#1041), the push key with #1375; the page is this Mac's name,
+    // the tunnel fronting this server, iCloud sync, and the pairing cards.
+    searchTerms: ["phone tunnel cloudflare pair qr port hostname name icloud", "machine sync"],
   },
   {
     id: "infinitus-engines",

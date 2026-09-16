@@ -29,7 +29,7 @@ export const SECRET_ATTEMPTS_PER_MINUTE = 5;
     out of band and the Mac validates — a sign-in's code or callback, for a
     login the client can start over `infinitus.command` anyway, and a team
     invite code, since joining a team is the phone's own flow. Every other
-    secret verb (an engine key, the APNs key, the team's identity and inbox,
+    secret verb (an engine key, the team's identity and inbox,
     the desktop credential) is the Mac's configuration and keeps needing
     `access:write` — the desktop app's own session, never a phone's or a
     `t3 pair` browser's. */

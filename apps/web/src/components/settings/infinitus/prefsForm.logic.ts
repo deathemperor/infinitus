@@ -183,28 +183,15 @@ export const PREF_COPY: Readonly<
     description:
       "A named tunnel's hostname, so the URL survives a restart. Empty takes a fresh quick-tunnel URL each time.",
   },
-  // Devices: this Mac's name, the APNs key ids and iCloud sync (#1178). The
-  // .p8 itself goes over `apns-key`, never a pref, so no row for it here.
+  // Devices: this Mac's name and iCloud sync (#1178).
   machine_name: {
     label: "This Mac's name",
     description: "How the phone and this server name the Mac. Empty follows the computer name.",
   },
-  // "Team ID" / "Key ID" as the Mac's Sync pane words them: the rows sit under
-  // the page's Phone alerts card, whose file input stays off until the key id
-  // is set (the Mac stores the key under it).
-  apns_team_id: {
-    label: "Team ID",
-    description: "The Apple Developer team the push key belongs to, like ABCDE12345.",
-  },
-  apns_key_id: {
-    label: "Key ID",
-    description:
-      "The push key's 10-character id. Set it before uploading the .p8 below; the key is stored under it.",
-  },
   icloud_sync: {
     label: "Sync settings via iCloud Drive",
     description:
-      "Display preferences, custom themes and engine settings travel through one file in your iCloud Drive. Never credentials, never push secrets.",
+      "Display preferences, custom themes and engine settings travel through one file in your iCloud Drive. Never credentials.",
   },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
