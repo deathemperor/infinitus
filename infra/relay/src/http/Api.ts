@@ -1229,11 +1229,23 @@ function clerkVerificationFailureReason(cause: unknown): string {
   return "unknown";
 }
 
-function hasExpectedClerkAudience(audience: unknown, expectedAudience: string): boolean {
+/** Infinitus (#1368 B): `CLERK_JWT_AUDIENCE` may list several audiences,
+    comma-separated, so the relay keeps verifying tokens minted from the old
+    `t3-code-relay` template while phones and desktops move to the
+    `infinitus-relay` one. */
+export function expectedClerkAudiences(configured: string): ReadonlyArray<string> {
+  return configured
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function hasExpectedClerkAudience(audience: unknown, configured: string): boolean {
+  const expected = expectedClerkAudiences(configured);
   return typeof audience === "string"
-    ? audience === expectedAudience
+    ? expected.includes(audience)
     : Array.isArray(audience) &&
-        audience.some((entry) => typeof entry === "string" && entry === expectedAudience);
+        audience.some((entry) => typeof entry === "string" && expected.includes(entry));
 }
 
 function verifyClerkBearerToken(
@@ -1244,7 +1256,7 @@ function verifyClerkBearerToken(
     try: () =>
       verifyToken(token, {
         secretKey: Redacted.value(config.clerkSecretKey),
-        audience: config.clerkJwtAudience,
+        audience: [...expectedClerkAudiences(config.clerkJwtAudience)],
       }),
     catch: (cause) => new ClerkTokenVerificationFailed({ cause }),
   }).pipe(

@@ -95,7 +95,7 @@ export class InfinitusAlertPublisher extends Context.Service<
       readonly request: RelayInfinitusAlertRequest;
     }) => Effect.Effect<RelayPublishResponse, InfinitusAlertPublishError>;
   }
->()("t3code-relay/infinitusAlerts/InfinitusAlertPublisher") {}
+>()("infinitus-relay/infinitusAlerts/InfinitusAlertPublisher") {}
 
 const decodeProof = Schema.decodeUnknownEffect(RelayInfinitusAlertProofPayload);
 

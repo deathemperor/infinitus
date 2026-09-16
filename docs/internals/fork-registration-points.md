@@ -320,6 +320,24 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   deploy of #1366 dropped the two rows the first deploys had left `creating`
   in the state store (Alchemy dies on a persisted row whose provider is not
   registered, which is why they stayed for that one deploy).
+- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`,
+  the root `.env.example` (its Clerk block is the fork's since #1322: no
+  upstream values, filled in once the Infinitus relay is deployed), every
+  `infra/relay/src` service tag, `docs/operations/connect-setup.md` —
+  the package is `infinitus-relay` (#1368 B): its name, the `--filter` in
+  `deploy-relay.yml` and the README, the `infinitus-relay/<dir>/<Name>`
+  service tags, and the Clerk template and audience (`infinitus-relay`) the
+  setup doc, example env and test fixtures name. The Alchemy stack stays
+  `T3CodeRelay`: state rows key on it and a fresh stack looks the retained
+  Neon project up by a generated name, so a rename orphans the database.
+  Axiom dataset and token names stay `t3-code-relay-*`: their tokens are
+  baked into shipped builds (the OTel `service.name` the worker reports is
+  `infinitus-relay-worker`). Upstream's `release.yml` (disabled),
+  `docs/operations/release.md` and `docs/operations/android-notifications.md`
+  still say `t3code-relay`; the codemod sync (#1368 C) renames them.
+  `infra/relay/src/http/Api.ts` — `CLERK_JWT_AUDIENCE` is a comma-separated
+  list (`expectedClerkAudiences`), so the deployed relay verifies tokens
+  minted from the old and the new Clerk template through the cutover.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
   #1375) added to `RelayApi` beside upstream's server group, and its handler
@@ -584,9 +602,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   macOS Preview, Web Preview, Mobile Showcase Screenshots, Thread Transfer
   Report, Desktop macOS Preview Publish — new with the 0310cbf9 sync,
   `pull_request_target` on close/unlabel) are disabled in the repository's
-  Actions settings, not deleted, so merges stay clean. Upstream's Deploy T3
-  Connect relay (`deploy-relay.yml`) is the exception since #1322
-  (2026-09-16): enabled unchanged, it deploys `infra/relay` as the
+  Actions settings, not deleted, so merges stay clean. Upstream's relay deploy
+  workflow (`deploy-relay.yml`, named "Deploy Infinitus Connect relay" and
+  filtering the `infinitus-relay` package since #1368 B) is the exception since #1322
+  (2026-09-16): enabled, it deploys `infra/relay` as the
   Infinitus relay (`relay.infinitus.run`, the `production` environment's
   vars and secrets) on every push to `main`, and
   `infinitus-release.yml`'s `connect` job reads that environment so builds
