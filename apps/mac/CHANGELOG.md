@@ -10,6 +10,15 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.18
+
+### Mac
+- Team no longer involves the biometric lock — minting a code, approving a member and turning the lock off ask nothing extra.
+
+### Phone
+- Pasting a sign-in code back (and the no-code relay) now reaches the Mac; the server had refused every phone.
+- Joining a team with an invite code from the phone works; the server had refused it.
+
 ## 0.5.0-alpha.17
 
 ### Mac
