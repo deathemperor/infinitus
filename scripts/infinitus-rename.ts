@@ -49,9 +49,11 @@ export const RENAMES: ReadonlyArray<Rename> = [
     replacement: "@infinitus/",
   },
   {
-    what: "Effect service tags rooted at t3/ (apps/server, packages)",
-    pattern: /\(\)\("t3\//g,
-    replacement: '()("infinitus/',
+    what: "Effect service and reference tags rooted at t3/ (apps/server, packages)",
+    // The tag is the first argument of `()(` or `<…>(`, on the same line or
+    // the next; a branch name or a path quoted elsewhere never follows `(`.
+    pattern: /(?<=\(\s*)"t3\//g,
+    replacement: '"infinitus/',
   },
   {
     what: "CSS custom properties --t3-* (theme palette, the desktop's preview annotations)",
@@ -93,6 +95,12 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
     "apps/web/src/components/clerk/InfinitusConnectUserProfilePage.tsx",
   ],
   [
+    "apps/web/src/components/clerk/T3ConnectUserProfilePage.test.tsx",
+    "apps/web/src/components/clerk/InfinitusConnectUserProfilePage.test.tsx",
+  ],
+  // The widget's logo asset: the imageset and the plugin that copies it name it.
+  ["apps/mobile/assets/widget/T3Mark.svg", "apps/mobile/assets/widget/InfinitusMark.svg"],
+  [
     "apps/web/src/components/clerk/useT3ConnectAuthPrompt.tsx",
     "apps/web/src/components/clerk/useInfinitusConnectAuthPrompt.tsx",
   ],
@@ -103,13 +111,14 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
 ];
 
 /**
- * Left alone, by path prefix: vendored references, the upstream-variant
- * mobile native module ids (`modules/t3-*`, App Store / Play identity),
- * legacy fixtures, and this script's own tests (they quote the old names).
+ * Left alone, by path prefix: vendored references, and this script's own
+ * tests and page (they quote the old names). The mobile native modules
+ * under `modules/t3-*` keep their directory names (upstream-variant ids)
+ * but their package names and imports are `@t3tools/*` like everything
+ * else's, so they are rewritten.
  */
 export const EXCLUDED_PREFIXES: ReadonlyArray<string> = [
   ".repos/",
-  "apps/mobile/modules/t3-",
   "scripts/infinitus-rename.ts",
   "scripts/infinitus-rename.test.ts",
   "docs/internals/infinitus-rename.md",

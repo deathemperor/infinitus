@@ -18,6 +18,9 @@ const REPO = NodeURL.fileURLToPath(new URL("..", import.meta.url));
 const SAMPLE = [
   'import { PRODUCT_NAME } from "@t3tools/shared/productName";',
   '>()("t3/serverSettings/ServerSettingsService") {}',
+  'export class CaptureStore extends Context.Service<CaptureStore, X>()(\n  "t3/captures/CaptureStore",',
+  'export const Limit = Context.Reference<Limit>("t3/sourceControl/Limit", {',
+  'const branches = ["t3/completed", "t3/feature"];',
   "  --t3-primary: oklch(0.488 0.217 264); color: var(--t3-primary-foreground);",
   '<span className="font-t3-mono text-sm">',
   "import { T3Wordmark } from './T3Wordmark'; <T3Mark />",
@@ -29,6 +32,9 @@ describe("infinitus-rename", () => {
     const out = applyRenames(SAMPLE);
     expect(out).toContain('"@infinitus/shared/productName"');
     expect(out).toContain('()("infinitus/serverSettings/ServerSettingsService")');
+    expect(out).toContain('()(\n  "infinitus/captures/CaptureStore"');
+    expect(out).toContain('Context.Reference<Limit>("infinitus/sourceControl/Limit"');
+    expect(out).toContain('const branches = ["t3/completed", "t3/feature"];');
     expect(out).toContain("--infinitus-primary:");
     expect(out).toContain("var(--infinitus-primary-foreground)");
     expect(out).toContain("font-infinitus-mono");
@@ -86,9 +92,9 @@ describe("infinitus-rename", () => {
     }
   });
 
-  it("skips vendored references and the upstream-variant native modules", () => {
+  it("skips vendored references, and rewrites the native modules' package names", () => {
     expect(isCandidate(".repos/effect-smol/README.md")).toBe(false);
-    expect(isCandidate("apps/mobile/modules/t3-terminal/ios/T3TerminalModule.swift")).toBe(false);
+    expect(isCandidate("apps/mobile/modules/t3-markdown-text/package.json")).toBe(true);
     expect(isCandidate("apps/web/src/components/T3Wordmark.tsx")).toBe(true);
     expect(isCandidate("pnpm-lock.yaml")).toBe(true);
     expect(isCandidate("assets/icon.png")).toBe(false);
