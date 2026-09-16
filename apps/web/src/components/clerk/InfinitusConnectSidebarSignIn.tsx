@@ -11,7 +11,7 @@ import { CONNECT_NAME } from "@infinitus/shared/productName";
 export function InfinitusConnectSidebarSignIn() {
   if (!hasCloudPublicConfig()) return null;
 
-  return <ConfiguredT3ConnectSidebarSignIn />;
+  return <ConfiguredInfinitusConnectSidebarSignIn />;
 }
 
 export function InfinitusConnectSidebarAvatar() {
@@ -52,7 +52,7 @@ function ConfiguredT3ConnectSidebarAvatar() {
   );
 }
 
-function ConfiguredT3ConnectSidebarSignIn() {
+function ConfiguredInfinitusConnectSidebarSignIn() {
   const { isLoaded, isSignedIn } = useAuth();
   const { authPrompt, openAuthPrompt } = useInfinitusConnectAuthPrompt();
 
