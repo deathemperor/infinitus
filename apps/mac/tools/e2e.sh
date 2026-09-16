@@ -585,18 +585,15 @@ echo "aws: rebind refused"
 git init -q --bare "$SOCKDIR/team.git"
 git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
 "$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
-    | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder'] and d['lockEnabled'] is False" || fail "team-create"
-# Spec §2.2: minting a code and approving need the lock on; the e2e never
-# turns it on, so the CLI mints in-process against the app's own team dir.
-"$CTL" team-code --days 1 2>&1 | grep -q "biometric lock" || fail "team-code must want the lock on"
-CODE="$(INFINITUS_TEAM_DIR="$SOCKDIR/team-app" "$CTL" team code --days 1 | json "d['code']")"
+    | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder'] and 'lockEnabled' not in d" || fail "team-create"
+# The lock never touches Team (ruling 2026-09-16): the app mints and approves outright.
+CODE="$("$CTL" team-code --days 1 | json "d['code']")"
 case "$CODE" in infinitus://join/*) ;; *) fail "team-code shape" ;; esac
 CLI_TEAM="$SOCKDIR/team-cli"
 printf '%s' "$CODE" | INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team request - --name Bo >/dev/null || fail "cli team request"
 KID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team status | json "d['kid']")"
 "$CTL" team-fetch | expect "len(d['requests'])==1 and d['requests'][0]['name']=='Bo'" || fail "the request did not reach the leader"
-"$CTL" team-approve "$KID" 2>&1 | grep -q "biometric lock" || fail "team-approve must want the lock on"
-INFINITUS_TEAM_DIR="$SOCKDIR/team-app" "$CTL" team approve "$KID" >/dev/null || fail "cli team approve"
+"$CTL" team-approve "$KID" | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members'])" || fail "team-approve"
 "$CTL" team-fetch | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members']) and not d['requests']" || fail "the approval did not reach the app"
 INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team fetch >/dev/null || fail "cli team fetch"
 # #354: on a Mac with the app up and no INFINITUS_TEAM_DIR, `team status` is
@@ -620,7 +617,6 @@ INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts off \
 echo "team: ok (leader Ann, member Bo $KID)"
 # #747: the secret-carrying team verbs refuse an empty stdin by name.
 "$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
-"$CTL" lock off 2>&1 | grep -q -- "--yes" || fail "lock off in a team must want --yes"
 "$CTL" team-leave 2>&1 | grep -q -- "--yes" || fail "team-leave must want --yes"
 
 # #822: the desktop verbs against a demo desktop (tools/demo-desktop): the

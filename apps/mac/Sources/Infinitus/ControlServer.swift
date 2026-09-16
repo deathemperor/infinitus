@@ -222,12 +222,6 @@ final class ControlServer {
         return one.keys.kid
     }
 
-    /// Minting a code and approving a member need the biometric lock on
-    /// (spec §2.2): a stolen unlocked Mac must not be able to let anyone in.
-    private func requireLock() throws {
-        guard model.lock.enabled else { throw Fail("turn the biometric lock on first (Settings › Infinitus › Lock)") }
-    }
-
     private func dispatch(_ r: ControlRequest) async throws -> ControlReply {
         switch r.command {
         case "manifest":
@@ -662,12 +656,6 @@ final class ControlServer {
                     guard on else { throw Fail(model.lock.lastError ?? "the unlock prompt was cancelled") }
                 }
             case "off":
-                // The pane warns before turning it off inside a team; the
-                // verb wants the same deliberate step.
-                let teams = model.lock.teamNames()
-                if r.options["yes"] == nil, !teams.isEmpty {
-                    throw Fail("this Mac is in \(teams.joined(separator: ", ")): pass --yes to turn the lock off")
-                }
                 model.lock.turnOff()
             case "now":
                 model.lock.lockNow()
@@ -980,7 +968,6 @@ final class ControlServer {
             return try teamReply()
 
         case "team-code":
-            try requireLock()
             let days = min(max(r.options["days"].flatMap(Int.init) ?? 7, 1), 3650)
             let minted = r.options["invite"] != nil ? await model.team.mintInvite(days: days) : await model.team.mintCode(days: days)
             guard let minted else { throw Fail(model.team.lastError ?? "no code") }
@@ -1002,7 +989,7 @@ final class ControlServer {
             guard let kid = r.args.first, !kid.isEmpty else { throw Fail("usage: \(r.command) <kid>") }
             let failure: String?
             switch r.command {
-            case "team-approve": try requireLock(); failure = await model.team.approve(kid: kid)
+            case "team-approve": failure = await model.team.approve(kid: kid)
             case "team-decline": failure = await model.team.decline(kid: kid)
             case "team-remove": failure = await model.team.remove(kid: kid)
             default: failure = await model.team.promote(kid: kid)

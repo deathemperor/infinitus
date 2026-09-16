@@ -20,7 +20,7 @@
 - Secrets travel on the request line's `secret` field (stdin for the CLI), never argv; never logged.
 - Bundle id `run.infinitus` never changes. Dev instances need `INFINITUS_CONTROL_SOCKET=/tmp/<short>.sock` and `INFINITUS_APP_SUPPORT`. Never `pkill -f`; kill only PIDs captured at spawn.
 - Swift builds: one `--product` per `swift build`; the Mac app is `Infinitus`, the CLI `infinitusctl`.
-- Spec §5.4: `team-code` and `team-approve` refuse while the lock is off; `lock off` in a team needs `--yes`; create/join are not gated.
+- Spec §5.4 (as amended 2026-09-16): the lock never touches Team; no verb checks it.
 
 ---
 

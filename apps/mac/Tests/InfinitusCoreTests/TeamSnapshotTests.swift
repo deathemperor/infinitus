@@ -38,10 +38,10 @@ final class TeamSnapshotTests: XCTestCase {
         var shares = TeamShares(); shares.byKind = ["transcripts": .off, "stats": .team, "now": .members([a.kid])]
         let snap = TeamSnapshot.make(status: status, roster: roster, reader: reader, requests: [request],
                                      today: "2026-09-05", lastFetch: 200, lastPublish: nil, lastError: nil,
-                                     shares: shares, exclusions: TeamExclusions(projects: ["/r/secret"]), lockEnabled: true)
+                                     shares: shares, exclusions: TeamExclusions(projects: ["/r/secret"]))
         XCTAssertEqual(snap.remote, "https://h/x")
         XCTAssertEqual(snap.shares, ["transcripts": "off", "stats": "team", "now": a.kid])
-        XCTAssertEqual(snap.exclusions, ["/r/secret"]); XCTAssertTrue(snap.lockEnabled)
+        XCTAssertEqual(snap.exclusions, ["/r/secret"])
         XCTAssertEqual(snap.policy?.requests, roster.policy.requests)
         XCTAssertEqual(snap.members.map(\.name), ["Ann", "Bo", "Zed"])
         XCTAssertEqual(snap.members[0].role, "leader"); XCTAssertTrue(snap.members[0].founder); XCTAssertTrue(snap.members[0].isMe)
@@ -65,6 +65,6 @@ final class TeamSnapshotTests: XCTestCase {
         let status = TeamStatus(id: "t", name: "P", remote: "file:///r", kid: "me", role: "pending", rev: nil, leaders: 0, members: 0, requests: 0)
         let snap = TeamSnapshot.make(status: status, roster: nil, reader: nil, requests: [], today: "2026-09-05", lastFetch: nil, lastPublish: nil, lastError: "x")
         XCTAssertEqual(snap.members, []); XCTAssertEqual(snap.role, "pending"); XCTAssertEqual(snap.lastError, "x")
-        XCTAssertNil(snap.policy); XCTAssertFalse(snap.lockEnabled)
+        XCTAssertNil(snap.policy)
     }
 }

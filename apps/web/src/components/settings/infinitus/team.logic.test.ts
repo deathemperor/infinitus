@@ -73,7 +73,6 @@ describe("team.logic (#1313)", () => {
       ],
       shares: { transcripts: "off" },
       exclusions: ["secret-repo"],
-      lockEnabled: false,
       lastFetch: 1_699_999_900,
       lastPublish: null,
       lastError: null,

@@ -93,9 +93,6 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
     public var shares: [String: String] = [:]
     /// Projects kept private here, as saved (`TeamExclusions`).
     public var exclusions: [String] = []
-    /// Whether the biometric lock is on: `team-code` and `team-approve`
-    /// want it (spec §5).
-    public var lockEnabled = false
     /// This Mac's grants (spec §8); nil on a build without them.
     public var grants: [TeamGrants.Grant]?
     /// Drivers' commands waiting for this Mac's tap; nil when none.
@@ -117,7 +114,7 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
     public static func make(status: TeamStatus, roster: TeamRoster?, reader: TeamReader?, requests: [Signed<TeamRequest>],
                             today: String, lastFetch: Int?, lastPublish: Int?, lastError: String?,
                             shares: TeamShares = TeamShares(), exclusions: TeamExclusions = TeamExclusions(),
-                            lockEnabled: Bool = false, grants: TeamGrants? = nil, pending: [Pending] = []) -> TeamSnapshot {
+                            grants: TeamGrants? = nil, pending: [Pending] = []) -> TeamSnapshot {
         func row(_ m: TeamRoster.Member, role: String) -> Member {
             var out = Member(kid: m.keys.kid, name: m.name, role: role, isMe: m.keys.kid == status.kid, founder: m.founder, since: m.since)
             if let r = reader?.members[m.keys.kid] {
@@ -150,7 +147,7 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
                                role: status.role, rev: status.rev, members: members, requests: requestRows,
                                lastFetch: lastFetch, lastPublish: lastPublish, lastError: lastError,
                                policy: roster?.policy, shares: shares.byKind.mapValues(\.label),
-                               exclusions: exclusions.projects, lockEnabled: lockEnabled)
+                               exclusions: exclusions.projects)
         out.grants = grants?.grants
         out.pending = pending.isEmpty ? nil : pending
         return out

@@ -2,7 +2,7 @@
  * Settings › Infinitus › Team (#1313): the team this Mac is in, read over the
  * control socket's `team-status`, with Fetch now / Publish now; for a
  * leader the pending requests' Approve / Decline, Remove / Promote on the
- * roster, the invite code (which needs the Mac's biometric lock on) and who
+ * roster, the invite code and who
  * may request to join. Every member picks the audience per kind and keeps
  * projects private. With no team the page offers Join — this Mac's roster
  * name as the argument, the team code or invite link on `infinitus.secret` —
@@ -76,7 +76,6 @@ import {
 } from "./team.logic";
 
 const UNSUPPORTED = "This Infinitus build has no team commands (needs ≥ 0.5.0-alpha.17).";
-const LOCK_OFF = "Turn the lock on in Settings › Infinitus › Lock";
 
 export function InfinitusTeamPanel() {
   const { environmentId, capability, snapshot } = useInfinitusEnvironment();
@@ -313,7 +312,6 @@ export function InfinitusTeamPanel() {
 
   const isLeader = team?.role === "leader";
   const inTeam = team !== null && team !== undefined;
-  const lockOn = team?.lockEnabled === true;
 
   return (
     <SettingsPageContainer>
@@ -434,8 +432,7 @@ export function InfinitusTeamPanel() {
                     </Button>
                     <Button
                       size="sm"
-                      disabled={busy !== null || !lockOn}
-                      title={lockOn ? undefined : LOCK_OFF}
+                      disabled={busy !== null}
                       aria-label={`Approve ${request.name}`}
                       onClick={() => void run({ type: "approve", kid: request.kid })}
                     >
@@ -452,26 +449,20 @@ export function InfinitusTeamPanel() {
         <SettingsSection id="infinitus-team-invite" title="Invite">
           <SettingsRow
             title="Team code"
-            description={
-              lockOn
-                ? "A code is good for 7 days; an invite link is a code with a one-time nonce this Mac approves on its own. Both are secrets: shown once, never logged."
-                : "Minting needs the Mac's biometric lock on, so a stolen unlocked Mac cannot let anyone in."
-            }
+            description="A code is good for 7 days; an invite link is a code with a one-time nonce this Mac approves on its own. Both are secrets: shown once, never logged."
             control={
               <>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={busy !== null || !lockOn}
-                  title={lockOn ? undefined : LOCK_OFF}
+                  disabled={busy !== null}
                   onClick={() => void run({ type: "code", days: 7, invite: false })}
                 >
                   {busy === "code" ? "Minting…" : "Mint a code"}
                 </Button>
                 <Button
                   size="sm"
-                  disabled={busy !== null || !lockOn}
-                  title={lockOn ? undefined : LOCK_OFF}
+                  disabled={busy !== null}
                   onClick={() => void run({ type: "code", days: 7, invite: true })}
                 >
                   Mint an invite link

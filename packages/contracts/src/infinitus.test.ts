@@ -676,7 +676,6 @@ describe("InfinitusTeamSnapshot", () => {
     const team = decodeTeam(TEAM_STATUS);
     expect(team?.members.map((m) => m.name)).toEqual(["Ann", "Bo"]);
     expect(team?.shares?.transcripts).toBe("leaders");
-    expect(team?.lockEnabled).toBe(true);
   });
 
   it("decodes the grants, the waits and a member's controls (#1313, delegated control)", () => {
@@ -780,7 +779,6 @@ const TEAM_STATUS = {
     fleet: "off",
   },
   exclusions: ["secret-repo"],
-  lockEnabled: true,
   lastFetch: 1_757_960_100,
   lastPublish: 1_757_950_000,
   lastError: null,

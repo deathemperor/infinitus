@@ -34,7 +34,7 @@ paths bound to kinds (§4.3), redaction and chunking (§7.3), aggregates
 | 1 | Terminal sessions are gone; the unit is a thread | The `sessions` kind becomes `threads`; `now` is rebuilt from the desktop server's thread shells and the activity card the server already pushes; transcripts are thread transcripts read from the desktop server (§4) | `TeamDocs`, `TeamKinds`, `TeamPublisher`, `DesktopAPI` (apps/mac) |
 | 2 | The Mac's mirror HTTP server is gone; the phone reaches the Mac only through the desktop server | The phone's Team screen sends the same `infinitus.command` / `infinitus.secret` the web sends; no phone-specific transport (§6.3) | `apps/mobile/src/features/team/` |
 | 3 | One API over the control socket, contracts hand-written | Every Team action is a `team-*` verb in `ControlProtocol.swift`; reply shapes in `packages/contracts/src/infinitus.ts` (§5) | `ControlProtocol.swift`, `ControlServer.swift`, `infinitus.ts` |
-| 4 | Biometric lock exists (#788) | Kept as the old spec §2.2 had it: minting an invite or a team code and approving a request need the lock on; `lock off` in a team needs `--yes` (§5.4) | `LockModel.swift`, `ControlServer.swift`, `InfinitusLockPanel` copy |
+| 4 | Biometric lock exists (#788) | The lock never touches Team (user ruling 2026-09-16, reversing the old §2.2): no Team verb checks it and `lock off` asks nothing extra in a team (§5.4) | `ControlServer.swift` |
 | 5 | `infinitus://` is claimed by both apps | The desktop takes `infinitus://join/<payload>` back (#1044 removed it); the invite link users see is the universal link `https://infinitus.run/join#<payload>`, the `/pair` shape from #724 (§7) | `InfinitusDeepLinks.ts`, `packages/contracts/src/ipc.ts`, `apps/mac/site`, `App.tsx` |
 | 6 | No Windows build | The CLI's in-process `team` subcommands build for macOS and Linux only; no Windows job, no systemd units (§9) | `Package.swift`, `TeamCommand.swift` |
 | 7 | Surfaces are web, phone, Mac menu bar | Web: Settings › Infinitus › Team. Phone: Settings › Team. Mac: no pane; a headless `TeamModel` behind the verbs (§6) | `apps/web`, `apps/mobile`, `apps/mac/Sources/Infinitus/TeamModel.swift` |
@@ -172,15 +172,10 @@ manifest says `stdin: "secret"`, as the Engines pane does.
 
 ### 5.4 The lock
 
-The old §2.2 gate, on the same three actions: `team-code` (either form)
-and `team-approve` refuse while `lock-status.enabled` is false with "turn
-the biometric lock on first"; `lock off` in a team refuses without
-`--yes` (`LockModel.teamNames()` reads the configs under
-`TeamPaths.standard()` again). Create and join are not gated, as before.
-The e2e keeps the lock off and never needs a bypass: it mints the code
-with the CLI's in-process `team code` against the leader's
-`INFINITUS_TEAM_DIR`, and the CLI has no lock to check (the lock is the
-app's).
+The biometric lock and Team are unrelated (user ruling 2026-09-16; the
+old §2.2 gate on `team-code`, `team-approve` and `lock off` is gone). No
+Team verb reads `lock-status`, `team-status` carries no `lockEnabled`,
+and the e2e mints and approves through the app's own verbs.
 
 ### 5.5 CLI
 
@@ -206,8 +201,7 @@ Route `settings.infinitus.team.tsx` over `InfinitusTeamPanel.tsx` +
 - In a team: Members (role badge, last seen, Promote / Remove for
   leaders), Requests (Approve / Decline, hidden unless leader), Invite
   (Mint a code → the code shown once with a Copy and a "Copy link"
-  building the universal link, §7; disabled with the lock's own copy while
-  the lock is off), Sharing (a select per kind), Exclusions, Policy,
+  building the universal link, §7), Sharing (a select per kind), Exclusions, Policy,
   Sync (last fetch / publish / error, Fetch now, Publish now), Leave.
 
 Gate: manifest carries `team-status`, else "no team commands". Every

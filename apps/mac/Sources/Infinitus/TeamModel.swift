@@ -47,8 +47,6 @@ final class TeamModel: ObservableObject {
     /// Set by AppModel: the desktop credential (#822) the loop reads the
     /// threads and transcripts with; nil publishes `desktop: false`.
     var desktopCredential: () -> (origin: URL, token: String)? = { nil }
-    /// Set by AppModel: the biometric lock's setting, for the snapshot.
-    var lockEnabled: () -> Bool = { false }
     /// Set by AppModel: the Mac's tunnel URL while it is up, one of the
     /// doors a driver reaches this desktop through (spec §8).
     var tunnelURL: () -> String? = { nil }
@@ -175,7 +173,7 @@ final class TeamModel: ObservableObject {
     /// Rebuilds the snapshot from the local clone (no network): status +
     /// reader + (leaders) the request list.
     private nonisolated static func snapshot(_ client: TeamClient, lastFetch: Int?, lastPublish: Int?, lastError: String?,
-                                             shares: TeamShares, exclusions: TeamExclusions, lockEnabled: Bool,
+                                             shares: TeamShares, exclusions: TeamExclusions,
                                              docs: TeamReader.DocCache, scans: TeamReader.ScanCache,
                                              grants: TeamGrants, pending: [TeamSnapshot.Pending]) throws -> (TeamSnapshot, TeamReader?) {
         let status = try client.status()
@@ -185,7 +183,7 @@ final class TeamModel: ObservableObject {
         let requests = client.isLeader ? (try? client.requests()) ?? [] : []
         return (TeamSnapshot.make(status: status, roster: client.roster?.doc, reader: reader, requests: requests,
                                   today: Stats.dayKey(Date(), calendar: .current), lastFetch: lastFetch, lastPublish: lastPublish,
-                                  lastError: lastError, shares: shares, exclusions: exclusions, lockEnabled: lockEnabled,
+                                  lastError: lastError, shares: shares, exclusions: exclusions,
                                   grants: grants, pending: pending), reader)
     }
 
@@ -204,7 +202,7 @@ final class TeamModel: ObservableObject {
     @discardableResult
     func load() -> Task<Void, Never> {
         guard enabled else { return Task {} }
-        let fetch = lastFetchAt, publish = lastPublishAt, err = lastError, lock = lockEnabled()
+        let fetch = lastFetchAt, publish = lastPublishAt, err = lastError
         let docs = docCache, scans = scanCache, memo = headerMemo, control = control
         return Task {
             do {
@@ -221,7 +219,7 @@ final class TeamModel: ObservableObject {
                     let grants = TeamGrants.load(teamDir: dir)
                     let pending = Self.pendingRows(control.withLock { $0 }, roster: client.roster?.doc)
                     let (snap, reader) = try Self.snapshot(client, lastFetch: fetch, lastPublish: publish, lastError: err,
-                                                          shares: shares, exclusions: exclusions, lockEnabled: lock, docs: docs, scans: scans,
+                                                          shares: shares, exclusions: exclusions, docs: docs, scans: scans,
                                                           grants: grants, pending: pending)
                     return (snap, reader, shares, exclusions, kid, client.roster, grants)
                 }

@@ -849,7 +849,6 @@ final class AppModel: ObservableObject {
         team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
         team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
         team.scanRequested = { [weak self] in self?.statsModel.refresh() }
-        team.lockEnabled = { [weak self] in self?.lock.enabled ?? false }
         team.tunnelURL = { [weak self] in self?.forkTunnelStatus.url }
         team.desktopCredential = { [weak self] in
             guard let self, let origin = desktopCredential.origin, let url = URL(string: origin),
