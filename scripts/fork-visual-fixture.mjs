@@ -524,8 +524,6 @@ function answer(request, socketPath) {
         passwordPresent: false,
         enabled: false,
       };
-    case "apns":
-      return { keyPresent: false, teamId: "", keyId: "", registrations: [] };
     case "test-connection":
       return { ok: true, latencyMs: 12 };
     default:

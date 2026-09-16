@@ -340,14 +340,6 @@
       {
         "args": [],
         "effect": "write",
-        "name": "activities-token",
-        "options": ["--body <json>", "--forget <deviceId>/<kind>"],
-        "replyShape": "{slot} | with --forget {slot, forgotten}",
-        "summary": "Register a phone's push token — the body `POST /activities/token` takes: {kind, token, deviceId, deviceName, environment, themeID?, macId?}. Without --body the CLI reads the JSON from stdin. `--forget <deviceId>/<kind>` withdraws that one registration instead (the phone's alerts switched off); forgotten is false when none was held."
-      },
-      {
-        "args": [],
-        "effect": "write",
         "name": "client-activity",
         "options": ["--body <json>"],
         "replyShape": "{clientId}",
@@ -418,23 +410,6 @@
         "replyShape": "{restarting:true}",
         "stdin": "secret",
         "summary": "Store the 9Router dashboard password read from stdin in the keychain. Empty stdin clears it. The app relaunches."
-      },
-      {
-        "args": [],
-        "effect": "read",
-        "name": "apns",
-        "options": [],
-        "replyShape": "{keyPresent, teamId, keyId, registrations: [{deviceId, deviceName, kind, environment, registeredAt}]}",
-        "summary": "The phone-alert push setup (#1178): the APNs key id and team id (prefs apns_key_id / apns_team_id), whether the .p8 is in the keychain, and every registered phone by device and kind — never a token."
-      },
-      {
-        "args": [],
-        "effect": "write",
-        "name": "apns-key",
-        "options": [],
-        "replyShape": "{stored}",
-        "stdin": "secret",
-        "summary": "Keep the APNs .p8 (PEM on stdin, never argv) in the keychain under apns_key_id, once it proves to sign; empty stdin forgets it. A dev instance's write evicts the installed app's key (#845)."
       },
       {
         "args": ["cliproxy|9router"],
@@ -782,22 +757,6 @@
         "default": "",
         "effect": "live",
         "key": "machine_name",
-        "section": "devices",
-        "type": "string",
-        "value": ""
-      },
-      {
-        "default": "",
-        "effect": "live",
-        "key": "apns_team_id",
-        "section": "devices",
-        "type": "string",
-        "value": ""
-      },
-      {
-        "default": "",
-        "effect": "live",
-        "key": "apns_key_id",
         "section": "devices",
         "type": "string",
         "value": ""
