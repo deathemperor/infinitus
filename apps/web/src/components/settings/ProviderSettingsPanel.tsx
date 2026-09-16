@@ -166,7 +166,7 @@ function ProviderLastChecked({ lastCheckedAt }: { lastCheckedAt: string | null }
 
 function providerEnvironmentDetail(environment: EnvironmentPresentation): string {
   if (environment.entry.target._tag === "PrimaryConnectionTarget") return "Primary device";
-  if (environment.relayManaged) return `${CONNECT_NAME}`;
+  if (environment.relayManaged) return CONNECT_NAME;
   if (environment.entry.target._tag === "SshConnectionTarget") return "SSH";
   if (isDesktopLocalConnectionTarget(environment.entry.target)) return "Local device";
   return environment.displayUrl ?? "Remote device";

@@ -123,7 +123,8 @@ these bullets.
   until #1368's later slices rename them; "T3 Connect" is `CONNECT_NAME`
   (`productName.ts`, "Infinitus Connect", #1368 slice A) on every surface —
   web, mobile, server, `packages/*`, `docs/user` — and the web and desktop
-  guard tests and the visual pass fail on a new literal.
+  guard tests, `scripts/connect-name.guard.test.ts` (server, phone, packages,
+  relay) and the visual pass fail on a new literal.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/

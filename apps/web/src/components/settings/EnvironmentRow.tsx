@@ -20,7 +20,7 @@ export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): str
 export function environmentTransportLabel(environment: EnvironmentPresentation): string {
   const { entry } = environment;
   if (entry.target._tag === "PrimaryConnectionTarget") return "This machine";
-  if (environment.relayManaged) return `${CONNECT_NAME}`;
+  if (environment.relayManaged) return CONNECT_NAME;
   if (isDesktopLocalConnectionTarget(entry.target)) return "WSL";
   if (
     entry.target._tag === "SshConnectionTarget" &&

@@ -12,7 +12,7 @@ import { CONNECT_NAME } from "@t3tools/shared/productName";
 const USER_PROFILE_CUSTOM_PAGES = [
   {
     path: "t3-connect",
-    label: `${CONNECT_NAME}`,
+    label: CONNECT_NAME,
     icon: "globe",
     content: <T3ConnectProfilePage />,
   },

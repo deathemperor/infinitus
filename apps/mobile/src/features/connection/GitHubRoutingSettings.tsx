@@ -65,7 +65,7 @@ export function GitHubRoutingSettings() {
                     {entry.target.label}
                   </Text>
                   <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-                    {connectionCatalogDisplayUrl(entry) ?? `${CONNECT_NAME}`}
+                    {connectionCatalogDisplayUrl(entry) ?? CONNECT_NAME}
                   </Text>
                 </View>
                 <Text className="text-sm text-foreground-muted">

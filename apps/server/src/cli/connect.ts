@@ -198,7 +198,7 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
         : undefined;
 
   return [
-    `${CONNECT_NAME}`,
+    CONNECT_NAME,
     `  Exposure: ${status.desired ? "enabled" : "disabled"}`,
     `  Authorization: ${status.authenticated ? "stored credential" : "missing"}`,
     `  Environment link: ${provisioned}`,

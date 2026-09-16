@@ -42,7 +42,7 @@ function ConfiguredT3ConnectSidebarAvatar() {
         <MobileClientsUserProfilePage />
       </UserButton.UserProfilePage>
       <UserButton.UserProfilePage
-        label={`${CONNECT_NAME}`}
+        label={CONNECT_NAME}
         labelIcon={<ServerIcon className="size-4" />}
         url="t3-connect"
       >

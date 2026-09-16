@@ -201,7 +201,7 @@ export function T3ConnectUserProfilePage() {
 
   return (
     <ClerkUserProfilePage
-      title={`${CONNECT_NAME}`}
+      title={CONNECT_NAME}
       description="Environments registered to your account. Connections on this device are managed in Settings."
       action={
         <ClerkUserProfileRefreshButton
