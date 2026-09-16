@@ -239,12 +239,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `connectionCatalogRoamedHost`; `authorization/service.ts` —
   `authorizeBearer` takes `descriptorTimeoutMs` and returns the descriptor's
   alternates (#663).
-- `apps/mobile/src/connection/platform.ts` — the wakeups layer merges
-  `requestedConnectionWakeups` from
-  `apps/mobile/src/features/infinitus/connectionWakeups.ts` (#1277): a
-  fork feature can ask for the `application-active-reconnect` wakeup the
-  foreground sends, so the thread-card bridge brings the Mac's socket up in
-  the background window a push-to-start grants. One `Stream.merge` line.
 - `apps/mobile/src/components/AndroidScreenHeader.tsx` — `AndroidHeaderAction`
   gains an optional `menu` (`AndroidAnchoredMenuProps`' actions, title and
   `onPressAction`); an action carrying one renders the icon button inside
@@ -386,10 +380,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `{activityId, name, state}` (`started`, then ActivityKit's own state names);
   `addActivityUpdateListener` and `ActivityUpdateEvent` on the JS side (src,
   build and index). One patch file per package version is pnpm's rule, so
-  the two live together; re-apply the fork's hunk with `pnpm patch` /
-  `pnpm patch-commit` when upstream bumps expo-widgets or rewrites its patch
-  (the lockfile's `patch_hash` follows). The thread-card bridge is its one
-  consumer.
+  the two live together. Its one consumer, the thread-card bridge, left with
+  #1375: drop the hunk (`pnpm patch` / `pnpm patch-commit`, the lockfile's
+  `patch_hash` follows) the next time upstream bumps expo-widgets or
+  rewrites its patch, rather than re-applying it.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
   upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
   resolves afresh, and once npm carried 57.0.5 the range resolved past the
@@ -421,16 +415,21 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` and `SettingsTeam` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts row, Mac alerts / thread card (with
-  its test card, #1047) / reset alarms toggles, sending mode, the alerting
-  Mac) after General.
-- `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusAlertPushBridge` (#702), `InfinitusThreadCardBridge` (#1047), `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
+  `SettingsInfinitusSection` (Accounts and Team rows, the reset alarms
+  toggle, sending mode) after General.
+- `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
-  `infinitusLiveActivityMac` (the Mac the alerts come from) /
-  `infinitusAlarmsEnabled` / `infinitusPushAlertsEnabled` /
-  `infinitusThreadCardEnabled` (#1047, absent reads on) /
-  `infinitusPinAtCreation` (#742) / `infinitusComposerSendMode` (#807,
-  `"queue" | "steer"`) keys (interface and sanitizer).
+  `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
+  `infinitusComposerSendMode` (#807, `"queue" | "steer"`) keys (interface
+  and sanitizer).
+- `apps/mobile/src/features/agent-awareness/notificationPayload.ts` —
+  `INFINITUS_ACCOUNTS_DEEP_LINK` (`/settings/accounts`) accepted whole by
+  `extractAgentNotificationDeepLink` beside the thread links (#1375): an
+  environment's account alert rides the relay's ordinary push and a tap
+  opens Settings › Accounts. One case in `notificationNavigation.test.ts`.
+- `apps/mobile/modules/t3-agent-notifications/android/.../AgentNotifications.kt`
+  — `contentIntent` takes `/settings/accounts` beside `/threads/…` for the
+  same alert (#1375).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the fork's slots (`infinitusReconnectingNotice` #832, `infinitusHoldBanner` #742, `infinitusQueuedTurns` #806, `infinitusBestOfCard` #269 B, `infinitusTurnFooters` #952) and the thread header menu (`useThreadHeaderMenu`, #941; `usePullRequestHeaderItem`, #269 F), built in `ThreadRouteScreen.tsx`. Rules and traps: `docs/internals/phone-thread-screen.md`.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — the optional `infinitusMessageMenu` prop (revert to a message the user sent; `useRevertMessageMenu` + `revertMessage.logic.ts`, `restoreAttachments.ts`). Rules and traps: `docs/internals/phone-thread-screen.md`.
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
@@ -487,7 +486,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/home/HomeHeader.tsx` — the header's
   brand slot (and `components/CompactBrandTitle.tsx`, the iOS one) shows
   `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
-- `apps/mobile/src/widgets/AgentActivity.tsx` — the lock-screen thread card's elapsed timer (#1047 follow-up), the fork's one edit to the widget: `AgentActivityRowProps.startedAt` and the `timerInterval` `Text` in `renderCompactRow`. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
   `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's

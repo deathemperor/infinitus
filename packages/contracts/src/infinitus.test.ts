@@ -3,7 +3,6 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { ExecutionEnvironmentCapabilities } from "./environment.ts";
 import {
-  InfinitusActivityPushRegistration,
   InfinitusAwsLogins,
   InfinitusClientActivityReport,
   InfinitusCommandInput,
@@ -472,43 +471,8 @@ describe("the infinitus capability", () => {
 });
 
 describe("the phone-only write bodies", () => {
-  const decodeRegistration = Schema.decodeUnknownSync(InfinitusActivityPushRegistration);
-  const encodeRegistration = Schema.encodeUnknownSync(InfinitusActivityPushRegistration);
   const decodeActivity = Schema.decodeUnknownSync(InfinitusClientActivityReport);
   const decodeCrash = Schema.decodeUnknownSync(InfinitusCrashReport);
-
-  // The keys the native phone sends today (NetworkFleetMirror, ISO 8601 dates).
-  const registration = {
-    kind: "agent-activity-start",
-    token: "8f3a…c1",
-    deviceId: "F3B1D2E4-0000-4000-8000-000000000001",
-    deviceName: "Loc's iPhone",
-    environment: "sandbox",
-    themeID: "rpg",
-    registeredAt: "2026-09-10T10:00:00Z",
-    macId: "env-7c2f",
-    layout: "expo",
-  } as const;
-
-  it("round-trips a token registration with every field", () => {
-    const decoded = decodeRegistration(registration);
-    expect(decoded.kind).toBe("agent-activity-start");
-    expect(decoded.macId).toBe("env-7c2f");
-    expect(encodeRegistration(decoded)).toEqual(registration);
-  });
-
-  it("accepts the null theme and the absent macId, layout and stamp an older phone sends", () => {
-    const { macId: _macId, layout: _layout, registeredAt: _at, ...older } = registration;
-    const decoded = decodeRegistration({ ...older, kind: "alert", themeID: null });
-    expect(decoded.themeID).toBeNull();
-    expect(decoded.macId).toBeUndefined();
-    expect(decoded.layout).toBeUndefined();
-    expect(decoded.registeredAt).toBeUndefined();
-  });
-
-  it("rejects a token kind the Mac has no slot for", () => {
-    expect(() => decodeRegistration({ ...registration, kind: "widget" })).toThrow();
-  });
 
   it("decodes the two scopes the server still sends", () => {
     const decoded = decodeActivity({

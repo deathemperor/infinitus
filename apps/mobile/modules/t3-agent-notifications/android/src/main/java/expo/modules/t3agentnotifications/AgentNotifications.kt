@@ -290,7 +290,8 @@ object AgentNotifications {
     path: String?,
     id: Int
   ): PendingIntent? {
-    val threadPath = path?.takeIf { it.startsWith("/threads/") }
+    // Infinitus (fork, #1375): an account alert opens Settings › Accounts.
+    val threadPath = path?.takeIf { it.startsWith("/threads/") || it == "/settings/accounts" }
     val route = threadPath?.takeUnless { it.contains('?') || it.contains('#') } ?: "/"
     val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
       ?: return null

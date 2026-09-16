@@ -363,7 +363,6 @@ these bullets.
   adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the
   device's clock format — the phone has no timestamp setting — null once
   the instant is past).
-- `apps/mobile/src/features/infinitus/InfinitusThreadCardBridge.tsx` (+ `threadCardBridge.controller.ts`, `liveActivityStarts.ts`, `testCard.logic.ts`, `cardSync.logic.ts`) — the phone half of the lock-screen thread card (#1047 part 2, #1265, #1277): files the `agent-activity-start` / `agent-activity` tokens with `pusherMac` through `activities-token`, re-scans `getInstances()` (`cardsToEnd`), the test card (`TEST_CARD_STATE`, `testCardState`); `packages/contracts/src/infinitus.ts` `InfinitusActivityPushKind`. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
@@ -371,15 +370,6 @@ these bullets.
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure (the held banner still offers Pin).
-- `apps/mobile/src/features/infinitus/liveActivity.logic.ts`,
-  `pushRegistration.ts`, `pushForget.ts` — the phone's `activities-token`
-  registration with the Mac for the `alert` kind (the Mac's account-event
-  pushes reach the phone as banners); `pusherMac` picks the Mac the alerts
-  come from (`infinitusLiveActivityMac`). `pushRegistration.ts` logs a
-  refused `activities-token` (`[infinitus-push]`) since the bridge sends
-  with `reportFailure: false`.
-- `apps/mobile/src/features/infinitus/pushRetry.logic.ts` (+ test) — the thread-card bridge's re-send rule (#941): `nextRetry`, `RETRY_DELAYS_MS`, `isEnvironmentUnreachable`. Rules and traps: `docs/internals/phone-thread-card.md`.
-- `apps/mobile/src/features/infinitus/pushDiagnostics.ts` (+ `pushDiagnostics.logic.ts`, test) — the "Card push registration" row in Settings › Infinitus (#941, #1265): `tokenSender`, `agentActivityPushSummary`, `useForgetOnSwitchOff`, `forgetTokensOutcome`. Rules and traps: `docs/internals/phone-thread-card.md`.
 
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives

@@ -31,7 +31,6 @@ import * as MobileStorage from "../persistence/mobile-storage";
 import { appAtomRegistry } from "../state/atom-registry";
 import { clearThreadOutboxEnvironment } from "../state/thread-outbox-removal";
 import { clearComposerDraftsEnvironment } from "../state/use-composer-drafts";
-import { requestedConnectionWakeups } from "../features/infinitus/connectionWakeups";
 import { mobileApplicationActiveWakeup } from "./app-state-wakeups";
 import { connectionStorageLayer } from "./storage";
 import { CONNECT_NAME } from "@t3tools/shared/productName";
@@ -108,12 +107,8 @@ const wakeupsLayer = Wakeups.layer({
         (subscription) => Effect.sync(() => subscription.remove()),
       ).pipe(Effect.asVoid),
     ),
-    Stream.merge(
-      managedRelayAccountChanges(appAtomRegistry).pipe(
-        Stream.map(() => "credentials-changed" as const),
-      ),
-      // Infinitus (fork, #1277): a wakeup a feature asks for, see the module.
-      requestedConnectionWakeups,
+    managedRelayAccountChanges(appAtomRegistry).pipe(
+      Stream.map(() => "credentials-changed" as const),
     ),
   ),
 });

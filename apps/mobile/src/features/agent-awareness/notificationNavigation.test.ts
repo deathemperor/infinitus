@@ -137,6 +137,14 @@ describe("extractAgentNotificationDeepLink", () => {
     ).toBe("/threads/env/thread");
   });
 
+  it("takes the accounts deep link an Infinitus account alert carries (#1375)", () => {
+    expect(
+      extractAgentNotificationDeepLink(
+        responseWithData({ deepLink: "/settings/accounts", environmentId: "env" }),
+      ),
+    ).toBe("/settings/accounts");
+  });
+
   it("ignores malformed or external links", () => {
     expect(
       extractAgentNotificationDeepLink(responseWithData({ deepLink: "https://example.com" })),

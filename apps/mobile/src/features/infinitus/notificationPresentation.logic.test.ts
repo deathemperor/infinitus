@@ -3,8 +3,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { presentInForeground } from "./notificationPresentation.logic";
 
 describe("presentInForeground", () => {
-  it("shows a Mac alert and an Infinitus alarm", () => {
-    expect(presentInForeground(notification({ type: "push" }, { aps: { alert: {} } }))).toBe(true);
+  it("shows an Infinitus account alert and an Infinitus alarm", () => {
+    expect(
+      presentInForeground(
+        notification({ type: "push" }, { deepLink: "/settings/accounts", environmentId: "env" }),
+      ),
+    ).toBe(true);
     expect(presentInForeground(notification({ type: "date" }, { infinitus: "accounts" }))).toBe(
       true,
     );
@@ -17,6 +21,10 @@ describe("presentInForeground", () => {
     expect(presentInForeground(notification({ type: "push" }, { deepLink: "/threads/a/b" }))).toBe(
       false,
     );
+    expect(presentInForeground(notification({ type: "push" }, { aps: { alert: {} } }))).toBe(false);
+    expect(
+      presentInForeground(notification({ type: "date" }, { deepLink: "/settings/accounts" })),
+    ).toBe(false);
     expect(presentInForeground(notification({ type: "timeInterval" }, { other: 1 }))).toBe(false);
     expect(presentInForeground(notification(null, undefined))).toBe(false);
   });

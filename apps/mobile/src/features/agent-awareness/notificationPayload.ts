@@ -69,9 +69,17 @@ function normalizeThreadDeepLink(value: string): string | null {
   }
 }
 
+/** Infinitus (fork, #1375): where an environment's account alert (a limit,
+    a switch, a lapsed sign-in) lands — Settings › Accounts. The relay sends
+    it as an ordinary push with this deep link and no thread. */
+export const INFINITUS_ACCOUNTS_DEEP_LINK = "/settings/accounts";
+
 export function extractAgentNotificationDeepLink(response: unknown): string | null {
   const data = dataFromNotificationResponse(response);
   const deepLink = data?.deepLink;
+  if (deepLink === INFINITUS_ACCOUNTS_DEEP_LINK) {
+    return deepLink;
+  }
   if (typeof deepLink === "string") {
     const normalizedDeepLink = normalizeThreadDeepLink(deepLink);
     if (normalizedDeepLink) {
