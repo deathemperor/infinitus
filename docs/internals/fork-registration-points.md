@@ -335,6 +335,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `infinitus-relay-worker`). Upstream's `release.yml` (disabled),
   `docs/operations/release.md` and `docs/operations/android-notifications.md`
   still say `t3code-relay`; the codemod sync (#1368 C) renames them.
+  `infra/relay/src/http/Api.ts` — `CLERK_JWT_AUDIENCE` is a comma-separated
+  list (`expectedClerkAudiences`), so the deployed relay verifies tokens
+  minted from the old and the new Clerk template through the cutover.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
   #1375) added to `RelayApi` beside upstream's server group, and its handler

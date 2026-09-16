@@ -56,7 +56,8 @@ Create a Clerk JWT template named `infinitus-relay` with claims:
 ```
 
 Set `T3CODE_CLERK_JWT_TEMPLATE=infinitus-relay` for clients and
-`CLERK_JWT_AUDIENCE=infinitus-relay` for the relay. The production relay deployment environment
+`CLERK_JWT_AUDIENCE=infinitus-relay` for the relay (a comma-separated list keeps
+an earlier template's tokens valid while clients move over). The production relay deployment environment
 also defines `CLERK_JWT_TEMPLATE`. The audience stays the same across relay stages; the relay
 URL selects the deployment.
 

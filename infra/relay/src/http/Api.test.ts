@@ -181,9 +181,32 @@ describe("relay client authentication", () => {
       });
       expect(verifyToken).toHaveBeenCalledWith("session-token", {
         secretKey: "clerk-secret-key",
-        audience: relaySettings.clerkJwtAudience,
+        audience: [relaySettings.clerkJwtAudience],
       });
       expect(createClerkClient).not.toHaveBeenCalled();
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          vi.mocked(verifyToken).mockReset();
+          vi.mocked(createClerkClient).mockReset();
+        }),
+      ),
+    ),
+  );
+
+  it.effect("accepts a token minted for any audience the relay lists (#1368 B)", () =>
+    Effect.gen(function* () {
+      const settings = { ...relaySettings, clerkJwtAudience: "infinitus-relay, t3-code-relay" };
+      vi.mocked(verifyToken).mockResolvedValue({ sub: "user_old", aud: "t3-code-relay" } as never);
+
+      expect(yield* verifyRelayClientBearerToken(settings, "old-token")).toEqual({
+        sub: "user_old",
+        mode: "clerk_session_bearer",
+      });
+      expect(verifyToken).toHaveBeenCalledWith("old-token", {
+        secretKey: "clerk-secret-key",
+        audience: ["infinitus-relay", "t3-code-relay"],
+      });
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
