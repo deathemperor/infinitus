@@ -189,7 +189,9 @@ function makePushNotificationRequest(input: {
         sound: "default",
       },
       environmentId: input.notification.environmentId,
-      threadId: input.notification.threadId,
+      ...(input.notification.threadId === undefined
+        ? {}
+        : { threadId: input.notification.threadId }),
       deepLink: input.notification.deepLink,
     },
   };

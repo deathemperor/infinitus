@@ -110,6 +110,7 @@ these bullets.
 - `apps/web/src/test/animationFrame.ts` — the `requestAnimationFrame` polyfill
   registered in `apps/web/vite.config.ts` test setup (an upstream test needs it
   under the fork's runner).
+- `packages/contracts/src/relayInfinitusAlert.ts`, `infra/relay/src/infinitusAlerts/` (`InfinitusAlertPublisher.ts`, `InfinitusAlertApi.ts`, tests) — the relay's thread-less account alert route (#1375): an environment-signed proof (`RELAY_INFINITUS_ALERT_TYP`, same registered claims as the activity proof, the alert in place of the state, the nonce in the DPoP replay table under `infinitus-alert:`) fanned out to every phone of every linked user with notifications on — iOS as an APNs notification job without `threadId`, Android as an FCM `alert` job whose `alert_id` is the proof's `jti`. Answers with the agent-activity publish errors so the server's relay client understands every status. Why it exists and what calls it: issue #1375.
 - `packages/contracts/src/productName.ts` — `PRODUCT_NAME`, the one constant
   every user-facing string routes through (#601 phase 2); contracts holds it
   because shared depends on contracts, and `packages/shared/src/productName.ts`

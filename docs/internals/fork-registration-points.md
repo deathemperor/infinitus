@@ -24,7 +24,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   routes (#710), and `InfinitusTeamControlHttpApi`: a teammate's sealed team
   command for the Mac (#1313), so the typed HTTP clients carry them.
 - `packages/contracts/package.json` — the `./infinitus`,
-  `./infinitusPairing`, `./infinitusTeamControl` and `./captures` subpath exports.
+  `./infinitusPairing`, `./infinitusTeamControl`, `./captures` and
+  `./relayInfinitusAlert` (#1375) subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
   (#812) and `turnQueueSendAt` (#1318) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
@@ -321,6 +322,20 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   deploy of #1366 dropped the two rows the first deploys had left `creating`
   in the state store (Alchemy dies on a persisted row whose provider is not
   registered, which is why they stayed for that one deploy).
+- `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
+  `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
+  #1375) added to `RelayApi` beside upstream's server group, and its handler
+  and publisher merged into the worker's API and runtime layers; the alert
+  publisher gets the same FCM queue sender `FcmDeliveries` is given, hoisted
+  into `fcmDeliveryQueueSenderLayer`. The runtime layer pipe has twenty
+  stages, the most `pipe` takes: a new layer joins an existing stage.
+- `infra/relay/src/agentActivity/apnsDeliveryJobs.ts`, `ApnsClient.ts`,
+  `ApnsDeliveries.ts` — `ApnsNotificationPayload.threadId` is optional
+  (#1375): an Infinitus account alert names no thread, so the request omits
+  the key, the freshness recheck stands down and the attempt rows carry
+  `null`. `FcmDeliveries.ts` — the queue job's optional `alert`
+  (`FcmAlertData`): a ready-made alert with a null state, sent over the card
+  the consumer computes anyway and never acknowledged as a card delivery.
 - `infra/relay/scripts/deploy.ts` — the `AlchemyContext` the deploy runs
   under carries `updateStateStore: options.yes` beside `adopt` (#1322).
   Upstream forwards only `adopt`, so on a Cloudflare account with no Alchemy

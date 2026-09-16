@@ -19,6 +19,10 @@
       "types": "./src/relay.ts",
       "import": "./src/relay.ts"
     },
+    "./relayInfinitusAlert": {
+      "types": "./src/relayInfinitusAlert.ts",
+      "import": "./src/relayInfinitusAlert.ts"
+    },
     "./infinitus": {
       "types": "./src/infinitus.ts",
       "import": "./src/infinitus.ts"
