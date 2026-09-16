@@ -755,48 +755,15 @@ export const InfinitusDesktopPrefs = Schema.Struct({
 export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
 
 /*
- * Phone-only writes (#572). The native mirror's `POST /activities/token`,
- * `POST /client-activity` and `POST /crashes` bodies, carried unchanged as the
- * `--body` option of the `activities-token`, `client-activity` and
- * `crash-report` control commands so a paired phone reaches them through
- * `infinitus.command`. Every schema mirrors the Swift struct the native decoder
- * reads (LiveActivityPush.swift, LeaseTable.swift, CrashReport.swift); dates are
- * ISO 8601 strings because those decoders use `.iso8601`.
+ * Phone-only writes (#572). The native mirror's `POST /client-activity` and
+ * `POST /crashes` bodies, carried unchanged as the `--body` option of the
+ * `client-activity` and `crash-report` control commands so a paired phone
+ * reaches them through `infinitus.command`. Every schema mirrors the Swift
+ * struct the native decoder reads (LeaseTable.swift, CrashReport.swift);
+ * dates are ISO 8601 strings because those decoders use `.iso8601`. The
+ * `activities-token` registration left with #1375: the phone's alerts and
+ * thread card ride Infinitus Connect.
  */
-
-/** Which push a token takes: `alert` is an ordinary notification token;
-    `agent-activity-start` lets the Mac start the phone's lock-screen thread
-    card while the app is closed (iOS 17.2 push-to-start) and `agent-activity`
-    is a running card's own token (#1047). The Mac-driven session cards'
-    `working` / `revival` kinds retired with #1041. */
-export const InfinitusActivityPushKind = Schema.Literals([
-  "alert",
-  "agent-activity-start",
-  "agent-activity",
-]);
-export type InfinitusActivityPushKind = typeof InfinitusActivityPushKind.Type;
-
-/** One token registration: the Mac keeps one slot per device and kind, a new
-    token for the same pair replaces it. `environment` is `sandbox` for
-    development-signed builds, `production` otherwise (Apple routes them to
-    different gateways). `macId` is the key the phone files this Mac under — the
-    fork uses the environment id — echoed into a push-to-start's attributes so
-    the phone adopts the card into the right Mac's slot. `registeredAt` may be
-    left to the Mac, which stamps it. `layout` names the push envelope the
-    phone's activity host expects: absent or `native` for the SwiftUI phone,
-    `expo` for this app (expo-widgets' `{name, props}` content state). */
-export const InfinitusActivityPushRegistration = Schema.Struct({
-  kind: InfinitusActivityPushKind,
-  token: Schema.String,
-  deviceId: Schema.String,
-  deviceName: Schema.String,
-  environment: Schema.String,
-  themeID: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  registeredAt: Schema.optionalKey(Schema.String),
-  macId: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  layout: Schema.optionalKey(Schema.NullOr(Schema.String)),
-});
-export type InfinitusActivityPushRegistration = typeof InfinitusActivityPushRegistration.Type;
 
 /** What a client is looking at: the fleet, or the stats. The Mac only does
     that work while some client holds a lease on the scope. The two session

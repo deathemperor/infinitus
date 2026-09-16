@@ -17,10 +17,8 @@ import { teamJoinLinkCode } from "./features/team/team.logic";
 import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet";
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
-import { InfinitusAlertPushBridge } from "./features/infinitus/InfinitusAlertPushBridge";
 import { InfinitusHoldsBridge } from "./features/infinitus/InfinitusHoldsBridge";
 import { InfinitusNotificationPresenter } from "./features/infinitus/InfinitusNotificationPresenter";
-import { InfinitusThreadCardBridge } from "./features/infinitus/InfinitusThreadCardBridge";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
 import { IncomingShareProvider } from "./features/sharing/IncomingShareProvider";
@@ -136,8 +134,6 @@ function AppContent() {
               <ConfirmDialogHost />
               <ThreadArrangementHost />
               <InfinitusAlarmsBridge />
-              <InfinitusAlertPushBridge />
-              <InfinitusThreadCardBridge />
               <InfinitusHoldsBridge />
               <InfinitusNotificationPresenter />
             </BlurTargetView>

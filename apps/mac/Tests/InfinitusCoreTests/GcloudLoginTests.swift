@@ -4,10 +4,11 @@ import XCTest
 final class GcloudLoginTests: XCTestCase {
     func testArgumentsPerProfileAndFlow() {
         XCTAssertEqual(GcloudLogin.arguments(profile: "default", flow: .remote), ["auth", "login", "--no-launch-browser"])
-        XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .remote), ["auth", "login", "me@example.com", "--no-launch-browser"])
+        // A named account gets --force: gcloud would otherwise ask to overwrite its live credentials on a tty nobody answers.
+        XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .remote), ["auth", "login", "me@example.com", "--force", "--no-launch-browser"])
         XCTAssertEqual(GcloudLogin.arguments(profile: "default", flow: .local), ["auth", "login"])
         // The relay keeps the CLI's localhost listener; the runner suppresses the browser (#403).
-        XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .relay), ["auth", "login", "me@example.com"])
+        XCTAssertEqual(GcloudLogin.arguments(profile: "me@example.com", flow: .relay), ["auth", "login", "me@example.com", "--force"])
         XCTAssertEqual(GcloudLogin.arguments(profile: GcloudLogin.adcProfile, flow: .relay), ["auth", "application-default", "login"])
         XCTAssertEqual(AwsLogin.Provider.gcloud.flow(profile: "me@example.com", configText: ""), .relay)
         XCTAssertEqual(GcloudLogin.arguments(profile: GcloudLogin.adcProfile, flow: .remote),
