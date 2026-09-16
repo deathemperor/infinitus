@@ -25,8 +25,12 @@ these bullets.
 - `apps/web/src/hooks/useInfinitusEventToasts.ts`,
   `apps/web/src/hooks/infinitusEventToasts.logic.ts`,
   `apps/web/src/components/InfinitusEventToasts.tsx` — the host's new events
-  (an account switch, every account exhausted) as the app's toasts; nothing
-  from the first snapshot, deduped by the server's event id. Every toast has
+  (an account switch, every account exhausted, and the Mac's own `alert` /
+  `notice` announcements) as the app's toasts; nothing from the first
+  snapshot, deduped by the server's event id. An urgent one also rings and
+  raises a real `Notification` while the window is away, through the client's
+  `notificationMode` — this machine's only notifier for that news
+  (`docs/internals/notifications.md`). Every toast has
   one Open action to /accounts; nothing is sent to the Infinitus socket
   (the waiting-session toast left with the sessions sweep, #1041). Mounted
   once from `apps/web/src/routes/__root.tsx`

@@ -32,11 +32,19 @@ export interface ActivityRow {
  * `nudge` (#1079) — keep their chips: those rows are still in the log the
  * page reads, and dropping the label would only strip them of their label,
  * not of the row.
+ *
+ * `alert` and `notice` are the app's own announcements (`AppModel.announce`),
+ * the rows this app turns into notifications now that the menu bar app has
+ * stopped posting its own: a row says what was SAID, beside the `death` /
+ * `revival` rows saying what the fleet DID. Both sit outside StatsEvents'
+ * vocabulary on purpose, so an announcement never lands in a tally.
  */
 export const ACTIVITY_KIND_LABELS: Readonly<Record<string, string>> = {
   switch: "switch",
   death: "limit",
   limit: "all out",
+  alert: "alert",
+  notice: "notice",
   revival: "revival",
   ignite: "ignite",
   resume: "resume",

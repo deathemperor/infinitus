@@ -8,10 +8,12 @@ import {
 } from "./infinitusActivity.ts";
 
 describe("ACTIVITY_KIND_LABELS", () => {
-  /** Every kind the Mac writes to `events.jsonl` today: the six literals
-      `AppModel.logEvent` is called with, plus the three `AppModel.eventKind`
-      folds the engine's own events into. `other` is the deliberate no-chip
-      default. Kept in step by hand with `apps/mac/Sources/Infinitus/AppModel.swift`. */
+  /** Every kind the Mac writes to `events.jsonl` today: the literals
+      `AppModel.logEvent` is called with — `alert` / `notice` among them, the
+      app's own announcements (`AppModel.announce`) — plus the three
+      `AppModel.eventKind` folds the engine's own events into. `other` is the
+      deliberate no-chip default. Kept in step by hand with
+      `apps/mac/Sources/Infinitus/AppModel.swift`. */
   const MAC_KINDS = [
     "death",
     "desktop",
@@ -21,6 +23,8 @@ describe("ACTIVITY_KIND_LABELS", () => {
     "switch",
     "limit",
     "resume",
+    "alert",
+    "notice",
   ];
 
   it("chips every kind the Mac logs", () => {
