@@ -66,7 +66,8 @@ jobs:
           # once main carries no old identifier, upstream's tip is renamed on
           # its own branch first, so the merge meets the same names on both
           # sides. Before the rename lands, `--check` fails and this is skipped.
-          if git show main:scripts/infinitus-rename.ts > /tmp/infinitus-rename.ts 2>/dev/null              && node scripts/infinitus-rename.ts --check 2>/dev/null | grep -q "no old identifier remains"; then
+          if git show main:scripts/infinitus-rename.ts > /tmp/infinitus-rename.ts 2>/dev/null \
+             && node scripts/infinitus-rename.ts --check 2>/dev/null | grep -q "no old identifier remains"; then
             git checkout -q -b "$branch-upstream-renamed" upstream/main
             node /tmp/infinitus-rename.ts
             git add -A && git commit -qm "chore: upstream renamed by scripts/infinitus-rename.ts"
