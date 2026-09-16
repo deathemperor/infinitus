@@ -304,13 +304,16 @@ const ReactorLayerLive = ReactorCoreLayerLive.pipe(
   // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
   // work-log row and starts the Mac's login; and (#1047) the phone's
   // lock-screen thread card, folded from the shell snapshot and handed to the
-  // Mac's `push` verb. The activity layer gets its own control client, since
-  // InfinitusLayerLive's is private.
+  // Mac's `push` verb — standing down while the secret store holds a T3
+  // Connect link (#1322), which the relay's own pusher reads too. The
+  // activity layer gets its own control client, since InfinitusLayerLive's
+  // is private.
   Layer.provideMerge(
     Layer.mergeAll(InfinitusSignInLapseLive, InfinitusAgentActivityLive).pipe(
       Layer.provide(
         InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
       ),
+      Layer.provide(ServerSecretStore.layer),
     ),
   ),
   // Fork (#574): the Slack bridge over Socket Mode.

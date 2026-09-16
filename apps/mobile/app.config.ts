@@ -6,6 +6,7 @@ import * as NodeURL from "node:url";
 import { BRAND_ASSET_PATHS } from "../../scripts/lib/brand-assets.ts";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 import { PRODUCT_NAME } from "../../packages/shared/src/productName.ts";
+import { clerkFrontendApiHostnameFromPublishableKey } from "../../packages/shared/src/relayAuth.ts";
 
 type AppVariant = "development" | "preview" | "production" | "infinitus";
 
@@ -94,6 +95,16 @@ const INFINITUS_ASSETS = {
 
 const T3_APPLE_TEAM_ID = "ARK85ZXQ4Z";
 
+function infinitusRelyingParty(publishableKey: string | undefined): string {
+  const key = publishableKey?.trim();
+  if (!key) return "clerk.infinitus.run";
+  try {
+    return clerkFrontendApiHostnameFromPublishableKey(key);
+  } catch {
+    return "clerk.infinitus.run";
+  }
+}
+
 const VARIANT_CONFIG = {
   development: {
     appName: "T3 Code Dev",
@@ -128,7 +139,10 @@ const VARIANT_CONFIG = {
     iosBundleIdentifier: "run.infinitus.mobile",
     androidPackage: "run.infinitus.mobile",
     appleTeamId: "Q783W6B4FA",
-    relyingParty: "clerk.t3.codes",
+    // Fork (#1322): the Infinitus Clerk instance's Frontend API host, which
+    // the publishable key encodes (upstream's variants pin clerk.t3.codes);
+    // a build without the key gets a placeholder that entitles nothing real.
+    relyingParty: infinitusRelyingParty(repoEnv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY),
     // Fork (#724): the Devices card's QR is `https://infinitus.run/pair#…`, so
     // a Camera scan opens this app (AASA `applinks` + assetlinks on the site).
     universalLinkHost: "infinitus.run",

@@ -77,6 +77,57 @@ jobs:
           fi
           { echo "Release notes for $version:"; cat notes.md; } >> "$GITHUB_STEP_SUMMARY"
 
+  # Fork (#1322): the T3 Connect public values baked into every build —
+  # the desktop, the CLI archive and, by hand, the phone. Upstream's
+  # `relay_public_config` fails the release when the `production`
+  # environment is not filled in; here an empty environment is a release
+  # without T3 Connect, exactly the release cut before the relay existed,
+  # so each value is passed through as it is (empty included) and the
+  # build scripts read an empty string as "disabled". The step summary
+  # says which it was. Values only, never a secret.
+  connect:
+    name: Resolve T3 Connect public config
+    needs: notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: production
+    outputs:
+      clerk_publishable_key: ${{ steps.config.outputs.clerk_publishable_key }}
+      clerk_jwt_template: ${{ steps.config.outputs.clerk_jwt_template }}
+      clerk_cli_oauth_client_id: ${{ steps.config.outputs.clerk_cli_oauth_client_id }}
+      relay_url: ${{ steps.config.outputs.relay_url }}
+    env:
+      RELAY_DOMAIN: ${{ vars.RELAY_DOMAIN }}
+      RELAY_API_ZONE_NAME: ${{ vars.RELAY_API_ZONE_NAME }}
+      CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+      CLERK_JWT_TEMPLATE: ${{ vars.CLERK_JWT_TEMPLATE }}
+      CLERK_CLI_OAUTH_CLIENT_ID: ${{ vars.CLERK_CLI_OAUTH_CLIENT_ID }}
+    steps:
+      - id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+          relay_domain="${RELAY_DOMAIN:-}"
+          if [[ -z "$relay_domain" && -n "${RELAY_API_ZONE_NAME:-}" ]]; then
+            relay_domain="relay.$RELAY_API_ZONE_NAME"
+          fi
+          relay_url=""
+          if [[ -n "$relay_domain" ]]; then
+            relay_url="https://$relay_domain"
+          fi
+          {
+            echo "clerk_publishable_key=${CLERK_PUBLISHABLE_KEY:-}"
+            echo "clerk_jwt_template=${CLERK_JWT_TEMPLATE:-}"
+            echo "clerk_cli_oauth_client_id=${CLERK_CLI_OAUTH_CLIENT_ID:-}"
+            echo "relay_url=$relay_url"
+          } >> "$GITHUB_OUTPUT"
+          if [[ -n "$relay_url" && -n "${CLERK_PUBLISHABLE_KEY:-}" && -n "${CLERK_JWT_TEMPLATE:-}" && -n "${CLERK_CLI_OAUTH_CLIENT_ID:-}" ]]; then
+            echo "T3 Connect: builds point at $relay_url." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "T3 Connect: off (the production environment carries no relay config)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # The Swift app on the macOS 26 image (the glass chrome needs its SDK):
   # `Infinitus-Menu-Bar-<v>.zip` (CFBundleName "Infinitus Menu Bar", no
   # infinitus:// URL type), which the desktop job nests as a login item.
@@ -195,7 +246,7 @@ jobs:
 
   desktop:
     name: Build desktop macOS arm64
-    needs: [notes, mac]
+    needs: [notes, mac, connect]
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -379,7 +430,18 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.NOTARY_ISSUER_ID }}
           APPLE_TEAM_ID: Q783W6B4FA
+          # Fork (#1322): T3 Connect's public values, empty when unset.
+          T3CODE_CLERK_PUBLISHABLE_KEY: ${{ needs.connect.outputs.clerk_publishable_key }}
+          T3CODE_CLERK_JWT_TEMPLATE: ${{ needs.connect.outputs.clerk_jwt_template }}
+          T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ needs.connect.outputs.clerk_cli_oauth_client_id }}
+          T3CODE_RELAY_URL: ${{ needs.connect.outputs.relay_url }}
           T3CODE_DESKTOP_NATIVE_HELPER: ${{ steps.native_helper.outputs.path }}
+          # Fork (#1322): a signed build that carries the Clerk key must also
+          # carry an Associated Domains provisioning profile for
+          # run.infinitus.desktop (passkeys), or the build script refuses.
+          # Base64 of the .provisionprofile; absent = ship signed without
+          # T3 Connect rather than fail the release.
+          MACOS_PROVISIONING_PROFILE: ${{ secrets.MACOS_PROVISIONING_PROFILE }}
         run: |
           set -euo pipefail
           args=(
@@ -391,6 +453,17 @@ jobs:
           )
           if [[ "${{ steps.signing.outputs.signed }}" == "true" ]]; then
             args+=(--signed)
+            if [[ -n "${T3CODE_CLERK_PUBLISHABLE_KEY:-}" ]]; then
+              if [[ -n "${MACOS_PROVISIONING_PROFILE:-}" ]]; then
+                profile_path="$RUNNER_TEMP/infinitus.provisionprofile"
+                printf '%s' "$MACOS_PROVISIONING_PROFILE" | base64 -D > "$profile_path"
+                security cms -D -i "$profile_path" >/dev/null
+                export T3CODE_MACOS_PROVISIONING_PROFILE="$profile_path"
+              else
+                echo "Signed desktop without T3 Connect: MACOS_PROVISIONING_PROFILE is not set, so the Clerk key stays out of this build." >> "$GITHUB_STEP_SUMMARY"
+                unset T3CODE_CLERK_PUBLISHABLE_KEY T3CODE_CLERK_JWT_TEMPLATE T3CODE_CLERK_CLI_OAUTH_CLIENT_ID T3CODE_RELAY_URL
+              fi
+            fi
           else
             export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
@@ -562,7 +635,7 @@ jobs:
   cli:
     name: Build CLI archive ${{ matrix.label }}
     if: ${{ !inputs.version }}
-    needs: notes
+    needs: [notes, connect]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -644,6 +717,12 @@ jobs:
       # emits. Not `build:desktop` — that adds the Electron main and needs
       # libsecret headers on Linux for a bundle nothing here ships.
       - name: Build server bundle and web client
+        env:
+          # Fork (#1322): T3 Connect's public values, empty when unset.
+          T3CODE_CLERK_PUBLISHABLE_KEY: ${{ needs.connect.outputs.clerk_publishable_key }}
+          T3CODE_CLERK_JWT_TEMPLATE: ${{ needs.connect.outputs.clerk_jwt_template }}
+          T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ needs.connect.outputs.clerk_cli_oauth_client_id }}
+          T3CODE_RELAY_URL: ${{ needs.connect.outputs.relay_url }}
         run: vp run --filter t3 build
 
       # The single-executable needs a Node with --build-sea (25.7+) while the

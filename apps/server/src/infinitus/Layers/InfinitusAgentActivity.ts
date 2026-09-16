@@ -11,6 +11,8 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
+import * as ServerSecretStore from "../../auth/ServerSecretStore.ts";
+import { RELAY_ENVIRONMENT_CREDENTIAL_SECRET, RELAY_URL_SECRET } from "../../cloud/config.ts";
 import { ServerConfig } from "../../config.ts";
 import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
@@ -59,6 +61,15 @@ const decodeReply = Schema.decodeUnknownOption(
  * Withheld exactly where the port publish is (dev runner, isolated socket,
  * worktree `.t3`), and quiet on a build whose `push` summary does not name
  * the card. Counts and phases reach the log; titles never.
+ *
+ * Stands down while this server is linked to a T3 Connect relay (#1322):
+ * upstream's `AgentAwarenessRelay` then pushes the same card through the
+ * relay's own key, and two pushers would draw two cards. The link is the
+ * relay url and environment credential in the secret store, read at every
+ * fold, so linking or unlinking takes effect at the next event; an unlink
+ * that finds a Mac card up leaves it to age out. Reading the store is
+ * `AgentAwarenessRelay`'s own gate word for word, so the two cannot both
+ * think they are on.
  */
 export const InfinitusAgentActivityLive = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -78,7 +89,17 @@ export const InfinitusAgentActivityLive = Layer.effectDiscard(
     const snapshotQuery = yield* ProjectionSnapshotQuery;
     const infinitus = yield* InfinitusService;
     const control = yield* InfinitusControlClient;
+    const secrets = yield* ServerSecretStore.ServerSecretStore;
     const environmentId = yield* (yield* ServerEnvironment).getEnvironmentId;
+
+    /** True while the relay holds this environment's link (its pusher is on). */
+    const relayLinked = Effect.gen(function* () {
+      const [url, credential] = yield* Effect.all([
+        secrets.get(RELAY_URL_SECRET),
+        secrets.get(RELAY_ENVIRONMENT_CREDENTIAL_SECRET),
+      ]);
+      return url._tag === "Some" && credential._tag === "Some";
+    }).pipe(Effect.orElseSucceed(() => false));
 
     /** Identity of the last card the Mac took; null until one was. */
     let sent: string | null = null;
@@ -167,6 +188,10 @@ export const InfinitusAgentActivityLive = Layer.effectDiscard(
       });
 
     const publish: Effect.Effect<void, never, Scope.Scope> = Effect.gen(function* () {
+      if (yield* relayLinked) {
+        yield* Effect.logDebug("infinitus.agent-activity.relay-linked");
+        return;
+      }
       if (!(yield* manifestReady)) {
         yield* Effect.logDebug("infinitus.agent-activity.no-verb");
         return;

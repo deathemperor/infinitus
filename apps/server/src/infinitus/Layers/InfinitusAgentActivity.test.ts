@@ -20,6 +20,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
@@ -28,6 +29,8 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { describe, expect } from "vite-plus/test";
 
+import * as ServerSecretStore from "../../auth/ServerSecretStore.ts";
+import { RELAY_ENVIRONMENT_CREDENTIAL_SECRET, RELAY_URL_SECRET } from "../../cloud/config.ts";
 import { ServerConfig } from "../../config.ts";
 import { ServerEnvironment } from "../../environment/ServerEnvironment.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
@@ -126,8 +129,11 @@ const makeHarness = (input: {
   readonly polled?: InfinitusSnapshot;
   readonly controlSocketOverride?: string;
   readonly initial?: ReadonlyArray<OrchestrationThreadShell>;
+  /** The T3 Connect link in the secret store (#1322). */
+  readonly relayLinked?: boolean;
 }) =>
   Effect.gen(function* () {
+    const linked = yield* Ref.make(input.relayLinked ?? false);
     const domainEvents = yield* PubSub.unbounded<OrchestrationEvent>();
     const shells = yield* Ref.make<ReadonlyMap<ThreadId, OrchestrationThreadShell>>(
       new Map((input.initial ?? []).map((row) => [row.id, row])),
@@ -184,6 +190,16 @@ const makeHarness = (input: {
                 ),
               ),
           }),
+          Layer.mock(ServerSecretStore.ServerSecretStore)({
+            get: (name) =>
+              Ref.get(linked).pipe(
+                Effect.map((on) =>
+                  on && (name === RELAY_URL_SECRET || name === RELAY_ENVIRONMENT_CREDENTIAL_SECRET)
+                    ? Option.some(new TextEncoder().encode("x"))
+                    : Option.none(),
+                ),
+              ),
+          }),
           Layer.succeed(
             HostProcessEnvironment,
             input.controlSocketOverride === undefined
@@ -214,6 +230,7 @@ const makeHarness = (input: {
       emit: (event: OrchestrationEvent) =>
         PubSub.publish(domainEvents, event).pipe(Effect.andThen(settle)),
       setUnavailable: (down: boolean) => Ref.set(unavailable, down),
+      setRelayLinked: (on: boolean) => Ref.set(linked, on),
       reads: Ref.get(reads),
       pushes: Ref.get(requests).pipe(
         Effect.map((list) =>
@@ -228,6 +245,31 @@ const makeHarness = (input: {
   });
 
 describe("InfinitusAgentActivityLive (#1047)", () => {
+  effectIt.effect("stands down while the server is linked to a T3 Connect relay (#1322)", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({ relayLinked: true });
+      yield* h.set(shell(one, "running", yield* h.now));
+      yield* h.emit(sessionSet(one));
+      yield* h.elapse("5 seconds");
+      // The relay's pusher draws this card; a second one from the Mac would double it.
+      expect(yield* h.pushes).toEqual([]);
+      // Unlinked: the next event folds as before.
+      yield* h.setRelayLinked(false);
+      yield* h.emit(sessionSet(one));
+      yield* h.elapse("5 seconds");
+      expect(yield* h.pushes).toHaveLength(1);
+      // Linked again: nothing more goes out, and the shutdown sends the
+      // null for the card this server put up.
+      yield* h.setRelayLinked(true);
+      yield* h.set(shell(two, "approval", yield* h.now));
+      yield* h.emit(sessionSet(two));
+      yield* h.elapse("5 seconds");
+      expect(yield* h.pushes).toHaveLength(1);
+      yield* h.shutdown;
+      expect((yield* h.pushes).at(-1)?.state).toBeNull();
+    }),
+  );
+
   effectIt.effect(
     "folds the running threads into one card 5 s after the event, once per change",
     () =>
