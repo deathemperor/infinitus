@@ -35,6 +35,10 @@
       "types": "./src/infinitusTeamControl.ts",
       "import": "./src/infinitusTeamControl.ts"
     },
+    "./infinitusAlert": {
+      "types": "./src/infinitusAlert.ts",
+      "import": "./src/infinitusAlert.ts"
+    },
     "./captures": {
       "types": "./src/captures.ts",
       "import": "./src/captures.ts"

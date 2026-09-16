@@ -88,7 +88,7 @@ import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { infinitusTeamControlHttpApiLayer } from "./infinitus/Layers/InfinitusTeamControlHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
-import { InfinitusAgentActivityLive } from "./infinitus/Layers/InfinitusAgentActivity.ts";
+import { InfinitusAlertRelayLive } from "./infinitus/Layers/InfinitusAlertRelay.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
 import { InfinitusSlackLive } from "./infinitus/Layers/InfinitusSlack.ts";
 import { SlackClientLive } from "./infinitus/Layers/InfinitusSlackSocket.ts";
@@ -303,18 +303,14 @@ const ReactorLayerLive = ReactorCoreLayerLive.pipe(
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
   Layer.provideMerge(InfinitusResumeOnLimitLive),
   // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
-  // work-log row and starts the Mac's login; and (#1047) the phone's
-  // lock-screen thread card, folded from the shell snapshot and handed to the
-  // Mac's `push` verb — standing down while the secret store holds a T3
-  // Connect link (#1322), which the relay's own pusher reads too. The
-  // activity layer gets its own control client, since InfinitusLayerLive's
-  // is private.
+  // work-log row and starts the Mac's login. The layer gets its own control
+  // client, since InfinitusLayerLive's is private. (The phone's lock-screen
+  // thread card left with #1375: the relay draws it.)
   Layer.provideMerge(
-    Layer.mergeAll(InfinitusSignInLapseLive, InfinitusAgentActivityLive).pipe(
+    InfinitusSignInLapseLive.pipe(
       Layer.provide(
         InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
       ),
-      Layer.provide(ServerSecretStore.layer),
     ),
   ),
   // Fork (#574): the Slack bridge over Socket Mode.
@@ -692,7 +688,7 @@ export const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(infinitusPairingHttpApiLayer),
       // Fork (#1313): the team command route gets its own control client, as
-      // the activity layer does — InfinitusLayerLive's is private.
+      // the sign-in lapse layer does — InfinitusLayerLive's is private.
       Layer.provide(
         infinitusTeamControlHttpApiLayer.pipe(
           Layer.provide(
@@ -700,7 +696,18 @@ export const makeRoutesLayer = Layer.mergeAll(
           ),
         ),
       ),
-      Layer.provide(infinitusHttpApiLayer),
+      // Fork (#1375): the Mac's account alerts, signed with the relay link's
+      // key and posted to the relay over fetch.
+      Layer.provide(
+        infinitusHttpApiLayer.pipe(
+          Layer.provide(
+            InfinitusAlertRelayLive.pipe(
+              Layer.provide(ServerSecretStore.layer),
+              Layer.provide(FetchHttpClient.layer),
+            ),
+          ),
+        ),
+      ),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),
     otlpTracesProxyRouteLayer,

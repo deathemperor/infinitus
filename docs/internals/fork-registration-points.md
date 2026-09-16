@@ -22,10 +22,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
   routes (#710), and `InfinitusTeamControlHttpApi`: a teammate's sealed team
-  command for the Mac (#1313), so the typed HTTP clients carry them.
+  command for the Mac (#1313), so the typed HTTP clients carry them; the
+  `infinitus` group's `POST /api/infinitus/alert` (#1375) takes the Mac's
+  account alert on the operate scope.
 - `packages/contracts/package.json` — the `./infinitus`,
-  `./infinitusPairing`, `./infinitusTeamControl`, `./captures` and
-  `./relayInfinitusAlert` (#1375) subpath exports.
+  `./infinitusPairing`, `./infinitusTeamControl`, `./captures`,
+  `./infinitusAlert` and `./relayInfinitusAlert` (#1375) subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
   (#812) and `turnQueueSendAt` (#1318) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
@@ -103,7 +105,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `infinitusPairingHttpApiLayer` and `infinitusTeamControlHttpApiLayer` in
   `makeRoutesLayer`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
-  client (#1076), merged with `InfinitusAgentActivityLive` (#1047). `InfinitusSlackLive` (provided `SlackClientLive` over
+  client (#1076; the thread-card layer it was merged with left with #1375).
+  `infinitusHttpApiLayer` is provided `InfinitusAlertRelayLive` over the
+  secret store and `FetchHttpClient.layer` (#1375). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
