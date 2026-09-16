@@ -687,7 +687,15 @@ export const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(pullRequestHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(infinitusPairingHttpApiLayer),
-      Layer.provide(infinitusTeamControlHttpApiLayer),
+      // Fork (#1313): the team command route gets its own control client, as
+      // the activity layer does — InfinitusLayerLive's is private.
+      Layer.provide(
+        infinitusTeamControlHttpApiLayer.pipe(
+          Layer.provide(
+            InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
+          ),
+        ),
+      ),
       Layer.provide(infinitusHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),
