@@ -68,6 +68,15 @@ describe("proxyProvider", () => {
       "xhigh",
       "max",
     ]);
+    expect(descriptors.find((descriptor) => descriptor.id === "fastMode")?.type).toBe("boolean");
+    // The context choice is the only route to 1M on a proxy: the adapter turns
+    // a 1M selection into the long-context beta header, since the `[1m]` suffix
+    // is what a proxy answers 400 to (#1088). It defaults to 200k.
+    const context = descriptors.find((descriptor) => descriptor.id === "contextWindow");
+    expect(context?.type === "select" ? context.options : []).toEqual([
+      { id: "200k", label: "200k", isDefault: true },
+      { id: "1m", label: "1M" },
+    ]);
   });
 
   it("skips picker models the instance already lists, as a slug or an object", () => {

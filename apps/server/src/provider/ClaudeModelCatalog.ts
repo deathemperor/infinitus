@@ -76,8 +76,10 @@ export const BUNDLED_CLAUDE_MODEL_CATALOG = resolveClaudeModelCatalog(BUNDLED_MO
  * (a built-in alias they shadow is dropped, canonical slugs and capabilities
  * are preserved), and custom entries that declare their own capabilities are
  * appended so the adapter resolves effort / fast mode / thinking against the
- * user's descriptors instead of the empty default. Custom entries carry no
- * runtime profile, so option values pass through to Claude Code verbatim.
+ * user's descriptors instead of the empty default. Option values pass through
+ * to Claude Code verbatim, with one exception: a context window choice means
+ * nothing to the CLI as a value, only as a token count and a wire form, so
+ * `customClaudeRuntime` gives a custom entry that much of a runtime profile.
  */
 export function scopeClaudeModelCatalog(
   catalog: ClaudeModelCatalog,
@@ -110,12 +112,46 @@ export function scopeClaudeModelCatalog(
         isCustom: true,
         capabilities: entry.capabilities,
       },
-      runtime: {},
+      runtime: customClaudeRuntime(entry.capabilities),
       compatibility: {},
     });
   }
 
   return { models: [...builtInModels, ...customCatalogModels] };
+}
+
+/**
+ * The window each `contextWindow` choice buys, by the option ids the manifest's
+ * own Claude profiles use. A custom entry carries descriptors but no runtime
+ * profile, so a `contextWindow` choice it declares would resolve no token count
+ * and no wire syntax: the adapter would neither send the long-context beta on a
+ * proxied instance nor append the suffix on a direct one, leaving the control
+ * inert. Recognised ids get the manifest's own mapping; any other id stays
+ * unmapped, as every custom option value does.
+ */
+const CUSTOM_CONTEXT_WINDOW_TOKENS: Readonly<Record<string, number>> = {
+  "200k": 200_000,
+  "1m": 1_000_000,
+};
+const LONG_CONTEXT_WINDOW_ID = "1m";
+
+function customClaudeRuntime(capabilities: ModelCapabilities): ClaudeCodeProfile {
+  const descriptor = (capabilities.optionDescriptors ?? []).find(
+    (candidate) => candidate.id === "contextWindow",
+  );
+  if (descriptor?.type !== "select") return {};
+  const contextWindowTokens: Record<string, number> = {};
+  for (const option of descriptor.options) {
+    const tokens = CUSTOM_CONTEXT_WINDOW_TOKENS[option.id];
+    if (tokens !== undefined) contextWindowTokens[option.id] = tokens;
+  }
+  if (Object.keys(contextWindowTokens).length === 0) return {};
+  return {
+    contextWindowTokens,
+    ...(contextWindowTokens[LONG_CONTEXT_WINDOW_ID] !== undefined
+      ? { modelSuffixes: { contextWindow: { [LONG_CONTEXT_WINDOW_ID]: "[1m]" } } }
+      : {}),
+  };
 }
 
 function resolveClaudeCatalogModel(

@@ -7,6 +7,7 @@ import {
   formatClaudeVersionUpgradeMessage,
   normalizeClaudeCatalogEffort,
   resolveClaudeCatalogApiModelId,
+  resolveClaudeCatalogContextWindowTokens,
   resolveClaudeCatalogEffort,
   resolveClaudeModelCatalog,
   resolveClaudeModelsForVersion,
@@ -198,6 +199,83 @@ describe("Claude model catalog", () => {
     assert.deepStrictEqual(
       resolveClaudeModelsForVersion(catalog, "3.2.0").map((model) => model.slug),
       ["claude-synthetic-next", "claude-custom-tuned"],
+    );
+  });
+
+  it("maps a custom entry's context window choices to tokens and the wire suffix", () => {
+    const catalog = scopeClaudeModelCatalog(resolveClaudeModelCatalog(manifest()), [
+      {
+        slug: "proxy/claude-opus-5",
+        name: "Proxied",
+        capabilities: {
+          optionDescriptors: [
+            {
+              id: "contextWindow",
+              label: "Context Window",
+              type: "select",
+              options: [
+                { id: "200k", label: "200k", isDefault: true },
+                { id: "1m", label: "1M" },
+                { id: "roomy", label: "Roomy" },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+    const select = (value: string) => ({
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      model: "proxy/claude-opus-5",
+      options: [{ id: "contextWindow", value }],
+    });
+
+    // The window the adapter reads to decide whether to send the long-context
+    // beta, which is a proxied instance's only route to 1M.
+    assert.strictEqual(resolveClaudeCatalogContextWindowTokens(catalog, select("200k")), 200_000);
+    assert.strictEqual(resolveClaudeCatalogContextWindowTokens(catalog, select("1m")), 1_000_000);
+    // An id the manifest does not use resolves no window at all, so it buys
+    // neither the beta nor the suffix.
+    assert.strictEqual(
+      resolveClaudeCatalogContextWindowTokens(catalog, select("roomy")),
+      undefined,
+    );
+    assert.strictEqual(
+      resolveClaudeCatalogApiModelId(catalog, select("roomy")),
+      "proxy/claude-opus-5",
+    );
+
+    // A direct instance takes Anthropic's own syntax; a proxied one the plain
+    // slug, since the suffix is what it answers 400 to (#1088).
+    assert.strictEqual(
+      resolveClaudeCatalogApiModelId(catalog, select("1m")),
+      "proxy/claude-opus-5[1m]",
+    );
+    assert.strictEqual(
+      resolveClaudeCatalogApiModelId(catalog, select("200k")),
+      "proxy/claude-opus-5",
+    );
+    assert.strictEqual(
+      resolveClaudeCatalogApiModelId(catalog, select("1m"), { modelSuffixes: false }),
+      "proxy/claude-opus-5",
+    );
+  });
+
+  it("leaves a custom entry without context choices unmapped", () => {
+    const catalog = scopeClaudeModelCatalog(resolveClaudeModelCatalog(manifest()), [
+      {
+        slug: "claude-custom-plain",
+        name: "Plain",
+        capabilities: {
+          optionDescriptors: [{ id: "fastMode", label: "Fast Mode", type: "boolean" }],
+        },
+      },
+    ]);
+    assert.strictEqual(
+      resolveClaudeCatalogContextWindowTokens(catalog, {
+        instanceId: ProviderInstanceId.make("claudeAgent"),
+        model: "claude-custom-plain",
+      }),
+      undefined,
     );
   });
 });

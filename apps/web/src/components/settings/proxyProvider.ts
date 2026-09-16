@@ -97,8 +97,16 @@ function customModelSlug(entry: unknown): string | null {
  * the composer with no reasoning control at all; writing Claude's own effort
  * descriptor makes the control appear without editing every model by hand.
  * Custom entries carry no runtime effort map, so the chosen value reaches the
- * proxy verbatim as `output_config.effort`. Fast mode and thinking are Claude
- * Code settings a proxy upstream need not honour, so they stay off the entry.
+ * proxy verbatim as `output_config.effort`. Thinking is a Claude Code setting
+ * a proxy upstream need not honour, so it stays off the entry.
+ *
+ * Context window is here because a proxy is the one place the choice cannot be
+ * inferred: the `[1m]` suffix that buys the CLI its 1M window is Anthropic's
+ * wire syntax a proxy answers 400 to (#1088), so the adapter sends the
+ * long-context beta header instead — but only when the selection resolves 1M,
+ * which needs this descriptor to exist. It defaults to 200k: which upstream a
+ * proxy slug reaches is the router's business, and a model that cannot serve
+ * 1M should not be asked for it by default.
  */
 const PROXY_MODEL_OPTION_DESCRIPTORS = [
   {
@@ -111,6 +119,16 @@ const PROXY_MODEL_OPTION_DESCRIPTORS = [
       { id: "high", label: "High", isDefault: true },
       { id: "xhigh", label: "Extra High" },
       { id: "max", label: "Max" },
+    ],
+  },
+  { id: "fastMode", label: "Fast Mode", type: "boolean" },
+  {
+    id: "contextWindow",
+    label: "Context Window",
+    type: "select",
+    options: [
+      { id: "200k", label: "200k", isDefault: true },
+      { id: "1m", label: "1M" },
     ],
   },
 ] as const satisfies ReadonlyArray<ProviderOptionDescriptor>;
