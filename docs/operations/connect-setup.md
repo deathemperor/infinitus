@@ -49,14 +49,14 @@ In Clerk's OAuth applications settings:
 
 ## JWT template
 
-Create a Clerk JWT template named `t3-relay` with claims:
+Create a Clerk JWT template named `infinitus-relay` with claims:
 
 ```json
-{ "aud": "t3-code-relay" }
+{ "aud": "infinitus-relay" }
 ```
 
-Set `T3CODE_CLERK_JWT_TEMPLATE=t3-relay` for clients and
-`CLERK_JWT_AUDIENCE=t3-code-relay` for the relay. The production relay deployment environment
+Set `T3CODE_CLERK_JWT_TEMPLATE=infinitus-relay` for clients and
+`CLERK_JWT_AUDIENCE=infinitus-relay` for the relay. The production relay deployment environment
 also defines `CLERK_JWT_TEMPLATE`. The audience stays the same across relay stages; the relay
 URL selects the deployment.
 

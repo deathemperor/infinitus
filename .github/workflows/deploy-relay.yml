@@ -1,4 +1,4 @@
-name: Deploy T3 Connect relay
+name: Deploy Infinitus Connect relay
 
 on:
   push:
@@ -51,11 +51,11 @@ jobs:
           cache: true
           run-install: |
             args:
-              - --filter=t3code-relay...
+              - --filter=infinitus-relay...
 
       - name: Deploy production relay stage
         id: deploy
-        run: vp run --filter t3code-relay deploy --stage prod --yes --github-output
+        run: vp run --filter infinitus-relay deploy --stage prod --yes --github-output
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
