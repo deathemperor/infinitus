@@ -15,7 +15,32 @@ function dataFromNotificationResponse(response: unknown): Record<string, unknown
     return null;
   }
   const data = (content as { readonly data?: unknown }).data;
-  return typeof data === "object" && data !== null ? (data as Record<string, unknown>) : null;
+  if (typeof data === "object" && data !== null) {
+    return data as Record<string, unknown>;
+  }
+  return pushPayloadFromRequest(request);
+}
+
+/** Infinitus (fork, #1375): expo-notifications on iOS fills `content.data`
+    for a remote push from the payload's `body` key alone, and the relay
+    sends its keys (`environmentId`, `threadId`, `deepLink`) at the top level
+    beside `aps` — so `data` is empty there. The push trigger carries the
+    whole `userInfo` as `payload`; that is the same keys, read second. */
+export function pushPayloadFromRequest(request: unknown): Record<string, unknown> | null {
+  if (typeof request !== "object" || request === null) {
+    return null;
+  }
+  const trigger = (request as { readonly trigger?: unknown }).trigger;
+  if (typeof trigger !== "object" || trigger === null) {
+    return null;
+  }
+  if ((trigger as { readonly type?: unknown }).type !== "push") {
+    return null;
+  }
+  const payload = (trigger as { readonly payload?: unknown }).payload;
+  return typeof payload === "object" && payload !== null
+    ? (payload as Record<string, unknown>)
+    : null;
 }
 
 function identifierFromNotificationResponse(response: unknown): string | null {

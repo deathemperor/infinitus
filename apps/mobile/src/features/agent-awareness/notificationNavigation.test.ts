@@ -145,6 +145,22 @@ describe("extractAgentNotificationDeepLink", () => {
     ).toBe("/settings/accounts");
   });
 
+  it("reads the relay's keys off the push trigger when iOS leaves data empty (#1375)", () => {
+    const response = {
+      notification: {
+        request: {
+          identifier: "notification-2",
+          trigger: {
+            type: "push",
+            payload: { aps: { alert: {} }, environmentId: "env", deepLink: "/threads/env/thread" },
+          },
+          content: {},
+        },
+      },
+    };
+    expect(extractAgentNotificationDeepLink(response)).toBe("/threads/env/thread");
+  });
+
   it("ignores malformed or external links", () => {
     expect(
       extractAgentNotificationDeepLink(responseWithData({ deepLink: "https://example.com" })),

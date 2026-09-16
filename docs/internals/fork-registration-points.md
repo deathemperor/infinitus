@@ -426,7 +426,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `INFINITUS_ACCOUNTS_DEEP_LINK` (`/settings/accounts`) accepted whole by
   `extractAgentNotificationDeepLink` beside the thread links (#1375): an
   environment's account alert rides the relay's ordinary push and a tap
-  opens Settings › Accounts. One case in `notificationNavigation.test.ts`.
+  opens Settings › Accounts. `dataFromNotificationResponse` falls back to
+  the push trigger's `payload` (`pushPayloadFromRequest`): expo-notifications
+  on iOS fills `content.data` for a remote push from a `body` key alone, and
+  the relay's keys sit at the top level beside `aps`, so `data` is empty
+  there — for upstream's thread taps as much as the fork's alert. Two cases
+  in `notificationNavigation.test.ts`.
 - `apps/mobile/modules/t3-agent-notifications/android/.../AgentNotifications.kt`
   — `contentIntent` takes `/settings/accounts` beside `/threads/…` for the
   same alert (#1375).
