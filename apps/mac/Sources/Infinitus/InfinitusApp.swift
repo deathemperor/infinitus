@@ -162,8 +162,8 @@ struct InfinitusApp: App {
     // removes; the sign-in flow it drives stays native (SignInFlow.swift)
     // and account backup, a file panel over the keychain-backed store,
     // moved to Devices. Devices itself shrank on 2026-09-15 (#1178): this
-    // Mac's name, phone alerts and the iCloud toggle are the desktop's
-    // Devices page, over their prefs and the `apns` / `apns-key` verbs.
+    // Mac's name and the iCloud toggle are the desktop's Devices page, over
+    // their prefs (phone alerts need no setup since #1375).
     [
         // "Sync" until 2026-09-02: the pane grew the phone companion and
         // its routes, and syncing settings is now the smaller half.

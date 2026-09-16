@@ -124,10 +124,7 @@ public enum PrefCatalog {
         Entry("fork_server_port", .int, .number(Double(ForkTunnelStatus.defaultPort)), devices),
         Entry("fork_tunnel_hostname", .string, .string(""), devices),
         // Devices: this Mac's name, the APNs key ids and iCloud sync (#1178).
-        // The .p8 itself goes over `apns-key` (stdin), never a pref.
         Entry("machine_name", .string, .string(""), devices),
-        Entry("apns_team_id", .string, .string(""), devices),
-        Entry("apns_key_id", .string, .string(""), devices),
         Entry("icloud_sync", .bool, .bool(false), devices),
         // Engines: the `engine` command relaunches the app for these.
         Entry("engine_swapd_enabled", .bool, .bool(true), engines, effect: .restart),

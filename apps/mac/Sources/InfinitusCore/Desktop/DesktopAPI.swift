@@ -190,6 +190,24 @@ public struct DesktopAPI {
     public func releaseThread(_ id: String) throws -> Release {
         try decode(post("/api/infinitus/release-thread", body: .object(["threadId": .string(id)])))
     }
+    /// `GET /api/infinitus/running-turns` (#829): the provider turns running
+    /// now — the Mac's busy-session count since the thread card left (#1375).
+    public struct RunningTurn: Decodable, Equatable {
+        public var threadId: String
+        public var turnId: String
+    }
+    public func runningTurns() throws -> [RunningTurn] { try decode(get("/api/infinitus/running-turns")) }
+    /// `POST /api/infinitus/alert` (#1375): one account alert for the relay
+    /// to push to the phones. `nil` when the desktop holds no relay link
+    /// (its 503): nothing to push, nothing to report.
+    public struct AlertResult: Decodable, Equatable {
+        public var deliveries: Int
+    }
+    public func alert(title: String, body: String) throws -> AlertResult? {
+        do {
+            return try decode(post("/api/infinitus/alert", body: .object(["title": .string(title), "body": .string(body)])))
+        } catch let failure as Failure where failure.status == 503 { return nil }
+    }
 
     // MARK: plumbing
 

@@ -259,31 +259,13 @@ final class ControlServer {
 
         case "push":
             // #269 G: the desktop's thread phase changes ride the Mac's
-            // own pusher, so they get its gating and every channel on.
-            // #1047: its thread card state rides the same verb to the
-            // phone's lock screen — no Notification Center line for it.
-            // The reply says what was addressed: `targets` phones and the
-            // requests per token kind, 0 when nobody is registered (a
-            // synthetic push into nothing used to read as a success).
-            if let payload = r.secret, let activity = ThreadActivityPush.parse(payload) {
-                let reach: PushReach
-                switch activity {
-                case .show(let state):
-                    reach = model.liveActivityPusher.pushAgentActivity(state)
-                    model.desktopActiveThreads = state.activeCount
-                case .end:
-                    reach = model.liveActivityPusher.pushAgentActivity(nil)
-                    model.desktopActiveThreads = 0
-                }
-                return ControlReply(ok: true, result: .object(
-                    ["pushed": .bool(true), "card": .bool(true)].merging(reach.replyFields) { _, new in new }))
-            }
+            // own channels, so they get its gating. (The phone's thread
+            // card rode this verb until #1375; the relay draws it now.)
             guard let payload = r.secret, let push = ThreadPhasePush.parse(payload) else {
-                throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} or {kind: \"thread.activity\", state} is expected on stdin")
+                throw Fail("push: {kind: \"thread.phase\", threadId, title, phase, detail?} is expected on stdin")
             }
-            let reach = model.push(push.line)
-            return ControlReply(ok: true, result: .object(
-                ["pushed": .bool(true)].merging(reach.replyFields) { _, new in new }))
+            model.push(push.line)
+            return ControlReply(ok: true, result: .object(["pushed": .bool(true)]))
 
         case "switch", "hold", "unhold", "rename", "remove":
             let (fleet, n) = try target(r)
@@ -692,20 +674,6 @@ final class ControlServer {
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
-        case "activities-token":
-            // `--forget <deviceId>/<kind>` withdraws one registration (#572
-            // G6); idempotent, so a phone that never registered here can
-            // still switch its alerts off.
-            if let slot = r.options["forget"] {
-                let forgotten = model.liveActivityPusher.forget(slot: slot)
-                return ControlReply(ok: true, result: .object(["slot": .string(slot), "forgotten": .bool(forgotten)]))
-            }
-            // The mirror's `POST /activities/token`, for a client on the
-            // socket (#572 N1): the same decode, the same registration.
-            let registration = try ControlBody.decode(ActivityPushRegistration.self, from: r)
-            model.liveActivityPusher.register(registration)
-            return ControlReply(ok: true, result: .object(["slot": .string(registration.slot)]))
-
         case "client-activity":
             let report = try ControlBody.decode(ClientActivity.Report.self, from: r)
             model.leases.report(report)
@@ -839,26 +807,6 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: .object(["sessionAffinity": .bool(word == "on")]))
 
-        case "apns":
-            // #1178: the push setup for the Devices page — the key ids,
-            // whether the .p8 is in the keychain, the phones registered.
-            // Never a token: a registration's token is the phone's push
-            // address.
-            let pusher = model.liveActivityPusher
-            return ControlReply(ok: true, result: .object(ApnsStatus.fields(
-                keyPresent: pusher.keyStored, teamId: pusher.teamID, keyId: pusher.keyID,
-                registrations: Array(pusher.registrations.values), lastPushes: pusher.lastPushes)))
-
-        case "apns-key":
-            // #1178: the .p8 rides stdin, never argv; empty stdin forgets it.
-            // Stored under the key id, so that pref comes first.
-            let pusher = model.liveActivityPusher
-            guard !pusher.keyID.isEmpty else { throw Fail("set the key id first (prefs set apns_key_id <id>)") }
-            let pem = r.secret ?? ""
-            let forgetting = pem.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            pusher.storeKey(pem: pem)
-            guard forgetting || pusher.keyStored else { throw Fail(pusher.lastResult ?? "couldn't store the key") }
-            return ControlReply(ok: true, result: .object(["stored": .bool(pusher.keyStored)]))
         case "test-connection":
             // #1177: the fork's Engines page probes with the keychain
             // credential; the reply never carries it, only the engine's words.

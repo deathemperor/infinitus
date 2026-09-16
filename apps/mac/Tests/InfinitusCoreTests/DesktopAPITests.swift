@@ -122,6 +122,25 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertEqual(log.calls[1].body, "{\"threadId\":\"t2\"}")
     }
 
+    func testRunningTurnsAndAlertRideTheInfinitusRoutes() throws {
+        // #1375: the busy-session count and the phone alert, both over the
+        // desktop credential; a desktop without a relay link answers 503
+        // to the alert and that reads as nothing to push.
+        let log = Log()
+        let a = api([(200, #"[{"threadId":"t1","turnId":"u1"},{"threadId":"t2","turnId":"u2"}]"#),
+                     (200, #"{"deliveries":2}"#),
+                     (503, #"{"_tag":"InfinitusAlertRelayUnlinked"}"#)], log: log)
+        XCTAssertEqual(try a.runningTurns().map(\.threadId), ["t1", "t2"])
+        XCTAssertEqual(try a.alert(title: "Infinitus", body: "switched to account 2 (work)"), DesktopAPI.AlertResult(deliveries: 2))
+        XCTAssertNil(try a.alert(title: "Infinitus", body: "all accounts are back"))
+        XCTAssertEqual(log.calls.map(\.url), ["http://127.0.0.1:3773/api/infinitus/running-turns",
+                                              "http://127.0.0.1:3773/api/infinitus/alert",
+                                              "http://127.0.0.1:3773/api/infinitus/alert"])
+        XCTAssertEqual(log.calls[1].method, "POST")
+        XCTAssertEqual(log.calls[1].body, #"{"body":"switched to account 2 (work)","title":"Infinitus"}"#)
+        XCTAssertEqual(log.calls[1].headers["Authorization"], "Bearer tok-secret-1234")
+    }
+
     func testRenameDispatchesTheSameMetadataCommandAsTheUI() throws {
         let log = Log()
         let a = api([(200, "{\"sequence\":43}")], log: log)

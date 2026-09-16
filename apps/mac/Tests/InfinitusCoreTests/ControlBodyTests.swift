@@ -1,28 +1,19 @@
 import XCTest
 @testable import InfinitusCore
 
-/// The `--body <json>` carrier (#572 N1): the three verbs decode exactly
-/// what their mirror routes decode.
+/// The `--body <json>` carrier (#572 N1): the verbs decode exactly what
+/// their mirror routes decoded.
 final class ControlBodyTests: XCTestCase {
     private func request(_ command: String, body: String?) -> ControlRequest {
         ControlRequest(command: command, args: [], options: body.map { ["body": $0] } ?? [:], secret: nil)
     }
 
-    func testTheThreeVerbsAreWriteCommandsWithABodyOption() {
-        for name in ["activities-token", "client-activity", "crash-report"] {
+    func testTheBodyVerbsAreWriteCommandsWithABodyOption() {
+        for name in ["client-activity", "crash-report"] {
             let command = ControlCommand.named(name)
             XCTAssertEqual(command?.effect, .write, name)
-            XCTAssertEqual(command?.options.first, "--body <json>", name)   // activities-token also takes --forget (#572 G6)
+            XCTAssertEqual(command?.options.first, "--body <json>", name)
         }
-    }
-
-    func testAPushRegistrationDecodesWithItsISODate() throws {
-        let body = #"{"kind":"alert","token":"ab12","deviceId":"d1","deviceName":"Phone","environment":"sandbox","themeID":null,"registeredAt":"2026-09-10T10:00:00Z","macId":"m-1"}"#
-        let r = try ControlBody.decode(ActivityPushRegistration.self, from: request("activities-token", body: body))
-        XCTAssertEqual(r.slot, "d1/alert")
-        XCTAssertEqual(r.macId, "m-1")
-        XCTAssertTrue(r.isSandbox)
-        XCTAssertEqual(r.registeredAt, ISO8601DateFormatter().date(from: "2026-09-10T10:00:00Z"))
     }
 
     func testAClientReportDecodesItsScopes() throws {

@@ -198,7 +198,7 @@ touch "$ENV_FILE" && chmod 600 "$ENV_FILE"
 TEAM_ID=Q783W6B4FA          # the paid personal team ("Loc Truong")
 NOTARY_PROFILE=infinitus    # notarytool keychain profile name
 
-TOTAL_STAGES=6
+TOTAL_STAGES=5
 
 banner "Infinitus signing setup"
 
@@ -314,27 +314,6 @@ if [[ -f "$P12_PATH" && -f "${NOTARY_KEY_PATH:-/nonexistent}" ]]; then
 else
   warn "missing $P12_PATH or the .p8 — see docs/RELEASING.md for the five secrets"
   SKIPPED+=("GitHub secrets DEVELOPER_ID_P12_BASE64, DEVELOPER_ID_P12_PASSWORD, NOTARY_KEY_ID, NOTARY_ISSUER_ID, NOTARY_KEY_BASE64")
-fi
-
-# ── 6 ─────────────────────────────────────────────────────────────────────
-stage "Push — APNs key for the phone's alerts (#70)"
-say "The Mac pushes its alerts to the phone with an APNs auth key. This is a"
-warn "DIFFERENT .p8 from stage 2's App Store Connect key — don't reuse that one."
-open_url "https://developer.apple.com/account/resources/authkeys/add"
-step "Key name 'infinitus apns' → tick 'Apple Push Notifications service (APNs)' → Continue → Register."
-step "Note the KEY ID, click Download (once) → AuthKey_<KEY ID>.p8."
-ask APNS_KEY_ID "APNs Key ID (10 characters, blank to skip):"
-if [[ -n "$APNS_KEY_ID" ]]; then
-  write_env APNS_KEY_ID "$APNS_KEY_ID"
-  step "Open the .p8 in a text editor and copy its whole contents to the clipboard."
-  step "Infinitus (menu bar) → Settings → Devices → 'Phone alerts' → Team ID '$TEAM_ID', Key ID '$APNS_KEY_ID' → 'Paste .p8 from clipboard'."
-  note "The key lives in the Mac keychain only (run.infinitus.apns); shown masked."
-  pause "Press Enter once the row says 'key in the keychain'"
-  security find-generic-password -s run.infinitus.apns -a "$APNS_KEY_ID" >/dev/null 2>&1 \
-    && printf '  %s✓ found%s the APNs key in the keychain\n' "$GREEN" "$RESET" \
-    || warn "no keychain item for key $APNS_KEY_ID yet — paste it in Settings › Devices"
-else
-  SKIPPED+=("APNs key → Settings › Devices (issue #70)")
 fi
 
 finish

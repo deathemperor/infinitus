@@ -6,10 +6,10 @@ import InfinitusCore
 /// Devices: what cannot leave the Mac — the Cloudflare tunnel the desktop
 /// server rides (cloudflared on this Mac), crash reports, settings as a
 /// file (a file panel) and account backup (#1179, a file panel over the
-/// keychain-backed store). This Mac's name, phone alerts (APNs) and the
-/// iCloud sync toggle are the desktop's Settings › Infinitus › Devices
-/// since #1218/#1221 (their prefs and the `apns` / `apns-key` verbs), and
-/// left this pane with #1178. Was "Sync" — it lived in Display before,
+/// keychain-backed store). This Mac's name and the iCloud sync toggle are
+/// the desktop's Settings › Infinitus › Devices since #1218/#1221 (their
+/// prefs), and left this pane with #1178; phone alerts go through the
+/// Infinitus Connect relay since #1375, with nothing to set up here. Was "Sync" — it lived in Display before,
 /// which is the wrong home (user report 2026-08-30). The phone mirror it
 /// once paired (#9) left with #1041; the phone pairs through the desktop.
 struct SyncPane: View {

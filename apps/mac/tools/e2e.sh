@@ -414,10 +414,7 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 # #1178: the Devices page's prefs and the push setup verbs.
 "$CTL" prefs set machine_name "E2E Mac" | expect "d['value']=='E2E Mac' and d['section']=='devices'" || fail "prefs set machine_name"
 "$CTL" prefs set machine_name "" | expect "d['value']==''" || fail "prefs set machine_name back"
-"$CTL" prefs get apns_team_id apns_key_id icloud_sync | expect "[p['value'] for p in d['prefs']]==['','',False]" || fail "prefs get apns ids / icloud_sync"
-"$CTL" apns | expect "d['keyPresent'] is False and d['teamId']=='' and d['keyId']=='' and d['registrations']==[]" || fail "apns"
-printf 'x' | "$CTL" apns-key 2>&1 | grep -q "apns_key_id" || fail "apns-key must want a key id first"
-"$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='apns-key')['stdin']=='secret'" || fail "manifest: apns-key takes stdin"
+"$CTL" prefs get icloud_sync | expect "[p['value'] for p in d['prefs']]==[False]" || fail "prefs get icloud_sync"
 "$CTL" prefs set fork_tunnel_hostname '""' | expect "d['value']==''" || fail "prefs set fork_tunnel_hostname back"
 "$CTL" status | expect "d['forkTunnel']['state']=='off'" || fail "fork tunnel must be off again"
 pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
@@ -427,9 +424,6 @@ echo "prefs: ok"
 "$CTL" client-activity --body '{"clientId":"e2e","visible":true,"focused":true,"recentlyInteracted":true,"scopes":[{"type":"fleets"}],"ttlMs":5000}' | expect "d['clientId']=='e2e'" || fail "client-activity"
 "$CTL" perf | expect "d['leaseScopes'].get('e2e')==['fleets']" || fail "perf must name the lease e2e just took (#499)"
 "$CTL" perf | expect "'stats' not in d['leaseScopes'].get('local', [])" || fail "the local client must not hold stats without the Stats pane (#499)"
-# #572 G6: a phone withdraws its own alert registration; a second withdrawal is a no-op, not an error.
-"$CTL" activities-token --body '{"kind":"alert","token":"00ff","deviceId":"e2e-phone","deviceName":"e2e phone","environment":"sandbox","registeredAt":"2026-09-11T00:00:00Z"}' | expect "d['slot']=='e2e-phone/alert'" || fail "activities-token register"
-"$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is True" || fail "activities-token --forget"
 # #1177: the fork's "Test connection" against a port nothing serves — a
 # dev Mac's keychain may hold a real key (CI's never does), so the words
 # differ but the verdict and the shape do not; a bad target is a usage
@@ -437,23 +431,20 @@ echo "prefs: ok"
 "$CTL" test-connection cliproxy --url http://127.0.0.1:9 | expect "d['ok'] is False and isinstance(d['error'], str) and d['error'] and 'latencyMs' not in d" || fail "test-connection cliproxy against a dead port"
 "$CTL" test-connection 9router --url http://127.0.0.1:9 | expect "d['ok'] is False and isinstance(d['error'], str) and d['error']" || fail "test-connection 9router against a dead port"
 "$CTL" test-connection swapd >/dev/null 2>&1 && fail "test-connection must refuse an unknown engine"
-# #1047: the desktop's thread card on the push verb — a null state ends
-# it (no phone registered: a no-op that still answers), a stray shape is refused.
-# No phone is registered on this private instance, so the reply says so.
-printf '{"kind":"thread.activity","state":null}' | "$CTL" push | expect "d['pushed'] is True and d['card'] is True and d['targets'] == 0 and d['kinds'] == {}" || fail "push thread.activity end"
-printf '{"kind":"thread.activity","state":{"title":"x"}}' | "$CTL" push 2>&1 | grep -q "thread.activity" || fail "push thread.activity refuses a stray state"
-"$CTL" activities-token --forget e2e-phone/alert | expect "d['forgotten'] is False" || fail "activities-token --forget twice"
-# #835: --forget has no body, so a stdin pipe nobody closes must not hold it
+# #1375: the thread card left the push verb with the Mac's APNs key; a
+# stray shape is still refused, never pushed.
+printf '{"kind":"thread.activity","state":null}' | "$CTL" push 2>&1 | grep -q "thread.phase" || fail "push refuses a stray shape"
+# #835: a verb with no body must not wait on a stdin pipe nobody closes
 # (a fifo opened read-write never reaches EOF).
 mkfifo "$SOCKDIR/hold.fifo"; exec 7<>"$SOCKDIR/hold.fifo"
-"$CTL" activities-token --forget e2e-phone/alert <&7 >"$LOG.forget" 2>&1 &
-FORGET_PID=$!
-i=0; while /bin/kill -0 "$FORGET_PID" 2>/dev/null; do
-    i=$((i + 1)); [ "$i" -lt 100 ] || { kill "$FORGET_PID" 2>/dev/null; fail "activities-token --forget waited on stdin (#835)"; }
+"$CTL" prefs get icloud_sync <&7 >"$LOG.hold" 2>&1 &
+HOLD_PID=$!
+i=0; while /bin/kill -0 "$HOLD_PID" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 100 ] || { kill "$HOLD_PID" 2>/dev/null; fail "prefs get waited on stdin (#835)"; }
     sleep 0.1
 done
 exec 7>&-
-expect "d['forgotten'] is False" <"$LOG.forget" || fail "activities-token --forget with an open stdin"
+expect "d['prefs'][0]['value'] is False" <"$LOG.hold" || fail "prefs get with an open stdin"
 echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVersion":"0","at":"2026-09-10T00:00:00Z","kind":"crash","reason":"e2e","frames":[]}' | "$CTL" crash-report | expect "d['id']=='e2e-crash'" || fail "crash-report (stdin body)"
 "$CTL" crashes | expect "any(c['id']=='e2e-crash' for c in d['crashes'])" || fail "crash-report not listed by crashes"
 # The #677 sign-in verbs are wired (the flow itself needs a human and the Claude CLI): a

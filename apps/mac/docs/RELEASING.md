@@ -30,7 +30,8 @@ pipeline was proven end-to-end on 2026-09-01 under the company team,
 then unsigned the same day. The personal paid team (`Q783W6B4FA`,
 2026-09-05) redoes it: `tools/signing-wizard.sh` walks every step
 below — cert, API key, local notarization proof, the five CI secrets,
-the phone's first team build, the APNs key for #70 — and re-runs safely.
+the phone's first team build — and re-runs safely. (The APNs key of #70
+left with #1375: phone alerts go through the Infinitus Connect relay.)
 
 ## Getting a Developer ID
 
