@@ -10,8 +10,19 @@ final class PrefCatalogTests: XCTestCase {
         defaults = UserDefaults(suiteName: suite)
     }
 
+    /// `removePersistentDomain` empties the domain but leaves its plist on
+    /// disk, and the suite name is fresh per test — so every `swift test`
+    /// left one more empty file in ~/Library/Preferences (1133 of them on
+    /// one dev Mac). `defaults delete` cannot clear them either: an empty
+    /// domain reads as "does not exist". Unlink the file too. The per-test
+    /// UUID stays — worktrees run `swift test` concurrently, and one shared
+    /// suite name would have them writing over each other.
     override func tearDown() {
         defaults.removePersistentDomain(forName: suite)
+        defaults = nil
+        let plist = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Preferences/\(suite).plist")
+        try? FileManager.default.removeItem(at: plist)
     }
 
     /// The table stays honest as it grows: every entry sits in a listed
