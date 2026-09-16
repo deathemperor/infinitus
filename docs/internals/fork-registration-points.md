@@ -263,8 +263,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/**` — every user-facing "T3 Code" (brand mark, first-run
   heading, copy, errors, labels, the boot-shell fallback) reads `PRODUCT_NAME`;
   `productName.guard.test.ts` fails on a new literal outside its allowlist (the
-  GNOME extension's shipped name). Comments, "T3 Connect" and the
-  `t3code/<version>` UA token stay (#601 slice A).
+  GNOME extension's shipped name), and on a "T3 Connect" since #1368: the
+  relay feature is `CONNECT_NAME` ("Infinitus Connect", user ruling
+  2026-09-16 — identifiers follow in #1368's later slices). Comments stay.
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
   boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
   `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`
@@ -537,8 +538,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `docs/user/mobile-notifications.md` — the "Alerts from an Infinitus Mac"
   section appended at the end (#1178): Settings › Infinitus › Devices, the
   push key and the registered phones, and the lock-screen thread card with
-  its phone Settings rows (#1265). Upstream's T3 Connect text above it is
-  untouched.
+  its phone Settings rows (#1265). Upstream's text above it says Infinitus
+  Connect (#1368) and is otherwise untouched.
 - **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the four read sites (`T3ProjectFileLoader.ts`, `useT3ProjectFileScripts.ts`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the

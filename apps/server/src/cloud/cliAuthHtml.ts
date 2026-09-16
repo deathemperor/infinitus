@@ -1,4 +1,4 @@
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 
 export type LoopbackAuthorizationStage = "dev" | "nightly" | "latest";
 
@@ -25,7 +25,7 @@ export function renderLoopbackAuthorizationCompleteHtml(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>T3 Connect authorization complete</title>
+    <title>{CONNECT_NAME} authorization complete</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -149,7 +149,7 @@ export function renderLoopbackAuthorizationCompleteHtml(
       <section class="content">
         <p class="eyebrow">Browser authorization complete</p>
         <h1>You're connected</h1>
-        <p class="description">Return to your terminal to finish setting up T3 Connect. You can close this window.</p>
+        <p class="description">Return to your terminal to finish setting up {CONNECT_NAME}. You can close this window.</p>
       </section>
     </main>
   </body>

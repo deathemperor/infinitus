@@ -180,6 +180,7 @@ import * as NetService from "@t3tools/shared/Net";
 import * as RelayClient from "@t3tools/shared/relayClient";
 import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";
 import { forkParked, ServerActivation } from "./serverActivation.ts";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 // MCP handoff thread IDs include escaped provenance and can exceed find-my-way's
 // 100-character default for one path segment.
@@ -883,9 +884,11 @@ const makeServerLayer = Layer.unwrap(
                   Schedule.upTo({ duration: "10 minutes" }),
                 ),
               }),
-              Effect.tap(() => Effect.logInfo("T3 Connect desired link reconciled on startup")),
+              Effect.tap(() =>
+                Effect.logInfo(`${CONNECT_NAME} desired link reconciled on startup`),
+              ),
               Effect.catch((cause) =>
-                Effect.logWarning("Failed to reconcile T3 Connect desired link on startup", {
+                Effect.logWarning(`Failed to reconcile ${CONNECT_NAME} desired link on startup`, {
                   message: cause.message,
                 }),
               ),

@@ -6,7 +6,7 @@ import {
   EnvironmentHttpUnauthorizedError,
 } from "@t3tools/contracts";
 import { RelayProtectedError } from "@t3tools/contracts/relay";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -26,7 +26,7 @@ export function relayRequestError(cause: unknown) {
   return isRelayResponseError(cause)
     ? cause
     : new EnvironmentHttpInternalServerError({
-        message: `Could not complete the T3 Connect relay request. ${isHttpClientError(cause) ? `The relay request failed (${cause.reason._tag}).` : "The relay returned an unexpected response."} Check this machine's network connection and relay availability, then retry.`,
+        message: `Could not complete the ${CONNECT_NAME} relay request. ${isHttpClientError(cause) ? `The relay request failed (${cause.reason._tag}).` : "The relay returned an unexpected response."} Check this machine's network connection and relay availability, then retry.`,
       });
 }
 
@@ -44,7 +44,7 @@ export const shouldRetryCloudLink = (error: unknown): boolean => !isPermanentClo
 function recoveryHint(error: RelayProtectedError): string {
   switch (error._tag) {
     case "RelayEnvironmentLinkLimitExceededError":
-      return `Unlink an unused environment in T3 Connect, then restart ${PRODUCT_NAME} on this machine.`;
+      return `Unlink an unused environment in ${CONNECT_NAME}, then restart ${PRODUCT_NAME} on this machine.`;
     case "RelayAuthInvalidError":
       return `Run \`t3 connect login\` to check this machine's authorization. If the stored credential was revoked, sign out with \`t3 connect logout\`, then run \`t3 connect\` again. Restart ${PRODUCT_NAME} after signing in.`;
     case "RelayEnvironmentLinkProofExpiredError":
@@ -66,8 +66,8 @@ export const filterRelayResponse = Effect.fn("cloud.filter_relay_response")(func
   const ray = response.headers["cf-ray"];
   const requestId = ray && /^[a-zA-Z0-9-]{1,128}$/.test(ray) ? ` Cloudflare Ray ID: ${ray}.` : "";
   const message = Option.isSome(decoded)
-    ? `T3 Connect: ${decoded.value.message}. ${recoveryHint(decoded.value)} Trace ID: ${decoded.value.traceId}.`
-    : `T3 Connect relay returned HTTP ${response.status} without a recognized error response. Check relay access and any proxy or firewall restrictions, then restart ${PRODUCT_NAME}.${requestId}`;
+    ? `${CONNECT_NAME}: ${decoded.value.message}. ${recoveryHint(decoded.value)} Trace ID: ${decoded.value.traceId}.`
+    : `${CONNECT_NAME} relay returned HTTP ${response.status} without a recognized error response. Check relay access and any proxy or firewall restrictions, then restart ${PRODUCT_NAME}.${requestId}`;
 
   if (response.status === 401) return yield* new EnvironmentHttpUnauthorizedError({ message });
   if (response.status === 403) return yield* new EnvironmentHttpForbiddenError({ message });

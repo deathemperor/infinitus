@@ -86,6 +86,7 @@ import * as CliTokenManager from "./CliTokenManager.ts";
 import { getOrCreateEnvironmentKeyPairFromSecretStore } from "./environmentKeys.ts";
 import { traceRelayRequest } from "./traceRelayRequest.ts";
 import { filterRelayResponse, relayRequestError } from "./relayResponse.ts";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 const CLOUD_MINT_NONCE_PREFIX = "cloud-mint-nonce-";
 const CLOUD_MINT_JTI_PREFIX = "cloud-mint-jti-";
@@ -614,7 +615,7 @@ const reconcileDesiredCloudLinkWith = Effect.fn("environment.cloud.reconcileDesi
   },
   Effect.catchIf(
     ServerSecretStore.isSecretStoreError,
-    failEnvironmentCloudInternalError("Could not persist desired T3 Connect link state."),
+    failEnvironmentCloudInternalError(`Could not persist desired ${CONNECT_NAME} link state.`),
   ),
   Effect.catchTags({
     CloudCliCredentialRemovalError: failCloudCliTokenManagerError,
@@ -1014,7 +1015,7 @@ const cloudMintCredentialHandler = Effect.fn("environment.cloud.mintCredential")
       scopes: AuthStandardClientScopes,
       subject: "cloud-connect",
       ttl: Duration.minutes(2),
-      label: "T3 Connect connect",
+      label: `${CONNECT_NAME} connect`,
       proofKeyThumbprint: proof.clientProofKeyThumbprint,
     });
     const responsePayload = {

@@ -180,7 +180,7 @@ import {
   threadJumpCommandForIndex,
   threadJumpIndexFromCommand,
 } from "../../keybindings";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const DEFAULT_TAILSCALE_SERVE_PORT = 443;
 const EMPTY_ADVERTISED_ENDPOINTS: ReadonlyArray<AdvertisedEndpoint> = [];
@@ -1631,7 +1631,7 @@ function CloudLinkSwitch({
   disabled,
   disabledReason,
   onCheckedChange,
-  ariaLabel = "Enable T3 Connect",
+  ariaLabel = `Enable ${CONNECT_NAME}`,
 }: {
   readonly checked: boolean;
   readonly disabled: boolean;
@@ -1670,9 +1670,9 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
   const [isUpdatingPreference, setIsUpdatingPreference] = useState(false);
 
   const disabledReason = !isSignedIn
-    ? "Sign in to T3 Connect to manage this environment."
+    ? `Sign in to ${CONNECT_NAME} to manage this environment.`
     : !canManageRelay
-      ? "Your session does not have permission to manage T3 Connect access."
+      ? `Your session does not have permission to manage ${CONNECT_NAME} access.`
       : null;
   const isBusy = isUpdating || isUpdatingPreference;
 
@@ -1685,15 +1685,15 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       toastManager.add({
         type: "success",
         title: enabled
-          ? "T3 Connect linked"
+          ? `${CONNECT_NAME} linked`
           : publishAgentActivity
-            ? "T3 Connect tunnel disabled"
-            : "T3 Connect unlinked",
+            ? `${CONNECT_NAME} tunnel disabled`
+            : `${CONNECT_NAME} unlinked`,
         description: enabled
-          ? "This environment is available through T3 Connect."
+          ? `This environment is available through ${CONNECT_NAME}.`
           : publishAgentActivity
             ? "The managed tunnel was removed. Agent activity publishing stays on."
-            : "This environment is no longer available through T3 Connect.",
+            : `This environment is no longer available through ${CONNECT_NAME}.`,
       });
     }
     setIsUpdating(false);
@@ -1721,8 +1721,8 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
           title={searchableSetting("t3-connect").title}
           description={
             managedTunnelActive
-              ? "This environment is available to your other devices through T3 Connect."
-              : "Make this environment available to your other devices through T3 Connect."
+              ? `This environment is available to your other devices through ${CONNECT_NAME}.`
+              : `Make this environment available to your other devices through ${CONNECT_NAME}.`
           }
           status={operationError ?? primaryCloudLinkState.error}
           control={
@@ -1737,7 +1737,7 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
       ) : null}
       <SettingsRow
         title={searchableSetting("publish-agent-activity").title}
-        description="Send activity to mobile notifications and Live Activities without T3 Connect."
+        description={`Send activity to mobile notifications and Live Activities without ${CONNECT_NAME}.`}
         control={
           <CloudLinkSwitch
             ariaLabel="Publish agent activity to mobile clients"
@@ -1766,7 +1766,7 @@ function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnable
         <EmptyTitle>No saved remote environments</EmptyTitle>
         <EmptyDescription>
           {cloudEnabled
-            ? "Click “Add environment” to pair another environment, or connect one from T3 Connect."
+            ? `Click “Add environment” to pair another environment, or connect one from ${CONNECT_NAME}.`
             : "Click “Add environment” to pair another environment."}
         </EmptyDescription>
       </EmptyHeader>

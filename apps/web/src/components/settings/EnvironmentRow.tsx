@@ -6,6 +6,7 @@ import { cn } from "~/lib/utils";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): string {
   const authority = target.username ? `${target.username}@${target.hostname}` : target.hostname;
@@ -19,7 +20,7 @@ export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): str
 export function environmentTransportLabel(environment: EnvironmentPresentation): string {
   const { entry } = environment;
   if (entry.target._tag === "PrimaryConnectionTarget") return "This machine";
-  if (environment.relayManaged) return "T3 Connect";
+  if (environment.relayManaged) return `${CONNECT_NAME}`;
   if (isDesktopLocalConnectionTarget(entry.target)) return "WSL";
   if (
     entry.target._tag === "SshConnectionTarget" &&

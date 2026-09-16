@@ -3,11 +3,11 @@
 Connect a phone, browser, or another desktop app to Infinitus running on a different
 machine. That machine must stay running and reachable while you work.
 
-## T3 Connect
+## Infinitus Connect
 
-T3 Connect makes an environment available to your other devices without setting
+Infinitus Connect makes an environment available to your other devices without setting
 up router forwarding. In the desktop app on the host, open **Settings →
-Connections**, sign in, and enable **T3 Connect** for that environment.
+Connections**, sign in, and enable **Infinitus Connect** for that environment.
 
 For a Linux host without the desktop app, run the unpacked server archive's
 `t3` (see [Install](./install.md#headless-server-linux)):
@@ -22,12 +22,12 @@ server with `./t3 serve`. Saving your sign-in alone does not make the machine
 reachable. Every `t3` command on this page is that executable; a Mac host runs
 the desktop app instead and does all of this from **Settings → Connections**.
 
-On your other device, sign in to the same T3 Connect account and choose the
+On your other device, sign in to the same Infinitus Connect account and choose the
 environment. Over SSH, the CLI prints a browser link and a short code. Open the
 link on any device, confirm the code matches, and approve. The CLI continues on
 its own, so you do not need to forward an OAuth callback port.
 
-T3 Connect renews access credentials when needed without disconnecting a healthy
+Infinitus Connect renews access credentials when needed without disconnecting a healthy
 connection. Pull request diffs and provider settings keep working after the
 previous credential expires. A failed renewal affects that request; it does not
 disconnect an otherwise healthy conversation.
@@ -148,8 +148,8 @@ management is available through `./t3 auth --help`.
 A session with an open connection stays listed after its access credential
 expires.
 
-To remove an environment from T3 Connect, open your account menu's **T3 Connect**
-page, or **Settings → T3 Connect** on mobile, and choose **Deregister**. This
+To remove an environment from Infinitus Connect, open your account menu's **Infinitus Connect**
+page, or **Settings → Infinitus Connect** on mobile, and choose **Deregister**. This
 revokes its cloud access and frees its host space even when the environment is
 offline or has been wiped.
 
@@ -160,7 +160,7 @@ your login; `t3 connect logout` also clears that login. Background-service
 Treat pairing URLs and authorization codes as passwords. Do not include them in
 screenshots, logs, or bug reports.
 
-## T3 Connect troubleshooting
+## Infinitus Connect troubleshooting
 
 Run `t3 connect status` on the host to inspect saved authorization and link
 configuration. It is not a live reachability check. If the environment appears
@@ -189,7 +189,7 @@ If a computer should only drive work running elsewhere, turn off its local envir
 desktop app, open **Settings → Connections** and switch off **Local
 environment**. Infinitus restarts without a local server: no local agents or terminals run, WSL
 backends stay off, and other devices can no longer connect to this computer. Your projects,
-history, and saved connections are kept, and you keep working through pairing, T3 Connect, or SSH.
+history, and saved connections are kept, and you keep working through pairing, Infinitus Connect, or SSH.
 
 Switch **Local environment** back on in the same place to restart with your previous local
 settings.

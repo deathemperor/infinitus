@@ -20,6 +20,7 @@ import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
 import { findErrorTraceId } from "../errors/errorTrace.ts";
 import * as ManagedRelay from "./managedRelay.ts";
 import { relayProtectedErrorMessage } from "./errorPresentation.ts";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 const DEFAULT_STALE_TIME_MS = 15_000;
 const DEFAULT_IDLE_TTL_MS = 5 * 60_000;
@@ -127,7 +128,7 @@ export function createManagedRelaySession(input: ManagedRelaySessionInput): Mana
         try: () => readCachedClerkToken(nowMillis),
         catch: (cause) =>
           new ManagedRelaySessionError({
-            message: "Could not obtain the T3 Connect session token.",
+            message: `Could not obtain the ${CONNECT_NAME} session token.`,
             cause,
           }),
       });
@@ -185,7 +186,7 @@ function readSessionClerkToken(
         ? Effect.succeed(token)
         : Effect.fail(
             new ManagedRelaySessionError({
-              message: "The T3 Connect session token is unavailable.",
+              message: `The ${CONNECT_NAME} session token is unavailable.`,
             }),
           ),
     ),
@@ -202,7 +203,7 @@ export const deregisterManagedRelayEnvironment = Effect.fn(
   const session = registry.get(managedRelaySessionAtom);
   if (!session || session.accountId !== input.accountId) {
     return yield* new ManagedRelaySessionError({
-      message: "Sign in to T3 Connect before deregistering an environment.",
+      message: `Sign in to ${CONNECT_NAME} before deregistering an environment.`,
     });
   }
   const clerkToken = yield* readSessionClerkToken(session);
@@ -218,7 +219,7 @@ function requireClerkToken(
   if (!session || session.accountId !== accountId) {
     return Effect.fail(
       new ManagedRelaySessionError({
-        message: "Sign in to T3 Connect before loading relay data.",
+        message: `Sign in to ${CONNECT_NAME} before loading relay data.`,
       }),
     );
   }
@@ -293,7 +294,7 @@ export function readManagedRelaySnapshotState<A>(
         ? relayProtectedErrorMessage(cause.relayError)
         : cause instanceof Error
           ? cause.message
-          : "Could not load T3 Connect data.";
+          : `Could not load ${CONNECT_NAME} data.`;
     errorTraceId = findErrorTraceId(cause);
   }
   return {

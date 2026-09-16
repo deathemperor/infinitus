@@ -48,7 +48,7 @@ Notifications identify the project and thread; click one to open that thread.
 The visible thread stays quiet while the desktop window has focus. Enable the
 Dock badge to count threads waiting for approval or input.
 
-Desktop alerts need no T3 Connect account. Allow Infinitus notifications in macOS
+Desktop alerts need no Infinitus Connect account. Allow Infinitus notifications in macOS
 System Settings. For alerts on a phone, see [Mobile notifications](./mobile-notifications.md).
 
 ## Pin and reorder threads

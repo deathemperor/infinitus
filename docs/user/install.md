@@ -76,7 +76,7 @@ so this is not available on Infinitus for now.
 The Infinitus phone app is not on a store: it is installed from a build
 (TestFlight or a device build). The phone connects to a server on another
 machine. Follow
-[remote access](./remote-access.md) to link it through T3 Connect or a pairing URL.
+[remote access](./remote-access.md) to link it through Infinitus Connect or a pairing URL.
 
 If the app crashes during launch, open Settings → Diagnostics on the next launch
 that succeeds. It lists startup crashes from the last 7 days with the error and

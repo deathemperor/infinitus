@@ -36,7 +36,7 @@ describe("product name", () => {
       const relative = NodePath.relative(SRC, file);
       return withoutComments(NodeFS.readFileSync(file, "utf8"))
         .split("\n")
-        .filter((line) => line.includes("T3 Code"))
+        .filter((line) => line.includes("T3 Code") || line.includes("T3 Connect"))
         .filter(
           (line) => !LITERAL_ALLOWED.some(([f, text]) => relative === f && line.includes(text)),
         )

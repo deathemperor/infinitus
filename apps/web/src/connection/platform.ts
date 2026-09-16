@@ -61,6 +61,7 @@ import {
 } from "./desktopLocal";
 import { connectionStorageLayer } from "./storage";
 import { clientPresentationMetadata } from "./clientMetadata";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 let nextObservedRpcRequestId = 0;
 
@@ -191,7 +192,7 @@ const capabilitiesLayer = Layer.effectContext(
         if (session === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: "Sign in to T3 Connect to connect this environment.",
+            detail: `Sign in to ${CONNECT_NAME} to connect this environment.`,
           });
         }
         const token = yield* session.readClerkToken().pipe(
@@ -206,7 +207,7 @@ const capabilitiesLayer = Layer.effectContext(
         if (token === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: "The T3 Connect session is unavailable.",
+            detail: `The ${CONNECT_NAME} session is unavailable.`,
           });
         }
         return token;

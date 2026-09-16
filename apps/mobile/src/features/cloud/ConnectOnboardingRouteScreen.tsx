@@ -14,6 +14,7 @@ import { splitEnvironmentSections } from "../connection/environmentSections";
 import { useConnectionController } from "../connection/useConnectionController";
 import { optOutOfConnectOnboarding } from "./connectOnboardingOptOut";
 import { hasCloudPublicConfig } from "./publicConfig";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 
 /**
  * Post-sign-in onboarding sheet for T3 Connect. Mobile never publishes
@@ -85,7 +86,7 @@ function ConfiguredConnectOnboardingRouteScreen() {
     <View collapsable={false} className="flex-1 bg-sheet">
       {Platform.OS === "android" ? (
         <AndroidSheetHeader
-          title="Set up T3 Connect"
+          title={`Set up ${CONNECT_NAME}`}
           actions={[{ accessibilityLabel: "Close", icon: "xmark", onPress: handleClose }]}
         />
       ) : (
@@ -118,7 +119,7 @@ function ConfiguredConnectOnboardingRouteScreen() {
         ) : (
           <View collapsable={false} className="rounded-[24px] bg-card p-5">
             <Text className="text-sm leading-normal text-foreground-muted">
-              Sign in to your T3 account to set up T3 Connect.
+              Sign in to your {PRODUCT_NAME} account to set up {CONNECT_NAME}.
             </Text>
           </View>
         )}

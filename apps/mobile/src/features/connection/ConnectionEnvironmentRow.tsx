@@ -19,6 +19,7 @@ import { roamingHostsLine } from "./roamingHosts";
 import type { ConnectedEnvironmentSummary } from "../../state/remote-runtime-types";
 import { serverEnvironment } from "../../state/server";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 function connectionStatusLabel(environment: ConnectedEnvironmentSummary): string | null {
   if (!environment.isEnabled) {
@@ -167,7 +168,7 @@ export function ConnectionEnvironmentRow(props: {
         >
           {props.environment.isRelayManaged ? (
             <Text className="text-sm text-foreground-muted">
-              Managed by T3 Connect. Tunnel details update automatically.
+              Managed by {CONNECT_NAME}. Tunnel details update automatically.
             </Text>
           ) : (
             <>

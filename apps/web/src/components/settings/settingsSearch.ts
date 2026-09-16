@@ -7,6 +7,7 @@ import {
   type ResolvedSettingsScope,
   type SettingsScopeSearch,
 } from "./settingsScope";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 export type SettingsPath =
   | "/settings/projects"
@@ -713,7 +714,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "t3-connect",
     localEnvironmentOnly: true,
-    title: "T3 Connect",
+    title: `${CONNECT_NAME}`,
     to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["managed tunnel cloud other devices remote"],

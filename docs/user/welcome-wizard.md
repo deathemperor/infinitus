@@ -12,7 +12,7 @@ browser.
 
 You can add more computers before continuing:
 
-- **T3 Connect** connects computers that are signed in to your account. On a
+- **Infinitus Connect** connects computers that are signed in to your account. On a
   Mac, sign in from the desktop app's **Settings → Connections** and keep the
   app running; on a Linux server, run the unpacked archive's `./t3 connect`
   and then `./t3 serve`, or install the [background service](./background-service.md).
@@ -23,7 +23,7 @@ You can add more computers before continuing:
   (or `./t3 pair --tailscale`) prints the link to paste. See
   [Remote access](./remote-access.md).
 
-Saved computers and computers discovered through T3 Connect are selected by
+Saved computers and computers discovered through Infinitus Connect are selected by
 default. Uncheck any you do not want to set up; this does not disconnect them.
 Continue when your selected computers are connected. Setup checks
 agents across the selected computers, then offers project import grouped by computer.

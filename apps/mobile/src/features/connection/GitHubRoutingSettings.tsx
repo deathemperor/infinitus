@@ -13,6 +13,7 @@ import { SymbolView } from "../../components/AppSymbol";
 import { environmentCatalog } from "../../connection/catalog";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { SettingsSection } from "../settings/components/SettingsSection";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 const options: ReadonlyArray<{
   value: GitHubRoutingPermission;
@@ -64,7 +65,7 @@ export function GitHubRoutingSettings() {
                     {entry.target.label}
                   </Text>
                   <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-                    {connectionCatalogDisplayUrl(entry) ?? "T3 Connect"}
+                    {connectionCatalogDisplayUrl(entry) ?? `${CONNECT_NAME}`}
                   </Text>
                 </View>
                 <Text className="text-sm text-foreground-muted">

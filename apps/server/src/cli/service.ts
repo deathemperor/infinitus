@@ -1,5 +1,5 @@
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -253,9 +253,9 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
         ? `The installed ${PRODUCT_NAME} service needs an update or repair. Update it now?`
         : platform === "darwin"
           ? `Run ${PRODUCT_NAME} in the background whenever you log in to this Mac? ` +
-            "It stays reachable through T3 Connect while you are logged in."
+            `It stays reachable through ${CONNECT_NAME} while you are logged in.`
           : `Run ${PRODUCT_NAME} in the background whenever this machine boots? ` +
-            "It stays reachable through T3 Connect even after you log out.",
+            `It stays reachable through ${CONNECT_NAME} even after you log out.`,
       initial: true,
     }),
   );

@@ -46,6 +46,7 @@ import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as OrchestrationEngine from "../orchestration/Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { forkParked } from "../serverActivation.ts";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 export class AgentAwarenessRelay extends Context.Service<
   AgentAwarenessRelay,
@@ -589,11 +590,13 @@ export const make = Effect.gen(function* () {
       switch (startupState) {
         case "waiting-for-link":
           yield* Effect.logInfo(
-            "agent activity publishing standby; waiting for T3 Connect link reconciliation",
+            `agent activity publishing standby; waiting for ${CONNECT_NAME} link reconciliation`,
           );
           break;
         case "disabled":
-          yield* Effect.logInfo("agent activity publishing disabled by T3 Connect configuration");
+          yield* Effect.logInfo(
+            `agent activity publishing disabled by ${CONNECT_NAME} configuration`,
+          );
           break;
         case "enabled":
           yield* Effect.logInfo("agent activity publishing enabled", {

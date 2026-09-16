@@ -15,7 +15,7 @@ import {
   PortSchema,
 } from "@t3tools/contracts";
 import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 import {
   buildTailscaleHttpsBaseUrl,
   DEFAULT_TAILSCALE_SERVE_PORT,
@@ -80,7 +80,7 @@ export class NoRunningServerError extends Schema.TaggedError<NoRunningServerErro
     return [
       `No running ${PRODUCT_NAME} server found.`,
       ...this.checkedStatePaths.map((statePath) => `  checked ${statePath}`),
-      "Start one with `npx t3 serve`, or connect this machine with T3 Connect: `npx t3 connect`.",
+      `Start one with \`npx t3 serve\`, or connect this machine with ${CONNECT_NAME}: \`npx t3 connect\`.`,
     ].join("\n");
   }
 }

@@ -6,7 +6,7 @@ import { Argument, Command } from "effect/unstable/cli";
 import * as CliError from "effect/unstable/cli/CliError";
 
 import * as NetService from "@t3tools/shared/Net";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 import packageJson from "../package.json" with { type: "json" };
 import { authCommand } from "./cli/auth.ts";
 import { appCommand } from "./cli/app.ts";
@@ -29,8 +29,7 @@ import { triageCommand } from "./cli/triage.ts";
 
 const CliRuntimeLayer = Layer.mergeAll(NodeServices.layer, NetService.layer);
 
-const connectPublicConfigMissingMessage =
-  "T3 Connect commands are unavailable: this build is missing T3 Connect public configuration.";
+const connectPublicConfigMissingMessage = `${CONNECT_NAME} commands are unavailable: this build is missing ${CONNECT_NAME} public configuration.`;
 
 class ConnectPublicConfigMissingError extends CliError.UserError {
   override get message() {
@@ -41,7 +40,7 @@ class ConnectPublicConfigMissingError extends CliError.UserError {
 const connectUnavailableCommand = Command.make("connect", {
   command: Argument.string("command").pipe(Argument.variadic),
 }).pipe(
-  Command.withDescription("T3 Connect is unavailable in builds without public configuration."),
+  Command.withDescription(`${CONNECT_NAME} is unavailable in builds without public configuration.`),
   Command.unlisted,
   Command.withHandler(() =>
     Effect.fail(

@@ -46,7 +46,7 @@ for one message; "Send now" on a queued row sends it into the turn at once.
 
 Mobile keeps local copies of draft attachments, so you can preview them and queue
 messages while disconnected. Uploads resume when you reconnect. Drafts and queued
-messages survive app restarts. Signing out of T3 Connect keeps that work on your
+messages survive app restarts. Signing out of Infinitus Connect keeps that work on your
 device until you sign back into the same account.
 
 ## Custom models

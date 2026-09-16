@@ -19,6 +19,7 @@ import { Dialog } from "../ui/dialog";
 import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { WizardSteps, WizardPopup, WizardHeader, WizardPanel, WizardFooter } from "../ui/wizard";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 /**
  * Post-sign-in onboarding wizard for T3 Connect. Opens on every in-session
@@ -191,9 +192,9 @@ function ConfiguredConnectOnboardingDialog() {
     if (!ok) return;
     toastManager.add({
       type: "success",
-      title: "T3 Connect enabled",
+      title: `${CONNECT_NAME} enabled`,
       description: exposeEnvironment
-        ? "This environment is available to your other devices through T3 Connect."
+        ? `This environment is available to your other devices through ${CONNECT_NAME}.`
         : "This environment publishes agent activity to your mobile clients.",
     });
     setStep("devices");
@@ -210,7 +211,7 @@ function ConfiguredConnectOnboardingDialog() {
     >
       <WizardPopup>
         <WizardHeader
-          title="Set up T3 Connect"
+          title={`Set up ${CONNECT_NAME}`}
           description={
             <>
               Mesh your devices together — publish this environment and connect the rest, all in one
@@ -303,7 +304,7 @@ function PublishStep({
       <div className="rounded-lg border">
         <OnboardingToggleRow
           title="Publish this environment"
-          description="Make this environment available to your other devices through T3 Connect."
+          description={`Make this environment available to your other devices through ${CONNECT_NAME}.`}
           checked={exposeEnvironment}
           disabled={disabled}
           onCheckedChange={onExposeEnvironmentChange}

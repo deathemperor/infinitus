@@ -18,7 +18,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "../ui/dialog";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 const installSteps: ReadonlyArray<{
   readonly stage: RelayClientInstallProgressStage;
   readonly label: string;
@@ -70,8 +70,8 @@ export function RelayClientInstallDialog() {
           </DialogTitle>
           <DialogDescription>
             {isInstalling
-              ? `${PRODUCT_NAME} is preparing this environment for secure access through T3 Connect.`
-              : `${PRODUCT_NAME} needs the relay client to make this environment available through T3 Connect.`}
+              ? `${PRODUCT_NAME} is preparing this environment for secure access through ${CONNECT_NAME}.`
+              : `${PRODUCT_NAME} needs the relay client to make this environment available through ${CONNECT_NAME}.`}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>

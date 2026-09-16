@@ -34,6 +34,7 @@ import { clearComposerDraftsEnvironment } from "../state/use-composer-drafts";
 import { requestedConnectionWakeups } from "../features/infinitus/connectionWakeups";
 import { mobileApplicationActiveWakeup } from "./app-state-wakeups";
 import { connectionStorageLayer } from "./storage";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 function networkStatus(state: Network.NetworkState): "unknown" | "offline" | "online" {
   if (state.isConnected === false) {
@@ -131,7 +132,7 @@ const capabilitiesLayer = Layer.effectContext(
           if (session === null) {
             return yield* new ConnectionBlockedError({
               reason: "authentication",
-              detail: "Sign in to T3 Connect to connect this environment.",
+              detail: `Sign in to ${CONNECT_NAME} to connect this environment.`,
             });
           }
           const token = yield* session.readClerkToken().pipe(
@@ -146,7 +147,7 @@ const capabilitiesLayer = Layer.effectContext(
           if (token === null) {
             return yield* new ConnectionBlockedError({
               reason: "authentication",
-              detail: "The T3 Connect session is unavailable.",
+              detail: `The ${CONNECT_NAME} session is unavailable.`,
             });
           }
           return token;

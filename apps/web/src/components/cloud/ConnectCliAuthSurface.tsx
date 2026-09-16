@@ -10,6 +10,7 @@ import { isElectron } from "../../env";
 import { AuthSurfaceShell } from "../auth/AuthSurfaceShell";
 import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { Button } from "../ui/button";
+import { CONNECT_NAME } from "@t3tools/shared/productName";
 
 function ConnectCliAuthMessage({
   eyebrow,
@@ -99,8 +100,8 @@ export function ConnectCliAuthorizeSurface() {
         title="Connecting your terminal"
         description={
           isSignedIn
-            ? "Redirecting to authorize T3 Connect for your CLI…"
-            : "Sign in to continue authorizing T3 Connect for your CLI."
+            ? `Redirecting to authorize ${CONNECT_NAME} for your CLI…`
+            : `Sign in to continue authorizing ${CONNECT_NAME} for your CLI.`
         }
       />
       {isLoaded && !isSignedIn ? (

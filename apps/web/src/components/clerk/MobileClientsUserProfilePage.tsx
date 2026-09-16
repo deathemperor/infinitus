@@ -16,7 +16,7 @@ import {
   ClerkUserProfileRefreshButton,
   ClerkUserProfileRow,
 } from "./ClerkUserProfilePage";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 
 const MOBILE_CLIENT_SKELETON_ROWS = ["primary", "secondary"] as const;
 
@@ -113,7 +113,7 @@ export function MobileClientsUserProfilePage() {
   return (
     <ClerkUserProfilePage
       title="Mobile clients"
-      description="Devices registered to receive T3 Connect activity from your environments."
+      description={`Devices registered to receive ${CONNECT_NAME} activity from your environments.`}
       action={
         <ClerkUserProfileRefreshButton
           isPending={devicesState.isPending}

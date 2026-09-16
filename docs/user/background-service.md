@@ -71,8 +71,8 @@ the Mac instead; it hosts remote clients the same way.
 
 Windows background services are not supported.
 
-T3 Connect can offer service installation during setup, but the two are managed
-separately. Signing out of T3 Connect does not stop or uninstall the service.
+Infinitus Connect can offer service installation during setup, but the two are managed
+separately. Signing out of Infinitus Connect does not stop or uninstall the service.
 
 ## Troubleshooting
 
@@ -105,5 +105,5 @@ and keep that session open.
 | `service-disabled` or `service-stopped` | Read the log and `systemctl --user status t3code.service`, then use the repair command printed by the server.                  |
 | `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `t3 service restart`.                            |
 
-For failures after signing in to T3 Connect, see
+For failures after signing in to Infinitus Connect, see
 [connection troubleshooting](./remote-access.md#t3-connect-troubleshooting).

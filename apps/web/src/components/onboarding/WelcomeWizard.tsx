@@ -14,7 +14,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { CommandId, ProviderDriverKind, ThreadId } from "@t3tools/contracts";
-import { PRODUCT_NAME } from "@t3tools/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@t3tools/shared/productName";
 import * as Schema from "effect/Schema";
 import {
   ArrowRightIcon,
@@ -438,7 +438,7 @@ function ConnectAccountOption({
         }
       >
         <CloudIcon className="size-4 text-muted-foreground" />
-        <span className="flex-1">T3 Connect</span>
+        <span className="flex-1">{CONNECT_NAME}</span>
         <span className="text-xs text-muted-foreground">
           {!isLoaded
             ? "Loading sign-in…"
