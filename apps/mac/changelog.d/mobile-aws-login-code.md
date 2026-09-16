@@ -1,1 +1,1 @@
-Phone: An expired AWS or gcloud sign-in is finished from the phone the way the old app did it — the account id and user name to copy, the page in Safari, the code pasted back — with the no-code relay as the alternative.
+Phone: An expired AWS or gcloud sign-in shows the account to copy and takes the code pasted back, as before.

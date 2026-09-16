@@ -2,7 +2,6 @@ import type { InfinitusSnapshot } from "@t3tools/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  isValidSignInCode,
   lapsedSignIns,
   signInCallbackPort,
   signInCallbackSecretArgs,
@@ -66,8 +65,23 @@ describe("signInModel / lapsedSignIns", () => {
     expect(model).toMatchObject({
       flow: "remote",
       phase: "waiting",
+      codeSubmitted: false,
       account: { accountId: "123456789012", userName: "deathemperor" },
     });
+    // The Mac's own marker once the pasted code is with the CLI.
+    expect(
+      signInModel({
+        profile: "papaya",
+        flow: "relay",
+        state: {
+          profile: "papaya",
+          flow: "remote",
+          phase: "waitingForBrowser",
+          message: "code submitted",
+          startedAt: 1,
+        },
+      }).codeSubmitted,
+    ).toBe(true);
     expect(signInModel({ profile: "p", flow: "sso", account: { accountId: "1" } })).toMatchObject({
       flow: "unknown",
       account: { accountId: "1", userName: null },
@@ -177,17 +191,8 @@ describe("signInHeadline / startSignInCommand", () => {
   });
 });
 
-describe("isValidSignInCode / signInCodeSecretArgs", () => {
+describe("signInCodeSecretArgs", () => {
   const item = signInModel({ profile: "papaya", flow: "relay" });
-
-  it("takes what the Mac's own check takes", () => {
-    expect(isValidSignInCode("abc-DEF_123+/=")).toBe(true);
-    expect(isValidSignInCode("a".repeat(8192))).toBe(true);
-    expect(isValidSignInCode("")).toBe(false);
-    expect(isValidSignInCode("a".repeat(8193))).toBe(false);
-    expect(isValidSignInCode("abc def")).toBe(false);
-    expect(isValidSignInCode("héllo")).toBe(false);
-  });
 
   it("names the CLI's own code verb, with gcloud's positional as the manifest spells it", () => {
     expect(signInCodeSecretArgs(item)).toEqual({

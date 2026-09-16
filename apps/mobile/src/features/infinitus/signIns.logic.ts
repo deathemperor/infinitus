@@ -31,6 +31,9 @@ export interface SignInModel {
   /** The account id and user name the AWS page asks for, from the profile's
       config; the user copies them from the card. */
   readonly account: { readonly accountId: string; readonly userName: string | null } | null;
+  /** The code flow's code went to the Mac, which is finishing the login
+      (`AwsLoginRunner.submit` writes that message, and reads it itself). */
+  readonly codeSubmitted: boolean;
   readonly message: string | null;
 }
 
@@ -83,6 +86,7 @@ export function signInModel(item: InfinitusAwsLogin): SignInModel {
     userCode: item.state?.userCode ?? null,
     callbackPort: item.state?.callbackPort ?? null,
     account: accountOf(item.account),
+    codeSubmitted: item.state?.message === "code submitted",
     message: item.state?.message ?? null,
   };
 }
@@ -137,13 +141,6 @@ export function startSignInCommand(
     the Mac replaces a run of another kind. */
 export function signInTakesCode(item: SignInModel): boolean {
   return item.flow !== "deviceCode";
-}
-
-/** `AwsLogin.isValidCode`, the Mac's own check on a pasted authorization
-    code: ASCII letters, digits and `-_+/=`, up to 8 KiB. AWS's is ~1.8k
-    chars of base64; gcloud's is a short verification code. */
-export function isValidSignInCode(code: string): boolean {
-  return code.length > 0 && code.length <= 8192 && /^[A-Za-z0-9\-_+/=]+$/.test(code);
 }
 
 /** Hand the pasted code to the Mac: `aws-login-code <profile>` or

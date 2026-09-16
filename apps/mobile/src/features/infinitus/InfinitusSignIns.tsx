@@ -25,7 +25,6 @@ import {
   stopLoopbackCatch,
 } from "./loopbackCatch";
 import {
-  isValidSignInCode,
   lapsedSignIns,
   type SignInModel,
   type SignInStartMode,
@@ -76,24 +75,22 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
-  /** The code went to the Mac; the CLI is finishing. */
-  const [codeSent, setCodeSent] = useState(false);
   /** The last value copied — its row shows a check until another is. */
   const [copied, setCopied] = useState<string | null>(null);
 
   const running = item.phase === "starting" || item.phase === "waiting";
   const takesCode = signInTakesCode(item);
-  // The relay flow's redirect can be answered here (`loopbackCatch.ts`); the
-  // code flow needs no catcher, and is the default as on the old native phone.
-  const catchPort =
-    loopbackCatchSupported && item.flow === "relay" ? signInCallbackPort(item) : null;
+  // A loopback redirect — a relay login, or one the Mac's own button started
+  // with `--local`, which reports the port too — can be answered here
+  // (`loopbackCatch.ts`). The code flow needs no catcher, and is the default
+  // as on the old native phone.
+  const catchPort = loopbackCatchSupported ? signInCallbackPort(item) : null;
   const primaryMode: SignInStartMode = takesCode ? "code" : "catch";
   const pasteBack = item.flow === "remote" && item.phase === "waiting" && item.url !== null;
 
   const start = async (mode: SignInStartMode) => {
     setBusy(true);
     setError(null);
-    setCodeSent(false);
     const result = await run({
       environmentId: mac.environmentId,
       input: startSignInCommand(item, mode),
@@ -102,19 +99,15 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
     if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
   };
 
-  /** Hand the pasted authorization code to the Mac, which writes it to the
-      waiting CLI. Cleared from the field on send; never logged. */
+  /** Hand the pasted authorization code to the Mac, which checks it and
+      writes it to the waiting CLI; its refusal ("invalid code") is shown as
+      is. Cleared from the field on send; never logged. */
   const sendCode = async () => {
-    const trimmed = code.trim();
-    if (!isValidSignInCode(trimmed)) {
-      setError("That doesn't look like an authorization code.");
-      return;
-    }
     setBusy(true);
     setError(null);
     const answer = await runSecret({
       environmentId: mac.environmentId,
-      input: { ...signInCodeSecretArgs(item), secret: Redacted.make(trimmed) },
+      input: { ...signInCodeSecretArgs(item), secret: Redacted.make(code.trim()) },
     });
     setBusy(false);
     if (answer._tag !== "Success") {
@@ -122,7 +115,6 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
       return;
     }
     setCode("");
-    setCodeSent(true);
   };
 
   const pasteCode = async () => {
@@ -196,7 +188,7 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
     item.phase === "starting"
       ? `${mac.label} is starting the sign-in…`
       : pasteBack
-        ? codeSent
+        ? item.codeSubmitted
           ? "Finishing… the Mac is signing in with your code."
           : "Open the sign-in page in Safari; it ends with a code to paste back here."
         : item.phase === "waiting" && item.url !== null
@@ -274,14 +266,14 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
           </Pressable>
         ) : null}
       </View>
-      {!running && takesCode && loopbackCatchSupported ? (
+      {takesCode && loopbackCatchSupported && item.flow !== "relay" ? (
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void start("catch")}>
           <Text className="text-xs text-warning-foreground underline">
             Sign in here instead (no code, but no passkeys)
           </Text>
         </Pressable>
       ) : null}
-      {pasteBack && !codeSent ? (
+      {pasteBack && !item.codeSubmitted ? (
         <View className="gap-2">
           <TextInput
             value={code}
