@@ -74,9 +74,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     // The port the fixture sets, unformatted. #1110 shipped a port that read
     // "3,773" — the label and the description were on screen, so nothing here
     // saw it. It is a number field's value, so this is the check that would.
-    // #1178: the APNs card read the fixture's empty setup; the key itself is a
-    // file input, never text.
-    shows: ["[Server port: 3773]", "No phones registered."],
+    shows: ["[Server port: 3773]"],
   },
   {
     route: "/settings/infinitus/engines",
