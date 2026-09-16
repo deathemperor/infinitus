@@ -417,19 +417,28 @@ export const InfinitusAwsLoginState = Schema.Struct({
 });
 export type InfinitusAwsLoginState = typeof InfinitusAwsLoginState.Type;
 
+/** What the AWS sign-in page asks for and nobody remembers across accounts
+    (`AwsLogin.Account`): the account id and, for an IAM user, the user name,
+    both read off the profile's own `~/.aws/config`. Never a secret. */
+export const InfinitusAwsLoginAccount = Schema.Struct({
+  accountId: Schema.String,
+  userName: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusAwsLoginAccount = typeof InfinitusAwsLoginAccount.Type;
+
 /** One lapsed sign-in: the profile (an account for gcloud), which CLI
     (`provider` is `gcloud` for gcloud items and absent for AWS), and the login
-    running for it, if any. `account` is the engine's account record, opaque
-    here. The session that hit it — `pid` and `sessionLabel` — left with the
-    Mac's session tracker (#1041); the struct is open, so an older app still
-    sending them decodes unchanged. */
+    running for it, if any. `account` is the page's account id and user name
+    when the config names them. The session that hit it — `pid` and
+    `sessionLabel` — left with the Mac's session tracker (#1041); the struct is
+    open, so an older app still sending them decodes unchanged. */
 export const InfinitusAwsLogin = Schema.Struct({
   profile: Schema.String,
   provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
   flow: Schema.String,
   state: Schema.optionalKey(Schema.NullOr(InfinitusAwsLoginState)),
   failedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  account: Schema.optionalKey(Schema.Unknown),
+  account: Schema.optionalKey(Schema.NullOr(InfinitusAwsLoginAccount)),
 });
 export type InfinitusAwsLogin = typeof InfinitusAwsLogin.Type;
 

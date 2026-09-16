@@ -27,8 +27,10 @@ const ATTEMPT_WINDOW_MS = 60_000;
 
 /** The manifest spells a positional `<flowId>` and an option as its usage
     line, `--url <base URL, …>`; the caller's `args` keys are the bare names,
-    `flowId` and `url`, which is also how the request line names an option. */
-const argName = (spec: string): string => spec.replace(/^<(.*)>$/, "$1");
+    `flowId` and `url`, which is also how the request line names an option. A
+    positional spelled as a choice, `<account|default|application-default>`
+    (`gcloud-login-code`), goes by its first alternative, `account`. */
+const argName = (spec: string): string => spec.replace(/^<(.*)>$/, "$1").split("|", 1)[0] ?? spec;
 const optionName = (spec: string): string => spec.replace(/^-+/, "").split(/\s+/, 1)[0] ?? spec;
 
 /** The request-line pair for the verb, from `args` keyed by the manifest's
