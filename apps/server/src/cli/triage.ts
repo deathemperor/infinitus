@@ -159,7 +159,7 @@ export const triageCommand = Command.make("triage", {
   model: modelFlag,
 }).pipe(
   Command.withDescription(
-    `Investigate a ${PRODUCT_NAME} problem on this machine with claude or codex, and help file a good issue.`,
+    `Investigate an ${PRODUCT_NAME} problem on this machine with claude or codex, and help file a good issue.`,
   ),
   Command.withHandler((flags) =>
     Effect.gen(function* () {

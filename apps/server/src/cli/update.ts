@@ -578,7 +578,7 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     );
   } else if (status.installed && !servesThisHome) {
     yield* Console.log(
-      `  The background service serves ${status.installedBaseDir ?? "another ${PRODUCT_NAME} home"} and was left unchanged.`,
+      `  The background service serves ${status.installedBaseDir ?? `another ${PRODUCT_NAME} home`} and was left unchanged.`,
     );
   }
   if (foreground !== undefined) {
