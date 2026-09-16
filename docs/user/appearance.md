@@ -39,7 +39,7 @@ standard theme.
 Run this on the server to set a default and switch connected clients to it:
 
 ```bash
-t3 theme set nightfall
+infinitus theme set nightfall
 ```
 
 Clients that are offline apply it when they reconnect. Each client applies the setting once;

@@ -277,7 +277,7 @@ const runWslShell = (
 
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
 
-// Holds the sha256 of the runtime's `t3` executable, written when the install
+// Holds the sha256 of the runtime's `infinitus` executable, written when the install
 // promotes a verified tree. Presence alone only says an install once finished
 // here; the digest is what lets a later launch prove the entry still is what
 // that install wrote.
@@ -301,14 +301,14 @@ export const buildWslRuntimeInstallScript = (
     'runtime_parent="$HOME/.t3/wsl-runtime"',
     `runtime_root="$runtime_parent/${safeRuntimeId}"`,
     `ready_marker="$runtime_root/${WSL_RUNTIME_READY_MARKER}"`,
-    // The runtime is a self-contained `t3` executable with Node inside, so the
+    // The runtime is a self-contained `infinitus` executable with Node inside, so the
     // readiness proof is the same one the SSH runner and the CLI installers
     // use: the file is executable and `infinitus --version` exits 0. That covers the
     // truncated-binary and wrong-arch cases without a separate native probe.
     "runtime_entry_runs() {",
     '  [ -x "$1/infinitus" ] && "$1/infinitus" --version >/dev/null 2>&1',
     "}",
-    // Hashing the entry is what tells a working cache from one whose `t3` was
+    // Hashing the entry is what tells a working cache from one whose `infinitus` was
     // swapped or half-written after install: the file is still there and may
     // even still run, and launch then picks an executable that is not what
     // this install verified. Hashing the executable measures in tens of

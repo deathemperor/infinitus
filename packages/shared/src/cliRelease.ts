@@ -9,7 +9,7 @@
 // upstream's. Every runtime installer derives its download URLs and its
 // "what is newest" lookup from this one constant, so upstream's value here
 // means an Infinitus desktop asks pingdotgg for a `v0.5.0-alpha.N` archive
-// that cannot exist (404), and `t3 update` on an Infinitus CLI resolves
+// that cannot exist (404), and `infinitus update` on an Infinitus CLI resolves
 // upstream's newest build and installs T3 Code over it. Re-flipped after
 // every upstream sync.
 const CLI_RELEASE_REPOSITORY = "deathemperor/infinitus";

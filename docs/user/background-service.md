@@ -15,15 +15,15 @@ curl -fsSL https://infinitus.run/install.sh | sh
 
 It downloads the newest release's `infinitus-<version>-linux-<arch>.tar.gz`, checks
 it against the release's `SHA256SUMS`, unpacks it under `~/.infinitus/runtime`
-and links `t3` into `~/.local/bin`. It needs only `sh`, `tar`, `curl` or
+and links `infinitus` into `~/.local/bin`. It needs only `sh`, `tar`, `curl` or
 `wget`, and `sha256sum`; no Node.js. Set `T3CODE_VERSION` to pin a release
 (the archives start with the release after 0.5.0-alpha.11), or
 `T3CODE_RELEASE_BASE_URL` to download from a mirror.
 
 Without the script, download the archive and `SHA256SUMS` from a
 [release](https://github.com/deathemperor/infinitus/releases) yourself, check
-it — `sha256sum -c --ignore-missing SHA256SUMS` — and unpack it; the `t3`
-inside is the server, run as `./t3` below.
+it — `sha256sum -c --ignore-missing SHA256SUMS` — and unpack it; the `infinitus`
+inside is the server, run as `./infinitus` below.
 
 If the machine is an SSH remote of your desktop app, skip all of this: the
 desktop puts the matching server on it by itself.
@@ -40,20 +40,20 @@ Run these on the machine that will host the server:
 | Stop and remove from startup    | `infinitus service uninstall` |
 
 The service reuses the copy the install script put under
-`~/.infinitus/runtime`; a hand-unpacked `./t3` downloads that version's
+`~/.infinitus/runtime`; a hand-unpacked `./infinitus` downloads that version's
 archive there first, so the machine needs to reach the releases (or
 `T3CODE_RELEASE_BASE_URL`). Uninstalling the service leaves your projects,
 threads and settings under `~/.infinitus/userdata` intact.
 
 `infinitus update` moves a script-installed `infinitus` to the newest release: it downloads
-and verifies it, points `t3` at it, and asks before restarting a background
+and verifies it, points `infinitus` at it, and asks before restarting a background
 service (pass `--yes` from a script; decline and the service keeps running its
 current version until `infinitus service restart`; a server you started by hand is
 left for you to restart). Pass an exact version to pin one, or `--allow-downgrade` to
-move backwards. Install and update use the version of the `t3` you run; an
-older `t3` refuses to replace a newer service unless you add
+move backwards. Install and update use the version of the `infinitus` you run; an
+older `infinitus` refuses to replace a newer service unless you add
 `--allow-downgrade`. `infinitus uninstall` reverses the install script — the service,
-the `t3` link, every downloaded version — and keeps `~/.infinitus/userdata`.
+the `infinitus` link, every downloaded version — and keeps `~/.infinitus/userdata`.
 
 Updating restarts the server. Finish active work first, and wait for any remote
 update already in progress.
@@ -95,7 +95,7 @@ ssh -t your-server 'sudo loginctl enable-linger "$(id -un)"'
 
 Then retry service setup as your normal user. Run only the `loginctl` command
 with sudo; running the server as root creates a separate installation and
-Connect identity. Without administrator access, run `./t3 serve` in a terminal
+Connect identity. Without administrator access, run `./infinitus serve` in a terminal
 and keep that session open.
 
 | Status problem                          | Next step                                                                                                                      |

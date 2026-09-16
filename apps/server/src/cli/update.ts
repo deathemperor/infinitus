@@ -142,16 +142,14 @@ export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function
     const current = yield* fs.readFileString(shimPath).pipe(Effect.option);
     const quoted = Option.isSome(current) ? /^"([^"]+)"/m.exec(current.value)?.[1] : undefined;
     if (quoted === undefined || !ownsTarget(quoted)) return Option.none<string>();
-    yield* fs
-      .writeFileString(shimPath, `@echo off\r\n"${input.targetEntryPath}" %*`)
-      .pipe(
-        Effect.mapError(
-          () =>
-            new CliUpdateError({
-              reason: `Could not rewrite the infinitus launcher at ${shimPath}.`,
-            }),
-        ),
-      );
+    yield* fs.writeFileString(shimPath, `@echo off\r\n"${input.targetEntryPath}" %*`).pipe(
+      Effect.mapError(
+        () =>
+          new CliUpdateError({
+            reason: `Could not rewrite the infinitus launcher at ${shimPath}.`,
+          }),
+      ),
+    );
     return Option.some(shimPath);
   }
 
@@ -520,7 +518,7 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     Effect.catchIf(
       (error): error is PinnedRuntimeInstallError =>
         error._tag === "PinnedRuntimeInstallError" &&
-        error.step.startsWith("downloading the t3 release checksums") &&
+        error.step.startsWith("downloading the release checksums") &&
         String(error.cause).includes("404"),
       () =>
         Effect.fail(

@@ -45,7 +45,7 @@ const connectUnavailableCommand = Command.make("connect", {
   Command.withHandler(() =>
     Effect.fail(
       new CliError.ShowHelp({
-        commandPath: ["t3", "connect"],
+        commandPath: ["infinitus", "connect"],
         errors: [new ConnectPublicConfigMissingError({ cause: connectPublicConfigMissingMessage })],
       }),
     ),
@@ -53,7 +53,7 @@ const connectUnavailableCommand = Command.make("connect", {
 );
 
 export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
-  Command.make("t3", { ...sharedServerCommandFlags }).pipe(
+  Command.make("infinitus", { ...sharedServerCommandFlags }).pipe(
     Command.withDescription(`Run the ${PRODUCT_NAME} server.`),
     Command.withHandler((flags) => runServerCommand(flags)),
     Command.withSubcommands([

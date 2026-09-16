@@ -10,16 +10,16 @@ up router forwarding. In the desktop app on the host, open **Settings →
 Connections**, sign in, and enable **Infinitus Connect** for that environment.
 
 For a Linux host without the desktop app, run the unpacked server archive's
-`t3` (see [Install](./install.md#headless-server-linux)):
+`infinitus` (see [Install](./install.md#headless-server-linux)):
 
 ```bash
-./t3 connect
+./infinitus connect
 ```
 
 Follow the sign-in instructions. Setup offers a
 [background service](./background-service.md); if you decline it, start the
-server with `./t3 serve`. Saving your sign-in alone does not make the machine
-reachable. Every `t3` command on this page is that executable; a Mac host runs
+server with `./infinitus serve`. Saving your sign-in alone does not make the machine
+reachable. Every `infinitus` command on this page is that executable; a Mac host runs
 the desktop app instead and does all of this from **Settings → Connections**.
 
 On your other device, sign in to the same Infinitus Connect account and choose the
@@ -44,13 +44,13 @@ For a command-line host, replace `<private-ip>` with the host's LAN or tailnet
 address:
 
 ```bash
-./t3 serve --host <private-ip>
+./infinitus serve --host <private-ip>
 ```
 
 If a server is already running, generate a fresh link without restarting it:
 
 ```bash
-./t3 pair
+./infinitus pair
 ```
 
 Scan the QR code on your phone or paste the pairing URL into **Add environment**
@@ -90,13 +90,13 @@ HTTPS** in **Settings → Connections**. Turn it off there to remove that route.
 To start a command-line server with Tailscale HTTPS:
 
 ```bash
-./t3 serve --tailscale-serve
+./infinitus serve --tailscale-serve
 ```
 
 For an already-running server:
 
 ```bash
-./t3 pair --tailscale
+./infinitus pair --tailscale
 ```
 
 The pairing link uses an address such as `https://machine.tailnet.ts.net/`.
@@ -108,7 +108,7 @@ tailscale serve --https=443 off
 ```
 
 If that port is already in use, choose another with
-`--tailscale-serve-port`. See `./t3 pair --help` for other pairing options.
+`--tailscale-serve-port`. See `./infinitus pair --help` for other pairing options.
 
 ### Web app
 
@@ -143,7 +143,7 @@ For Antigravity's Google callback on a remote host, see
 On the host, **Settings → Connections** lets authorized administrators create
 pairing links and revoke client sessions. Revoking an unused link prevents new
 pairings; revoke a device's session to remove its existing access. Command-line
-management is available through `./t3 auth --help`.
+management is available through `./infinitus auth --help`.
 
 A session with an open connection stays listed after its access credential
 expires.

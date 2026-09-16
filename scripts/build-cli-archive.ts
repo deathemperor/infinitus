@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Packages the server single-executable into a self-contained per-platform
- * archive: the `t3` binary, the web client, the resource monitor, and a
+ * archive: the `infinitus` binary, the web client, the resource monitor, and a
  * production install of the native packages the bundle keeps external. The
  * archive is the unit every runtime installer downloads, so nothing in it may
  * require Node, npm, or a compiler on the machine that unpacks it.
@@ -471,7 +471,8 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   const serverDir = path.join(repoRoot, "apps/server");
   const executableName = input.platform === "win" ? "infinitus.exe" : "infinitus";
   // tsdown suffixes cross-built executables with their target (t3-darwin-x64);
-  // a host build is plain t3. Prefer the exact target when both exist.
+  // a host build is plain t3 — the build output keeps the package's name, the
+  // archive renames it (#1368 D). Prefer the exact target when both exist.
   const targetKey = `${input.platform === "mac" ? "darwin" : input.platform}-${input.arch}`;
   const targetExecutable = path.join(
     serverDir,
@@ -485,7 +486,7 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   const builtExecutable = (yield* fs.exists(targetExecutable))
     ? targetExecutable
     : targetKey === hostKey
-      ? path.join(serverDir, "dist-exe", executableName)
+      ? path.join(serverDir, "dist-exe", input.platform === "win" ? "t3.exe" : "t3")
       : targetExecutable;
   const webClient = path.join(serverDir, "dist/client");
   const resourceMonitorDir = Option.getOrElse(input.resourceMonitorDir, () =>
@@ -540,7 +541,7 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     yield* fs.chmod(executablePath, 0o755);
     // The name before #1368 D, for one window: an install from before the
     // rename downloads this archive under its old name (`publish` attaches
-    // it under both) and runs `t3` inside it. After the signing pass, which
+    // it under both) and runs `infinitus` inside it. After the signing pass, which
     // walks the stage for Mach-O files. Drop with the old archive name.
     yield* fs.symlink(executableName, path.join(contentDir, "t3"));
   }
