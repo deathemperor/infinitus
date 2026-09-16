@@ -5,6 +5,7 @@ import { BearerConnectionProfile } from "./catalog.ts";
 import { ConnectionBlockedError, ConnectionTransientError } from "./model.ts";
 import {
   bearerHostOrder,
+  isPublicHost,
   learnedBearerProfile,
   normalizedAlternates,
   roamsPast,
@@ -24,15 +25,27 @@ const profile = (over: Partial<ConstructorParameters<typeof BearerConnectionProf
   });
 
 describe("bearerHostOrder", () => {
-  it("tries the host that worked last, then the paired one, then the alternates, once each", () => {
+  it("dials the tunnel before the LAN address, whichever worked last or was paired", () => {
     expect(bearerHostOrder(profile())).toEqual([LAN]);
-    expect(bearerHostOrder(profile({ alternateHttpBaseUrls: [TUNNEL] }))).toEqual([LAN, TUNNEL]);
+    expect(bearerHostOrder(profile({ alternateHttpBaseUrls: [TUNNEL] }))).toEqual([TUNNEL, LAN]);
     expect(
-      bearerHostOrder(profile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: TUNNEL })),
+      bearerHostOrder(profile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: LAN })),
     ).toEqual([TUNNEL, LAN]);
+    expect(bearerHostOrder(profile({ httpBaseUrl: TUNNEL, alternateHttpBaseUrls: [LAN] }))).toEqual(
+      [TUNNEL, LAN],
+    );
+  });
+
+  it("orders each class by the host that worked last, then the paired one, once each", () => {
+    const other = "https://other.example.test/";
+    expect(
+      bearerHostOrder(
+        profile({ alternateHttpBaseUrls: [TUNNEL, other], lastGoodHttpBaseUrl: other }),
+      ),
+    ).toEqual([other, TUNNEL, LAN]);
     expect(
       bearerHostOrder(profile({ alternateHttpBaseUrls: [TUNNEL, LAN], lastGoodHttpBaseUrl: LAN })),
-    ).toEqual([LAN, TUNNEL]);
+    ).toEqual([TUNNEL, LAN]);
   });
 
   it("never tries a last-good host the server no longer names", () => {
@@ -44,7 +57,22 @@ describe("bearerHostOrder", () => {
           lastGoodHttpBaseUrl: TUNNEL,
         }),
       ),
-    ).toEqual([LAN, "https://new.example.test"]);
+    ).toEqual(["https://new.example.test", LAN]);
+  });
+});
+
+describe("isPublicHost", () => {
+  it("is an https hostname, never an address of one network", () => {
+    expect(isPublicHost(TUNNEL)).toBe(true);
+    expect(isPublicHost("https://abc-def.trycloudflare.com/")).toBe(true);
+    expect(isPublicHost(LAN)).toBe(false);
+    expect(isPublicHost("http://100.69.163.65:3773/")).toBe(false);
+    expect(isPublicHost("https://10.0.0.2/")).toBe(false);
+    expect(isPublicHost("http://mac.local:3773/")).toBe(false);
+    expect(isPublicHost("http://localhost:3773/")).toBe(false);
+    expect(isPublicHost("https://[::1]:3773/")).toBe(false);
+    expect(isPublicHost("http://code.infinitus.run/")).toBe(false);
+    expect(isPublicHost("not a url")).toBe(false);
   });
 });
 
@@ -103,18 +131,25 @@ describe("learnedBearerProfile", () => {
     expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [LAN, TUNNEL] })).toBeNull();
   });
 
-  it("drops a tunnel the server no longer names and takes the one it names now", () => {
+  it("keeps a named tunnel through a connect that names none, and takes the one named now", () => {
     const settled = profile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: LAN });
-    const gone = learnedBearerProfile(settled, LAN, {});
-    expect(gone?.alternateHttpBaseUrls).toBeUndefined();
-    expect(gone?.lastGoodHttpBaseUrl).toBe(LAN);
-    expect(
-      learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [] })?.alternateHttpBaseUrls,
-    ).toBeUndefined();
+    expect(learnedBearerProfile(settled, LAN, {})).toBeNull();
+    expect(learnedBearerProfile(settled, LAN, { alternateHttpBaseUrls: [] })).toBeNull();
     const moved = learnedBearerProfile(settled, LAN, {
       alternateHttpBaseUrls: ["https://other.example.test"],
     });
     expect(moved?.alternateHttpBaseUrls).toEqual(["https://other.example.test/"]);
-    expect(bearerHostOrder(moved!)).toEqual([LAN, "https://other.example.test/"]);
+    expect(bearerHostOrder(moved!)).toEqual(["https://other.example.test/", LAN]);
+  });
+
+  it("drops a quick tunnel the server no longer names", () => {
+    const quick = "https://abc-def.trycloudflare.com/";
+    const settled = profile({ alternateHttpBaseUrls: [quick, TUNNEL], lastGoodHttpBaseUrl: LAN });
+    const gone = learnedBearerProfile(settled, LAN, {});
+    expect(gone?.alternateHttpBaseUrls).toEqual([TUNNEL]);
+    expect(
+      learnedBearerProfile(profile({ alternateHttpBaseUrls: [quick] }), LAN, {})
+        ?.alternateHttpBaseUrls,
+    ).toBeUndefined();
   });
 });

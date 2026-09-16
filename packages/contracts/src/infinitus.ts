@@ -467,8 +467,40 @@ export const InfinitusTeamMember = Schema.Struct({
   todayMessages: Schema.optionalKey(Schema.Number),
   todayCommits: Schema.optionalKey(Schema.Number),
   fleet: Schema.optionalKey(Schema.Unknown),
+  /** What this member lets ME do to their threads (spec §8), sorted; absent when nothing. */
+  controls: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.String))),
 });
 export type InfinitusTeamMember = typeof InfinitusTeamMember.Type;
+
+/** An audience as the Mac words it: `leaders`, `team`, or the kids named. */
+export const InfinitusTeamAudience = Schema.Union([Schema.String, Schema.Array(Schema.String)]);
+export type InfinitusTeamAudience = typeof InfinitusTeamAudience.Type;
+
+/** One of this Mac's grants (spec §8): who may do what to which threads
+    (`"all"` or the ids). `preauthorized` runs without the Mac's tap. */
+export const InfinitusTeamGrant = Schema.Struct({
+  id: Schema.String,
+  audience: InfinitusTeamAudience,
+  threads: Schema.Union([Schema.Literal("all"), Schema.Array(Schema.String)]),
+  capabilities: Schema.Array(Schema.String),
+  since: Schema.Number,
+  preauthorized: Schema.optionalKey(Schema.Array(Schema.String)),
+  expires: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+});
+export type InfinitusTeamGrant = typeof InfinitusTeamGrant.Type;
+
+/** A driver's command waiting for this Mac's tap (`team-allow` / `team-deny`). */
+export const InfinitusTeamPending = Schema.Struct({
+  id: Schema.String,
+  kid: Schema.String,
+  name: Schema.String,
+  thread: Schema.String,
+  action: Schema.String,
+  text: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  project: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  expires: Schema.Number,
+});
+export type InfinitusTeamPending = typeof InfinitusTeamPending.Type;
 
 /** A pending join request (leaders see them). */
 export const InfinitusTeamRequest = Schema.Struct({
@@ -501,6 +533,10 @@ export const InfinitusTeamSnapshot = Schema.Struct({
   lastFetch: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   lastPublish: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   lastError: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** Delegated control (spec §8): this Mac's grants and the commands waiting
+      for its tap. Absent on a build without them. */
+  grants: Schema.optionalKey(Schema.NullOr(Schema.Array(InfinitusTeamGrant))),
+  pending: Schema.optionalKey(Schema.NullOr(Schema.Array(InfinitusTeamPending))),
 });
 export type InfinitusTeamSnapshot = typeof InfinitusTeamSnapshot.Type;
 

@@ -314,7 +314,7 @@ describe("ConnectionResolver", () => {
     new BearerConnectionCredential({ token: "secret-bearer" }),
   ] as const;
 
-  it.effect("roams to the tunnel when the paired host is unreachable and remembers it", () =>
+  it.effect("dials the tunnel first, never the LAN address, and remembers it", () =>
     Effect.gen(function* () {
       const inputs = yield* Ref.make<ReadonlyArray<BearerInput>>([]);
       const profilePuts: Array<ConnectionProfile> = [];
@@ -323,13 +323,7 @@ describe("ConnectionResolver", () => {
         profilePuts,
         authorizeBearer: (input) =>
           Ref.update(inputs, (values) => [...values, input]).pipe(
-            Effect.flatMap(() =>
-              input.httpBaseUrl === LAN
-                ? Effect.fail(
-                    new ConnectionTransientError({ reason: "timeout", detail: "no route" }),
-                  )
-                : Effect.succeed(authorizedAt(input, [TUNNEL])),
-            ),
+            Effect.as(authorizedAt(input, [TUNNEL])),
           ),
       });
       const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(brokerLayer));
@@ -345,7 +339,6 @@ describe("ConnectionResolver", () => {
       expect(prepared.socketUrl).toBe("wss://code.infinitus.run/ws?wsTicket=ticket");
       const tried = yield* Ref.get(inputs);
       expect(tried.map((input) => [input.httpBaseUrl, input.descriptorTimeoutMs])).toEqual([
-        [LAN, 3_000],
         [TUNNEL, undefined],
       ]);
       expect(profilePuts).toHaveLength(1);
@@ -355,6 +348,53 @@ describe("ConnectionResolver", () => {
         lastGoodHttpBaseUrl: TUNNEL,
       });
     }),
+  );
+
+  it.effect(
+    "falls back to the LAN address, with the short probe, when the tunnel is unreachable",
+    () =>
+      Effect.gen(function* () {
+        const inputs = yield* Ref.make<ReadonlyArray<BearerInput>>([]);
+        const profilePuts: Array<ConnectionProfile> = [];
+        const brokerLayer = yield* makeDependencies({
+          credentials: [roamingCredential],
+          profilePuts,
+          authorizeBearer: (input) =>
+            Ref.update(inputs, (values) => [...values, input]).pipe(
+              Effect.flatMap(() =>
+                input.httpBaseUrl === TUNNEL
+                  ? Effect.fail(
+                      new ConnectionTransientError({ reason: "timeout", detail: "no route" }),
+                    )
+                  : Effect.succeed(authorizedAt(input, [TUNNEL])),
+              ),
+            ),
+        });
+        const broker = yield* ConnectionResolver.ConnectionResolver.pipe(
+          Effect.provide(brokerLayer),
+        );
+
+        const prepared = yield* broker.prepare(
+          catalogEntry(
+            roamingTarget,
+            Option.some(
+              roamingProfile({ alternateHttpBaseUrls: [TUNNEL], lastGoodHttpBaseUrl: TUNNEL }),
+            ),
+          ),
+        );
+
+        expect(prepared.httpBaseUrl).toBe(LAN);
+        const tried = yield* Ref.get(inputs);
+        expect(tried.map((input) => [input.httpBaseUrl, input.descriptorTimeoutMs])).toEqual([
+          [TUNNEL, undefined],
+          [LAN, 3_000],
+        ]);
+        expect(profilePuts).toHaveLength(1);
+        expect(profilePuts[0]).toMatchObject({
+          alternateHttpBaseUrls: [TUNNEL],
+          lastGoodHttpBaseUrl: LAN,
+        });
+      }),
   );
 
   it.effect("stops at a host that answers and refuses instead of trying the tunnel", () =>
@@ -383,7 +423,7 @@ describe("ConnectionResolver", () => {
         .pipe(Effect.flip);
 
       expect(failure).toMatchObject({ _tag: "ConnectionBlockedError", reason: "authentication" });
-      expect(yield* Ref.get(tried)).toEqual([LAN]);
+      expect(yield* Ref.get(tried)).toEqual([TUNNEL]);
     }),
   );
 
@@ -405,7 +445,7 @@ describe("ConnectionResolver", () => {
 
       const tried = yield* Ref.get(inputs);
       expect(tried.map((input) => [input.httpBaseUrl, input.descriptorTimeoutMs])).toEqual([
-        [LAN, undefined],
+        [LAN, 3_000],
       ]);
       expect(profilePuts).toHaveLength(1);
       expect(profilePuts[0]).toMatchObject({

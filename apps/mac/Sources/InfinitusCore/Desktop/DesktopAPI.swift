@@ -49,6 +49,12 @@ public struct DesktopAPI {
         public var label: String
         public var platform: Platform?
         public var serverVersion: String?
+        /// The fork's other doors (`packages/contracts/src/environment.ts`):
+        /// the host's LAN base URLs while it listens beyond loopback, and
+        /// the base URLs it also answers on (a tunnel). Team control
+        /// publishes them as the grantor's endpoints (spec §8).
+        public var lanHttpBaseUrls: [String]?
+        public var alternateHttpBaseUrls: [String]?
     }
     public struct Project: Decodable, Equatable {
         public var id: String

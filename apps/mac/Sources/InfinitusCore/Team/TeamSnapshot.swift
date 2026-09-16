@@ -30,7 +30,7 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
         /// older phone decodes the row without it.
         public var fleet: TeamDocs.FleetDoc?
         /// What this member lets ME do to their threads (delegated
-        /// control, spec §9), sorted; nil when nothing.
+        /// control, spec §8), sorted; nil when nothing.
         public var controls: [String]?
         public var id: String { kid }
 
@@ -42,6 +42,22 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
             self.lastPublished = lastPublished; self.kinds = kinds; self.threadsNow = threadsNow
             self.blockers = blockers; self.crashes = crashes; self.todayUSD = todayUSD
             self.todayMessages = todayMessages; self.todayCommits = todayCommits; self.fleet = fleet
+        }
+    }
+
+    /// A driver's command waiting for this Mac's tap (spec §8).
+    public struct Pending: Codable, Equatable, Sendable, Identifiable {
+        public var id: String
+        public var kid: String
+        public var name: String
+        public var thread: String
+        public var action: String
+        public var text: String?
+        public var project: String?
+        public var expires: Int
+        public init(id: String, kid: String, name: String, thread: String, action: String, text: String?, project: String?, expires: Int) {
+            self.id = id; self.kid = kid; self.name = name; self.thread = thread; self.action = action
+            self.text = text; self.project = project; self.expires = expires
         }
     }
 
@@ -80,11 +96,28 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
     /// Whether the biometric lock is on: `team-code` and `team-approve`
     /// want it (spec §5).
     public var lockEnabled = false
+    /// This Mac's grants (spec §8); nil on a build without them.
+    public var grants: [TeamGrants.Grant]?
+    /// Drivers' commands waiting for this Mac's tap; nil when none.
+    public var pending: [Pending]?
+
+    /// The union of every hint whose audience names `me`, sorted; nil
+    /// when no hint does (the row reads as "cannot drive"). With
+    /// `thread`, only the hints that name it (no list = every thread).
+    public static func controls(hints: [TeamDocs.GrantHint]?, roster: TeamRoster?, me: String, thread: String? = nil) -> [String]? {
+        guard let hints, let roster else { return nil }
+        var out = Set<String>()
+        for hint in hints where roster.recipients(for: hint.audience).contains(where: { $0.kid == me }) {
+            if let thread, let only = hint.threads, !only.contains(thread) { continue }
+            out.formUnion(hint.capabilities)
+        }
+        return out.isEmpty ? nil : out.sorted()
+    }
 
     public static func make(status: TeamStatus, roster: TeamRoster?, reader: TeamReader?, requests: [Signed<TeamRequest>],
                             today: String, lastFetch: Int?, lastPublish: Int?, lastError: String?,
                             shares: TeamShares = TeamShares(), exclusions: TeamExclusions = TeamExclusions(),
-                            lockEnabled: Bool = false) -> TeamSnapshot {
+                            lockEnabled: Bool = false, grants: TeamGrants? = nil, pending: [Pending] = []) -> TeamSnapshot {
         func row(_ m: TeamRoster.Member, role: String) -> Member {
             var out = Member(kid: m.keys.kid, name: m.name, role: role, isMe: m.keys.kid == status.kid, founder: m.founder, since: m.since)
             if let r = reader?.members[m.keys.kid] {
@@ -94,6 +127,7 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
                 out.blockers = r.now?.blockers ?? []
                 out.crashes = r.crashes.count
                 out.fleet = r.fleet
+                out.controls = controls(hints: r.now?.grantsTo, roster: roster, me: status.kid)
                 if let day = r.days[today] {
                     out.todayUSD = day.usd
                     out.todayMessages = day.messages
@@ -107,16 +141,19 @@ public struct TeamSnapshot: Codable, Equatable, Sendable {
         }
         let members = sorted((roster?.leaders ?? []).map { row($0, role: "leader") })
             + sorted((roster?.members ?? []).map { row($0, role: "member") })
-        var pending: [Request] = requests.map { signed in
+        var requestRows: [Request] = requests.map { signed in
             let doc = signed.doc
             return Request(kid: doc.keys.kid, name: doc.name, platform: doc.platform, devices: doc.devices, at: doc.at)
         }
-        pending.sort { $0.at == $1.at ? $0.kid < $1.kid : $0.at < $1.at }
-        return TeamSnapshot(id: status.id, name: status.name, remote: maskRemote(status.remote), kid: status.kid,
-                            role: status.role, rev: status.rev, members: members, requests: pending,
-                            lastFetch: lastFetch, lastPublish: lastPublish, lastError: lastError,
-                            policy: roster?.policy, shares: shares.byKind.mapValues(\.label),
-                            exclusions: exclusions.projects, lockEnabled: lockEnabled)
+        requestRows.sort { $0.at == $1.at ? $0.kid < $1.kid : $0.at < $1.at }
+        var out = TeamSnapshot(id: status.id, name: status.name, remote: maskRemote(status.remote), kid: status.kid,
+                               role: status.role, rev: status.rev, members: members, requests: requestRows,
+                               lastFetch: lastFetch, lastPublish: lastPublish, lastError: lastError,
+                               policy: roster?.policy, shares: shares.byKind.mapValues(\.label),
+                               exclusions: exclusions.projects, lockEnabled: lockEnabled)
+        out.grants = grants?.grants
+        out.pending = pending.isEmpty ? nil : pending
+        return out
     }
 
     /// The remote without its userinfo (`https://user:token@host/…` →

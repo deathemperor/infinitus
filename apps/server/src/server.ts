@@ -86,6 +86,7 @@ import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
+import { infinitusTeamControlHttpApiLayer } from "./infinitus/Layers/InfinitusTeamControlHttp.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusAgentActivityLive } from "./infinitus/Layers/InfinitusAgentActivity.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
@@ -686,6 +687,15 @@ export const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(pullRequestHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(infinitusPairingHttpApiLayer),
+      // Fork (#1313): the team command route gets its own control client, as
+      // the activity layer does — InfinitusLayerLive's is private.
+      Layer.provide(
+        infinitusTeamControlHttpApiLayer.pipe(
+          Layer.provide(
+            InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
+          ),
+        ),
+      ),
       Layer.provide(infinitusHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),

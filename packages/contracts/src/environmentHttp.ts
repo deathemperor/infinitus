@@ -38,6 +38,7 @@ import {
   InfinitusReleaseThreadResult,
 } from "./infinitus.ts";
 import { InfinitusPairingHttpApi } from "./infinitusPairing.ts";
+import { InfinitusTeamControlHttpApi } from "./infinitusTeamControl.ts";
 import { ServerRunningTurn } from "./server.ts";
 import {
   ClientOrchestrationCommand,
@@ -693,5 +694,7 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentConnectHttpApi)
   // Infinitus fork: the approve-on-Mac pairing routes (#710).
   .add(InfinitusPairingHttpApi)
+  // Infinitus fork: a teammate's sealed team command for the Mac (#1313).
+  .add(InfinitusTeamControlHttpApi)
   // Infinitus fork: infinitusctl's holds read and release (#822).
   .add(InfinitusHttpApi) {}

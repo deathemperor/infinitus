@@ -665,6 +665,43 @@ desk_get /api/demo/dispatches | expect "[c['type'] for c in d]==['thread.turn.st
 "$CTL" thread new --project "Demo project" "Bare model" --model haiku --wait | expect "d['text']=='echo: Bare model'" || fail "thread new --model model"
 "$CTL" thread new --project "Bare project" "x" --model /haiku 2>&1 | grep -q "wants <instanceId>/<model>" || fail "thread new must refuse a malformed --model"
 desk_get /api/demo/dispatches | expect "[c['bootstrap']['createThread']['modelSelection'] for c in d[4:7]]==[{'instanceId':'claude','model':'sonnet'},{'instanceId':'codex','model':'gpt-5'},{'instanceId':'claude','model':'haiku'}]" || fail "the new threads must carry the environment default, the explicit instance/model and the project's instance with the bare model"
+# #1313 spec §8, delegated control over the store lane: Ann (the app) grants
+# Bo (the CLI identity) send, view and new; Bo drives from his own team dir.
+# Ann's now.json predates the grant and carries no endpoints (and the app's
+# own httpBaseUrl is loopback, which a driver skips anyway), so the command
+# rides the store; the app's next fetch executes it against the demo desktop
+# and answers a sealed ack Bo reaps with `team acks`.
+ANN_KID="$("$CTL" team-identity | json "d['kid']")"
+"$CTL" team-grant "$KID" --cap send,view,new | expect "d['audience']==['$KID'] and d['threads']=='all' and sorted(d['capabilities'])==['new','send','view'] and 'preauthorized' not in d" || fail "team-grant"
+"$CTL" team-grants | expect "len(d['grants'])==1" || fail "team-grants"
+DRIVE="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle send "hello from Bo via the store")"
+printf '%s' "$DRIVE" | expect "d['lane']=='store' and d['outcome']=='queued'" || fail "team drive send must queue on the store (got $DRIVE)"
+SEND_ID="$(printf '%s' "$DRIVE" | json "d['id']")"
+"$CTL" team-fetch | expect "d['role']=='leader'" || fail "team-fetch after a queued command"
+desk_get /api/orchestration/threads/t-idle | expect "any(m.get('role')=='user' and 'hello from Bo via the store' in json.dumps(m) for m in d['messages'])" || fail "the store-lane send did not reach the desktop thread"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$SEND_ID' and a['outcome']=='delivered' and a['from']=='$ANN_KID' for a in d)" || fail "team acks after send"
+NEW_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" - new "Fix the tests" --project "Demo project" | json "d['id'] if d['lane']=='store' and d['outcome']=='queued' else ''")"
+[ -n "$NEW_ID" ] || fail "team drive new must queue"
+"$CTL" team-fetch >/dev/null || fail "team-fetch after a queued new"
+PENDING_ID="$("$CTL" team-pending | json "d[0]['id']")"
+"$CTL" team-pending | expect "len(d)==1 and d[0]['name']=='Bo' and d[0]['action']=='new' and d[0]['project']=='Demo project' and d[0]['text']=='Fix the tests'" || fail "team-pending must list the new command waiting for a tap"
+"$CTL" team-allow "$PENDING_ID" | expect "d['outcome']=='done' and len(d['detail'])==36" || fail "team-allow must start the thread"
+"$CTL" team-pending | expect "d==[]" || fail "an allowed command leaves the wait list"
+"$CTL" threads --project p-demo | expect "any(t['title']=='Fix the tests' for t in d)" || fail "the allowed new thread must exist on the desktop"
+"$CTL" team-fetch >/dev/null || fail "team-fetch to push the ack"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$NEW_ID' and a['outcome']=='done' and len(a['detail'])==36 for a in d)" || fail "team acks after allow"
+VIEW_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle view | json "d['id'] if d['lane']=='store' and d['outcome']=='queued' else ''")"
+[ -n "$VIEW_ID" ] || fail "team drive view must queue"
+"$CTL" team-fetch >/dev/null || fail "team-fetch after a queued view"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$VIEW_ID' and a['outcome']=='done' and 'echo: hello from Bo via the store' in a['detail'] for a in d)" || fail "team acks after view must carry the thread's transcript"
+"$CTL" team-fetch | expect "any(m['name']=='Bo' and m.get('controls') is None for m in d['members']) and len(d['grants'])==1 and d.get('pending') is None" || fail "team-status must carry the grant and no waits"
+GRANT_ID="$("$CTL" team-grants | json "d['grants'][0]['id']")"
+"$CTL" team-revoke "$GRANT_ID" | expect "d['removed'] is True" || fail "team-revoke"
+LATE_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle send "after the revoke" | json "d['id'] if d['outcome']=='queued' else ''")"
+[ -n "$LATE_ID" ] || fail "team drive after revoke must still queue"
+"$CTL" team-fetch >/dev/null || fail "team-fetch after the revoke"
+INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$LATE_ID' and a['outcome']=='noGrant' for a in d)" || fail "a revoked grant must answer noGrant"
+echo "team control: ok"
 printf 'wrong' | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" >/dev/null || fail "desktop-credential replace"
 rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
 [ "$rc" -eq 2 ] && grep -q "no longer accepts this credential" "$LOG.desk" || fail "a revoked credential must exit 2 with the relaunch hint (got $rc: $(head -c 200 "$LOG.desk"))"
