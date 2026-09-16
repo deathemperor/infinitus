@@ -5,6 +5,7 @@ import {
   threadUsageBadgeAriaLabel,
   threadUsageBadgeLabel,
   threadUsageCostLabel,
+  threadUsageRowGroups,
   threadUsageRows,
   threadUsageSourceDetail,
   threadUsageSourceLine,
@@ -79,6 +80,36 @@ describe("threadUsageRows", () => {
     expect(threadUsageRows(rollup({ models: [] })).some((row) => row.label === "Model")).toBe(
       false,
     );
+  });
+});
+
+describe("threadUsageRowGroups", () => {
+  it("keeps the work, token and model rows apart so the popover can rule between them", () => {
+    expect(threadUsageRowGroups(rollup({ toolCalls: 17 }))).toEqual([
+      [
+        { label: "Turns", value: "3" },
+        { label: "Tool calls", value: "17" },
+      ],
+      [
+        { label: "Input tokens", value: "12k" },
+        { label: "Output tokens", value: "980" },
+        { label: "Cache creation", value: "2k" },
+      ],
+      [{ label: "Model", value: "claude-opus-5" }],
+    ]);
+  });
+
+  it("empties a group with nothing to say", () => {
+    const groups = threadUsageRowGroups(
+      rollup({
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheCreationTokens: 0,
+        models: [],
+      }),
+    );
+    expect(groups[1]).toEqual([]);
+    expect(groups[2]).toEqual([]);
   });
 });
 

@@ -10,7 +10,7 @@ import {
   threadUsageBadgeAriaLabel,
   threadUsageBadgeLabel,
   threadUsageCostLabel,
-  threadUsageRows,
+  threadUsageRowGroups,
   threadUsageSourceDetail,
   threadUsageSourceLine,
   threadUsageUnreportedLine,
@@ -19,16 +19,28 @@ import {
 /**
  * Fork (#834): the thread-info popover behind a badge in the chat header's
  * action group. The badge reads the thread's estimated cost (or its turn
- * count when no turn carried one); the popover lists turns, tokens by
- * kind, models and the last turn. Drawn only for a thread with a rollup:
- * an empty card on every older thread would be a lying affordance.
+ * count when no turn carried one); the popover leads with that cost and
+ * lists what the thread did, the tokens by kind, the models and the last
+ * turn under it. Drawn only for a thread with a rollup: an empty card on
+ * every older thread would be a lying affordance.
  */
 export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const rows = threadUsageRows(usage);
+  const [work = [], tokens = [], models = []] = threadUsageRowGroups(usage);
   const sourceLine = threadUsageSourceLine(usage);
   const sourceDetail = threadUsageSourceDetail(usage);
   const unreportedLine = threadUsageUnreportedLine(usage);
+  // The cost is the headline; without one, why it is missing takes its place.
+  const missingCostLine =
+    unreportedLine ?? (usage.costUsd === null ? threadUsageCostLabel(null) : null);
+  const sections = [
+    work,
+    tokens,
+    [
+      ...models,
+      { label: "Last turn", value: formatDayAwareTimestamp(usage.lastTurnAt, timestampFormat) },
+    ],
+  ].filter((section) => section.length > 0);
   return (
     <Popover>
       <PopoverTrigger
@@ -48,38 +60,44 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
       <PopoverPopup
         side="bottom"
         align="end"
-        className="w-64 max-w-none p-[var(--floating-content-inset)] text-left whitespace-normal"
+        className="w-72 max-w-none p-[var(--floating-content-inset)] text-left whitespace-normal"
       >
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="font-medium text-muted-foreground text-xs">Thread usage</div>
-            <div className="text-secondary-label text-[11px]">estimates</div>
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-medium text-muted-foreground text-xs">Thread usage</div>
+              {missingCostLine ? (
+                <div className="mt-1 text-pretty text-[11px] text-secondary-label leading-4">
+                  {missingCostLine}
+                </div>
+              ) : (
+                <div className="mt-0.5 font-semibold text-base text-foreground tabular-nums leading-5">
+                  {threadUsageCostLabel(usage.costUsd)}
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 text-[11px] text-secondary-label">estimates</div>
           </div>
-          <dl className="flex flex-col gap-1 text-[11px] leading-4">
-            {rows.map((row) => (
-              <div key={row.label} className="flex items-baseline justify-between gap-3">
-                <dt className="text-secondary-label">{row.label}</dt>
-                <dd className="truncate font-medium tabular-nums text-secondary-label">
-                  {row.value}
-                </dd>
+          <dl className="flex flex-col gap-2 text-[11px] leading-4">
+            {sections.map((section, index) => (
+              <div
+                key={section[0]?.label ?? index}
+                className={
+                  index === 0
+                    ? "flex flex-col gap-1"
+                    : "flex flex-col gap-1 border-border/60 border-t pt-2"
+                }
+              >
+                {section.map((row) => (
+                  <div key={row.label} className="flex items-baseline justify-between gap-3">
+                    <dt className="shrink-0 text-secondary-label">{row.label}</dt>
+                    <dd className="min-w-0 break-words text-right font-medium text-foreground/90 tabular-nums">
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
               </div>
             ))}
-            {unreportedLine ? (
-              <div className="text-pretty text-secondary-label">{unreportedLine}</div>
-            ) : (
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-secondary-label">Cost</dt>
-                <dd className="font-medium tabular-nums text-secondary-label">
-                  {threadUsageCostLabel(usage.costUsd)}
-                </dd>
-              </div>
-            )}
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-secondary-label">Last turn</dt>
-              <dd className="font-medium tabular-nums text-secondary-label">
-                {formatDayAwareTimestamp(usage.lastTurnAt, timestampFormat)}
-              </dd>
-            </div>
           </dl>
           {sourceLine ? (
             <Tooltip>
