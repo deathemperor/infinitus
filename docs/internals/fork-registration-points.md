@@ -304,6 +304,17 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` re-letters the stable DMG artwork ("Drag T3 Code
   into Applications") for the `infinitus` channel before rasterizing (#601).
+- `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`,
+  `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon
+  project (`RelayNeonProject`, retained, `prod`; `RelayNeonBranch` on every
+  other stage) in place of upstream's PlanetScale database, branch and
+  runtime role (#1322: PlanetScale's cheapest cluster needs a card on file).
+  Same shape, Neon's owner role, Hyperdrive on the project's direct origin.
+  The workflow feeds `NEON_API_KEY` (repository secret) and `NEON_ORG_ID`
+  (repository variable). Transitional: `Planetscale.providers()` and the
+  `PLANETSCALE_*` workflow env stay until one deploy has dropped the two
+  PlanetScale rows the first deploys left `creating` in the state store —
+  Alchemy dies on a persisted row whose provider is not registered.
 - `infra/relay/scripts/deploy.ts` — the `AlchemyContext` the deploy runs
   under carries `updateStateStore: options.yes` beside `adopt` (#1322).
   Upstream forwards only `adopt`, so on a Cloudflare account with no Alchemy
