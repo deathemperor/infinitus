@@ -16,6 +16,7 @@ import {
 } from "./baseSchemas.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import { CONNECT_NAME, PRODUCT_NAME } from "./productName.ts";
+import { RelayInfinitusAlertRequest } from "./relayInfinitusAlert.ts";
 
 export const RelayAgentAwarenessPlatform = Schema.Literals(["ios", "android"]);
 export type RelayAgentAwarenessPlatform = typeof RelayAgentAwarenessPlatform.Type;
@@ -1110,6 +1111,20 @@ const RelayServerGroup = HttpApiGroup.make("server")
   .annotate(OpenApi.Description, "Environment-authenticated activity publication.")
   .middleware(RelayEnvironmentAuth);
 
+// Fork (#1375): an Infinitus environment's thread-less account alerts, pushed
+// with the relay's key to every linked phone with notifications on.
+const RelayInfinitusAlertGroup = HttpApiGroup.make("infinitusAlert")
+  .add(
+    HttpApiEndpoint.post("publishInfinitusAlert", "/v1/environments/:environmentId/alerts", {
+      params: Schema.Struct({ environmentId: EnvironmentId }),
+      payload: RelayInfinitusAlertRequest,
+      success: RelayPublishResponse,
+      error: RelayAgentActivityPublishErrors,
+    }).annotate(OpenApi.Summary, "Publish an Infinitus account alert"),
+  )
+  .annotate(OpenApi.Description, "Environment-authenticated account alert publication.")
+  .middleware(RelayEnvironmentAuth);
+
 export const RelayApi = HttpApi.make("RelayApi")
   .add(
     RelayHealthGroup,
@@ -1119,6 +1134,7 @@ export const RelayApi = HttpApi.make("RelayApi")
     RelayTokenGroup,
     RelayDpopClientGroup,
     RelayServerGroup,
+    RelayInfinitusAlertGroup,
   )
   .annotate(OpenApi.Title, `${PRODUCT_NAME} Relay API`)
   .annotate(OpenApi.Version, "1.0.0")

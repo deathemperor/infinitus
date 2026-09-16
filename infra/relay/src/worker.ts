@@ -70,6 +70,9 @@ import * as EnvironmentPublishSignatures from "./environments/EnvironmentPublish
 import * as ManagedEndpointProvider from "./environments/ManagedEndpointProvider.ts";
 import * as ManagedTunnelLimits from "./environments/ManagedTunnelLimits.ts";
 import * as MobileRegistrations from "./agentActivity/MobileRegistrations.ts";
+// Fork (#1375): Infinitus account alerts, thread-less, on the relay's key.
+import { infinitusAlertApi } from "./infinitusAlerts/InfinitusAlertApi.ts";
+import * as InfinitusAlertPublisher from "./infinitusAlerts/InfinitusAlertPublisher.ts";
 
 const webcryptoLayer = Layer.succeed(
   Crypto.Crypto,
@@ -102,6 +105,7 @@ const relayApiLayer = Layer.mergeAll(
   tokenApi,
   dpopClientApi,
   serverApi,
+  infinitusAlertApi,
 );
 
 const CloudMintKeyPair = Alchemy.KeyPair("CloudMintKeyPair");
@@ -209,9 +213,25 @@ export const ApiLive = Api.make(
       }).pipe(Effect.map(makeRelayTraceLayer)),
     );
 
+    // Fork (#1375): the alert publisher sends to the FCM queue itself, so it
+    // gets the same sender the FcmDeliveries layer below is given.
+    const fcmDeliveryQueueSenderLayer = Layer.succeed(
+      FcmDeliveryQueueSender.FcmDeliveryQueueSender,
+      {
+        send: (body) =>
+          fcmDeliveryQueueSender
+            .send(body)
+            .pipe(Effect.provideService(Alchemy.RuntimeContext, alchemyRuntimeContext)),
+      },
+    );
     const runtimeLayer = Layer.empty.pipe(
       Layer.provideMerge(MobileRegistrations.layer),
-      Layer.provideMerge(AgentActivityPublisher.layer),
+      Layer.provideMerge(
+        Layer.mergeAll(
+          AgentActivityPublisher.layer,
+          InfinitusAlertPublisher.layer.pipe(Layer.provide(fcmDeliveryQueueSenderLayer)),
+        ),
+      ),
       Layer.provideMerge(EnvironmentConnector.layer),
       Layer.provideMerge(EnvironmentLinker.layer),
       Layer.provideMerge(EnvironmentPublishSignatures.layer),
@@ -226,14 +246,7 @@ export const ApiLive = Api.make(
       Layer.provideMerge(ApnsDeliveries.layer),
       Layer.provideMerge(
         FcmDeliveries.layer.pipe(
-          Layer.provide(
-            Layer.succeed(FcmDeliveryQueueSender.FcmDeliveryQueueSender, {
-              send: (body) =>
-                fcmDeliveryQueueSender
-                  .send(body)
-                  .pipe(Effect.provideService(Alchemy.RuntimeContext, alchemyRuntimeContext)),
-            }),
-          ),
+          Layer.provide(fcmDeliveryQueueSenderLayer),
           Layer.provideMerge(
             FcmClient.layer.pipe(
               Layer.provide(FcmAssertionSigner.layer),

@@ -195,6 +195,28 @@ describe("ApnsClient", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
+  // Fork (#1375): an Infinitus account alert names no thread.
+  it.effect("omits the thread key from a thread-less alert payload", () =>
+    Effect.gen(function* () {
+      const apns = yield* ApnsClient.ApnsClient;
+      const request = apns.makePushNotificationRequest({
+        token: "push-token",
+        notification: {
+          title: "Infinitus",
+          body: "switched to account 2 (work)",
+          environmentId: "env",
+          deepLink: "/settings/accounts",
+        },
+      });
+
+      expect(request.payload).not.toHaveProperty("threadId");
+      expect(request.payload).toMatchObject({
+        environmentId: "env",
+        deepLink: "/settings/accounts",
+      });
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
   it.effect("preserves JWT signing context and the crypto cause", () =>
     Effect.gen(function* () {
       const apns = yield* ApnsClient.ApnsClient;

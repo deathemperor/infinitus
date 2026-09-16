@@ -32,6 +32,16 @@ import {
   shouldAlertForActivity,
 } from "./agentActivityAlerts.ts";
 
+// Fork (#1375): an Infinitus account alert rides the queue as a ready-made
+// alert with a null state; the consumer sends it over the card it is showing.
+export const FcmAlertData = Schema.Struct({
+  alert_id: Schema.String,
+  alert_title: Schema.String,
+  alert_body: Schema.String,
+  alert_path: Schema.String,
+});
+export type FcmAlertData = typeof FcmAlertData.Type;
+
 export const FcmDeliveryJob = Schema.Struct({
   userId: Schema.String,
   deviceId: Schema.String,
@@ -39,6 +49,7 @@ export const FcmDeliveryJob = Schema.Struct({
   state: Schema.NullOr(RelayAgentActivityState),
   queuedAt: Schema.Number,
   replay: Schema.optional(Schema.Boolean),
+  alert: Schema.optional(FcmAlertData),
 });
 export type FcmDeliveryJob = typeof FcmDeliveryJob.Type;
 const decodeJob = Schema.decodeUnknownEffect(FcmDeliveryJob);
@@ -196,6 +207,7 @@ export const make = Effect.gen(function* () {
       if (!target) return;
       const preferences = decodePreferences(target.preferences_json);
       if (Option.isNone(preferences)) return;
+      if (job.alert && !preferences.value.notificationsEnabled) return;
 
       // Re-read links and state when consuming: queued messages must honor
       // sign-out, token rotation, disabled publishing, and newer thread states.
@@ -210,7 +222,7 @@ export const make = Effect.gen(function* () {
       const previousAggregate = target.last_aggregate_json
         ? Option.getOrNull(decodePreviousActivity(target.last_aggregate_json))
         : null;
-      let alert: ReturnType<typeof androidAlertForState> = null;
+      let alert: ReturnType<typeof androidAlertForState> = job.alert ?? null;
       // Deletion jobs can observe another thread's newly completed state. They
       // update the card, but must leave that transition for its own alert job.
       // Registration replay deliberately establishes a silent baseline.

@@ -645,7 +645,11 @@ export const make = Effect.gen(function* () {
   }) {
     // Jobs from older relay versions do not carry a state identity. Preserve
     // backwards compatibility and only revalidate newly queued jobs.
-    if (input.notification.phase === undefined || input.notification.updatedAt === undefined) {
+    if (
+      input.notification.phase === undefined ||
+      input.notification.updatedAt === undefined ||
+      input.notification.threadId === undefined
+    ) {
       return true;
     }
     return yield* stateIdentityIsCurrent({
@@ -873,7 +877,7 @@ export const make = Effect.gen(function* () {
     const notification = sanitizeApnsNotificationPayload(input.notification);
     yield* Effect.annotateCurrentSpan({
       "relay.environment_id": notification.environmentId,
-      "relay.thread_id": notification.threadId,
+      ...(notification.threadId === undefined ? {} : { "relay.thread_id": notification.threadId }),
     });
     const request = apns.makePushNotificationRequest({
       token: input.token,
@@ -892,7 +896,7 @@ export const make = Effect.gen(function* () {
       const claim = yield* attempts.claimSourceJob({
         userId: input.target.user_id,
         environmentId: notification.environmentId,
-        threadId: notification.threadId,
+        threadId: notification.threadId ?? null,
         deviceId: input.target.device_id,
         kind: "push_notification",
         sourceJobId: input.sourceJobId,
@@ -987,7 +991,7 @@ export const make = Effect.gen(function* () {
       yield* attempts.record({
         userId: input.target.user_id,
         environmentId: notification.environmentId,
-        threadId: notification.threadId,
+        threadId: notification.threadId ?? null,
         deviceId: input.target.device_id,
         kind: "push_notification",
         token: input.token,

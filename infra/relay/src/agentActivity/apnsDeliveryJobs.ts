@@ -40,7 +40,8 @@ export const ApnsNotificationPayload = Schema.Struct({
   title: Schema.String,
   body: Schema.String,
   environmentId: Schema.String,
-  threadId: Schema.String,
+  // Fork (#1375): absent on an Infinitus account alert, which names no thread.
+  threadId: Schema.optional(Schema.String),
   deepLink: Schema.String,
   // Optional so delivery jobs queued by older relay builds still decode.
   // New jobs use these fields to avoid delivering a stale Done/attention

@@ -324,6 +324,39 @@ describe("Android delivery routing", () => {
     });
   }
 
+  // Fork (#1375): an Infinitus account alert is a ready-made alert with no
+  // state; it rides over the card without acknowledging it.
+  it.effect("sends an Infinitus alert job over the current card without acknowledging it", () => {
+    const h = harness();
+    const alert = {
+      alert_id: "alert-jti",
+      alert_title: "Infinitus",
+      alert_body: "switched to account 2 (work)",
+      alert_path: "/settings/accounts",
+    };
+    return Effect.gen(function* () {
+      const delivery = yield* FcmDeliveries;
+      yield* delivery.process({ ...h.job, state: null, alert });
+      expect(h.sent).toHaveLength(1);
+      expect(h.sent[0]?.alert).toBe(true);
+      expect(h.sent[0]?.data).toMatchObject({
+        alert_title: "Infinitus",
+        alert_body: "switched to account 2 (work)",
+        alert_path: "/settings/accounts",
+        activity_active_count: "1",
+      });
+      expect(h.sent[0]?.data.alert_id).toMatch(/^[0-9a-f]{64}$/);
+      expect(h.marked).toHaveLength(0);
+      h.current.mutedEnvironments.push("env");
+      h.current.target.preferences_json = encodeJson({
+        ...preferences,
+        notificationsEnabled: false,
+      });
+      yield* delivery.process({ ...h.job, state: null, alert });
+      expect(h.sent).toHaveLength(1);
+    }).pipe(Effect.provide(h.layer));
+  });
+
   it.effect("registration replay establishes a baseline without alerting", () => {
     const h = harness();
     h.current.state = { ...state, phase: "waiting_for_approval" };
