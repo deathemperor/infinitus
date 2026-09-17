@@ -300,7 +300,9 @@ describe("searchSettings", () => {
     // What each page does still hold is still findable.
     expect(ids("account exhausted")).toContain("infinitus-push");
     expect(ids("revive countdown")).toContain("infinitus-push");
-    expect(ids("pair a phone")).toContain("infinitus-devices");
+    expect(ids("pair phone")).toContain("infinitus-devices");
+    // The "Pair a phone" QR retired; Settings › Connections mints every link.
+    expect(ids("qr")).not.toContain("infinitus-devices");
     expect(ids("crash report")).toContain("infinitus-devices");
   });
 
