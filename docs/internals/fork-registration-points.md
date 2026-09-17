@@ -312,8 +312,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `resolveDesktopBuildIconAssets` / `resolveDesktopWebAssetBrand` return the
   `infinitus` artwork for fork versions; the Screen Recording usage text and
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
-  `stageDesktopDmgBackground` re-letters the stable DMG artwork ("Drag T3 Code
-  into Applications") for the `infinitus` channel before rasterizing (#601).
+  `stageDesktopDmgBackground` rasterizes a per-channel SVG, so the `infinitus`
+  channel has artwork of its own (#601, #732; the file is in `fork-only-files.md`).
 - `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`,
   `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon
   project (`RelayNeonProject`, retained, `prod`; `RelayNeonBranch` on every
