@@ -105,7 +105,7 @@ export const INFINITUS_HOME_DEEP_LINK = "/";
 export function extractAgentNotificationDeepLink(response: unknown): string | null {
   const data = dataFromNotificationResponse(response);
   const deepLink = data?.deepLink;
-  if (deepLink === INFINITUS_ACCOUNTS_DEEP_LINK || deepLink === INFINITUS_HOME_DEEP_LINK) {
+  if (deepLink === INFINITUS_ACCOUNTS_DEEP_LINK) {
     return deepLink;
   }
   if (typeof deepLink === "string") {
@@ -119,6 +119,10 @@ export function extractAgentNotificationDeepLink(response: unknown): string | nu
   const threadId = data?.threadId;
   if (typeof environmentId === "string" && typeof threadId === "string") {
     return encodeThreadDeepLink({ environmentId, threadId });
+  }
+  // After the thread fallback: a `/` beside thread ids still means the thread.
+  if (deepLink === INFINITUS_HOME_DEEP_LINK) {
+    return deepLink;
   }
   return null;
 }
