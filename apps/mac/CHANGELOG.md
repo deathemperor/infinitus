@@ -23,6 +23,7 @@ release cut folds the fragments and `## Unreleased` into the new section.
 - The licenses screen credits the T3 Code project Infinitus is forked from.
 
 ### Phone
+- Tapping a sign-in alert opens the home screen, where the sign-in card is, instead of the thread that hit the expired credentials.
 - Loading screens show the Infinitus mark instead of T3 Code's logo.
 - A connection that is retrying shows a spinner rather than a wifi-slash icon, so "Reconnecting to …" no longer reads as disconnected.
 - Settings › Legal shows Infinitus's own privacy, terms and security documents instead of T3 Code's.
