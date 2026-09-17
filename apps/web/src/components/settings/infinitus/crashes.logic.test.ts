@@ -10,10 +10,7 @@ import {
   parseCrashes,
 } from "./crashes.logic";
 
-const command = (
-  name: string,
-  options: ReadonlyArray<string> = [],
-): InfinitusManifestCommand => ({
+const command = (name: string, options: ReadonlyArray<string> = []): InfinitusManifestCommand => ({
   name,
   args: [],
   options,

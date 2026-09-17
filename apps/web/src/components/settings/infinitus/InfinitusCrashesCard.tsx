@@ -40,8 +40,7 @@ export function InfinitusCrashesCard() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const supported =
-    snapshot !== null && snapshot.available && crashesSupported(snapshot.commands);
+  const supported = snapshot !== null && snapshot.available && crashesSupported(snapshot.commands);
 
   // The reports are not part of the snapshot, so they are asked for once the
   // app is answering. They only change on a crash, which takes a relaunch.
