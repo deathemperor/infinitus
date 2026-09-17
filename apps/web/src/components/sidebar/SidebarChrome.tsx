@@ -18,10 +18,10 @@ import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import {
   resolveEnvironmentIdentificationPillLabel,
-  resolveSidebarStageBackdropVariant,
   resolveSidebarStageFocusRingOffsetClass,
   SidebarStageBackdrop,
   useEnvironmentStageLabel,
+  useSidebarStageBackdropVariant,
 } from "../SidebarStageBackdrop";
 import { Badge } from "../ui/badge";
 import {
@@ -45,8 +45,8 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
-  const backdropVariant = resolveSidebarStageBackdropVariant(
-    stageLabel,
+  // Through the hook, not the resolver: the scene comes from the active theme.
+  const backdropVariant = useSidebarStageBackdropVariant(
     environmentIdentificationMode === "artwork",
   );
   const pillLabel =

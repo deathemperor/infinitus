@@ -105,6 +105,14 @@ export const THEME_COLOR_ROLES = [
   "terminalScrollbarHover",
 ] as const;
 
+/**
+ * Stage scenes the sidebar header can draw. A built-in theme names one; every
+ * scene reads the `--stage-night-*` palette the themes already define, apart
+ * from `dev`, which keeps the blueprint's own `--stage-art-*` family.
+ */
+export const STAGE_ART_SCENES = ["nightly", "dev", "tide", "dawn", "nebula"] as const;
+export type StageArtScene = (typeof STAGE_ART_SCENES)[number];
+
 export type ThemeColorRole = (typeof THEME_COLOR_ROLES)[number];
 export type ThemeColors = Readonly<Record<ThemeColorRole, string>>;
 export type ThemeVariants = Readonly<Partial<Record<ThemeAppearance, ThemeColors>>>;
@@ -118,6 +126,8 @@ export type ThemeDefinition = Readonly<{
   collection?: Readonly<{ id: string; label: string }>;
   /** Allows reviewed built-ins to render product artwork over their sidebar. */
   sidebarArtwork?: boolean;
+  /** Which stage scene that artwork draws. Falls back to the night sky. */
+  stageArt?: StageArtScene;
   /** Generated from the guided editor's canvas and accent roles. */
   managed?: boolean;
 }>;
@@ -247,6 +257,7 @@ export const T3_CHAT_THEME: ThemeDefinition = {
     },
   },
   sidebarArtwork: true,
+  stageArt: "nebula",
 };
 
 export const GROVE_THEME: ThemeDefinition = {
@@ -374,6 +385,7 @@ export const GROVE_THEME: ThemeDefinition = {
     },
   },
   sidebarArtwork: true,
+  stageArt: "nebula",
 };
 
 export const OCEAN_THEME: ThemeDefinition = {
@@ -501,6 +513,7 @@ export const OCEAN_THEME: ThemeDefinition = {
     },
   },
   sidebarArtwork: true,
+  stageArt: "tide",
 };
 
 export const EMBER_THEME: ThemeDefinition = {
@@ -628,6 +641,7 @@ export const EMBER_THEME: ThemeDefinition = {
     },
   },
   sidebarArtwork: true,
+  stageArt: "dawn",
 };
 
 export const IRIS_THEME: ThemeDefinition = {
@@ -755,6 +769,7 @@ export const IRIS_THEME: ThemeDefinition = {
     },
   },
   sidebarArtwork: true,
+  stageArt: "nebula",
 };
 
 export const BUILT_IN_THEMES: ReadonlyArray<ThemeDefinition> = [

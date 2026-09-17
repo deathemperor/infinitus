@@ -26,7 +26,9 @@ import {
   serializeThemeFile,
   subscribeToThemePreview,
   subscribeToCustomThemes,
+  STAGE_ART_SCENES,
   themeAllowsSidebarArtwork,
+  themeStageArtScene,
   T3_CHAT_THEME,
   EMBER_THEME,
   GROVE_THEME,
@@ -325,10 +327,15 @@ describe("theme files", () => {
       appearance: "light",
       colors: { accent: "#5b6cff" },
       sidebarArtwork: true,
+      stageArt: "aurora",
     });
 
     expect(theme.sidebarArtwork).toBeUndefined();
+    expect(theme.stageArt).toBeUndefined();
     expect(JSON.parse(serializeThemeFile(theme))).not.toHaveProperty("sidebarArtwork");
+    // A scene is reviewed with the built-in palettes, so a theme file cannot name one.
+    expect(JSON.parse(serializeThemeFile(theme))).not.toHaveProperty("stageArt");
+    expect(themeStageArtScene("art-sidebar")).toBeNull();
   });
 
   it("suppresses sidebar artwork during a live custom-theme preview", () => {
@@ -432,6 +439,9 @@ describe("theme files", () => {
       expect(getThemeModes(theme)).toEqual(["light", "dark"]);
       expect(theme.sidebarArtwork).toBe(true);
       expect(themeAllowsSidebarArtwork(theme.id)).toBe(true);
+      // Every artwork theme names the scene it draws.
+      expect(STAGE_ART_SCENES).toContain(theme.stageArt);
+      expect(themeStageArtScene(theme.id)).toBe(theme.stageArt);
       expect(theme.colors.accent).toMatch(/^oklch\(/);
       expect(theme.variants?.dark?.accent).toMatch(/^oklch\(/);
 
@@ -467,6 +477,7 @@ describe("theme files", () => {
       }
     }
     expect(themeAllowsSidebarArtwork("my-custom-theme")).toBe(false);
+    expect(themeStageArtScene("my-custom-theme")).toBeNull();
   });
 
   it("rejects a variant that repeats the base appearance", () => {

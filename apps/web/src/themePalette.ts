@@ -10,7 +10,9 @@ import {
   OCEAN_THEME,
   T3_CHAT_THEME,
   RESERVED_THEME_IDS,
+  STAGE_ART_SCENES,
   THEME_COLOR_ROLES,
+  type StageArtScene,
   type ThemeAppearance,
   type ThemeColorRole,
   type ThemeColors,
@@ -18,8 +20,23 @@ import {
   type ThemeVariants,
 } from "@infinitus/shared/themePalettes";
 
-export { EMBER_THEME, GROVE_THEME, IRIS_THEME, OCEAN_THEME, T3_CHAT_THEME, THEME_COLOR_ROLES };
-export type { ThemeAppearance, ThemeColorRole, ThemeColors, ThemeDefinition, ThemeVariants };
+export {
+  EMBER_THEME,
+  GROVE_THEME,
+  IRIS_THEME,
+  OCEAN_THEME,
+  STAGE_ART_SCENES,
+  T3_CHAT_THEME,
+  THEME_COLOR_ROLES,
+};
+export type {
+  StageArtScene,
+  ThemeAppearance,
+  ThemeColorRole,
+  ThemeColors,
+  ThemeDefinition,
+  ThemeVariants,
+};
 
 export const T3_CHAT_THEME_ID = "t3-chat" as const;
 const GROVE_THEME_ID = "grove" as const;
@@ -1210,6 +1227,17 @@ export function themeAllowsSidebarArtwork(theme: ThemePreference): boolean {
   return (
     BUILT_IN_THEME_DEFINITIONS.find((definition) => definition.id === themeId)?.sidebarArtwork ===
     true
+  );
+}
+
+/**
+ * Which stage scene the active theme draws, or null to leave the choice to the
+ * build's stage. Reviewed alongside the palettes, so only built-ins name one.
+ */
+export function themeStageArtScene(theme: ThemePreference): StageArtScene | null {
+  const themeId = themeIdFromPreference(theme);
+  return (
+    BUILT_IN_THEME_DEFINITIONS.find((definition) => definition.id === themeId)?.stageArt ?? null
   );
 }
 

@@ -302,6 +302,44 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   its hardcoded blue gradient. `apps/server/src/cloud/cliAuthHtml.ts`'s
   `.stage-*` CSS is a separate mechanism off `__T3CODE_BUILD_CHANNEL__` and
   is unaffected.
+  A theme then picks WHICH scene: `StageArtScene`
+  (`packages/shared/src/themePalettes.ts`) names the five — upstream's
+  `nightly` and `dev` plus the fork's `tide`, `dawn` and `nebula` — and the
+  optional `stageArt` beside `sidebarArtwork` on `ThemeDefinition` is what
+  each built-in claims (t3-chat, grove and iris `nebula`, ocean `tide`,
+  ember `dawn`). `themeStageArtScene` in `themePalette.ts` is
+  the reader, `themeAllowsSidebarArtwork`'s sibling: built-ins only, so a
+  user theme can never name one, and `serializeThemeFile`'s explicit
+  `ThemeFile` omits it the way it already omits `sidebarArtwork`. The stage
+  label still decides WHETHER art draws — a theme's scene replaces the
+  default the label would pick, the blueprint included, so a dev build is
+  themed like any other — which is why
+  `resolveSidebarStageBackdropVariant` takes the scene as an optional third
+  argument and `AuthSurfaceShell.tsx`'s two-argument call keeps working
+  untouched. `StageBackdropArt` dispatches through a
+  `Record<StageArtScene, …>`, so a new scene is one map entry and one
+  component; `resolveSidebarStageFocusRingOffsetClass` tests for `dev`
+  rather than `nightly` because every other scene reads the night palette.
+  Still no CSS and no new art files: each scene is inline SVG over the
+  `--stage-night-*` vars that already resolve for every theme, tiled in a
+  `<pattern>` on the 8192-wide canvas, `useId`-prefixed def ids (the test
+  renders each scene twice and asserts globally unique ids) and no
+  animation. Two traps a new scene meets: the `sidebar-stage-backdrop`
+  utility masks the container to transparent from 55 % down, so nothing
+  below y≈53 of the 96-unit canvas renders at all — ground detail is
+  impossible here, which is why upstream's clouds sit low (they are meant
+  to dissolve) and why a first cut of every scene put its horizon where it
+  could never be seen; and the brand wordmark sits around y≈28–40, so
+  geometry there reads as clutter behind the product name. A scene's
+  content belongs between them. Three attempts at a vertical-curtain
+  `aurora` for grove never read as well as `nebula` does in grove's own
+  palette, so grove shares that scene and the fourth was dropped rather
+  than shipped weak (user ruling).
+- `packages/shared/src/themePalettes.ts` — the `StageArtScene` union and the
+  optional `stageArt` on `ThemeDefinition`, plus the scene each of the five
+  artwork themes claims. Described with the backdrop above.
+- `apps/web/src/themePalette.ts` — `themeStageArtScene` and the scene union's
+  re-export. Described with the backdrop above.
 - `packages/shared/src/git.ts` — `WORKTREE_BRANCH_PREFIX` is `infinitus`
   (#823: a branch name is on screen), `LEGACY_WORKTREE_BRANCH_PREFIX` keeps
   upstream's `t3code` so temporary branches minted before the rename are
