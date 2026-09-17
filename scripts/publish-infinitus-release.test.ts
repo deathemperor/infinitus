@@ -1,31 +1,31 @@
-import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
+import * as NodeURL from "node:url";
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
-const script = fileURLToPath(new URL("./publish-infinitus-release.sh", import.meta.url));
+const script = NodeURL.fileURLToPath(new URL("./publish-infinitus-release.sh", import.meta.url));
 const temporary: string[] = [];
 afterEach(() => {
-  for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true });
+  for (const path of temporary.splice(0)) NodeFS.rmSync(path, { recursive: true, force: true });
 });
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "infinitus-publish-"));
+  const root = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "infinitus-publish-"));
   temporary.push(root);
-  const bin = join(root, "bin");
-  const assets = join(root, "assets");
-  mkdirSync(bin);
-  mkdirSync(assets);
-  writeFileSync(join(assets, "a.zip"), "first signed artifact");
-  writeFileSync(join(assets, "b.zip"), "second signed artifact");
-  const notes = join(root, "notes.md");
-  writeFileSync(notes, "Release notes");
-  const state = join(root, "state.json");
-  writeFileSync(state, JSON.stringify({ exists: false, assets: [], uploads: [], edits: 0 }));
-  writeFileSync(
-    join(bin, "gh"),
+  const bin = NodePath.join(root, "bin");
+  const assets = NodePath.join(root, "assets");
+  NodeFS.mkdirSync(bin);
+  NodeFS.mkdirSync(assets);
+  NodeFS.writeFileSync(NodePath.join(assets, "a.zip"), "first signed artifact");
+  NodeFS.writeFileSync(NodePath.join(assets, "b.zip"), "second signed artifact");
+  const notes = NodePath.join(root, "notes.md");
+  NodeFS.writeFileSync(notes, "Release notes");
+  const state = NodePath.join(root, "state.json");
+  NodeFS.writeFileSync(state, JSON.stringify({ exists: false, assets: [], uploads: [], edits: 0 }));
+  NodeFS.writeFileSync(
+    NodePath.join(bin, "gh"),
     `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -60,10 +60,12 @@ switch (args[1]) {
 `,
     { mode: 0o755 },
   );
-  writeFileSync(join(bin, "sleep"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
-  writeFileSync(join(bin, "timeout"), '#!/bin/sh\nshift\nexec "$@"\n', { mode: 0o755 });
+  NodeFS.writeFileSync(NodePath.join(bin, "sleep"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  NodeFS.writeFileSync(NodePath.join(bin, "timeout"), '#!/bin/sh\nshift\nexec "$@"\n', {
+    mode: 0o755,
+  });
   const read = () =>
-    JSON.parse(readFileSync(state, "utf8")) as {
+    JSON.parse(NodeFS.readFileSync(state, "utf8")) as {
       isDraft: boolean;
       targetCommitish: string;
       uploads: string[];
@@ -75,7 +77,7 @@ switch (args[1]) {
     state,
     read,
     run: (failure = "") =>
-      spawnSync("bash", [script, assets, notes], {
+      NodeChildProcess.spawnSync("bash", [script, assets, notes], {
         env: {
           ...process.env,
           PATH: `${bin}:${process.env.PATH}`,
@@ -92,7 +94,7 @@ switch (args[1]) {
   };
 }
 
-describe.skipIf(process.platform === "win32")("release publication", () => {
+describe("release publication", () => {
   it("retains completed assets on failure and resumes the draft on rerun", () => {
     const f = fixture();
     const failed = f.run("before-save");
@@ -119,10 +121,10 @@ describe.skipIf(process.platform === "win32")("release publication", () => {
     const f = fixture();
     expect(f.run().status).toBe(0);
     const uploads = f.read().uploads;
-    writeFileSync(join(f.assets, "a.zip"), "different artifact");
+    NodeFS.writeFileSync(NodePath.join(f.assets, "a.zip"), "different artifact");
     expect(f.run().status).toBe(1);
     expect(f.read().uploads).toEqual(uploads);
-    writeFileSync(
+    NodeFS.writeFileSync(
       f.state,
       JSON.stringify({ ...f.read(), exists: true, isDraft: true, targetCommitish: "other-commit" }),
     );
@@ -131,6 +133,6 @@ describe.skipIf(process.platform === "win32")("release publication", () => {
   });
 
   it("has valid shell syntax", () => {
-    expect(() => execFileSync("bash", ["-n", script])).not.toThrow();
+    expect(() => NodeChildProcess.execFileSync("bash", ["-n", script])).not.toThrow();
   });
 });
