@@ -1,6 +1,13 @@
 import Foundation
 
 #if !os(iOS)
+public protocol EngineLifecycle: Sendable {
+    func start() async
+    func stop() async
+    /// Release this client's observation without stopping an independent service.
+    func disconnect() async
+}
+
 /// Assembles NDJSON lines from pipe chunks and remembers whether an
 /// engine-refused event went by. Mutated from the pipe's readability
 /// handler and read from the termination handler — two GCD threads, hence
@@ -49,7 +56,7 @@ private final class LineAssembler: @unchecked Sendable {
 /// host (a stray `swapd auto`) already owns the store's engine mutex —
 /// surfaced as a state, not retried hot, since the refusal is instant and
 /// hammering it would spin.
-public actor EngineSupervisor {
+public actor EngineSupervisor: EngineLifecycle {
     public enum State: Sendable, Equatable {
         case stopped
         case running(pid: Int32)
@@ -97,6 +104,8 @@ public actor EngineSupervisor {
         process = nil
         onState(.stopped)
     }
+
+    public func disconnect() { stop() }
 
     private func spawn() {
         guard !stopping else { return }

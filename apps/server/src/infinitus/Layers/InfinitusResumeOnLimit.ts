@@ -22,6 +22,7 @@ import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { InfinitusSwapdProbe } from "../Services/InfinitusSwapdProbe.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusLimitStops, InfinitusLimitStopsLive } from "../Services/InfinitusLimitStops.ts";
 import {
@@ -74,6 +75,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const orchestrationEngine = yield* OrchestrationEngineService;
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const infinitus = yield* InfinitusService;
+    const swapd = yield* InfinitusSwapdProbe;
+    const withBackgroundAccounts = (snapshot: InfinitusSnapshot) =>
+      snapshot.available ? Effect.succeed(snapshot) : swapd.snapshot;
     const settings = yield* ServerSettingsService;
     const turnStartGate = yield* TurnStartGate;
     const limitStops = yield* InfinitusLimitStops;
@@ -88,6 +92,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     // Suspended: the list is read when it runs, not when the layer builds.
     const publish = Effect.suspend(() => limitStops.setStopped([...marks.values()]));
     const resumed = new Set<TurnId>();
+    const scheduled = new Set<LimitStop>();
     const lastResumeAt = new Map<ThreadId, number>();
     const watch = yield* FiberHandle.make();
 
@@ -173,6 +178,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
 
     const forget = (threadId: ThreadId) =>
       Effect.gen(function* () {
+        const stop = stops.get(threadId);
+        if (stop !== undefined) scheduled.delete(stop);
         stops.delete(threadId);
         if (marks.delete(threadId)) yield* publish;
         // A proxy's stop (#1088) waits for nothing here: it keeps no poll alive.
@@ -266,12 +273,20 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         }
         if (plain === null || !recorded) return;
         const proxy = yield* proxyFor(plain.threadId);
-        const fresh = proxy === null ? plain : proxyStop(plain, proxy);
+        const fresh =
+          proxy === null
+            ? (limitStopFromEvent(
+                event,
+                plain.stoppedAt,
+                yield* withBackgroundAccounts(snapshot),
+              ) ?? plain)
+            : proxyStop(plain, proxy);
         const known = stops.get(fresh.threadId);
         const stop =
           known !== undefined && fresh.resetsAt === null
             ? { ...fresh, resetsAt: known.resetsAt, limitType: known.limitType }
             : fresh;
+        if (known !== undefined) scheduled.delete(known);
         stops.set(stop.threadId, stop);
         if (known === undefined) yield* mark(stop);
         else if (known.resetsAt !== stop.resetsAt) yield* remark(stop);
@@ -287,9 +302,11 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
 
     const onSnapshot = (snapshot: InfinitusSnapshot): Effect.Effect<void> =>
       Effect.gen(function* () {
+        if (![...stops.values()].some((stop) => stop.proxy === null)) return;
+        const accounts = yield* withBackgroundAccounts(snapshot);
         const now = yield* nowMillis;
         for (const stop of stops.values()) {
-          const target = resumeTarget(stop, snapshot, now);
+          const target = resumeTarget(stop, accounts, now);
           if (target === null) continue;
           const last = lastResumeAt.get(stop.threadId);
           if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
@@ -297,36 +314,47 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
             yield* forget(stop.threadId);
             continue;
           }
-          // The record goes before anything is sent: a second tick cannot
-          // resume the same stop, and our own interrupt cannot cancel it.
-          yield* forget(stop.threadId);
-          if (stop.turnId !== null) {
-            resumed.add(stop.turnId);
-            if (resumed.size > RESUMED_LIMIT) {
-              const oldest = resumed.values().next().value;
-              if (oldest !== undefined) resumed.delete(oldest);
-            }
-          }
-          lastResumeAt.set(stop.threadId, now);
+          if (scheduled.has(stop)) continue;
+          scheduled.add(stop);
           // Fork (#616): a background thread's resume waits with the gate while
           // its fleet reads low; run later, it resumes on the account live then.
-          yield* turnStartGate.start({
-            threadId: stop.threadId,
-            replacesActiveTurn: stop.kind === "parked",
-            run: Effect.gen(function* () {
-              const current =
-                resumeTarget(stop, yield* infinitus.snapshot, yield* nowMillis) ?? target;
-              yield* resume(stop, current);
-            }).pipe(
-              Effect.catchCause((cause) =>
-                Effect.logWarning("infinitus.resume-on-limit.failed", {
-                  threadId: stop.threadId,
-                  turnId: stop.turnId,
-                  cause: Cause.pretty(cause),
-                }),
+          yield* turnStartGate
+            .start({
+              threadId: stop.threadId,
+              replacesActiveTurn: stop.kind === "parked",
+              run: Effect.gen(function* () {
+                const latest = yield* withBackgroundAccounts(yield* infinitus.snapshot);
+                const resumedAt = yield* nowMillis;
+                const current = resumeTarget(stop, latest, resumedAt);
+                // A held start may outlive a usage reading or the user's turn.
+                // Keep an invalid stop watched so the next probe can retry it.
+                const stillEnabled = yield* enabled;
+                if (stops.get(stop.threadId) !== stop || current === null) return;
+                if (!stillEnabled) return yield* forget(stop.threadId);
+                // Claim before yielding so another event cannot record the
+                // same stop while the sidebar state is being published.
+                if (stop.turnId !== null) {
+                  resumed.add(stop.turnId);
+                  if (resumed.size > RESUMED_LIMIT) {
+                    const oldest = resumed.values().next().value;
+                    if (oldest !== undefined) resumed.delete(oldest);
+                  }
+                }
+                lastResumeAt.set(stop.threadId, resumedAt);
+                yield* forget(stop.threadId);
+                yield* resume(stop, current);
+              }).pipe(
+                Effect.ensuring(Effect.sync(() => scheduled.delete(stop))),
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("infinitus.resume-on-limit.failed", {
+                    threadId: stop.threadId,
+                    turnId: stop.turnId,
+                    cause: Cause.pretty(cause),
+                  }),
+                ),
               ),
-            ),
-          });
+            })
+            .pipe(Effect.onError(() => Effect.sync(() => scheduled.delete(stop))));
         }
       });
 

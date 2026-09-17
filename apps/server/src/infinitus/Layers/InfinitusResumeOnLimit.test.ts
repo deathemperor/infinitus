@@ -42,6 +42,7 @@ import {
 } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { InfinitusSwapdProbe } from "../Services/InfinitusSwapdProbe.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusResumeOnLimitLive } from "./InfinitusResumeOnLimit.ts";
@@ -155,6 +156,7 @@ const testCrypto = Crypto.make({
 });
 
 interface Harness {
+  readonly setBackground: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly emit: (event: ProviderRuntimeEvent) => Effect.Effect<void>;
   readonly poll: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly setCurrent: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
@@ -178,6 +180,11 @@ const makeHarnessWith = (
     const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
     const current = yield* Ref.make<InfinitusSnapshot>(stale);
     const enabled = yield* Ref.make(true);
+    const background = yield* Ref.make<InfinitusSnapshot>({
+      available: false,
+      fleets: [],
+      commands: [],
+    });
     const interrupts = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>([]);
     const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input?: string }>>([]);
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
@@ -226,6 +233,7 @@ const makeHarnessWith = (
               })),
             ),
           }),
+          Layer.succeed(InfinitusSwapdProbe, { snapshot: Ref.get(background) }),
           Layer.mock(InfinitusService)({
             snapshot: Ref.get(current),
             changes: () =>
@@ -246,8 +254,13 @@ const makeHarnessWith = (
 
     return {
       emit: (event) => PubSub.publish(events, event).pipe(Effect.asVoid),
-      poll: (snapshot) => Queue.offer(snapshots, snapshot).pipe(Effect.asVoid),
+      poll: (snapshot) =>
+        Ref.set(current, snapshot).pipe(
+          Effect.andThen(Queue.offer(snapshots, snapshot)),
+          Effect.asVoid,
+        ),
       setCurrent: (snapshot) => Ref.set(current, snapshot),
+      setBackground: (snapshot: InfinitusSnapshot) => Ref.set(background, snapshot),
       setEnabled: (value) => Ref.set(enabled, value),
       interrupts: Ref.get(interrupts),
       turns: Ref.get(turns),
@@ -275,6 +288,24 @@ const settle = <A>(read: Effect.Effect<A>, check: (value: A) => boolean) =>
 const at = (offsetSeconds: number) => DateTime.formatIso(DateTime.makeUnsafe(offsetSeconds * 1000));
 
 describe("InfinitusResumeOnLimitLive", () => {
+  effectIt.effect("resumes through the background daemon while the menu bar is closed", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        const offline: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
+        yield* h.setCurrent(offline);
+        yield* h.setBackground(stale);
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.setBackground(swapped(at(150)));
+        yield* h.poll(offline);
+        const turns = yield* settle(h.turns, (value) => value.length === 1);
+        expect(turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+        expect(yield* h.interrupts).toEqual([{ threadId, turnId }]);
+      }),
+    ),
+  );
   effectIt.effect(
     "hands the resume to the TurnStartGate: a holding gate resumes nothing until the start runs (#616)",
     () =>
@@ -328,6 +359,48 @@ describe("InfinitusResumeOnLimitLive", () => {
           ]);
         }),
       ),
+  );
+
+  effectIt.effect("rechecks a delayed background resume and keeps invalid targets waiting", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const kept: Array<Effect.Effect<void>> = [];
+        const h = yield* makeHarnessWith({
+          start: <E, R>({ run }: TurnStartInput<E, R>) =>
+            Effect.gen(function* () {
+              const context = yield* Effect.context<R>();
+              kept.push(run.pipe(Effect.provideContext(context), Effect.orDie));
+              return "held" as const;
+            }),
+        });
+        const offline: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
+        yield* h.setCurrent(offline);
+        yield* h.setBackground(stale);
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.setBackground(swapped(at(150)));
+        yield* h.poll(offline);
+        yield* settle(
+          Effect.sync(() => kept.length),
+          (n) => n === 1,
+        );
+        expect(yield* h.isStopped).toBe(true);
+        yield* h.setBackground(stale);
+        yield* kept[0]!;
+        expect(yield* h.turns).toEqual([]);
+        expect(yield* h.isStopped).toBe(true);
+        yield* h.setBackground(swapped(at(200)));
+        yield* h.poll(offline);
+        yield* settle(
+          Effect.sync(() => kept.length),
+          (n) => n === 2,
+        );
+        yield* kept[1]!;
+        expect(yield* h.turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+        expect(yield* h.isStopped).toBe(false);
+      }),
+    ),
   );
 
   effectIt.effect("resumes a parked turn once the swapped-to account is probed ok", () =>
