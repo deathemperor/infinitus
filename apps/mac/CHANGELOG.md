@@ -10,6 +10,23 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.22
+
+### Mac
+- The settings window stopped drawing crash reports — the desktop shows them, and `infinitusctl crashes --id <id>` answers one with its transcript.
+- The Cloudflare tunnels are gone — Infinitus Connect carries remote reach, and a phone off your Wi-Fi links through it.
+
+### Desktop
+- A rebase during a turn no longer shows the commits that landed on main as the thread's own changes in the turn cards and the diff panel.
+- Settings › Infinitus › Devices lists the Mac's crash reports, and Copy hands one to a session for triage.
+- Settings › Infinitus › Engines can start, stop and keep a proxy engine running.
+- Settings › Infinitus › Devices no longer draws its own "Pair a phone" QR; create the phone's pairing link under Settings › Connections, the one place every link comes from.
+- Settings › Infinitus › Devices drops the tunnel rows; the pairing QR is the Wi-Fi link, and points at Infinitus Connect for anywhere else.
+
+### Phone
+- The no-code sign-in ("Sign in here instead") opens in the system sign-in sheet, so passkeys work there too.
+- A lapsed AWS or gcloud sign-in in one of your threads now reaches the phone as a notification, opening that thread.
+
 ## 0.5.0-alpha.21
 
 ### Desktop
