@@ -1439,7 +1439,7 @@ final class AppModel: ObservableObject {
             Task { @MainActor in self?.swapdState = state }
         }
         let supervisor: any EngineLifecycle
-        if ProcessInfo.processInfo.environment["INFINITUS_SWAPD_CLI"] != nil {
+        if mockMode || ProcessInfo.processInfo.environment["INFINITUS_SWAPD_CLI"] != nil {
             supervisor = EngineSupervisor(binaryPath: binary, onLine: onLine, onState: onState)
         } else {
             supervisor = SwapdLaunchAgent(binaryPath: binary, onLine: onLine, onState: onState)
@@ -1610,7 +1610,7 @@ final class AppModel: ObservableObject {
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
         let team = team
-        let keepEngine = swapdEnabled
+        let keepEngine = swapdEnabled && !mockMode
         Task {
             if keepEngine { await oldSwapd?.disconnect() }
             else { await oldSwapd?.stop() }

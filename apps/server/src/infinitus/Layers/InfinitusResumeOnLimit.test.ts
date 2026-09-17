@@ -254,7 +254,11 @@ const makeHarnessWith = (
 
     return {
       emit: (event) => PubSub.publish(events, event).pipe(Effect.asVoid),
-      poll: (snapshot) => Queue.offer(snapshots, snapshot).pipe(Effect.asVoid),
+      poll: (snapshot) =>
+        Ref.set(current, snapshot).pipe(
+          Effect.andThen(Queue.offer(snapshots, snapshot)),
+          Effect.asVoid,
+        ),
       setCurrent: (snapshot) => Ref.set(current, snapshot),
       setBackground: (snapshot: InfinitusSnapshot) => Ref.set(background, snapshot),
       setEnabled: (value) => Ref.set(enabled, value),
@@ -355,6 +359,48 @@ describe("InfinitusResumeOnLimitLive", () => {
           ]);
         }),
       ),
+  );
+
+  effectIt.effect("rechecks a delayed background resume and keeps invalid targets waiting", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const kept: Array<Effect.Effect<void>> = [];
+        const h = yield* makeHarnessWith({
+          start: <E, R>({ run }: TurnStartInput<E, R>) =>
+            Effect.gen(function* () {
+              const context = yield* Effect.context<R>();
+              kept.push(run.pipe(Effect.provideContext(context), Effect.orDie));
+              return "held" as const;
+            }),
+        });
+        const offline: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
+        yield* h.setCurrent(offline);
+        yield* h.setBackground(stale);
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.setBackground(swapped(at(150)));
+        yield* h.poll(offline);
+        yield* settle(
+          Effect.sync(() => kept.length),
+          (n) => n === 1,
+        );
+        expect(yield* h.isStopped).toBe(true);
+        yield* h.setBackground(stale);
+        yield* kept[0]!;
+        expect(yield* h.turns).toEqual([]);
+        expect(yield* h.isStopped).toBe(true);
+        yield* h.setBackground(swapped(at(200)));
+        yield* h.poll(offline);
+        yield* settle(
+          Effect.sync(() => kept.length),
+          (n) => n === 2,
+        );
+        yield* kept[1]!;
+        expect(yield* h.turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+        expect(yield* h.isStopped).toBe(false);
+      }),
+    ),
   );
 
   effectIt.effect("resumes a parked turn once the swapped-to account is probed ok", () =>
