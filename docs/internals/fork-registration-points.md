@@ -278,6 +278,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `Alert` shows at most three buttons; #269 F's PR menu reaches four).
 - `apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx` — the
   `roamingHostsLine` under a saved environment's host (#663).
+- `apps/mobile/src/features/connection/EnvironmentConnectionNotice.tsx` and
+  `apps/mobile/src/features/home/workspace-connection-status.ts` — the
+  connection icon says what the label says. The header status returns label
+  and `showsProgress` from one function, so a retry that recorded a failure
+  keeps its spinner instead of reading "Reconnecting to X" beside a
+  wifi-slash; the full-screen notice drops `bolt.horizontal.circle` and
+  shows wifi-slash for every non-retrying phase.
 - `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — mounts
   `InfinitusNearbyServers` above the Host field (#651) and
   `InfinitusAskToApprove` under the code field (#710), whose approved
