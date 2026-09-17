@@ -6,7 +6,14 @@ import { supportsAgentAwarenessPush } from "./capabilities";
 // Development builds are Xcode-signed and receive sandbox APNs tokens;
 // preview and production builds are distribution-signed and use production
 // APNs. The relay routes each device's pushes accordingly.
-export function resolveApsEnvironment(appVariant: unknown): "sandbox" | "production" {
+// Fork: `override` is the build's `extra.apsEnvironment`
+// (`INFINITUS_APS_ENVIRONMENT=sandbox`), for an `infinitus` build signed by
+// Xcode onto a device — its token is a sandbox one whatever the variant.
+export function resolveApsEnvironment(
+  appVariant: unknown,
+  override?: unknown,
+): "sandbox" | "production" {
+  if (override === "sandbox" || override === "production") return override;
   return appVariant === "development" ? "sandbox" : "production";
 }
 
