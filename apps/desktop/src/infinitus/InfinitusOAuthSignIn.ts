@@ -24,7 +24,7 @@ import * as Layer from "effect/Layer";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import { signInWindowOptions } from "./InfinitusSignIn.ts";
+import { prepareSignInWindow, signInWindowOptions } from "./InfinitusSignIn.ts";
 import { isExecutableFile, startSwapdAddOAuth } from "./InfinitusSwapdProcess.ts";
 import { resolveSwapdBinary } from "./infinitusSwapd.logic.ts";
 
@@ -107,7 +107,7 @@ const make = Effect.gen(function* () {
         yield* Effect.promise(() => run.result);
         return { ok: false, error: WINDOW_ERROR };
       }
-      window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      prepareSignInWindow(window);
       // Unlike #677 there is nothing to paste elsewhere: closing the page
       // ends the flow, rather than leaving it to the engine's timeout.
       window.once("closed", cancel);

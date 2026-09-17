@@ -511,6 +511,11 @@ const config: ExpoConfig = {
     // version (EAS owns the build numbers, `appVersionSource: remote`).
     productVersion: PRODUCT_VERSION,
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
+    // Fork: `sandbox` for a build Xcode signs onto a device (its APNs token
+    // is a sandbox one); unset everywhere else, where the variant decides.
+    ...(repoEnv.INFINITUS_APS_ENVIRONMENT
+      ? { apsEnvironment: repoEnv.INFINITUS_APS_ENVIRONMENT }
+      : {}),
     relay: {
       url: repoEnv.T3CODE_RELAY_URL ?? null,
     },

@@ -336,6 +336,9 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     expect(resolveApsEnvironment("preview")).toBe("production");
     expect(resolveApsEnvironment("production")).toBe("production");
     expect(resolveApsEnvironment(undefined)).toBe("production");
+    expect(resolveApsEnvironment("infinitus", "sandbox")).toBe("sandbox");
+    expect(resolveApsEnvironment("development", "production")).toBe("production");
+    expect(resolveApsEnvironment("infinitus", "staging")).toBe("production");
   });
 
   it("disables push features in Personal Team relay registrations", () => {
