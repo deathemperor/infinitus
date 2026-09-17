@@ -533,9 +533,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
-- `apps/web/src/routes/pair.tsx` — one early return: a link with the phone
-  marker (`isPhonePairingLink`, #724) renders `InfinitusPhoneLinkSurface`
-  instead of the pairing form, so the browser does not spend a phone's token.
 - `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
   routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
   the catalog's `themes` / `animations` sections, #747 step 1, and Priority

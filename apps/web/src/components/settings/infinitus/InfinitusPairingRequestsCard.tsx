@@ -19,13 +19,12 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
 import { SettingsSection, useRelativeTimeTick } from "../settingsLayout";
-import { formatCountdown } from "./pairPhone.logic";
 import { FORBIDDEN_NOTICE } from "./pairingAccess.logic";
-import { decisionNotice, pairingRequestRows } from "./pairingRequests.logic";
+import { decisionNotice, formatCountdown, pairingRequestRows } from "./pairingRequests.logic";
 import { usePairingRequests } from "./usePairingRequests";
 
 const EMPTY_NOTICE =
-  "No phone is asking to pair. In the Infinitus app, add a connection, find this Mac on the network and choose “Ask to approve”.";
+  "No phone is asking to pair. In the Infinitus app, add a connection, find this Mac on the network and choose “Ask to approve” — or scan a pairing link created under Settings › Connections.";
 
 export function InfinitusPairingRequestsCard() {
   const environmentId = usePrimaryEnvironment()?.environmentId ?? null;
