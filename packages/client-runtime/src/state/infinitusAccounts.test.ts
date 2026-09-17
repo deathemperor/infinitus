@@ -2,6 +2,7 @@ import type {
   InfinitusAccount,
   InfinitusAwsLogin,
   InfinitusFleet,
+  InfinitusManifestCommand,
   InfinitusSnapshot,
 } from "@infinitus/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
@@ -709,12 +710,13 @@ describe("sign-in rows", () => {
       options: { dismiss: "true" },
     });
     expect(signInDismissCommandArgs("gcloud", "me@example.com").command).toBe("gcloud-login");
-    const verb = {
+    const verb: InfinitusManifestCommand = {
       name: "aws-login",
       args: ["<profile>"],
       options: ["--local", "--remote"],
       effect: "human",
       summary: "",
+      replyShape: "",
     };
     expect(signInDismissSupported(snapshot({ commands: [verb] }))).toBe(false);
     expect(
