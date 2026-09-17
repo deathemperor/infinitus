@@ -1386,11 +1386,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func removeCrash(_ id: String) {
-        crashStore.remove(id)
-        crashReports = crashStore.list()
-    }
-
     /// This Mac's own crashes: `~/Library/Logs/DiagnosticReports/
     /// Infinitus-*.ips` newer than the last look. The first look starts
     /// the clock — old reports aren't news.

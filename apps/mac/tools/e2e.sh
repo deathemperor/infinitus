@@ -438,7 +438,10 @@ done
 exec 7>&-
 expect "d['clientId']=='e2e-hold'" <"$LOG.hold" || fail "client-activity --body with an open stdin"
 echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVersion":"0","at":"2026-09-10T00:00:00Z","kind":"crash","reason":"e2e","frames":[]}' | "$CTL" crash-report | expect "d['id']=='e2e-crash'" || fail "crash-report (stdin body)"
-"$CTL" crashes | expect "any(c['id']=='e2e-crash' for c in d['crashes'])" || fail "crash-report not listed by crashes"
+"$CTL" crashes | expect "any(c['id']=='e2e-crash' and c['appVersion']=='0' and 'transcript' not in c for c in d['crashes'])" || fail "crash-report not listed by crashes"
+# `--id` is the desktop's Copy: that one report, with the transcript.
+"$CTL" crashes --id e2e-crash | expect "len(d['crashes'])==1 and d['crashes'][0]['id']=='e2e-crash' and 'reason: e2e' in d['crashes'][0]['transcript']" || fail "crashes --id must answer the one report with its transcript"
+"$CTL" crashes --id nope | expect "d['crashes']==[]" || fail "crashes --id must answer nothing for an unknown id"
 # The #677 sign-in verbs are wired (the flow itself needs a human and the Claude CLI): a
 # flow nobody started is refused by id, and a fleet that does not exist by name.
 "$CTL" signin-status nope 2>&1 | grep -q "no sign-in nope" || fail "signin-status did not refuse an unknown flow"

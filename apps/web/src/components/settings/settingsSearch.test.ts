@@ -301,6 +301,7 @@ describe("searchSettings", () => {
     expect(ids("account exhausted")).toContain("infinitus-push");
     expect(ids("revive countdown")).toContain("infinitus-push");
     expect(ids("pair a phone")).toContain("infinitus-devices");
+    expect(ids("crash report")).toContain("infinitus-devices");
   });
 
   it("lights up the deepest Infinitus nav item only", () => {
