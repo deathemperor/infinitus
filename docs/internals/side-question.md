@@ -9,3 +9,7 @@ Web: `apps/web/src/rightPanelStore.ts` — the `side-question` surface (`openSid
 ## Gating
 
 Gated on a Claude or Codex session (`supportsThreadFork`, #819) and `capabilities.infinitus`; the button sits after the mode toggle in `ChatComposer.tsx` (`ComposerFooterModeControls`) and as a menu item in `CompactComposerControlsMenu.tsx`; `Sidebar.tsx`, `CommandPalette.tsx` and `getLatestThreadForProject` skip `sideOf` threads. Tests: `ThreadFork.test.ts` (`forkCreateFields`), `ProjectionPipeline.babysit.test.ts` (the column), `rightPanelStore.test.ts`, `SideQuestionPanel.logic.test.ts`.
+
+## Phone
+
+`apps/mobile/src/features/threads/ThreadRouteScreen.tsx` builds it from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s `action` is the thread menu's "Ask a side question" (`docs/internals/phone-thread-screen.md`, #941) on a Claude Agent thread of an `infinitus` server; a tap forks the session's latest completed turn (`infinitus.forkThread` with `side: true`, no `turnCount`, #887) and opens `SideQuestionSheet` (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`, no link): `apps/mobile/src/features/infinitus/InfinitusSideQuestionSheet.tsx` subscribes to the side fork, asks in plan mode, and "Bring to main" appends the latest answer to the main composer's draft. `sideQuestions.ts` carries the web `SideQuestionPanel.logic.ts` helpers, kept local so neither app edits the other's file.

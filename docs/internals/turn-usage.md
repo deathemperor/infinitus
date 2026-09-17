@@ -8,7 +8,11 @@ Tool calls and wall time (`toolCalls?`, `durationMs?` on the turn record and, su
 
 ## Web
 
-Web: `apps/web/src/components/chat/ThreadUsagePopover.tsx` (+ `threadUsage.logic.ts`) — a badge at the head of the chat header's action group ("≈ $0.35", or "N turns" while no turn carried a cost) opening the thread-info popover: turns (with the subagent count), tool calls and duration (wall time, waits included) when counted, the token counts that moved, models, cost ("Cost not recorded", never $0.00, for none) and the last turn in the user's timestamp format, plus "Estimated from the transcript" for a `transcript` rollup; drawn only when the thread has a rollup. Registration: `ChatHeader.tsx`'s optional `usage` prop, fed `activeServerThread?.usage` from `ChatView.tsx`. The phone sheet is PR #908.
+Web: `apps/web/src/components/chat/ThreadUsagePopover.tsx` (+ `threadUsage.logic.ts`) — a badge at the head of the chat header's action group ("≈ $0.35", or "N turns" while no turn carried a cost) opening the thread-info popover: turns (with the subagent count), tool calls and duration (wall time, waits included) when counted, the token counts that moved, models, cost ("Cost not recorded", never $0.00, for none) and the last turn in the user's timestamp format, plus "Estimated from the transcript" for a `transcript` rollup; drawn only when the thread has a rollup. Registration: `ChatHeader.tsx`'s optional `usage` prop, fed `activeServerThread?.usage` from `ChatView.tsx`.
+
+## Phone
+
+`apps/mobile/src/features/threads/ThreadRouteScreen.tsx` builds it from the phone (#834, PR #908): `useThreadUsageHeaderItem`'s `action` is the thread menu's "Thread usage" (`docs/internals/phone-thread-screen.md`, #941) once the shell carries `usage` — a turn was recorded; no choice before, and none on a server without the rollup. A tap opens `ThreadUsageSheet` (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`, no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx` reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows, worded like the web popover (#907): turns (with the subagent count), tool calls and duration when the server counted them (#927), each non-zero token share, model(s), cost ("Cost not recorded" for null, never $0.00), last turn — every estimate prefixed "≈", and the caveat lines under them.
 
 ## Transcript backfill
 

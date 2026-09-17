@@ -119,23 +119,7 @@ these bullets.
   every user-facing string routes through (#601 phase 2); contracts holds it
   because shared depends on contracts, and `packages/shared/src/productName.ts`
   re-exports it so `@infinitus/shared/productName` imports keep working.
-- `apps/server` — rule: any string the user reads (CLI help and command
-  descriptions, log lines, errors, HTTP/HTML pages, pairing and service copy,
-  MCP tool descriptions, the git author name, the prompts and runtime
-  instructions the assistant echoes) says `${PRODUCT_NAME}`, never a literal
-  "T3 Code"; identifiers stay (`t3` binary and package, `T3CODE_*` env vars,
-  the `t3code/<version>` UA token, upstream URLs) until #1368's later
-  slices rename them (the MCP server id is `infinitus` since slice E); "T3 Connect" is `CONNECT_NAME`
-  (`productName.ts`, "Infinitus Connect", #1368 slice A) on every surface —
-  web, mobile, server, `packages/*`, `docs/user` — and the web and desktop
-  guard tests, `scripts/connect-name.guard.test.ts` (server, phone, packages,
-  relay) and the visual pass fail on a new literal. The same three guards
-  fail on a bare "T3" used as the product noun ("T3 Account", "Open T3",
-  "a T3 thread"; #1368 follow-up) — identifiers never match — with an
-  allowlist for the wordmark glyph, the relay's live column default and the
-  triage playbook that must stay byte-identical to upstream's file. The
-  lock-screen widgets say a literal "Infinitus": a widget body serializes
-  into the extension and cannot reach an imported constant.
+- `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A). Rules and traps: `docs/internals/infinitus-rename.md`.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
