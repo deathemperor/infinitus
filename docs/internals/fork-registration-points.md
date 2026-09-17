@@ -279,6 +279,29 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
   `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`
   and cannot import the constant).
+- `apps/web/src/components/SidebarStageBackdrop.tsx` — the sidebar header's
+  stage artwork on the release track: `resolveSidebarStageBackdropVariant`
+  answers the night sky (`nightly`) for the stage label `Alpha` too, and
+  `resolveEnvironmentIdentificationPillLabel` answers `"Alpha"`. Upstream
+  leaves its stable channel bare because the art is how it marks a
+  prerelease; here every version is `0.5.0-alpha.N`
+  (`resolveDesktopAppStageLabel` → `Alpha`), so the release build is the only
+  one a user installs and there is nothing to set apart — which is why the
+  match is by name and `Latest` (hosted web) stays bare, pinned by
+  `SidebarStageBackdrop.test.tsx`. No new art and no CSS: `--stage-night-*`
+  is already defined for `:root` and every `sidebarArtwork` theme. The pill
+  label is widened with it because `SettingsPanels.tsx`'s
+  `showEnvironmentIdentification` row is derived from that function — without
+  it the artwork would have no off switch — so that row's description
+  ("Choose how this environment is identified…", no longer "Dev and
+  Nightly") and its `settingsSearch.ts` terms follow. Riding along, all
+  upstream code the fork does not touch: `AppSidebarLayout.tsx`'s floating
+  sidebar trigger turns white, `ComposerPrimaryActions.tsx` draws the send
+  button on the art, and `AuthSurfaceShell.tsx` (no mode gate — the auth
+  surface has no settings) gives the CLI-connect pages the sky in place of
+  its hardcoded blue gradient. `apps/server/src/cloud/cliAuthHtml.ts`'s
+  `.stage-*` CSS is a separate mechanism off `__T3CODE_BUILD_CHANNEL__` and
+  is unaffected.
 - `packages/shared/src/git.ts` — `WORKTREE_BRANCH_PREFIX` is `infinitus`
   (#823: a branch name is on screen), `LEGACY_WORKTREE_BRANCH_PREFIX` keeps
   upstream's `t3code` so temporary branches minted before the rename are

@@ -6,7 +6,7 @@ import { resolveServerBackedAppStageLabel } from "../branding.logic";
 import { primaryServerConfigAtom } from "../state/server";
 
 export type SidebarStageBackdropVariant = "nightly" | "dev";
-export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly";
+export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly" | "Alpha";
 
 // A wide viewBox keeps the 96-unit art height at a fixed scale while sidebar resizing reveals
 // more horizontal canvas instead of zooming the scene.
@@ -18,7 +18,10 @@ export function resolveSidebarStageBackdropVariant(
 ): SidebarStageBackdropVariant | null {
   if (!enabled) return null;
   const normalized = stageLabel.trim().toLowerCase();
-  if (normalized === "nightly") return "nightly";
+  // Fork: the release track draws the night sky too. Upstream leaves its stable
+  // channel bare because the art is how it marks a prerelease; here every build
+  // the user installs is this one, so there is nothing to set it apart from.
+  if (normalized === "nightly" || normalized === "alpha") return "nightly";
   if (normalized === "dev") return "dev";
   return null;
 }
@@ -37,6 +40,9 @@ export function resolveEnvironmentIdentificationPillLabel(
   const normalized = stageLabel.trim().toLowerCase();
   if (normalized === "dev") return "Dev";
   if (normalized === "nightly") return "Nightly";
+  // Fork: the release track has artwork, so it needs the pill as the other way
+  // to answer the setting — and the settings row is drawn off this label.
+  if (normalized === "alpha") return "Alpha";
   return null;
 }
 
