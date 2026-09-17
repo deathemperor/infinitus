@@ -9,12 +9,46 @@ import {
   type ThirdPartyLicenseEntry,
   type ThirdPartyLicenseManifest,
 } from "@infinitus/shared/thirdPartyLicenses";
+import {
+  PRODUCT_NAME,
+  UPSTREAM_PRODUCT_NAME,
+  UPSTREAM_PUBLISHER_NAME,
+  UPSTREAM_REPOSITORY_URL,
+} from "@infinitus/shared/productName";
 
 import { Button } from "../ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
+
+/**
+ * Credits the upstream project the fork is built on. The formal notice is the
+ * "T3 Code" entry in the list below (MIT requires shipping its text), but that
+ * sits among hundreds of npm packages; a fork's debt to its upstream deserves
+ * to be read, so it gets its own section at the top.
+ */
+function UpstreamCreditSection() {
+  return (
+    <div className="border-b border-border px-4 py-3 text-base sm:text-sm">
+      <p className="font-medium text-foreground">Built on {UPSTREAM_PRODUCT_NAME}</p>
+      <p className="mt-1 text-muted-foreground">
+        {PRODUCT_NAME} is a fork of {UPSTREAM_PRODUCT_NAME} by {UPSTREAM_PUBLISHER_NAME}, used
+        under the MIT license. It is an independent project, not affiliated with or endorsed by{" "}
+        {UPSTREAM_PUBLISHER_NAME}.
+      </p>
+      <a
+        className="mt-2 inline-flex items-center gap-1.5 text-primary hover:underline"
+        href={UPSTREAM_REPOSITORY_URL}
+        rel="noreferrer noopener"
+        target="_blank"
+      >
+        {UPSTREAM_PRODUCT_NAME} on GitHub
+        <ExternalLinkIcon className="size-3.5" aria-hidden />
+      </a>
+    </div>
+  );
+}
 
 type LicenseManifestState =
   | { readonly status: "loading" }
@@ -239,6 +273,7 @@ export function OpenSourceLicensesPanel() {
       >
         {state.status === "ready" ? (
           <div className="text-base sm:text-sm">
+            {query.trim() === "" ? <UpstreamCreditSection /> : null}
             {filteredEntries.length > 0 ? (
               filteredEntries.map((entry) => {
                 const entryKey = thirdPartyLicenseEntryKey(entry);

@@ -474,6 +474,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   private vulnerability reporting, or the maintainer's email) and the
   policy link is `infinitus.run/security-policy`; upstream's routes them
   to `security@ping.gg`, who do not maintain this fork.
+- `third-party-licenses.config.json`, `apps/web/src/components/settings/OpenSourceLicenses.tsx`,
+  `apps/mobile/src/features/settings/SettingsOpenSourceLicensesRouteScreen.tsx` — the fork ships
+  upstream's MIT-licensed source, whose license requires the notice travel with "substantial
+  portions" of it. A `customNotices` entry named "T3 Code" carries upstream's copyright line and
+  MIT text into the generated manifest, and both licenses screens lead with a "Built on T3 Code"
+  section (hidden while searching) crediting the fork's origin — the generated entry alone sorts
+  to position ~703 of 771, among the npm packages.
 - `apps/mobile/src/components/BrandMark.tsx` and
   `apps/mobile/src/lib/mobileBranding.ts` — the brand lockup's icon is
   chosen through `resolveMobileBrandMarkVariant`, which maps the fork's
