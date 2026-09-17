@@ -117,7 +117,10 @@ public enum AwsLogin {
     /// survives as a failure that says why — its CLI died with the app.
     public enum Ledger {
         public static let doneMaxAge: TimeInterval = 24 * 3600
-        public static let failedMaxAge: TimeInterval = 3600
+        /// A failure is worth a retry for as long as a login is given to
+        /// finish; past that the card is a stale notice — the next expired
+        /// result raises a new login anyway (user 2026-09-17).
+        public static let failedMaxAge: TimeInterval = AwsLogin.timeout
         public static let relaunchMessage = "the app relaunched mid-login — start it again"
 
         public static func snapshot(running: [State], finished: [State]) -> [State] {
