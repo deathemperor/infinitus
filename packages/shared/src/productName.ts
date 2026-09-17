@@ -4,4 +4,10 @@
  * through this constant so upstream-sync conflicts collapse to import
  * lines; see INFINITUS.md.
  */
-export { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/contracts/productName";
+export {
+  CONNECT_NAME,
+  PRODUCT_NAME,
+  UPSTREAM_PRODUCT_NAME,
+  UPSTREAM_PUBLISHER_NAME,
+  UPSTREAM_REPOSITORY_URL,
+} from "@infinitus/contracts/productName";

@@ -119,7 +119,13 @@ these bullets.
 - `packages/contracts/src/productName.ts` — `PRODUCT_NAME`, the one constant
   every user-facing string routes through (#601 phase 2); contracts holds it
   because shared depends on contracts, and `packages/shared/src/productName.ts`
-  re-exports it so `@infinitus/shared/productName` imports keep working.
+  re-exports it so `@infinitus/shared/productName` imports keep working. It
+  also carries the upstream attribution constants (`UPSTREAM_PRODUCT_NAME`,
+  `UPSTREAM_PUBLISHER_NAME`, `UPSTREAM_REPOSITORY_URL`) the
+  licenses screens' "Built on T3 Code" section reads: the guard test treats a
+  bare "T3 Tools" as a stray literal, so the credit routes through them like
+  every other upstream reference. `productNamePlugin` rewrites only
+  `index.html` and `bootError.ts`, so these constants survive the build.
 - `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A). Rules and traps: `docs/internals/infinitus-rename.md`.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
