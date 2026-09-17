@@ -46,7 +46,10 @@ import {
   resolveAutoFeatureBranchName,
   sanitizeBranchFragment,
   sanitizeFeatureBranchName,
+<<<<<<< HEAD
   WORKTREE_BRANCH_PREFIX,
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 } from "@infinitus/shared/git";
 import {
   getChangeRequestTerminologyForKind,

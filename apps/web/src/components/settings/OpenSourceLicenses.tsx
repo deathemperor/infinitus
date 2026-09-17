@@ -9,12 +9,15 @@ import {
   type ThirdPartyLicenseEntry,
   type ThirdPartyLicenseManifest,
 } from "@infinitus/shared/thirdPartyLicenses";
+<<<<<<< HEAD
 import {
   PRODUCT_NAME,
   UPSTREAM_PRODUCT_NAME,
   UPSTREAM_PUBLISHER_NAME,
   UPSTREAM_REPOSITORY_URL,
 } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 import { Button } from "../ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";

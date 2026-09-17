@@ -10,7 +10,10 @@ import { defineConfig, type Connect, type Plugin } from "vite-plus";
 import pkg from "./package.json" with { type: "json" };
 
 import { DEV_PROXIED_PATH_PREFIXES } from "@infinitus/shared/devProxy";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 import { loadRepoEnv } from "../../scripts/lib/public-config";
 import { thirdPartyLicensesPlugin } from "../../scripts/lib/third-party-licenses";

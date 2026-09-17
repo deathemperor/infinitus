@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import {
   ActivityIcon,
   ArrowLeftIcon,
@@ -8,6 +9,9 @@ import {
   SettingsIcon,
   UsersIcon,
 } from "lucide-react";
+=======
+import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { Link, useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
@@ -16,6 +20,10 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
+<<<<<<< HEAD
+=======
+import { InfinitusWordmark } from "../InfinitusWordmark";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -37,6 +45,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
 export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   isElectron,
@@ -95,7 +104,22 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
       )}
       to="/"
     >
+<<<<<<< HEAD
       <span className="truncate text-sm font-medium tracking-tight">{PRODUCT_NAME}</span>
+=======
+      {/* Center the visible capitals, without the font's ascender/descender space. */}
+      <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
+        <InfinitusWordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+        <span
+          className={cn(
+            "truncate [text-box:trim-both_cap_alphabetic]",
+            onBackdrop ? "text-white/70" : "text-muted-foreground",
+          )}
+        >
+          Code
+        </span>
+      </span>
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
     </Link>
   );
 }
@@ -231,7 +255,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
           />
           {pullRequestsSupported ? (
             <SidebarUtilityItem
-              icon={<GitPullRequestIcon />}
+              icon={<PullRequestGlyph.pullRequest />}
               label="Pull Requests"
               onClick={handlePullRequestsClick}
             />

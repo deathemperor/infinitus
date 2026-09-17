@@ -3,6 +3,10 @@ import type { NativeStackNavigationOptions } from "@react-navigation/native-stac
 import { Platform, View } from "react-native";
 
 import { AppText as Text } from "./AppText";
+<<<<<<< HEAD
+=======
+import { InfinitusWordmark } from "./InfinitusWordmark";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { IPAD_HOME_TITLE_OFFSET } from "../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../lib/mobileBranding";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
@@ -36,9 +40,16 @@ export function CompactBrandTitle(
       className="flex-row items-center gap-1.5"
       style={{ marginLeft: titleOffset }}
     >
+<<<<<<< HEAD
       <Text
         allowFontScaling={props.allowFontScaling}
         className="font-infinitus-medium text-[21px] tracking-[-0.5px] text-foreground"
+=======
+      <InfinitusWordmark colorClassName="accent-icon" height={15} />
+      <Text
+        allowFontScaling={props.allowFontScaling}
+        className="font-infinitus-medium text-[21px] tracking-[-0.5px] text-foreground-muted"
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
       >
         {PRODUCT_NAME}
       </Text>

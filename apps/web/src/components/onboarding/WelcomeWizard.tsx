@@ -15,7 +15,10 @@ import {
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
 import { CommandId, ProviderDriverKind, ThreadId } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import * as Schema from "effect/Schema";
 import {
   ArrowRightIcon,
@@ -64,7 +67,12 @@ import { getProviderSummary } from "../settings/providerStatus";
 import { getDriverOption } from "../settings/providerDriverMeta";
 import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
+<<<<<<< HEAD
 import { ClaudeAI, OmpIcon, OpenAI, PiIcon } from "../Icons";
+=======
+import { ClaudeAI, OpenAI } from "../Icons";
+import { InfinitusWordmark } from "../InfinitusWordmark";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
@@ -192,9 +200,18 @@ export function WelcomeWizard({
         <WizardHeader
           title={`Set up ${PRODUCT_NAME}`}
           identity={
+<<<<<<< HEAD
             <span className="text-[1.4rem] font-medium tracking-tight text-muted-foreground">
               {PRODUCT_NAME}
             </span>
+=======
+            <div className="flex items-baseline gap-1.5" role="img" aria-label="T3 Code">
+              <InfinitusWordmark className="h-4 w-auto shrink-0" aria-hidden />
+              <span className="text-[1.4rem] font-medium tracking-tight text-muted-foreground">
+                Code
+              </span>
+            </div>
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
           }
         >
           <WizardSteps

@@ -1,17 +1,22 @@
+<<<<<<< HEAD
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import type { EnvironmentId, SidebarThreadSortOrder } from "@infinitus/contracts";
 import type { MenuAction } from "@react-native-menu/menu";
-import Constants from "expo-constants";
+
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import { useCallback, useMemo, useRef } from "react";
-import { Platform, Pressable, Text as RNText, TextInput, View } from "react-native";
+import { Platform } from "react-native";
 import type { SearchBarCommands } from "react-native-screens";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+<<<<<<< HEAD
 import { ControlPillMenu } from "../../components/ControlPill";
 import { SymbolView } from "../../components/AppSymbol";
 import { HOME_HORIZONTAL_INSET } from "../../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../../lib/mobileBranding";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useThreadListV2Enabled } from "../threads/use-thread-list-v2-enabled";
@@ -22,7 +27,7 @@ import {
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
 import type { HomeProjectSortOrder } from "./homeThreadList";
-import { WorkspaceConnectionTitle } from "./WorkspaceConnectionTitle";
+import { MaterialThreadListToolbar } from "./MaterialThreadListToolbar";
 import {
   buildHomeListFilterMenu,
   type HomeListFilterMenuEnvironment,
@@ -67,9 +72,6 @@ function checkedMenuState(checked: boolean) {
 }
 
 function AndroidHomeHeader(props: HomeHeaderProps) {
-  const { materialYouStyleLayoutActive } = useAppearancePreferences();
-  const insets = useSafeAreaInsets();
-  const stageLabel = resolveMobileStageLabel(Constants.expoConfig?.extra?.appVariant);
   // Thread List v2 lays the list out in fixed creation order, so the
   // sort/group filter controls would be silently ignored — hide them and
   // key the "customized" icon state off the environment filter alone.
@@ -200,6 +202,7 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
   return (
     <>
       <NativeStackScreenOptions options={{ headerShown: false }} />
+<<<<<<< HEAD
       <View
         className={
           materialYouStyleLayoutActive
@@ -313,6 +316,17 @@ function AndroidHomeHeader(props: HomeHeaderProps) {
           </View>
         </View>
       </View>
+=======
+      <MaterialThreadListToolbar
+        searchQuery={props.searchQuery}
+        onSearchQueryChange={props.onSearchQueryChange}
+        filterActions={menuActions}
+        filterCustomized={hasCustomListOptions}
+        onFilterAction={handleMenuAction}
+        onOpenSettings={props.onOpenSettings}
+        onOpenEnvironments={props.onOpenEnvironments}
+      />
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
     </>
   );
 }

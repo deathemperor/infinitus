@@ -6,7 +6,10 @@ import {
 } from "@infinitus/contracts";
 import { RelayOkResponse } from "@infinitus/contracts/relay";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+<<<<<<< HEAD
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import * as RelayClient from "@infinitus/shared/relayClient";
 import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
 import * as Cause from "effect/Cause";

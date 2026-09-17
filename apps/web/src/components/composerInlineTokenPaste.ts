@@ -1,5 +1,9 @@
 import { ComposerContextId } from "@infinitus/contracts";
+<<<<<<< HEAD
 import type { AssistantCitation, ComposerContextClipboardFragment } from "@infinitus/contracts";
+=======
+import type { ComposerContextClipboardFragment } from "@infinitus/contracts";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
   decodeComposerContextFragment,
@@ -10,6 +14,7 @@ import {
   formatComposerContextReference,
   replaceComposerContextReferences,
 } from "@infinitus/shared/composerContextReferences";
+<<<<<<< HEAD
 import {
   $createLineBreakNode,
   $createTextNode,
@@ -144,6 +149,8 @@ export function registerComposerInlineTokenPaste(
   );
 }
 
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 /** Clipboard records referenced by the copied text, including dependent screenshots. */
 export function readPastedComposerContext(
   clipboardData: Pick<DataTransfer, "getData">,
@@ -177,7 +184,9 @@ export function readPastedComposerContext(
 /** Imports the same structured clipboard payload for focused paste and paste-to-focus. */
 export function importPastedComposerText(
   clipboardData: Pick<DataTransfer, "getData">,
-  importContextFragment?: ComposerInlineTokenPasteOptions["importContextFragment"],
+  importContextFragment?: (
+    fragment: ComposerContextClipboardFragment,
+  ) => ReadonlyMap<string, string>,
 ): string {
   const pastedText = clipboardData.getData("text/plain");
   const fragment = importContextFragment ? readPastedComposerContext(clipboardData) : null;

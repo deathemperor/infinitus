@@ -12,7 +12,10 @@ import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { createModelCapabilities } from "@infinitus/shared/model";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import {
   query as claudeQuery,

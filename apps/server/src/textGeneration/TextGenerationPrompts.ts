@@ -10,7 +10,10 @@ import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import { limitTitleMessage } from "./ThreadTitleContext.ts";
 import type { ChatAttachment } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 import { limitSection } from "./TextGenerationUtils.ts";
 import type { TextGenerationPolicy } from "./TextGenerationPolicy.ts";

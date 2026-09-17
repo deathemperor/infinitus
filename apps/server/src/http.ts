@@ -4,7 +4,10 @@ import {
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@infinitus/shared/desktopIdentity";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { isDevProxiedPath } from "@infinitus/shared/devProxy";
 import { decodeOtlpTraceRecords } from "@infinitus/shared/observability";
 import * as Data from "effect/Data";
@@ -30,6 +33,7 @@ import { OtlpTracer, OtlpSerialization } from "effect/unstable/observability";
 
 import * as ServerConfig from "./config.ts";
 import { ASSET_ROUTE_PREFIX, resolveAsset } from "./assets/AssetAccess.ts";
+import { githubMediaResponse } from "./assets/GitHubMediaFetch.ts";
 import { statMediaFile, streamMediaFile, type OpenMediaFile } from "./assets/MediaFile.ts";
 import {
   ATTACHMENT_UPLOAD_ROUTE_PREFIX,
@@ -391,6 +395,19 @@ export const assetRouteLayer = HttpRouter.add(
     );
     if (!asset) {
       return HttpServerResponse.text("Not Found", { status: 404 });
+    }
+    if (asset.kind === "github-media") {
+      return yield* githubMediaResponse(asset, request.headers).pipe(
+        Effect.tapError((cause) =>
+          Effect.logWarning("Failed to fetch GitHub media.", { url: asset.url, cause }),
+        ),
+        Effect.orElseSucceed(() =>
+          HttpServerResponse.empty({
+            status: 502,
+            headers: { "cache-control": "private, no-store", "x-content-type-options": "nosniff" },
+          }),
+        ),
+      );
     }
     return yield* assetFileResponse(
       asset,

@@ -20,6 +20,7 @@ on Windows and Linux to start a new thread and immediately open another draft. T
 next draft keeps the workspace mode and base branch you selected. With **New
 worktree**, each background submission creates its own worktree.
 
+<<<<<<< HEAD
 ## Rename from an agent or terminal
 
 On a Mac running Infinitus desktop, an agent can rename its thread with:
@@ -50,6 +51,12 @@ Dock badge to count threads waiting for approval or input.
 
 Desktop alerts need no Infinitus Connect account. Allow Infinitus notifications in macOS
 System Settings. For alerts on a phone, see [Mobile notifications](./mobile-notifications.md).
+=======
+To send the same prompt to several models on web or desktop, **Shift-click** models
+in a new thread's model picker to add or remove them. A regular click returns to a
+single model. Choose a base branch and send. Each selection starts a separate thread
+and worktree while you stay in the new thread composer. This requires a Git project.
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 ## Pin and reorder threads
 

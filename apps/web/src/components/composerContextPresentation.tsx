@@ -3,7 +3,11 @@ import { ReadOnlySourcePreview } from "./files/AttachmentFilePreview";
 import type { PreviewAnnotationPayload } from "@infinitus/contracts";
 import { formatAttachmentSize } from "@infinitus/client-runtime/state/attachments";
 import { videoMimeType } from "@infinitus/shared/video";
+<<<<<<< HEAD
 import { GitPullRequestIcon, MessageCircleIcon, MousePointerClickIcon } from "lucide-react";
+=======
+import { MessageCircleIcon, MousePointerClickIcon } from "lucide-react";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { createContext, type MouseEvent, type ReactElement, type ReactNode, use } from "react";
 
 import type { ComposerFileAttachment, ComposerImageAttachment } from "~/composerDraftStore";
@@ -14,6 +18,7 @@ import {
   type AttachmentUploadState,
 } from "~/lib/attachmentUploadState";
 import { cn } from "~/lib/utils";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import {
   fileContextReference,
   imageContextReference,
@@ -392,7 +397,7 @@ const composerContextPresentationRegistry = createContextPresentationRegistry<
           <ContextChip
             icon={
               isPullRequest ? (
-                <GitPullRequestIcon
+                <PullRequestGlyph.pullRequest
                   className={cn(
                     COMPOSER_INLINE_CHIP_ICON_CLASS_NAME,
                     CONTEXT_INLINE_CHIP_ICON_TONE_CLASS_NAMES["pull-request"],

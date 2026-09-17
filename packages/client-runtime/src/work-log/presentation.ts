@@ -10,11 +10,14 @@ import { classifyMarkdownImageSource } from "@infinitus/client-runtime/markdown-
 import { resolveMediaSource } from "@infinitus/client-runtime/media-source";
 import { parseChangeRequestUrl } from "@infinitus/shared/changeRequestUrl";
 import { isWorkspaceImagePreviewPath } from "@infinitus/shared/filePreview";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 /**
  * Activities the worktree setup card already represents. The settled record
- * is rendered by the card on web (and mobile's status row), never as a
+ * is rendered by the card on web and mobile, never as a
  * worklog entry, so it is hidden from the activity feed even when it failed.
  */
 export function isWorktreeSetupActivity(kind: string): boolean {

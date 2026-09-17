@@ -14,7 +14,11 @@ import {
   type SourceControlRepositoryVisibility,
 } from "@infinitus/contracts";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
+<<<<<<< HEAD
 import { sanitizeBranchFragment, WORKTREE_BRANCH_PREFIX } from "@infinitus/shared/git";
+=======
+import { sanitizeBranchFragment } from "@infinitus/shared/git";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import {
   detectSourceControlProviderFromRemoteUrl,
   isSshRemoteUrl,

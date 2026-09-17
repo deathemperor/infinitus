@@ -21,12 +21,16 @@ import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
   isInfinitusDesktopVersion,
   isInfinitusNightlyDesktopVersion,
   isNightlyDesktopVersion,
 } from "../updates/updateChannels.ts";
+=======
+import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import type { OtlpProtocol } from "@infinitus/shared/observability";
 
 export interface MakeDesktopEnvironmentInput {
@@ -107,6 +111,11 @@ export class DesktopEnvironment extends Context.Service<
     readonly resolveResourcePathCandidates: (fileName: string) => readonly string[];
   }
 >()("@infinitus/desktop/app/DesktopEnvironment") {}
+<<<<<<< HEAD
+=======
+
+const APP_BASE_NAME = "T3 Code";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 function resolveDesktopAppStageLabel(input: {
   readonly isDevelopment: boolean;

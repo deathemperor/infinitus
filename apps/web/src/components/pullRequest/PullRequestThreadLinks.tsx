@@ -6,7 +6,11 @@ import type {
   ScopedThreadRef,
   ThreadId,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { CheckIcon, LinkIcon, MessageSquareIcon, UnlinkIcon } from "lucide-react";
+=======
+import { CheckIcon, MessageSquareIcon } from "lucide-react";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { useState } from "react";
 import { threadPullRequestLinkMode } from "@infinitus/client-runtime/thread-pull-request-compatibility";
 import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
@@ -23,6 +27,7 @@ import { Command, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import { MenuItem } from "../ui/menu";
 import { toastManager } from "../ui/toast";
+import { PullRequestGlyph } from "./pullRequestIcons";
 
 interface PullRequestThreadLinksProps {
   environmentId: EnvironmentId;
@@ -149,9 +154,9 @@ function EnabledPullRequestThreadLinks({
           }}
         >
           {linkedHere ? (
-            <UnlinkIcon aria-hidden className="size-3.5" />
+            <PullRequestGlyph.unlink aria-hidden className="size-3.5" />
           ) : (
-            <LinkIcon aria-hidden className="size-3.5" />
+            <PullRequestGlyph.link aria-hidden className="size-3.5" />
           )}
           {linkedHere
             ? "Unlink from this thread"

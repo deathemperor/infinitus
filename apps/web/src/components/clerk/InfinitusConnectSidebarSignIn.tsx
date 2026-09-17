@@ -6,7 +6,10 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { MobileClientsUserProfilePage } from "./MobileClientsUserProfilePage";
 import { InfinitusConnectUserProfilePage } from "./InfinitusConnectUserProfilePage";
 import { useInfinitusConnectAuthPrompt } from "./useInfinitusConnectAuthPrompt";
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 export function InfinitusConnectSidebarSignIn() {
   if (!hasCloudPublicConfig()) return null;

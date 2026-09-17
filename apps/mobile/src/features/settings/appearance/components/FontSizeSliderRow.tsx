@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import * as Haptics from "expo-haptics";
 import { SymbolView } from "../../../../components/AppSymbol";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -210,3 +211,6 @@ export function FontSizeSliderRow(props: {
     </View>
   );
 }
+=======
+export { FontSizeSliderRow } from "./FontSizeSliderRow.shared";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed

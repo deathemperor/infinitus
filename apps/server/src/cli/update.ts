@@ -42,6 +42,7 @@ import { compareExactServiceVersions, isExactServiceVersion } from "../cloud/ser
 import * as ProcessRunner from "../processRunner.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
+import { createUpdateProgress } from "./updateProgress.ts";
 import { bootServiceLayer } from "./service.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
@@ -362,7 +363,13 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
       reason: `'${input.requestedVersion}' is not an exact Infinitus version.`,
     });
   }
-  const targetVersion = input.requestedVersion ?? (yield* resolveNewestVersion(channel));
+  const progress = createUpdateProgress();
+  progress.status("Checking for updates...");
+  const targetVersion = yield* (
+    input.requestedVersion === undefined
+      ? resolveNewestVersion(channel)
+      : Effect.succeed(input.requestedVersion)
+  ).pipe(Effect.ensuring(Effect.sync(progress.finish)));
   const targetChannel = cliReleaseChannelOf(targetVersion);
 
   // Preview is a maintainers' dogfooding train: it is cut by hand from
@@ -451,14 +458,22 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
       Effect.orElseSucceed(() => false),
     );
 
-  yield* Console.log(
+  progress.heading(
     executableCurrent && restartPending
       ? `The background service is still running the version before ${targetVersion} (${targetChannel}).`
       : executableCurrent
         ? `Updating the background service ${serviceVersion ?? "(unknown version)"} -> ${targetVersion} (${targetChannel}).`
         : alreadyOnDisk
+<<<<<<< HEAD
           ? `Switching infinitus ${currentVersion} -> ${targetVersion} (${targetChannel}, already downloaded).`
           : `Updating infinitus ${currentVersion} -> ${targetVersion} (${targetChannel}).`,
+=======
+          ? "Switching T3 Code"
+          : "Updating T3 Code",
+    executableCurrent
+      ? ""
+      : `${currentVersion} → ${targetVersion}${targetChannel === "stable" ? "" : ` (${targetChannel})`}`,
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
   );
   let restartService = false;
   if (serviceInstalled && !serviceCurrent) {
@@ -482,6 +497,7 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   }
 
   const runtime = yield* ensurePinnedRuntimeInstalled({
+    onProgress: progress.report,
     baseDir: input.baseDir,
     version: targetVersion,
     fs,
@@ -515,6 +531,7 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
           ),
         ),
   }).pipe(
+    Effect.ensuring(Effect.sync(progress.finish)),
     Effect.catchIf(
       (error): error is PinnedRuntimeInstallError =>
         error._tag === "PinnedRuntimeInstallError" &&
@@ -544,6 +561,11 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   // version; only the restart itself waits for the user's answer.
   let serviceUpdated = false;
   if (serviceInstalled && !serviceCurrent) {
+    yield* Console.log(
+      restartService
+        ? "Restarting the background service..."
+        : "Updating the background service...",
+    );
     yield* BootService.BootService.pipe(
       Effect.flatMap((target) =>
         target.install({ allowDowngrade: input.allowDowngrade, start: restartService }),
@@ -565,14 +587,22 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     serviceUpdated = restartService;
   }
 
+<<<<<<< HEAD
   yield* Console.log("");
   yield* Console.log(`infinitus ${targetVersion} is installed at ${runtime.entryPath}`);
+=======
+  progress.success(`Installed T3 Code ${targetVersion}`);
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
   if (Option.isSome(repointed)) {
-    yield* Console.log(`  ${repointed.value} now runs ${targetVersion}`);
+    yield* Console.log("  Run t3 to get started.\n");
   } else {
+<<<<<<< HEAD
     yield* Console.log(
       `  Run it as ${runtime.entryPath}, or point your \`infinitus\` launcher at it.`,
     );
+=======
+    yield* Console.log(`  Run ${runtime.entryPath}\n`);
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
   }
   if (serviceUpdated) {
     yield* Console.log(`  Background service restarted on ${targetVersion}`);

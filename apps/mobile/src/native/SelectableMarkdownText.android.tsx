@@ -2,8 +2,14 @@ import {
   SelectableMarkdownText as T3SelectableMarkdownText,
   type SelectableMarkdownTextProps,
 } from "@infinitus/mobile-markdown-text/renderer";
+<<<<<<< HEAD
+=======
+import { useMemo } from "react";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 import { highlightCodeSnippet } from "../features/review/shikiReviewHighlighter";
+import { themeColorWithAlpha } from "../lib/mobileTheme";
+import { useUniwindTheme } from "../lib/useUniwindTheme";
 
 type MobileSelectableMarkdownTextProps = Omit<SelectableMarkdownTextProps, "highlightCode">;
 
@@ -20,5 +26,18 @@ export function hasNativeSelectableMarkdownText(): boolean {
 }
 
 export function SelectableMarkdownText(props: MobileSelectableMarkdownTextProps) {
-  return <T3SelectableMarkdownText {...props} highlightCode={highlightCodeSnippet} />;
+  const theme = useUniwindTheme();
+  const selectionColor = themeColorWithAlpha(theme["--color-primary"], 0.32);
+  const selectionHandleColor = theme["--color-primary"];
+  const textStyle = useMemo(
+    () => ({ selectionColor, selectionHandleColor, ...props.textStyle }),
+    [props.textStyle, selectionColor, selectionHandleColor],
+  );
+  return (
+    <T3SelectableMarkdownText
+      {...props}
+      textStyle={textStyle}
+      highlightCode={highlightCodeSnippet}
+    />
+  );
 }

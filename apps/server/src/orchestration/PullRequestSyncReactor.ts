@@ -23,6 +23,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
 import type * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
 
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import { forkParked } from "../serverActivation.ts";
@@ -158,7 +160,7 @@ export const make = Effect.gen(function* () {
     <E>(cause: Cause.Cause<E>): Effect.Effect<void, E> =>
       Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.logWarning(message, fields);
 
-  const sweep = Effect.fn("PullRequestSyncReactor.sweep")(function* () {
+  const sweep = Effect.fn("PullRequestSyncReactor.sweep")(function* (requestedKey?: string) {
     const snapshot = yield* snapshots.getShellSnapshot();
     const now = yield* DateTime.now;
     const nowMs = DateTime.toEpochMillis(now);
@@ -182,6 +184,7 @@ export const make = Effect.gen(function* () {
     // Layers auto-linked this sweep, so two links of one thread that share a
     // stack do not both try to add the same sibling.
     const linkedThisSweep = new Set<string>();
+    const persistence = yield* Semaphore.make(1);
 
     const syncEntry = Effect.fn("PullRequestSyncReactor.syncEntry")(function* (
       entry: LinkEntry,
@@ -198,21 +201,8 @@ export const make = Effect.gen(function* () {
         link.snapshot === null ||
         !snapshotFieldsEqual(link.snapshot, fields) ||
         !stacksEqual(link.stack, nextStack);
-      if (changed) {
-        const uuid = yield* crypto.randomUUIDv4;
-        yield* engine.dispatch({
-          type: "thread.pull-request-link.sync",
-          commandId: CommandId.make(`server:pr-sync:${thread.id}:${uuid}`),
-          threadId: thread.id,
-          host: normalizeThreadPullRequestKey(link).host,
-          repository: link.repository,
-          number: link.number,
-          snapshot: { ...fields, syncedAt: nowIso },
-          stack: nextStack,
-        });
-      }
-      if (fetchedStack === null || fetchedStack.stack === null) return;
-      for (const layer of fetchedStack.stack.layers) {
+      // Persist discovered siblings before a terminal snapshot can trigger settlement.
+      for (const layer of fetchedStack?.stack?.layers ?? []) {
         const layerKey = {
           host: normalizeThreadPullRequestKey(link).host,
           repository: link.repository,
@@ -228,25 +218,29 @@ export const make = Effect.gen(function* () {
         }
         const url = siblingPullRequestUrl(link.url, layer.number);
         if (url === null) continue;
-        linkedThisSweep.add(dedupeKey);
         const uuid = yield* crypto.randomUUIDv4;
-        yield* engine
-          .dispatch({
-            type: "thread.pull-request.link",
-            commandId: CommandId.make(`server:pr-stack-link:${thread.id}:${uuid}`),
-            threadId: thread.id,
-            ...layerKey,
-            url,
-            source: "stack",
-          })
-          .pipe(
-            Effect.catchCause(
-              logSkipped("pull request stack layer link skipped", {
-                threadId: thread.id,
-                number: layer.number,
-              }),
-            ),
-          );
+        yield* engine.dispatch({
+          type: "thread.pull-request.link",
+          commandId: CommandId.make(`server:pr-stack-link:${thread.id}:${uuid}`),
+          threadId: thread.id,
+          ...layerKey,
+          url,
+          source: "stack",
+        });
+        linkedThisSweep.add(dedupeKey);
+      }
+      if (changed) {
+        const uuid = yield* crypto.randomUUIDv4;
+        yield* engine.dispatch({
+          type: "thread.pull-request-link.sync",
+          commandId: CommandId.make(`server:pr-sync:${thread.id}:${uuid}`),
+          threadId: thread.id,
+          host: normalizeThreadPullRequestKey(link).host,
+          repository: link.repository,
+          number: link.number,
+          snapshot: { ...fields, syncedAt: nowIso },
+          stack: nextStack,
+        });
       }
     });
 
@@ -287,8 +281,11 @@ export const make = Effect.gen(function* () {
           )
         : null;
       if (needsStack) {
-        if (fetchedStack === null) retryStacks.add(key);
-        else retryStacks.delete(key);
+        if (fetchedStack === null) {
+          retryStacks.add(key);
+          return;
+        }
+        retryStacks.delete(key);
       }
       // The host answered, so the cadence clock ticks even if a dispatch below is rejected.
       lastSyncedAt.set(key, nowMs);
@@ -297,10 +294,21 @@ export const make = Effect.gen(function* () {
       yield* Effect.forEach(
         entries,
         (entry) =>
+<<<<<<< HEAD
           syncEntry(entry, fields, fetchedStack, generation !== undefined).pipe(
             Effect.catchCause(
               logSkipped("pull request sync skipped", { threadId: entry.thread.id, key }),
             ),
+=======
+          syncEntry(entry, fields, fetchedStack).pipe(
+            persistence.withPermits(1),
+            Effect.catchCause((cause) => {
+              if (!Cause.hasInterruptsOnly(cause)) retryStacks.add(key);
+              return logSkipped("pull request sync skipped", { threadId: entry.thread.id, key })(
+                cause,
+              );
+            }),
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
           ),
         { discard: true },
       );
@@ -309,7 +317,7 @@ export const make = Effect.gen(function* () {
     yield* Effect.forEach(
       groups,
       ([key, entries]) =>
-        isDue(key, entries, nowMs)
+        (requestedKey === undefined || requestedKey === key) && isDue(key, entries, nowMs)
           ? syncGroup(key, entries).pipe(
               Effect.catchCause(logSkipped("pull request sync skipped", { key })),
             )
@@ -318,13 +326,19 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const worker = yield* makeDrainableWorker(() =>
-    sweep().pipe(Effect.catchCause(logSkipped("pull request sync sweep failed", {}))),
+  const worker = yield* makeDrainableWorker((key: string | undefined) =>
+    sweep(key).pipe(Effect.catchCause(logSkipped("pull request sync sweep failed", {}))),
   );
 
   const start: PullRequestSyncReactor["Service"]["start"] = Effect.fn(
     "PullRequestSyncReactor.start",
   )(function* () {
+    const events = yield* engine.subscribeDomainEvents;
+    yield* forkParked(
+      Stream.runForEach(events, (event) =>
+        event.type === "thread.pull-request-linked" ? requestSync(event.payload.link) : Effect.void,
+      ),
+    );
     yield* forkParked(
       Effect.gen(function* () {
         yield* worker.enqueue(undefined);
@@ -335,8 +349,9 @@ export const make = Effect.gen(function* () {
 
   const requestSync: PullRequestSyncReactor["Service"]["requestSync"] = (key) =>
     Effect.suspend(() => {
-      requested.set(threadPullRequestKeyOf(key), ++requestGeneration);
-      return worker.enqueue(undefined);
+      const syncKey = threadPullRequestKeyOf(key);
+      requested.set(syncKey, ++requestGeneration);
+      return worker.enqueue(syncKey);
     });
 
   return { start, drain: worker.drain, requestSync } satisfies PullRequestSyncReactor["Service"];

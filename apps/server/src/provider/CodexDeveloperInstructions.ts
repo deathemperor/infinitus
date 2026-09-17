@@ -1,5 +1,8 @@
 import type { ProviderInteractionMode } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { buildRuntimeInstructions } from "./RuntimeInstructions.ts";
 
 const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `

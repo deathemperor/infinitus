@@ -1,8 +1,11 @@
+<<<<<<< HEAD
+=======
+import { Platform } from "react-native";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import type { EnvironmentThreadSearchMatch } from "@infinitus/client-runtime/state/thread-search";
 
 import { AppText as Text } from "../../components/AppText";
 import { cn } from "../../lib/cn";
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 
 function foldAsciiCase(value: string): string {
   return value.replace(/[A-Z]/g, (character) => character.toLowerCase());
@@ -51,14 +54,13 @@ export function ThreadSearchMatchExcerpt(props: {
   readonly compact?: boolean;
 }) {
   const isUser = props.match.source === "user";
-  const { materialYouStyleLayoutActive } = useAppearancePreferences();
   const parts = splitHighlightParts(props.match.snippet, props.query);
   return (
     <Text
       className={cn(
         props.compact ? "text-sm" : "text-xs",
         props.selected
-          ? materialYouStyleLayoutActive
+          ? Platform.OS === "android"
             ? "text-thread-selected-foreground-muted"
             : "text-user-bubble-foreground-muted"
           : "text-foreground-muted",
@@ -69,7 +71,7 @@ export function ThreadSearchMatchExcerpt(props: {
         className={cn(
           props.compact ? "text-sm font-infinitus-medium" : "text-xs font-infinitus-medium",
           props.selected
-            ? materialYouStyleLayoutActive
+            ? Platform.OS === "android"
               ? "text-thread-selected-foreground"
               : "text-user-bubble-foreground"
             : isUser
@@ -85,7 +87,7 @@ export function ThreadSearchMatchExcerpt(props: {
             props.compact ? "text-sm" : "text-xs",
             part.highlighted && "font-infinitus-bold",
             props.selected
-              ? materialYouStyleLayoutActive
+              ? Platform.OS === "android"
                 ? "text-thread-selected-foreground"
                 : "text-user-bubble-foreground"
               : part.highlighted

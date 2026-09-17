@@ -6,7 +6,10 @@ import {
   EnvironmentHttpUnauthorizedError,
 } from "@infinitus/contracts";
 import { RelayProtectedError } from "@infinitus/contracts/relay";
+<<<<<<< HEAD
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

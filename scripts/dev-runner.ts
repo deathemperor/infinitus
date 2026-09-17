@@ -6,7 +6,10 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NetService from "@infinitus/shared/Net";
 import { resolveGitWorktreePath, resolveWorktreeT3Home } from "@infinitus/shared/devHome";
+<<<<<<< HEAD
 import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { HostProcessEnvironment, HostProcessWorkingDirectory } from "@infinitus/shared/hostProcess";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import * as Config from "effect/Config";

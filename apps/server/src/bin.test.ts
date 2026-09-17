@@ -14,7 +14,10 @@ import {
   ThreadId,
 } from "@infinitus/contracts";
 import * as NetService from "@infinitus/shared/Net";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";

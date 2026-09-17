@@ -1,4 +1,5 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+<<<<<<< HEAD
 import type {
   EnvironmentId,
   ProjectListEntriesResult,
@@ -8,8 +9,17 @@ import {
   isWorkspaceImagePreviewPath,
   isWorkspaceVideoPreviewPath,
 } from "@infinitus/shared/filePreview";
+=======
+import {
+  type EnvironmentId,
+  type ProjectListEntriesResult,
+  ProjectReadFileError,
+  type ProjectReadFileResult,
+} from "@infinitus/contracts";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { useCallback } from "react";
 
@@ -31,6 +41,11 @@ interface ProjectQueryState<A> {
   readonly error: string | null;
   readonly isPending: boolean;
   readonly refresh: () => void;
+}
+
+interface ProjectFileQueryState extends ProjectQueryState<ProjectReadFileResult> {
+  /** The path exists but is not a regular file, typically a directory. */
+  readonly isNotFile: boolean;
 }
 
 function getProjectEntriesQueryAtom(
@@ -126,11 +141,16 @@ export function clearProjectFileQueryData(
   appAtomRegistry.set(optimisticFileAtom(environmentId, cwd, relativePath), null);
 }
 
-function errorMessage<A>(result: AsyncResult.AsyncResult<A, unknown>): string | null {
-  if (result._tag !== "Failure") return null;
-  const cause = Cause.squash(result.cause);
+function failureCause<A>(result: AsyncResult.AsyncResult<A, unknown>): unknown {
+  return result._tag === "Failure" ? Cause.squash(result.cause) : null;
+}
+
+function errorMessage(cause: unknown): string | null {
+  if (cause === null) return null;
   return cause instanceof Error ? cause.message : "Workspace query failed.";
 }
+
+const isProjectReadFileError = Schema.is(ProjectReadFileError);
 
 export function useProjectEntriesQuery(
   environmentId: EnvironmentId,
@@ -143,7 +163,7 @@ export function useProjectEntriesQuery(
   const refresh = useCallback(() => refreshAtom(), [refreshAtom]);
   return {
     data: Option.getOrNull(AsyncResult.value(result)),
-    error: errorMessage(result),
+    error: errorMessage(failureCause(result)),
     isPending: result.waiting,
     refresh,
   };
@@ -189,14 +209,12 @@ export function useProjectFileQuery(
   cwd: string,
   relativePath: string | null,
   enabled = true,
-): ProjectQueryState<ProjectReadFileResult> {
-  const isMedia =
-    relativePath !== null &&
-    (isWorkspaceImagePreviewPath(relativePath) || isWorkspaceVideoPreviewPath(relativePath));
-  const atom =
-    enabled && !isMedia
-      ? getProjectFileQueryAtom(environmentId, cwd, relativePath)
-      : EMPTY_PROJECT_FILE_QUERY_ATOM;
+): ProjectFileQueryState {
+  // The caller decides what to read. A media path is not skipped here: a folder
+  // named `assets.png` is only knowable as a folder from the read failure.
+  const atom = enabled
+    ? getProjectFileQueryAtom(environmentId, cwd, relativePath)
+    : EMPTY_PROJECT_FILE_QUERY_ATOM;
   const result = useAtomValue(atom);
   const refreshAtom = useAtomRefresh(atom);
   const refresh = useCallback(() => refreshAtom(), [refreshAtom]);
@@ -205,10 +223,12 @@ export function useProjectFileQuery(
     optimisticFileAtom(environmentId, cwd, relativePath ?? EMPTY_PROJECT_FILE_PATH),
   );
   const optimisticFile = relativePath === null ? null : optimisticResult;
+  const cause = failureCause(result);
 
   return {
     data: optimisticFile?.data ?? data,
-    error: errorMessage(result),
+    error: errorMessage(cause),
+    isNotFile: isProjectReadFileError(cause) && cause.failure === "path_not_file",
     isPending: result.waiting,
     refresh,
   };

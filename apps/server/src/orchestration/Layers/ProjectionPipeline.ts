@@ -8,7 +8,10 @@ import {
   ThreadId,
 } from "@infinitus/contracts";
 import { compareDateTimeStrings } from "@infinitus/shared/dateTime";
+<<<<<<< HEAD
 import { foldTurnUsage } from "@infinitus/shared/threadUsage";
+=======
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -1835,6 +1838,18 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             threadId: event.payload.threadId,
             turnId: event.payload.turnId,
           });
+          // Do not let a placeholder (status "missing") overwrite a checkpoint
+          // that has already been captured with a real git ref. In-memory
+          // projectEvent already refuses this. SQL did not, so thread detail
+          // and diffs could show missing after a ready capture.
+          if (
+            Option.isSome(existingTurn) &&
+            existingTurn.value.checkpointStatus !== null &&
+            existingTurn.value.checkpointStatus !== "missing" &&
+            event.payload.status === "missing"
+          ) {
+            return;
+          }
           const nextState = event.payload.status === "error" ? "error" : "completed";
           yield* projectionTurnRepository.clearCheckpointTurnConflict({
             threadId: event.payload.threadId,

@@ -18,7 +18,12 @@ import {
   createLucideIcon,
   GaugeIcon,
   GitBranchIcon,
+<<<<<<< HEAD
   InfinityIcon,
+=======
+  HardDriveIcon,
+  PanelsTopLeftIcon,
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
   KeyboardIcon,
   Link2Icon,
   LockIcon,
@@ -95,6 +100,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/providers": BotIcon,
   "/settings/integrations": BlocksIcon,
   "/settings/source-control": GitBranchIcon,
+  "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
   "/settings/infinitus": InfinityIcon,
   "/settings/infinitus/themes": SwatchBookIcon,

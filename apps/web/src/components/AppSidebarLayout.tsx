@@ -11,12 +11,20 @@ import { useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
+<<<<<<< HEAD
 import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings";
 import {
   mouseHistoryIntent,
   swipeHistoryIntent,
   type MouseHistoryIntent,
 } from "../lib/backNavigation";
+=======
+import {
+  isRichTextBoldShortcut,
+  resolveShortcutCommand,
+  shortcutLabelForCommand,
+} from "../keybindings";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
@@ -91,6 +99,15 @@ function SidebarControl() {
         event.target instanceof HTMLElement &&
         event.target.closest("[data-keybinding-capture]")
       ) {
+        return;
+      }
+      if (
+        isRichTextBoldShortcut(event) &&
+        event.target instanceof HTMLElement &&
+        event.target.closest('[data-composer-rich-text="true"]')
+      ) {
+        // The rich-text composer claims Mod+B for bold; the toggle stays
+        // available everywhere else, including the plain-text composer.
         return;
       }
       if (resolveShortcutCommand(event, keybindings) !== "sidebar.toggle") return;

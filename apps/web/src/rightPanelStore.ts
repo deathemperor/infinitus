@@ -138,7 +138,7 @@ interface RightPanelStoreState {
    */
   openProactive: (
     ref: ScopedThreadRef,
-    surface: Extract<RightPanelSurface, { kind: "diff" | "pull-request" }>,
+    surface: Extract<RightPanelSurface, { kind: "diff" | "pull-request" | "pull-requests" }>,
     expectedUserActionRevision: number,
   ) => boolean;
   open: (
@@ -532,7 +532,8 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           // always apply, and later user choices reject both proactive requests.
           if (
             surface.kind === "diff" &&
-            selectActiveRightPanel(state.byThreadKey, ref) === "pull-request"
+            (selectActiveRightPanel(state.byThreadKey, ref) === "pull-request" ||
+              selectActiveRightPanel(state.byThreadKey, ref) === "pull-requests")
           ) {
             return state;
           }
@@ -610,6 +611,7 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
               : next;
           }),
         ),
+<<<<<<< HEAD
       openSideQuestion: (ref, threadId) =>
         set((state) =>
           userAction(state, scopedThreadKey(ref), (current) =>
@@ -643,8 +645,15 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           })),
         ),
       openFile: (ref, relativePath, line) =>
+=======
+      openFile: (ref, requestedPath, line) =>
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
         set((state) =>
           userAction(state, scopedThreadKey(ref), (current) => {
+            // Workspace entry paths use '/', including on Windows.
+            const relativePath = /^[A-Za-z]:\/+$/.test(requestedPath)
+              ? requestedPath
+              : requestedPath.replace(/\/+$/, "") || requestedPath;
             const withoutStandaloneExplorer = current.surfaces.filter(
               (surface) => surface.kind !== "files",
             );

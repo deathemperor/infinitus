@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type {
   DesktopUpdateActionResult,
   DesktopUpdateState,
@@ -5,6 +6,9 @@ import type {
   TurnId,
 } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import type { DesktopUpdateActionResult, DesktopUpdateState } from "@infinitus/contracts";
+>>>>>>> upstream-sync-d4d5d12e8-upstream-renamed
 
 export type DesktopUpdateButtonAction = "download" | "install" | "none";
 
