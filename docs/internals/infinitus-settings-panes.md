@@ -4,7 +4,7 @@
 
 ## Pairing a phone
 
-Pairing a phone is Settings › Connections' job: its "Create link" mints upstream's one-time link with the endpoint picker (LAN, Tailscale, hosted) and the phone scans it from inside the app. The Devices pane's own "Pair a phone" QR card (#651, #724) retired on 2026-09-17 as a duplicate of that — one page mints every link. With it went the `for=phone` marker the card put in the fragment and the browser-side gate in `routes/pair.tsx` that refused to spend such a link (`InfinitusPhoneLinkSurface`); the phone app still handles a universal link carrying the marker (`universalPairLink.logic.ts`) and the site's `/pair` forwarder still rewrites one, both now without a producer. A phone that finds the Mac on the Wi‑Fi with no link at hand asks to be approved instead:
+Pairing a phone is Settings › Connections' job: its "Create link" mints upstream's one-time link with the endpoint picker (LAN, Tailscale, hosted) and the phone scans it from inside the app. The Devices pane's own "Pair a phone" QR card (#651, #724) retired on 2026-09-17 as a duplicate of that — one page mints every link. With it went the `for=phone` marker the card put in the fragment and the browser-side gate in `routes/pair.tsx` that refused to spend such a link (`InfinitusPhoneLinkSurface`); the phone app's universal-link rewrite and the site's `/pair` forwarder still accept one and retire with #1407. A phone that finds the Mac on the Wi‑Fi with no link at hand asks to be approved instead:
 
 ## Pairing requests
 
