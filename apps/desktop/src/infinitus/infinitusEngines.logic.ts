@@ -220,9 +220,9 @@ export const parseCommandLine = (command: string): CommandLine => {
 
 /** The delays a repeatedly dying engine is retried after, the Mac
     supervisor's own (`EventFeed.swift` `SupervisorBackoff`). */
-export const ENGINE_BACKOFF_CAP_SECONDS = 60;
+const ENGINE_BACKOFF_CAP_SECONDS = 60;
 /** A run this long counts as healthy, so the next death starts over at 1 s. */
-export const ENGINE_BACKOFF_RESET_SECONDS = 300;
+const ENGINE_BACKOFF_RESET_SECONDS = 300;
 
 export const engineBackoffSeconds = (attempt: number): number =>
   Math.min(2 ** Math.max(attempt, 0), ENGINE_BACKOFF_CAP_SECONDS);

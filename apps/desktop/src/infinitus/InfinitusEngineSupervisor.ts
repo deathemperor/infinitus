@@ -66,7 +66,7 @@ export interface EngineSpawner {
   readonly now: () => number;
 }
 
-export const nodeEngineSpawner: EngineSpawner = {
+const nodeEngineSpawner: EngineSpawner = {
   spawn: (binary, args, handlers) => {
     const child = NodeChildProcess.spawn(binary, [...args], {
       stdio: ["ignore", "ignore", "pipe"],
