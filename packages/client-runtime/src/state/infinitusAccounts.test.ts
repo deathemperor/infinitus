@@ -18,6 +18,8 @@ import {
   infinitusPageState,
   buildSignInRows,
   signInCommandArgs,
+  signInDismissCommandArgs,
+  signInDismissSupported,
   snapshotOffersAdd,
   snapshotSignInRunning,
   waitAddCommandArgs,
@@ -698,6 +700,29 @@ describe("sign-in rows", () => {
       phase: "failed",
       message: "token endpoint refused",
     });
+  });
+
+  it("dismisses through the login verb's --dismiss, only where the manifest lists it", () => {
+    expect(signInDismissCommandArgs("aws", "dev")).toEqual({
+      command: "aws-login",
+      args: ["dev"],
+      options: { dismiss: "true" },
+    });
+    expect(signInDismissCommandArgs("gcloud", "me@example.com").command).toBe("gcloud-login");
+    const verb = {
+      name: "aws-login",
+      args: ["<profile>"],
+      options: ["--local", "--remote"],
+      effect: "human",
+      summary: "",
+    };
+    expect(signInDismissSupported(snapshot({ commands: [verb] }))).toBe(false);
+    expect(
+      signInDismissSupported(
+        snapshot({ commands: [{ ...verb, options: [...verb.options, "--dismiss"] }] }),
+      ),
+    ).toBe(true);
+    expect(signInDismissSupported(null)).toBe(false);
   });
 
   it("starts a device-code profile flag-less and every other flow on the Mac's browser", () => {

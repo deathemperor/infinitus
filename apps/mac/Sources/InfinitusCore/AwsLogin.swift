@@ -140,13 +140,19 @@ public enum AwsLogin {
         /// a day says nothing about today's credentials.
         public static func decode(_ data: Data, now: Date = Date()) -> [State] {
             guard let states = try? JSONDecoder().decode([State].self, from: data) else { return [] }
-            return states.filter { state in
-                let age = now.timeIntervalSince1970 - state.startedAt
-                switch state.phase {
-                case .done: return age < doneMaxAge
-                case .failed: return age < failedMaxAge
-                default: return false
-                }
+            return states.filter { isCurrent($0, now: now) }
+        }
+
+        /// An outcome still worth listing: a failure for an hour, a
+        /// sign-in for a day. The runner applies it to its live list too
+        /// (2026-09-17: a failed login sat on the phone for nine hours
+        /// because the ages were only read at relaunch).
+        public static func isCurrent(_ state: State, now: Date = Date()) -> Bool {
+            let age = now.timeIntervalSince1970 - state.startedAt
+            switch state.phase {
+            case .done: return age < doneMaxAge
+            case .failed: return age < failedMaxAge
+            default: return false
             }
         }
     }

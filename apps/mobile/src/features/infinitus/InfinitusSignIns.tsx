@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { signInDismissSupported } from "@infinitus/client-runtime/state/infinitusAccounts";
 import * as Redacted from "effect/Redacted";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
@@ -25,6 +26,7 @@ import {
   stopLoopbackCatch,
 } from "./loopbackCatch";
 import {
+  dismissSignInCommand,
   lapsedSignIns,
   type SignInModel,
   type SignInStartMode,
@@ -58,18 +60,23 @@ function MacSignIns(props: { readonly mac: InfinitusMac }) {
     infinitusEnvironment.snapshot({ environmentId: props.mac.environmentId, input: {} }),
   );
   const items = lapsedSignIns(view.data);
+  const canDismiss = signInDismissSupported(view.data);
   if (items.length === 0) return null;
   return (
     <>
       {items.map((item) => (
-        <SignInCard key={item.key} mac={props.mac} item={item} />
+        <SignInCard key={item.key} mac={props.mac} item={item} canDismiss={canDismiss} />
       ))}
     </>
   );
 }
 
-function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInModel }) {
-  const { mac, item } = props;
+function SignInCard(props: {
+  readonly mac: InfinitusMac;
+  readonly item: SignInModel;
+  readonly canDismiss: boolean;
+}) {
+  const { mac, item, canDismiss } = props;
   const run = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
   const [busy, setBusy] = useState(false);
@@ -94,6 +101,17 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
     const result = await run({
       environmentId: mac.environmentId,
       input: startSignInCommand(item, mode),
+    });
+    setBusy(false);
+    if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
+  };
+
+  const dismiss = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await run({
+      environmentId: mac.environmentId,
+      input: dismissSignInCommand(item),
     });
     setBusy(false);
     if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
@@ -258,6 +276,16 @@ function SignInCard(props: { readonly mac: InfinitusMac; readonly item: SignInMo
                   ? "Try again"
                   : "Sign in from this phone"}
             </Text>
+          </Pressable>
+        ) : null}
+        {item.phase === "failed" && canDismiss ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => void dismiss()}
+            className="rounded-full bg-subtle px-4 py-2 active:opacity-70"
+          >
+            <Text className="text-sm font-infinitus-bold text-foreground">Dismiss</Text>
           </Pressable>
         ) : null}
         {running && takesCode && item.flow !== "remote" ? (

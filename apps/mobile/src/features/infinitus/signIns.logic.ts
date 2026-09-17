@@ -1,3 +1,4 @@
+import { signInDismissCommandArgs } from "@infinitus/client-runtime/state/infinitusAccounts";
 import type { InfinitusCommandInput, InfinitusSecretInput } from "@infinitus/contracts/infinitus";
 import type {
   InfinitusAwsLogin,
@@ -133,6 +134,12 @@ export function startSignInCommand(
     args: [item.profile],
     options: mode === "code" ? { remote: "true" } : {},
   };
+}
+
+/** Forget the login (`--dismiss`): a failed card leaves the list. */
+export function dismissSignInCommand(item: SignInModel): InfinitusCommandInput {
+  const args = signInDismissCommandArgs(item.provider, item.profile);
+  return { command: args.command, args: [...args.args], options: args.options };
 }
 
 /** Whether the row can take the code flow: the Mac turns `--remote` into a

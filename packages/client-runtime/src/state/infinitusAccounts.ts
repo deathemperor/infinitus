@@ -586,6 +586,29 @@ export function buildSignInRows(snapshot: InfinitusSnapshot): ReadonlyArray<Sign
  * flow takes `--local`, so the Mac opens its own browser — the relay and
  * `--remote` flows finish over stdin, which the fork's RPC never carries.
  */
+/** Whether the Mac's `aws-login` takes `--dismiss` (the failed card's
+    Dismiss); an older build would read the option as a plain start. */
+export function signInDismissSupported(snapshot: InfinitusSnapshot | null): boolean {
+  return (
+    snapshot?.commands.some(
+      (command) => command.name === "aws-login" && command.options.includes("--dismiss"),
+    ) ?? false
+  );
+}
+
+/** `aws-login <profile> --dismiss` (`gcloud-login` for gcloud): forget the
+    login, stopping it if it still runs, so the list drops the row. */
+export function signInDismissCommandArgs(
+  tool: SignInTool,
+  profile: string,
+): { command: string; args: ReadonlyArray<string>; options: Record<string, string> } {
+  return {
+    command: tool === "gcloud" ? "gcloud-login" : "aws-login",
+    args: [profile],
+    options: { dismiss: "true" },
+  };
+}
+
 export function signInCommandArgs(row: SignInRowModel): {
   command: string;
   args: ReadonlyArray<string>;

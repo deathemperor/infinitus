@@ -375,7 +375,12 @@ final class ControlServer {
             // "application-default" for the library credentials.
             let provider: AwsLogin.Provider = r.command == "gcloud-login" ? .gcloud : .aws
             guard let profile = r.args.first, !profile.isEmpty else {
-                throw Fail("usage: \(r.command) <\(provider == .aws ? "profile" : "account|application-default")> [--local] [--remote] [--status]")
+                throw Fail("usage: \(r.command) <\(provider == .aws ? "profile" : "account|application-default")> [--local] [--remote] [--status] [--dismiss]")
+            }
+            // --dismiss: forget the login (stop it if running); the reply's state is what was dropped.
+            if r.options["dismiss"] == "true" {
+                let reply = await model.dismissAwsLogin(provider: provider, profile: profile)
+                return ControlReply(ok: true, result: try .of(["state": reply.state]))
             }
             // --status: the phone's flag-less poll — report, start nothing.
             let reply = await model.startAwsLogin(provider: provider, profile: profile, pid: nil, local: r.options["local"] == "true",

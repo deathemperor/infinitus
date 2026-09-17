@@ -5,6 +5,7 @@ import {
   lapsedSignIns,
   signInCallbackPort,
   signInCallbackSecretArgs,
+  dismissSignInCommand,
   signInCodeSecretArgs,
   signInHeadline,
   signInModel,
@@ -188,6 +189,16 @@ describe("signInHeadline / startSignInCommand", () => {
     expect(signInTakesCode({ ...item, flow: "local" })).toBe(true);
     expect(signInTakesCode({ ...item, flow: "remote" })).toBe(true);
     expect(signInTakesCode({ ...item, flow: "deviceCode" })).toBe(false);
+  });
+});
+
+describe("dismissSignInCommand", () => {
+  it("forgets the login through the login verb's --dismiss", () => {
+    expect(dismissSignInCommand(signInModel({ profile: "papaya", flow: "remote" }))).toEqual({
+      command: "aws-login",
+      args: ["papaya"],
+      options: { dismiss: "true" },
+    });
   });
 });
 

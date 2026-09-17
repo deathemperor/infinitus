@@ -14,11 +14,14 @@ export function SignInsSection({
   pendingKey,
   failure,
   onSignIn,
+  onDismiss,
 }: {
   readonly rows: ReadonlyArray<SignInRowModel>;
   readonly pendingKey: string | null;
   readonly failure: { readonly key: string; readonly message: string } | null;
   readonly onSignIn: (row: SignInRowModel) => void;
+  /** Forget a failed login; null on a Mac whose `aws-login` has no `--dismiss`. */
+  readonly onDismiss: ((row: SignInRowModel) => void) | null;
 }) {
   return (
     <section className="flex flex-col gap-1">
@@ -51,6 +54,17 @@ export function SignInsSection({
                     {label}
                   </Button>
                 )}
+                {row.phase === "failed" && onDismiss !== null ? (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    aria-label={`Dismiss: ${row.toolLabel} ${row.profile}`}
+                    disabled={pending}
+                    onClick={() => onDismiss(row)}
+                  >
+                    Dismiss
+                  </Button>
+                ) : null}
               </div>
               <p className="text-muted-foreground text-xs">{signInStatus(row)}</p>
               {row.phase === "waiting" && row.url !== null ? (

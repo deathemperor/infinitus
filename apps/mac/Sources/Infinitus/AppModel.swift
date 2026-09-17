@@ -1411,6 +1411,12 @@ final class AppModel: ObservableObject {
         Task { _ = await startAwsLogin(provider: provider, profile: profile, pid: pid, local: local) }
     }
 
+    func dismissAwsLogin(provider: AwsLogin.Provider = .aws, profile: String) async -> AwsLogin.Reply {
+        let reply = await awsLoginRunner.dismiss(provider: provider, profile: profile)
+        logMirrorInput("🔐", "\(provider.cliName) login for \(profile) dismissed")
+        return reply
+    }
+
     func submitAwsLoginCode(provider: AwsLogin.Provider = .aws, profile: String, code: String) async -> AwsLogin.Reply {
         await awsLoginRunner.submit(provider: provider, profile: profile, code: code)
     }

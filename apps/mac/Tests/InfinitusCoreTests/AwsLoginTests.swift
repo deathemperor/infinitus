@@ -21,6 +21,18 @@ final class AwsLoginTests: XCTestCase {
         XCTAssertEqual(AwsLogin.flow(profile: "missing", configText: config), .relay)
     }
 
+    func testLedgerKeepsAFailureForAnHourAndASignInForADay() {
+        let now = Date()
+        func state(_ phase: AwsLogin.Phase, ago: TimeInterval) -> AwsLogin.State {
+            AwsLogin.State(profile: "p", flow: .remote, phase: phase, startedAt: now.timeIntervalSince1970 - ago)
+        }
+        XCTAssertTrue(AwsLogin.Ledger.isCurrent(state(.failed, ago: 3000), now: now))
+        XCTAssertFalse(AwsLogin.Ledger.isCurrent(state(.failed, ago: 4000), now: now))
+        XCTAssertTrue(AwsLogin.Ledger.isCurrent(state(.done, ago: 20 * 3600), now: now))
+        XCTAssertFalse(AwsLogin.Ledger.isCurrent(state(.done, ago: 25 * 3600), now: now))
+        XCTAssertFalse(AwsLogin.Ledger.isCurrent(state(.waitingForCode, ago: 1), now: now))
+    }
+
     func testLoginProfileFollowsTheCredentialProcess() {
         let config = """
         [default]
