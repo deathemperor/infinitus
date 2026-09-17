@@ -559,8 +559,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
 - The server binary and its release archive are named `infinitus` (#1368 D):
-  `scripts/build-cli-archive.ts` (stem, executable, and for one window a `t3`
-  symlink beside it), `scripts/smoke-cli-archive.ts`,
+  `scripts/build-cli-archive.ts` (stem and executable), `scripts/smoke-cli-archive.ts`,
   `scripts/build-desktop-artifact.ts` (`wslRuntimeArchiveStem`, the WSL
   runtime's entry), `packages/shared/src/cliRelease.ts`
   (`cliArchiveFileName`), `apps/server/src/cloud/pinnedRuntime.ts`
@@ -569,9 +568,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   scripts), `apps/server/src/cli/update.ts` (`infinitus.cmd`, and with
   `service.ts`, `connect.ts`, `pair.ts`, `uninstall.ts`, `cloud/bootService.ts`,
   `cloud/selfUpdate.ts` the command names in user-facing copy), the
-  installers below, and `infinitus-release.yml`'s `publish` job, which
-  attaches each archive under both names and lists both in `SHA256SUMS`
-  until the window closes. The `t3` package name and `bin` in
+  installers below, and `infinitus-release.yml`'s `publish` job (0.5.0-alpha.20 alone also attached each archive under its old
+  name, with a `t3` symlink inside, for installs from before the rename). The `t3` package name and `bin` in
   `apps/server/package.json` stay: they are the npm identity, and the Effect
   service tags follow them. Re-applied on every sync with the fixtures
   (`cliRelease.test.ts`, `pinnedRuntime.test.ts`, `selfUpdate.test.ts`,

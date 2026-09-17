@@ -539,11 +539,6 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   }
   if (input.platform !== "win") {
     yield* fs.chmod(executablePath, 0o755);
-    // The name before #1368 D, for one window: an install from before the
-    // rename downloads this archive under its old name (`publish` attaches
-    // it under both) and runs `infinitus` inside it. After the signing pass, which
-    // walks the stage for Mach-O files. Drop with the old archive name.
-    yield* fs.symlink(executableName, path.join(contentDir, "t3"));
   }
 
   yield* fs.makeDirectory(input.outputDir, { recursive: true });

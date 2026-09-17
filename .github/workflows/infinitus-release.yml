@@ -798,18 +798,11 @@ jobs:
           # The CLI archives every runtime installer downloads (#1192).
           cp artifacts/cli-linux-x64/infinitus-*.tar.gz \
              artifacts/cli-linux-arm64/infinitus-*.tar.gz release-assets/
-          # The name before #1368 D, for one window: an install from before the
-          # rename asks for `t3-<version>-…` and runs the `t3` symlink inside.
-          # Drop together with the symlink in scripts/build-cli-archive.ts.
-          for archive in release-assets/infinitus-*.tar.gz; do
-            cp "$archive" "release-assets/t3-${archive##*/infinitus-}"
-          done
           channel="${VERSION#*-}"
           [[ "$channel" == "$VERSION" ]] && channel=latest || channel="${channel%%.*}"
           for want in "Infinitus-Menu-Bar-${VERSION}.zip" \
                       "Infinitus-${VERSION}-arm64.dmg" "Infinitus-${VERSION}-arm64.zip" "${channel}-mac.yml" \
-                      "infinitus-${VERSION}-linux-x64.tar.gz" "infinitus-${VERSION}-linux-arm64.tar.gz" \
-                      "t3-${VERSION}-linux-x64.tar.gz" "t3-${VERSION}-linux-arm64.tar.gz"; do
+                      "infinitus-${VERSION}-linux-x64.tar.gz" "infinitus-${VERSION}-linux-arm64.tar.gz"; do
             [[ -f "release-assets/$want" ]] || { echo "Missing release asset $want" >&2; ls -1 release-assets >&2; exit 1; }
           done
           # `pinnedRuntime` verifies a downloaded archive against this file
@@ -819,7 +812,7 @@ jobs:
           (
             cd release-assets
             shopt -s nullglob
-            archives=(infinitus-*.tar.gz t3-*.tar.gz)
+            archives=(infinitus-*.tar.gz)
             if [[ ${#archives[@]} -eq 0 ]]; then echo "No CLI archives were produced." >&2; exit 1; fi
             shasum -a 256 "${archives[@]}" > SHA256SUMS
             cat SHA256SUMS
