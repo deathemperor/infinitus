@@ -155,9 +155,13 @@ function SignInCard(props: {
       return;
     }
     const redirect = awaitLoopbackRedirect();
-    void WebBrowser.openBrowserAsync(url).finally(() => void stopLoopbackCatch());
+    // The system sign-in session rather than the plain in-app Safari view: it
+    // shares Safari's passkeys and AutoFill, which the plain view did not
+    // offer the AWS page. The CLI redirects to localhost, which the session
+    // never treats as its end, so the catch below closes it.
+    void WebBrowser.openAuthSessionAsync(url, null).finally(() => void stopLoopbackCatch());
     const caught = await redirect;
-    void WebBrowser.dismissBrowser();
+    WebBrowser.dismissAuthSession();
     if (caught === null) {
       setBusy(false);
       return;
@@ -302,7 +306,7 @@ function SignInCard(props: {
       {takesCode && loopbackCatchSupported && item.flow !== "relay" ? (
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void start("catch")}>
           <Text className="text-xs text-warning-foreground underline">
-            Sign in here instead (no code, but no passkeys)
+            Sign in here instead (no code)
           </Text>
         </Pressable>
       ) : null}
