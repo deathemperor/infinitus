@@ -27,8 +27,8 @@ final class AwsLoginLedgerTests: XCTestCase {
         let states = [
             state("fresh-done", phase: .done, startedAt: t - 3600),
             state("old-done", phase: .done, startedAt: t - 25 * 3600),
-            state("fresh-failed", phase: .failed, startedAt: t - 600),
-            state("old-failed", phase: .failed, startedAt: t - 2 * 3600),
+            state("fresh-failed", phase: .failed, startedAt: t - 300),
+            state("old-failed", phase: .failed, startedAt: t - 900),
             state("in-flight", phase: .waitingForCode, startedAt: t - 10),
         ]
         let back = AwsLogin.Ledger.decode(try AwsLogin.Ledger.encode(states), now: now)
