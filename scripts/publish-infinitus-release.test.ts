@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off - Runs the real shell publisher against a disposable on-disk CLI fixture.
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
