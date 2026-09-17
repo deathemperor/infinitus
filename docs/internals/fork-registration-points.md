@@ -325,24 +325,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   deploy of #1366 dropped the two rows the first deploys had left `creating`
   in the state store (Alchemy dies on a persisted row whose provider is not
   registered, which is why they stayed for that one deploy).
-- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`,
-  the root `.env.example` (its Clerk block is the fork's since #1322: no
-  upstream values, filled in once the Infinitus relay is deployed), every
-  `infra/relay/src` service tag, `docs/operations/connect-setup.md` —
-  the package is `infinitus-relay` (#1368 B): its name, the `--filter` in
-  `deploy-relay.yml` and the README, the `infinitus-relay/<dir>/<Name>`
-  service tags, and the Clerk template and audience (`infinitus-relay`) the
-  setup doc, example env and test fixtures name. The Alchemy stack stays
-  `T3CodeRelay`: state rows key on it and a fresh stack looks the retained
-  Neon project up by a generated name, so a rename orphans the database.
-  Axiom dataset and token names stay `t3-code-relay-*`: their tokens are
-  baked into shipped builds (the OTel `service.name` the worker reports is
-  `infinitus-relay-worker`). Upstream's `release.yml` (disabled),
-  `docs/operations/release.md` and `docs/operations/android-notifications.md`
-  still say `t3code-relay`; the codemod sync (#1368 C) renames them.
-  `infra/relay/src/http/Api.ts` — `CLERK_JWT_AUDIENCE` is a comma-separated
-  list (`expectedClerkAudiences`), so the deployed relay verifies tokens
-  minted from the old and the new Clerk template through the cutover.
+- `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
   #1375) added to `RelayApi` beside upstream's server group, and its handler
@@ -560,35 +543,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
   the `keydown` listener that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability.
-- The server binary and its release archive are named `infinitus` (#1368 D):
-  `scripts/build-cli-archive.ts` (stem and executable), `scripts/smoke-cli-archive.ts`,
-  `scripts/build-desktop-artifact.ts` (`wslRuntimeArchiveStem`, the WSL
-  runtime's entry), `packages/shared/src/cliRelease.ts`
-  (`cliArchiveFileName`), `apps/server/src/cloud/pinnedRuntime.ts`
-  (`entryPath`), `packages/ssh/src/tunnel.ts` (the remote runner script),
-  `apps/desktop/src/wsl/DesktopWslEnvironment.ts` (the probe and install
-  scripts), `apps/server/src/cli/update.ts` (`infinitus.cmd`, and with
-  `service.ts`, `connect.ts`, `pair.ts`, `uninstall.ts`, `cloud/bootService.ts`,
-  `cloud/selfUpdate.ts` the command names in user-facing copy), the
-  installers below, and `infinitus-release.yml`'s `publish` job (0.5.0-alpha.20 alone also attached each archive under its old
-  name, with a `t3` symlink inside, for installs from before the rename). The `t3` package name and `bin` in
-  `apps/server/package.json` stay: they are the npm identity, and the Effect
-  service tags follow them. Re-applied on every sync with the fixtures
-  (`cliRelease.test.ts`, `pinnedRuntime.test.ts`, `selfUpdate.test.ts`,
-  `service.test.ts`, `tunnel.test.ts`, `DesktopWslEnvironment.test.ts`,
-  `build-desktop-artifact.test.ts`).
-- `scripts/install.sh`, `scripts/install.ps1` — `repo` is this repository and
-  the home `~/.infinitus`, the same flip as `CLI_RELEASE_REPOSITORY` (#1192);
-  the shell script installs on Linux only and says plainly that no macOS or
-  Windows archive exists (exit 1 before any fetch, never upstream's), resolves
-  only the release train (a `v…` tag without a nightly/preview suffix — the
-  fork's nightly is the rolling tag and ships no archive), and is served at
-  `https://infinitus.run/install.sh` as the checked-in copy
-  `apps/mac/site/public/install.sh`: `scripts/sync-install-script.ts` writes
-  it, `--check` and its test fail on drift, and the test fails while the
-  source names upstream's owner. The PowerShell script stops at once (no
-  Windows archive) and is not served. Regenerate the copy after any edit; the
-  site deploy is by hand from `apps/mac/site`.
+- `scripts/build-cli-archive.ts`, `scripts/smoke-cli-archive.ts`, `scripts/build-desktop-artifact.ts`, `packages/shared/src/cliRelease.ts`, `apps/server/src/cloud/pinnedRuntime.ts`, `packages/ssh/src/tunnel.ts`, `apps/desktop/src/wsl/DesktopWslEnvironment.ts`, `apps/server/src/cli/*.ts`, `apps/server/src/cloud/{bootService,selfUpdate}.ts`, `infinitus-release.yml`'s `publish` job — the server binary and its archive are named `infinitus` (#1368 D); re-applied on every sync with their seven fixtures. Rules and traps: `docs/internals/infinitus-rename.md`.
+- `scripts/install.sh`, `scripts/install.ps1` (+ `scripts/sync-install-script.ts` and the served copy `apps/mac/site/public/install.sh`) — this repository, `~/.infinitus`, Linux only, release train only (#1192). Rules and traps: `docs/internals/release-and-updates.md`.
 - `README.md` — the fork notice at the top, and the Installation section
   below the rule: this product's releases (the DMG, the Linux server archives,
   what is not published yet) in place of upstream's npm, winget, brew and AUR
@@ -617,16 +573,4 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   workflows, pull requests — write), since the default token cannot push a
   branch that touches `.github/workflows` (#658); without it such a sync
   is done by hand.
-- Upstream workflows that deploy or publish (Release, Forward to Cursor
-  hygiene, Mobile EAS Preview/Production, Publish AUR, Issue Labels, Desktop
-  macOS Preview, Web Preview, Mobile Showcase Screenshots, Thread Transfer
-  Report, Desktop macOS Preview Publish — new with the 0310cbf9 sync,
-  `pull_request_target` on close/unlabel) are disabled in the repository's
-  Actions settings, not deleted, so merges stay clean. Upstream's relay deploy
-  workflow (`deploy-relay.yml`, named "Deploy Infinitus Connect relay" and
-  filtering the `infinitus-relay` package since #1368 B) is the exception since #1322
-  (2026-09-16): enabled, it deploys `infra/relay` as the
-  Infinitus relay (`relay.infinitus.run`, the `production` environment's
-  vars and secrets) on every push to `main`, and
-  `infinitus-release.yml`'s `connect` job reads that environment so builds
-  carry the relay's Clerk config.
+- Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
