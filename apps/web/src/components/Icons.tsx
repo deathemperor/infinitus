@@ -722,6 +722,25 @@ export const AntigravityIcon: Icon = (props) => (
   </svg>
 );
 
+/**
+ * Pi's mark. Drawn rather than embedded: the project ships no icon asset we
+ * are licensed to redistribute, and the letterform is unambiguous at the
+ * sizes the provider list uses.
+ */
+export const PiIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 7h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M9 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path
+      d="M16 7v7a3 3 0 0 0 3 3"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 export const OpenCodeIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clipPath="url(#opencode__clip0_1311_94969)">

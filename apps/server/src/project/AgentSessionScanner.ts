@@ -20,6 +20,7 @@ import {
   ClaudeSettings,
   CodexSettings,
   OmpSettings,
+  PiSettings,
   ProviderDriverKind,
   ProviderInstanceId,
   resolveProviderInstanceEnabled,
@@ -115,9 +116,12 @@ const TranscriptRecord = Schema.Struct({
   type: Schema.optional(Schema.String),
   timestamp: Schema.optional(Schema.String),
   cwd: Schema.optional(Schema.String),
+  /** The `session` header of Oh My Pi and Pi carries the resumable id here. */
   id: Schema.optional(Schema.String),
   title: Schema.optional(Schema.String),
+  /** Oh My Pi's `model_change`; Pi spells the same record's field `modelId`. */
   model: Schema.optional(Schema.String),
+  modelId: Schema.optional(Schema.String),
   sessionId: Schema.optional(Schema.String),
   aiTitle: Schema.optional(Schema.String),
   isSidechain: Schema.optional(Schema.Boolean),
@@ -142,6 +146,7 @@ const TranscriptRecord = Schema.Struct({
 const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
 const decodeCodexSettings = Schema.decodeUnknownOption(CodexSettings);
 const decodeOmpSettings = Schema.decodeUnknownOption(OmpSettings);
+const decodePiSettings = Schema.decodeUnknownOption(PiSettings);
 const decodeTranscriptRecord = Schema.decodeUnknownOption(Schema.fromJsonString(TranscriptRecord));
 const decodeTranscriptValue = Schema.decodeUnknownOption(TranscriptRecord);
 const selectTranscriptPath = createTranscriptJsonSelector(TranscriptRecord);
@@ -307,9 +312,10 @@ function parseAgentSessionRecords(
 ): AgentSessionThread | null {
   const fallbackTimestamp = DateTime.formatIso(DateTime.makeUnsafe(input.lastActiveAtMs));
   // Claude and Oh My Pi put the session id in the filename. Codex rollout
-  // filenames include extra timestamp text, so only transcript metadata can
-  // provide a resumable ID.
-  let providerSessionId = input.source === "codex" ? "" : input.fallbackSessionId;
+  // filenames, and Pi's `<timestamp>_<sessionId>` names, include extra text,
+  // so for those only transcript metadata can provide a resumable ID.
+  let providerSessionId =
+    input.source === "codex" || input.source === "pi" ? "" : input.fallbackSessionId;
   let title: string | null = null;
   let model: string | null = null;
   let hasCodexSessionId = false;
@@ -402,6 +408,34 @@ function parseAgentSessionRecords(
   let recordIndex = -1;
   for (const record of records) {
     recordIndex += 1;
+    if (input.source === "pi") {
+      // Pi's filenames are `<timestamp>_<sessionId>.jsonl`, so the session
+      // header is the only reliable source of a resumable id.
+      if (record.type === "session") {
+        const sessionId = record.id?.trim();
+        if (sessionId) providerSessionId = sessionId;
+        continue;
+      }
+      if (record.type === "model_change" && record.modelId?.trim()) {
+        model = record.modelId.trim();
+        continue;
+      }
+      if (record.type !== "message") continue;
+      const role = record.message?.role;
+      if (role !== "user" && role !== "assistant") continue;
+      // `extractText` keeps only text-ish blocks, so Pi's `thinking` blocks —
+      // the model's private reasoning — never reach an imported transcript.
+      const text = extractText(record.message?.content);
+      if (text.length === 0) continue;
+      retainMessage({
+        role,
+        text,
+        createdAt: normalizeTimestamp(record.timestamp, fallbackTimestamp),
+        codexResponseUser: false,
+      });
+      continue;
+    }
+
     if (input.source === "claudeAgent") {
       if (
         record.isSidechain === true ||
@@ -584,6 +618,15 @@ function shouldRetainDecodedRecord(
         record.type === "session" ||
         record.type === "title" ||
         record.type === "title_change" ||
+        record.type === "model_change" ||
+        (record.type === "message" &&
+          (record.message?.role === "user" || record.message?.role === "assistant"))
+      );
+    // Pi writes no title record: its thread name is derived from the first
+    // user message, the way the parser already does for a titleless source.
+    case "pi":
+      return (
+        record.type === "session" ||
         record.type === "model_change" ||
         (record.type === "message" &&
           (record.message?.role === "user" || record.message?.role === "assistant"))
@@ -1178,6 +1221,65 @@ export const make = Effect.gen(function* () {
     },
   );
 
+  /**
+   * Pi stores one directory per working directory, named after a slug of that
+   * path, holding `<timestamp>_<sessionId>.jsonl` files. The slug is lossy, so
+   * the real cwd still comes from each transcript's `session` header; the
+   * directory only bounds the walk.
+   */
+  const discoverPiTranscripts = Effect.fn("AgentSessionScanner.discoverPiTranscripts")(function* (
+    homePath: string,
+    providerInstanceId: ProviderInstanceId,
+    operationBudget: number,
+  ) {
+    const sessionsDir = path.join(homePath, "sessions");
+    let operationsRemaining = operationBudget;
+    let truncated = false;
+    const readDirectory = (directory: string) => {
+      if (operationsRemaining <= 0) {
+        truncated = true;
+        return Effect.succeed<ReadonlyArray<string>>([]);
+      }
+      operationsRemaining -= 1;
+      return listDirectory(directory);
+    };
+
+    const transcripts: Array<TranscriptCandidate> = [];
+    for (const projectDirectory of yield* readDirectory(sessionsDir)) {
+      if (operationsRemaining <= 0) {
+        truncated = true;
+        break;
+      }
+      const directory = path.join(sessionsDir, projectDirectory);
+      // Filenames lead with an ISO timestamp, so reverse order visits the most
+      // recent sessions first and spends the budget where it matters.
+      for (const entry of (yield* readDirectory(directory)).toSorted().toReversed()) {
+        if (!entry.endsWith(".jsonl")) continue;
+        if (operationsRemaining <= 0) {
+          truncated = true;
+          break;
+        }
+        operationsRemaining -= 1;
+        const filePath = path.join(directory, entry);
+        const stats = yield* statOption(filePath);
+        if (
+          Option.isNone(stats) ||
+          stats.value.type !== "File" ||
+          Option.isNone(stats.value.mtime)
+        ) {
+          continue;
+        }
+        transcripts.push({
+          filePath,
+          mtimeMs: stats.value.mtime.value.getTime(),
+          providerInstanceId,
+          size: Number(stats.value.size),
+        });
+      }
+    }
+    return { transcripts, truncated };
+  });
+
   const groupTranscriptsByCwd = Effect.fn("AgentSessionScanner.groupTranscriptsByCwd")(function* (
     source: AgentSessionSource,
     transcripts: ReadonlyArray<TranscriptCandidate>,
@@ -1229,7 +1331,7 @@ export const make = Effect.gen(function* () {
     const raw: Array<RawCandidate> = [];
     let truncated = false;
 
-    for (const source of ["claudeAgent", "codex", "omp"] as const) {
+    for (const source of ["claudeAgent", "codex", "omp", "pi"] as const) {
       const instances: Array<{
         readonly instanceId: ProviderInstanceId;
         readonly config: ProviderInstanceConfig;
@@ -1264,18 +1366,32 @@ export const make = Effect.gen(function* () {
       const homes: Array<{ homePath: string; providerInstanceId: ProviderInstanceId }> = [];
       const seenHomes = new Set<string>();
       for (const { instanceId, config: instance } of instances) {
+        // `PI_CODING_AGENT_DIR` belongs to Oh My Pi here, not to Pi. Oh My Pi
+        // is a fork of Pi that kept `APP_NAME = "pi"`, so both binaries derive
+        // that same name — reading it for BOTH sources would have each import
+        // the other's transcripts. Oh My Pi keeps the variable (it has no home
+        // setting of its own); Pi's home comes from its `homePath` alone.
         const homeVariable =
           source === "claudeAgent"
             ? "CLAUDE_CONFIG_DIR"
             : source === "codex"
               ? "CODEX_HOME"
-              : "PI_CODING_AGENT_DIR";
+              : source === "omp"
+                ? "PI_CODING_AGENT_DIR"
+                : null;
         const environmentHome =
-          instance.environment?.findLast((variable) => variable.name === homeVariable)?.value ??
-          hostEnvironment[homeVariable];
+          homeVariable === null
+            ? undefined
+            : (instance.environment?.findLast((variable) => variable.name === homeVariable)
+                ?.value ?? hostEnvironment[homeVariable]);
 
         let homePath: string;
-        if (source === "claudeAgent") {
+        if (source === "pi") {
+          const config = decodePiSettings(instance.config ?? {});
+          if (Option.isNone(config)) continue;
+          const configured = config.value.homePath.trim();
+          homePath = expandHomePath(configured.length > 0 ? configured : "~/.pi/agent");
+        } else if (source === "claudeAgent") {
           const config = decodeClaudeSettings(instance.config ?? {});
           if (Option.isNone(config)) continue;
           homePath = resolveClaudeConfigDir(config.value.homePath, environmentHome);
@@ -1319,7 +1435,9 @@ export const make = Effect.gen(function* () {
           ? discoverClaudeTranscripts(home.homePath, home.providerInstanceId, operationBudget)
           : source === "codex"
             ? discoverCodexTranscripts(home.homePath, home.providerInstanceId, operationBudget)
-            : discoverOmpTranscripts(home.homePath, home.providerInstanceId, operationBudget);
+            : source === "omp"
+              ? discoverOmpTranscripts(home.homePath, home.providerInstanceId, operationBudget)
+              : discoverPiTranscripts(home.homePath, home.providerInstanceId, operationBudget);
         truncated ||= discovered.truncated;
         transcriptCandidates.push(...discovered.transcripts);
       }

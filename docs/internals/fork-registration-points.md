@@ -10,6 +10,28 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- Pi provider (#1409 follow-on). Registration points only:
+  `packages/contracts/src/settings.ts` (`PiSettings`, the `pi` arm of the
+  provider-config union) and `src/model.ts` (`PI_DEFAULT_MODEL`);
+  `apps/server/src/provider/builtInDrivers.ts` (`PiDriver` + `PiDriverEnv`),
+  `provider/providerStatusCache.ts` (`"pi"` in `BUILT_IN_DRIVER_ORDER`),
+  `textGeneration/TextGeneration.ts` (`"pi"` in `TextGenerationProvider`),
+  `apps/server/src/serverSettings.ts` (the `pi` defaults);
+  `apps/web/src/components/Icons.tsx` (`PiIcon`),
+  `components/chat/providerIconUtils.ts`,
+  `components/settings/providerDriverMeta.ts`,
+  `components/settings/settingsSearch.ts`;
+  `apps/mobile/src/components/ProviderIcon.tsx` (its own `pi` branch);
+  `packages/contracts/src/agentSessions.ts` (`"pi"` on `AgentSessionSource`),
+  `apps/server/src/project/AgentSessionScanner.ts` (`discoverPiTranscripts`
+  plus the `pi` arms of the parse, retain and home-resolution paths),
+  `AgentSessionImporter.ts` (Pi's resume cursor shape, with omp's) and
+  `apps/web/src/components/onboarding/WelcomeWizard.tsx` (the wizard's third
+  source-icon slot); `apps/server/src/provider/Layers/ProviderRegistry.test.ts`
+  (its list of every built-in instance id — a new driver fails the suite until
+  it is listed) and `knip.jsonc` (`scripts/pi-rpc-mock-agent.ts` as an
+  `apps/server` entry: its test spawns it by path, so nothing reaches it
+  statically). Rules and traps: `docs/internals/pi-driver.md`.
 - `packages/contracts/src/rpc.ts` — `subscribeInfinitus` and
   `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
   `WsRpcGroup`; `provider.proxyModels` (the add-instance wizard lists an

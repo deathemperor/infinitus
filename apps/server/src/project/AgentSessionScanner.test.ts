@@ -74,6 +74,12 @@ const makeProjectionSnapshotQueryLayer = (importedWorkspaceRoots: ReadonlyArray<
 interface ScannerTestInput {
   readonly claudeHomePath: string;
   readonly codexHomePath: string;
+  /**
+   * Pi is disabled by default, so most tests leave this unset and the source
+   * is skipped. Setting it enables Pi AND points it at an isolated home — both
+   * matter, because Pi's default home is the developer's real `~/.pi/agent`.
+   */
+  readonly piHomePath?: string;
   /** Enables the omp instance and points it at this `PI_CODING_AGENT_DIR`. */
   readonly ompHomePath?: string;
   readonly importedWorkspaceRoots?: ReadonlyArray<string>;
@@ -90,6 +96,9 @@ const makeScannerTestLayer = (input: ScannerTestInput) =>
           providers: {
             claudeAgent: { homePath: input.claudeHomePath },
             codex: { homePath: input.codexHomePath },
+            ...(input.piHomePath === undefined
+              ? {}
+              : { pi: { enabled: true, homePath: input.piHomePath } }),
             ...(input.ompHomePath === undefined ? {} : { omp: { enabled: true } }),
           },
           ...(input.providerInstances === undefined
@@ -171,6 +180,58 @@ const claudeSessionLine = (cwd: string) =>
 const codexRolloutLine = (cwd: string) =>
   `${JSON.stringify({ timestamp: "2026-01-01T00:00:00.000Z", type: "session_meta", payload: { id: "r1", cwd } })}\n`;
 
+/**
+ * Pi transcript: a `session` header carrying the cwd and the resumable id,
+ * then `message` records whose content blocks mirror the RPC's.
+ */
+const piTranscript = (input: {
+  readonly cwd: string;
+  readonly sessionId: string;
+  readonly userText?: string;
+  readonly assistantText?: string;
+  readonly thinkingText?: string;
+  readonly modelId?: string;
+}) =>
+  [
+    JSON.stringify({
+      type: "session",
+      version: 3,
+      id: input.sessionId,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      cwd: input.cwd,
+    }),
+    ...(input.modelId === undefined
+      ? []
+      : [
+          JSON.stringify({
+            type: "model_change",
+            timestamp: "2026-01-01T00:00:01.000Z",
+            provider: "zai",
+            modelId: input.modelId,
+          }),
+        ]),
+    JSON.stringify({
+      type: "message",
+      timestamp: "2026-01-01T00:00:02.000Z",
+      message: {
+        role: "user",
+        content: [{ type: "text", text: input.userText ?? "First prompt" }],
+      },
+    }),
+    JSON.stringify({
+      type: "message",
+      timestamp: "2026-01-01T00:00:03.000Z",
+      message: {
+        role: "assistant",
+        content: [
+          ...(input.thinkingText === undefined
+            ? []
+            : [{ type: "thinking", thinking: input.thinkingText }]),
+          { type: "text", text: input.assistantText ?? "First answer" },
+        ],
+      },
+    }),
+  ].join("\n") + "\n";
 const OMP_SESSION_ID = "01a09f4b-0797-707f-9201-691a923d8fa1";
 const ompTranscriptFilename = (sessionId = OMP_SESSION_ID) =>
   `2026-09-14T09-41-29-623Z_${sessionId}.jsonl`;
@@ -3466,4 +3527,108 @@ describe("parseAgentSessionTranscript", () => {
     expect(thread?.messages[0]?.text).toBe("Keep this prompt");
     expect(thread?.messages.at(-1)?.text).toBe("Assistant update 249");
   });
+});
+
+it.layer(NodeServices.layer)("AgentSessionScanner — Pi", (it) => {
+  it.effect("discovers a project from a Pi session directory", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+      const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+      const piHomePath = yield* makeTempDir("t3code-pi-home-");
+      const cwd = yield* makeTempDir("t3code-pi-project-");
+
+      // Pi names the directory after a lossy slug of the cwd, so the real path
+      // has to come from the transcript's own `session` header.
+      yield* writeTranscript({
+        filePath: path.join(
+          piHomePath,
+          "sessions",
+          "--slugged-cwd--",
+          "2026-01-01T00-00-00-000Z_t3-session-1.jsonl",
+        ),
+        contents: piTranscript({ cwd, sessionId: "t3-session-1" }),
+        mtimeMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = yield* runScan({ claudeHomePath, codexHomePath, piHomePath });
+
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]?.path).toBe(cwd);
+      expect(result.candidates[0]?.sources).toEqual(["pi"]);
+      expect(result.candidates[0]?.threadCount).toBe(1);
+    }),
+  );
+
+  it.effect("leaves Pi alone when it is not enabled", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+      const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+      const piHomePath = yield* makeTempDir("t3code-pi-home-");
+      const cwd = yield* makeTempDir("t3code-pi-project-");
+      yield* writeTranscript({
+        filePath: path.join(
+          piHomePath,
+          "sessions",
+          "--slug--",
+          "2026-01-01T00-00-00-000Z_t3-session-1.jsonl",
+        ),
+        contents: piTranscript({ cwd, sessionId: "t3-session-1" }),
+        mtimeMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      // Pi ships disabled, and its default home is the developer's real
+      // `~/.pi/agent` — a scan that read it regardless would import history
+      // from an agent the user never turned on.
+      const result = yield* runScan({ claudeHomePath, codexHomePath });
+
+      expect(result.candidates).toEqual([]);
+    }),
+  );
+
+  it.effect("takes the resumable session id from the header, not the filename", () =>
+    Effect.gen(function* () {
+      const thread = AgentSessionScanner.parseAgentSessionTranscript({
+        contents: piTranscript({
+          cwd: "/tmp/pi-project",
+          sessionId: "t3-real-session",
+          modelId: "glm-5.3",
+        }),
+        source: "pi",
+        providerInstanceId: ProviderInstanceId.make("pi"),
+        // Pi's filenames are `<timestamp>_<sessionId>`, so the basename the
+        // scanner passes as a fallback is not a resumable id.
+        fallbackSessionId: "2026-01-01T00-00-00-000Z_t3-real-session",
+        lastActiveAtMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      expect(thread?.providerSessionId).toBe("t3-real-session");
+      expect(thread?.model).toBe("glm-5.3");
+    }),
+  );
+
+  it.effect("keeps Pi's thinking blocks out of an imported thread", () =>
+    Effect.gen(function* () {
+      const thread = AgentSessionScanner.parseAgentSessionTranscript({
+        contents: piTranscript({
+          cwd: "/tmp/pi-project",
+          sessionId: "t3-thinking",
+          userText: "Ask something",
+          assistantText: "The answer",
+          thinkingText: "Private reasoning that must not be imported",
+        }),
+        source: "pi",
+        providerInstanceId: ProviderInstanceId.make("pi"),
+        fallbackSessionId: "unused",
+        lastActiveAtMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      const assistant = thread?.messages.find((message) => message.role === "assistant");
+      expect(assistant?.text).toBe("The answer");
+      expect(
+        thread?.messages.filter((message) => message.text.includes("Private reasoning")),
+      ).toEqual([]);
+    }),
+  );
 });

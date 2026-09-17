@@ -1177,6 +1177,9 @@ it.layer(NodeServices.layer)("server settings", (it) => {
             serverUrl: "http://127.0.0.1:4096",
             serverPassword: "secret-password",
           },
+          pi: {
+            enabled: false,
+          },
         },
         backgroundActivity: {
           schemaVersion: 1,

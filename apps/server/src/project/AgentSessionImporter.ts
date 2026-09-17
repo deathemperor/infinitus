@@ -231,11 +231,12 @@ export const importRecentAgentThreads = Effect.fn("importRecentAgentThreads")(fu
               status: "stopped",
               runtimeMode: DEFAULT_RUNTIME_MODE,
               // Each adapter parses only its own cursor shape; omp's is
-              // `parseOmpResume` in `provider/Layers/OmpAdapter.ts`.
+              // `parseOmpResume` in `provider/Layers/OmpAdapter.ts`, Pi's
+              // `PiResumeCursor` in `PiAdapter.ts`.
               resumeCursor:
                 thread.source === "codex"
                   ? { threadId: thread.providerSessionId }
-                  : thread.source === "omp"
+                  : thread.source === "omp" || thread.source === "pi"
                     ? { schemaVersion: 1, sessionId: thread.providerSessionId }
                     : { threadId, resume: thread.providerSessionId },
               runtimePayload: { cwd: workspaceRoot },

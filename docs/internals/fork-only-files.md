@@ -396,6 +396,13 @@ these bullets.
   proxy" for a Claude instance: 9Router / CLIProxyAPI / custom presets, model
   slots picked from the proxy's `GET <baseUrl>/models`, everything stored on
   the ordinary instance (env vars + CLAUDE_CONFIG_DIR), no settings file written.
+- `apps/server/src/provider/Drivers/PiDriver.ts`,
+  `provider/Services/PiAdapter.ts`, `provider/Layers/{PiAdapter,PiProvider,PiSessionRuntime,piRpcProtocol,piHomeEnvironment,piModels.logic}.ts`
+  (+ tests), `apps/server/src/textGeneration/PiTextGeneration.ts`,
+  `apps/server/scripts/pi-rpc-mock-agent.ts` — the Pi provider: the one
+  shipped driver speaking neither ACP nor an app-server protocol, but Pi's
+  own JSONL RPC (`pi --mode rpc`). Rules and traps:
+  `docs/internals/pi-driver.md`.
 - `apps/server/src/vcs/checkpointDiffPathspec.ts` (+ its test) — restricts a
   checkpoint-to-checkpoint diff (turn cards, the panel's turn and full-thread
   views) to the paths whose `to` content still differs from the base branch's

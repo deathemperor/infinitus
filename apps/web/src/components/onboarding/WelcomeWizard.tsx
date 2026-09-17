@@ -64,7 +64,7 @@ import { getProviderSummary } from "../settings/providerStatus";
 import { getDriverOption } from "../settings/providerDriverMeta";
 import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
-import { ClaudeAI, OmpIcon, OpenAI } from "../Icons";
+import { ClaudeAI, OmpIcon, OpenAI, PiIcon } from "../Icons";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
@@ -1486,7 +1486,7 @@ function ImportRowMeta({
   // "just now" does not fit the fixed column, so collapse it.
   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
   return (
-    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
+    <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       <span className="flex size-4 items-center justify-center">
         {sources?.includes("claudeAgent") ? (
           <ClaudeAI className="size-3" aria-label="Claude Code" />
@@ -1497,6 +1497,9 @@ function ImportRowMeta({
       </span>
       <span className="flex size-4 items-center justify-center">
         {sources?.includes("omp") ? <OmpIcon className="size-3" aria-label="Oh My Pi" /> : null}
+      </span>
+      <span className="flex size-4 items-center justify-center">
+        {sources?.includes("pi") ? <PiIcon className="size-3" aria-label="Pi" /> : null}
       </span>
       <span className="text-right">{threadCount}</span>
       <span className="text-right whitespace-nowrap">{age}</span>

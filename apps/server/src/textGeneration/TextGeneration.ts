@@ -16,7 +16,8 @@ export type TextGenerationProvider =
   | "cursor"
   | "grok"
   | "omp"
-  | "opencode";
+  | "opencode"
+  | "pi";
 
 export interface CommitMessageGenerationInput {
   cwd: string;

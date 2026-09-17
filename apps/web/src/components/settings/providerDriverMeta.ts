@@ -6,6 +6,7 @@ import {
   GrokSettings,
   OmpSettings,
   OpenCodeSettings,
+  PiSettings,
   ProviderDriverKind,
 } from "@infinitus/contracts";
 import type * as Schema from "effect/Schema";
@@ -18,6 +19,7 @@ import {
   OmpIcon,
   OpenAI,
   OpenCodeIcon,
+  PiIcon,
 } from "../Icons";
 
 type ProviderSettingsSchema = {
@@ -90,6 +92,13 @@ const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = [
     label: "Antigravity",
     icon: AntigravityIcon,
     settingsSchema: AntigravitySettings,
+  },
+  {
+    value: ProviderDriverKind.make("pi"),
+    label: "Pi",
+    icon: PiIcon,
+    badgeLabel: "Early Access",
+    settingsSchema: PiSettings,
   },
 ];
 

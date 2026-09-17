@@ -34,4 +34,10 @@ Oh My Pi asks before running a shell command or deleting or moving a file, and i
 without asking in every mode. **Auto-accept edits** therefore behaves like **Supervised** on it.
 **Full access** answers every request automatically.
 
+Pi, despite the shared ancestry, is the opposite: it runs only in **Full access**. It has no
+permission system of its own — it runs every tool with the permissions it was started with, and
+there is nothing for Infinitus to approve or reject on your behalf. Choosing another mode refuses
+to start the session rather than showing a gate that would not hold. Run Pi in a container if you
+want the work confined.
+
 See the [provider guides](./install.md#providers) for setup and provider-specific limits.
