@@ -314,17 +314,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` rasterizes a per-channel SVG, so the `infinitus`
   channel has artwork of its own (#601, #732; the file is in `fork-only-files.md`).
-- `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`,
-  `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon
-  project (`RelayNeonProject`, retained, `prod`; `RelayNeonBranch` on every
-  other stage) in place of upstream's PlanetScale database, branch and
-  runtime role (#1322: PlanetScale's cheapest cluster needs a card on file).
-  Same shape, Neon's owner role, Hyperdrive on the project's direct origin.
-  The workflow feeds `NEON_API_KEY` (repository secret) and `NEON_ORG_ID`
-  (repository variable). The PlanetScale provider and env are gone: the
-  deploy of #1366 dropped the two rows the first deploys had left `creating`
-  in the state store (Alchemy dies on a persisted row whose provider is not
-  registered, which is why they stayed for that one deploy).
+- `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`, `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon project in place of upstream's PlanetScale database (#1322, #1366). Rules and traps: `docs/internals/release-and-updates.md`.
 - `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
   `infinitusAlert` group (`POST /v1/environments/:environmentId/alerts`,
@@ -383,17 +373,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs` and
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them).
-- `patches/expo-widgets@57.0.15.patch` — upstream's patch (#11604, system
-  glass for Live Activities) plus the fork's hunk (#1277): `WidgetsModule.swift`
-  observes `Activity<LiveActivityAttributes>.activityUpdates` and each
-  activity's `activityStateUpdates` and emits `onExpoWidgetsActivityUpdate`
-  `{activityId, name, state}` (`started`, then ActivityKit's own state names);
-  `addActivityUpdateListener` and `ActivityUpdateEvent` on the JS side (src,
-  build and index). One patch file per package version is pnpm's rule, so
-  the two live together. Its one consumer, the thread-card bridge, left with
-  #1375: drop the hunk (`pnpm patch` / `pnpm patch-commit`, the lockfile's
-  `patch_hash` follows) the next time upstream bumps expo-widgets or
-  rewrites its patch, rather than re-applying it.
+- `patches/expo-widgets@57.0.15.patch` — upstream's patch (#11604) plus the fork's `onExpoWidgetsActivityUpdate` hunk (#1277), consumer gone with #1375: drop the hunk at the next expo-widgets bump, never re-apply it. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
   upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
   resolves afresh, and once npm carried 57.0.5 the range resolved past the
@@ -473,28 +453,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `apps/mobile/src/features/archive/ArchivedThreadsRouteScreen.tsx` filters
   the archived snapshots the same way (`features/infinitus/sideQuestions.ts`,
   #863).
-- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — a side question
-  from the phone (#269 C, #881): `useSideQuestionHeaderItem`'s `action` is
-  the thread menu's "Ask a side question" (above, #941) on a Claude Agent
-  thread of an `infinitus` server; a tap forks the session's latest completed turn (`infinitus.forkThread`
-  with `side: true`, no `turnCount`, #887) and opens `SideQuestionSheet`
-  (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
-  no link): `apps/mobile/src/features/infinitus/InfinitusSideQuestionSheet.tsx`
-  subscribes to the side fork, asks in plan mode, and "Bring to main" appends
-  the latest answer to the main composer's draft (`sideQuestions.ts` carries
-  the web `SideQuestionPanel.logic.ts` helpers, kept local).
-- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx` — the thread's
-  usage from the phone (#834): `useThreadUsageHeaderItem`'s `action` is the
-  thread menu's "Thread usage" (above, #941) once the shell carries `usage`
-  (a turn was recorded; no choice before, and none on a server without the
-  rollup); a tap opens `ThreadUsageSheet`
-  (`apps/mobile/src/Stack.tsx`, a form sheet in `WORKSPACE_OVERLAY_ROUTES`,
-  no link): `apps/mobile/src/features/infinitus/InfinitusThreadUsageSheet.tsx`
-  reads the live shell's rollup and draws `threadUsage.logic.ts`'s rows —
-  worded like the web popover (#907): turns (with the subagent count), tool
-  calls and duration when the server counted them (#927), each non-zero
-  token share, model(s), cost ("Cost not recorded" for null, never $0.00),
-  last turn — every estimate prefixed "≈", and the caveat lines under them.
+- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusSideQuestionSheet.tsx`, `sideQuestions.ts`) — a side question from the phone (#269 C, #881, #887). Rules and traps: `docs/internals/side-question.md`.
+- `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusThreadUsageSheet.tsx`, `threadUsage.logic.ts`) — the thread's usage from the phone (#834, #907, #927). Rules and traps: `docs/internals/turn-usage.md`.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/state/use-thread-outbox-drain.ts` (+ test) — `usePinAtCreation` after a delivered creation, `threadsByKey` (#1278), `queueBehindRunningTurn` around both `resolveThreadOutboxDeliveryAction` calls (#807) and its `thread.turn.queue` form on a `turnQueue` server (#812: `sendQueuedMessage` `via`, `completeQueuedMessageDelivery` `retainInFeed`). Rules and traps: `docs/internals/phone-outbox-drain.md`.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
