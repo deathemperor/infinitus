@@ -439,6 +439,19 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
   `SettingsInfinitusSection` (Accounts and Team rows, the reset alarms
   toggle, sending mode) after General.
+- `apps/mobile/src/features/settings/lib/legal-document-url.ts` and its
+  test — the marketing-site base is `infinitus.run`, not `t3.codes`:
+  Settings › App › Legal is the one client surface that shows a legal
+  document, and upstream's bind T3 Tools, Inc. and describe services this
+  fork does not run. Everything else (the four document URLs, the WebView
+  allowlist) derives from that one constant. The test pins the old host as
+  rejected, which is the regression. The documents themselves are the
+  fork's, under `apps/mac/site/public/` — deployed by hand with
+  `npx wrangler deploy`, never by CI.
+- `.github/SECURITY.md` — reports go to this fork's maintainer (GitHub
+  private vulnerability reporting, or the maintainer's email) and the
+  policy link is `infinitus.run/security-policy`; upstream's routes them
+  to `security@ping.gg`, who do not maintain this fork.
 - `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /

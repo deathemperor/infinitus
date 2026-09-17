@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms of Service — Infinitus</title>
+<meta name="description" content="The terms that govern your use of Infinitus, the infinitus.run site, and the optional account and relay features.">
+<link rel="icon" type="image/png" href="/img/icon.png">
+<style>
+  /* The landing page's palette, system fonts in place of its Google ones.
+     Inlined and script-free on purpose: the phone's Legal WebView runs with
+     javaScriptEnabled={false} and cacheEnabled={false}, and only allowlisted
+     URLs load, so an external stylesheet could render the page bare. */
+  :root {
+    --bg: #0a0d11; --panel: #11161d; --line: #232b35; --line-strong: #2f3945;
+    --text: #e6e1d6; --dim: #8b93a0; --faint: #7c8592; --orange: #f0a03c;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--mono); font-size: 15px; line-height: 1.7;
+    -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
+  .page { width: min(1100px, calc(100% - 48px)); margin: 0 auto; padding: 56px 0 72px; }
+  .back { display: inline-block; margin-bottom: 34px; color: var(--dim);
+    font-size: 12.5px; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
+  .back:hover { color: var(--text); }
+  .eyebrow { margin: 0; color: var(--orange); font-size: 11.5px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; }
+  h1 { margin: 14px 0 0; font-family: var(--serif); font-size: clamp(2.6rem, 7vw, 4.4rem);
+    font-weight: 400; letter-spacing: -0.02em; line-height: 1.02; }
+  .lede { max-width: 68ch; margin: 26px 0 0; color: var(--dim); font-size: 15.5px; line-height: 1.72; }
+  .dates { display: flex; flex-wrap: wrap; gap: 32px; margin: 32px 0 0; }
+  .dates div { display: grid; gap: 2px; }
+  .dates dt { color: var(--faint); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .dates dd { margin: 0; font-size: 13px; }
+  .rule { height: 1px; margin: 52px 0;
+    background: linear-gradient(90deg, var(--line-strong), var(--line) 65%, transparent); }
+  .layout { display: grid; grid-template-columns: 210px minmax(0, 720px);
+    gap: clamp(48px, 8vw, 110px); align-items: start; }
+  .toc { position: sticky; top: 40px; }
+  .toc p { margin: 0 0 14px; color: var(--faint); font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase; }
+  .toc ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .toc a { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 5px 8px 5px 0;
+    color: var(--dim); font-size: 12.5px; line-height: 1.4; text-decoration: none; }
+  .toc a span { color: var(--faint); font-size: 11px; }
+  .toc a:hover { color: var(--text); }
+  .copy { min-width: 0; }
+  .copy section { scroll-margin-top: 24px; }
+  .copy section + section { margin-top: 56px; padding-top: 56px; border-top: 1px solid var(--line); }
+  .num { margin: 0; color: var(--orange); font-size: 11.5px; letter-spacing: 0.12em; }
+  h2 { margin: 8px 0 22px; font-family: var(--serif); font-size: clamp(1.6rem, 3.4vw, 2.1rem);
+    font-weight: 400; letter-spacing: -0.015em; line-height: 1.15; }
+  h3 { margin: 30px 0 8px; font-size: 14.5px; font-weight: 600; }
+  p, li, address { color: var(--dim); font-size: 14.5px; font-style: normal; line-height: 1.78; }
+  p { margin: 0 0 16px; }
+  strong { color: var(--text); font-weight: 600; }
+  ul, ol.list { display: grid; gap: 10px; margin: 16px 0 18px; padding-left: 1.15rem; }
+  li::marker { color: var(--orange); }
+  a { color: var(--text); overflow-wrap: anywhere; text-decoration: underline;
+    text-decoration-color: rgba(240, 160, 60, 0.55); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--orange); }
+  .notice { color: var(--text); font-weight: 600; }
+  address { margin: 18px 0; padding: 16px 18px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--panel); }
+  .cards { display: grid; margin-top: 46px; border-top: 1px solid var(--line); }
+  .card { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 20px;
+    align-items: center; padding: 26px 4px; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .card:hover { background: rgba(255, 255, 255, 0.025); }
+  .card-num { color: var(--orange); font-size: 11.5px; letter-spacing: 0.1em; }
+  .card-copy { display: grid; gap: 5px; }
+  .card-copy strong { font-size: 16px; font-weight: 600; }
+  .card-copy span { color: var(--dim); font-size: 13.5px; line-height: 1.55; }
+  .card-arrow { color: var(--faint); font-size: 18px; }
+  .foot { margin-top: 64px; padding-top: 26px; border-top: 1px solid var(--line);
+    color: var(--faint); font-size: 12.5px; }
+  .foot a { color: var(--dim); }
+  @media (max-width: 860px) {
+    .page { width: calc(100% - 36px); padding: 36px 0 56px; }
+    .layout { display: block; }
+    .toc { position: static; margin-bottom: 44px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+    .rule { margin: 38px 0; }
+    .copy section + section { margin-top: 44px; padding-top: 44px; }
+    .card { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 14px; padding: 22px 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a class="back" href="/legal">&#8592; All legal documents</a>
+
+  <header>
+    <p class="eyebrow">Infinitus / Legal</p>
+    <h1>Terms of Service</h1>
+    <p class="lede">These Terms govern your use of Infinitus — the Mac, desktop, Linux and iOS applications — the infinitus.run website, and the optional sign-in and relay features. Infinitus is free and open source software.</p>
+    <dl class="dates">
+      <div><dt>Effective</dt><dd>2026-09-17</dd></div>
+      <div><dt>Last updated</dt><dd>2026-09-17</dd></div>
+    </dl>
+  </header>
+
+  <div class="rule"></div>
+
+  <div class="layout">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <ol>
+        <li><a href="#introduction"><span>01</span>Introduction</a></li>
+        <li><a href="#software"><span>02</span>The software and its license</a></li>
+        <li><a href="#accounts"><span>03</span>Accounts</a></li>
+        <li><a href="#content"><span>04</span>Your content and providers</a></li>
+        <li><a href="#acceptable-use"><span>05</span>Acceptable use</a></li>
+        <li><a href="#availability"><span>06</span>Availability and changes</a></li>
+        <li><a href="#fees"><span>07</span>Fees</a></li>
+        <li><a href="#privacy"><span>08</span>Privacy</a></li>
+        <li><a href="#termination"><span>09</span>Suspension and termination</a></li>
+        <li><a href="#alpha"><span>10</span>Alpha software</a></li>
+        <li><a href="#disclaimers"><span>11</span>Disclaimers</a></li>
+        <li><a href="#liability"><span>12</span>Limitation of liability</a></li>
+        <li><a href="#indemnification"><span>13</span>Indemnification</a></li>
+        <li><a href="#copyright"><span>14</span>Copyright complaints</a></li>
+        <li><a href="#third-parties"><span>15</span>Third-party services</a></li>
+        <li><a href="#feedback"><span>16</span>Feedback</a></li>
+        <li><a href="#disputes"><span>17</span>Governing law and disputes</a></li>
+        <li><a href="#miscellaneous"><span>18</span>Miscellaneous</a></li>
+        <li><a href="#changes"><span>19</span>Changes to these Terms</a></li>
+        <li><a href="#contact"><span>20</span>Contact</a></li>
+      </ol>
+    </nav>
+
+    <article class="copy">
+
+      <section id="introduction">
+        <p class="num">01</p>
+        <h2>Introduction</h2>
+        <p>
+          These Terms of Service (the &ldquo;Terms&rdquo;) are an agreement between you and Loc Truong,
+          an individual publishing as &ldquo;deathemperor&rdquo; (the &ldquo;Publisher,&rdquo;
+          &ldquo;I,&rdquo; &ldquo;me&rdquo;). They govern your use of the Infinitus applications for
+          macOS, desktop, Linux and iOS (the &ldquo;Software&rdquo;), the website at
+          <a href="https://infinitus.run">https://infinitus.run</a> (the &ldquo;Site&rdquo;), and the
+          optional sign-in and relay features (the &ldquo;Services&rdquo;).
+        </p>
+        <p>
+          By using the Software, the Site or the Services, you agree to these Terms. If you use them for
+          an organization, you represent that you may bind it, and &ldquo;you&rdquo; includes that
+          organization. If you do not agree, do not use them.
+        </p>
+        <p>
+          You must be at least 13 years old. If the law where you live sets a higher age for agreements
+          like this one, you must meet it or have a parent or guardian agree on your behalf.
+        </p>
+      </section>
+
+      <section id="software">
+        <p class="num">02</p>
+        <h2>The Software and Its License</h2>
+        <p>
+          Infinitus is open source software published under the MIT License. Your rights to use, copy,
+          modify and distribute the source code come from that license, which accompanies the source
+          repository. <strong>Where these Terms and the MIT License differ as to the source code, the MIT
+          License controls.</strong> These Terms add nothing to and take nothing from it; they govern the
+          Site and the optional Services, which the license does not cover.
+        </p>
+        <p>
+          Infinitus is a fork of T3 Code, itself MIT-licensed, and includes third-party open source
+          components under their own licenses. Those notices are available in the application and in the
+          source repository. The names, marks and branding of other projects remain theirs.
+        </p>
+      </section>
+
+      <section id="accounts">
+        <p class="num">03</p>
+        <h2>Accounts</h2>
+        <p>
+          Infinitus works without an account. An account is needed only for the optional relay features
+          &mdash; push notifications and device-to-environment linking. If you create one, keep your
+          credentials secure and report suspected unauthorized access. You are responsible for activity
+          through your account and connected devices, except where caused by a failure to use reasonable
+          security measures on my side.
+        </p>
+        <p>
+          Do not share credentials in a way that compromises the Services, impersonate anyone, or create
+          accounts by unauthorized automated means.
+        </p>
+      </section>
+
+      <section id="content">
+        <p class="num">04</p>
+        <h2>Your Content and Providers</h2>
+        <p>
+          Infinitus helps you send prompts, source files, images, attachments and instructions to
+          coding-agent harnesses and providers you choose, and displays their responses, command output,
+          file changes and diffs (&ldquo;User Content&rdquo;). <strong>You retain every right you have in
+          your User Content.</strong>
+        </p>
+        <p>
+          You bring and configure your own harness and provider. Your User Content is processed on the
+          machine you control and by the providers you select. It does not pass through my
+          infrastructure. The relay, if you enable it, carries only notification metadata &mdash; thread
+          and project titles, model name and a status headline &mdash; as described in the
+          <a href="/privacy-policy">Privacy Policy</a>. To the limited extent a feature you enable must
+          transmit that metadata, you grant me a license to host and transmit it solely to provide that
+          feature.
+        </p>
+        <p>
+          You represent that you have the rights needed to submit your User Content and to direct its
+          processing by the harnesses and providers you select. Review their terms, privacy practices and
+          data controls before using them with confidential, proprietary, regulated or personal
+          information.
+        </p>
+      </section>
+
+      <section id="acceptable-use">
+        <p class="num">05</p>
+        <h2>Acceptable Use</h2>
+        <p>
+          The MIT License governs what you may do with the source code and imposes no use restrictions.
+          This section applies to the Site and the Services &mdash; the infrastructure I operate and pay
+          for. You may not use them to:
+        </p>
+        <ul>
+          <li>Violate applicable law or another person's rights;</li>
+          <li>Distribute malware or harmful content, except in authorized security work;</li>
+          <li>Probe, attack, disrupt or gain unauthorized access to the Services or any other system;</li>
+          <li>Bypass rate limits, access controls or security measures;</li>
+          <li>Place an unreasonable load on shared infrastructure, or interfere with other users;</li>
+          <li>Facilitate fraud, harassment or deceptive conduct; or</li>
+          <li>Misrepresent that output from a third-party agent was produced or endorsed by me.</li>
+        </ul>
+        <p>
+          Authorized security research should follow the <a href="/security-policy">Security Policy</a>.
+          Suspected violations may be investigated, and proportionate action taken.
+        </p>
+      </section>
+
+      <section id="availability">
+        <p class="num">06</p>
+        <h2>Availability and Changes</h2>
+        <p>
+          Features, integrations and supported platforms may be added, changed, suspended or
+          discontinued. Infinitus is maintained by one person in his own time: there is no uptime
+          commitment, no support obligation and no guarantee that any feature will continue to exist.
+          Because the Software is open source, a discontinued version remains yours to run and to fork.
+        </p>
+        <p>
+          Infinitus depends on software, environments, networks and coding-agent providers that you
+          configure or that third parties operate. I control none of their availability, compatibility,
+          pricing or behavior.
+        </p>
+      </section>
+
+      <section id="fees">
+        <p class="num">07</p>
+        <h2>Fees</h2>
+        <p>
+          <strong>Infinitus is free.</strong> There is no subscription and nothing to buy. You remain
+          responsible for what you pay others &mdash; your coding-agent providers, cloud infrastructure,
+          network operators and app stores. If a paid feature is ever introduced, its price and terms
+          will be shown before you buy anything.
+        </p>
+      </section>
+
+      <section id="privacy">
+        <p class="num">08</p>
+        <h2>Privacy</h2>
+        <p>
+          The <a href="/privacy-policy">Privacy Policy</a> explains what information is involved and
+          which optional features reach a server. Third-party environments, harnesses, identity providers
+          and coding-agent providers handle information under their own terms.
+        </p>
+      </section>
+
+      <section id="termination">
+        <p class="num">09</p>
+        <h2>Suspension and Termination</h2>
+        <p>
+          You may stop at any time: disconnect environments and devices in the app, and request account
+          deletion as described in the Privacy Policy.
+        </p>
+        <p>
+          Access to the Services may be suspended or terminated where I reasonably believe you materially
+          violated these Terms, created a security or legal risk, or used the Services in a way that
+          could harm others or shared infrastructure. Where practicable I will give notice and a chance to
+          cure, but may act immediately to prevent harm or comply with law. Losing access to the Services
+          does not affect your rights under the MIT License &mdash; the Software remains yours to run.
+        </p>
+        <p>
+          Provisions that should by their nature survive termination &mdash; ownership, disclaimers,
+          limitation of liability, indemnification and dispute terms &mdash; survive.
+        </p>
+      </section>
+
+      <section id="alpha">
+        <p class="num">10</p>
+        <h2>Alpha Software</h2>
+        <p>
+          Infinitus is alpha software. It may be incomplete, change without notice, contain errors or
+          lose data. Do not rely on it as the only copy of important work, and review proposed commands
+          and file changes before applying them. It drives coding agents that can modify and delete files
+          on your machine &mdash; treat every automated action as something to check.
+        </p>
+      </section>
+
+      <section id="disclaimers">
+        <p class="num">11</p>
+        <h2>Disclaimers</h2>
+        <p class="notice">
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SOFTWARE, SITE AND SERVICES ARE PROVIDED
+          &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE,&rdquo; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+          IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND
+          NON-INFRINGEMENT.
+        </p>
+        <p>
+          Coding agents and AI systems produce incorrect, insecure, incomplete and sometimes harmful
+          output. You are responsible for reviewing output, commands and patches before relying on or
+          executing them. Nothing here warrants that the Software or third-party output will be
+          uninterrupted, secure, accurate, error-free or fit for your purpose.
+        </p>
+        <p>Some jurisdictions do not allow certain exclusions, so parts of this may not apply to you.</p>
+      </section>
+
+      <section id="liability">
+        <p class="num">12</p>
+        <h2>Limitation of Liability</h2>
+        <p class="notice">
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE PUBLISHER WILL NOT BE LIABLE FOR INDIRECT,
+          INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR FOR LOST PROFITS,
+          REVENUE, DATA, GOODWILL OR BUSINESS OPPORTUNITIES, ARISING FROM OR RELATED TO THE SOFTWARE,
+          SITE, SERVICES OR THESE TERMS.
+        </p>
+        <p>
+          To the maximum extent permitted by law, total liability for all claims arising from or relating
+          to the Software, Site, Services or these Terms will not exceed one hundred United States
+          dollars ($100). Infinitus is provided free of charge; this limit reflects that. It applies
+          regardless of legal theory and even if a remedy fails of its essential purpose, and does not
+          limit liability that cannot lawfully be limited.
+        </p>
+      </section>
+
+      <section id="indemnification">
+        <p class="num">13</p>
+        <h2>Indemnification</h2>
+        <p>
+          To the extent permitted by law, you will defend and indemnify the Publisher from third-party
+          claims, damages, losses and reasonable legal fees arising from your User Content, your use of
+          the Site or Services in violation of these Terms or law, or your infringement of another
+          person's rights. You will be notified promptly of any covered claim and I will cooperate
+          reasonably in its defense. Do not settle a claim in a way that admits fault by me or imposes
+          obligations on me without my written consent.
+        </p>
+      </section>
+
+      <section id="copyright">
+        <p class="num">14</p>
+        <h2>Copyright Complaints</h2>
+        <p>
+          If you believe material on a part of the Site or Services that I operate infringes your
+          copyright, send notice to
+          <a href="mailto:deathemperor@gmail.com">deathemperor@gmail.com</a> identifying the copyrighted
+          work, the allegedly infringing material and its location, your contact information, a statement
+          of good-faith belief, a statement under penalty of perjury that the notice is accurate and that
+          you are authorized to act, and your signature.
+        </p>
+        <p>
+          Content held only in a user's own environment or by a provider they selected is outside my
+          control. Direct requests about that material to whoever hosts it.
+        </p>
+      </section>
+
+      <section id="third-parties">
+        <p class="num">15</p>
+        <h2>Third-Party Services</h2>
+        <p>
+          Infinitus connects to and displays content from third-party coding agents, model providers,
+          identity providers, repositories, app stores and infrastructure. Your use of those is governed
+          by their terms. They are neither endorsed nor controlled by me, and I am not responsible for
+          their content, security, availability, output or data practices.
+        </p>
+        <p>
+          Third-party and open source software included with Infinitus is governed by its own license
+          notices, which control over these Terms for that software.
+        </p>
+      </section>
+
+      <section id="feedback">
+        <p class="num">16</p>
+        <h2>Feedback</h2>
+        <p>
+          If you send ideas, suggestions or other feedback about Infinitus, you grant me a perpetual,
+          irrevocable, worldwide, royalty-free right to use it without restriction or compensation. This
+          does not transfer ownership of your User Content. Code contributions are governed by the
+          repository's license and contribution guidelines, not by this section.
+        </p>
+      </section>
+
+      <section id="disputes">
+        <p class="num">17</p>
+        <h2>Governing Law and Disputes</h2>
+        <p>
+          These Terms are governed by the laws of Vietnam, without regard to conflict-of-law principles.
+          Nothing here deprives you of the protection of mandatory consumer-protection laws of the
+          country where you live.
+        </p>
+        <p>
+          <strong>Talk first.</strong> Before starting any proceeding, please email
+          <a href="mailto:deathemperor@gmail.com">deathemperor@gmail.com</a> describing the dispute and
+          what you want. Most problems with a free, open source tool can be settled in an email thread,
+          and both of us should try in good faith for at least 30 days. If that fails, disputes will be
+          resolved in the competent courts of Ho Chi Minh City, Vietnam, or in the courts of your own
+          country of residence where the law gives you that right.
+        </p>
+        <p>
+          There is no arbitration requirement and no class-action waiver in these Terms. You keep
+          whatever procedural rights your local law gives you.
+        </p>
+      </section>
+
+      <section id="miscellaneous">
+        <p class="num">18</p>
+        <h2>Miscellaneous</h2>
+        <p>
+          These Terms, with the documents they reference, are the entire agreement between us about the
+          Site and Services. If a provision is unenforceable, it will be narrowed to the minimum extent
+          necessary or severed, and the rest continues in effect. Failure to enforce a provision is not a
+          waiver of it.
+        </p>
+        <p>
+          You may not assign these Terms without my written consent. I may assign them in connection with
+          a transfer of the project. Neither of us is liable for delays caused by events beyond
+          reasonable control. Headings are for convenience, and &ldquo;including&rdquo; means
+          &ldquo;including without limitation.&rdquo;
+        </p>
+      </section>
+
+      <section id="changes">
+        <p class="num">19</p>
+        <h2>Changes to These Terms</h2>
+        <p>
+          These Terms may be updated from time to time. Updates are posted at this URL with the dates
+          above revised. Where a change materially affects your rights, additional notice will be given
+          where practicable or where the law requires. Changes apply from their effective date, and
+          continued use after that date means you accept them.
+        </p>
+      </section>
+
+      <section id="contact">
+        <p class="num">20</p>
+        <h2>Contact</h2>
+        <p>Questions about these Terms:</p>
+        <address>
+          <strong>Loc Truong</strong> (&ldquo;deathemperor&rdquo;)<br />
+          31 Nguyen Van Dau, Binh Loi Trung<br />
+          Ho Chi Minh City, Vietnam
+        </address>
+        <p><a href="mailto:deathemperor@gmail.com">deathemperor@gmail.com</a></p>
+      </section>
+    </article>
+  </div>
+
+  <div class="foot">
+    <a href="/">infinitus.run</a> &middot;
+    <a href="/legal">Legal</a> &middot;
+    <a href="https://github.com/deathemperor/infinitus">GitHub</a>
+  </div>
+</div>
+</body>
+</html>
