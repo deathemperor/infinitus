@@ -375,6 +375,7 @@ these bullets.
 - `scripts/infinitus-md-size.test.ts` — the INFINITUS.md byte cap (16 KB, #1339):
   every session loads that file whole, so a feature's narrative goes in a
   `docs/internals/<feature>.md` page and one ledger line here.
+- `scripts/phone.sh` (+ `.agents/skills/drive-phone/SKILL.md`) — drives the developer's paired physical iPhone from a session with the server's pinned `agent-device` (launch, deep links, screenshots, console; snapshots and taps once the Mac's `DevToolsSecurity` is on). The CLI installs under the worktree's `.t3/tools`, never on the Mac. Usage and traps: the skill.
 - `.github/workflows/upstream-sync.yml` — the daily upstream merge as a PR (INFINITUS.md); once `scripts/infinitus-rename.ts --check` passes on `main` it renames upstream's tip on its own branch before merging (#1368 C).
 - `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
