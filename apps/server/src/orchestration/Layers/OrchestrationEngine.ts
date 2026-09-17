@@ -46,6 +46,10 @@ import { OrchestrationProjectionPipeline } from "../Services/ProjectionPipeline.
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { ThreadBackgroundLivenessService } from "../ThreadBackgroundLiveness.ts";
 import {
+  InfinitusLimitStops,
+  InfinitusLimitStopsLive,
+} from "../../infinitus/Services/InfinitusLimitStops.ts";
+import {
   OrchestrationEngineService,
   type OrchestrationEngineShape,
 } from "../Services/OrchestrationEngine.ts";
@@ -88,6 +92,7 @@ const makeOrchestrationEngine = Effect.gen(function* () {
   const projectionPipeline = yield* OrchestrationProjectionPipeline;
   const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
   const threadBackgroundLiveness = yield* ThreadBackgroundLivenessService;
+  const limitStops = yield* InfinitusLimitStops;
   const crypto = yield* Crypto.Crypto;
 
   const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
@@ -209,6 +214,16 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           return yield* new OrchestrationCommandInvariantError({
             commandType: envelope.command.type,
             detail: `thread ${envelope.command.threadId} has live background work`,
+          });
+        }
+
+        if (
+          envelope.command.type === "thread.auto-settle" &&
+          (yield* limitStops.isStopped(envelope.command.threadId))
+        ) {
+          return yield* new OrchestrationCommandInvariantError({
+            commandType: envelope.command.type,
+            detail: `thread ${envelope.command.threadId} is waiting on a usage limit`,
           });
         }
 
@@ -470,4 +485,4 @@ const makeOrchestrationEngine = Effect.gen(function* () {
 export const OrchestrationEngineLive = Layer.effect(
   OrchestrationEngineService,
   makeOrchestrationEngine,
-);
+).pipe(Layer.provideMerge(InfinitusLimitStopsLive));

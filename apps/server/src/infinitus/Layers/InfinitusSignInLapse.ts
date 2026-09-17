@@ -18,6 +18,7 @@ import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
+import { INFINITUS_HOME_DEEP_LINK } from "./InfinitusAlertRelay.ts";
 import {
   hasLoginInFlight,
   manifestHasVerb,
@@ -137,15 +138,15 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
     };
 
     /** The phones hear about it (user 2026-09-17): one push through the
-        relay, deep-linked to the thread, whether or not the Mac could start
-        the login. An unlinked server or a refused relay is logged, never
+        relay, deep-linked to the home screen's sign-in cards, whether or not
+        the Mac could start the login. An unlinked server or a refused relay is logged, never
         retried; the row and the login above stand on their own. */
     const notify = (threadId: ThreadId, lapse: SignInLapse) =>
       alerts
         .publish({
           title: `${lapse.provider === "aws" ? "AWS" : "gcloud"} sign-in needed`,
           body: `${lapse.profile} has expired credentials. Open Infinitus to sign in from this phone.`,
-          threadId,
+          deepLink: INFINITUS_HOME_DEEP_LINK,
         })
         .pipe(
           Effect.asVoid,

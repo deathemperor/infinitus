@@ -98,6 +98,9 @@ function normalizeThreadDeepLink(value: string): string | null {
     a switch, a lapsed sign-in) lands — Settings › Accounts. The relay sends
     it as an ordinary push with this deep link and no thread. */
 export const INFINITUS_ACCOUNTS_DEEP_LINK = "/settings/accounts";
+/** Infinitus (fork, #1076): a lapsed sign-in's alert lands on the home
+    screen, where the sign-in cards are. */
+export const INFINITUS_HOME_DEEP_LINK = "/";
 
 export function extractAgentNotificationDeepLink(response: unknown): string | null {
   const data = dataFromNotificationResponse(response);
@@ -116,6 +119,10 @@ export function extractAgentNotificationDeepLink(response: unknown): string | nu
   const threadId = data?.threadId;
   if (typeof environmentId === "string" && typeof threadId === "string") {
     return encodeThreadDeepLink({ environmentId, threadId });
+  }
+  // After the thread fallback: a `/` beside thread ids still means the thread.
+  if (deepLink === INFINITUS_HOME_DEEP_LINK) {
+    return deepLink;
   }
   return null;
 }

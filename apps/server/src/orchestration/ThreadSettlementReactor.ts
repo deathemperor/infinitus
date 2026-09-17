@@ -16,6 +16,10 @@ import * as GitManager from "../git/GitManager.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { forkParked } from "../serverActivation.ts";
+import {
+  InfinitusLimitStops,
+  InfinitusLimitStopsLive,
+} from "../infinitus/Services/InfinitusLimitStops.ts";
 import * as OrchestrationEngine from "./Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./Services/ProjectionSnapshotQuery.ts";
 import { pullRequestMatchesProject } from "./ThreadPullRequestReactor.ts";
@@ -81,6 +85,7 @@ export const make = Effect.gen(function* () {
   const pullRequests = yield* PullRequestService.PullRequestService;
   const crypto = yield* Crypto.Crypto;
   const fileSystem = yield* FileSystem.FileSystem;
+  const limitStops = yield* InfinitusLimitStops;
 
   const sweep = Effect.fn("ThreadSettlementReactor.sweep")(function* (
     mergedPullRequest: PullRequestService.PullRequestMergeEvent | null,
@@ -94,7 +99,10 @@ export const make = Effect.gen(function* () {
     const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
     // A merge rechecks all candidates, including branches that discovery has
     // not linked yet. Those lookups can still have cached the PR as open.
-    const candidates = snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now));
+    const candidates = yield* Effect.filter(
+      snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now)),
+      (thread) => limitStops.isStopped(thread.id).pipe(Effect.map((stopped) => !stopped)),
+    );
 
     // Return the thread when it still needs a pull request decision. A rejected
     // dispatch skips it for this snapshot instead of retrying through a lookup.
@@ -320,4 +328,6 @@ export const make = Effect.gen(function* () {
   return { start, drain: worker.drain } satisfies ThreadSettlementReactor["Service"];
 });
 
-export const layer = Layer.effect(ThreadSettlementReactor, make);
+export const layer = Layer.effect(ThreadSettlementReactor, make).pipe(
+  Layer.provideMerge(InfinitusLimitStopsLive),
+);

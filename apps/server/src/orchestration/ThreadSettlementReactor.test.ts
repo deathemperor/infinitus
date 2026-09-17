@@ -31,6 +31,7 @@ import {
   type PullRequestMergeEvent,
 } from "../pullRequest/PullRequestService.ts";
 import { ServerActivation } from "../serverActivation.ts";
+import { InfinitusLimitStops } from "../infinitus/Services/InfinitusLimitStops.ts";
 import { ServerSettingsService } from "../serverSettings.ts";
 import { OrchestrationCommandInvariantError } from "./Errors.ts";
 import {
@@ -382,6 +383,55 @@ describe("ThreadSettlementReactor", () => {
         }),
       ),
   );
+  it.effect("keeps limit-stopped threads pending through merge and inactivity sweeps", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse(NOW));
+        const limited = makeThread("limited", {
+          latestUserMessageAt: "2026-08-27T00:00:00.000Z",
+          branch: "saved-feature",
+        });
+        const inactive = makeThread("inactive-limited");
+        const fixture = yield* makeHarness({
+          snapshot: makeSnapshot([limited, inactive, makeThread("unrelated")]),
+          settings: {
+            ...DEFAULT_SERVER_SETTINGS,
+            sidebarAutoSettleOnMerge: true,
+            sidebarAutoSettleAfterDays: 3,
+          },
+          branchPullRequest: () => Effect.succeed(makeBranchPullRequest("merged")),
+        });
+        yield* Effect.gen(function* () {
+          const stops = yield* InfinitusLimitStops;
+          const reactor = yield* ThreadSettlementReactor.ThreadSettlementReactor;
+          yield* stops.setStopped(
+            [limited, inactive].map(({ id }) => ({
+              threadId: id,
+              kind: "limited" as const,
+              since: NOW,
+              summary: "Limit hit",
+            })),
+          );
+          yield* startHarness(reactor, fixture.activation, fixture.snapshotReads);
+          assert.deepStrictEqual(
+            (yield* Ref.get(fixture.commands)).map(({ threadId }) => threadId),
+            [ThreadId.make("unrelated")],
+          );
+          assert.deepStrictEqual(yield* Ref.get(fixture.branchCalls), []);
+
+          // Once the pending continuation clears, normal settlement resumes.
+          yield* stops.setStopped([]);
+          yield* TestClock.adjust("1 minute");
+          yield* Queue.take(fixture.snapshotReads);
+          yield* reactor.drain;
+          const settled = (yield* Ref.get(fixture.commands)).map(({ threadId }) => threadId);
+          assert.include(settled, limited.id);
+          assert.include(settled, inactive.id);
+        }).pipe(Effect.provide(fixture.layer));
+      }),
+    ),
+  );
+
   it.effect("uses saved PRs without settling resumed threads or branches with newer PRs", () =>
     Effect.scoped(
       Effect.gen(function* () {

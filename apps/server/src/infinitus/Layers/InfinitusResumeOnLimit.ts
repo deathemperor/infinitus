@@ -14,7 +14,6 @@ import * as FiberHandle from "effect/FiberHandle";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import * as SubscriptionRef from "effect/SubscriptionRef";
 import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
@@ -24,7 +23,7 @@ import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
-import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
+import { InfinitusLimitStops, InfinitusLimitStopsLive } from "../Services/InfinitusLimitStops.ts";
 import {
   CONTINUATION_PROMPT,
   eventCancelsStop,
@@ -69,8 +68,7 @@ type Input =
 const resetsAtIso = (stop: LimitStop): string | null =>
   stop.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(stop.resetsAt));
 
-export const InfinitusResumeOnLimitLive = Layer.effect(
-  InfinitusLimitStops,
+export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const providerService = yield* ProviderService;
     const orchestrationEngine = yield* OrchestrationEngineService;
@@ -78,6 +76,7 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
     const infinitus = yield* InfinitusService;
     const settings = yield* ServerSettingsService;
     const turnStartGate = yield* TurnStartGate;
+    const limitStops = yield* InfinitusLimitStops;
     const crypto = yield* Crypto.Crypto;
     const randomUUID = crypto.randomUUIDv4;
     const commandId = randomUUID.pipe(Effect.map(CommandId.make));
@@ -85,10 +84,9 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
 
     const stops = new Map<ThreadId, LimitStop>();
     /** What the sidebar sees of `stops`: one entry per stopped thread. */
-    const stopped = yield* SubscriptionRef.make<ReadonlyArray<InfinitusHeldThread>>([]);
     const marks = new Map<ThreadId, InfinitusHeldThread>();
     // Suspended: the list is read when it runs, not when the layer builds.
-    const publish = Effect.suspend(() => SubscriptionRef.set(stopped, [...marks.values()]));
+    const publish = Effect.suspend(() => limitStops.setStopped([...marks.values()]));
     const resumed = new Set<TurnId>();
     const lastResumeAt = new Map<ThreadId, number>();
     const watch = yield* FiberHandle.make();
@@ -358,7 +356,5 @@ export const InfinitusResumeOnLimitLive = Layer.effect(
         Stream.runForEach((event) => worker.enqueue({ source: "runtime", event })),
       ),
     );
-
-    return InfinitusLimitStops.of({ stopped: SubscriptionRef.changes(stopped) });
   }),
-);
+).pipe(Layer.provideMerge(InfinitusLimitStopsLive));
