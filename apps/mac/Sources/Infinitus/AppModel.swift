@@ -8,7 +8,7 @@ import InfinitusUI
 
 /// Main-actor state the MenuBarExtra renders. Feeds per spec §2:
 /// snapshots from `swapd list --json` (timer + right after any switch
-/// event), events from the supervised `swapd auto --json`.
+/// event), events from the background `swapd auto --json` service.
 @MainActor
 final class AppModel: ObservableObject {
     // MARK: fleets (#8 multi-engine seam)
@@ -240,7 +240,7 @@ final class AppModel: ObservableObject {
     // dev loop, or a manual make-app.sh) — surfaced as "restart to update".
     @Published var appUpdatePending = false
     private let launchExecutableDate = AppModel.executableDate()
-    private var swapdSupervisor: EngineSupervisor?
+    private var swapdSupervisor: (any EngineLifecycle)?
     private var refreshTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
 
@@ -1430,19 +1430,20 @@ final class AppModel: ObservableObject {
         return false
     }
 
-    /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the daemon's
-    /// NDJSON stream, restarted by the supervisor; its state feeds the
-    /// Engines pane and the badge.
+    /// launchd owns the production engine; fixture overrides stay process-local.
     private func startSwapd(binary: String) {
-        let supervisor = EngineSupervisor(
-            binaryPath: binary, arguments: ["auto", "--json"], environmentFlag: "SWAPD_SUPERVISED",
-            onLine: { [weak self] line in
-                Task { @MainActor in self?.consume(line) }
-            },
-            onState: { [weak self] state in
-                Task { @MainActor in self?.swapdState = state }
-            }
-        )
+        let onLine: @Sendable (EventLine) -> Void = { [weak self] line in
+            Task { @MainActor in self?.consume(line) }
+        }
+        let onState: @Sendable (EngineSupervisor.State) -> Void = { [weak self] state in
+            Task { @MainActor in self?.swapdState = state }
+        }
+        let supervisor: any EngineLifecycle
+        if ProcessInfo.processInfo.environment["INFINITUS_SWAPD_CLI"] != nil {
+            supervisor = EngineSupervisor(binaryPath: binary, onLine: onLine, onState: onState)
+        } else {
+            supervisor = SwapdLaunchAgent(binaryPath: binary, onLine: onLine, onState: onState)
+        }
         swapdSupervisor = supervisor
         Task { await supervisor.start() }
     }
@@ -1609,8 +1610,10 @@ final class AppModel: ObservableObject {
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
         let team = team
+        let keepEngine = swapdEnabled
         Task {
-            await oldSwapd?.stop()
+            if keepEngine { await oldSwapd?.disconnect() }
+            else { await oldSwapd?.stop() }
             // The team's now.json delete (bounded by TeamModel.quitBound), so
             // teammates stop seeing this Mac "on" across the relaunch.
             await team.quit()
@@ -1901,17 +1904,13 @@ final class AppModel: ObservableObject {
 
     @Published var reorderError: String?
 
-    /// Apply a drag-reorder: `order` is the account numbers in their new
-    /// top-to-bottom sequence. Optimistically re-sorts the local rows so the
-    /// row lands where it was dropped, then lets the snapshot confirm.
-    /// Quit path: stop the supervised engine BEFORE the process dies, so
-    /// the child never outlives the app holding the mutex (the engine also
-    /// watches its stdin pipe for EOF as the backstop against a hard kill).
+    /// Closing the UI leaves automatic switching with launchd. Only the
+    /// explicit engine toggle disables that service.
     func shutdown() {
         let swapdSupervisor = swapdSupervisor
         let team = team
         Task {
-            await swapdSupervisor?.stop()
+            await swapdSupervisor?.disconnect()
             await team.quit()
             await MainActor.run {
                 NSApplication.shared.terminate(nil)

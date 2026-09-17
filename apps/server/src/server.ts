@@ -87,6 +87,7 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { infinitusTeamControlHttpApiLayer } from "./infinitus/Layers/InfinitusTeamControlHttp.ts";
+import { InfinitusSwapdProbeLive } from "./infinitus/Services/InfinitusSwapdProbe.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusAlertRelayLive } from "./infinitus/Layers/InfinitusAlertRelay.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
@@ -301,7 +302,11 @@ const ReactorCoreLayerLive = Layer.empty.pipe(
  */
 const ReactorLayerLive = ReactorCoreLayerLive.pipe(
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
-  Layer.provideMerge(InfinitusResumeOnLimitLive),
+  Layer.provideMerge(
+    InfinitusResumeOnLimitLive.pipe(
+      Layer.provide(InfinitusSwapdProbeLive.pipe(Layer.provide(ProcessRunner.layer))),
+    ),
+  ),
   // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
   // work-log row and starts the Mac's login. The layer gets its own control
   // client, since InfinitusLayerLive's is private. (The phone's lock-screen

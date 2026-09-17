@@ -22,6 +22,7 @@ import { TurnStartGate } from "../../orchestration/Services/TurnStartGate.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { InfinitusSwapdProbe } from "../Services/InfinitusSwapdProbe.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusLimitStops, InfinitusLimitStopsLive } from "../Services/InfinitusLimitStops.ts";
 import {
@@ -74,6 +75,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const orchestrationEngine = yield* OrchestrationEngineService;
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const infinitus = yield* InfinitusService;
+    const swapd = yield* InfinitusSwapdProbe;
+    const withBackgroundAccounts = (snapshot: InfinitusSnapshot) =>
+      snapshot.available ? Effect.succeed(snapshot) : swapd.snapshot;
     const settings = yield* ServerSettingsService;
     const turnStartGate = yield* TurnStartGate;
     const limitStops = yield* InfinitusLimitStops;
@@ -266,7 +270,14 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         }
         if (plain === null || !recorded) return;
         const proxy = yield* proxyFor(plain.threadId);
-        const fresh = proxy === null ? plain : proxyStop(plain, proxy);
+        const fresh =
+          proxy === null
+            ? (limitStopFromEvent(
+                event,
+                plain.stoppedAt,
+                yield* withBackgroundAccounts(snapshot),
+              ) ?? plain)
+            : proxyStop(plain, proxy);
         const known = stops.get(fresh.threadId);
         const stop =
           known !== undefined && fresh.resetsAt === null
@@ -287,9 +298,11 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
 
     const onSnapshot = (snapshot: InfinitusSnapshot): Effect.Effect<void> =>
       Effect.gen(function* () {
+        if (![...stops.values()].some((stop) => stop.proxy === null)) return;
+        const accounts = yield* withBackgroundAccounts(snapshot);
         const now = yield* nowMillis;
         for (const stop of stops.values()) {
-          const target = resumeTarget(stop, snapshot, now);
+          const target = resumeTarget(stop, accounts, now);
           if (target === null) continue;
           const last = lastResumeAt.get(stop.threadId);
           if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
