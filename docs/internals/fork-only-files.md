@@ -7,6 +7,7 @@ file or directory. Upstream files the fork edits are in
 per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
+- `apps/server/src/provider/Drivers/OmpDriver.ts`, `Layers/OmpProvider.ts`, `Layers/OmpAdapter.ts`, `Services/OmpAdapter.ts`, `acp/OmpAcpSupport.ts`, `Layers/ompUsage.logic.ts` and `textGeneration/OmpTextGeneration.ts` (each with its test) — the Oh My Pi driver, one more tenant of the ACP runtime, templated on Cursor. Text generation rides `omp -p` (no schema flag, so OpenCode's decode path), quota comes from `omp usage --json --redact`'s `capacity` fold (no email, hence no `resetsAt`), and session import reads `~/.omp/agent/sessions`. Rules and traps: `docs/internals/omp-driver.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlack.ts` (+ `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts` — the `SlackClient` seam, tests) — the Slack bridge's reactor (#574, PR 2 of 4); state in `<stateDir>/infinitus-slack/threads.json`. Rules and traps: `docs/internals/slack-bridge.md`.
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
@@ -374,6 +375,7 @@ these bullets.
 - `scripts/infinitus-md-size.test.ts` — the INFINITUS.md byte cap (16 KB, #1339):
   every session loads that file whole, so a feature's narrative goes in a
   `docs/internals/<feature>.md` page and one ledger line here.
+- `scripts/phone.sh` (+ `.agents/skills/drive-phone/SKILL.md`) — drives the developer's paired physical iPhone from a session with the server's pinned `agent-device` (launch, deep links, screenshots, console; snapshots and taps once the Mac's `DevToolsSecurity` is on). The CLI installs under the worktree's `.t3/tools`, never on the Mac. Usage and traps: the skill.
 - `.github/workflows/upstream-sync.yml` — the daily upstream merge as a PR (INFINITUS.md); once `scripts/infinitus-rename.ts --check` passes on `main` it renames upstream's tip on its own branch before merging (#1368 C).
 - `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
@@ -394,6 +396,13 @@ these bullets.
   proxy" for a Claude instance: 9Router / CLIProxyAPI / custom presets, model
   slots picked from the proxy's `GET <baseUrl>/models`, everything stored on
   the ordinary instance (env vars + CLAUDE_CONFIG_DIR), no settings file written.
+- `apps/server/src/provider/Drivers/PiDriver.ts`,
+  `provider/Services/PiAdapter.ts`, `provider/Layers/{PiAdapter,PiProvider,PiSessionRuntime,piRpcProtocol,piHomeEnvironment,piModels.logic}.ts`
+  (+ tests), `apps/server/src/textGeneration/PiTextGeneration.ts`,
+  `apps/server/scripts/pi-rpc-mock-agent.ts` — the Pi provider: the one
+  shipped driver speaking neither ACP nor an app-server protocol, but Pi's
+  own JSONL RPC (`pi --mode rpc`). Rules and traps:
+  `docs/internals/pi-driver.md`.
 - `apps/server/src/vcs/checkpointDiffPathspec.ts` (+ its test) — restricts a
   checkpoint-to-checkpoint diff (turn cards, the panel's turn and full-thread
   views) to the paths whose `to` content still differs from the base branch's

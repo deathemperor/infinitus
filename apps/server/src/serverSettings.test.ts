@@ -681,9 +681,25 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const settings = yield* serverSettings.getSettings;
 
       assert.isFalse(settings.providers.grok.enabled);
+      assert.isFalse(settings.providers.omp.enabled);
       assert.isTrue(settings.providers.opencode.enabled);
       assert.isFalse(settings.providers.cursor.enabled);
       assert.equal(settings.providers.opencode.serverUrl, "http://127.0.0.1:4096");
+    }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
+
+  it.effect("enables previously used omp from sparse settings files", () =>
+    Effect.gen(function* () {
+      const serverConfig = yield* ServerConfig.ServerConfig;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+      yield* fileSystem.writeFileString(serverConfig.settingsPath, "{}");
+      yield* recordProviderUsage("omp");
+
+      const settings = yield* serverSettings.getSettings;
+
+      assert.isTrue(settings.providers.omp.enabled);
+      assert.isFalse(settings.providers.grok.enabled);
     }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 
@@ -719,18 +735,21 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
       yield* fileSystem.writeFileString(
         serverConfig.settingsPath,
-        '{"providers":{"grok":{"enabled":false},"opencode":{"enabled":false},"cursor":{"enabled":false}},"providerInstances":{"grok":{"driver":"grok","enabled":false,"config":{}},"opencode":{"driver":"opencode","config":{"enabled":false}},"cursor":{"driver":"cursor","enabled":false,"config":{}}}}',
+        '{"providers":{"grok":{"enabled":false},"omp":{"enabled":false},"opencode":{"enabled":false},"cursor":{"enabled":false}},"providerInstances":{"grok":{"driver":"grok","enabled":false,"config":{}},"omp":{"driver":"omp","enabled":false,"config":{}},"opencode":{"driver":"opencode","config":{"enabled":false}},"cursor":{"driver":"cursor","enabled":false,"config":{}}}}',
       );
       yield* recordProviderUsage("grok");
+      yield* recordProviderUsage("omp");
       yield* recordProviderUsage("opencode");
       yield* recordProviderUsage("cursor");
 
       const settings = yield* serverSettings.getSettings;
 
       assert.isFalse(settings.providers.grok.enabled);
+      assert.isFalse(settings.providers.omp.enabled);
       assert.isFalse(settings.providers.opencode.enabled);
       assert.isFalse(settings.providers.cursor.enabled);
       assert.isFalse(settings.providerInstances[ProviderInstanceId.make("grok")]?.enabled);
+      assert.isFalse(settings.providerInstances[ProviderInstanceId.make("omp")]?.enabled);
       assert.isFalse(settings.providerInstances[ProviderInstanceId.make("opencode")]?.enabled);
       assert.isFalse(settings.providerInstances[ProviderInstanceId.make("cursor")]?.enabled);
     }).pipe(Effect.provide(makeServerSettingsLayer())),
@@ -751,6 +770,35 @@ it.layer(NodeServices.layer)("server settings", (it) => {
       const settings = yield* serverSettings.getSettings;
 
       assert.equal(settings.textGenerationModelSelection.instanceId, "claudeAgent");
+    }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
+
+  it.effect("falls back to Oh My Pi when it is the first enabled text-generation provider", () =>
+    Effect.gen(function* () {
+      const serverConfig = yield* ServerConfig.ServerConfig;
+      const fileSystem = yield* FileSystem.FileSystem;
+      const serverSettings = yield* ServerSettingsModule.ServerSettingsService;
+      // Only omp and opencode are enabled. omp comes first in the providers
+      // struct and now generates text over `omp -p`, so the fallback lands on it.
+      yield* fileSystem.writeFileString(
+        serverConfig.settingsPath,
+        // @effect-diagnostics-next-line preferSchemaOverJson:off
+        JSON.stringify({
+          providers: {
+            codex: { enabled: false },
+            claudeAgent: { enabled: false },
+            cursor: { enabled: false },
+            grok: { enabled: false },
+            omp: { enabled: true },
+            opencode: { enabled: true },
+            antigravity: { enabled: false },
+          },
+        }),
+      );
+
+      const settings = yield* serverSettings.getSettings;
+
+      assert.equal(settings.textGenerationModelSelection.instanceId, "omp");
     }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 
@@ -1121,10 +1169,16 @@ it.layer(NodeServices.layer)("server settings", (it) => {
           grok: {
             enabled: false,
           },
+          omp: {
+            enabled: false,
+          },
           opencode: {
             enabled: false,
             serverUrl: "http://127.0.0.1:4096",
             serverPassword: "secret-password",
+          },
+          pi: {
+            enabled: false,
           },
         },
         backgroundActivity: {

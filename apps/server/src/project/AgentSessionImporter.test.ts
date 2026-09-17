@@ -67,10 +67,17 @@ const WORKSPACE_ROOT = "/tmp/project-from-server";
 const CLAUDE_SESSION_ID = "123e4567-e89b-42d3-a456-426614174000";
 const encodeTranscriptRecord = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
-const makeThread = (source: "codex" | "claudeAgent"): AgentSessionScanner.AgentSessionThread => ({
+const makeThread = (
+  source: "codex" | "claudeAgent" | "omp" | "pi",
+): AgentSessionScanner.AgentSessionThread => ({
   source,
   providerInstanceId: ProviderInstanceId.make(source),
-  providerSessionId: source === "codex" ? "codex-session" : CLAUDE_SESSION_ID,
+  providerSessionId:
+    source === "codex"
+      ? "codex-session"
+      : source === "claudeAgent"
+        ? CLAUDE_SESSION_ID
+        : `${source}-session`,
   title: `Imported ${source} thread`,
   model: null,
   createdAt: "2026-08-24T10:00:00.000Z",
@@ -287,6 +294,50 @@ it.layer(NodeServices.layer)("AgentSessionImporter", (it) => {
         ]);
       }),
     );
+
+    for (const source of ["omp", "pi"] as const) {
+      it.effect(`stores the cursor shape the ${source} adapter resumes from`, () =>
+        Effect.gen(function* () {
+          const bindings: Array<ProviderSessionDirectory.ProviderRuntimeBinding> = [];
+          const scanner = AgentSessionScanner.AgentSessionScanner.of({
+            scan: Effect.die("unused"),
+            recentThreads: () => Stream.succeed(makeThreadOutcome(makeThread(source))),
+          });
+          const engine = OrchestrationEngine.OrchestrationEngineService.of({
+            dispatch: () => Effect.succeed({ sequence: 1 }),
+            readEvents: () => Stream.empty,
+            readThreadEvents: () => Stream.empty,
+            getThreadReplayStats: () => Effect.die("unused"),
+            streamDomainEvents: Stream.empty,
+            subscribeDomainEvents: Effect.succeed(Stream.empty),
+            latestSequence: Effect.succeed(0),
+          });
+          const directory = ProviderSessionDirectory.ProviderSessionDirectory.of({
+            upsert: (binding) => Effect.sync(() => void bindings.push(binding)),
+            getProvider: () => Effect.die("unused"),
+            recordImportedTranscript: () => Effect.void,
+            getBinding: () => Effect.succeed(Option.none()),
+            listThreadIds: () => Effect.die("unused"),
+            listBindings: () => Effect.die("unused"),
+          });
+
+          yield* runImport({
+            scanner,
+            engine,
+            directory,
+            snapshots: makeSnapshotsLayer({ project: makeProject() }),
+          });
+
+          expect(bindings).toMatchObject([
+            {
+              provider: source,
+              resumeCursor: { schemaVersion: 1, sessionId: `${source}-session` },
+            },
+          ]);
+          expect(bindings[0]?.resumeCursor).not.toHaveProperty("resume");
+        }),
+      );
+    }
 
     it.effect("rejects a changed project root before scanning or writing", () =>
       Effect.gen(function* () {

@@ -1,1 +1,0 @@
-Desktop: Signing an account in with Google or Apple works in the sign-in window — the page's pop-up opens instead of being refused, and the window no longer names itself an app, which sent Google down its legacy embedded-browser flow.

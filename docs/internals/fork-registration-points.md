@@ -10,6 +10,28 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- Pi provider (#1409 follow-on). Registration points only:
+  `packages/contracts/src/settings.ts` (`PiSettings`, the `pi` arm of the
+  provider-config union) and `src/model.ts` (`PI_DEFAULT_MODEL`);
+  `apps/server/src/provider/builtInDrivers.ts` (`PiDriver` + `PiDriverEnv`),
+  `provider/providerStatusCache.ts` (`"pi"` in `BUILT_IN_DRIVER_ORDER`),
+  `textGeneration/TextGeneration.ts` (`"pi"` in `TextGenerationProvider`),
+  `apps/server/src/serverSettings.ts` (the `pi` defaults);
+  `apps/web/src/components/Icons.tsx` (`PiIcon`),
+  `components/chat/providerIconUtils.ts`,
+  `components/settings/providerDriverMeta.ts`,
+  `components/settings/settingsSearch.ts`;
+  `apps/mobile/src/components/ProviderIcon.tsx` (its own `pi` branch);
+  `packages/contracts/src/agentSessions.ts` (`"pi"` on `AgentSessionSource`),
+  `apps/server/src/project/AgentSessionScanner.ts` (`discoverPiTranscripts`
+  plus the `pi` arms of the parse, retain and home-resolution paths),
+  `AgentSessionImporter.ts` (Pi's resume cursor shape, with omp's) and
+  `apps/web/src/components/onboarding/WelcomeWizard.tsx` (the wizard's third
+  source-icon slot); `apps/server/src/provider/Layers/ProviderRegistry.test.ts`
+  (its list of every built-in instance id — a new driver fails the suite until
+  it is listed) and `knip.jsonc` (`scripts/pi-rpc-mock-agent.ts` as an
+  `apps/server` entry: its test spawns it by path, so nothing reaches it
+  statically). Rules and traps: `docs/internals/pi-driver.md`.
 - `packages/contracts/src/rpc.ts` — `subscribeInfinitus` and
   `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
   `WsRpcGroup`; `provider.proxyModels` (the add-instance wizard lists an
@@ -450,6 +472,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
   `extra.productVersion` is the root `VERSION` (#823 layer 3), which
   `SettingsRouteScreen` shows in place of the store version.
+- `apps/mobile/eas.json` — the `infinitus` build profile, the only one that
+  selects that variant (`APP_VARIANT=infinitus`): `distribution: internal`
+  (this app is not shipped to the App Store) and its own `channel`, so a fork
+  build never takes an upstream channel's updates. No `environment` key:
+  upstream's `preview` / `production` profiles name EAS server-side
+  environments holding upstream's secrets, and the fork has none. The repo's
+  `owner` and EAS `projectId` in `app.config.ts` are still upstream's, so a
+  build needs an account with access to that project, or `eas init` under one
+  of ours.
 - `apps/mobile/plugins/withWidgetLogoAsset.cjs` (+ its test) — the mark the
   lock-screen card draws in its header comes from the variant
   (`SOURCE_BY_VARIANT`, #941): the `infinitus` build gets
@@ -594,4 +625,5 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   workflows, pull requests — write), since the default token cannot push a
   branch that touches `.github/workflows` (#658); without it such a sync
   is done by hand.
+- **Oh My Pi as a provider driver.** `omp` speaks ACP natively (`omp acp`), so the driver is one more tenant of the existing ACP runtime; its own files are in `fork-only-files.md`. The registration points are the ones every driver has: `packages/contracts/src/settings.ts` (`OmpSettings` / `OmpSettingsPatch`, the `omp` key of `providers` and its patch, `enabled` false by default), `packages/contracts/src/model.ts` (`DEFAULT_MODEL_BY_PROVIDER.omp`, `PROVIDER_DISPLAY_NAMES.omp`), `apps/server/src/provider/builtInDrivers.ts`, `providerStatusCache.ts`, `apps/server/src/serverSettings.ts`, `textGeneration/TextGeneration.ts`, `apps/server/scripts/acp-mock-agent.ts` (`T3_ACP_OMP=1`), `packages/contracts/src/agentSessions.ts` (`"omp"` on `AgentSessionSource`) `apps/server/src/project/AgentSessionScanner.ts` and `AgentSessionImporter.ts` (the omp resume cursor, plus its test); web `Icons.tsx`, `chat/providerIconUtils.ts`, `settings/providerDriverMeta.ts`, `settings/customModelEditor.logic.ts`, `settings/settingsSearch.ts` and `onboarding/WelcomeWizard.tsx`; mobile `ProviderIcon.tsx`; docs `README.md`, `docs/user/install.md`, `docs/user/permission-modes.md`. Rules and traps: `docs/internals/omp-driver.md`.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.

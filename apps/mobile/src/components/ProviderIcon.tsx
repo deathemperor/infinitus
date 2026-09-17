@@ -73,7 +73,41 @@ export function ProviderIcon(props: ProviderIconProps) {
     );
   }
 
-  // codex (and unknown drivers)
+  if (props.provider === "omp") {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path
+          d="M4.5 18.5c2.4-6.2 5.1-10.4 7.5-12.6 2.4 2.2 5.1 6.4 7.5 12.6"
+          stroke={mono}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          fill="none"
+        />
+        <Path d="M8.2 14.8h7.6" stroke={mono} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  if (props.provider === "pi") {
+    // Matches `PiIcon` in the web `Icons.tsx`.
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <Path d="M4 7h16" stroke={mono} strokeWidth={2} strokeLinecap="round" />
+        <Path d="M9 7v10" stroke={mono} strokeWidth={2} strokeLinecap="round" />
+        <Path
+          d="M16 7v7a3 3 0 0 0 3 3"
+          stroke={mono}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+
+  // codex (and unknown drivers). An unlisted driver is drawn with the Codex
+  // mark, so a new driver added without a branch here is mislabelled rather
+  // than merely unstyled.
   return (
     <Svg width={size} height={size} viewBox="0 0 256 260" fill="none">
       <Path

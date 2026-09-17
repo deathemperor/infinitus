@@ -10,6 +10,19 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.23
+
+### Desktop
+- Oh My Pi (`omp`) is a provider you can turn on in Settings, with its models, thinking levels and past sessions to import.
+- A provider card no longer asks you to sign in to Oh My Pi when its model listing merely failed to run.
+- When Infinitus Connect cannot get its session token, the error now says why instead of only that it failed.
+- The installer window wears the Infinitus palette and its drag arrow is the swap arrow from the mark.
+- Adding an account through Google or Apple sign-in works in the sign-in window.
+
+### Phone
+- When Infinitus Connect cannot get its session token, the error now says why instead of only that it failed.
+- A build signed by Xcode onto a device can register for Infinitus Connect pushes as a sandbox device (`INFINITUS_APS_ENVIRONMENT=sandbox`).
+
 ## 0.5.0-alpha.22
 
 ### Mac

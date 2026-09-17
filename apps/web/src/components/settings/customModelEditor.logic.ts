@@ -100,6 +100,24 @@ export const DESCRIPTOR_PRESETS_BY_KIND: Partial<
   [ProviderDriverKind.make("grok")]: [
     { id: "reasoningEffort", label: "Reasoning", type: "select", choices: EFFORT_CHOICES },
   ],
+  [ProviderDriverKind.make("omp")]: [
+    {
+      id: "thinking",
+      label: "Thinking",
+      type: "select",
+      choices: [
+        { id: "off", label: "Off" },
+        // Oh My Pi offers Auto alongside Off and the model's own levels.
+        { id: "auto", label: "Auto" },
+        { id: "minimal", label: "Minimal" },
+        { id: "low", label: "Low" },
+        { id: "medium", label: "Medium" },
+        { id: "high", label: "High" },
+        { id: "xhigh", label: "Extra High" },
+        { id: "max", label: "Max" },
+      ],
+    },
+  ],
   [ProviderDriverKind.make("opencode")]: [
     { id: "variant", label: "Reasoning", type: "select", choices: EFFORT_CHOICES },
     {
