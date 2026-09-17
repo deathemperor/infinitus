@@ -452,6 +452,14 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   private vulnerability reporting, or the maintainer's email) and the
   policy link is `infinitus.run/security-policy`; upstream's routes them
   to `security@ping.gg`, who do not maintain this fork.
+- `apps/mobile/src/components/BrandMark.tsx` and
+  `apps/mobile/src/lib/mobileBranding.ts` — the brand lockup's icon is
+  chosen through `resolveMobileBrandMarkVariant`, which maps the fork's
+  `infinitus` variant to `apps/mobile/assets/infinitus-ios-1024.png`.
+  Upstream's chain knows only `development` / `preview` / `prod`, so the
+  fork's build fell through to upstream's T3 mark and drew the T3 logo
+  beside the Infinitus wordmark on every loading screen. Any new
+  variant-keyed asset needs an `infinitus` branch for the same reason.
 - `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
