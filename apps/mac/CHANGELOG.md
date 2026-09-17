@@ -10,6 +10,14 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.21
+
+### Desktop
+- Releases no longer carry the server archive under its old `t3` name; an install older than 0.5.0-alpha.20 updates to that release first.
+
+### Phone
+- A failed sign-in card can be dismissed, and one left alone leaves by itself after ten minutes instead of staying until the Mac app relaunches.
+
 ## 0.5.0-alpha.20
 
 ### Mac
