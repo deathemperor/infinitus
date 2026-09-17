@@ -95,7 +95,7 @@
       ]
     },
     {
-      "bundles": ["mobile"],
+      "bundles": ["desktop", "mobile", "server", "web"],
       "license": "MIT",
       "name": "T3 Code",
       "sourceUrl": "https://github.com/pingdotgg/t3code",
