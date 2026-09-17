@@ -21,7 +21,7 @@ import type { Session } from "electron";
 import { signInUserAgent } from "./signInUserAgent.ts";
 
 /** Hosts known to refuse the native agent. Add one only with evidence it fails. */
-export const PREVIEW_OAUTH_URLS = ["https://accounts.google.com/*"];
+const PREVIEW_OAUTH_URLS = ["https://accounts.google.com/*"];
 
 export const withSignInUserAgent = (
   requestHeaders: Record<string, string>,
