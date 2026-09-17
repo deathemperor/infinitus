@@ -61,8 +61,10 @@ const ALIASES: Readonly<Record<string, ReadonlyArray<string>>> = {
   // Where these notifications land: the Mac posts them to the phone (#702).
   // The rows name the account event, never the device.
   "infinitus-push": ["phone"],
-  // The route's "Pair a phone" card draws the code as a QR.
-  "infinitus-devices": ["qr"],
+  // The route's "Pair a phone" card, which has no pref behind it: it draws
+  // the code as a QR. "pair" was grounded by the tunnel row's wording until
+  // that row retired with the Cloudflare tunnels; the card still carries it.
+  "infinitus-devices": ["qr", "pair"],
   // The route's About section: the menu bar app's version and build, with a
   // link to the releases (the Mac's About pane, folded in 2026-09-14).
   "infinitus-engines": [
