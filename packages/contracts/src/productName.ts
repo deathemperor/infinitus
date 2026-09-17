@@ -23,4 +23,3 @@ export const CONNECT_NAME = `${PRODUCT_NAME} Connect`;
 export const UPSTREAM_PRODUCT_NAME = "T3 Code";
 export const UPSTREAM_PUBLISHER_NAME = "T3 Tools, Inc.";
 export const UPSTREAM_REPOSITORY_URL = "https://github.com/pingdotgg/t3code";
-export const REPOSITORY_URL = "https://github.com/deathemperor/infinitus";

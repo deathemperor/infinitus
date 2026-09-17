@@ -121,7 +121,7 @@ these bullets.
   because shared depends on contracts, and `packages/shared/src/productName.ts`
   re-exports it so `@infinitus/shared/productName` imports keep working. It
   also carries the upstream attribution constants (`UPSTREAM_PRODUCT_NAME`,
-  `UPSTREAM_PUBLISHER_NAME`, `UPSTREAM_REPOSITORY_URL`, `REPOSITORY_URL`) the
+  `UPSTREAM_PUBLISHER_NAME`, `UPSTREAM_REPOSITORY_URL`) the
   licenses screens' "Built on T3 Code" section reads: the guard test treats a
   bare "T3 Tools" as a stray literal, so the credit routes through them like
   every other upstream reference. `productNamePlugin` rewrites only

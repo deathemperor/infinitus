@@ -51,8 +51,8 @@ function UpstreamCreditSection() {
         Built on {UPSTREAM_PRODUCT_NAME}
       </Text>
       <Text className="text-sm leading-normal text-foreground-muted">
-        {PRODUCT_NAME} is a fork of {UPSTREAM_PRODUCT_NAME} by {UPSTREAM_PUBLISHER_NAME}, used
-        under the MIT license. It is an independent project, not affiliated with or endorsed by{" "}
+        {PRODUCT_NAME} is a fork of {UPSTREAM_PRODUCT_NAME} by {UPSTREAM_PUBLISHER_NAME}, used under
+        the MIT license. It is an independent project, not affiliated with or endorsed by{" "}
         {UPSTREAM_PUBLISHER_NAME}.
       </Text>
       <Pressable
@@ -61,7 +61,9 @@ function UpstreamCreditSection() {
         onPress={() => void Linking.openURL(UPSTREAM_REPOSITORY_URL).catch(() => undefined)}
         className="min-h-12 flex-row items-center gap-2 self-start py-2 active:opacity-60"
       >
-        <Text className="font-infinitus-medium text-primary">{UPSTREAM_PRODUCT_NAME} on GitHub</Text>
+        <Text className="font-infinitus-medium text-primary">
+          {UPSTREAM_PRODUCT_NAME} on GitHub
+        </Text>
         <SymbolView
           name="arrow.up.right"
           size={16}

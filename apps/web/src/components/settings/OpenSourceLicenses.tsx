@@ -33,8 +33,8 @@ function UpstreamCreditSection() {
     <div className="border-b border-border px-4 py-3 text-base sm:text-sm">
       <p className="font-medium text-foreground">Built on {UPSTREAM_PRODUCT_NAME}</p>
       <p className="mt-1 text-muted-foreground">
-        {PRODUCT_NAME} is a fork of {UPSTREAM_PRODUCT_NAME} by {UPSTREAM_PUBLISHER_NAME}, used
-        under the MIT license. It is an independent project, not affiliated with or endorsed by{" "}
+        {PRODUCT_NAME} is a fork of {UPSTREAM_PRODUCT_NAME} by {UPSTREAM_PUBLISHER_NAME}, used under
+        the MIT license. It is an independent project, not affiliated with or endorsed by{" "}
         {UPSTREAM_PUBLISHER_NAME}.
       </p>
       <a
