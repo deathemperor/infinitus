@@ -103,19 +103,27 @@ const SIGN_IN_POPUP_WINDOW_OPTIONS = {
 } satisfies Electron.BrowserWindowConstructorOptions;
 
 /** The browser a sign-in window and everything it opens present to the
-    provider. Applied before the first load, so the first request already
-    carries it. */
+    provider.
+ *
+ * The agent goes on the flow's session as well as this window: a pop-up is
+ * navigating by the time `did-create-window` could reach it, and the request
+ * that decides which flow Google serves is its first one. `parent` makes the
+ * pop-up this window's child, so it cannot outlive the flow holding the jar it
+ * was opened in. */
 export const prepareSignInWindow = (window: Electron.BrowserWindow): void => {
   const userAgent = signInUserAgent(window.webContents.getUserAgent());
+  // Session-wide covers what is opened next; this window's contents already
+  // exist and keep their own.
+  window.webContents.session.setUserAgent(userAgent);
   window.webContents.setUserAgent(userAgent);
   window.webContents.setWindowOpenHandler((details) =>
     signInWindowOpenAction(details) === "popup"
-      ? { action: "allow", overrideBrowserWindowOptions: SIGN_IN_POPUP_WINDOW_OPTIONS }
+      ? {
+          action: "allow",
+          overrideBrowserWindowOptions: { ...SIGN_IN_POPUP_WINDOW_OPTIONS, parent: window },
+        }
       : { action: "deny" },
   );
-  window.webContents.on("did-create-window", (popup) => {
-    popup.webContents.setUserAgent(userAgent);
-  });
 };
 
 const decodeCodeResult = Schema.decodeUnknownEffect(InfinitusSignInCodeResult);
