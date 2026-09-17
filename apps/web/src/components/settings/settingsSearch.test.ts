@@ -303,6 +303,7 @@ describe("searchSettings", () => {
     expect(ids("pair phone")).toContain("infinitus-devices");
     // The "Pair a phone" QR retired; Settings › Connections mints every link.
     expect(ids("qr")).not.toContain("infinitus-devices");
+    expect(ids("crash report")).toContain("infinitus-devices");
   });
 
   it("lights up the deepest Infinitus nav item only", () => {

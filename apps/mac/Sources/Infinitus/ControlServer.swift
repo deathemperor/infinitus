@@ -362,9 +362,15 @@ final class ControlServer {
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "crashes":
-            return ControlReply(ok: true, result: try .of(["crashes": model.crashReports.map { r in
-                CrashListing(id: r.id, platform: r.platform, device: r.device, at: r.at, kind: r.kind,
-                             reason: r.reason, frames: r.frames) }]))
+            // `--id` is the desktop's Copy: one report with the transcript a
+            // session gets, raw diagnostic and all. The list stays without it —
+            // a raw body is up to 512 KB each.
+            let wanted = r.options["id"]
+            let reports = wanted.map { id in model.crashReports.filter { $0.id == id } } ?? model.crashReports
+            return ControlReply(ok: true, result: try .of(["crashes": reports.map { r in
+                CrashListing(id: r.id, platform: r.platform, device: r.device, appVersion: r.appVersion,
+                             osVersion: r.osVersion, at: r.at, kind: r.kind, reason: r.reason,
+                             frames: r.frames, transcript: wanted == nil ? nil : r.transcript) }]))
 
         case "aws-logins":
             return ControlReply(ok: true, result: try .of(["logins": model.awsLogins]))
@@ -1253,7 +1259,10 @@ final class ControlServer {
     }
 }
 
-/// `crashes`: the reports without their raw diagnostic.
+/// `crashes`: the reports without their raw diagnostic, except the one a
+/// `--id` read names, which carries the whole transcript.
 private struct CrashListing: Encodable {
-    let id: String, platform: String, device: String, at: Date, kind: String, reason: String, frames: [String]
+    let id: String, platform: String, device: String, appVersion: String, osVersion: String
+    let at: Date, kind: String, reason: String, frames: [String]
+    let transcript: String?
 }
