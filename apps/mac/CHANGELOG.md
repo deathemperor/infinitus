@@ -10,6 +10,16 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.20
+
+### Mac
+- Phone alerts go out through Infinitus Connect with no push key of your own; the Mac no longer takes a Team ID, Key ID or .p8.
+- A sign-in for a profile that reads its credentials from a broker (`credential_process`) now runs for the login profile behind it instead of failing, and a failed sign-in shows its whole reason.
+
+### Desktop
+- The command-line server is `infinitus` now (`infinitus serve`, `infinitus update`, `infinitus service install`); the installer links that name, and a release still carries the archive under its old name for one version so an earlier install can update.
+- The Phone alerts card with its Team ID, Key ID and push key rows left Settings › Infinitus › Devices; alerts ride Infinitus Connect.
+
 ## 0.5.0-alpha.19
 
 ### Mac
