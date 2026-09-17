@@ -48,6 +48,12 @@ export function decisionNotice(input: {
   return input.outcome.decided ? null : "That request had already expired.";
 }
 
+/** `4:59` — the countdown on a row. */
+export function formatCountdown(secondsLeft: number): string {
+  const seconds = Math.max(0, secondsLeft);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 /** The requests not toasted yet, in stream order. Every request the desktop
     has not seen is news — including those already waiting when the page
     loads, since a pending ask needs the user within two minutes. */
