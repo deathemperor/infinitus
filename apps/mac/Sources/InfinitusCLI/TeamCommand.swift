@@ -421,7 +421,6 @@ func runTeam(_ args: [String]) -> Int32 {
                                                 codexDir: options["projects"] == nil ? StatsScanner.defaultCodexDir() : nil,
                                                 cacheURL: teamDir.appendingPathComponent("scan-cache.json"),
                                                 maxAge: TimeInterval(sources.historyDays + 1) * 86_400).entries
-            sources.crashes = CrashStore(directory: CrashStore.defaultDirectory()).list()
             // Threads and transcripts are the desktop's; without it the
             // index stays as last published and now.json says so.
             #if os(macOS)

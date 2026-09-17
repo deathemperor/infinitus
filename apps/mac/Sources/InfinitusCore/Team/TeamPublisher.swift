@@ -97,7 +97,6 @@ public struct TeamPublisher {
         public var live: [TeamDocs.LiveThread] = []
         public var desktop = false
         public var transcripts: [TeamThreadSources.Transcript] = []
-        public var crashes: [CrashReport] = []
         public var fleets: [TeamDocs.Fleet] = []
         /// Every account of every fleet (`fleet.json`, #221); the CLI,
         /// which has no fleet view, sends none and the file is left alone.
@@ -362,8 +361,6 @@ public struct TeamPublisher {
                       try CanonicalJSON.encode(TeamDocs.ThreadsIndex(at: at, threads: threads, fleets: sources.fleets)),
                       always: true)
         }
-        let today = calendar.startOfDay(for: now)
-        let crashesToday = sources.crashes.filter { $0.at >= today }.count
         if off(TeamKinds.now) {
             // Turned off after a publish that sent one: a stale now.json
             // would keep this member "on" for the team forever. Retire it
@@ -371,7 +368,7 @@ public struct TeamPublisher {
             if state.hashes.removeValue(forKey: "now.json") != nil { try client.unpublish(path: "now.json") }
         } else {
             let doc = TeamDocs.Now(at: at, machine: sources.machine, live: sources.desktop ? live : [], fleets: sources.fleets,
-                                   blockers: sources.blockers, crashesToday: crashesToday,
+                                   blockers: sources.blockers, crashesToday: 0,
                                    // An older client's ShareTarget decoder throws on "off";
                                    // the hint carries only kinds that actually travel.
                                    // Every kind's EFFECTIVE audience, so a reader can tell
@@ -393,9 +390,12 @@ public struct TeamPublisher {
                       try CanonicalJSON.encode(TeamDocs.FleetDoc(at: at, fleets: sources.fleetRows)),
                       always: true)
         }
-        if !off(TeamKinds.crashes) {
-            try stage(TeamKinds.crashes, "crashes.json",
-                      try CanonicalJSON.encode(TeamDocs.Crashes(crashes: sources.crashes.map(\.summary))))
+        // The Mac's crash reports left with the Devices pane (user
+        // 2026-09-15), so there is nothing to publish here. Retired once,
+        // like now.json above: a member who published crashes before would
+        // otherwise keep a stale crashes.json in the team forever.
+        if state.hashes.removeValue(forKey: "crashes.json") != nil {
+            try client.unpublish(path: "crashes.json")
         }
 
         /// What a stop leaves: every unreached transcript's rows past its cursor.

@@ -77,7 +77,7 @@ final class TeamPublisherTests: XCTestCase {
     }
 
     /// Stats from the fixture scan; two threads, one per project, each
-    /// with a two-row transcript; the running one live; a crash and a fleet.
+    /// with a two-row transcript; the running one live; and a fleet.
     func sources(_ projects: URL) -> TeamPublisher.Sources {
         var s = TeamPublisher.Sources(home: "/Users/alice", machine: "alice-mac")
         s.entries = StatsScanner.scan(projectsDir: projects, cacheURL: nil, calendar: .current, maxAge: 10_000 * 86_400).entries
@@ -86,7 +86,6 @@ final class TeamPublisherTests: XCTestCase {
         s.threads = [thread("t1", "app", status: "running"), thread("t2", "secret")]
         s.live = [TeamDocs.LiveThread(id: "t1", title: "Thread t1", project: "app", startedAt: 1)]
         s.transcripts = [transcript("t1", "app"), transcript("t2", "secret")]
-        s.crashes = [CrashReport(platform: "mac", device: "Mac", appVersion: "1", osVersion: "26", at: Date(), kind: "crash", reason: "SIGSEGV")]
         s.fleets = [TeamDocs.Fleet(engine: "opaque", account: "acct-1", windows: [TeamDocs.Window(label: "5h", pct: 40)])]
         return s
     }
@@ -113,7 +112,7 @@ final class TeamPublisherTests: XCTestCase {
         let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
         let report = try publisher.publish(sources: sources(projects), now: Date(timeIntervalSince1970: 1_788_609_600))
         let me = "m/\(t.alice.identity.kid)/", mine = "t/\(t.alice.identity.kid)/"
-        XCTAssertEqual(Set(report.published), [me + "days/2026-09-04.json", me + "threads/index.json", me + "now.json", me + "crashes.json",
+        XCTAssertEqual(Set(report.published), [me + "days/2026-09-04.json", me + "threads/index.json", me + "now.json",
                                                mine + "transcripts/t1/1.jsonl"])
         XCTAssertEqual(report.transcriptChunks, 1, "the excluded project's thread is never chunked")
         XCTAssertEqual(report.skipped, 0)
@@ -132,7 +131,8 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertEqual(index.threads.map(\.id), ["t1"]); XCTAssertEqual(index.fleets.map(\.engine), ["opaque"])
         let now = try CanonicalJSON.decode(TeamDocs.Now.self, from: try t.leader.read(me + "now.json").1)
         XCTAssertEqual(now.machine, "alice-mac"); XCTAssertTrue(now.desktop); XCTAssertEqual(now.live.map(\.id), ["t1"])
-        XCTAssertEqual(now.crashesToday, 1); XCTAssertEqual(now.sharesTo[TeamKinds.stats], .team)
+        XCTAssertEqual(now.crashesToday, 0, "nothing produces crashes since they left the Mac")
+        XCTAssertEqual(now.sharesTo[TeamKinds.stats], .team)
         // The transcript rides t/<kid>, fetched on demand, redacted.
         try t.leader.fetchTranscripts(from: t.alice.identity.kid, session: "t1")
         XCTAssertEqual(try rows(t.leader, mine + "transcripts/t1/1.jsonl").map(\.text), ["use [redacted-key] please", "sure"])
@@ -140,10 +140,10 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: publisher.copiesDir.appendingPathComponent("transcripts/t1/1.jsonl").path))
         XCTAssertEqual(TeamPublishState.load(teamDir: teamDir).transcripts["t1"], TeamPublishState.Cursor(seq: 1, offset: 2))
 
-        // A second pass with nothing new: the day and the crashes are
-        // skipped by hash, the index and now.json go out again, no chunk.
+        // A second pass with nothing new: the day is skipped by hash, the
+        // index and now.json go out again, no chunk.
         let again = try publisher.publish(sources: sources(projects), now: Date(timeIntervalSince1970: 1_788_609_700))
-        XCTAssertEqual(again.skipped, 2)
+        XCTAssertEqual(again.skipped, 1)
         XCTAssertEqual(Set(again.published), [me + "threads/index.json", me + "now.json"])
         XCTAssertEqual(again.transcriptChunks, 0)
     }
