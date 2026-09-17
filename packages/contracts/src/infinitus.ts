@@ -746,11 +746,103 @@ export const InfinitusOAuthSignInResult = Schema.Struct({
 });
 export type InfinitusOAuthSignInResult = typeof InfinitusOAuthSignInResult.Type;
 
+/**
+ * Fork: the proxy engines the desktop shell can run for you. The keys are the
+ * Engines page's own (`ProxyEngineKey` in the web's `engines.logic.ts`); the
+ * shell knows nothing of the engines beyond how to start them.
+ */
+export const InfinitusEngineKey = Schema.Literals(["cliproxy", "9router"]);
+export type InfinitusEngineKey = typeof InfinitusEngineKey.Type;
+
+/**
+ * How an engine is run on this machine, which the shell detects rather than
+ * assumes:
+ *
+ * - `child` — the shell owns the process: it starts it, restarts it when it
+ *   exits unexpectedly, and takes it down with the app.
+ * - `service` — something else already owns it (CLIProxyAPI under Homebrew's
+ *   launchd job). The shell says so and stays out of the way; a second
+ *   supervisor on top of launchd would only fight it.
+ * - `unknown` — no command was detected and none was typed, so there is
+ *   nothing to run.
+ */
+export const InfinitusEngineMode = Schema.Literals(["child", "service", "unknown"]);
+export type InfinitusEngineMode = typeof InfinitusEngineMode.Type;
+
+/** What a `child` engine's process is doing. A `service` engine is always
+    `stopped` here: its state belongs to whoever supervises it. */
+export const InfinitusEngineRunState = Schema.Literals([
+  "running",
+  "starting",
+  "stopped",
+  "backing-off",
+  "failed",
+]);
+export type InfinitusEngineRunState = typeof InfinitusEngineRunState.Type;
+
+export const InfinitusEngineSupervision = Schema.Struct({
+  key: InfinitusEngineKey,
+  mode: InfinitusEngineMode,
+  /** Whether the shell should keep this engine running. Off by default: no
+      process starts until it is asked for. */
+  managed: Schema.Boolean,
+  /** The command in force — what was typed, else what was detected. Null when
+      neither found anything to run. */
+  command: Schema.NullOr(Schema.String),
+  /** What detection found, so the field can show what it would fall back to
+      and a typed command can be told apart from a found one. */
+  detectedCommand: Schema.NullOr(Schema.String),
+  state: InfinitusEngineRunState,
+  pid: Schema.NullOr(Schema.Number),
+  /** The last failure's own words — a spawn error, or the exit status. */
+  error: Schema.NullOr(Schema.String),
+});
+export type InfinitusEngineSupervision = typeof InfinitusEngineSupervision.Type;
+
+/** Every engine's supervision, the shape the Engines page renders. */
+export const InfinitusEngines = Schema.Struct({
+  engines: Schema.Array(InfinitusEngineSupervision),
+});
+export type InfinitusEngines = typeof InfinitusEngines.Type;
+
+/** A change to one engine's settings. An absent field is left alone; a
+    `command` of `""` clears the override and falls back to detection. */
+export const InfinitusEngineSettingsInput = Schema.Struct({
+  key: InfinitusEngineKey,
+  managed: Schema.optionalKey(Schema.Boolean),
+  command: Schema.optionalKey(Schema.String),
+});
+export type InfinitusEngineSettingsInput = typeof InfinitusEngineSettingsInput.Type;
+
+export const InfinitusEngineAction = Schema.Literals(["start", "stop", "restart"]);
+export type InfinitusEngineAction = typeof InfinitusEngineAction.Type;
+
+/** A button press on the Engines page. `start` on an unmanaged engine runs it
+    once without turning management on. */
+export const InfinitusEngineControlInput = Schema.Struct({
+  key: InfinitusEngineKey,
+  action: InfinitusEngineAction,
+});
+export type InfinitusEngineControlInput = typeof InfinitusEngineControlInput.Type;
+
+/** What the shell remembers about one engine. An array rather than a record so
+    an entry for an engine a later build drops still decodes. */
+export const InfinitusEngineSettings = Schema.Struct({
+  key: InfinitusEngineKey,
+  managed: Schema.Boolean,
+  /** The typed command, or null to follow detection. */
+  command: Schema.NullOr(Schema.String),
+});
+export type InfinitusEngineSettings = typeof InfinitusEngineSettings.Type;
+
 export const InfinitusDesktopPrefs = Schema.Struct({
   quitInfinitusWithApp: Schema.Boolean,
   /** #433 slice 2: a double tap of Shift in any app captures its selected text
       into the active project. macOS only; off by default. */
   captureGestureEnabled: Schema.Boolean,
+  /** Engines the shell runs. Absent for every engine never configured, which
+      is the default: nothing is started until it is asked for. */
+  engines: Schema.Array(InfinitusEngineSettings),
 });
 export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
 

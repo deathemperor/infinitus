@@ -4,7 +4,11 @@
  * than inside it: this is fork state, and the upstream settings document
  * stays byte-for-byte upstream's.
  */
-import { InfinitusDesktopPrefs as InfinitusDesktopPrefsSchema } from "@infinitus/contracts/infinitus";
+import {
+  InfinitusDesktopPrefs as InfinitusDesktopPrefsSchema,
+  InfinitusEngineSettings,
+  type InfinitusEngineSettingsInput,
+} from "@infinitus/contracts/infinitus";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -20,6 +24,7 @@ export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefsSchema.Type;
 export const DEFAULT_INFINITUS_DESKTOP_PREFS: InfinitusDesktopPrefs = {
   quitInfinitusWithApp: false,
   captureGestureEnabled: false,
+  engines: [],
 };
 
 const INFINITUS_DESKTOP_PREFS_FILE = "infinitus-desktop.json";
@@ -29,6 +34,7 @@ const INFINITUS_DESKTOP_PREFS_FILE = "infinitus-desktop.json";
 const PrefsDocument = Schema.Struct({
   quitInfinitusWithApp: Schema.optionalKey(Schema.Boolean),
   captureGestureEnabled: Schema.optionalKey(Schema.Boolean),
+  engines: Schema.optionalKey(Schema.Array(InfinitusEngineSettings)),
 });
 const decodeDocument = Schema.decodeUnknownSync(Schema.fromJsonString(PrefsDocument));
 const encodeDocument = Schema.encodeSync(Schema.fromJsonString(PrefsDocument));
@@ -41,6 +47,7 @@ export function decodeInfinitusDesktopPrefs(raw: string | null): InfinitusDeskto
     return {
       quitInfinitusWithApp: parsed.quitInfinitusWithApp === true,
       captureGestureEnabled: parsed.captureGestureEnabled === true,
+      engines: parsed.engines ?? [],
     };
   } catch {
     return DEFAULT_INFINITUS_DESKTOP_PREFS;
@@ -49,6 +56,27 @@ export function decodeInfinitusDesktopPrefs(raw: string | null): InfinitusDeskto
 
 export function encodeInfinitusDesktopPrefs(prefs: InfinitusDesktopPrefs): string {
   return `${encodeDocument(prefs)}\n`;
+}
+
+/** One engine's row, merged. An engine with no row yet starts from the
+    defaults (unmanaged, following detection). */
+export function applyEngineSettings(
+  engines: ReadonlyArray<InfinitusEngineSettings>,
+  change: InfinitusEngineSettingsInput,
+): ReadonlyArray<InfinitusEngineSettings> {
+  const current = engines.find((entry) => entry.key === change.key) ?? {
+    key: change.key,
+    managed: false,
+    command: null,
+  };
+  const command = change.command === undefined ? current.command : change.command.trim();
+  const next: InfinitusEngineSettings = {
+    key: change.key,
+    managed: change.managed ?? current.managed,
+    command: command === null || command.length === 0 ? null : command,
+  };
+  const others = engines.filter((entry) => entry.key !== change.key);
+  return [...others, next];
 }
 
 export class InfinitusDesktopPrefsWriteError extends Schema.TaggedError<InfinitusDesktopPrefsWriteError>()(
@@ -69,6 +97,11 @@ export class InfinitusDesktopPrefsService extends Context.Service<
     ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
     readonly setCaptureGestureEnabled: (
       enabled: boolean,
+    ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
+    /** Merge one engine's settings; an absent field is left as it was, and a
+        `command` of `""` clears the override. */
+    readonly setEngine: (
+      change: InfinitusEngineSettingsInput,
     ) => Effect.Effect<InfinitusDesktopPrefs, InfinitusDesktopPrefsWriteError>;
   }
 >()("@infinitus/desktop/infinitus/InfinitusDesktopPrefs/InfinitusDesktopPrefsService") {}
@@ -108,6 +141,14 @@ const make = Effect.gen(function* () {
     get: SynchronizedRef.get(ref),
     setQuitWithApp: (enabled) => setFlag("quitInfinitusWithApp", enabled),
     setCaptureGestureEnabled: (enabled) => setFlag("captureGestureEnabled", enabled),
+    setEngine: (change) =>
+      SynchronizedRef.updateAndGetEffect(ref, (prefs) => {
+        const next: InfinitusDesktopPrefs = {
+          ...prefs,
+          engines: applyEngineSettings(prefs.engines, change),
+        };
+        return write(next).pipe(Effect.as(next));
+      }),
   });
 });
 

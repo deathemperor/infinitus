@@ -183,6 +183,11 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.BEGIN_INFINITUS_OAUTH_SIGN_IN_CHANNEL, input),
   cancelInfinitusOAuthSignIn: (flowId) =>
     ipcRenderer.invoke(IpcChannels.CANCEL_INFINITUS_OAUTH_SIGN_IN_CHANNEL, flowId),
+  getInfinitusEngines: () => ipcRenderer.invoke(IpcChannels.GET_INFINITUS_ENGINES_CHANNEL),
+  setInfinitusEngineSettings: (input) =>
+    ipcRenderer.invoke(IpcChannels.SET_INFINITUS_ENGINE_SETTINGS_CHANNEL, input),
+  controlInfinitusEngine: (input) =>
+    ipcRenderer.invoke(IpcChannels.CONTROL_INFINITUS_ENGINE_CHANNEL, input),
   consumePendingDeepLink: () =>
     ipcRenderer.invoke(IpcChannels.CONSUME_INFINITUS_DEEP_LINK_CHANNEL, undefined),
   onDeepLinkPending: (listener) => {

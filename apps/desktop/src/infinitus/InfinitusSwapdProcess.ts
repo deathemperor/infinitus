@@ -17,6 +17,26 @@ export function isExecutableFile(path: string): boolean {
   }
 }
 
+/** A directory's entries, empty when it is missing — the engine locator's way
+    of walking nvm's per-version bins without caring whether nvm is installed. */
+export function listDirectoryNames(path: string): ReadonlyArray<string> {
+  try {
+    return NodeFS.readdirSync(path);
+  } catch {
+    return [];
+  }
+}
+
+/** Any file, executable or not: a launch agent plist says a service manager
+    already owns an engine. */
+export function fileExists(path: string): boolean {
+  try {
+    return NodeFS.statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * One `swapd --json --provider <p> add-oauth` run (#1213). The verb prints two
  * lines: the URL to open, flushed the moment its loopback listener is up, then

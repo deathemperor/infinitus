@@ -202,11 +202,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `DesktopCaptureGestureEvent` schema
   beside `DesktopSnapShotEvent` (#433 slices 2–3), and `consumePendingDeepLink`
   / `onDeepLinkPending` with the `DesktopDeepLink` schema after it (#270 D),
-  and `onHistoryGesture` (#1250) after those.
+  and `onHistoryGesture` (#1250) after those, and `getInfinitusEngines` /
+  `setInfinitusEngineSettings` / `controlInfinitusEngine` for the engines the
+  shell runs.
   `packages/contracts/src/infinitus.ts`
-  — `captureGestureEnabled` on `InfinitusDesktopPrefs`, and
+  — `captureGestureEnabled` and `engines` on `InfinitusDesktopPrefs`, and
   `InfinitusOAuthSignInInput` / `InfinitusOAuthSignInResult` after
-  `InfinitusSignInCodeResult` (#1213);
+  `InfinitusSignInCodeResult` (#1213); the engine-supervision schemas
+  (`InfinitusEngineKey` / `-Mode` / `-RunState` / `-Supervision` / `-Settings`
+  / `-SettingsInput` / `-ControlInput` / `InfinitusEngines`) before the prefs;
   `packages/contracts/src/captures.ts` — `MAX_CAPTURE_TEXT_LENGTH`, the cap
   the desktop's selected-text helper cuts at.
 - `apps/desktop/src/ipc/channels.ts`, `apps/desktop/src/ipc/DesktopIpcHandlers.ts`,

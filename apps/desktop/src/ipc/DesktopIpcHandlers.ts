@@ -76,9 +76,12 @@ import {
   closeInfinitusSignIn,
   consumeInfinitusDeepLink,
   consumePendingCaptureGestures,
+  controlInfinitusEngine,
   getInfinitusDesktopPrefs,
+  getInfinitusEngines,
   openInfinitusSignIn,
   setInfinitusCaptureGestureEnabled,
+  setInfinitusEngineSettings,
   setInfinitusQuitWithApp,
   setKeepAwake,
   submitInfinitusSignInCode,
@@ -151,6 +154,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(consumeInfinitusDeepLink);
   yield* ipc.handle(setBadgeCount);
   yield* ipc.handle(setKeepAwake);
+  yield* ipc.handle(getInfinitusEngines);
+  yield* ipc.handle(setInfinitusEngineSettings);
+  yield* ipc.handle(controlInfinitusEngine);
 
   yield* ipc.handle(pickFolder);
   yield* ipc.handle(pickProjectFavicon);

@@ -11,6 +11,7 @@ import type { EnvironmentPresentation } from "~/state/environments";
 import { Badge } from "../../ui/badge";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 
+import { InfinitusEngineControls } from "./InfinitusEngineControls";
 import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 import { InfinitusPrefsPanel, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
 import { buildEngineStatusRows, menuBarAppVersionLine } from "./panel.logic";
@@ -116,6 +117,9 @@ export function InfinitusEnginesPanel({
       </p>
       <InfinitusEngineStatusList {...target} />
       <InfinitusEngineSecrets {...target} />
+      {/* This computer's own engine processes, so never for a named remote
+          environment: the shell can only start one on the machine it runs on. */}
+      {environment ? null : <InfinitusEngineControls />}
       <InfinitusAboutSection {...target} />
     </InfinitusPrefsPanel>
   );

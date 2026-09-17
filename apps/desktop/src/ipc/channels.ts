@@ -133,6 +133,10 @@ export const CONSUME_INFINITUS_DEEP_LINK_CHANNEL = "desktop:infinitus-consume-de
 export const INFINITUS_DEEP_LINK_PENDING_CHANNEL = "desktop:infinitus-deep-link-pending";
 // Fork: macOS's navigate-back/forward gesture on the main window (#1250).
 export const INFINITUS_HISTORY_GESTURE_CHANNEL = "desktop:infinitus-history-gesture";
+// Fork: the proxy engines this shell runs.
+export const GET_INFINITUS_ENGINES_CHANNEL = "desktop:infinitus-get-engines";
+export const SET_INFINITUS_ENGINE_SETTINGS_CHANNEL = "desktop:infinitus-set-engine-settings";
+export const CONTROL_INFINITUS_ENGINE_CHANNEL = "desktop:infinitus-control-engine";
 
 export const MAC_PERMISSION_HELPER_CHANNEL = "desktop:mac-permission-helper";
 

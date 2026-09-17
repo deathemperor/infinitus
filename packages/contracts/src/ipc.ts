@@ -101,6 +101,9 @@ import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import type {
   InfinitusDesktopPrefs,
+  InfinitusEngineControlInput,
+  InfinitusEngineSettingsInput,
+  InfinitusEngines,
   InfinitusOAuthSignInInput,
   InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
@@ -1378,6 +1381,15 @@ export interface DesktopBridge {
     input: InfinitusOAuthSignInInput,
   ) => Promise<InfinitusOAuthSignInResult>;
   cancelInfinitusOAuthSignIn?: (flowId: string) => Promise<void>;
+  /**
+   * Fork: the proxy engines this shell runs. A thread on a proxied Claude
+   * instance dies with `ConnectionRefused` when its engine is down, so the
+   * Engines page can start one and the shell keeps it up while the app runs.
+   * Optional: a browser, the phone and an older shell simply have no controls.
+   */
+  getInfinitusEngines?: () => Promise<InfinitusEngines>;
+  setInfinitusEngineSettings?: (input: InfinitusEngineSettingsInput) => Promise<InfinitusEngines>;
+  controlInfinitusEngine?: (input: InfinitusEngineControlInput) => Promise<InfinitusEngines>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   /** Optional while older desktop shells can host a newer web client. */
   pickProjectFavicon?: (initialPath?: string) => Promise<string | null>;

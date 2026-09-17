@@ -1,6 +1,9 @@
 import { DesktopCaptureGestureEvent, DesktopDeepLink } from "@infinitus/contracts";
 import {
   InfinitusDesktopPrefs,
+  InfinitusEngineControlInput,
+  InfinitusEngineSettingsInput,
+  InfinitusEngines,
   InfinitusOAuthSignInInput,
   InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
@@ -13,6 +16,7 @@ import * as Schema from "effect/Schema";
 import { InfinitusCaptureGestureService } from "../../captures/InfinitusCaptureGesture.ts";
 import { InfinitusDeepLinksService } from "../../infinitus/InfinitusDeepLinks.ts";
 import { InfinitusDesktopPrefsService } from "../../infinitus/InfinitusDesktopPrefs.ts";
+import { InfinitusEngineSupervisorService } from "../../infinitus/InfinitusEngineSupervisor.ts";
 import { InfinitusKeepAwakeService } from "../../infinitus/InfinitusKeepAwake.ts";
 import { InfinitusOAuthSignInService } from "../../infinitus/InfinitusOAuthSignIn.ts";
 import { InfinitusSignInService } from "../../infinitus/InfinitusSignIn.ts";
@@ -126,5 +130,35 @@ export const setKeepAwake = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.setKeepAwake")(function* (active) {
     const keepAwake = yield* InfinitusKeepAwakeService;
     yield* keepAwake.set(active);
+  }),
+});
+
+export const getInfinitusEngines = makeIpcMethod({
+  channel: IpcChannels.GET_INFINITUS_ENGINES_CHANNEL,
+  payload: Schema.Void,
+  result: InfinitusEngines,
+  handler: Effect.fn("desktop.ipc.infinitus.getEngines")(function* () {
+    const engines = yield* InfinitusEngineSupervisorService;
+    return yield* engines.get;
+  }),
+});
+
+export const setInfinitusEngineSettings = makeIpcMethod({
+  channel: IpcChannels.SET_INFINITUS_ENGINE_SETTINGS_CHANNEL,
+  payload: InfinitusEngineSettingsInput,
+  result: InfinitusEngines,
+  handler: Effect.fn("desktop.ipc.infinitus.setEngineSettings")(function* (input) {
+    const engines = yield* InfinitusEngineSupervisorService;
+    return yield* engines.setSettings(input);
+  }),
+});
+
+export const controlInfinitusEngine = makeIpcMethod({
+  channel: IpcChannels.CONTROL_INFINITUS_ENGINE_CHANNEL,
+  payload: InfinitusEngineControlInput,
+  result: InfinitusEngines,
+  handler: Effect.fn("desktop.ipc.infinitus.controlEngine")(function* (input) {
+    const engines = yield* InfinitusEngineSupervisorService;
+    return yield* engines.control(input);
   }),
 });
