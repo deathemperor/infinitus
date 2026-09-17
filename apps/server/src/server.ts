@@ -311,6 +311,13 @@ const ReactorLayerLive = ReactorCoreLayerLive.pipe(
       Layer.provide(
         InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
       ),
+      // The phones are told through the relay (#1375's alert route).
+      Layer.provide(
+        InfinitusAlertRelayLive.pipe(
+          Layer.provide(ServerSecretStore.layer),
+          Layer.provide(FetchHttpClient.layer),
+        ),
+      ),
     ),
   ),
   // Fork (#574): the Slack bridge over Socket Mode.

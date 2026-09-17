@@ -3,6 +3,7 @@ import type {
   InfinitusAlertResult,
 } from "@infinitus/contracts/infinitusAlert";
 import { InfinitusAlertRelayUnlinked } from "@infinitus/contracts/infinitusAlert";
+import type { ThreadId } from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -19,9 +20,9 @@ export class InfinitusAlertRelayFailed extends Schema.TaggedError<InfinitusAlert
 
 export interface InfinitusAlertRelayShape {
   /** Signs the alert for the relay's `infinitusAlert` route and posts it;
-      the deep link is always the phone's accounts screen. */
+      the deep link is the thread named, else the phone's accounts screen. */
   readonly publish: (
-    input: InfinitusAlertInput,
+    input: InfinitusAlertInput & { readonly threadId?: ThreadId },
   ) => Effect.Effect<InfinitusAlertResult, InfinitusAlertRelayUnlinked | InfinitusAlertRelayFailed>;
 }
 

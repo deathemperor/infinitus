@@ -17,6 +17,7 @@ import { OrchestrationEngineService } from "../../orchestration/Services/Orchest
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
+import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
 import {
   hasLoginInFlight,
   manifestHasVerb,
@@ -59,6 +60,7 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
     const providerService = yield* ProviderService;
     const orchestrationEngine = yield* OrchestrationEngineService;
     const infinitus = yield* InfinitusService;
+    const alerts = yield* InfinitusAlertRelay;
     const crypto = yield* Crypto.Crypto;
     const commandId = crypto.randomUUIDv4.pipe(Effect.map(CommandId.make));
     const eventId = crypto.randomUUIDv4.pipe(Effect.map(EventId.make));
@@ -134,6 +136,30 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
       });
     };
 
+    /** The phones hear about it (user 2026-09-17): one push through the
+        relay, deep-linked to the thread, whether or not the Mac could start
+        the login. An unlinked server or a refused relay is logged, never
+        retried; the row and the login above stand on their own. */
+    const notify = (threadId: ThreadId, lapse: SignInLapse) =>
+      alerts
+        .publish({
+          title: `${lapse.provider === "aws" ? "AWS" : "gcloud"} sign-in needed`,
+          body: `${lapse.profile} has expired credentials. Open Infinitus to sign in from this phone.`,
+          threadId,
+        })
+        .pipe(
+          Effect.asVoid,
+          Effect.catchTags({
+            InfinitusAlertRelayUnlinked: () =>
+              Effect.logDebug("infinitus.signin-lapse.alert-unlinked", { threadId }),
+            InfinitusAlertRelayFailed: (error) =>
+              Effect.logWarning("infinitus.signin-lapse.alert-failed", {
+                threadId,
+                stage: error.stage,
+              }),
+          }),
+        );
+
     const onEvent = (event: ProviderRuntimeEvent) =>
       Effect.gen(function* () {
         const lapse = signInLapseFromEvent(event);
@@ -151,6 +177,7 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
         seen.set(key, now);
         yield* mark(threadId, event.turnId ?? null, lapse);
         yield* login(threadId, lapse);
+        yield* notify(threadId, lapse);
       });
 
     const worker = yield* makeDrainableWorker((event: ProviderRuntimeEvent) =>

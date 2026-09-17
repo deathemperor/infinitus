@@ -73,7 +73,13 @@ export const InfinitusAlertRelayLive = Layer.effect(
           Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "key_pair", cause })),
         );
         const environmentId = yield* serverEnvironment.getEnvironmentId;
-        const alert = { title: input.title, body: input.body, deepLink: INFINITUS_ALERT_DEEP_LINK };
+        // A thread's alert (a lapsed sign-in, #1076) lands on that thread; the
+        // path is the one the phone's notification handler already accepts.
+        const deepLink =
+          input.threadId === undefined
+            ? INFINITUS_ALERT_DEEP_LINK
+            : `/threads/${encodeURIComponent(environmentId)}/${encodeURIComponent(input.threadId)}`;
+        const alert = { title: input.title, body: input.body, deepLink };
         const now = yield* DateTime.now;
         const jti = yield* crypto.randomUUIDv4.pipe(
           Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "sign", cause })),
