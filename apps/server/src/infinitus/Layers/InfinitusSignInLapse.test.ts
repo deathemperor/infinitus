@@ -111,7 +111,7 @@ const makeHarness = (input: {
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
     const requests = yield* Ref.make<ReadonlyArray<InfinitusCommandInput>>([]);
     const alerts = yield* Ref.make<
-      ReadonlyArray<{ title: string; body: string; threadId?: string }>
+      ReadonlyArray<{ title: string; body: string; deepLink?: string }>
     >([]);
     const current = yield* Ref.make(input.snapshot ?? manifest("aws-login", "gcloud-login"));
     const layer = InfinitusSignInLapseLive.pipe(
@@ -195,12 +195,12 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
         },
       ]);
       expect(yield* h.logins).toEqual([["aws-login", "papaya"]]);
-      // The phones hear about it once, deep-linked to the thread.
+      // The phones hear about it once, deep-linked to the home screen's cards.
       expect(yield* h.alerts).toEqual([
         {
           title: "AWS sign-in needed",
           body: "papaya has expired credentials. Open Infinitus to sign in from this phone.",
-          threadId: one,
+          deepLink: "/",
         },
       ]);
     }),

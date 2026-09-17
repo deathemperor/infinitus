@@ -145,6 +145,12 @@ describe("extractAgentNotificationDeepLink", () => {
     ).toBe("/settings/accounts");
   });
 
+  it("takes the home deep link a lapsed sign-in's alert carries (#1076)", () => {
+    expect(
+      extractAgentNotificationDeepLink(responseWithData({ deepLink: "/", environmentId: "env" })),
+    ).toBe("/");
+  });
+
   it("reads the relay's keys off the push trigger when iOS leaves data empty (#1375)", () => {
     const response = {
       notification: {
