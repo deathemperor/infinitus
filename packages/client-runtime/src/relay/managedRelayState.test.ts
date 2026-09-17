@@ -182,6 +182,32 @@ describe("createManagedRelayQueryManager", () => {
     }),
   );
 
+  it.effect("says why the token provider failed, not only that it did", () =>
+    Effect.gen(function* () {
+      const session = createManagedRelaySession({
+        accountId: "account-1",
+        readClerkToken: () => Promise.reject(new Error("JWT template not found")),
+      });
+
+      const error = yield* Effect.flip(session.readClerkToken());
+      expect(error.message).toBe(
+        "Could not obtain the Infinitus Connect session token: JWT template not found",
+      );
+    }),
+  );
+
+  it.effect("keeps the plain sentence when the token provider fails without a reason", () =>
+    Effect.gen(function* () {
+      const session = createManagedRelaySession({
+        accountId: "account-1",
+        readClerkToken: () => Promise.reject(undefined),
+      });
+
+      const error = yield* Effect.flip(session.readClerkToken());
+      expect(error.message).toBe("Could not obtain the Infinitus Connect session token.");
+    }),
+  );
+
   it.effect("updates the token provider without replacing a same-account session", () =>
     Effect.gen(function* () {
       const firstRead = vi.fn(() => Promise.resolve<string | null>(null));

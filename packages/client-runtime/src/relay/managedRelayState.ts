@@ -126,11 +126,17 @@ export function createManagedRelaySession(input: ManagedRelaySessionInput): Mana
       const nowMillis = yield* Clock.currentTimeMillis;
       return yield* Effect.tryPromise({
         try: () => readCachedClerkToken(nowMillis),
-        catch: (cause) =>
-          new ManagedRelaySessionError({
-            message: `Could not obtain the ${CONNECT_NAME} session token.`,
+        // The provider is the auth SDK's token mint. Its own reason (template
+        // missing, session not active, network) is the only lead a user has.
+        catch: (cause) => {
+          const reason = cause instanceof Error ? cause.message.trim() : "";
+          return new ManagedRelaySessionError({
+            message: reason
+              ? `Could not obtain the ${CONNECT_NAME} session token: ${reason}`
+              : `Could not obtain the ${CONNECT_NAME} session token.`,
             cause,
-          }),
+          });
+        },
       });
     }),
   };
