@@ -1,0 +1,1 @@
+Desktop: "Sign in with Google" from a page in the built-in browser gets Google's normal sign-in instead of its embedded-browser flow, which ended on a 400 error; only Google's sign-in host sees the plain Chrome user agent, so Cloudflare checks elsewhere keep passing.

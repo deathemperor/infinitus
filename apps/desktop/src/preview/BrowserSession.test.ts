@@ -17,6 +17,7 @@ const { fromPartition, sessions } = vi.hoisted(() => ({
       readonly setPermissionRequestHandler: ReturnType<typeof vi.fn>;
       readonly setPermissionCheckHandler: ReturnType<typeof vi.fn>;
       readonly setUserAgent: ReturnType<typeof vi.fn>;
+      readonly webRequest: { readonly onBeforeSendHeaders: ReturnType<typeof vi.fn> };
     }
   >(),
 }));
@@ -43,6 +44,7 @@ describe("BrowserSession", () => {
         setPermissionRequestHandler: vi.fn(),
         setPermissionCheckHandler: vi.fn(),
         setUserAgent: vi.fn(),
+        webRequest: { onBeforeSendHeaders: vi.fn() },
       };
       sessions.set(partition, browserSession);
       return browserSession;
@@ -125,6 +127,7 @@ describe("BrowserSession", () => {
           setUserAgent: vi.fn((next: string) => {
             userAgent = next;
           }),
+          webRequest: { onBeforeSendHeaders: vi.fn() },
         };
         sessions.set(partition, browserSession);
         return browserSession;
@@ -137,6 +140,24 @@ describe("BrowserSession", () => {
       const browserSession = sessions.get(partition);
       assert.isDefined(browserSession);
       assert.strictEqual(browserSession.getUserAgent(), nativeUserAgent);
+    }).pipe(Effect.provide(layer)),
+  );
+
+  // Infinitus: Google's sign-in refuses the native agent, so the session sends
+  // Chromium's to that host alone — as a request header, which is why the test
+  // above still holds (`infinitus/previewOAuthUserAgent.ts`).
+  it.effect("sends Chromium's User-Agent to Google's sign-in host and no other", () =>
+    Effect.gen(function* () {
+      const browserSessions = yield* BrowserSession.BrowserSession;
+      const partition = yield* browserSessions.getPartition("scope-a");
+      yield* browserSessions.getSession("scope-a");
+
+      const browserSession = sessions.get(partition);
+      assert.isDefined(browserSession);
+      const { calls } = browserSession.webRequest.onBeforeSendHeaders.mock;
+      assert.strictEqual(calls.length, 1);
+      assert.deepStrictEqual(calls[0]![0], { urls: ["https://accounts.google.com/*"] });
+      assert.strictEqual(browserSession.setUserAgent.mock.calls.length, 0);
     }).pipe(Effect.provide(layer)),
   );
 

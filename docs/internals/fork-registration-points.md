@@ -353,6 +353,11 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/desktop/src/app/DesktopAppIdentity.ts` — `resolveUserDataPath` returns
   the fork's directory without probing a legacy one unless the build adopts it
   (it never does), so an installed `T3 Code (Alpha)` is left alone.
+- `apps/desktop/src/preview/BrowserSession.ts` (+ test) — `getSession` calls
+  `installPreviewOAuthUserAgent` beside the permission handlers, so a preview
+  page's "Sign in with Google" stops ending on Google's 400. Upstream's rule
+  stands: the session's agent stays native (#5002); the test mocks gain
+  `webRequest`. Logic: `apps/desktop/src/infinitus/previewOAuthUserAgent.ts`.
 - `apps/desktop/src/electron/ElectronProtocol.ts` — the production and
   development schemes come from `@infinitus/shared/desktopIdentity`; everything
   else (CSP, renderer origin, Clerk renderer, the Linux handler) follows

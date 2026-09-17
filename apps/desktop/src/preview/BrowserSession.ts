@@ -9,6 +9,8 @@ import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import * as SynchronizedRef from "effect/SynchronizedRef";
 
+import { installPreviewOAuthUserAgent } from "../infinitus/previewOAuthUserAgent.ts";
+
 const PREVIEW_PARTITION_PREFIX = "persist:t3code-preview-";
 /**
  * Incognito partitions deliberately omit the `persist:` prefix, which is what
@@ -203,6 +205,10 @@ export const make = Effect.gen(function* BrowserSessionMake() {
           // the challenge every few seconds, so logins behind it never complete
           // (#5002). Re-setting the unchanged native string is harmless, so it
           // is the rewritten string itself that trips the check.
+          // Infinitus: Google's sign-in refuses that native agent, so requests
+          // to its host alone carry Chromium's — a header on those requests,
+          // never the session's agent (`previewOAuthUserAgent.ts`).
+          installPreviewOAuthUserAgent(browserSession);
           browserSession.setPermissionRequestHandler((_webContents, permission, callback) => {
             callback(ALLOWED_PREVIEW_PERMISSIONS.has(permission));
           });
