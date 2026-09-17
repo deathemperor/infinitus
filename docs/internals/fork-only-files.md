@@ -403,3 +403,13 @@ these bullets.
   proxy" for a Claude instance: 9Router / CLIProxyAPI / custom presets, model
   slots picked from the proxy's `GET <baseUrl>/models`, everything stored on
   the ordinary instance (env vars + CLAUDE_CONFIG_DIR), no settings file written.
+- `apps/server/src/vcs/checkpointDiffPathspec.ts` (+ its test) — restricts a
+  checkpoint-to-checkpoint diff (turn cards, the panel's turn and full-thread
+  views) to the paths whose `to` content still differs from the base branch's
+  tip, re-resolved per call (#1403): a rebase inside a turn otherwise attributes
+  every commit that landed on main to the turn. Traps: `git diff` takes no
+  pathspec file, so the paths go on argv under a 400 KB budget and a larger
+  set leaves the diff unrestricted; a file both the base and the agent
+  touched keeps its whole from→to hunks; the base is resolved without
+  `GitVcsDriverCore` (its layer needs would leak into `vcsLayer`), so a
+  non-`origin` remote falls back to the local base branch.

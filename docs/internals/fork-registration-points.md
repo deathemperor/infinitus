@@ -125,7 +125,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the fresh-index path when the index is missing, corrupt, truncated or
   carries assume-unchanged / skip-worktree flags. Drops on the upstream
   sync that brings #10792 in; until then a sync conflict here is resolved
-  toward upstream.
+  toward upstream. Separately, `checkpoints.diffCheckpoints` runs its `git
+  diff` through the pathspec from `checkpointDiffPathspec.ts` (#1403), one
+  call before the command and the `--literal-pathspecs` / `-- <paths>`
+  arguments; this edit stays after that sync.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
   `serverRuntimeStartup.ts` — the post-update continuation's forked send does

@@ -37,6 +37,7 @@ import {
   PATCH_RENDER_PREFIX_ARGS,
   splitNullSeparatedGitStdoutPaths,
 } from "./GitVcsDriverCore.ts";
+import { resolveCheckpointDiffPathspec } from "./checkpointDiffPathspec.ts";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsProcess from "./VcsProcess.ts";
 
@@ -981,10 +982,22 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
         }
       }
 
+      // Fork (#1403): keep only the paths the thread still changes against
+      // its base, so a rebase inside the turn is not attributed to it.
+      const pathspec = yield* resolveCheckpointDiffPathspec(execute, {
+        cwd: input.cwd,
+        fromRevision,
+        toRevision: input.toCheckpointRef,
+      });
+      if (pathspec !== null && pathspec.length === 0) {
+        return "";
+      }
+
       const result = yield* execute({
         operation,
         cwd: input.cwd,
         args: [
+          ...(pathspec ? ["--literal-pathspecs"] : []),
           "diff",
           ...(input.format === "numstat" ? ["--numstat", "-z"] : ["--patch"]),
           "--no-color",
@@ -994,6 +1007,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
           ...(input.ignoreWhitespace ? ["--ignore-all-space"] : []),
           `${fromRevision}^{commit}`,
           `${input.toCheckpointRef}^{commit}`,
+          ...(pathspec ? ["--", ...pathspec] : []),
         ],
         allowNonZeroExit: true,
         maxOutputBytes: CHECKPOINT_DIFF_MAX_OUTPUT_BYTES,
