@@ -13,17 +13,20 @@ shopt -s nullglob
 files=("$assets"/*)
 [[ ${#files[@]} -gt 0 ]] || { echo "No release assets" >&2; exit 1; }
 
+# GitHub's commit endpoint peels lightweight and annotated tags alike.
+remote_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)
+[[ "$remote_sha" == "$GITHUB_SHA" ]] || {
+    echo "Release tag points to a different commit" >&2; exit 1;
+}
+
 release=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-    --json isDraft,targetCommitish 2>/dev/null || true)
+    --json isDraft 2>/dev/null || true)
 if [[ -z "$release" ]]; then
     args=(--draft --title "Infinitus $VERSION" --notes-file "$notes" --target "$GITHUB_SHA")
     [[ "$VERSION" != *-* ]] || args+=(--prerelease)
     gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" "${args[@]}"
     published=false
 else
-    jq -e --arg sha "$GITHUB_SHA" '.targetCommitish == $sha' <<< "$release" >/dev/null || {
-        echo "Existing release belongs to a different commit" >&2; exit 1;
-    }
     published=$(jq -r '.isDraft | not' <<< "$release")
 fi
 

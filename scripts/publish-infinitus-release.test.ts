@@ -35,13 +35,17 @@ const args = process.argv.slice(2);
 const file = process.env.TEST_STATE;
 const state = JSON.parse(fs.readFileSync(file, "utf8"));
 const save = () => fs.writeFileSync(file, JSON.stringify(state));
+if (args[0] === "api") {
+  console.log(state.tagCommit ?? process.env.GITHUB_SHA);
+  process.exit(0);
+}
 switch (args[1]) {
   case "view":
     if (!state.exists) process.exit(1);
     console.log(JSON.stringify(state));
     break;
   case "create":
-    state.exists = true; state.isDraft = true; state.targetCommitish = process.env.GITHUB_SHA;
+    state.exists = true; state.isDraft = true; state.targetCommitish = "main";
     save(); break;
   case "upload": {
     const asset = args[3];
@@ -118,7 +122,7 @@ describe("release publication", () => {
     expect(f.read().uploads).toEqual(["a.zip", "b.zip"]);
   });
 
-  it("does not replace a published artifact or a different commit's draft", () => {
+  it("does not replace a published artifact or a tag pointing to a different commit", () => {
     const f = fixture();
     expect(f.run().status).toBe(0);
     const uploads = f.read().uploads;
@@ -127,7 +131,7 @@ describe("release publication", () => {
     expect(f.read().uploads).toEqual(uploads);
     NodeFS.writeFileSync(
       f.state,
-      JSON.stringify({ ...f.read(), exists: true, isDraft: true, targetCommitish: "other-commit" }),
+      JSON.stringify({ ...f.read(), exists: true, isDraft: true, tagCommit: "other-commit" }),
     );
     expect(f.run().status).toBe(1);
     expect(f.read().uploads).toEqual(uploads);
