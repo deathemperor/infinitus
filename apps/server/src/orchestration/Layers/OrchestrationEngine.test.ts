@@ -54,6 +54,7 @@ import {
 } from "../Services/ProjectionPipeline.ts";
 import { ProjectionSnapshotQuery } from "../Services/ProjectionSnapshotQuery.ts";
 import { ServerConfig } from "../../config.ts";
+import { InfinitusLimitStops } from "../../infinitus/Services/InfinitusLimitStops.ts";
 
 const asProjectId = (value: string): ProjectId => ProjectId.make(value);
 const asMessageId = (value: string): MessageId => MessageId.make(value);
@@ -568,17 +569,20 @@ describe("OrchestrationEngine", () => {
   );
 
   effectIt.effect(
-    "rejects persisted changes and live background work without blocking unrelated threads",
+    "rejects persisted changes, live background work and limit stops without blocking unrelated threads",
     () =>
       Effect.gen(function* () {
         yield* TestClock.setTime(Date.parse(now()));
         const engine = yield* OrchestrationEngineService;
         const snapshots = yield* ProjectionSnapshotQuery;
         const backgroundLiveness = yield* ThreadBackgroundLiveness.ThreadBackgroundLivenessService;
+        const limitStops = yield* InfinitusLimitStops;
         const projectId = ProjectId.make("project-auto-settle-guard");
         const guardedThreadId = ThreadId.make("thread-auto-settle-guarded");
         const unrelatedThreadId = ThreadId.make("thread-auto-settle-unrelated");
         const liveThreadId = ThreadId.make("thread-auto-settle-live");
+        const limitedThreadId = ThreadId.make("thread-auto-settle-limited");
+        const manuallySettledThreadId = ThreadId.make("thread-manual-settle-limited");
 
         yield* engine.dispatch({
           type: "project.create",
@@ -588,7 +592,13 @@ describe("OrchestrationEngine", () => {
           workspaceRoot: "/tmp/project-auto-settle-guard",
           createdAt: now(),
         });
-        for (const threadId of [guardedThreadId, unrelatedThreadId, liveThreadId]) {
+        for (const threadId of [
+          guardedThreadId,
+          unrelatedThreadId,
+          liveThreadId,
+          limitedThreadId,
+          manuallySettledThreadId,
+        ]) {
           yield* engine.dispatch({
             type: "thread.create",
             commandId: CommandId.make(`cmd-create-${threadId}`),
@@ -675,6 +685,48 @@ describe("OrchestrationEngine", () => {
           settledAt: lastActivityAt,
         });
 
+        // A limit can arrive after a settlement snapshot, without a persisted
+        // event yet. The commit must still protect its pending continuation.
+        const beforeLimitSequence = yield* engine.latestSequence;
+        yield* limitStops.setStopped(
+          [limitedThreadId, manuallySettledThreadId].map((threadId) => ({
+            threadId,
+            kind: "limited" as const,
+            since: now(),
+            summary: "Limit hit",
+          })),
+        );
+        const limitError = yield* engine
+          .dispatch({
+            type: "thread.auto-settle",
+            commandId: CommandId.make("cmd-auto-settle-limit-stop"),
+            threadId: limitedThreadId,
+            snapshotSequence: beforeLimitSequence,
+            settledAt: lastActivityAt,
+          })
+          .pipe(Effect.flip);
+        expect(limitError._tag).toBe("OrchestrationCommandInvariantError");
+        expect(yield* engine.latestSequence).toBe(beforeLimitSequence);
+        expect(
+          (yield* snapshots.getSnapshot()).threads.find((thread) => thread.id === limitedThreadId)
+            ?.settledOverride,
+        ).toBeNull();
+
+        // Explicit settlement remains the user's way to dismiss the thread.
+        yield* engine.dispatch({
+          type: "thread.settle",
+          commandId: CommandId.make("cmd-manual-settle-limit-stop"),
+          threadId: manuallySettledThreadId,
+        });
+        yield* limitStops.setStopped([]);
+        yield* engine.dispatch({
+          type: "thread.auto-settle",
+          commandId: CommandId.make("cmd-auto-settle-limit-cleared"),
+          threadId: limitedThreadId,
+          snapshotSequence: yield* engine.latestSequence,
+          settledAt: lastActivityAt,
+        });
+
         const freshSnapshotSequence = yield* engine.latestSequence;
         yield* engine.dispatch({
           type: "thread.meta.update",
@@ -691,7 +743,7 @@ describe("OrchestrationEngine", () => {
         });
 
         const settled = yield* snapshots.getSnapshot();
-        for (const threadId of [guardedThreadId, liveThreadId]) {
+        for (const threadId of [guardedThreadId, liveThreadId, limitedThreadId]) {
           const thread = settled.threads.find((candidate) => candidate.id === threadId);
           expect(thread?.settledOverride).toBe("settled");
           expect(thread?.settledAt).toBe(lastActivityAt);

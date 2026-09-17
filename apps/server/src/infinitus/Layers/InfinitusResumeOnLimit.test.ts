@@ -165,6 +165,7 @@ interface Harness {
   readonly watchers: Effect.Effect<number>;
   /** The sidebar's view of the stops (#270 I). */
   readonly stopped: Stream.Stream<ReadonlyArray<InfinitusHeldThread>>;
+  readonly isStopped: Effect.Effect<boolean>;
 }
 
 /** Fork (#616): the gate a resume passes through; passthrough by default. */
@@ -253,6 +254,7 @@ const makeHarnessWith = (
       dispatched: Ref.get(dispatched),
       watchers: Ref.get(watchers),
       stopped: limitStops.stopped,
+      isStopped: limitStops.isStopped(threadId),
     } satisfies Harness;
   });
 const makeHarness = makeHarnessWith();
@@ -434,12 +436,14 @@ describe("InfinitusResumeOnLimitLive", () => {
           (command) => command.type === "thread.activity.append",
         );
         expect(rows).toHaveLength(1);
+        expect(yield* h.isStopped).toBe(true);
         const lists = yield* Ref.get(seen);
         expect(lists.at(-1)).toMatchObject([{ threadId, resetsAt: "2025-09-11T14:13:20.000Z" }]);
         yield* h.poll(swapped(at(150)));
         yield* settle(h.turns, (list) => list.length === 1);
         // Failed, so nothing to interrupt.
         expect(yield* h.interrupts).toEqual([]);
+        expect(yield* h.isStopped).toBe(false);
       }),
     ),
   );
@@ -479,6 +483,7 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* h.poll(swapped(at(150)));
         yield* Effect.yieldNow;
         expect(yield* h.turns).toEqual([]);
+        expect(yield* h.isStopped).toBe(false);
       }),
     ),
   );
