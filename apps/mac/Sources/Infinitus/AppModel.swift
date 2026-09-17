@@ -508,51 +508,15 @@ final class AppModel: ObservableObject {
     /// and its effects (switch/death/revival flash, the burn breath).
     @Published var menuBarThemed: Bool { didSet { defaults.set(menuBarThemed, forKey: "menubar_themed") } }
     @Published var menuBarEffects: Bool { didSet { defaults.set(menuBarEffects, forKey: "menubar_effects") } }
-    /// The named Cloudflare tunnel (#9, the restart-proof route): the
-    /// user's own hostname, the token in the keychain. Off by default.
-    /// Since the mirror's retirement it stands on its own toggle and
-    /// hostname; the fork server's stable route (#650) rides it.
-    @Published var mirrorNamedTunnelEnabled: Bool {
-        didSet {
-            defaults.set(mirrorNamedTunnelEnabled, forKey: NamedTunnel.enabledKey)
-            applyNamedTunnel()
-        }
-    }
-    @Published var mirrorNamedTunnelHost: String {
-        didSet {
-            defaults.set(mirrorNamedTunnelHost, forKey: NamedTunnel.hostnameKey)
-            applyNamedTunnel()
-        }
-    }
-    /// The quick tunnel fronting the T3 Code fork server's port (#572):
-    /// off by default like the mirror's. The port is where the fork's
-    /// server bound (it scans up from 3773 when that one is taken, so
-    /// the server sets this pref on startup).
-    @Published var forkTunnelEnabled: Bool {
-        didSet {
-            defaults.set(forkTunnelEnabled, forKey: "fork_tunnel_enabled")
-            applyForkTunnel()
-        }
-    }
+    /// Where the desktop server bound (it scans up from 3773 when that
+    /// one is taken, so the server sets this pref on startup): the CLI's
+    /// credential origin and the pairing QR's LAN link follow it.
     @Published var forkServerPort: Int {
-        didSet {
-            defaults.set(forkServerPort, forKey: "fork_server_port")
-            applyForkTunnel()
-        }
+        didSet { defaults.set(forkServerPort, forKey: "fork_server_port") }
     }
     /// How a fork-server publish is probed before it is followed (#1137);
     /// a stored property so a test can answer without a socket.
     var forkServerProbe: ForkServerProbe.Transport = ForkServerProbe.urlSession
-    /// The fork's stable hostname on the named tunnel (#650): when set
-    /// and the companion's named tunnel is running, the fork rides that
-    /// tunnel as a second ingress rule instead of minting a fresh
-    /// `*.trycloudflare.com` name every relaunch. Empty = quick tunnel.
-    @Published var forkTunnelHostname: String {
-        didSet {
-            defaults.set(forkTunnelHostname, forKey: "fork_tunnel_hostname")
-            applyForkTunnel()
-        }
-    }
     let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
 
@@ -604,9 +568,6 @@ final class AppModel: ObservableObject {
         credential.log = { [weak self] text in self?.logEvent("desktop", icon: "key", text) }
         return credential
     }()
-    let namedTunnel = NamedTunnel()
-    let forkTunnel = QuickTunnel(pidKey: "fork_tunnel_pid")
-
     /// Every app notification: Notification Center here, and the same
     /// text to the phones (issue #3; #756: the engine's own away-push
     /// channels went with cswap; swapd's `notify` only reports).
@@ -834,11 +795,7 @@ final class AppModel: ObservableObject {
         cliproxyEnabled = defaults.object(forKey: "engine_cliproxy_enabled") as? Bool ?? false
         nineRouterEnabled = defaults.object(forKey: "engine_9router_enabled") as? Bool ?? false
         popupSort = Self.popupSort(defaults)
-        mirrorNamedTunnelEnabled = defaults.bool(forKey: NamedTunnel.enabledKey)
-        mirrorNamedTunnelHost = defaults.string(forKey: NamedTunnel.hostnameKey) ?? ""
-        forkTunnelEnabled = defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false
-        forkTunnelHostname = defaults.string(forKey: "fork_tunnel_hostname") ?? ""
-        forkServerPort = defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort
+        forkServerPort = defaults.object(forKey: "fork_server_port") as? Int ?? ForkServerProbe.defaultPort
         // Push triggers default ON — they exist because they were asked for.
         pushAllDead = defaults.object(forKey: "push_all_dead") as? Bool ?? true
         pushLastAlive = defaults.object(forKey: "push_last_alive") as? Bool ?? true
@@ -919,7 +876,6 @@ final class AppModel: ObservableObject {
         team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
         team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
         team.scanRequested = { [weak self] in self?.statsModel.refresh() }
-        team.tunnelURL = { [weak self] in self?.forkTunnelStatus.url }
         team.desktopCredential = { [weak self] in
             guard let self, let origin = desktopCredential.origin, let url = URL(string: origin),
                   let token = desktopCredential.token() else { return nil }
@@ -1091,9 +1047,7 @@ final class AppModel: ObservableObject {
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.dockIconShown, defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
-        set(\.forkTunnelEnabled, defaults.object(forKey: "fork_tunnel_enabled") as? Bool ?? false)
-        set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkTunnelStatus.defaultPort)
-        set(\.forkTunnelHostname, defaults.string(forKey: "fork_tunnel_hostname") ?? "")
+        set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkServerProbe.defaultPort)
         // #1178: the Devices page's prefs land on their owners; each didSet
         // writes the same key back.
         set(\.sync.enabled, defaults.object(forKey: "icloud_sync") as? Bool ?? false)
@@ -1315,15 +1269,8 @@ final class AppModel: ObservableObject {
         if !isPlayground, !mockMode {
             Task.detached(priority: .utility) { [eventStore] in await eventStore.prune() }
         }
-        namedTunnel.log = { [weak self] icon, text in
-            self?.logEvent("other", icon: icon, text)
-        }
-        forkTunnel.log = { [weak self] icon, text in
-            self?.logEvent("other", icon: icon, "fork server: " + text)
-        }
         crashReports = crashStore.list()
         scanMacCrashReports()
-        applyNamedTunnel()  // ends by applying the fork tunnel
         _ = awsLoginRunner
         // The playground gets a socket only where INFINITUS_CONTROL_SOCKET
         // points — never the real app's path.
@@ -1472,8 +1419,8 @@ final class AppModel: ObservableObject {
     }
 
     /// Guards a fork-server publish that would move the target (#1137): the
-    /// quick tunnel and the CLI's credential origin only follow a port that
-    /// serves `/.well-known/t3/environment`, and only when the port they would
+    /// CLI's credential origin only follows a port that serves
+    /// `/.well-known/t3/environment`, and only when the port it would
     /// leave still does. `ForkServerProbe.verdict` holds the rule; this adds
     /// the work-log line, so a refusal is on the record rather than inferred.
     func acceptsForkServerPublish(port: Int) async -> Bool {
@@ -1486,122 +1433,6 @@ final class AppModel: ObservableObject {
         if verdict == .accept { return true }
         logMirrorInput("⚠️", ForkServerProbe.refusalLine(port: port))
         return false
-    }
-
-    /// Whether this instance may open a door onto this Mac at all — every
-    /// tunnel. Mock mode only swaps the CLI —
-    /// sessions/usage in the snapshot are still this machine's real
-    /// ones, so a dev instance must never advertise them on the LAN.
-    /// `mirror_lan_allow_mock` lifts that for a dev COPY of the binary
-    /// only (the shipped process is named Infinitus), so the server can
-    /// be exercised end to end.
-    private var exposureAllowed: Bool {
-        let mockAllowed = mockMode
-            && ProcessInfo.processInfo.processName != "Infinitus"
-            && defaults.bool(forKey: "mirror_lan_allow_mock")
-        return !isPlayground && (!mockMode || mockAllowed)
-    }
-
-    /// Starts or stops the tunnel fronting the fork server's port (#572).
-    /// Independent of the mirror listener — the fork's server binds its
-    /// own port. With a stable hostname on the running named tunnel
-    /// (#650) nothing is started: the companion's connector carries the
-    /// fork as a second ingress rule. Otherwise a quick tunnel; a port
-    /// change restarts it, cloudflared is told the port on its command
-    /// line.
-    private func applyForkTunnel() {
-        let port = forkServerPort
-        if forkTunnel.isRunning, forkTunnel.port.map(Int.init) != port { forkTunnel.stop() }
-        guard forkTunnelEnabled, exposureAllowed, ForkTunnelStatus.isValidPort(port) else {
-            forkTunnel.stop()
-            return
-        }
-        if forkNamedHost != nil {
-            forkTunnel.stop()
-            return
-        }
-        forkTunnel.start(port: UInt16(port))
-    }
-
-    /// The fork's hostname on the named tunnel while that route applies:
-    /// a hostname is set and the companion's named tunnel is configured
-    /// (enabled, with a hostname). The route follows configuration, not
-    /// the connector's life: once chosen, the fork never falls back to a
-    /// quick tunnel — a dead named tunnel reports `stopped` (no throwaway
-    /// name under the phone), and it comes back with the connector. A
-    /// locally-managed tunnel (config.yml) is checked for the ingress
-    /// rule to the fork's port; a dashboard-managed one can't be, so the
-    /// pref is trusted. Logged once per change, not per refresh.
-    private var forkNamedHost: String? {
-        let host = NamedTunnel.normalizeHostname(forkTunnelHostname)
-        let companion = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
-        guard !host.isEmpty, mirrorNamedTunnelEnabled, !companion.isEmpty else { return nil }
-        if NamedTunnel.localConfigCovers(companion), !NamedTunnel.localConfigRoutes(host, toPort: forkServerPort) {
-            if forkNamedHostWarned != host {
-                forkNamedHostWarned = host
-                logMirrorInput("⚠️", "~/.cloudflared/config.yml has no ingress for \(host) → :\(forkServerPort); the fork uses a quick tunnel")
-            }
-            return nil
-        }
-        return host
-    }
-    private var forkNamedHostWarned = ""
-
-    /// `status`'s `forkTunnel`.
-    var forkTunnelStatus: ForkTunnelStatus {
-        if let host = forkNamedHost {
-            return ForkTunnelStatus.derive(enabled: forkTunnelEnabled, port: forkServerPort, allowed: exposureAllowed,
-                                           available: forkTunnel.isAvailable, running: namedTunnel.isRunning,
-                                           url: namedTunnel.connected ? "https://\(host)" : nil)
-        }
-        return ForkTunnelStatus.derive(enabled: forkTunnelEnabled, port: forkServerPort, allowed: exposureAllowed,
-                                       available: forkTunnel.isAvailable, running: forkTunnel.isRunning,
-                                       url: forkTunnel.url)
-    }
-
-    /// Starts or stops the named tunnel (#9): needs the toggle, a
-    /// hostname and a token in the keychain (or a local config). A
-    /// hostname change while running restarts it — the token is per
-    /// hostname. Ends by applying the fork tunnel, whose named route
-    /// (#650) rides this connector.
-    private func applyNamedTunnel() {
-        let host = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
-        if namedTunnel.isRunning, namedTunnel.hostname != host { namedTunnel.stop() }
-        guard mirrorNamedTunnelEnabled, !host.isEmpty else {
-            namedTunnel.stop()
-            applyForkTunnel()
-            return
-        }
-        // A local cloudflared config for this hostname wins over a token:
-        // it was set up on this Mac and carries its own credentials file.
-        if NamedTunnel.localConfigCovers(host) {
-            namedTunnel.start(hostname: host, token: nil)
-        } else if let token = NamedTunnel.token(for: host) {
-            namedTunnel.start(hostname: host, token: token)
-        } else {
-            namedTunnel.stop()
-        }
-        applyForkTunnel()
-    }
-
-    var namedTunnelTokenPresent: Bool {
-        let host = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
-        return !host.isEmpty && NamedTunnel.token(for: host) != nil
-    }
-
-    /// The locally-managed setup is in place for the typed hostname.
-    var namedTunnelLocalConfig: Bool {
-        NamedTunnel.localConfigCovers(NamedTunnel.normalizeHostname(mirrorNamedTunnelHost))
-    }
-
-    /// Stores (or, when empty, forgets) the tunnel token for the current
-    /// hostname and applies it at once.
-    func saveNamedTunnelToken(_ token: String) {
-        let host = NamedTunnel.normalizeHostname(mirrorNamedTunnelHost)
-        guard !host.isEmpty else { return }
-        NamedTunnel.setToken(token, for: host)
-        namedTunnel.stop()
-        applyNamedTunnel()
     }
 
     /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the daemon's
@@ -2082,9 +1913,6 @@ final class AppModel: ObservableObject {
     /// the child never outlives the app holding the mutex (the engine also
     /// watches its stdin pipe for EOF as the backstop against a hard kill).
     func shutdown() {
-        // The tunnels are child processes: they must not outlive the app.
-        namedTunnel.stop()
-        forkTunnel.stop()
         let swapdSupervisor = swapdSupervisor
         let team = team
         Task {

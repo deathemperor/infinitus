@@ -397,27 +397,19 @@ echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
 "$CTL" prefs set intro_speed 3 >/dev/null 2>&1 && fail "prefs set accepted a value outside the range"
 "$CTL" prefs set intro_style fade | expect "d['value']=='fade'" || fail "prefs set intro_style"
 "$CTL" prefs set intro_style top >/dev/null || fail "prefs set intro_style back"
-# The fork server's tunnel (#572): off by default on T3's port; a mock
-# instance named Infinitus is `blocked`, so enabling it here never runs
-# cloudflared — the gate is what this checks.
-"$CTL" status | expect "d['forkTunnel']['state']=='off' and d['forkTunnel']['port']==3773 and d['forkTunnel']['enabled'] is False and d['forkTunnel'].get('url') is None" || fail "fork tunnel must default to off on 3773"
 # #777: where the process runs from, and that a standalone one is not nested.
 "$CTL" status | expect "isinstance(d['bundlePath'], str) and d['bundlePath'] != '' and d['nested'] is False" || fail "status must carry bundlePath and nested"
-"$CTL" prefs set fork_tunnel_enabled true | expect "d['value'] is True" || fail "prefs set fork_tunnel_enabled"
-"$CTL" status | expect "d['forkTunnel']['state']=='blocked'" || fail "a mock instance must report the fork tunnel blocked, not run it"
-"$CTL" prefs set fork_server_port 70000 | expect "d['value']==70000" || fail "prefs set fork_server_port"
-"$CTL" status | expect "d['forkTunnel']['state']=='invalidPort'" || fail "an out-of-range fork port must report invalidPort"
+# The Cloudflare tunnels retired with Infinitus Connect: no tunnel in the
+# status reply, no tunnel prefs, and nothing spawns cloudflared.
+"$CTL" status | expect "'forkTunnel' not in d" || fail "status must not carry a tunnel any more"
+"$CTL" prefs set fork_tunnel_enabled true >/dev/null 2>&1 && fail "fork_tunnel_enabled must be gone from the catalog"
+"$CTL" prefs set fork_server_port 3841 | expect "d['value']==3841 and d['section']=='devices'" || fail "prefs set fork_server_port"
 "$CTL" prefs set fork_server_port 3773 >/dev/null || fail "prefs set fork_server_port back"
-"$CTL" prefs set fork_tunnel_enabled false | expect "d['value'] is False" || fail "prefs set fork_tunnel_enabled back"
-"$CTL" prefs set fork_tunnel_hostname code.e2e.invalid | expect "d['value']=='code.e2e.invalid'" || fail "prefs set fork_tunnel_hostname"
-"$CTL" prefs get fork_tunnel_hostname | expect "d['prefs'][0]['value']=='code.e2e.invalid'" || fail "prefs get fork_tunnel_hostname"
 # #1178: the Devices page's prefs.
 "$CTL" prefs set machine_name "E2E Mac" | expect "d['value']=='E2E Mac' and d['section']=='devices'" || fail "prefs set machine_name"
 "$CTL" prefs set machine_name "" | expect "d['value']==''" || fail "prefs set machine_name back"
 "$CTL" prefs get icloud_sync | expect "[p['value'] for p in d['prefs']]==[False]" || fail "prefs get icloud_sync"
-"$CTL" prefs set fork_tunnel_hostname '""' | expect "d['value']==''" || fail "prefs set fork_tunnel_hostname back"
-"$CTL" status | expect "d['forkTunnel']['state']=='off'" || fail "fork tunnel must be off again"
-pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared for the fork port"
+pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared"
 echo "prefs: ok"
 
 # JSON-body verbs (#572 N1): the socket takes a JSON body on stdin.
@@ -738,8 +730,7 @@ idle_cpu_ok "idle CPU with no lease" "$PCT" "$WINDOW_S"
 "$CTL" show popout >/dev/null || fail "show popout (restore)"
 popout_visible || fail "pop-out not restored after the no-lease window"
 # #654: the fork's quit-with-window setting sends `quit`; the app answers,
-# then leaves on its own (tunnels stop first) — the wait below is bounded,
-# and the time is printed.
+# then leaves on its own — the wait below is bounded, and the time is printed.
 "$CTL" quit | expect "d['quitting'] is True" || fail "quit"
 # The app is this shell's child: until `wait` reaps it the pid lingers as
 # a zombie, so the exit shows as state Z, not as a missing pid.

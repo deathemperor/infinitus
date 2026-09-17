@@ -3,12 +3,9 @@ import Security
 
 /// The keychain slots: CLIProxyAPI's management key (#8) — generic
 /// password, service = bundle-id-scoped, account = the proxy base URL,
-/// so two proxies could hold two keys — and the Cloudflare named-tunnel
-/// token (#9), same shape under its own service. Never mirrored into
-/// defaults.
+/// so two proxies could hold two keys. Never mirrored into defaults.
 enum Keychain {
     static let service = "run.infinitus.cliproxy"
-    static let tunnelService = "run.infinitus.cloudflare-tunnel"
     /// 9Router's dashboard password (third engine), account = base URL.
     static let nineRouterService = "run.infinitus.9router"
     /// The team identity secret and store tokens (#1313), account = secret name.

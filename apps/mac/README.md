@@ -103,7 +103,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **iCloud settings sync** and file export/import, never credentials.
 - **Push notifications** — switch and limit events in Notification Center and on the phone.
 - **Pop-out window, compact mode, three layouts, popup scaling** — the pop-out remembers its spot.
-- **Phone companion, four ways in** — Wi-Fi (Bonjour), Tailscale, your own Cloudflare tunnel or a free quick tunnel; one QR carries every route; pair more than one Mac.
+- **Phone companion, three ways in** — Wi-Fi (Bonjour), Tailscale or Infinitus Connect; one QR carries every route; pair more than one Mac.
 - **Versions on the phone** — Settings shows both apps' versions and says when a newer phone build is out.
 - **Widgets in your theme** — home and lock-screen widgets show the active account's windows, what's waiting, and the revival countdown; "Fleet on a Mac" shows a paired Mac of your choice and its tap opens that Mac's sessions.
 - **AWS and gcloud sign-in from the desktop app or the phone** — start `aws login` or `gcloud auth login` from the Accounts page or the phone (passkeys for AWS, a paste-back code for gcloud).
@@ -111,7 +111,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **Priority mode** — `hold` or `interrupt` gives every fleet a headroom verdict (abundant / low / critical, with hysteresis on the active account's fullest window), so a client can pause background work before a window binds.
 - **Preferences over the socket** — `infinitusctl prefs` lists every setting with its type, choices, range and effect; `prefs set` changes one live, from the CLI, the phone or the desktop app.
 - **Devices** — every phone that has paired, with its route, when it was last seen and what it holds on this Mac, each with Forget.
-- **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`), and its server rides the companion's quick or named Cloudflare tunnel (`fork_tunnel_*`).
+- **Desktop app hosting** — the Infinitus desktop app drives the Mac over the control socket (`quit`, `signin-*`, `events --after`, `lock`), and a phone off the Wi-Fi reaches its server through Infinitus Connect.
 - **"At this pace"** — measured burn per window, when each runs out, a per-account forecast and a plain-words plan for the next reset.
 - **Stats**, on the desktop app's Stats page — commits, lines, PRs, messages, sessions, tool calls, waiting time, switches, cost; effort per activity, model, engine and effort setting; tokens/min records; cached vs uncached input and cache savings.
 - **This Mac's name** — Settings › Devices names the Mac for the phone, widgets and crash reports; the default drops macOS's "(7)" suffix.
@@ -127,9 +127,9 @@ One line per feature; the site and the CHANGELOG carry the detail.
 ## Privacy
 
 Everything stays on your machine (the phone talks straight to your Mac
-over routes you enable; the only thing that ever touches infinitus.run
-is a quick tunnel's URL, keyed by a hash of the pairing token — never
-the token, never usage). The app talks to the engine through
+over routes you enable; a pairing link opens infinitus.run only to hand
+the phone app back the code in its fragment, which the site's server
+never sees — never usage). The app talks to the engine through
 `swapd … --json` subprocesses and never reads its files (sessions and
 transcripts read Claude Code's own records, nothing of the engine's);
 usage-cost

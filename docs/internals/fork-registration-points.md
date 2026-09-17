@@ -232,8 +232,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (`<logsDir>/server.log.ndjson`) on `ServerDerivedPaths` beside upstream's
   `serverLogPath`; `apps/server/src/cli/triage.ts` and `triagePrompt.ts` —
   the path in the triage context so `t3 triage` names it.
-- `apps/server/src/http.ts` — the `/.well-known/t3/environment` handler passes
-  the descriptor through `withAlternateHttpBaseUrls` (#663).
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`
   and `lastGoodHttpBaseUrl` (both optional keys) on `BearerConnectionProfile`;
   `connection/resolver.ts` — the bearer broker walks `bearerHostOrder` and

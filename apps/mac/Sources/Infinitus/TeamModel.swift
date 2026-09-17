@@ -47,9 +47,6 @@ final class TeamModel: ObservableObject {
     /// Set by AppModel: the desktop credential (#822) the loop reads the
     /// threads and transcripts with; nil publishes `desktop: false`.
     var desktopCredential: () -> (origin: URL, token: String)? = { nil }
-    /// Set by AppModel: the Mac's tunnel URL while it is up, one of the
-    /// doors a driver reaches this desktop through (spec §8).
-    var tunnelURL: () -> String? = { nil }
     /// Delegated control (spec §8): this Mac's grants as last loaded.
     @Published private(set) var grants = TeamGrants()
     /// Drivers' commands waiting for this Mac's tap, as the snapshot lists them.
@@ -264,7 +261,6 @@ final class TeamModel: ObservableObject {
         let fold = scanFold
         let fetched = transcriptsFetched
         let credential = desktopCredential()
-        let tunnel = tunnelURL()
         let control = control
         let home = NSHomeDirectory()
         let stop = stopRequested
@@ -342,10 +338,13 @@ final class TeamModel: ObservableObject {
                 if let credential {
                     let api = DesktopAPI(origin: credential.origin, token: credential.token)
                     // Where a driver reaches this desktop (spec §8): only
-                    // worth publishing while something is granted.
+                    // worth publishing while something is granted. The
+                    // `tunnel` door is still read from a teammate's
+                    // document; this Mac stopped having one of its own
+                    // when the Cloudflare tunnels retired.
                     if s.grantsTo != nil, let descriptor = try? api.descriptor() {
                         s.endpoints = TeamControl.Endpoints(httpBaseUrl: credential.origin.absoluteString,
-                                                            lanHttpBaseUrls: descriptor.lanHttpBaseUrls, tunnel: tunnel)
+                                                            lanHttpBaseUrls: descriptor.lanHttpBaseUrls)
                     }
                     do {
                         pass.handed = try TeamThreadSources.desktop(api, into: &s,

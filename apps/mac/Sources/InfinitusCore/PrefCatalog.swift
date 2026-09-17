@@ -119,10 +119,9 @@ public enum PrefCatalog {
         Entry("push_last_alive", .bool, .bool(true), push),
         Entry("push_revived", .bool, .bool(true), push),
         Entry("revive_lead_minutes", .int, .number(10), push),
-        // Devices: the tunnel fronting the T3 Code fork server's port (#572).
-        Entry("fork_tunnel_enabled", .bool, .bool(false), devices),
-        Entry("fork_server_port", .int, .number(Double(ForkTunnelStatus.defaultPort)), devices),
-        Entry("fork_tunnel_hostname", .string, .string(""), devices),
+        // Devices: where the T3 Code fork server bound, which the server
+        // publishes on startup.
+        Entry("fork_server_port", .int, .number(Double(ForkServerProbe.defaultPort)), devices),
         // Devices: this Mac's name and iCloud sync (#1178).
         Entry("machine_name", .string, .string(""), devices),
         Entry("icloud_sync", .bool, .bool(false), devices),

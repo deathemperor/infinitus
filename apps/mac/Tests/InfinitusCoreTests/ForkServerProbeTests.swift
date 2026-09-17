@@ -107,9 +107,8 @@ final class ForkServerProbeTests: XCTestCase {
     }
 
     func testAnInvalidPortIsNotRefusedWhileNothingIsServing() async {
-        // `ForkTunnelStatus` reports an out-of-range port as invalidPort and
-        // runs no tunnel on it, so storing it costs nothing when there is no
-        // live target to displace.
+        // `url(port:)` refuses an out-of-range port before any socket, so
+        // storing it costs nothing when there is no live target to displace.
         let verdict = await ForkServerProbe.verdict(newPort: 70000, currentPort: 3773, using: fleet([]))
         XCTAssertEqual(verdict, .accept)
         // With a server actually up, swapping it for an unusable port is the

@@ -49,7 +49,7 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertEqual(ControlCommand.named("rotate")?.requires, "rotate")
         XCTAssertEqual(ControlCommand.named("reorder")?.args, ["<fleet>", "<n>..."])
         XCTAssertEqual(ControlCommand.named("randomize-names")?.args, ["<fleet>", "[n]"])
-        XCTAssertTrue(ControlCommand.named("status")?.replyShape.contains("forkTunnel:{enabled, port, state, url?, hostname?}") ?? false)
+        XCTAssertFalse(ControlCommand.named("status")?.replyShape.contains("forkTunnel") ?? true)
         XCTAssertEqual(ControlCommand.named("prefer")?.requires, "prefer")
         XCTAssertEqual(ControlCommand.named("lock-status")?.effect, .read)
         XCTAssertEqual(ControlCommand.named("signin-begin")?.effect, .human)

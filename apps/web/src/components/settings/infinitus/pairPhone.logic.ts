@@ -1,33 +1,16 @@
 import type { DesktopServerExposureState } from "@infinitus/contracts";
-import type { InfinitusForkTunnel } from "@infinitus/contracts/infinitus";
 
 import { resolveDesktopPairingUrl } from "../pairingUrls";
 
 /**
  * The "Pair a phone" card on Settings › Infinitus › Devices, as pure state:
- * which tunnel phase to explain, which origin the QR encodes, and where the
- * one-time link is in its life. The card only renders this.
+ * which address on the Mac's Wi‑Fi the QR encodes, and where the one-time
+ * link is in its life. The card only renders this.
+ *
+ * This pairs a phone that is on the Mac's own network. Off it, the phone
+ * reaches this environment through Infinitus Connect — the Mac's Cloudflare
+ * tunnels retired when Connect took that job over.
  */
-
-/** The native app's `status.forkTunnel.state` values this page knows. */
-export type ForkTunnelPhase =
-  | "off"
-  | "invalidPort"
-  | "blocked"
-  | "unavailable"
-  | "starting"
-  | "up"
-  | "stopped";
-
-const KNOWN_PHASES: ReadonlySet<string> = new Set<ForkTunnelPhase>([
-  "off",
-  "invalidPort",
-  "blocked",
-  "unavailable",
-  "starting",
-  "up",
-  "stopped",
-]);
 
 /** The minted one-time credential as the card holds it. */
 export interface PhonePairingLink {
@@ -35,16 +18,6 @@ export interface PhonePairingLink {
   readonly credential: string;
   readonly expiresAtMs: number;
 }
-
-export interface PairPhoneOrigin {
-  /** `tunnel`: the Cloudflare hostname; `lan`: the server's address on the
-      Mac's own network, which only reaches phones on the same network. */
-  readonly kind: "tunnel" | "lan";
-  readonly url: string;
-}
-
-/** Which origin the card encodes when both are there. */
-export type PairPhoneReach = "tunnel" | "lan";
 
 export type PairPhoneLinkState =
   | { readonly kind: "none" }
@@ -58,52 +31,18 @@ export type PairPhoneLinkState =
   | { readonly kind: "expired" };
 
 export interface PairPhoneCardModel {
-  /** `unsupported` is a status without the tunnel (an older build, or the
-      Linux tray); `unknown` a state newer than this page. */
-  readonly tunnel: ForkTunnelPhase | "unsupported" | "unknown";
-  /** What to say about the tunnel while it is not up; null while it is. */
-  readonly tunnelNotice: string | null;
-  /** What to say about the network side; null while a tunnel link needs no
-      caveat. */
-  readonly lanNotice: string | null;
-  /** Both reaches are available, so the card offers the choice. */
-  readonly reachChoice: boolean;
-  readonly origin: PairPhoneOrigin | null;
+  /** What to say about the network this link reaches over. */
+  readonly lanNotice: string;
+  /** The LAN origin the QR encodes; null when nothing on the network can be
+      dialled, in which case there is no link to draw. */
+  readonly origin: string | null;
   readonly link: PairPhoneLinkState;
 }
 
-const LAN_ONLY_NOTICE = "This link only works for phones on your Wi‑Fi.";
+const LAN_ONLY_NOTICE =
+  "This link only works for phones on your Wi‑Fi. Off it, link this environment to Infinitus Connect under Settings › Connections and the phone reaches it from anywhere.";
 const LAN_UNAVAILABLE_NOTICE =
-  "Phones on your Wi‑Fi can pair once Network access is on under Settings › Connections.";
-
-/** The Infinitus build that first reports the tunnel (native #588). */
-const FORK_TUNNEL_MIN_BUILD = "3bdc03cca";
-
-function forkTunnelNotice(
-  tunnel: InfinitusForkTunnel | undefined,
-  phase: PairPhoneCardModel["tunnel"],
-): string | null {
-  switch (phase) {
-    case "up":
-      return null;
-    case "unsupported":
-      return `This Infinitus build has no tunnel (needs ≥ ${FORK_TUNNEL_MIN_BUILD}, on a Mac).`;
-    case "off":
-      return "Turn on the Cloudflare quick tunnel above to pair a phone off your network.";
-    case "invalidPort":
-      return `The server port (${tunnel?.port ?? "?"}) is out of range; set it above to the port this server listens on.`;
-    case "blocked":
-      return "The tunnel stays off for playground and mock instances of Infinitus.";
-    case "unavailable":
-      return "cloudflared is not installed on the Mac; the tunnel needs it (brew install cloudflared).";
-    case "starting":
-      return "Starting the tunnel…";
-    case "stopped":
-      return "The tunnel stopped. Turn it off and on above to start it again.";
-    case "unknown":
-      return `The tunnel reports a state this page does not know (${tunnel?.state ?? "?"}).`;
-  }
-}
+  "Phones on your Wi‑Fi can pair once Network access is on under Settings › Connections. Off it, link this environment to Infinitus Connect there instead.";
 
 /** Marks a pairing link as minted for the phone app: `#token=…&for=phone`.
     The phone reads the token as before (`URLSearchParams` on the fragment);
@@ -165,41 +104,21 @@ export function lanPairingOrigin(input: {
 }
 
 export function pairPhoneCardModel(input: {
-  readonly forkTunnel: InfinitusForkTunnel | undefined;
   /** From `lanPairingOrigin`; null when nothing on the network can be dialled. */
   readonly lanOrigin: string | null;
-  /** The user's pick while both reaches are available; ignored otherwise. */
-  readonly reach: PairPhoneReach;
   readonly link: PhonePairingLink | null;
   readonly nowMs: number;
 }): PairPhoneCardModel {
-  const { forkTunnel, lanOrigin, reach, link, nowMs } = input;
-  const tunnel: PairPhoneCardModel["tunnel"] =
-    forkTunnel === undefined
-      ? "unsupported"
-      : KNOWN_PHASES.has(forkTunnel.state)
-        ? (forkTunnel.state as ForkTunnelPhase)
-        : "unknown";
-  const tunnelOrigin: PairPhoneOrigin | null =
-    tunnel === "up" && forkTunnel?.url !== undefined
-      ? { kind: "tunnel", url: forkTunnel.url }
-      : null;
-  const lan: PairPhoneOrigin | null = lanOrigin === null ? null : { kind: "lan", url: lanOrigin };
-  const reachChoice = tunnelOrigin !== null && lan !== null;
-  const origin = reachChoice ? (reach === "lan" ? lan : tunnelOrigin) : (tunnelOrigin ?? lan);
+  const { lanOrigin, link, nowMs } = input;
   return {
-    tunnel,
-    tunnelNotice: forkTunnelNotice(forkTunnel, tunnel),
-    lanNotice:
-      origin === null ? LAN_UNAVAILABLE_NOTICE : origin.kind === "lan" ? LAN_ONLY_NOTICE : null,
-    reachChoice,
-    origin,
-    link: linkState(origin, link, nowMs),
+    lanNotice: lanOrigin === null ? LAN_UNAVAILABLE_NOTICE : LAN_ONLY_NOTICE,
+    origin: lanOrigin,
+    link: linkState(lanOrigin, link, nowMs),
   };
 }
 
 function linkState(
-  origin: PairPhoneOrigin | null,
+  origin: string | null,
   link: PhonePairingLink | null,
   nowMs: number,
 ): PairPhoneLinkState {
@@ -208,8 +127,8 @@ function linkState(
   if (secondsLeft <= 0) return { kind: "expired" };
   return {
     kind: "active",
-    url: phonePairingUrl(origin.url, link.credential),
-    host: new URL(origin.url).host,
+    url: phonePairingUrl(origin, link.credential),
+    host: new URL(origin).host,
     secondsLeft,
   };
 }

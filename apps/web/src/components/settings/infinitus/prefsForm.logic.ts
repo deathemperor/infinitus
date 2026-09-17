@@ -167,21 +167,11 @@ export const PREF_COPY: Readonly<
   push_last_alive: { label: "The last alive account nears its limit" },
   push_revived: { label: "An account comes back" },
   revive_lead_minutes: { label: "Revive countdown lead (minutes)" },
-  // Devices: the tunnel fronting this server's own port, which the "Pair a
-  // phone" card below hands the QR when the phone is off the Wi‑Fi. The keys
-  // are the Mac's (#572) and say "fork"; the screen never does (#823).
-  fork_tunnel_enabled: {
-    label: "Reach this server through a Cloudflare tunnel",
-    description: "Lets a phone pair and connect from outside your network.",
-  },
+  // Devices: where this server listens. The key is the Mac's (#572) and says
+  // "fork"; the screen never does (#823).
   fork_server_port: {
     label: "Server port",
     description: "The port this server listens on. Infinitus writes it at startup.",
-  },
-  fork_tunnel_hostname: {
-    label: "Tunnel hostname",
-    description:
-      "A named tunnel's hostname, so the URL survives a restart. Empty takes a fresh quick-tunnel URL each time.",
   },
   // Devices: this Mac's name and iCloud sync (#1178).
   machine_name: {

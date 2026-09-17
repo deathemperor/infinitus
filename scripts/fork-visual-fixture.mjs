@@ -426,7 +426,6 @@ function answer(request, socketPath) {
           cliproxy: { enabled: false, registered: false, keyPresent: false },
           "9router": { enabled: false, registered: false, keyPresent: false },
         },
-        forkTunnel: { enabled: false, port: 3773, state: "off" },
       };
     case "fleets":
     case "refresh":

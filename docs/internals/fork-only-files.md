@@ -311,7 +311,7 @@ these bullets.
 - `apps/mobile/src/features/team/` — Settings › Team (#1313): members, the
   leader's requests, join from a code or the site's `/join#<code>` invite
   link; the phone's subset of the web pane's `team.logic.ts`.
-- `packages/client-runtime/src/connection/roaming.ts`, `apps/server/src/infinitus/Layers/InfinitusDescriptor.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on the LAN, roam to the tunnel (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect; public hosts (the tunnel) are dialed before private ones (the LAN address). Rules and traps: `docs/internals/roaming.md`.
+- `packages/client-runtime/src/connection/roaming.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on one host, connect on another (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect; public hosts are dialed before private ones (the LAN address). No server fills the list since the Cloudflare tunnels retired (`InfinitusDescriptor.ts` went with them). Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
   snippets (#270 G): `useProjectPromptSnippets(environmentId, projectId)`

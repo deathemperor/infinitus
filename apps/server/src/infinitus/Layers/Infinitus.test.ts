@@ -262,24 +262,21 @@ describe("InfinitusService", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
-  effectIt.effect("carries the status reply's fork tunnel into the snapshot", () =>
+  effectIt.effect("keeps a key the status schema does not know out of the snapshot", () =>
     Effect.gen(function* () {
       const stub = yield* ControlStub;
       const infinitus = yield* InfinitusService;
+      // The Cloudflare tunnels retired; an older Mac still reports one, and
+      // the snapshot takes the rest of its status all the same.
       yield* stub.setResult("status", {
         ...status,
-        forkTunnel: {
-          enabled: true,
-          port: 3773,
-          state: "up",
-          url: "https://example-words.trycloudflare.com",
-        },
+        forkTunnel: { enabled: true, port: 3773, state: "up" },
       });
 
       const { fiber, first } = yield* subscribe(infinitus);
 
-      expect(first.status?.forkTunnel?.state).toBe("up");
-      expect(first.status?.forkTunnel?.url).toBe("https://example-words.trycloudflare.com");
+      expect(first.status?.version).toBe(status.version);
+      expect(first.status).not.toHaveProperty("forkTunnel");
 
       yield* Fiber.interrupt(fiber);
     }).pipe(Effect.provide(TestLayer)),

@@ -1,13 +1,13 @@
 /**
  * "Pair a phone" on Settings › Infinitus › Devices: a QR of a one-time pairing
- * link whose host is the Mac's Cloudflare quick tunnel while it is up, else
- * the server's own address on the Mac's Wi‑Fi (the desktop's advertised
- * address, or what the server reports in `lanHttpBaseUrls`, #651), so a phone
- * off the network or beside the Mac can reach this server. The token is
- * minted by upstream's pairing-token endpoint with the standard scopes and
- * TTL; nothing here adds an auth surface. The link carries the phone marker,
- * so a Camera-app scan that lands in Safari is told to use the app instead
- * of spending the code (#724).
+ * link whose host is the server's own address on the Mac's Wi‑Fi (the
+ * desktop's advertised address, or what the server reports in
+ * `lanHttpBaseUrls`, #651), so a phone beside the Mac can reach this server.
+ * A phone off that network reaches it through Infinitus Connect instead. The
+ * token is minted by upstream's pairing-token endpoint with the standard
+ * scopes and TTL; nothing here adds an auth surface. The link carries the
+ * phone marker, so a Camera-app scan that lands in Safari is told to use the
+ * app instead of spending the code (#724).
  *
  * @module InfinitusPairPhoneCard
  */
@@ -27,7 +27,6 @@ import {
   formatCountdown,
   lanPairingOrigin,
   pairPhoneCardModel,
-  type PairPhoneReach,
   type PhonePairingLink,
   SCAN_IN_APP_NOTICE,
 } from "./pairPhone.logic";
@@ -40,12 +39,11 @@ function pageOrigin(): string | null {
 }
 
 export function InfinitusPairPhoneCard() {
-  const { snapshot, serverLanOrigins } = useInfinitusEnvironment();
+  const { serverLanOrigins } = useInfinitusEnvironment();
   const [link, setLink] = useState<PhonePairingLink | null>(null);
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [reach, setReach] = useState<PairPhoneReach>("tunnel");
   const [codeShown, setCodeShown] = useState(false);
   // The countdown ticks only while there is one to draw.
   const nowMs = useRelativeTimeTick(link === null ? 60_000 : 1_000);
@@ -56,13 +54,11 @@ export function InfinitusPairPhoneCard() {
   );
 
   const model = pairPhoneCardModel({
-    forkTunnel: snapshot?.status?.forkTunnel,
     lanOrigin: lanPairingOrigin({
       serverExposure: desktopNetworkAccess.data?.serverExposureState ?? null,
       serverLanOrigins,
       pageOrigin: pageOrigin(),
     }),
-    reach,
     link,
     nowMs,
   });
@@ -109,31 +105,7 @@ export function InfinitusPairPhoneCard() {
   return (
     <SettingsSection id="infinitus-pair-phone" title="Pair a phone">
       <div className="flex flex-col gap-3 px-3 py-3 text-[13px] sm:px-4">
-        {model.tunnelNotice === null ? null : (
-          <p role="status" className="text-muted-foreground">
-            {model.tunnelNotice}
-          </p>
-        )}
-        {model.lanNotice === null ? null : (
-          <p className="text-muted-foreground">{model.lanNotice}</p>
-        )}
-        {model.reachChoice ? (
-          <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Reach">
-            <span className="text-muted-foreground">Pair over</span>
-            {(["tunnel", "lan"] as const).map((option) => (
-              <Button
-                key={option}
-                role="radio"
-                aria-checked={reach === option}
-                variant={reach === option ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setReach(option)}
-              >
-                {option === "tunnel" ? "Internet" : "Same Wi‑Fi"}
-              </Button>
-            ))}
-          </div>
-        ) : null}
+        <p className="text-muted-foreground">{model.lanNotice}</p>
         {model.origin === null ? null : (
           <>
             {model.link.kind === "active" ? (

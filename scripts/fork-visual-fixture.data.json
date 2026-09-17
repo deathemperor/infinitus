@@ -14,8 +14,8 @@
         "effect": "read",
         "name": "status",
         "options": [],
-        "replyShape": "{version, sha, engines:{swapd:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground, forkTunnel:{enabled, port, state, url?, hostname?}}",
-        "summary": "App version, which engines are on, engine badge, whether a sign-in is running, the fork server's tunnel (Mac only; state off|invalidPort|blocked|unavailable|starting|up|stopped, url while up — the stable fork_tunnel_hostname on the named tunnel when set, else a quick tunnel)."
+        "replyShape": "{version, sha, engines:{swapd:{enabled,registered}, cliproxy:{enabled,registered,keyPresent}, 9router:{enabled,registered,keyPresent}}, badge, signInRunning, playground}",
+        "summary": "App version, which engines are on, engine badge, whether a sign-in is running."
       },
       {
         "args": [],
@@ -730,28 +730,12 @@
         "value": 10
       },
       {
-        "default": false,
-        "effect": "live",
-        "key": "fork_tunnel_enabled",
-        "section": "devices",
-        "type": "bool",
-        "value": false
-      },
-      {
         "default": 3773,
         "effect": "live",
         "key": "fork_server_port",
         "section": "devices",
         "type": "int",
         "value": 3773
-      },
-      {
-        "default": "",
-        "effect": "live",
-        "key": "fork_tunnel_hostname",
-        "section": "devices",
-        "type": "string",
-        "value": ""
       },
       {
         "default": "",

@@ -1,4 +1,3 @@
-import type { InfinitusForkTunnel, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as DateTime from "effect/DateTime";
 import { act, StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
@@ -6,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 const { fake } = vi.hoisted(() => ({
   fake: {
-    snapshot: null as InfinitusSnapshot | null,
     create: vi.fn(),
     revoke: vi.fn(),
     loopback: true,
@@ -19,7 +17,7 @@ vi.mock("./InfinitusPrefsPanel", () => ({
   useInfinitusEnvironment: () => ({
     environmentId: "env-1",
     capability: true,
-    snapshot: fake.snapshot,
+    snapshot: null,
     serverLanOrigins: fake.lan,
   }),
 }));
@@ -42,26 +40,6 @@ vi.mock("../settingsLayout", async (importOriginal) => ({
 }));
 
 import { InfinitusPairPhoneCard } from "./InfinitusPairPhoneCard";
-
-const TUNNEL_URL = "https://example-words.trycloudflare.com";
-
-function snapshot(forkTunnel: InfinitusForkTunnel | undefined): InfinitusSnapshot {
-  return {
-    available: true,
-    status: {
-      version: "0.5.0",
-      sha: "3bdc03cca",
-      socket: "/tmp/infinitus.sock",
-      badge: "none",
-      playground: false,
-      signInRunning: false,
-      engines: {},
-      ...(forkTunnel === undefined ? {} : { forkTunnel }),
-    },
-    fleets: [],
-    commands: [],
-  };
-}
 
 function text(renderer: ReactTestRenderer): string {
   const walk = (node: unknown): string => {
@@ -97,7 +75,6 @@ describe("InfinitusPairPhoneCard", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-10T12:00:00Z"));
-    fake.snapshot = null;
     fake.loopback = true;
     fake.exposure = null;
     fake.lan = [];
@@ -112,45 +89,50 @@ describe("InfinitusPairPhoneCard", () => {
     vi.useRealTimers();
   });
 
-  it("tells a loopback page with the tunnel off to turn the tunnel on, with no QR", () => {
-    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
+  it("offers no QR at all from a loopback page nothing on the network can dial", () => {
     renderer = mount();
 
-    expect(text(renderer)).toContain("Turn on the Cloudflare quick tunnel");
+    expect(text(renderer)).toContain("Network access is on under Settings › Connections");
+    expect(text(renderer)).toContain("Infinitus Connect");
     expect(buttons(renderer)).toHaveLength(0);
     expect(renderer.root.findAll((node) => node.type === "svg")).toHaveLength(0);
   });
 
-  it("mints a link on demand while the tunnel is up and draws the QR with the tunnel host", async () => {
-    fake.snapshot = snapshot({ enabled: true, port: 3773, state: "up", url: TUNNEL_URL });
+  it("mints a link on demand and draws the QR", async () => {
+    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
+    fake.exposure = { mode: "network-accessible", endpointUrl: "http://192.168.1.20:3773" };
     fake.create.mockResolvedValue({
       id: "link-1",
       credential: "fixture-token",
       expiresAt: DateTime.makeUnsafe(Date.now() + 5 * 60_000),
     });
-    renderer = mount();
+    try {
+      renderer = mount();
 
-    expect(fake.create).not.toHaveBeenCalled();
-    const [show] = buttons(renderer);
-    expect(text(renderer)).toContain("Show QR");
-    await act(async () => {
-      show?.props.onClick();
-    });
+      expect(fake.create).not.toHaveBeenCalled();
+      const [show] = buttons(renderer);
+      expect(text(renderer)).toContain("Show QR");
+      await act(async () => {
+        show?.props.onClick();
+      });
 
-    expect(fake.create).toHaveBeenCalledWith({ label: "Infinitus phone" });
-    const svg = renderer.root.findAll((node) => node.type === "svg");
-    expect(svg).toHaveLength(1);
-    expect(text(renderer)).toContain("Expires in 5:00");
-    expect(text(renderer)).toContain("Scan with the Camera app on a phone that has Infinitus");
-    expect(text(renderer)).toContain("In a browser the link only explains");
-    expect(text(renderer)).not.toContain("Scan with the Infinitus app");
-    expect(text(renderer)).toContain("Copy link");
-    // The token never lands in the DOM as text — only inside the QR.
-    expect(text(renderer)).not.toContain("fixture-token");
+      expect(fake.create).toHaveBeenCalledWith({ label: "Infinitus phone" });
+      const svg = renderer.root.findAll((node) => node.type === "svg");
+      expect(svg).toHaveLength(1);
+      expect(text(renderer)).toContain("Expires in 5:00");
+      expect(text(renderer)).toContain("Scan with the Camera app on a phone that has Infinitus");
+      expect(text(renderer)).toContain("In a browser the link only explains");
+      expect(text(renderer)).toContain("Copy link");
+      // The token never lands in the DOM as text — only inside the QR.
+      expect(text(renderer)).not.toContain("fixture-token");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("revokes the link it replaces when a new one is minted", async () => {
-    fake.snapshot = snapshot({ enabled: true, port: 3773, state: "up", url: TUNNEL_URL });
+    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
+    fake.exposure = { mode: "network-accessible", endpointUrl: "http://192.168.1.20:3773" };
     fake.create
       .mockResolvedValueOnce({
         id: "link-1",
@@ -162,36 +144,29 @@ describe("InfinitusPairPhoneCard", () => {
         credential: "fixture-token-2",
         expiresAt: DateTime.makeUnsafe(Date.now() + 5 * 60_000),
       });
-    renderer = mount();
+    try {
+      renderer = mount();
 
-    await act(async () => {
-      buttons(renderer!)[0]?.props.onClick();
-    });
-    const fresh = buttons(renderer).find(
-      (button) => text({ toJSON: () => button.children } as never) === "New link",
-    );
-    await act(async () => {
-      fresh?.props.onClick();
-    });
+      await act(async () => {
+        buttons(renderer!)[0]?.props.onClick();
+      });
+      const fresh = buttons(renderer).find((node) => text0(node) === "New link");
+      await act(async () => {
+        fresh?.props.onClick();
+      });
 
-    expect(fake.create).toHaveBeenCalledTimes(2);
-    expect(fake.revoke).toHaveBeenCalledWith("link-1");
+      expect(fake.create).toHaveBeenCalledTimes(2);
+      expect(fake.revoke).toHaveBeenCalledWith("link-1");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
-  it("explains an older build without the tunnel", () => {
-    fake.snapshot = snapshot(undefined);
-    renderer = mount();
-
-    expect(text(renderer)).toContain("build has no tunnel");
-    expect(buttons(renderer)).toHaveLength(0);
-  });
-
-  it("offers a network-only link from a LAN page while the tunnel is off", () => {
+  it("offers a network-only link from a LAN page", () => {
     fake.loopback = false;
     vi.stubGlobal("window", {
       location: { hostname: "192.168.1.20", origin: "http://192.168.1.20:3773" },
     });
-    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
     try {
       renderer = mount();
 
@@ -205,7 +180,6 @@ describe("InfinitusPairPhoneCard", () => {
   it("points a loopback page at Network access when the desktop server is local-only", () => {
     vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
     fake.exposure = { mode: "local-only", endpointUrl: null };
-    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
     try {
       renderer = mount();
 
@@ -219,7 +193,6 @@ describe("InfinitusPairPhoneCard", () => {
   it("encodes the desktop server's LAN address, and reveals host and code for typing on request", async () => {
     vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
     fake.exposure = { mode: "network-accessible", endpointUrl: "http://192.168.1.20:3773" };
-    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
     fake.create.mockResolvedValue({
       id: "link-1",
       credential: "fixture-token",
@@ -235,6 +208,10 @@ describe("InfinitusPairPhoneCard", () => {
       const svg = renderer.root.findAll((node) => node.type === "svg");
       expect(svg).toHaveLength(1);
       expect(text(renderer)).not.toContain("fixture-token");
+      const qr = renderer.root.findAll((node) => node.props?.value?.startsWith?.("http"));
+      expect(qr[0]?.props.value).toBe(
+        "https://infinitus.run/pair#token=fixture-token&for=phone&to=http%3A%2F%2F192.168.1.20%3A3773",
+      );
       const reveal = buttons(renderer).find((node) => text0(node) === "Type it instead");
       act(() => reveal?.props.onClick());
       expect(text(renderer)).toContain("host 192.168.1.20:3773, code fixture-token.");
@@ -243,42 +220,9 @@ describe("InfinitusPairPhoneCard", () => {
     }
   });
 
-  it("lets the user pick the same network over the tunnel when both reach the server", async () => {
-    vi.stubGlobal("window", { location: { hostname: "127.0.0.1" }, desktopBridge: {} });
-    fake.exposure = { mode: "network-accessible", endpointUrl: "http://192.168.1.20:3773" };
-    fake.snapshot = snapshot({ enabled: true, port: 3773, state: "up", url: TUNNEL_URL });
-    fake.create.mockResolvedValue({
-      id: "link-1",
-      credential: "fixture-token",
-      expiresAt: DateTime.makeUnsafe(Date.now() + 5 * 60_000),
-    });
-    try {
-      renderer = mount();
-      expect(text(renderer)).toContain("Pair overInternetSame Wi‑Fi");
-      expect(text(renderer)).not.toContain("only works for phones on your Wi‑Fi");
-
-      const sameNetwork = buttons(renderer).find((node) => text0(node) === "Same Wi‑Fi");
-      act(() => sameNetwork?.props.onClick());
-      expect(text(renderer)).toContain("only works for phones on your Wi‑Fi");
-
-      const show = buttons(renderer).find((node) => text0(node) === "Show QR");
-      await act(async () => {
-        show?.props.onClick();
-      });
-      const svg = renderer.root.findAll((node) => node.type === "svg");
-      expect(svg[0]?.props.role ?? svg).toBeDefined();
-      const qr = renderer.root.findAll((node) => node.props?.value?.startsWith?.("http"));
-      expect(qr[0]?.props.value).toBe(
-        "https://infinitus.run/pair#token=fixture-token&for=phone&to=http%3A%2F%2F192.168.1.20%3A3773",
-      );
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-  it("encodes the address the server reports when there is no desktop bridge and no tunnel (#651)", async () => {
+  it("encodes the address the server reports when there is no desktop bridge (#651)", async () => {
     vi.stubGlobal("window", { location: { hostname: "127.0.0.1" } });
     fake.lan = ["http://192.168.1.20:3773", "http://10.0.0.7:3773"];
-    fake.snapshot = snapshot({ enabled: false, port: 3773, state: "off" });
     fake.create.mockResolvedValue({
       id: "link-1",
       credential: "fixture-token",

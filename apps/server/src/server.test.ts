@@ -121,7 +121,6 @@ import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
-import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
@@ -2208,52 +2207,6 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
 
       assert.equal(response.status, 200);
       assert.deepEqual(body, testEnvironmentDescriptor);
-    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
-  );
-
-  // Fork (#663): the descriptor names the Mac's tunnel while it is up, so a
-  // phone paired on the LAN learns where else this environment answers.
-  it.effect("names the Infinitus tunnel as an alternate base URL in the descriptor", () =>
-    Effect.gen(function* () {
-      yield* buildAppUnderTest({
-        layers: {
-          infinitus: {
-            snapshot: Effect.succeed({
-              available: true,
-              status: {
-                version: "1",
-                sha: "test",
-                socket: "/tmp/test.sock",
-                badge: "",
-                playground: false,
-                signInRunning: false,
-                engines: {},
-                forkTunnel: {
-                  enabled: true,
-                  port: 3773,
-                  state: "up",
-                  url: "https://code.infinitus.run",
-                },
-              },
-              fleets: [],
-              sessions: [],
-              commands: [],
-            } as unknown as InfinitusSnapshot),
-          },
-        },
-      });
-
-      const url = yield* getHttpServerUrl("/.well-known/t3/environment");
-      const response = yield* fetchEffect(url);
-      const body = yield* responseJsonEffect<
-        typeof testEnvironmentDescriptor & { alternateHttpBaseUrls?: ReadonlyArray<string> }
-      >(response);
-
-      assert.equal(response.status, 200);
-      assert.deepEqual(body, {
-        ...testEnvironmentDescriptor,
-        alternateHttpBaseUrls: ["https://code.infinitus.run"],
-      });
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 

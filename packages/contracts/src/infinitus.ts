@@ -87,22 +87,8 @@ export const InfinitusEngineState = Schema.Struct({
 });
 export type InfinitusEngineState = typeof InfinitusEngineState.Type;
 
-/** The Cloudflare quick tunnel the Mac app can run in front of this server's
-    port, for pairing a phone off the LAN (#572). `state` is one of off,
-    invalidPort, blocked, unavailable, starting, up, stopped — kept a string so
-    a state a newer build adds does not cost the whole status; `url` only
-    while up. Absent from builds before the tunnel and from the Linux tray. */
-export const InfinitusForkTunnel = Schema.Struct({
-  enabled: Schema.Boolean,
-  port: Schema.Number,
-  state: Schema.String,
-  url: Schema.optionalKey(Schema.String),
-  hostname: Schema.optionalKey(Schema.String),
-});
-export type InfinitusForkTunnel = typeof InfinitusForkTunnel.Type;
-
 /** The `status` command's reply: app build, the socket it answers on, the menu
-    bar badge, which engines are on, and the fork tunnel where the build has one. */
+    bar badge, and which engines are on. */
 export const InfinitusStatus = Schema.Struct({
   version: Schema.String,
   sha: Schema.String,
@@ -111,7 +97,6 @@ export const InfinitusStatus = Schema.Struct({
   playground: Schema.Boolean,
   signInRunning: Schema.Boolean,
   engines: Schema.Record(Schema.String, InfinitusEngineState),
-  forkTunnel: Schema.optionalKey(InfinitusForkTunnel),
   /** The running app's own bundle path (#777): the fork's startup reconcile
       quits and reopens a stale helper only when this is its nested bundle.
       Absent from helpers that predate it; the struct drops unknown keys, so
