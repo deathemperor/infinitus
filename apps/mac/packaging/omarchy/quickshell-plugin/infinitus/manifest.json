@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Infinitus",
   "license": "MIT",
-  "description": "claude-swap fleet in the bar: active account usage, themed fleet tooltip, click opens the fleet panel.",
+  "description": "Infinitus fleet in the bar: active account usage, themed fleet tooltip, click opens the fleet panel.",
   "kinds": [
     "bar-widget"
   ],

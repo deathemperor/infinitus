@@ -426,13 +426,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `null`. `FcmDeliveries.ts` — the queue job's optional `alert`
   (`FcmAlertData`): a ready-made alert with a null state, sent over the card
   the consumer computes anyway and never acknowledged as a card delivery.
-- `infra/relay/scripts/deploy.ts` — the `AlchemyContext` the deploy runs
-  under carries `updateStateStore: options.yes` beside `adopt` (#1322).
-  Upstream forwards only `adopt`, so on a Cloudflare account with no Alchemy
-  state store yet (ours; upstream's has had one for months) the CI deploy
-  died at `Cloudflare State store not found … or pass --yes` although the
-  workflow passes `--yes`. Alchemy's own `deploy --yes` sets the same field,
-  and with it the first deploy bootstraps the store itself.
 - `scripts/build-cli-archive.ts` — one call before the stage is copied:
   `applyWebBrandAssets(resolveWebAssetBrandForPackageVersion(version),
 "apps/server/dist/client")`, so a runtime unpacked from the archive serves
@@ -493,6 +486,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs` and
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them).
+- `patches/uniwind@1.11.0.patch` — upstream's patch (#9355) plus the fork's media-block hunk (2026-09-18): every rule inside a `@media` block keeps the block's media queries. Stock uniwind (1.12.0 too) resets its per-rule config after each child, so of the one `@media android` block Tailwind emits only the first `android:` utility keeps its platform and the rest apply on iOS as well — `android:bg-transparent` on the Settings section card erased every card on the phone. Pinned by `apps/mobile/src/lib/uniwind-platform-variants.test.ts`, which drives uniwind's own processor source; re-apply the hunk at the next uniwind bump until upstream fixes it.
 - `patches/expo-widgets@57.0.15.patch` — upstream's patch (#11604) plus the fork's `onExpoWidgetsActivityUpdate` hunk (#1277), consumer gone with #1375: drop the hunk at the next expo-widgets bump, never re-apply it. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
   upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
@@ -617,6 +611,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   #863).
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusSideQuestionSheet.tsx`, `sideQuestions.ts`) — a side question from the phone (#269 C, #881, #887). Rules and traps: `docs/internals/side-question.md`.
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusThreadUsageSheet.tsx`, `threadUsage.logic.ts`) — the thread's usage from the phone (#834, #907, #927). Rules and traps: `docs/internals/turn-usage.md`.
+- `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` route in the new-task sheet), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/state/use-thread-outbox-drain.ts` (+ test) — `usePinAtCreation` after a delivered creation, `threadsByKey` (#1278), `queueBehindRunningTurn` around both `resolveThreadOutboxDeliveryAction` calls (#807) and its `thread.turn.queue` form on a `turnQueue` server (#812: `sendQueuedMessage` `via`, `completeQueuedMessageDelivery` `retainInFeed`). Rules and traps: `docs/internals/phone-outbox-drain.md`.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).

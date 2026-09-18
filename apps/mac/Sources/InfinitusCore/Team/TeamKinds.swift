@@ -10,6 +10,10 @@ public enum TeamKinds {
     /// `m/<kid>/threads/index.json` — the Mac's threads on Infinitus desktop.
     public static let threads = "threads"
     public static let transcripts = "transcripts"
+    /// Retired (#1422): crash reports stay on the Mac. Not in
+    /// `memberKinds` — nothing publishes it — but the constant, the
+    /// `crashes.json` path shape and `TeamReader`'s case stay so
+    /// envelopes older members still hold keep reading.
     public static let crashes = "crashes"
     public static let aggregates = "aggregates"
     /// `m/<kid>/fleet.json` — every account of every fleet (#221).
@@ -22,7 +26,7 @@ public enum TeamKinds {
     public static let ack = "ack"
     public static let controlKinds = [command, ack]
     /// The kinds a member publishes about itself (§7), in table order.
-    public static let memberKinds = [stats, now, threads, transcripts, crashes, fleet]
+    public static let memberKinds = [stats, now, threads, transcripts, fleet]
 
     /// The branch a member writes `kind` to (#321): transcripts go to
     /// `t/<kid>`, fetched only by the readers their hint names, so the

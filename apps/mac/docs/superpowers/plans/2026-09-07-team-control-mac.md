@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- The engine stays isolated: nothing here reads `~/.claude-swap-backup/*`; Claude Code's own files (`~/.claude/sessions/*.json`) are fine.
+- The engine stays isolated: nothing here reads the engine's own backup dir; Claude Code's own files (`~/.claude/sessions/*.json`) are fine.
 - Everything is Swift; InfinitusCore + InfinitusCLI must build on Linux (`#if canImport(Glibc)` where needed).
 - Event-log icons are SF Symbol names (`person.2`), never emoji: both renderers use `Image(systemName:)`.
 - No file under `Sources/InfinitusUI/` or `ios/` changes (Infi3 owns InfinitusUI; `ios/` needs the phone gate). The HUD caption lives in `Sources/Infinitus/MacSessionsPopover.swift`.

@@ -9,8 +9,8 @@ machine.
 
 Upstream facts below were read from router-for-me/CLIProxyAPI @ `81e1b53`
 (`internal/api/server_management.go`, `handlers/management/*.go`,
-`sdk/cliproxy/auth/selector.go`) and from cswap's own
-`src/claude_swap/oauth.py`. Homebrew ships `cliproxyapi` 7.2.145; shapes
+`sdk/cliproxy/auth/selector.go`) and from the engine's own
+OAuth module. Homebrew ships `cliproxyapi` 7.2.145; shapes
 are re-verified against the installed release during phase 3 and any
 drift is recorded here.
 

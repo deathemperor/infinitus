@@ -1,5 +1,5 @@
 diff --git a/dist/common/bundler/css-processor/processor.js b/dist/common/bundler/css-processor/processor.js
-index 7dd369fa3197dbd622832c89ac3854c401e55c3e..ab3ea1a9520907321f9c21c2a3a859262fe5075b 100644
+index 7dd369fa3197dbd622832c89ac3854c401e55c3e..351953147770b8e94c70c09f66c6e212e4930659 100644
 --- a/dist/common/bundler/css-processor/processor.js
 +++ b/dist/common/bundler/css-processor/processor.js
 @@ -105,6 +105,64 @@ class ProcessorBuilder {
@@ -154,8 +154,30 @@ index 7dd369fa3197dbd622832c89ac3854c401e55c3e..ab3ea1a9520907321f9c21c2a3a85926
            return;
          }
          selector.forEach(selectorToken => {
+@@ -199,11 +223,19 @@ class ProcessorBuilder {
+       const {
+         mediaQueries
+       } = rule.value.query;
+-      this.declarationConfig.mediaQueries.push(...mediaQueries);
++      // Every rule inside the block starts from the config the block was entered
++      // with, media queries included: resetting to an empty config after each
++      // child dropped them from the second rule on, and a platform variant
++      // leaked onto every platform.
++      const scoped = {
++        ...this.declarationConfig,
++        mediaQueries: [...this.declarationConfig.mediaQueries, ...mediaQueries]
++      };
+       rule.value.rules.forEach(rule2 => {
++        this.declarationConfig = { ...scoped, mediaQueries: [...scoped.mediaQueries] };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = this.getDeclarationConfig();
+       return;
+     }
+     if (rule.type === "layer-block") {
 diff --git a/dist/metro/transformer.cjs b/dist/metro/transformer.cjs
-index d57ca8161f411f0dc7df827132586e428cafdf1b..3650a353b0db269ad4fc51b70a7158885c992e36 100644
+index d57ca8161f411f0dc7df827132586e428cafdf1b..6494582092a73a8f6776a2c69bc1b87c4e0fd9f6 100644
 --- a/dist/metro/transformer.cjs
 +++ b/dist/metro/transformer.cjs
 @@ -7,6 +7,7 @@ const culori = require('culori');
@@ -318,7 +340,29 @@ index d57ca8161f411f0dc7df827132586e428cafdf1b..3650a353b0db269ad4fc51b70a715888
            return;
          }
          selector.forEach((selectorToken) => {
-@@ -1753,10 +1778,11 @@ const transform = async (config$1, projectRoot, filePath, data, options) => {
+@@ -1629,11 +1654,19 @@ class ProcessorBuilder {
+     }
+     if (rule.type === "media") {
+       const { mediaQueries } = rule.value.query;
+-      this.declarationConfig.mediaQueries.push(...mediaQueries);
++      // Every rule inside the block starts from the config the block was entered
++      // with, media queries included: resetting to an empty config after each
++      // child dropped them from the second rule on, and a platform variant
++      // leaked onto every platform.
++      const scoped = {
++        ...this.declarationConfig,
++        mediaQueries: [...this.declarationConfig.mediaQueries, ...mediaQueries]
++      };
+       rule.value.rules.forEach((rule2) => {
++        this.declarationConfig = { ...scoped, mediaQueries: [...scoped.mediaQueries] };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = this.getDeclarationConfig();
+       return;
+     }
+     if (rule.type === "layer-block") {
+@@ -1753,10 +1786,11 @@ const transform = async (config$1, projectRoot, filePath, data, options) => {
    await bundlerConfig.generateArtifacts(cssArtifactPath);
    const virtualCode = await compileCSS(bundlerConfig);
    const isWeb = bundlerConfig.platform === config.Platform.Web;
@@ -332,7 +376,7 @@ index d57ca8161f411f0dc7df827132586e428cafdf1b..3650a353b0db269ad4fc51b70a715888
      "utf-8"
    );
 diff --git a/dist/metro/transformer.mjs b/dist/metro/transformer.mjs
-index d3e7475f8f0aaba510b318657dc8374e6c6097cb..6ff8cffc4bb703521b6d86f0ac14be054ba5b9ce 100644
+index d3e7475f8f0aaba510b318657dc8374e6c6097cb..58d16488fac331cb9d553285427da04a93941343 100644
 --- a/dist/metro/transformer.mjs
 +++ b/dist/metro/transformer.mjs
 @@ -5,6 +5,7 @@ import { converter, parse, formatHex, formatHex8 } from 'culori';
@@ -495,7 +539,29 @@ index d3e7475f8f0aaba510b318657dc8374e6c6097cb..6ff8cffc4bb703521b6d86f0ac14be05
            return;
          }
          selector.forEach((selectorToken) => {
-@@ -1746,10 +1771,11 @@ const transform = async (config, projectRoot, filePath, data, options) => {
+@@ -1622,11 +1647,19 @@ class ProcessorBuilder {
+     }
+     if (rule.type === "media") {
+       const { mediaQueries } = rule.value.query;
+-      this.declarationConfig.mediaQueries.push(...mediaQueries);
++      // Every rule inside the block starts from the config the block was entered
++      // with, media queries included: resetting to an empty config after each
++      // child dropped them from the second rule on, and a platform variant
++      // leaked onto every platform.
++      const scoped = {
++        ...this.declarationConfig,
++        mediaQueries: [...this.declarationConfig.mediaQueries, ...mediaQueries]
++      };
+       rule.value.rules.forEach((rule2) => {
++        this.declarationConfig = { ...scoped, mediaQueries: [...scoped.mediaQueries] };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = this.getDeclarationConfig();
+       return;
+     }
+     if (rule.type === "layer-block") {
+@@ -1746,10 +1779,11 @@ const transform = async (config, projectRoot, filePath, data, options) => {
    await bundlerConfig.generateArtifacts(cssArtifactPath);
    const virtualCode = await compileCSS(bundlerConfig);
    const isWeb = bundlerConfig.platform === Platform.Web;
@@ -509,7 +575,7 @@ index d3e7475f8f0aaba510b318657dc8374e6c6097cb..6ff8cffc4bb703521b6d86f0ac14be05
      "utf-8"
    );
 diff --git a/dist/module/bundler/css-processor/processor.js b/dist/module/bundler/css-processor/processor.js
-index 58c96b6ab642c2b724d1868d0d48b77bad33be6f..70b759b04913a0e9028c936827b4578d628b4728 100644
+index 58c96b6ab642c2b724d1868d0d48b77bad33be6f..744d60335d1683f85c8f3c84d2e81101420342a7 100644
 --- a/dist/module/bundler/css-processor/processor.js
 +++ b/dist/module/bundler/css-processor/processor.js
 @@ -99,6 +99,64 @@ export class ProcessorBuilder {
@@ -664,6 +730,28 @@ index 58c96b6ab642c2b724d1868d0d48b77bad33be6f..70b759b04913a0e9028c936827b4578d
            return;
          }
          selector.forEach((selectorToken) => {
+@@ -191,11 +215,19 @@ export class ProcessorBuilder {
+     }
+     if (rule.type === "media") {
+       const { mediaQueries } = rule.value.query;
+-      this.declarationConfig.mediaQueries.push(...mediaQueries);
++      // Every rule inside the block starts from the config the block was entered
++      // with, media queries included: resetting to an empty config after each
++      // child dropped them from the second rule on, and a platform variant
++      // leaked onto every platform.
++      const scoped = {
++        ...this.declarationConfig,
++        mediaQueries: [...this.declarationConfig.mediaQueries, ...mediaQueries]
++      };
+       rule.value.rules.forEach((rule2) => {
++        this.declarationConfig = { ...scoped, mediaQueries: [...scoped.mediaQueries] };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = this.getDeclarationConfig();
+       return;
+     }
+     if (rule.type === "layer-block") {
 diff --git a/src/bundler/adapters/metro/transformer.ts b/src/bundler/adapters/metro/transformer.ts
 index 08059b0fb2394effd2553086216d8933a53fad84..05c051595bfffd313f1d731fcedc1e991af720e1 100644
 --- a/src/bundler/adapters/metro/transformer.ts
@@ -699,7 +787,7 @@ index 08059b0fb2394effd2553086216d8933a53fad84..05c051595bfffd313f1d731fcedc1e99
          'utf-8',
      )
 diff --git a/src/bundler/css-processor/processor.ts b/src/bundler/css-processor/processor.ts
-index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..b5e185469733aca4289b7b07bc76dbfcd8fd5788 100644
+index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..c42c1c035462a2436fd968f24378c3ce9b0c5ff4 100644
 --- a/src/bundler/css-processor/processor.ts
 +++ b/src/bundler/css-processor/processor.ts
 @@ -123,6 +123,77 @@ export class ProcessorBuilder {
@@ -818,14 +906,14 @@ index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..b5e185469733aca4289b7b07bc76dbfc
 -                                }
 -                            })
 -                        })
+-                    }
+-
+-                    if (selector.type === 'pseudo-class' && selector.kind === 'active') {
+-                        active = true
 +                    if (trailing.length > 0 && !hasVariants) {
 +                        return
                      }
  
--                    if (selector.type === 'pseudo-class' && selector.kind === 'active') {
--                        active = true
--                    }
--
 -                    if (selector.type === 'pseudo-class' && selector.kind === 'focus') {
 -                        focus = true
 +                    const parseClassRule = () => {
@@ -885,6 +973,28 @@ index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..b5e185469733aca4289b7b07bc76dbfc
  
                      return
                  }
+@@ -242,11 +276,19 @@ export class ProcessorBuilder {
+         if (rule.type === 'media') {
+             const { mediaQueries } = rule.value.query
+ 
+-            this.declarationConfig.mediaQueries.push(...mediaQueries)
++            // Every rule inside the block starts from the config the block was entered
++            // with, media queries included: resetting to an empty config after each
++            // child dropped them from the second rule on, and a platform variant
++            // leaked onto every platform.
++            const scoped = {
++                ...this.declarationConfig,
++                mediaQueries: [...this.declarationConfig.mediaQueries, ...mediaQueries]
++            }
+             rule.value.rules.forEach(rule => {
++                this.declarationConfig = { ...scoped, mediaQueries: [...scoped.mediaQueries] }
+                 this.parseRuleRec(rule)
+-                this.declarationConfig = this.getDeclarationConfig()
+             })
++            this.declarationConfig = this.getDeclarationConfig()
+ 
+             return
+         }
 diff --git a/src/core/config/config.native.ts b/src/core/config/config.native.ts
 index 5e0832b5913df6f02604020d7ff5caf3b6a8d912..01aed1be25ca928f3a802996f41cb6b841aaed86 100644
 --- a/src/core/config/config.native.ts

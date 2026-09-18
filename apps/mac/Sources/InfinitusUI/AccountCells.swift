@@ -69,11 +69,12 @@ struct NextMarker<M: FleetModel>: View {
                   recovery.number == number {
             // Orange, not secondary: the first row to recover is the
             // one to watch while everything is limited (todo 2026-09-01).
+            let what = AccountVitals.spentModel(across: model.accounts)
+                .map { "All accounts are out of \($0)" } ?? "All accounts are at a limit"
             Image(systemName: "arrowtriangle.right")
                 .font(PopupFont.caption2)
                 .foregroundStyle(ThemeColor.flash(theme))
-                .instantTip("All accounts are at a limit — this one "
-                            + "recovers first\(Self.eta(recovery.at))")
+                .instantTip("\(what) — this one recovers first\(Self.eta(recovery.at))")
         } else {
             Image(systemName: "arrowtriangle.right.fill")
                 .font(PopupFont.caption2)

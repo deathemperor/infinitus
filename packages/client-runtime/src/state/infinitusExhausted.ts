@@ -28,6 +28,11 @@ export interface ExhaustedBandModel {
   readonly revivalAt: string | null;
   /** The label of the account that revives first, when known. */
   readonly revivesFirst: string | null;
+  /** The one per-model window that alone blocks every account ("Fable"):
+      the accounts still have plan headroom for other models, so the band
+      says which model ran out. Null when any account is out of a plan
+      window (5h/7d) or the blocking models differ. */
+  readonly model: string | null;
 }
 
 function iso(ms: number): string {
@@ -63,6 +68,21 @@ function revival(row: AccountRowModel, nowMs: number): { at: number | null } | n
   return { at: last !== null && last <= nowMs + PLAUSIBLE_HORIZON_MS ? last : null };
 }
 
+/** The sole per-model window name blocking `rows`, when no plan window is
+    maxed anywhere and every maxed scoped window carries the same name. */
+function blockingModel(rows: ReadonlyArray<AccountRowModel>, nowMs: number): string | null {
+  let model: string | null = null;
+  for (const row of rows) {
+    if (row.windows.some((window) => isMaxed(window, nowMs))) return null;
+    for (const window of row.scoped) {
+      if (!isMaxed(window, nowMs)) continue;
+      if (model !== null && model !== window.name) return null;
+      model = window.name;
+    }
+  }
+  return model;
+}
+
 /**
  * The band for one fleet, or null when it has nothing to say: no accounts
  * to wait on, or at least one unheld account that is not at a limit. A held
@@ -72,6 +92,7 @@ function revival(row: AccountRowModel, nowMs: number): { at: number | null } | n
 export function exhaustedBand(fleet: InfinitusFleet, nowMs: number): ExhaustedBandModel | null {
   const rows = buildFleetSection(fleet).rows.filter((row) => !row.held);
   if (rows.length === 0) return null;
+  const model = blockingModel(rows, nowMs);
   let earliest: { at: number; label: string } | null = null;
   for (const row of rows) {
     const revives = revival(row, nowMs);
@@ -81,13 +102,13 @@ export function exhaustedBand(fleet: InfinitusFleet, nowMs: number): ExhaustedBa
     }
   }
   if (earliest !== null) {
-    return { revivalAt: iso(earliest.at), revivesFirst: earliest.label };
+    return { revivalAt: iso(earliest.at), revivesFirst: earliest.label, model };
   }
   // The engine's own reviver, when no account reset could be ranked.
   const engine = fleet.nextRecovery;
   if (engine !== undefined && !Number.isNaN(Date.parse(engine.at))) {
     const label = rows.find((row) => row.number === engine.number)?.label ?? null;
-    return { revivalAt: iso(Date.parse(engine.at)), revivesFirst: label };
+    return { revivalAt: iso(Date.parse(engine.at)), revivesFirst: label, model };
   }
-  return { revivalAt: null, revivesFirst: null };
+  return { revivalAt: null, revivesFirst: null, model };
 }

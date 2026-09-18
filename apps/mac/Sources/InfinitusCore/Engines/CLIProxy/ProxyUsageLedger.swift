@@ -140,14 +140,13 @@ public struct ProxyUsageRecord: Codable, Sendable {
     }
 }
 
-// MARK: - Static price table (mirrors claude_swap/usage_report.py)
+// MARK: - Static price table (mirrors the engine's usage report)
 
-/// USD-per-million-token list prices, mirrored from
-/// `~/death/claude-swap/src/claude_swap/usage_report.py` so both engines
-/// price the same way. Models absent here are counted but reported as
-/// unpriced — never guessed.
+/// USD-per-million-token list prices, mirrored from the engine's own
+/// usage-report prices so both engines price the same way. Models absent
+/// here are counted but reported as unpriced — never guessed.
 public enum StaticPriceTable {
-    public static let source = "infinitus-static (mirrors claude-swap usage_report.py)"
+    public static let source = "infinitus-static (mirrors the engine's usage report)"
     public static let date = "2026-09-02"
 
     struct Rate {

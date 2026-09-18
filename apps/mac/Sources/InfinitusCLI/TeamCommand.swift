@@ -32,10 +32,10 @@ func teamUsage() -> String {
       insights [--period <p>]             leaderboards, repo coverage, blockers board, cost by member/model/repo, who's on, hours
       aggregates                          the leaders' published team picture
       aggregates publish [--period all|<p>]   (leaders) publish the team picture to the whole team
-      share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|threads|transcripts|crashes|fleet ("off" keeps it on this machine; new envelopes — see reshare)
+      share <kind> off|leaders|team|<kid>[,<kid>…]  audience for stats|now|threads|transcripts|fleet ("off" keeps it on this machine; new envelopes — see reshare)
       leave [--rotate-identity]                    delete my files on the store, tell the leaders, forget the team here (and mint a new identity)
       exclude <project-dir> [--off]                keep a project private (local, never sent)
-      publish [--projects <dir>] [--days N]        publish stats (from the Claude Code projects dir), threads, now, redacted transcripts and crashes (default 30 days); threads and transcripts need Infinitus desktop
+      publish [--projects <dir>] [--days N]        publish stats (from the Claude Code projects dir), threads, now and redacted transcripts (default 30 days); threads and transcripts need Infinitus desktop
       reshare [--days N]                           re-wrap the last N days (default 30) to the current audiences
       identity [show]                    this machine's identity kid
       identity recovery --show           the recovery key (base32, 8 groups) — keep it offline
@@ -526,7 +526,6 @@ func runTeam(_ args: [String]) -> Int32 {
                                                 codexDir: options["projects"] == nil ? StatsScanner.defaultCodexDir() : nil,
                                                 cacheURL: teamDir.appendingPathComponent("scan-cache.json"),
                                                 maxAge: TimeInterval(sources.historyDays + 1) * 86_400).entries
-            sources.crashes = CrashStore(directory: CrashStore.defaultDirectory()).list()
             // Threads and transcripts are the desktop's; without it the
             // index stays as last published and now.json says so.
             #if os(macOS)

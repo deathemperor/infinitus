@@ -185,7 +185,7 @@ Dropbox, OneDrive, iCloud Drive, NAS) and S3-compatible bucket.
 roster:    team.json  aggregates/<period>.json  credential.json
 requests:  requests/<kid>.json
 m/<kid>:   days/<yyyy-mm-dd>.json   now.json   sessions/index.json
-           transcripts/<session-id>/<seq>.jsonl   crashes.json
+           transcripts/<session-id>/<seq>.jsonl
 ```
 Every file is an envelope (§3); `team.json` is signed-plaintext (JSON +
 detached Ed25519 signature by a leader) so anyone with the credential
@@ -287,10 +287,15 @@ Stats.Day contribution; exclusions are local and never sent).
 | kind | file | content | cadence |
 |---|---|---|---|
 | stats | `days/<date>.json` | `Stats.Day` (Stats v2 shape, schema-versioned), minus per-project rows for excluded projects | day end + every push while the day changes |
-| now | `now.json` | sessions by status, active account + windows per fleet (engine ids opaque strings), blockers (dead accounts, expired AWS logins, waiting prompts), crashes today, `sharesTo` | every push while sessions are alive; deleted on quit |
+| now | `now.json` | sessions by status, active account + windows per fleet (engine ids opaque strings), blockers (dead accounts, expired AWS logins, waiting prompts), `sharesTo` | every push while sessions are alive; deleted on quit |
 | sessions | `sessions/index.json` | per session: id, project name (basename, not path), start/end, busy/waiting minutes, activity mix, $; fleet health summary | every push |
 | transcripts | `transcripts/<session>/<seq>.jsonl` | redacted JSONL, append-only chunks of ≤1 MiB of new lines since the last chunk; sub-agent transcripts under the same session | every push |
-| crashes | `crashes.json` | the built-in `CrashReport.summary` list (no raw) | on change |
+
+The crashes kind (`crashes.json`, the `CrashReport.summary` list) is
+retired (#1422): crash reports stay on the member's Mac, where the
+desktop's Settings › Devices shows them. Readers keep decoding old
+envelopes, and a publish removes a previously published `crashes.json`
+from the store once.
 
 Audience per kind (§1) is chosen in Settings › Team; changes apply to
 new envelopes. "Re-share history" re-wraps the local plaintext copies
@@ -318,7 +323,7 @@ Effort (tokens, $, minutes by day/week/month/year, by model, by
 activity, by repo); rhythm (hours heatmap, sessions/day, longest focus,
 waiting/blocked minutes); quality signals already in Stats v2 (review
 yield, test ROI, rework, delegation depth, cache hits, model switches);
-fleet health (accounts, limits hit, dead time, AWS stalls, crashes);
+fleet health (accounts, limits hit, dead time, AWS stalls);
 now (running/waiting/idle, active account, blockers); transcripts
 (list like the phone's Sessions screen, open, search, jump from a
 stat to the stretch behind it).
@@ -326,7 +331,7 @@ stat to the stretch behind it).
 ### 8.3 Insights for the team
 Totals and trends; per-member comparison table; leaderboards the leader
 picks; repo coverage (who works where, effort per repo); blockers board
-(every member's dead accounts, expired logins, waiting prompts, crashes);
+(every member's dead accounts, expired logins, waiting prompts);
 cost per member / repo / model with `UsageForecast` per member; team
 hours heatmap and who's on now. Leaders publish `aggregates/<period>.json`
 (wrapped to the team) so members see the team picture without reading

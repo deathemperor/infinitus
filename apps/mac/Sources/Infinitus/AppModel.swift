@@ -725,21 +725,19 @@ final class AppModel: ObservableObject {
             icon: "")  // the status button wears MenuBarGlyph instead
     }
 
-    /// One-time prefs adoption from the pre-2026-08-30 bundle id
-    /// (io.github.claude-swap.CswapBar.g2). Bundled runs only — the
-    /// unbundled domain is per-executable name and unaffected. Copies,
-    /// never moves: the old domain stays for rollback. Locally-set keys win.
-    /// First launch under a new bundle id copies the previous id's
-    /// prefs domain (the bundled app's UserDefaults.standard IS the
-    /// bundle id): com.huuloc.limitless (2026-08-30 → 2026-09-03), and
-    /// before it the CswapBar g2 domain. Each hop runs once; existing
-    /// keys are never overwritten.
+    /// One-time prefs adoption across the app's bundle-id renames.
+    /// Bundled runs only — the unbundled domain is per-executable name
+    /// and unaffected. Copies, never moves: the old domain stays for
+    /// rollback. Locally-set keys win. First launch under a new bundle
+    /// id copies the previous id's prefs domain (the bundled app's
+    /// UserDefaults.standard IS the bundle id): com.huuloc.limitless
+    /// (2026-08-30 → 2026-09-03), then com.huuloc.infinitus. Each hop
+    /// runs once; existing keys are never overwritten.
     private static func migrateLegacyDefaults() {
         guard AppDefaults.suite == nil else { return }   // a dev suite starts empty
         let std = AppDefaults.standard
         for (domain, marker) in [("com.huuloc.infinitus", "migrated_from_huuloc_id"),
-                                 ("com.huuloc.limitless", "migrated_from_limitless_id"),
-                                 ("io.github.claude-swap.CswapBar.g2", "migrated_from_g2")] {
+                                 ("com.huuloc.limitless", "migrated_from_limitless_id")] {
             guard !std.bool(forKey: marker), let legacy = std.persistentDomain(forName: domain) else { continue }
             for (key, value) in legacy where std.object(forKey: key) == nil {
                 std.set(value, forKey: key)
@@ -890,13 +888,12 @@ final class AppModel: ObservableObject {
     }()
 
     /// What this Mac publishes to its team (spec §7) besides the scan and
-    /// the desktop's threads: this Mac's crash reports, each engine's
-    /// active account with its window percentages, every account for the
-    /// member fleet view (#221), and the blockers the pop-out shows
-    /// (lapsed AWS logins, an all-limited fleet).
+    /// the desktop's threads: each engine's active account with its window
+    /// percentages, every account for the member fleet view (#221), and
+    /// the blockers the pop-out shows (lapsed AWS logins, an all-limited
+    /// fleet). Crash reports stay on this Mac (#1422).
     func teamSources() -> TeamPublisher.Sources {
         var s = TeamPublisher.Sources(home: NSHomeDirectory(), machine: machineName)
-        s.crashes = crashStore.list()
         let lastFleets = fleets.compactMap(\.lastFleet)
         s.fleets = lastFleets.map { fleet in
             let active = fleet.accounts.first { $0.number == fleet.activeNumber }
@@ -1851,7 +1848,8 @@ final class AppModel: ObservableObject {
                 number: a.number,
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
-                worstPct: PushTriggers.worstPlanPct(a.usage)) }
+                worstPct: PushTriggers.worstPlanPct(a.usage),
+                spentModel: AccountVitals.spentModel(a.usage)) }
         let pushes = pushTriggers.tick(
             accounts: health,
             flags: .init(allDead: pushAllDead, lastAlive: pushLastAlive),

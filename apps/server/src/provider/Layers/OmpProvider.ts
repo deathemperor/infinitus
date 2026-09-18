@@ -51,6 +51,27 @@ const VERSION_PROBE_TIMEOUT_MS = 4_000;
 const USAGE_PROBE_TIMEOUT_MS = 15_000;
 const OMP_UNAUTHENTICATED_MESSAGE = "Run `omp` once to sign in to a provider.";
 
+/** omp's own `defaultThinkingLevel` default; used when `omp config get` cannot answer. */
+const OMP_FALLBACK_THINKING_LEVEL = "high";
+// Levels omp's ACP thinking selector accepts: `off`, `auto`, and the ladder.
+const OMP_THINKING_LEVELS: Record<string, true> = {
+  off: true,
+  auto: true,
+  minimal: true,
+  low: true,
+  medium: true,
+  high: true,
+  xhigh: true,
+  max: true,
+};
+// omp's ACP session lists these ahead of the model's own ladder, so the
+// thread picker mirrors that: every value here is one `session/set_config_option`
+// accepts, and the configured default can be `auto`.
+const OMP_SESSION_THINKING_OPTIONS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: "off", label: "Off" },
+  { id: "auto", label: "Auto" },
+];
+
 const OMP_BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
   {
     slug: OMP_DEFAULT_MODEL_SLUG,
@@ -114,12 +135,15 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" ? value.trim() || undefined : undefined;
 }
 
-function thinkingOptionsFromModel(thinking: unknown): ModelCapabilities {
+function thinkingOptionsFromModel(
+  thinking: unknown,
+  defaultThinkingLevel: string,
+): ModelCapabilities {
   if (!Array.isArray(thinking)) {
     return EMPTY_CAPABILITIES;
   }
-  const seen = new Set<string>();
-  const options: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>(OMP_SESSION_THINKING_OPTIONS.map((option) => option.id));
+  const options: Array<{ id: string; label: string }> = [...OMP_SESSION_THINKING_OPTIONS];
   for (const entry of thinking) {
     const value = nonEmptyString(entry);
     if (value === undefined || seen.has(value)) {
@@ -128,9 +152,12 @@ function thinkingOptionsFromModel(thinking: unknown): ModelCapabilities {
     seen.add(value);
     options.push({ id: value, label: value });
   }
-  if (options.length === 0) {
+  if (options.length === OMP_SESSION_THINKING_OPTIONS.length) {
     return EMPTY_CAPABILITIES;
   }
+  // A new thread starts on omp's configured default, exactly what the ACP
+  // session reports as its current level; without it the picker is blank.
+  const currentValue = seen.has(defaultThinkingLevel) ? defaultThinkingLevel : undefined;
   return createModelCapabilities({
     optionDescriptors: [
       {
@@ -138,9 +165,21 @@ function thinkingOptionsFromModel(thinking: unknown): ModelCapabilities {
         label: "Thinking",
         type: "select",
         options,
+        ...(currentValue !== undefined ? { currentValue } : {}),
       },
     ],
   });
+}
+
+/**
+ * Parses `omp config get defaultThinkingLevel`. Anything that is not a level
+ * omp accepts (prose, an error, an empty answer) falls back to omp's own default.
+ */
+export function parseOmpDefaultThinkingLevel(output: string | undefined): string {
+  const value = output?.trim().toLowerCase();
+  return value !== undefined && OMP_THINKING_LEVELS[value] === true
+    ? value
+    : OMP_FALLBACK_THINKING_LEVEL;
 }
 
 export interface OmpModelsCliOutput {
@@ -153,7 +192,10 @@ export interface OmpModelsCliOutput {
  * catalog. Empty, missing, or unauthenticated prose ("No models available…")
  * is a warning, not an error — omp can be installed with zero credentials.
  */
-export function parseOmpModelsCliOutput(output: string): OmpModelsCliOutput {
+export function parseOmpModelsCliOutput(
+  output: string,
+  defaultThinkingLevel: string = OMP_FALLBACK_THINKING_LEVEL,
+): OmpModelsCliOutput {
   const trimmed = output.trim();
   if (trimmed.length === 0 || /no models available/i.test(trimmed)) {
     return { authenticated: false, models: [] };
@@ -190,7 +232,7 @@ export function parseOmpModelsCliOutput(output: string): OmpModelsCliOutput {
       slug,
       name: nonEmptyString(entry.name) ?? slug,
       isCustom: false,
-      capabilities: thinkingOptionsFromModel(entry.thinking),
+      capabilities: thinkingOptionsFromModel(entry.thinking, defaultThinkingLevel),
     });
   }
 
@@ -322,8 +364,38 @@ export const checkOmpProviderStatus = Effect.fn("checkOmpProviderStatus")(functi
     modelsResult.success.value.code === 0
       ? modelsResult.success.value
       : undefined;
+  // The level a fresh ACP session opens on. Only worth asking once the catalog
+  // answered; a failed probe falls back to omp's default rather than blanking
+  // the thread picker.
+  const thinkingLevelResult = modelsOutput
+    ? yield* runOmpCliCommand(
+        ompSettings,
+        ["config", "get", "defaultThinkingLevel"],
+        environment,
+      ).pipe(Effect.timeoutOption(VERSION_PROBE_TIMEOUT_MS), Effect.result)
+    : undefined;
+  const thinkingLevelOutput =
+    thinkingLevelResult !== undefined &&
+    Result.isSuccess(thinkingLevelResult) &&
+    Option.isSome(thinkingLevelResult.success) &&
+    thinkingLevelResult.success.value.code === 0
+      ? thinkingLevelResult.success.value.stdout
+      : undefined;
+  if (modelsOutput && thinkingLevelOutput === undefined) {
+    yield* Effect.logWarning("Oh My Pi CLI default thinking level probe failed or timed out.", {
+      errorTag:
+        thinkingLevelResult === undefined || Result.isFailure(thinkingLevelResult)
+          ? (thinkingLevelResult?.failure._tag ?? "Skipped")
+          : Option.isNone(thinkingLevelResult.success)
+            ? "Timeout"
+            : `ExitCode${thinkingLevelResult.success.value.code}`,
+    });
+  }
   const cliModels: OmpModelsCliOutput = modelsOutput
-    ? parseOmpModelsCliOutput(modelsOutput.stdout)
+    ? parseOmpModelsCliOutput(
+        modelsOutput.stdout,
+        parseOmpDefaultThinkingLevel(thinkingLevelOutput),
+      )
     : { authenticated: false, models: [] };
   if (!modelsOutput) {
     yield* Effect.logWarning("Oh My Pi CLI model listing failed or timed out.", {

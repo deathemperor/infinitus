@@ -14,7 +14,7 @@ Base: `origin/main` at **bbacd2d**, worktree `~/death/limitless-t-nearby2`, bran
 
 ## Global Constraints
 
-- **Everything is Swift; InfinitusCore builds on macOS AND Linux** (and iOS — the phone links it). No AppKit, no Security, no `Process` in anything this plan adds to Core; guard anything platform-shaped with `#if canImport(...)`. Never read engine internals (`~/.claude-swap-backup/*`); Claude Code's own files under `~/.claude` are fine.
+- **Everything is Swift; InfinitusCore builds on macOS AND Linux** (and iOS — the phone links it). No AppKit, no Security, no `Process` in anything this plan adds to Core; guard anything platform-shaped with `#if canImport(...)`. Never read engine internals (the engine's own backup dir); Claude Code's own files under `~/.claude` are fine.
 - **Secrets travel over stdin/keychain, never argv, never plaintext on disk outside `secrets`; shown masked only.** The team store token is embedded in every team code and invite link — so the invite link never touches argv, never gets logged, never gets written unsealed. The envelope on disk stays sealed; `TeamNearby.openInvite` is the only thing that opens it, in memory, at Accept.
 - **Idle CPU with the pop-out open stays ~0%:** no `TimelineView`, no `repeatForever` animation, no per-chunk main-actor hops. Nearby scans stay on demand (a button, or a section's first appearance) — never on a timer.
 - **Team-store I/O runs on `TeamModel.queue` via `run {}` / `action(...)`, never on the main actor.** `TeamModel` is `@MainActor`.
