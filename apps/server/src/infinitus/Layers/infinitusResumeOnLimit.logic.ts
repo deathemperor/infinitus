@@ -1,5 +1,7 @@
 import type {
   ModelSelection,
+  OrchestrationThreadActivity,
+  OrchestrationThreadShell,
   ProviderInstanceConfigMap,
   ProviderRuntimeEvent,
   ThreadId,
@@ -7,6 +9,7 @@ import type {
 } from "@infinitus/contracts";
 import type { InfinitusFleet, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
+import * as DateTime from "effect/DateTime";
 
 /**
  * Resume-on-limit for the threads this server runs (#648): the pure half.
@@ -70,6 +73,70 @@ export interface LimitStop {
       belongs to the proxy's upstream, so no swapd account is named and no
       rotation resumes it. */
   readonly proxy: string | null;
+}
+
+const decodeLimitMarker = Schema.decodeUnknownOption(
+  Schema.Struct({
+    stop: Schema.Literals(["parked", "failed"]),
+    accounts: Schema.Array(Schema.String),
+    resetsAt: Schema.optionalKey(Schema.NullOr(Schema.DateTimeUtcFromString)),
+    limitType: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    proxy: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  }),
+);
+
+/** Recover only unresolved failures of the thread's current turn. A saved
+ * parked marker may describe a turn that subsequently failed before exit. */
+export function restoreLimitStops(
+  threads: ReadonlyArray<OrchestrationThreadShell>,
+  limits: ReadonlyArray<OrchestrationThreadActivity>,
+  resumes: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyArray<LimitStop> {
+  const resumed = new Set(resumes.map((activity) => activity.turnId));
+  const byTurn = new Map<TurnId, OrchestrationThreadActivity>();
+  for (const activity of limits) {
+    if (activity.turnId === null || activity.kind !== LIMIT_MARKER_KIND) continue;
+    const previous = byTurn.get(activity.turnId);
+    if (previous === undefined || activity.createdAt > previous.createdAt) {
+      byTurn.set(activity.turnId, activity);
+    }
+  }
+  const stops: LimitStop[] = [];
+  for (const thread of threads) {
+    const turn = thread.latestTurn;
+    if (
+      thread.archivedAt !== null ||
+      turn === null ||
+      turn.state !== "error" ||
+      thread.session?.status !== "error" ||
+      thread.session.activeTurnId !== null ||
+      resumed.has(turn.turnId)
+    )
+      continue;
+    const marker = byTurn.get(turn.turnId);
+    if (marker === undefined) continue;
+    const stoppedAt = Date.parse(marker.createdAt);
+    if (thread.latestUserMessageAt !== null && Date.parse(thread.latestUserMessageAt) > stoppedAt)
+      continue;
+    const decoded = decodeLimitMarker(marker.payload);
+    if (decoded._tag !== "Some" || decoded.value.proxy != null) continue;
+    const payload = decoded.value;
+    // This feature has always tracked just the CLI credential fleet. Older
+    // markers saved its label as an array without the fleet key.
+    const account = payload.accounts[0];
+    if (account === undefined) continue;
+    stops.push({
+      threadId: thread.id,
+      turnId: turn.turnId,
+      kind: "failed",
+      stoppedAt,
+      activeAtStop: new Map([["swapd/claude", account]]),
+      resetsAt: payload.resetsAt == null ? null : DateTime.toEpochMillis(payload.resetsAt),
+      limitType: payload.limitType ?? null,
+      proxy: null,
+    });
+  }
+  return stops;
 }
 
 /**
