@@ -74,14 +74,20 @@ export const EDIT_FROM_HERE_CONFIRM = {
 
 export type RevertMenuAction = "files" | "restore-files" | "chat" | "fork";
 
-/** The menu's rows in the web's order: the two rollback modes need the provider's rollback, the fork a fork point. */
+/**
+ * The menu's rows in the web's order: the two rollback modes need the
+ * provider's rollback, the fork a fork point, and the two file modes an
+ * isolated worktree (the server refuses to restore files into a shared
+ * project directory, upstream #12306, as the web's menu hides them).
+ */
 export function revertMenuActions(gates: {
   readonly canRollback: boolean;
+  readonly canRestoreFiles: boolean;
   readonly canFork: boolean;
 }): ReadonlyArray<RevertMenuAction> {
   return [
-    ...(gates.canRollback ? (["files"] as const) : []),
-    "restore-files",
+    ...(gates.canRollback && gates.canRestoreFiles ? (["files"] as const) : []),
+    ...(gates.canRestoreFiles ? (["restore-files"] as const) : []),
     ...(gates.canRollback ? (["chat"] as const) : []),
     ...(gates.canFork ? (["fork"] as const) : []),
   ];

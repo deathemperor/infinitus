@@ -481,6 +481,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`, `server.test.ts`,
   `build-desktop-artifact.test.ts`, and the web fixtures that stub a desktop
   origin) use the fork's scheme.
+- `scripts/build-desktop-artifact.test.ts` — the cross-architecture Windows
+  probe test asserts on the probe's executable, not on `ELECTRON_RUN_AS_NODE`
+  in any spawned env: the bundle self-check inherits the host's env, and a
+  runner hosted by the desktop app (an agent inside Infinitus) carries that
+  variable, so the upstream assertion failed there.
+- `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
+  temp directory's real path: the service canonicalises transcript roots,
+  and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),
+  so two upstream tests failed on a Mac. Plus the fork's own cases (#834).
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs` and
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them).
