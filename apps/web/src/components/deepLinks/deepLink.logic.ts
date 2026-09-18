@@ -2,7 +2,7 @@ import { redirectedInfinitusSettingsPath } from "../settings/infinitus/settingsI
 import { SETTINGS_SECTION_LABELS, type SettingsPath } from "../settings/settingsSearch";
 
 /** `settings/<page>` navigates only to a section the sidebar lists. */
-export function isSettingsDeepLinkPath(path: string): path is SettingsPath {
+function isSettingsDeepLinkPath(path: string): path is SettingsPath {
   return Object.hasOwn(SETTINGS_SECTION_LABELS, path);
 }
 
