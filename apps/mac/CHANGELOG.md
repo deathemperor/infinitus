@@ -10,6 +10,18 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.26
+
+### Mac
+- The pop-out no longer locks; the `lock`, `lock-status` and `unlock` control commands are removed.
+
+### Desktop
+- 9Router started from Engines stays up — it was launched in its terminal-menu mode, which quits within seconds when there is no terminal.
+- The Pi status check runs offline, so it answers in well under a second and can no longer break a pending Pi extension install.
+- A Pi instance can route through 9Router or CLIProxyAPI from the add-instance wizard, like a Claude one.
+- Adding or re-signing a Claude account opens the sign-in page in a private window of Chrome, Brave, Edge, Vivaldi or Arc, so you no longer sign out of the browser's current account first.
+- Settings › Lock is gone, and with it the biometric lock over the menu bar pop-out.
+
 ## 0.5.0-alpha.25
 
 ### Mac
