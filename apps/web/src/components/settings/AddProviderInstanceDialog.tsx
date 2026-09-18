@@ -37,6 +37,7 @@ import {
   PROXY_ADVISOR_NOTE,
   validateProxyDraft,
   type ProxyDraft,
+  type ProxyDriver,
 } from "./proxyProvider";
 
 const PROVIDER_ACCENT_SWATCHES = [
@@ -72,6 +73,7 @@ function deriveInstanceId(driver: ProviderDriverKind, label: string): string {
 const INSTANCE_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 const CLAUDE_DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
+const PI_DRIVER_KIND = ProviderDriverKind.make("pi");
 const DEFAULT_DRIVER_OPTION = DRIVER_OPTIONS[0]!;
 const EMPTY_CONFIG_DRAFT: Record<string, unknown> = {};
 interface ComingSoonDriverOption {
@@ -142,7 +144,7 @@ export function AddProviderInstanceDialog({
   // Driver-specific config drafts keyed by driver so toggling between drivers
   // during the same dialog session does not lose in-progress input.
   const [configByDriver, setConfigByDriver] = useState<Record<string, Record<string, unknown>>>({});
-  // Fork: "Route through a proxy" on the Claude Config step.
+  // Fork: "Route through a proxy" on the Claude and Pi Config steps.
   const [proxyDraft, setProxyDraft] = useState<ProxyDraft>(EMPTY_PROXY_DRAFT);
   // Errors are suppressed until the user has tried to submit once. After that
   // they update live so fixing the problem clears the message in place.
@@ -161,7 +163,12 @@ export function AddProviderInstanceDialog({
   );
   const instanceIdError = validateInstanceId(instanceId, existingIds);
   const isClaude = driver === CLAUDE_DRIVER_KIND;
-  const proxyError = isClaude ? validateProxyDraft(proxyDraft) : null;
+  const proxyDriver: ProxyDriver | null = isClaude
+    ? "claude"
+    : driver === PI_DRIVER_KIND
+      ? "pi"
+      : null;
+  const proxyError = proxyDriver ? validateProxyDraft(proxyDraft) : null;
   const showInstanceIdError = hasAttemptedSubmit && instanceIdError !== null;
   const previewLabel = label.trim() || `${driverOption.label} Workspace`;
   const wizardStepSummaries = [driverOption.label, previewLabel, null] as const;
@@ -199,8 +206,8 @@ export function AddProviderInstanceDialog({
     if (instanceIdError !== null || proxyError !== null) return;
 
     const draftConfig = configByDriver[driver] ?? {};
-    const applied = isClaude
-      ? applyProxyDraft(proxyDraft, instanceId, draftConfig)
+    const applied = proxyDriver
+      ? applyProxyDraft(proxyDraft, instanceId, draftConfig, proxyDriver)
       : { config: draftConfig, environment: undefined };
     const config = applied.config;
     const hasConfig = Object.keys(config).length > 0;
@@ -402,8 +409,9 @@ export function AddProviderInstanceDialog({
 
           {driverSettingsFields.length > 0 ? (
             <div className={cn("grid gap-4", wizardStep !== 2 && "hidden")}>
-              {isClaude ? (
+              {proxyDriver ? (
                 <ProxyProviderFields
+                  driver={proxyDriver}
                   environmentId={environmentId}
                   draft={proxyDraft}
                   error={hasAttemptedSubmit ? proxyError : null}

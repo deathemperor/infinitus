@@ -22,6 +22,7 @@ import { expandHomePath } from "../../pathExpansion.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makePiAdapter } from "../Layers/PiAdapter.ts";
+import { writePiProxyModelsFile } from "../Layers/piProxyHome.ts";
 import {
   buildInitialPiProviderSnapshot,
   checkPiProviderStatus,
@@ -94,6 +95,20 @@ export const PiDriver: ProviderDriver<PiSettings, PiDriverEnv> = {
         enabled,
         binaryPath: expandHomePath(config.binaryPath),
       } satisfies PiSettings;
+
+      // A proxied instance's models.json is derived from its settings, so it
+      // is rewritten here, where every settings change passes through.
+      yield* writePiProxyModelsFile(effectiveConfig, processEnv).pipe(
+        Effect.mapError(
+          (cause) =>
+            new ProviderDriverError({
+              driver: DRIVER_KIND,
+              instanceId,
+              detail: `Failed to write Pi's models.json: ${cause.message}`,
+              cause,
+            }),
+        ),
+      );
 
       const adapter = yield* makePiAdapter(effectiveConfig, {
         instanceId,

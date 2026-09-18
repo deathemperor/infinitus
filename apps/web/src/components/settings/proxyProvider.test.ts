@@ -89,6 +89,23 @@ describe("proxyProvider", () => {
     ]);
   });
 
+  it("for Pi: writes PI_PROXY_* vars, no slots, its own dir, and proxy/ picker slugs", () => {
+    const { config, environment } = applyProxyDraft(
+      { ...filled, baseUrl: "http://127.0.0.1:20128/" },
+      "pi_9router",
+      { customModels: ["proxy/kr/gpt-5.6-sol"] },
+      "pi",
+    );
+    expect(environment).toEqual([
+      { name: "PI_PROXY_BASE_URL", value: "http://127.0.0.1:20128", sensitive: false },
+      { name: "PI_PROXY_API_KEY", value: "sk-9r", sensitive: true },
+    ]);
+    expect(config.homePath).toBe("~/.pi-proxy/pi_9router");
+    // Pi custom models carry no Claude descriptors; the picker slug is Pi's
+    // `provider/model`, under the provider the server declares in models.json.
+    expect(config.customModels).toEqual(["proxy/kr/gpt-5.6-sol", "proxy/kr/claude-opus-5"]);
+  });
+
   it("validates only when enabled: URL scheme, then key", () => {
     expect(validateProxyDraft(EMPTY_PROXY_DRAFT)).toBeNull();
     expect(validateProxyDraft({ ...filled, baseUrl: "127.0.0.1:20128" })).toMatch(/base URL/);

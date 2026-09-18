@@ -69,10 +69,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/client-runtime/src/state/server.ts` — `serverEnvironment.proxyModels`
   command (single-flight per base URL).
 - `apps/web/src/components/settings/AddProviderInstanceDialog.tsx` — the Claude
-  Config step renders `ProxyProviderFields` ("Route through a proxy"); on save
-  `applyProxyDraft` adds the ANTHROPIC_* environment variables (the key marked
-  sensitive), a dedicated `homePath` (`~/.claude-proxy/<instanceId>` unless one
-  was typed) and every picked model as a custom model (the loaded list is
+  and Pi Config steps render `ProxyProviderFields` ("Route through a proxy"); on save
+  `applyProxyDraft` adds the ANTHROPIC_* (Claude) or PI_PROXY_* (Pi) environment
+  variables (the key marked sensitive), a dedicated `homePath`
+  (`~/.<driver>-proxy/<instanceId>` unless one was typed) and every picked model as a custom model (the loaded list is
   checkboxes with Select all, so the proxy's models populate the picker in one
   click; models already on the instance, by slug or `{slug}`, are not doubled).
 - `packages/contracts/src/keybindings.ts` + `packages/shared/src/keybindings.ts`
