@@ -15,7 +15,7 @@
 - Every commit ends with `Co-Authored-By: Claude Code <noreply@anthropic.com>` (the repo hook adds it; write it anyway).
 - Stage by explicit path; never `git add -A`; never amend, stash or rebase.
 - Surgical changes; match the surrounding style; no speculative abstractions; comments explain why, in the repo's voice.
-- No engine internals; no `~/.claude-swap-backup/*`.
+- No engine internals; no engine backup dir.
 - All disk writes atomic (`Data.write(to:options: .atomic)`); nothing silently dropped.
 - `swift build` and `swift test` must pass after every InfinitusCore/Mac task; the phone tasks end with a green `xcodebuild` (command in Task 6).
 - Sending is queued ONLY on a transport error; any `SessionInput.Reply` is the Mac's answer.

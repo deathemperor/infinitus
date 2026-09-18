@@ -11,7 +11,7 @@
 **Spec:** `docs/research/multi-engine.md` (+ `cliproxyapi-backend.md` for the API mapping).
 
 ## Global constraints
-- Engine isolation: never read `~/.cli-proxy-api/*` contents or `~/.claude-swap-backup/*`; proxy = HTTP only, cswap = subprocess only.
+- Engine isolation: never read `~/.cli-proxy-api/*` contents or the engine's own backup dir; proxy = HTTP only, cswap = subprocess only.
 - Secrets never in argv, defaults, or logs; the management key lives in the keychain (`com.huuloc.infinitus.cliproxy`).
 - Bundle id `com.huuloc.limitless` untouched. Push nothing to any remote.
 - Surgical diffs, existing style, `swift test` green at every commit, popup pixel-identical on a cswap-only Mac after phase 1 (compare against `scratchpad/Infinitus-baseline.app`).

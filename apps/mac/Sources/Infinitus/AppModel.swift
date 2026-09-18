@@ -725,21 +725,19 @@ final class AppModel: ObservableObject {
             icon: "")  // the status button wears MenuBarGlyph instead
     }
 
-    /// One-time prefs adoption from the pre-2026-08-30 bundle id
-    /// (io.github.claude-swap.CswapBar.g2). Bundled runs only — the
-    /// unbundled domain is per-executable name and unaffected. Copies,
-    /// never moves: the old domain stays for rollback. Locally-set keys win.
-    /// First launch under a new bundle id copies the previous id's
-    /// prefs domain (the bundled app's UserDefaults.standard IS the
-    /// bundle id): com.huuloc.limitless (2026-08-30 → 2026-09-03), and
-    /// before it the CswapBar g2 domain. Each hop runs once; existing
-    /// keys are never overwritten.
+    /// One-time prefs adoption across the app's bundle-id renames.
+    /// Bundled runs only — the unbundled domain is per-executable name
+    /// and unaffected. Copies, never moves: the old domain stays for
+    /// rollback. Locally-set keys win. First launch under a new bundle
+    /// id copies the previous id's prefs domain (the bundled app's
+    /// UserDefaults.standard IS the bundle id): com.huuloc.limitless
+    /// (2026-08-30 → 2026-09-03), then com.huuloc.infinitus. Each hop
+    /// runs once; existing keys are never overwritten.
     private static func migrateLegacyDefaults() {
         guard AppDefaults.suite == nil else { return }   // a dev suite starts empty
         let std = AppDefaults.standard
         for (domain, marker) in [("com.huuloc.infinitus", "migrated_from_huuloc_id"),
-                                 ("com.huuloc.limitless", "migrated_from_limitless_id"),
-                                 ("io.github.claude-swap.CswapBar.g2", "migrated_from_g2")] {
+                                 ("com.huuloc.limitless", "migrated_from_limitless_id")] {
             guard !std.bool(forKey: marker), let legacy = std.persistentDomain(forName: domain) else { continue }
             for (key, value) in legacy where std.object(forKey: key) == nil {
                 std.set(value, forKey: key)

@@ -1,6 +1,6 @@
 import Foundation
 
-// Display-side logic ported from claude_swap/menubar.py — the JSON feed is
+// Display-side logic ported from the engine's menubar — the JSON feed is
 // deliberately raw (resetsAt preserved, pct as stored), so each frontend
 // rolls weekly windows against its own clock.
 
@@ -188,7 +188,7 @@ public extension Account {
 }
 
 /// Human notes for non-"ok" `usageStatus` values. Strings are word-for-word
-/// `SENTINEL_NOTES` from claude_swap/switcher.py — the codebase's stated
+/// `SENTINEL_NOTES` from the engine's switcher — the codebase's stated
 /// invariant is that every surface renders these identically.
 public enum SentinelNotes {
     public static let notes: [String: String] = [

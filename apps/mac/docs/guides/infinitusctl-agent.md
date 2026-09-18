@@ -98,5 +98,5 @@ infinitusctl wait-add --timeout 300 && infinitusctl fleets
 - Never pass secrets on the command line; `proxy-key` reads stdin.
 - Never call `remove` without the human's explicit go-ahead.
 - Do not edit `~/.claude/settings.json`, the proxy's config, or anything
-  under `~/.claude-swap-backup/` on the app's behalf; those are the
+  under the engine's own backup dir on the app's behalf; those are the
   human's or the engine's.

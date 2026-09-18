@@ -192,8 +192,8 @@ final class FleetPanelTests: XCTestCase {
         XCTAssertEqual(none.empty, "No account engine installed.")
         XCTAssertFalse(none.empty?.contains("swapd") == true, "core copy names no engine")
         let hinted = FleetPanel.panel(fleets: [], engineInstalled: false,
-                                      installHint: "`pip install claude-swap` adds one.")
-        XCTAssertEqual(hinted.empty, "No account engine installed. `pip install claude-swap` adds one.")
+                                      installHint: "Install an engine to add one.")
+        XCTAssertEqual(hinted.empty, "No account engine installed. Install an engine to add one.")
         XCTAssertTrue(none.sections.isEmpty)
 
         let reading = FleetPanel.panel(fleets: [], engineInstalled: true)

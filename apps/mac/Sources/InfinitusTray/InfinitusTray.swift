@@ -142,7 +142,7 @@ struct InfinitusTray {
     }
 
     static let help = """
-    infinitus-tray — Waybar module for the claude-swap fleet (Omarchy/Linux)
+    infinitus-tray — Waybar module for the Infinitus fleet (Omarchy/Linux)
 
       status [--theme ID] [--remaining]   Waybar JSON: active account + fleet tooltip
       panel [--theme ID] [--engine-order] structured fleet JSON for the Quickshell panel

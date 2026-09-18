@@ -25,8 +25,7 @@ if ! defaults read Infinitus-unbundled >/dev/null 2>&1; then
     { defaults export Limitless-unbundled - 2>/dev/null \
       || defaults export run.infinitus - 2>/dev/null \
       || defaults export com.huuloc.infinitus - 2>/dev/null \
-      || defaults export com.huuloc.limitless - 2>/dev/null \
-      || defaults export io.github.claude-swap.CswapBar.g2 - 2>/dev/null; } \
+      || defaults export com.huuloc.limitless - 2>/dev/null; } \
         | defaults import Infinitus-unbundled - 2>/dev/null || true
 fi
 nohup "$OUT" >/dev/null 2>&1 &
