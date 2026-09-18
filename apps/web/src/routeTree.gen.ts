@@ -35,7 +35,6 @@ import { Route as SettingsAppearanceRouteImport } from './routes/settings.appear
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as SettingsInfinitusIndexRouteImport } from './routes/settings.infinitus.index'
-import { Route as SettingsInfinitusThemesRouteImport } from './routes/settings.infinitus.themes'
 import { Route as SettingsInfinitusTeamRouteImport } from './routes/settings.infinitus.team'
 import { Route as SettingsInfinitusSessionsRouteImport } from './routes/settings.infinitus.sessions'
 import { Route as SettingsInfinitusNotificationsRouteImport } from './routes/settings.infinitus.notifications'
@@ -176,11 +175,6 @@ const SettingsInfinitusIndexRoute = SettingsInfinitusIndexRouteImport.update({
   path: '/infinitus/',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsInfinitusThemesRoute = SettingsInfinitusThemesRouteImport.update({
-  id: '/infinitus/themes',
-  path: '/infinitus/themes',
-  getParentRoute: () => SettingsRoute,
-} as any)
 const SettingsInfinitusTeamRoute = SettingsInfinitusTeamRouteImport.update({
   id: '/infinitus/team',
   path: '/infinitus/team',
@@ -267,7 +261,6 @@ export interface FileRoutesByFullPath {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRoutesByTo {
@@ -304,7 +297,6 @@ export interface FileRoutesByTo {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRoutesById {
@@ -343,7 +335,6 @@ export interface FileRoutesById {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRouteTypes {
@@ -382,7 +373,6 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
     | '/settings/infinitus/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -419,7 +409,6 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
     | '/settings/infinitus'
   id:
     | '__root__'
@@ -457,7 +446,6 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
     | '/settings/infinitus/'
   fileRoutesById: FileRoutesById
 }
@@ -659,13 +647,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsInfinitusIndexRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/settings/infinitus/themes': {
-      id: '/settings/infinitus/themes'
-      path: '/infinitus/themes'
-      fullPath: '/settings/infinitus/themes'
-      preLoaderRoute: typeof SettingsInfinitusThemesRouteImport
-      parentRoute: typeof SettingsRoute
-    }
     '/settings/infinitus/team': {
       id: '/settings/infinitus/team'
       path: '/infinitus/team'
@@ -768,7 +749,6 @@ interface SettingsRouteChildren {
   SettingsInfinitusNotificationsRoute: typeof SettingsInfinitusNotificationsRoute
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
   SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
-  SettingsInfinitusThemesRoute: typeof SettingsInfinitusThemesRoute
   SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
 }
 
@@ -792,7 +772,6 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusNotificationsRoute: SettingsInfinitusNotificationsRoute,
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
   SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
-  SettingsInfinitusThemesRoute: SettingsInfinitusThemesRoute,
   SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
 }
 

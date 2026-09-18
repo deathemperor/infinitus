@@ -20,7 +20,6 @@ export type SettingsPath =
   | "/settings/source-control"
   | "/settings/connections"
   | "/settings/infinitus"
-  | "/settings/infinitus/themes"
   | "/settings/infinitus/animations"
   | "/settings/infinitus/sessions"
   | "/settings/infinitus/lock"
@@ -97,7 +96,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   // The app is Infinitus, so its pages carry no prefix (user 2026-09-11); the
   // catalog page is named for what it holds, the menu bar and popup prefs.
   "/settings/infinitus": "Menu bar",
-  "/settings/infinitus/themes": "Themes",
   "/settings/infinitus/animations": "Animations",
   "/settings/infinitus/sessions": "Priority",
   "/settings/infinitus/lock": "Lock",
@@ -775,9 +773,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     infinitusOnly: true,
   },
   {
+    // The theme picker sits on the Menu bar page, under its own section.
     id: "infinitus-themes",
     title: "Infinitus themes",
-    to: "/settings/infinitus/themes",
+    to: "/settings/infinitus",
     targetId: "infinitus-themes",
     infinitusOnly: true,
     searchTerms: ["theme gamification style rpg movie hades picker look"],
@@ -900,7 +899,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   // Fork: the Infinitus pages read the primary environment's menu bar app and
   // need no selection scope to render.
   "/settings/infinitus": null,
-  "/settings/infinitus/themes": null,
   "/settings/infinitus/animations": null,
   "/settings/infinitus/sessions": null,
   "/settings/infinitus/lock": null,

@@ -558,8 +558,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
 - `apps/web/src/components/settings/settingsSearch.ts` — the eight Infinitus
-  `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Priority since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
+  `SettingsPath`s and their labels (Animations since #747 step 1,
+  Priority since #743, Lock since #747 step 3; the Themes page of #747 step 1
+  folded into the Menu bar page), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts`, and one block in upstream's `ThreadNotificationCoordinator.tsx` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
@@ -571,12 +572,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
 - `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
-  routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
-  the catalog's `themes` / `animations` sections, #747 step 1, and Priority
+  routes directory; Animations is an `InfinitusPrefsPanel` page over
+  the catalog's `animations` section, #747 step 1, and Priority
   over its `priority` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`,
   the mode row labelled "Thread priority" since #1069) —
-  the Menu bar page keeps `display` + `about`; the Priority page reads the
+  the Menu bar page keeps `display` + `themes` + `about`; the Priority page reads the
   catalog's `priority` section and, on a build before that rename,
   `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)

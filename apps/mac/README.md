@@ -93,7 +93,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **One account, one card** — a single account gets big gauges and full reset text; two or more get the grid.
 - **Every account at a glance** — live 5-hour, weekly and per-model gauges, pace markers, reset countdowns, dead rows with the cause.
 - **Auto-switch aware** — the next-candidate pick, a themed marker on the active account, switch history, a sweep on every switch.
-- **Themes** — RPG, Movie, Hades, Metal Gear, Sci-Fi, Cyberpunk, Ocean and more, picked in the desktop app's Settings › Infinitus › Themes, your own via `themes.json`; the phone follows.
+- **Themes** — RPG, Movie, Hades, Metal Gear, Sci-Fi, Cyberpunk, Ocean and more, picked in the desktop app's Settings › Menu bar, your own via `themes.json`; the phone follows.
 - **Themed menu bar** — the loop in the theme's color with its icon, a glow on switch, death and revival, an ember breath while burning ahead of pace.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
