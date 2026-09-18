@@ -1,5 +1,7 @@
 import {
   EventId,
+  type OrchestrationThreadActivity,
+  type OrchestrationThreadShell,
   ProviderDriverKind,
   ProviderInstanceId,
   type ProviderInstanceConfigMap,
@@ -9,16 +11,20 @@ import {
 } from "@infinitus/contracts";
 import type { InfinitusAccount, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { describe, expect, it } from "vite-plus/test";
+import * as DateTime from "effect/DateTime";
 
 import {
   activeClaudeAccounts,
   eventCancelsStop,
+  LIMIT_MARKER_KIND,
+  RESUME_MARKER_KIND,
   limitMarkerSummary,
   limitStopFromEvent,
   proxyInstanceLabel,
   proxyStop,
   resumeMarkerSummary,
   resumeTarget,
+  restoreLimitStops,
   type LimitStop,
 } from "./infinitusResumeOnLimit.logic.ts";
 
@@ -75,6 +81,88 @@ const stopAt = (snapshot: InfinitusSnapshot, kind: LimitStop["kind"] = "parked")
   resetsAt: null,
   limitType: null,
   proxy: null,
+});
+
+describe("restoreLimitStops", () => {
+  const createdAt = DateTime.formatIso(DateTime.makeUnsafe(NOW));
+  const thread = {
+    id: threadId,
+    archivedAt: null,
+    latestTurn: { turnId, state: "error" },
+    session: { status: "error", activeTurnId: null },
+    latestUserMessageAt: DateTime.formatIso(DateTime.makeUnsafe(NOW - 1000)),
+  } as OrchestrationThreadShell;
+  const marker: OrchestrationThreadActivity = {
+    id: EventId.make("saved-limit"),
+    tone: "info",
+    kind: LIMIT_MARKER_KIND,
+    summary: "Limit hit",
+    turnId,
+    createdAt,
+    payload: {
+      stop: "parked",
+      accounts: ["one@example.com"],
+      resetsAt: DateTime.formatIso(DateTime.makeUnsafe(NOW + 3600000)),
+      proxy: null,
+    },
+  };
+
+  it("recovers an old parked marker as a failed turn without changing its account", () => {
+    expect(restoreLimitStops([thread], [marker], [])).toEqual([
+      {
+        threadId,
+        turnId,
+        kind: "failed",
+        stoppedAt: NOW,
+        activeAtStop: new Map([["swapd/claude", "one@example.com"]]),
+        resetsAt: NOW + 3600000,
+        limitType: null,
+        proxy: null,
+      },
+    ]);
+  });
+
+  it("does not revive a resumed, cancelled, archived, active or superseded turn", () => {
+    expect(
+      restoreLimitStops([thread], [marker], [{ ...marker, kind: RESUME_MARKER_KIND }]),
+    ).toEqual([]);
+    for (const candidate of [
+      { ...thread, archivedAt: createdAt },
+      { ...thread, latestTurn: null },
+      ...(["interrupted", "completed", "running"] as const).map((state) => ({
+        ...thread,
+        latestTurn: { ...thread.latestTurn!, state },
+      })),
+      { ...thread, latestTurn: { ...thread.latestTurn!, turnId: TurnId.make("new-turn") } },
+      { ...thread, latestUserMessageAt: DateTime.formatIso(DateTime.makeUnsafe(NOW + 1000)) },
+      { ...thread, session: null },
+      { ...thread, session: { ...thread.session!, status: "ready" as const } },
+      { ...thread, session: { ...thread.session!, activeTurnId: turnId } },
+    ]) {
+      expect(restoreLimitStops([candidate], [marker], [])).toEqual([]);
+    }
+  });
+
+  it("ignores proxy stops and malformed markers, and retains the stored window", () => {
+    for (const payload of [
+      null,
+      {},
+      { stop: "failed", accounts: [] },
+      { stop: "parked", accounts: [], resetsAt: "invalid" },
+      { stop: "failed", accounts: [], proxy: "Router" },
+    ]) {
+      expect(restoreLimitStops([thread], [{ ...marker, payload }], [])).toEqual([]);
+    }
+    const updated = {
+      ...marker,
+      payload: { stop: "failed", accounts: ["original"], limitType: "seven_day_opus" },
+      createdAt: DateTime.formatIso(DateTime.makeUnsafe(NOW + 1000)),
+    };
+    expect(restoreLimitStops([thread], [updated, marker], [])[0]).toMatchObject({
+      limitType: "seven_day_opus",
+      activeAtStop: new Map([["swapd/claude", "original"]]),
+    });
+  });
 });
 
 describe("limitStopFromEvent", () => {
