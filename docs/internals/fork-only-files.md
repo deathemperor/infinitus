@@ -301,6 +301,12 @@ these bullets.
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure (the held banner still offers Pin).
+- `apps/mobile/src/features/sharing/ShareToThreadRouteScreen.tsx` (+
+  `share-to-thread.ts`, `.test.ts`) — "Add to an existing thread" on the
+  share sheet's project picker: the thread list (unarchived, newest first,
+  searchable), and the pick merges the share into that thread's composer
+  draft (`mergeComposerDraftContent` with the share id as receipt, then
+  `consumeShare`) and replaces the sheet with the thread.
 
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives
