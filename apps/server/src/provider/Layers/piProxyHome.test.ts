@@ -7,38 +7,53 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 
+import { mergePiProxyModelsJson, piProxyProvider, writePiProxyModelsFile } from "./piProxyHome.ts";
+
 const parseJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const provider = piProxyProvider({ PI_PROXY_BASE_URL: "http://h:1" }, ["proxy/kr/x"])!;
 
-import { piProxyModelsJson, writePiProxyModelsFile } from "./piProxyHome.ts";
-
-describe("piProxyModelsJson", () => {
+describe("piProxyProvider", () => {
   it("is nothing for an instance without a proxy base URL", () => {
-    expect(piProxyModelsJson({}, ["proxy/kr/x"])).toBeUndefined();
-    expect(piProxyModelsJson({ PI_PROXY_BASE_URL: "  " }, ["proxy/kr/x"])).toBeUndefined();
+    expect(piProxyProvider({}, ["proxy/kr/x"])).toBeUndefined();
+    expect(piProxyProvider({ PI_PROXY_BASE_URL: "  " }, ["proxy/kr/x"])).toBeUndefined();
   });
 
-  it("declares one openai-completions provider whose key is read from the env", () => {
-    const json = piProxyModelsJson({ PI_PROXY_BASE_URL: "http://127.0.0.1:20128/" }, [
-      "proxy/kr/gpt-5.6-sol",
-      { slug: "proxy/cc/claude-opus-5" },
-      "anthropic/claude-opus-5",
-    ]);
-    expect((parseJson(json!) as any)).toEqual({
-      providers: {
-        proxy: {
-          baseUrl: "http://127.0.0.1:20128/v1",
-          api: "openai-completions",
-          // Pi interpolates `$VAR` at request time, so the key never lands on disk.
-          apiKey: "$PI_PROXY_API_KEY",
-          models: [{ id: "kr/gpt-5.6-sol" }, { id: "cc/claude-opus-5" }],
-        },
-      },
+  it("is an openai-completions provider whose key is read from the env", () => {
+    expect(
+      piProxyProvider({ PI_PROXY_BASE_URL: "http://127.0.0.1:20128/" }, [
+        "proxy/kr/gpt-5.6-sol",
+        { slug: "proxy/cc/claude-opus-5" },
+        "anthropic/claude-opus-5",
+      ]),
+    ).toEqual({
+      baseUrl: "http://127.0.0.1:20128/v1",
+      api: "openai-completions",
+      // Pi interpolates `$VAR` at request time, so the key never lands on disk.
+      apiKey: "$PI_PROXY_API_KEY",
+      models: [{ id: "kr/gpt-5.6-sol" }, { id: "cc/claude-opus-5" }],
     });
   });
 
   it("keeps a base URL that already ends in /v1", () => {
-    const json = piProxyModelsJson({ PI_PROXY_BASE_URL: "http://h:1/v1" }, []);
-    expect((parseJson(json!) as any).providers.proxy.baseUrl).toBe("http://h:1/v1");
+    expect(piProxyProvider({ PI_PROXY_BASE_URL: "http://h:1/v1" }, [])?.baseUrl).toBe(
+      "http://h:1/v1",
+    );
+  });
+});
+
+describe("mergePiProxyModelsJson", () => {
+  it("keeps the providers a typed home already declares", () => {
+    const existing = '{"providers":{"ollama":{"baseUrl":"http://o/v1"},"proxy":{"old":1}},"x":1}';
+    expect(parseJson(mergePiProxyModelsJson(existing, provider)!)).toEqual({
+      x: 1,
+      providers: { ollama: { baseUrl: "http://o/v1" }, proxy: provider },
+    });
+  });
+
+  it("never replaces a file it cannot read as a JSON object", () => {
+    expect(mergePiProxyModelsJson("// hand notes {", provider)).toBeUndefined();
+    expect(mergePiProxyModelsJson("[]", provider)).toBeUndefined();
+    expect(mergePiProxyModelsJson('{"providers":"x"}', provider)).toBeUndefined();
   });
 });
 
@@ -48,14 +63,14 @@ it.layer(NodeServices.layer)("writePiProxyModelsFile", (it) => {
       const fileSystem = yield* FileSystem.FileSystem;
       const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pi-proxy-home-" });
       const homePath = NodePath.join(directory, "nested", "home");
-      yield* writePiProxyModelsFile(
+      const written = yield* writePiProxyModelsFile(
         { homePath, customModels: ["proxy/kr/x"] },
         { PI_PROXY_BASE_URL: "http://h:1" },
       );
-      const written = parseJson(
-        yield* fileSystem.readFileString(NodePath.join(homePath, "models.json")),
-      ) as any;
-      expect(written.providers.proxy.models).toEqual([{ id: "kr/x" }]);
+      expect(written).toBe(NodePath.join(homePath, "models.json"));
+      expect(parseJson(yield* fileSystem.readFileString(written!))).toEqual({
+        providers: { proxy: provider },
+      });
     }),
   );
 
@@ -71,12 +86,12 @@ it.layer(NodeServices.layer)("writePiProxyModelsFile", (it) => {
 
   it.effect("never writes into Pi's default home", () =>
     Effect.gen(function* () {
-      // An empty homePath means ~/.pi/agent, the user's real config: a proxy
-      // instance without its own dir must not overwrite their models.json.
-      yield* writePiProxyModelsFile(
+      // An empty homePath means ~/.pi/agent, the user's own config directory.
+      const written = yield* writePiProxyModelsFile(
         { homePath: "", customModels: [] },
         { PI_PROXY_BASE_URL: "http://h:1" },
       );
+      expect(written).toBeUndefined();
     }),
   );
 });

@@ -15,7 +15,9 @@
 import { readCustomModelEntries } from "@infinitus/shared/model";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 
 import { expandHomePath } from "../../pathExpansion.ts";
 
@@ -24,58 +26,85 @@ export const PI_PROXY_API_KEY_VAR = "PI_PROXY_API_KEY";
 /** Pi provider id the proxy's models live under, so a slug reads `proxy/<id>`. */
 export const PI_PROXY_PROVIDER = "proxy";
 
+const decodeModelsFile = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
+);
+
 /**
- * The file's content, or nothing when the instance has no proxy. Only custom
- * models under the `proxy/` prefix belong to it: a hand-typed
- * `anthropic/<id>` would otherwise be declared as a proxy model and, worse,
- * shadow Pi's built-in provider of that name.
+ * The `proxy` provider entry, or nothing when the instance has no proxy. Only
+ * custom models under the `proxy/` prefix belong to it: a hand-typed
+ * `anthropic/<id>` would otherwise be declared as a proxy model.
  */
-export function piProxyModelsJson(
-  environment: NodeJS.ProcessEnv,
-  customModels: unknown,
-): string | undefined {
+export function piProxyProvider(environment: NodeJS.ProcessEnv, customModels: unknown) {
   const baseUrl = environment[PI_PROXY_BASE_URL_VAR]?.trim().replace(/\/+$/, "");
   if (!baseUrl) return undefined;
   const prefix = `${PI_PROXY_PROVIDER}/`;
-  const models = readCustomModelEntries(customModels)
-    .filter((entry) => entry.slug.startsWith(prefix))
-    .map((entry) => ({ id: entry.slug.slice(prefix.length) }));
+  return {
+    baseUrl: baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`,
+    api: "openai-completions",
+    apiKey: `$${PI_PROXY_API_KEY_VAR}`,
+    models: readCustomModelEntries(customModels)
+      .filter((entry) => entry.slug.startsWith(prefix))
+      .map((entry) => ({ id: entry.slug.slice(prefix.length) })),
+  };
+}
+
+/**
+ * The file's next content. Only the `proxy` key is ours: a home the user
+ * typed may already hold a models.json with providers of their own, which
+ * stay. Nothing when the existing file is not a JSON object, so a file we
+ * cannot read is never replaced.
+ */
+export function mergePiProxyModelsJson(
+  existing: string | undefined,
+  provider: NonNullable<ReturnType<typeof piProxyProvider>>,
+): string | undefined {
+  const file =
+    existing === undefined ? Option.some<Record<string, unknown>>({}) : decodeModelsFile(existing);
+  if (Option.isNone(file)) return undefined;
+  const providers = file.value.providers;
+  if (providers !== undefined && (providers === null || typeof providers !== "object")) {
+    return undefined;
+  }
   return JSON.stringify(
-    {
-      providers: {
-        [PI_PROXY_PROVIDER]: {
-          baseUrl: baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl}/v1`,
-          api: "openai-completions",
-          apiKey: `$${PI_PROXY_API_KEY_VAR}`,
-          models,
-        },
-      },
-    },
+    { ...file.value, providers: { ...providers, [PI_PROXY_PROVIDER]: provider } },
     null,
     2,
   );
 }
 
 /**
- * Materialise the file in the instance's own home. An instance whose home is
- * Pi's default is left alone: that is the user's real config directory.
+ * Materialise the file in the instance's own home and answer its path. An
+ * instance on Pi's default home is left alone: that directory is the user's.
  */
 export const writePiProxyModelsFile = Effect.fn("writePiProxyModelsFile")(function* (
   settings: { readonly homePath: string; readonly customModels: unknown },
   environment: NodeJS.ProcessEnv,
 ) {
-  const content = piProxyModelsJson(environment, settings.customModels);
-  if (content === undefined) return;
+  const provider = piProxyProvider(environment, settings.customModels);
+  if (provider === undefined) return undefined;
   const homePath = settings.homePath.trim();
   if (homePath.length === 0) {
     yield* Effect.logWarning(
       "Pi proxy instance has no config directory of its own; models.json not written.",
     );
-    return;
+    return undefined;
   }
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const directory = expandHomePath(homePath);
+  const filePath = path.join(directory, "models.json");
+  const existing = (yield* fileSystem.exists(filePath))
+    ? yield* fileSystem.readFileString(filePath)
+    : undefined;
+  const content = mergePiProxyModelsJson(existing, provider);
+  if (content === undefined) {
+    yield* Effect.logWarning("Pi's models.json is not a JSON object; proxy provider not added.", {
+      filePath,
+    });
+    return undefined;
+  }
   yield* fileSystem.makeDirectory(directory, { recursive: true });
-  yield* fileSystem.writeFileString(path.join(directory, "models.json"), content);
+  yield* fileSystem.writeFileString(filePath, content);
+  return filePath;
 });
