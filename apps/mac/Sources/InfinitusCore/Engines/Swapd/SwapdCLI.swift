@@ -200,6 +200,12 @@ public struct SwapdCLI: Sendable {
         try await listVerb(["prefer", String(slot), on ? "on" : "off"], provider: provider)
     }
 
+    /// Keep-warm on/off: the daemon ignites the slot whenever its 5h window
+    /// has gone cold (swapd 0.3).
+    public func setAutoIgnite(provider: Provider, slot: Int, _ on: Bool) async throws -> SwapdList {
+        try await listVerb(["auto-ignite", String(slot), on ? "on" : "off"], provider: provider)
+    }
+
     /// Set (non-empty) or clear (empty) a slot's display alias.
     public func setAlias(provider: Provider, slot: Int, _ name: String) async throws -> SwapdList {
         let trimmed = name.trimmingCharacters(in: .whitespaces)

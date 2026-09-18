@@ -53,6 +53,7 @@ const row: AccountRowModel = {
   active: false,
   next: true,
   preferred: false,
+  autoIgnite: false,
   held: false,
   windows: [],
   scoped: [],
@@ -173,7 +174,18 @@ describe("row presentation", () => {
     expect(switchConfirmation(row, "claude").title).toBe("Switch claude to death4?");
   });
 
-  it("orders badges active, next, held, starred", () => {
+  it("words keep-warm by its current side", () => {
+    expect(rowMenuActions({ ...row, actions: ["autoIgnite"] }, { canPrompt: true })[0]?.title).toBe(
+      "Keep warm (restart 5h window)",
+    );
+    expect(
+      rowMenuActions({ ...row, autoIgnite: true, actions: ["autoIgnite"] }, { canPrompt: true })[0]
+        ?.title,
+    ).toBe("Stop keeping warm");
+  });
+
+  it("orders badges active, next, held, starred, warm", () => {
+    expect(rowBadges({ ...row, autoIgnite: true })).toEqual(["next", "warm"]);
     expect(rowBadges({ ...row, active: true, held: true, preferred: true })).toEqual([
       "active",
       "next",

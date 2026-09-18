@@ -72,6 +72,10 @@ public struct Account: Codable, Sendable {
     /// proxy priority tier); nil = this engine has no such knob, so the
     /// star is hidden. Additive, absent from `cswap list --json`.
     public let preferred: Bool?
+    /// The engine's own keep-warm flag: its daemon ignites the account
+    /// whenever the 5h window has gone cold (swapd `auto-ignite`). nil =
+    /// this engine has no such knob, so the control is hidden.
+    public let autoIgnite: Bool?
     public let usageFetchedAt: String?
     public let usageAgeSeconds: Double?
     // Display-grade last-good data served when the live fetch failed.
@@ -98,6 +102,7 @@ public struct Account: Codable, Sendable {
                 usage: Usage? = nil, windows: [UsageWindow]? = nil,
                 alias: String? = nil, icon: String? = nil,
                 plan: String? = nil, disabled: Bool? = nil, preferred: Bool? = nil,
+                autoIgnite: Bool? = nil,
                 usageFetchedAt: String? = nil, usageAgeSeconds: Double? = nil,
                 lastGoodUsage: Usage? = nil, lastGoodFetchedAt: String? = nil,
                 lastGoodAgeSeconds: Double? = nil, stale: Bool? = nil,
@@ -116,6 +121,7 @@ public struct Account: Codable, Sendable {
         self.plan = plan
         self.disabled = disabled
         self.preferred = preferred
+        self.autoIgnite = autoIgnite
         self.usageFetchedAt = usageFetchedAt
         self.usageAgeSeconds = usageAgeSeconds
         self.lastGoodUsage = lastGoodUsage
@@ -132,6 +138,7 @@ public struct Account: Codable, Sendable {
                 organizationUuid: organizationUuid, isOrganization: isOrganization,
                 active: active, usageStatus: usageStatus, usage: usage, windows: windows,
                 alias: alias, icon: icon, plan: plan, disabled: disabled, preferred: preferred,
+                autoIgnite: autoIgnite,
                 usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
                 lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
                 lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale, staleReason: staleReason)

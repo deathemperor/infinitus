@@ -7,6 +7,7 @@ import {
   ArrowLeftRightIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  FlameIcon,
   PauseIcon,
   PencilIcon,
   PlayIcon,
@@ -89,11 +90,12 @@ const ACTION_ICON: Record<AccountAction, typeof StarIcon> = {
   hold: PauseIcon,
   unhold: PlayIcon,
   prefer: StarIcon,
+  autoIgnite: FlameIcon,
   rename: PencilIcon,
   remove: Trash2Icon,
 };
 
-/** The tooltip an action's button carries; `prefer` names the side it toggles to. */
+/** The tooltip an action's button carries; `prefer` and `autoIgnite` name the side they toggle to. */
 function actionLabel(row: AccountRowModel, action: AccountAction): string {
   switch (action) {
     case "switch":
@@ -104,6 +106,8 @@ function actionLabel(row: AccountRowModel, action: AccountAction): string {
       return "Unhold";
     case "prefer":
       return row.preferred ? "Stop preferring" : "Prefer";
+    case "autoIgnite":
+      return row.autoIgnite ? "Stop keeping warm" : "Keep warm (restart its 5h window when cold)";
     case "rename":
       return "Rename";
     case "remove":
@@ -200,6 +204,9 @@ export function AccountRow({
         {row.preferred ? (
           <StarIcon className="size-3 fill-current text-yellow-500" aria-label="Preferred" />
         ) : null}
+        {row.autoIgnite ? (
+          <FlameIcon className="size-3 fill-current text-orange-500" aria-label="Kept warm" />
+        ) : null}
         {row.plan === null ? null : (
           <span className="text-muted-foreground text-xs">{row.plan}</span>
         )}
@@ -245,6 +252,7 @@ export function AccountRow({
                       className={cn(
                         "size-3",
                         action === "prefer" && row.preferred && "fill-current",
+                        action === "autoIgnite" && row.autoIgnite && "fill-current text-orange-500",
                       )}
                     />
                   )}

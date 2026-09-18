@@ -36,6 +36,7 @@ const BADGE_TONE = {
   next: { label: "Next", pillClassName: "bg-subtle-strong", textClassName: "text-foreground" },
   held: { label: "Held", pillClassName: "bg-warning", textClassName: "text-warning-foreground" },
   starred: { label: "★ First", pillClassName: "bg-subtle", textClassName: "text-foreground-muted" },
+  warm: { label: "Warm", pillClassName: "bg-subtle", textClassName: "text-foreground-muted" },
 } as const;
 
 const TONE_CLASS = {

@@ -33,7 +33,7 @@ public struct SwapdEngine: AccountEngine {
     public static let engineCapabilities: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
         .addToken, .autoSwitch, .history, .settings, .prefer, .ignite,
-        .refreshAccount,
+        .refreshAccount, .autoIgnite,
     ]
 
     public func snapshot() async throws -> [EngineFleet] {
@@ -82,6 +82,9 @@ public struct SwapdEngine: AccountEngine {
     }
     public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws {
         _ = try await cli.setPreferred(provider: fleet, slot: number, on)
+    }
+    public func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws {
+        _ = try await cli.setAutoIgnite(provider: fleet, slot: number, on)
     }
     /// `swapd ignite <slot>`: the driver's cheapest request under that
     /// slot's own login, then a forced fetch. The fleet stays put.

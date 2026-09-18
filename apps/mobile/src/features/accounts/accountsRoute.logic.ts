@@ -137,6 +137,7 @@ const ACTION_SYMBOL: Record<AccountAction, string> = {
   hold: "pause.circle",
   unhold: "play.circle",
   prefer: "star",
+  autoIgnite: "flame",
   rename: "pencil",
   remove: "trash",
 };
@@ -151,6 +152,8 @@ function actionTitle(action: AccountAction, row: AccountRowModel): string {
       return "Release hold";
     case "prefer":
       return row.preferred ? "Unstar" : "Star (pick first)";
+    case "autoIgnite":
+      return row.autoIgnite ? "Stop keeping warm" : "Keep warm (restart 5h window)";
     case "rename":
       return "Rename…";
     case "remove":
@@ -184,12 +187,13 @@ export function switchConfirmation(
 /** Pills after the label, in a fixed order so rows stay comparable. */
 export function rowBadges(
   row: AccountRowModel,
-): ReadonlyArray<"active" | "next" | "held" | "starred"> {
-  const badges: Array<"active" | "next" | "held" | "starred"> = [];
+): ReadonlyArray<"active" | "next" | "held" | "starred" | "warm"> {
+  const badges: Array<"active" | "next" | "held" | "starred" | "warm"> = [];
   if (row.active) badges.push("active");
   if (row.next) badges.push("next");
   if (row.held) badges.push("held");
   if (row.preferred) badges.push("starred");
+  if (row.autoIgnite) badges.push("warm");
   return badges;
 }
 

@@ -56,6 +56,11 @@ public struct EngineCapabilities: OptionSet, Sendable, Codable, Hashable {
     /// `refresh --slot n`. cswap has no per-account force (its list serves
     /// what its policy last fetched), which is why this is not in `.all`.
     public static let refreshAccount = EngineCapabilities(rawValue: 1 << 17)
+    /// Keep an account's 5h window running: the engine's own daemon
+    /// ignites it whenever the window has gone cold — swapd `auto-ignite
+    /// <slot> on|off`, reported back per account as `Account.autoIgnite`.
+    /// Not in `.all`: cswap and the proxies have no such flag.
+    public static let autoIgnite = EngineCapabilities(rawValue: 1 << 18)
 
     public static let all: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
@@ -165,6 +170,9 @@ public protocol AccountEngine: Sendable {
     /// Star/unstar: the engine lands on starred accounts first when it
     /// switches. Reported back per account as `Account.preferred`.
     func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws
+    /// Keep-warm on/off: the engine's daemon ignites the account whenever
+    /// its 5h window has gone cold. Only with `.autoIgnite`.
+    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws
     /// One tiny request as account n so its 5h window starts now; the
     /// fleet's active account is untouched. Returns when the request is
     /// done (seconds).
@@ -225,6 +233,7 @@ public extension AccountEngine {
     func reorder(fleet: Provider, _ numbers: [Int]) async throws { throw EngineError.unsupported("reorder") }
     func setHold(fleet: Provider, number: Int, held: Bool) async throws { throw EngineError.unsupported("hold") }
     func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws { throw EngineError.unsupported("prefer") }
+    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws { throw EngineError.unsupported("auto-ignite") }
     func ignite(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("ignite") }
     func rename(fleet: Provider, number: Int, _ name: String) async throws { throw EngineError.unsupported("rename") }
     func remove(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("remove") }

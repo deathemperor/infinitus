@@ -43,6 +43,7 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertNil(account.stale, "a plain ok row is not stale")
         XCTAssertEqual(account.disabled, false)
         XCTAssertEqual(account.preferred, false)
+        XCTAssertNil(account.autoIgnite, "a 0.2 list carries no keep-warm flag, so the control is hidden")
         XCTAssertEqual(account.usageFetchedAt, "2026-09-09T01:11:03Z")
         XCTAssertEqual(account.usageAgeSeconds, 7.6)
 
@@ -119,6 +120,19 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(fleets[1].accounts.map(\.email), ["g@example.com"])
         XCTAssertEqual(fleets[1].accounts[0].usage?.scoped?.map(\.name), ["gemini-2.5-pro", "gemini-2.5-flash"])
         XCTAssertEqual(fleets[1].accounts[0].usage?.scoped?.first?.pct, 75)
+    }
+
+    /// swapd 0.3's `autoIgnite` rides along per account; the control
+    /// server refuses the verb for a row that carries none.
+    func testAutoIgniteFlagIsCarriedWhenTheEngineReportsIt() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[
+          {"provider":"claude","installed":true,"activeSlot":1,"accounts":[
+            {"slot":1,"email":"a@example.com","organizationName":"","organizationUuid":"","active":true,
+             "disabled":false,"preferred":false,"autoIgnite":true,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let fleets = SwapdMapping.fleets(from: list, now: now)
+        XCTAssertEqual(fleets[0].accounts[0].autoIgnite, true)
     }
 
     /// The shape the engine ACTUALLY emits (`collect.rs account_view`:
@@ -357,7 +371,7 @@ final class SwapdEngineTests: XCTestCase {
         #!/bin/sh
         echo "$@" >> "\(argv)"
         case "$1" in
-          list|prefer|alias) echo '\(payload(nil))' ;;
+          list|prefer|auto-ignite|alias) echo '\(payload(nil))' ;;
           refresh|ignite) echo '\(payload("2026-09-09T05:59:59Z"))' ;;
           *) echo '{"schemaVersion":1,"error":{"code":"no-such-slot","message":"no slot 9 for claude"}}'; exit 1 ;;
         esac
@@ -378,6 +392,14 @@ final class SwapdEngineTests: XCTestCase {
         XCTAssertEqual(try argv(), ["list --json"], "one subprocess, no per-account calls")
         XCTAssertEqual(fleets.map(\.key), ["swapd/claude"])
         XCTAssertEqual(fleets[0].accounts.map(\.number), [1])
+    }
+
+    func testAutoIgniteIsTheEnginesOwnVerb() async throws {
+        let engine = try makeEngine()
+        try await engine.setAutoIgnite(fleet: .claude, number: 1, true)
+        try await engine.setAutoIgnite(fleet: .claude, number: 1, false)
+        XCTAssertEqual(try argv(), ["auto-ignite 1 on --provider claude --json",
+                                    "auto-ignite 1 off --provider claude --json"])
     }
 
     /// The ignite path's second half: the reset the popup announces comes

@@ -226,6 +226,12 @@ describe("row actions", () => {
     expect(actionsFor({ preferred: true })).toContain("prefer");
   });
 
+  it("offers keep-warm only when the fleet can and the account carries the flag", () => {
+    expect(actionsFor({ autoIgnite: false })).not.toContain("autoIgnite");
+    expect(actionsFor({ autoIgnite: false }, ["autoIgnite"])).toContain("autoIgnite");
+    expect(actionsFor({}, ["autoIgnite"])).not.toContain("autoIgnite");
+  });
+
   it("reports the held flag on the row", () => {
     const row: AccountRowModel = rowAt(fleet({ accounts: [account({ disabled: true })] }));
     expect(row.held).toBe(true);
@@ -271,6 +277,15 @@ describe("command arguments", () => {
     expect(accountCommandArgs("claude", row, "prefer").args).toEqual(["claude", "2", "on"]);
     const preferred = rowAt(fleet({ accounts: [account({ number: 3, preferred: true })] }));
     expect(accountCommandArgs("claude", preferred, "prefer").args).toEqual(["claude", "3", "off"]);
+  });
+
+  it("toggles keep-warm through the engine's auto-ignite verb", () => {
+    expect(accountCommandArgs("claude", row, "autoIgnite")).toEqual({
+      command: "auto-ignite",
+      args: ["claude", "2", "on"],
+    });
+    const warm = rowAt(fleet({ accounts: [account({ number: 3, autoIgnite: true })] }));
+    expect(accountCommandArgs("claude", warm, "autoIgnite").args).toEqual(["claude", "3", "off"]);
   });
 });
 

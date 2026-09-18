@@ -361,6 +361,18 @@ final class ControlServer {
             await model.refreshSnapshot()
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
+        case "auto-ignite":
+            let (fleet, n) = try target(r)
+            guard fleet.capabilities.contains(.autoIgnite) else { throw Fail("\(fleet.id) cannot keep a window running") }
+            guard r.args.count >= 3, ["on", "off"].contains(r.args[2]) else { throw Fail("usage: auto-ignite <fleet> <n> on|off") }
+            guard let account = fleet.accounts.first(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
+            guard account.autoIgnite != nil else {
+                throw Fail("the engine reports no keep-warm flag for \(fleet.id); update swapd")
+            }
+            try await fleet.engine.setAutoIgnite(fleet: fleet.provider, number: n, r.args[2] == "on")
+            await model.refreshSnapshot()
+            return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
+
         case "crashes":
             // `--id` is the desktop's Copy: one report with the transcript a
             // session gets, raw diagnostic and all. The list stays without it —
@@ -1255,7 +1267,7 @@ final class ControlServer {
             (.addToken, "addToken"), (.addOAuth, "addOAuth"), (.autoSwitch, "autoSwitch"),
             (.costReport, "costReport"), (.history, "history"), (.settings, "settings"),
             (.prefer, "prefer"), (.ignite, "ignite"),
-            (.refreshAccount, "refreshAccount"),
+            (.refreshAccount, "refreshAccount"), (.autoIgnite, "autoIgnite"),
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
     }

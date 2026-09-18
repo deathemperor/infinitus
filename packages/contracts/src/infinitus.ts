@@ -119,6 +119,10 @@ export const InfinitusAccount = Schema.Struct({
       `unhold` write it). Absent from engines that have no hold knob. */
   disabled: Schema.optionalKey(Schema.Boolean),
   preferred: Schema.optionalKey(Schema.Boolean),
+  /** Kept warm: the engine's daemon ignites the account whenever its 5h
+      window has gone cold (`auto-ignite` writes it). Absent from engines
+      without the knob and from a swapd older than 0.3. */
+  autoIgnite: Schema.optionalKey(Schema.Boolean),
   isOrganization: Schema.Boolean,
   organizationName: Schema.optionalKey(Schema.String),
   organizationUuid: Schema.optionalKey(Schema.String),

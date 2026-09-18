@@ -54,7 +54,7 @@ def account(slot, alias, plan, windows, active, status="ok", disabled=False):
         "organizationName": f"{alias}@example.com's Organization",
         "organizationUuid": f"00000000-0000-0000-0000-0000000000{slot:02d}",
         "plan": plan, "alias": alias, "active": active, "disabled": disabled,
-        "preferred": False, "usageStatus": status, "windows": windows,
+        "preferred": False, "autoIgnite": False, "usageStatus": status, "windows": windows,
         "fetchedAt": iso(0), "ageSeconds": 30.0,
     }
 
@@ -110,11 +110,13 @@ def fleet(active):
 def apply_overrides(accounts, st):
     disabled = set(st.get("disabled", [])); enabled = set(st.get("enabled", []))
     preferred = set(st.get("preferred", [])); aliases = st.get("aliases", {})
+    auto_ignite = set(st.get("autoIgnite", []))
     for a in accounts:
         n = a["slot"]
         if n in disabled: a["disabled"] = True
         elif n in enabled: a["disabled"] = False
         a["preferred"] = n in preferred
+        a["autoIgnite"] = n in auto_ignite
         if str(n) in aliases: a["alias"] = aliases[str(n)]
     return accounts
 
@@ -250,6 +252,16 @@ elif cmd == "prefer":
     if on == "on": pref.add(n)
     else: pref.discard(n)
     st["preferred"] = sorted(pref)
+    save(st)
+    print(json.dumps(list_payload()))
+elif cmd == "auto-ignite":
+    st = state()
+    n = slot_arg()
+    on = rest[1] if len(rest) > 1 else "on"
+    flagged = set(st.get("autoIgnite", []))
+    if on == "on": flagged.add(n)
+    else: flagged.discard(n)
+    st["autoIgnite"] = sorted(flagged)
     save(st)
     print(json.dumps(list_payload()))
 elif cmd == "alias":
