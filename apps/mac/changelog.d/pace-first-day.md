@@ -1,1 +1,1 @@
-Mac: Accounts show pace inside the first day of a weekly window instead of going blank for it — the proxy engines' rows now agree with swapd there too.
+Mac: Accounts show ahead/behind pace from one minute after a weekly reset across swapd, 9Router and CLIProxyAPI.

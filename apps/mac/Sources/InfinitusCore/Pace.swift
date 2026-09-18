@@ -5,8 +5,8 @@ import Foundation
 /// swapd computes pace in the engine and ships it on every window
 /// (`SwapdPace`); 9Router and CLIProxyAPI send a bare percentage, so their
 /// rows drew no pace stripe, no burn and no chill and their tooltip said
-/// neither "in reserve" nor "in deficit". This is a port of swapd's
-/// `pace.py` (issue #125) so both paths agree on the same numbers.
+/// neither "in reserve" nor "in deficit". This mirrors swapd's weekly
+/// pace calculation, including its one-minute guard after reset.
 ///
 /// Weekly windows only — a 5h window resets too fast for pace to mean
 /// anything, and reads "far ahead" almost by definition early in the
@@ -17,11 +17,11 @@ public enum Pace {
 
     /// Shortest elapsed span pace is read over. The rate below is `actual /
     /// elapsed` and a fetch can land on the reset second itself, so there has
-    /// to be a span to measure. swapd suppressed a whole day here once, on the
+    /// to be a span to measure. This suppressed a whole day once, on the
     /// grounds that expected is near zero right after a reset and any usage
     /// reads as "far ahead" — but `aheadThresholdPct` is already that damper,
     /// and scales with what was spent rather than with the clock, so the day
-    /// only cost every window its stripe (swapd, `MIN_ELAPSED_S`).
+    /// only cost every window its stripe.
     public static let minElapsed: TimeInterval = 60
 
     /// Minimum (actual − expected) gap in points before the window counts

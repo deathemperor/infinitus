@@ -1,9 +1,7 @@
 import XCTest
 import InfinitusCore
 
-// Port of swapd's tests/test_pace.py — the two implementations must agree
-// number for number, or one engine's rows would burn while another's
-// chill on the same usage.
+// Weekly pace math and the adapter paths that supply account gauges.
 
 private let now = Date(timeIntervalSince1970: 1_800_000_000)
 private let day: TimeInterval = 86400
@@ -38,12 +36,32 @@ final class PaceTests: XCTestCase {
         XCTAssertNil(Pace.compute(pct: 50, resetsAt: iso(now), fetchedAt: now))
     }
 
-    /// A minute in is the floor — inside the first day, where swapd and this
-    /// port both used to stay quiet for a whole day.
+    /// A minute in is the floor, rather than suppressing the whole first day.
     func testMinimumElapsedSpan() {
         XCTAssertNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: 59), fetchedAt: now))
         XCTAssertNotNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: 60), fetchedAt: now))
         XCTAssertNotNil(Pace.compute(pct: 50, resetsAt: reset(elapsed: day / 2), fetchedAt: now))
+    }
+
+    func testFirstDayAheadAndBehindSignals() throws {
+        let at = reset(elapsed: day / 2) // expected ≈ 7.1%
+        let ahead = Pace.applied(to: UsageWindow(pct: 33, resetsAt: at), fetchedAt: now)
+        XCTAssertEqual(ahead.expectedPct ?? 0, 100 / 14, accuracy: 0.0001)
+        XCTAssertEqual(ahead.aheadOfPace, true)
+        XCTAssertGreaterThan(GaugeMath.burnHeat(usedPct: ahead.pct,
+            expectedPct: ahead.expectedPct, ahead: ahead.aheadOfPace), 0)
+        XCTAssertEqual(ahead.willLastToReset, false)
+        XCTAssertNotNil(ahead.projectedExhaustionAt)
+
+        let behind = Pace.applied(to: UsageWindow(pct: 1, resetsAt: at), fetchedAt: now)
+        XCTAssertEqual(behind.aheadOfPace, false)
+        XCTAssertGreaterThan(GaugeMath.chillDepth(usedPct: behind.pct,
+            expectedPct: behind.expectedPct, ahead: behind.aheadOfPace), 0)
+        XCTAssertEqual(behind.willLastToReset, true)
+
+        // A small overshoot still does not trigger the ahead effect.
+        let near = try XCTUnwrap(Pace.compute(pct: 10, resetsAt: at, fetchedAt: now))
+        XCTAssertFalse(near.ahead)
     }
 
     func testUnusableInputs() {
@@ -109,7 +127,7 @@ final class PaceTests: XCTestCase {
     // MARK: - The engines that needed it (#125 was swapd-only)
 
     func testNineRouterWeeklyWindowsCarryPace() throws {
-        let at = reset(elapsed: day)
+        let at = reset(elapsed: day / 2)
         let json = """
         {"quotas": {"session (5h)": {"used": 50, "resetAt": "\(at)"},
                     "weekly (7d)": {"used": 50, "resetAt": "\(at)"},
@@ -125,7 +143,7 @@ final class PaceTests: XCTestCase {
     }
 
     func testProxyWeeklyWindowsCarryPace() throws {
-        let at = reset(elapsed: day)
+        let at = reset(elapsed: day / 2)
         let json = """
         {"five_hour": {"utilization": 50, "resets_at": "\(at)"},
          "seven_day": {"utilization": 50, "resets_at": "\(at)"},
