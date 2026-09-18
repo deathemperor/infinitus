@@ -97,8 +97,6 @@ public struct AccountUsageLines<M: FleetModel, U: UsageSource>: View {
             if let note = SentinelNotes.note(for: account.usageStatus) {
                 SentinelActionText(model: model, account: account, note: note)
                     .lineLimit(1)
-            } else if cells.allFresh {
-                cells.readyCell
             } else {
                 cells.windowCell(account.usage?.fiveHour, session: true)
                 cells.windowCell(account.usage?.sevenDay, session: false)

@@ -12,22 +12,21 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
     @ObservedObject var usage: U
 
     /// Usage-column count of the WIDEST row: 5h + 7d + spend + each
-    /// scoped window. Rows that span (dead/ready/sentinel) must cover
+    /// scoped window. Rows that span (compact/sentinel) must cover
     /// exactly this many columns or the cash column shifts left.
     private var usageColumns: Int {
         3 + (model.accounts.map { ($0.usage?.scoped ?? []).count }.max() ?? 0)
     }
 
     /// Does any row lay out per-column gauges? If so, the one-line rows
-    /// (dead/ready/sentinel) must not size their column — they start in the
+    /// (compact/sentinel) must not size their column — they start in the
     /// 5h column and run across the empty cells beside them. Spanning with
     /// gridCellColumns instead rendered the grid ~(span-1)*spacing wider
     /// than fixedSize measured, so the popup clipped both edges whenever a
     /// themed account was dead (2026-08-30, dev shim fleet).
     private var anyGauged: Bool {
         model.compactRows ? false : model.accounts.contains { a in
-            let c = AccountCells(model: model, usage: usage, account: a)
-            return SentinelNotes.note(for: a.usageStatus) == nil && !c.allFresh
+            SentinelNotes.note(for: a.usageStatus) == nil
         }
     }
 
@@ -126,13 +125,6 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                             .gridCellUnsizedAxes(anyGauged ? .horizontal : [])
                             .activeBand(account.active)
                         oneLineFillers
-                    } else if cells.allFresh {
-                        // A fully-available account carries no signal worth
-                        // five gauges — one "ready" line in every mode.
-                        cells.readyCell
-                            .gridCellUnsizedAxes(anyGauged ? .horizontal : [])
-                        oneLineFillers
-                        cells.cashCell.alignedColumn("cash")
                     } else if model.compactRows {
                         // Compact hides empty/exhausted cells, which makes
                         // per-cell grid columns meaningless — a row whose 5h
@@ -140,7 +132,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                         // the wrong column. Pack the visible cells tight in
                         // ONE cell; only number/name/plan/cash stay columns.
                         // The packed cell sizes the 5h column like the
-                        // dead/ready one-liners do and fillers keep the
+                        // sentinel one-liners do and fillers keep the
                         // cash column in place: a spanning cell never fed
                         // its width to the columns, so a wide packed row
                         // ran under the cash figures (#100).
@@ -410,8 +402,6 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                                         && !model.isPlayground
                                         ? "Re-login now — opens this account's private login window"
                                         : note)
-                    } else if cells.allFresh {
-                        cells.readyCell
                     } else {
                         // One attribute per line — the whole point of the
                         // stacked layout (user request 2026-08-30). A dead
