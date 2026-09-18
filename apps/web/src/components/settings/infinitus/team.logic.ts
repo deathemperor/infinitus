@@ -69,7 +69,6 @@ export const TEAM_KINDS: ReadonlyArray<{ readonly kind: string; readonly label: 
   { kind: "now", label: "Now — what this Mac is on, blockers" },
   { kind: "threads", label: "Threads — the index of your threads" },
   { kind: "transcripts", label: "Transcripts — your threads' conversations, redacted" },
-  { kind: "crashes", label: "Crashes — crash reports" },
   { kind: "fleet", label: "Fleet — every account's headroom" },
 ];
 

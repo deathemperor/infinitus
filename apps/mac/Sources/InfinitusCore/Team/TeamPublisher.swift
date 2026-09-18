@@ -2,11 +2,10 @@ import Foundation
 import Crypto
 
 /// Spec §7: turns what this Mac knows — the stats scan, the threads
-/// Infinitus desktop lists and their transcripts, the fleet, the crash
-/// log — into the member's documents and publishes them through
-/// `TeamClient`. `collect` is the pure half (the day files); the rest
-/// stages, chunks, seals and pushes with a cursor saved behind every
-/// batch.
+/// Infinitus desktop lists and their transcripts, the fleet — into the
+/// member's documents and publishes them through `TeamClient`. `collect`
+/// is the pure half (the day files); the rest stages, chunks, seals and
+/// pushes with a cursor saved behind every batch.
 public struct TeamPublisher {
     public struct Collected: Equatable, Sendable {
         public var days: [String: Stats.Day] = [:]
@@ -102,7 +101,6 @@ public struct TeamPublisher {
         public var endpoints: TeamControl.Endpoints?
         public var grantsTo: [TeamDocs.GrantHint]?
         public var transcripts: [TeamThreadSources.Transcript] = []
-        public var crashes: [CrashReport] = []
         public var fleets: [TeamDocs.Fleet] = []
         /// Every account of every fleet (`fleet.json`, #221); the CLI,
         /// which has no fleet view, sends none and the file is left alone.
@@ -209,8 +207,8 @@ public struct TeamPublisher {
     }
 
     /// Trims `published/` back under `cap`, oldest first, TRANSCRIPT
-    /// copies only: the day, thread, now and crash copies are kilobytes
-    /// and `reshare` needs every one of them. Returns how many went.
+    /// copies only: the day, thread and now copies are kilobytes and
+    /// `reshare` needs every one of them. Returns how many went.
     @discardableResult
     func pruneCopies(cap: Int) -> Int { Self.pruneCopies(in: copiesDir, cap: cap) }
 
@@ -284,8 +282,8 @@ public struct TeamPublisher {
 
     /// One push (spec §7 cadence is the caller's): days that changed in
     /// the window, the threads index and `now.json` every time, the
-    /// fleet, the crash list on change, every new transcript chunk.
-    /// State advances only after the push succeeded.
+    /// fleet, every new transcript chunk. State advances only after the
+    /// push succeeded.
     public func publish(sources: Sources, now: Date = Date()) throws -> Report {
         guard client.isMember else { throw TeamClient.ClientError.notInTeam }
         let shares = TeamShares.load(teamDir: teamDir)
@@ -367,8 +365,6 @@ public struct TeamPublisher {
                       try CanonicalJSON.encode(TeamDocs.ThreadsIndex(at: at, threads: threads, fleets: sources.fleets)),
                       always: true)
         }
-        let today = calendar.startOfDay(for: now)
-        let crashesToday = sources.crashes.filter { $0.at >= today }.count
         if off(TeamKinds.now) {
             // Turned off after a publish that sent one: a stale now.json
             // would keep this member "on" for the team forever. Retire it
@@ -376,7 +372,10 @@ public struct TeamPublisher {
             if state.hashes.removeValue(forKey: "now.json") != nil { try client.unpublish(path: "now.json") }
         } else {
             var doc = TeamDocs.Now(at: at, machine: sources.machine, live: sources.desktop ? live : [], fleets: sources.fleets,
-                                   blockers: sources.blockers, crashesToday: crashesToday,
+                                   blockers: sources.blockers,
+                                   // Always 0 since the team stopped carrying crash
+                                   // reports (#1422); the field stays for older readers.
+                                   crashesToday: 0,
                                    // An older client's ShareTarget decoder throws on "off";
                                    // the hint carries only kinds that actually travel.
                                    // Every kind's EFFECTIVE audience, so a reader can tell
@@ -400,9 +399,14 @@ public struct TeamPublisher {
                       try CanonicalJSON.encode(TeamDocs.FleetDoc(at: at, fleets: sources.fleetRows)),
                       always: true)
         }
-        if !off(TeamKinds.crashes) {
-            try stage(TeamKinds.crashes, "crashes.json",
-                      try CanonicalJSON.encode(TeamDocs.Crashes(crashes: sources.crashes.map(\.summary))))
+        // Retired kind (#1422): crash reports stay on this Mac (the desktop's
+        // Settings › Devices shows them). Unpublished once, like now.json
+        // above, so a member who shared crashes before doesn't keep a stale
+        // crashes.json in the team forever; the plaintext copy goes with it
+        // or a re-share would bring the file back.
+        if state.hashes.removeValue(forKey: "crashes.json") != nil {
+            try client.unpublish(path: "crashes.json")
+            try? FileManager.default.removeItem(at: copiesDir.appendingPathComponent("crashes.json"))
         }
 
         /// What a stop leaves: every unreached transcript's rows past its cursor.
@@ -492,6 +496,9 @@ public struct TeamPublisher {
             // Live state is never re-shared: the copy is stale, and it would
             // come back after `quit()` deleted it. The next publish rewraps it.
             if kind == TeamKinds.now { continue }
+            // Retired kinds are never re-shared either: a crashes.json copy
+            // from before #1422 must not come back.
+            if kind == TeamKinds.crashes { continue }
             // A kind the member turned off is not re-wrapped from the copies either.
             if shares.target(for: kind) == .off { continue }
             if kind == TeamKinds.transcripts {

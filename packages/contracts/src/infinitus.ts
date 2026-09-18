@@ -503,8 +503,9 @@ export type InfinitusTeamRequest = typeof InfinitusTeamRequest.Type;
 
 /** The `team-status` reply: the team this Mac is in, or `null` when there is
     none. `remote` is masked by the Mac. `shares` maps a kind (stats, now,
-    threads, transcripts, crashes, fleet) to its audience (off, leaders, team);
-    `exclusions` are project slugs kept private. */
+    threads, transcripts, fleet; older Macs also send the retired crashes) to
+    its audience (off, leaders, team); `exclusions` are project slugs kept
+    private. */
 export const InfinitusTeamSnapshot = Schema.Struct({
   id: Schema.String,
   name: Schema.String,

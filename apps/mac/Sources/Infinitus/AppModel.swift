@@ -890,13 +890,12 @@ final class AppModel: ObservableObject {
     }()
 
     /// What this Mac publishes to its team (spec §7) besides the scan and
-    /// the desktop's threads: this Mac's crash reports, each engine's
-    /// active account with its window percentages, every account for the
-    /// member fleet view (#221), and the blockers the pop-out shows
-    /// (lapsed AWS logins, an all-limited fleet).
+    /// the desktop's threads: each engine's active account with its window
+    /// percentages, every account for the member fleet view (#221), and
+    /// the blockers the pop-out shows (lapsed AWS logins, an all-limited
+    /// fleet). Crash reports stay on this Mac (#1422).
     func teamSources() -> TeamPublisher.Sources {
         var s = TeamPublisher.Sources(home: NSHomeDirectory(), machine: machineName)
-        s.crashes = crashStore.list()
         let lastFleets = fleets.compactMap(\.lastFleet)
         s.fleets = lastFleets.map { fleet in
             let active = fleet.accounts.first { $0.number == fleet.activeNumber }

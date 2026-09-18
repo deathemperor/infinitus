@@ -354,7 +354,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "team-remove", args: ["<kid>"], effect: .write, summary: "Remove a member (leaders; never the founder).", replyShape: "team-status"),
         ControlCommand(name: "team-promote", args: ["<kid>"], effect: .write, summary: "Make a member a leader.", replyShape: "team-status"),
         ControlCommand(name: "team-leave", options: ["--yes"], effect: .write, summary: "Delete my files on the store, tell the leaders, forget the team here; --yes confirms.", replyShape: "{left}"),
-        ControlCommand(name: "team-share", args: ["<kind>", "off|leaders|team"], effect: .write, summary: "Audience for stats|now|threads|transcripts|crashes|fleet.", replyShape: "team-status"),
+        ControlCommand(name: "team-share", args: ["<kind>", "off|leaders|team"], effect: .write, summary: "Audience for stats|now|threads|transcripts|fleet.", replyShape: "team-status"),
         ControlCommand(name: "team-exclude", args: ["add|remove", "<project slug>"], effect: .write, summary: "Keep a project private (local, never sent).", replyShape: "team-status"),
         ControlCommand(name: "team-policy", args: ["requests", "code|off"], effect: .write, summary: "Who may request to join (leaders): with a code, or nobody.", replyShape: "team-status"),
         ControlCommand(name: "team-insights", options: ["--period <day|week|month|year>"], effect: .read, summary: "Blockers, headroom, who is on, the team picture for the period (spend is an estimate).", replyShape: "{period, blockers: [{kid, name, kind, text}], headroom: [{kid, name, engine, active, headroom, spare, dead}], onNow: [name], cost: {total, byMember, byModel, byRepo}, repos: [{project, usd, turns, members}], hours: [n]}"),
