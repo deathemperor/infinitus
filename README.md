@@ -5,7 +5,7 @@ Infinitus is one product on three screens: the macOS menu bar app that runs your
 What the desktop, web and phone apps add to the agent client:
 
 - **Accounts page** — every engine's fleet with per-account usage bars, the switch / hold / star / rename actions, the forecast of the next reset, and lapsed AWS and gcloud sign-ins with their device codes.
-- **Settings › Infinitus** — the menu bar app's preferences, notification routes, paired devices (the phone QR code), engines and lock, edited from the browser.
+- **Settings › Menu bar, Notifications, Devices, Engines, Lock** — the menu bar app's preferences, notification routes, paired devices, engines and lock, edited from the browser.
 - **Sidebar** — an Accounts pill with the active account and its fullest window.
 - **Command palette** — "Open accounts".
 - **Event toasts** — the engine's events (a swap, a reset, every account exhausted) surface as toasts in the app shell.

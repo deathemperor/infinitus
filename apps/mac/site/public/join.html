@@ -28,7 +28,7 @@
 // phone with Infinitus installed the universal link never gets here — the
 // app takes it. A desktop browser is forwarded to the desktop app's own
 // infinitus://join/<code>; if nothing opens, the code is shown to paste
-// into Settings › Infinitus › Team. Nothing joins on its own.
+// into Settings › Team. Nothing joins on its own.
 (function () {
   var code = location.hash.replace(/^#/, "");
   var title = document.getElementById("title");
@@ -38,7 +38,7 @@
   var phone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   function reveal() {
     title.textContent = "Your team invite";
-    note.textContent = "If Infinitus did not open, paste this code into Settings › Infinitus › Team.";
+    note.textContent = "If Infinitus did not open, paste this code into Settings › Team.";
     codeEl.textContent = decodeURIComponent(code);
     codeEl.hidden = false;
     copy.hidden = false;
@@ -52,7 +52,7 @@
   }
   if (!code) {
     title.textContent = "This invite link is incomplete";
-    note.textContent = "Ask the person who invited you for the full link, or paste the code they gave you into Settings › Infinitus › Team.";
+    note.textContent = "Ask the person who invited you for the full link, or paste the code they gave you into Settings › Team.";
     return;
   }
   if (phone) {

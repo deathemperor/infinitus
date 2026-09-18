@@ -613,7 +613,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
 - `apps/web/src/routes/settings.{menu-bar,animations,priority,lock,team,notifications,devices,engines}.tsx`
-  and `settings.infinitus.$.tsx` (nine new files in upstream's routes
+  and `settings.infinitus.$.tsx` (new files in upstream's routes
   directory; the pages are top-level since 2026-09-18 — no "Infinitus"
   section, the whole app is Infinitus — and the splat redirects the old
   `/settings/infinitus[/…]` paths older menu bar apps and bookmarks still
