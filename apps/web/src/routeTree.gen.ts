@@ -761,6 +761,7 @@ interface SettingsRouteChildren {
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsSnapShotRoute: typeof SettingsSnapShotRoute
   SettingsSourceControlRoute: typeof SettingsSourceControlRoute
+  SettingsStorageRoute: typeof SettingsStorageRoute
   SettingsInfinitusAnimationsRoute: typeof SettingsInfinitusAnimationsRoute
   SettingsInfinitusDevicesRoute: typeof SettingsInfinitusDevicesRoute
   SettingsInfinitusEnginesRoute: typeof SettingsInfinitusEnginesRoute
@@ -769,7 +770,6 @@ interface SettingsRouteChildren {
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
   SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
   SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
-  SettingsStorageRoute: typeof SettingsStorageRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -785,6 +785,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsProvidersRoute: SettingsProvidersRoute,
   SettingsSnapShotRoute: SettingsSnapShotRoute,
   SettingsSourceControlRoute: SettingsSourceControlRoute,
+  SettingsStorageRoute: SettingsStorageRoute,
   SettingsInfinitusAnimationsRoute: SettingsInfinitusAnimationsRoute,
   SettingsInfinitusDevicesRoute: SettingsInfinitusDevicesRoute,
   SettingsInfinitusEnginesRoute: SettingsInfinitusEnginesRoute,
@@ -793,7 +794,6 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
   SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
   SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
-  SettingsStorageRoute: SettingsStorageRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
