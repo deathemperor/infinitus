@@ -34,7 +34,7 @@ const EVENTS_INPUT = { command: "events", args: [], options: { limit: "100" } } 
 const SHOW_POLLS_KEY = "infinitus.activityShowPolls";
 
 /**
- * Settings › Infinitus › Engines › Activity (#659): the pop-out's Activity
+ * Settings › Engines › Activity (#659): the pop-out's Activity
  * pane, in the fork — every account change Infinitus made, newest first,
  * reached from swapd's row on the Engines page. `events --limit 100` is read
  * once through the events query atom (dropped a minute after the page

@@ -1,7 +1,7 @@
 import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 
 /**
- * The "Pairing requests" card on Settings › Infinitus › Devices (#710), as pure
+ * The "Pairing requests" card on Settings › Devices (#710), as pure
  * state: one row per phone asking to be let in, with the code the user
  * matches against the phone's screen and how long the ask has left. The
  * stream carries metadata only — never the phone's secret or the credential —

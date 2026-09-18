@@ -279,7 +279,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        summary: "Process cost: CPU seconds so far, RSS + live heap bytes, thread count — sample twice for an idle % and a heap growth rate (perf gate).",
                        replyShape: "{cpuSeconds, rssBytes, heapBytes, threads, uptimeSeconds, leases, leaseScopes: {clientId: [scope]}}"),
         ControlCommand(name: "lock-status", effect: .read,
-                       summary: "Biometric lock (Settings › Infinitus › Lock in the desktop app): whether the setting is on, whether the pop-out is locked right now, and the re-lock choice. Off by default.",
+                       summary: "Biometric lock (Settings › Lock in the desktop app): whether the setting is on, whether the pop-out is locked right now, and the re-lock choice. Off by default.",
                        replyShape: "{enabled, locked, relock: immediately|5 min|1 h|on sleep}"),
         ControlCommand(name: "lock", args: ["on|off|now|relock", "[immediately|5m|1h|sleep]"], options: ["--yes"], effect: .write,
                        summary: "Biometric lock: `on` runs the unlock prompt on the Mac once and turns the setting on; `off` turns it off; `now` locks the pop-out; `relock <choice>` sets the re-lock delay.",
@@ -342,7 +342,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "desktop-status", effect: .read,
                        summary: "Where Infinitus desktop is (origin, the published port) and the CLI credential kept for it, masked.",
                        replyShape: "{origin, port, credential: <masked>|null, expiresAt, stale}"),
-        // Team (#1313): Settings › Infinitus › Team on the desktop and the
+        // Team (#1313): Settings › Team on the desktop and the
         // phone drive these; the secret-carrying ones take it on stdin.
         ControlCommand(name: "team-status", effect: .read,
                        summary: "Settings › Team: the team this Mac is in — members with what they last published, pending requests, shares, exclusions, the loop's last fetch/publish — or null when there is none.",

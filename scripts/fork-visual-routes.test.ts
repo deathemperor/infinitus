@@ -34,16 +34,16 @@ const ALWAYS_ON_SCREEN = [
 describe("FORK_VISUAL_ROUTES", () => {
   it("covers every fork page once", () => {
     expect(FORK_VISUAL_ROUTES.map((route) => route.route)).toEqual([
-      "/settings/infinitus",
-      "/settings/infinitus/animations",
-      "/settings/infinitus/sessions",
-      "/settings/infinitus/lock",
-      "/settings/infinitus/team",
-      "/settings/infinitus/notifications",
-      "/settings/infinitus/devices",
-      "/settings/infinitus/engines",
+      "/settings/menu-bar",
+      "/settings/animations",
+      "/settings/priority",
+      "/settings/lock",
+      "/settings/team",
+      "/settings/notifications",
+      "/settings/devices",
+      "/settings/engines",
       "/accounts",
-      "/settings/infinitus/engines/activity",
+      "/settings/engines/activity",
       "/utilization",
       "/stats",
     ]);
@@ -60,15 +60,15 @@ describe("FORK_VISUAL_ROUTES", () => {
   });
 
   it("names the capture files the way the harness does", () => {
-    expect(captureName("/settings/infinitus")).toBe("settings-infinitus");
-    expect(captureName("/settings/infinitus/lock")).toBe("settings-infinitus-lock");
+    expect(captureName("/settings/menu-bar")).toBe("settings-menu-bar");
+    expect(captureName("/settings/lock")).toBe("settings-lock");
     expect(captureName("/utilization")).toBe("utilization");
     expect(captureName("/")).toBe("home");
   });
 });
 
 describe("routeFailures", () => {
-  const lock = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/infinitus/lock")!;
+  const lock = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/lock")!;
 
   it("passes text that shows the marker and none of the empty states", () => {
     expect(routeFailures(lock, "Settings Lock Re-lock after 5 min")).toEqual([]);
@@ -88,7 +88,7 @@ describe("routeFailures", () => {
 
   it("names each `shows` phrase the capture is missing, beside the marker", () => {
     const activity = FORK_VISUAL_ROUTES.find(
-      (route) => route.route === "/settings/infinitus/engines/activity",
+      (route) => route.route === "/settings/engines/activity",
     )!;
     expect(
       routeFailures(activity, "Activity 8:46 PM ignite ignited linus-fixture — window"),
@@ -117,9 +117,7 @@ describe("routeFailures", () => {
   });
 
   it("fails a field whose label rendered but whose value did not", () => {
-    const devices = FORK_VISUAL_ROUTES.find(
-      (route) => route.route === "/settings/infinitus/devices",
-    )!;
+    const devices = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/devices")!;
     const port = "[Server port: 3773]";
     const missing = 'missing "[Sync settings via iCloud Drive: on]"';
     // The label alone is what `innerText` captured, and what a switch that
@@ -132,9 +130,7 @@ describe("routeFailures", () => {
   });
 
   it("fails the port #1110 grouped into 3,773", () => {
-    const devices = FORK_VISUAL_ROUTES.find(
-      (route) => route.route === "/settings/infinitus/devices",
-    )!;
+    const devices = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/devices")!;
     const on = "[Sync settings via iCloud Drive: on] No phones registered.";
     expect(routeFailures(devices, `${on} [Server port: 3,773]`)).toEqual([
       'missing "[Server port: 3773]"',
@@ -149,12 +145,12 @@ describe("checkVisualPass", () => {
 
   it("reads one capture per route and reports every failure", () => {
     const captures = new Map<string, string>([
-      ["settings-infinitus-lock", "Unlocking Re-lock Locked"],
+      ["settings-lock", "Unlocking Re-lock Locked"],
       ["stats", `Stats ${[stats.marker, ...stats.shows!].join(" ")}`],
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [byRoute("/settings/infinitus/lock"), stats, byRoute("/utilization")],
+      [byRoute("/settings/lock"), stats, byRoute("/utilization")],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],

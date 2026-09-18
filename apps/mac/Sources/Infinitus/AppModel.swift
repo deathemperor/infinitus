@@ -1965,7 +1965,7 @@ extension AppModel: FleetModel {
 
     /// The onboarding card's "Engine settings" button: Settings ›
     /// Infinitus › Engines is the desktop app's (#1177).
-    func openSettings() { openDesktop?("infinitus/engines") }
+    func openSettings() { openDesktop?("engines") }
 
     /// The "at this pace" line's click. The Utilization page is the
     /// desktop app's (#654, #774).

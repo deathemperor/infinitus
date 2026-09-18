@@ -10,7 +10,7 @@ import { usePrimaryEnvironment } from "../state/environments";
 /** Where the toast's one action goes: the card with the match code and the
     Approve / Deny pair. The toast itself never approves — a spoofed device
     name must not be let in by reflex (#710). */
-const PAIRING_REQUESTS_ROUTE = "/settings/infinitus/devices";
+const PAIRING_REQUESTS_ROUTE = "/settings/devices";
 
 interface Watched {
   environmentId: EnvironmentId;

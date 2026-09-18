@@ -5,7 +5,7 @@ import { InfinitusPrefsPanel } from "../components/settings/infinitus/InfinitusP
 import { InfinitusResumeCard } from "../components/settings/infinitus/InfinitusResumeCard";
 import { InfinitusSlackCard } from "../components/settings/infinitus/InfinitusSlackCard";
 
-function SettingsInfinitusRoute() {
+function SettingsMenuBarRoute() {
   return (
     <InfinitusPrefsPanel
       sectionSlugs={["display", "themes", "about"]}
@@ -21,6 +21,6 @@ function SettingsInfinitusRoute() {
   );
 }
 
-export const Route = createFileRoute("/settings/infinitus/")({
-  component: SettingsInfinitusRoute,
+export const Route = createFileRoute("/settings/menu-bar")({
+  component: SettingsMenuBarRoute,
 });

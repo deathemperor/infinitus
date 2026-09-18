@@ -1,5 +1,5 @@
 /**
- * Settings › Infinitus › Lock (#747): the Mac's biometric lock over the
+ * Settings › Lock (#747): the Mac's biometric lock over the
  * control socket's `lock-status` / `lock` / `unlock`. The prompts run on the
  * Mac — turning the lock on and unlocking wait for the answer there — so the
  * pane says so while a call is in flight. The app's own error text is shown

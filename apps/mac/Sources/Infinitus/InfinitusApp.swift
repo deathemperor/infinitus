@@ -115,7 +115,7 @@ struct InfinitusApp: App {
         Settings { EmptyView() }
             .commands {
                 CommandGroup(replacing: .appSettings) {
-                    Button("Settings…") { model.openDesktop?("infinitus") }
+                    Button("Settings…") { model.openDesktop?("menu-bar") }
                         .keyboardShortcut(",", modifiers: .command)
                 }
             }

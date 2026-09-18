@@ -2,7 +2,7 @@
 
 ## The harness
 
-`scripts/fork-visual-pass.mjs` — the visual pass: one headless Chrome over CDP pairs with a running web app, clicks through the first-run wizard, then screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Mint a token with `node apps/server/src/bin.ts pair` (from the server's worktree), then `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> /accounts /settings/infinitus` (`--base-url`, `--cdp-port`, `--profile`, `--settle-ms`, `CHROME_BIN`; the token is never printed). No dependencies; node ≥ 22.
+`scripts/fork-visual-pass.mjs` — the visual pass: one headless Chrome over CDP pairs with a running web app, clicks through the first-run wizard, then screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Mint a token with `node apps/server/src/bin.ts pair` (from the server's worktree), then `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> /accounts /settings/menu-bar` (`--base-url`, `--cdp-port`, `--profile`, `--settle-ms`, `CHROME_BIN`; the token is never printed). No dependencies; node ≥ 22.
 
 ## The fixture
 

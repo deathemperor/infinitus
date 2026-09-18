@@ -394,7 +394,7 @@ final class StatusItemController {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
     }
     @objc private func menuOpenFork() { openFork() }
-    @objc private func menuSettings() { openFork(settingsPage: "infinitus") }
+    @objc private func menuSettings() { openFork(settingsPage: "menu-bar") }
     /// Opens the desktop app; with a Settings page, at that section over
     /// its `infinitus://settings/<page>` deep link (the desktop is the
     /// scheme's one claimant on a Mac, `docs/internals/desktop-deep-links.md`).

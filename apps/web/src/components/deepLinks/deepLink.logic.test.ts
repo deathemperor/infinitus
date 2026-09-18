@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { resolveDeepLinkProject, workspaceRootBasename } from "./deepLink.logic";
+import {
+  resolveDeepLinkProject,
+  settingsDeepLinkTarget,
+  workspaceRootBasename,
+} from "./deepLink.logic";
 
 const projects = [
   { id: "p1", title: "Infinitus", workspaceRoot: "/Users/me/death/limitless" },
@@ -30,5 +34,18 @@ describe("workspaceRootBasename", () => {
     expect(workspaceRootBasename("/a/b/c/")).toBe("c");
     expect(workspaceRootBasename("C:\\x\\y")).toBe("y");
     expect(workspaceRootBasename("")).toBe("");
+  });
+});
+
+describe("settingsDeepLinkTarget", () => {
+  it("opens a listed section and refuses any other path", () => {
+    expect(settingsDeepLinkTarget("/settings/engines")).toBe("/settings/engines");
+    expect(settingsDeepLinkTarget("/settings/nowhere")).toBeNull();
+  });
+
+  it("lands an older menu bar app's retired Infinitus group on the page's new route", () => {
+    expect(settingsDeepLinkTarget("/settings/infinitus")).toBe("/settings/menu-bar");
+    expect(settingsDeepLinkTarget("/settings/infinitus/engines")).toBe("/settings/engines");
+    expect(settingsDeepLinkTarget("/settings/infinitus/sessions")).toBe("/settings/priority");
   });
 });

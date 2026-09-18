@@ -11,7 +11,7 @@ import { useEnvironmentQuery } from "../../state/query";
 import { environmentShell } from "../../state/shell";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
-import { isSettingsDeepLinkPath, resolveDeepLinkProject } from "./deepLink.logic";
+import { resolveDeepLinkProject, settingsDeepLinkTarget } from "./deepLink.logic";
 import { usePendingTeamJoinStore } from "./pendingTeamJoin";
 
 /**
@@ -48,14 +48,15 @@ export function DeepLinkCoordinator() {
       return;
     }
     if (link.kind === "settings") {
-      if (isSettingsDeepLinkPath(link.path)) await navigate({ to: link.path });
+      const to = settingsDeepLinkTarget(link.path);
+      if (to) await navigate({ to });
       return;
     }
     if (link.kind === "join") {
       // The code goes to the Team page's Join field and leaves only when the
       // user presses Request to join; nothing joins on its own.
       usePendingTeamJoinStore.getState().offer(link.link);
-      await navigate({ to: "/settings/infinitus/team" });
+      await navigate({ to: "/settings/team" });
       return;
     }
     const project = resolveDeepLinkProject(readProjects(), link.project);

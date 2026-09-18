@@ -1,5 +1,5 @@
 /**
- * Settings › Infinitus › Engines (#1177): the two proxy engines' base URL and
+ * Settings › Engines (#1177): the two proxy engines' base URL and
  * secret, the form the Mac's engine panes drew. The secret is a password
  * field, autocomplete off, cleared the moment it is submitted and gone with
  * the component; it travels once, as a `Redacted` value over

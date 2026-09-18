@@ -16,7 +16,7 @@ import {
 const LABEL = "Start threads from Slack";
 
 /**
- * Settings › Infinitus › Slack (#574): the server-side bridge's switch, the
+ * Settings › Menu bar › Slack (#574): the server-side bridge's switch, the
  * two tokens (typed once, stored by the server, shown only as set / not
  * set) and the members allowed to use it. Server-scoped: the server that
  * holds the tokens is the one that connects.

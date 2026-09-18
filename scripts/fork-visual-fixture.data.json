@@ -303,7 +303,7 @@
         "name": "lock-status",
         "options": [],
         "replyShape": "{enabled, locked, relock: immediately|5 min|1 h|on sleep}",
-        "summary": "Biometric lock (Settings › Infinitus › Lock in the desktop app): whether the setting is on, whether the pop-out is locked right now, and the re-lock choice. Off by default."
+        "summary": "Biometric lock (Settings › Lock in the desktop app): whether the setting is on, whether the pop-out is locked right now, and the re-lock choice. Off by default."
       },
       {
         "args": ["on|off|now|relock", "[immediately|5m|1h|sleep]"],

@@ -227,8 +227,8 @@ describe("AccountsPage", () => {
     const markup = renderToStaticMarkup(<AccountsPage />);
 
     expect(markup).toContain("Infinitus is running, but no engine reports accounts");
-    expect(markup).toContain('href="/settings/infinitus/engines"');
-    expect(markup).toContain("Open Settings › Infinitus › Engines");
+    expect(markup).toContain('href="/settings/engines"');
+    expect(markup).toContain("Open Settings › Engines");
   });
 
   it("draws the fleet of a freshly installed engine that holds no account yet", () => {

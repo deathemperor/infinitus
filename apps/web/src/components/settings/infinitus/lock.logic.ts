@@ -6,7 +6,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * Settings › Infinitus › Lock (#747): what the pane sends over
+ * Settings › Lock (#747): what the pane sends over
  * `infinitus.command` and how it reads the `lock-status` reply. Pure so the
  * pane only renders. The prompts themselves (Touch ID, the password fallback)
  * run on the Mac: `lock on` and `unlock` return once the user answered there.
