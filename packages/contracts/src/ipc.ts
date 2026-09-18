@@ -364,6 +364,8 @@ export const DesktopDeepLink = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("new"), project: Schema.String, prompt: Schema.String }),
   /** `infinitus://join/<team code>` (#1313): the whole link text is the code (a secret). */
   Schema.Struct({ kind: Schema.Literal("join"), link: Schema.String }),
+  /** `infinitus://settings/<page>`: a Settings route, `/settings/<page>` — the menu bar app's ⌘, lands on `/settings/infinitus`. */
+  Schema.Struct({ kind: Schema.Literal("settings"), path: Schema.String }),
 ]);
 export type DesktopDeepLink = typeof DesktopDeepLink.Type;
 

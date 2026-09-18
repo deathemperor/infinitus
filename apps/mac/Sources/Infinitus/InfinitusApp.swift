@@ -111,10 +111,13 @@ struct InfinitusApp: App {
         // it appears. (.defaultLaunchBehavior(.suppressed) would be
         // cleaner but is macOS 15+, and SceneBuilder takes no #available
         // branch.) ⌘, would raise it too; the command is replaced with
-        // nothing.
+        // one that opens the desktop app on its Menu bar settings page.
         Settings { EmptyView() }
             .commands {
-                CommandGroup(replacing: .appSettings) {}
+                CommandGroup(replacing: .appSettings) {
+                    Button("Settings…") { model.openDesktop?("infinitus") }
+                        .keyboardShortcut(",", modifiers: .command)
+                }
             }
     }
 }

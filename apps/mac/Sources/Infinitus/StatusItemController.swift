@@ -21,7 +21,7 @@ final class StatusItemHolder: ObservableObject {
     let controller: StatusItemController
     init(model: AppModel) {
         controller = StatusItemController(model: model)
-        model.openDesktop = { [weak controller] in controller?.openFork() }
+        model.openDesktop = { [weak controller] page in controller?.openFork(settingsPage: page) }
         model.reopenPopover = { [weak controller] in controller?.reopenPopover() }
         model.popOut = { [weak controller] in controller?.popOut() }
     }
@@ -342,6 +342,7 @@ final class StatusItemController {
         // reach it, shown only when LaunchServices knows the bundle.
         if Self.forkDesktopURL != nil {
             menu.addItem(menuItem("Open Infinitus", #selector(menuOpenFork)))
+            menu.addItem(menuItem("Settings…", #selector(menuSettings)))
             menu.addItem(.separator())
         }
 
@@ -393,7 +394,16 @@ final class StatusItemController {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
     }
     @objc private func menuOpenFork() { openFork() }
-    func openFork() {
+    @objc private func menuSettings() { openFork(settingsPage: "infinitus") }
+    /// Opens the desktop app; with a Settings page, at that section over
+    /// its `infinitus://settings/<page>` deep link (the desktop is the
+    /// scheme's one claimant on a Mac, `docs/internals/desktop-deep-links.md`).
+    /// A link nothing claims falls back to plainly opening the bundle.
+    func openFork(settingsPage: String? = nil) {
+        if let settingsPage, let link = URL(string: "infinitus://settings/\(settingsPage)"),
+           NSWorkspace.shared.open(link) {
+            return
+        }
         guard let url = Self.forkDesktopURL else { return }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }

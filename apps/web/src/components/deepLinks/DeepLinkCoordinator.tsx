@@ -11,7 +11,7 @@ import { useEnvironmentQuery } from "../../state/query";
 import { environmentShell } from "../../state/shell";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
-import { resolveDeepLinkProject } from "./deepLink.logic";
+import { isSettingsDeepLinkPath, resolveDeepLinkProject } from "./deepLink.logic";
 import { usePendingTeamJoinStore } from "./pendingTeamJoin";
 
 /**
@@ -22,7 +22,8 @@ import { usePendingTeamJoinStore } from "./pendingTeamJoin";
  * path. `thread` navigates; `new` opens the composer on the project's
  * default env mode with the prompt prefilled and never sends it; `join`
  * (#1313) parks the team code for the Team page's Join field and never
- * joins on its own.
+ * joins on its own; `settings` opens a listed Settings section (the menu
+ * bar app's ⌘,) and ignores any other path.
  */
 export function DeepLinkCoordinator() {
   const primaryEnvironment = usePrimaryEnvironment();
@@ -44,6 +45,10 @@ export function DeepLinkCoordinator() {
       const ref = resolveThreadRouteRef(link);
       if (ref === null) return;
       await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(ref) });
+      return;
+    }
+    if (link.kind === "settings") {
+      if (isSettingsDeepLinkPath(link.path)) await navigate({ to: link.path });
       return;
     }
     if (link.kind === "join") {

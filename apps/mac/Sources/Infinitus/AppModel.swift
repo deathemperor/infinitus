@@ -225,8 +225,10 @@ final class AppModel: ObservableObject {
     /// assertions, the engine supervisor — stay put until they are swept.
     let isPlayground = false
     /// Set by StatusItemHolder — opens the Infinitus desktop app, where
-    /// every setting lives since the Mac's Settings window retired.
-    var openDesktop: (() -> Void)?
+    /// every setting lives since the Mac's Settings window retired; with a
+    /// page (`infinitus`, `infinitus/engines`) it lands on that Settings
+    /// section through the desktop's `settings` deep link.
+    var openDesktop: ((_ settingsPage: String?) -> Void)?
     /// Set by StatusItemHolder — closes and re-shows an open popover.
     /// NSPopover keeps a stale fitting size when the content swaps shape
     /// wholesale (wide<->stacked left it clipped or oversized until a
@@ -1963,11 +1965,11 @@ extension AppModel: FleetModel {
 
     /// The onboarding card's "Engine settings" button: Settings ›
     /// Infinitus › Engines is the desktop app's (#1177).
-    func openSettings() { openDesktop?() }
+    func openSettings() { openDesktop?("infinitus/engines") }
 
     /// The "at this pace" line's click. The Utilization page is the
     /// desktop app's (#654, #774).
-    func openForecast() { openDesktop?() }
+    func openForecast() { openDesktop?(nil) }
 
     /// The primary fleet's engine decides what the mac-only panes may do.
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }

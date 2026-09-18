@@ -72,7 +72,8 @@ these bullets.
   project (`deepLink.logic` `resolveDeepLinkProject`: id, then title, then
   workspace-root basename, case-insensitive) and opens the composer through
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
-  unknown project toasts.
+  unknown project toasts; `settings` navigates to a listed Settings section
+  (`isSettingsDeepLinkPath`) and ignores any other path.
   `join` (#1313, the Team rebuild) parks the whole link — it is the team
   code, a secret — in `pendingTeamJoin.ts` (memory only, taken once) and
   opens Settings › Infinitus; the Team page's Join field takes it when that
@@ -283,7 +284,7 @@ these bullets.
   `claude` (`resolvePosixCliDirFallback`, pure over `exists` /
   `listDirectory`); one info line names the dirs added and the one holding
   `claude`. darwin only; a probe that answers in time still wins.
-- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new` and `join` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
+- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new`, `join` and `settings` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
 - `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the

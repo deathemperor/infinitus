@@ -1,11 +1,12 @@
 /**
  * Deep links (#270 D): `<scheme>://thread/<environmentId>/<threadId>` routes
  * to a thread, `<scheme>://new?project=<id|title|folder>&prompt=<text>` opens
- * the composer on that project with the prompt prefilled, never sent. The
- * scheme is the renderer's own (`infinitus` / `infinitus-dev`), so the `app`
- * host stays the renderer origin and the Clerk bridge's OAuth callback; the
- * `thread`, `new` and `join` (#1313: a team invite, the whole link is the
- * code) hosts are claimed here.
+ * the composer on that project with the prompt prefilled, never sent,
+ * `<scheme>://settings/<page>` opens a Settings page (the menu bar app's ⌘,).
+ * The scheme is the renderer's own (`infinitus` / `infinitus-dev`), so the
+ * `app` host stays the renderer origin and the Clerk bridge's OAuth callback;
+ * the `thread`, `new`, `join` (#1313: a team invite, the whole link is the
+ * code) and `settings` hosts are claimed here.
  *
  * Two halves: an intake attached before Electron is ready (macOS delivers a
  * cold launch's `open-url` before `ready`, Windows and Linux put the URL in
@@ -73,6 +74,13 @@ export function parseDesktopDeepLink(url: string, scheme: string): DesktopDeepLi
     const segments = parsed.pathname.split("/").filter((segment) => segment.length > 0);
     if (segments.length === 0) return null;
     return { kind: "join", link: url };
+  }
+  // A Settings route. The renderer checks the path against its section
+  // table before navigating; this only keeps it a plain route path.
+  if (parsed.host === "settings") {
+    const segments = parsed.pathname.split("/").filter((segment) => segment.length > 0);
+    if (!segments.every((segment) => /^[a-z0-9-]+$/.test(segment))) return null;
+    return { kind: "settings", path: ["/settings", ...segments].join("/") };
   }
   return null;
 }
