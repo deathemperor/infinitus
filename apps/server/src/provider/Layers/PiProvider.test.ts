@@ -108,7 +108,9 @@ it.layer(NodeServices.layer)("checkPiProviderStatus", (it) => {
       // The probe's timeout can kill that install mid-rename and leave npm's
       // retire dir behind, after which every Pi launch fails with ENOTEMPTY.
       const fileSystem = yield* FileSystem.FileSystem;
-      const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pi-provider-offline-" });
+      const directory = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "pi-provider-offline-",
+      });
       const binaryPath = writeFakeCli({
         directory,
         name: "pi",
