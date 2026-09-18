@@ -13,7 +13,6 @@ const testState = vi.hoisted(() => ({
 
 const NOW_ISO = "2026-09-11T12:00:00.000Z";
 
-vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () => ({ environment: { capabilities: { infinitus: testState.capability } } }),
 }));
@@ -48,15 +47,22 @@ vi.mock("../../state/query", () => ({
 vi.mock("../../state/server", () => ({ primaryServerConfigAtom: { label: "config-atom" } }));
 vi.mock("~/components/ui/refresh-icon", () => ({ RefreshIcon: () => null }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
-vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
-vi.mock("../ui/sidebar", () => ({ SidebarInset: "div" }));
 vi.mock("../ui/skeleton", () => ({ Skeleton: "div" }));
-vi.mock("../WorkspaceBreadcrumb", () => ({
-  WorkspaceBreadcrumb: "div",
-  WorkspaceBreadcrumbItem: "div",
+vi.mock("../settings/settingsLayout", () => ({
+  SettingsPageContainer: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+  SettingsSection: ({
+    children,
+    headerAction,
+  }: {
+    children: ReactNode;
+    headerAction: ReactNode;
+  }) => (
+    <section>
+      {headerAction}
+      {children}
+    </section>
+  ),
 }));
-vi.mock("../WorkspacePageContainer", () => ({ WorkspacePageContainer: "main" }));
-vi.mock("../WorkspacePageHeader", () => ({ WorkspacePageHeader: "header" }));
 vi.mock("../accounts/AccountsUnavailable", () => ({
   AccountsUnavailable: ({ reason }: { reason: string | null; children?: ReactNode }) => (
     <p>offline: {reason}</p>

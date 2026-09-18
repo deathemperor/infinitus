@@ -18,7 +18,6 @@ import {
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { SettingsRow } from "./components/SettingsRow";
-import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 
 /**
@@ -68,21 +67,58 @@ function PickerRow(props: {
   );
 }
 
-/** Settings › Infinitus (fork, #572): the Accounts and Team rows, the reset /
-    swap alarms toggle (it asks for the notification permission) and the
-    sending mode. Absent until a paired Mac runs Infinitus, so plain T3 users
-    never see it. A Mac's account alerts and the lock-screen thread card ride
+/** The fork's rows in Settings (#572): Accounts and Team beside Environments,
+    the reset / swap alarms toggle (it asks for the notification permission)
+    after the notification switches, the sending mode under General. All
+    absent until a paired Mac runs Infinitus, so plain T3 users never see
+    them. A Mac's account alerts and the lock-screen thread card ride
     Infinitus Connect's own Device Notifications and Live Activity switches
     (#1375). */
-export function SettingsInfinitusSection() {
-  const preferences = useAtomValue(mobilePreferencesAtom);
-  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+function useInfinitusMacPresent() {
   const configs = useAtomValue(environmentServerConfigsAtom);
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
-  const macs = useMemo(() => infinitusMacs(configs, presentations), [configs, presentations]);
+  return useMemo(() => infinitusMacs(configs, presentations).length > 0, [configs, presentations]);
+}
+
+export function InfinitusFleetRows() {
+  if (!useInfinitusMacPresent()) return null;
+  return (
+    <>
+      <SettingsRow icon="person.2" label="Accounts" target="SettingsAccounts" />
+      <SettingsRow icon="person.3" label="Team" target="SettingsTeam" />
+    </>
+  );
+}
+
+export function InfinitusAlarmsRow() {
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const present = useInfinitusMacPresent();
   const loaded = AsyncResult.isSuccess(preferences);
   const alarmsEnabled = loaded && preferences.value.infinitusAlarmsEnabled === true;
-  // Sending while a turn runs (#807, the desktop's `composerSendMode`).
+  if (!present) return null;
+  return (
+    <SettingsSwitchRow
+      icon="alarm"
+      label="Reset alarms"
+      subtitle="A banner before an exhausted account's limit lifts, and when the fleet swaps."
+      disabled={!loaded}
+      value={alarmsEnabled}
+      onValueChange={(value) => {
+        savePreferences({ infinitusAlarmsEnabled: value });
+        if (value)
+          void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
+      }}
+    />
+  );
+}
+
+/** Sending while a turn runs (#807, the desktop's `composerSendMode`). */
+export function InfinitusSendModeRow() {
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const present = useInfinitusMacPresent();
+  const loaded = AsyncResult.isSuccess(preferences);
   const sendMode = outboxQueueMode(preferences);
   const sendModeActions = useMemo<MenuAction[]>(
     () =>
@@ -93,36 +129,20 @@ export function SettingsInfinitusSection() {
       })),
     [sendMode],
   );
-  if (macs.length === 0) return null;
+  if (!present) return null;
   return (
-    <SettingsSection title="Infinitus">
-      <SettingsRow icon="person.2" label="Accounts" target="SettingsAccounts" />
-      <SettingsRow icon="person.3" label="Team" target="SettingsTeam" />
-      <SettingsSwitchRow
-        icon="alarm"
-        label="Reset alarms"
-        subtitle="A banner before an exhausted account's limit lifts, and when the fleet swaps."
-        disabled={!loaded}
-        value={alarmsEnabled}
-        onValueChange={(value) => {
-          savePreferences({ infinitusAlarmsEnabled: value });
-          if (value)
-            void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
-        }}
-      />
-      <PickerRow
-        title="Sending while a turn runs"
-        actions={sendModeActions}
-        onPressAction={({ nativeEvent }) => {
-          const mode = nativeEvent.event as OutboxQueueMode;
-          if (mode === "queue" || mode === "steer")
-            savePreferences({ infinitusComposerSendMode: mode });
-        }}
-        icon="tray.and.arrow.up"
-        label="Sending while a turn runs"
-        value={COMPOSER_SEND_MODE_LABELS[sendMode]}
-        disabled={!loaded}
-      />
-    </SettingsSection>
+    <PickerRow
+      title="Sending while a turn runs"
+      actions={sendModeActions}
+      onPressAction={({ nativeEvent }) => {
+        const mode = nativeEvent.event as OutboxQueueMode;
+        if (mode === "queue" || mode === "steer")
+          savePreferences({ infinitusComposerSendMode: mode });
+      }}
+      icon="tray.and.arrow.up"
+      label="Sending while a turn runs"
+      value={COMPOSER_SEND_MODE_LABELS[sendMode]}
+      disabled={!loaded}
+    />
   );
 }

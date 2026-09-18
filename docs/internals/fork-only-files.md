@@ -91,9 +91,11 @@ these bullets.
   section ("All accounts exhausted · next revival HH:MM (account)", the
   time in the user's timestamp format), replacing the pop-out's reviver band.
 - `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
-- `apps/web/src/routes/activity.tsx`, `apps/web/src/components/activity/` — the
-  `/activity` page (#659): the pop-out's Activity pane in the fork — the
-  app's event log newest first, sectioned by local day (`activity.logic.ts`),
+- `apps/web/src/routes/settings.infinitus.engines_.activity.tsx`,
+  `apps/web/src/components/activity/` — Settings › Infinitus › Engines ›
+  Activity (#659; `/settings/infinitus/engines/activity`, the `engines_`
+  keeping it out of the Engines panel's tree): the pop-out's Activity pane in
+  the fork — the app's event log newest first, sectioned by local day (`activity.logic.ts`),
   a kind chip per line. Reads `events --limit 100` once through
   `infinitusEnvironment.events` (a query atom with no refresh, dropped a
   minute after the page leaves) and then folds in `snapshot.events` deltas
@@ -102,8 +104,9 @@ these bullets.
   `@infinitus/client-runtime/state/infinitusActivity`) — no polling of its own.
   The engine poller's per-minute `poll` / `no switch — …` lines (kind `other`
   on native; `isPollRow` reads the text) stay in the store but are hidden until
-  the header's "Show polls" toggle, persisted like the Stats period (#696).
-  Sidebar "Activity" beside Stats.
+  the section header's "Show polls" toggle, persisted like the Stats period
+  (#696). Reached from swapd's row on the Engines page (primary environment
+  only) and the palette's "Open activity"; it left the sidebar 2026-09-18.
 - `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Rules and traps: `docs/internals/utilization.md`.
 - Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table on `/usage` (#779): `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads the app's `history <fleet>` verb once per scan, `infinitusUsageAttribution.logic.ts` gives `accountAt(ms)`, `UsageAggregator`'s `attribute` hook sums the optional `UsageSummary.accounts`. Rules and traps: `docs/internals/usage-attribution.md`.

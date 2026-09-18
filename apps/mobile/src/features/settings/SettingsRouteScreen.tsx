@@ -56,7 +56,11 @@ import { useSavedRemoteConnections } from "../../state/use-remote-environment-re
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
-import { SettingsInfinitusSection } from "./SettingsInfinitusSection";
+import {
+  InfinitusAlarmsRow,
+  InfinitusFleetRows,
+  InfinitusSendModeRow,
+} from "./SettingsInfinitusRows";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { resolveAgentAwarenessPlatformPresentation } from "./SettingsRouteScreen.logic";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
@@ -141,11 +145,11 @@ function LocalSettingsRouteScreen() {
             valuePosition="trailing"
             target="SettingsEnvironments"
           />
+          <InfinitusFleetRows />
+          <InfinitusAlarmsRow />
         </SettingsSection>
 
         <GeneralSettingsSection />
-
-        <SettingsInfinitusSection />
 
         <SettingsSection title="Appearance">
           <SettingsRow icon="paintbrush" label="Appearance" target="SettingsAppearance" />
@@ -526,6 +530,7 @@ function ConfiguredSettingsRouteScreen() {
             valuePosition="trailing"
             target="SettingsEnvironments"
           />
+          <InfinitusFleetRows />
           <SettingsSwitchRow
             icon="bell.badge"
             label="Device Notifications"
@@ -584,11 +589,10 @@ function ConfiguredSettingsRouteScreen() {
               }}
             />
           ) : null}
+          <InfinitusAlarmsRow />
         </SettingsSection>
 
         <GeneralSettingsSection />
-
-        <SettingsInfinitusSection />
 
         <SettingsSection title="Appearance">
           <SettingsRow icon="paintbrush" label="Appearance" target="SettingsAppearance" />
@@ -613,6 +617,7 @@ function GeneralSettingsSection() {
       ) : null}
       <AutoSettleSettingsRows />
       <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
+      <InfinitusSendModeRow />
     </SettingsSection>
   );
 }

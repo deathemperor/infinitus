@@ -320,6 +320,16 @@ describe("searchSettings", () => {
     ).toBe(true);
     // A path no nav item owns still belongs to its parent section.
     expect(isSettingsSectionActive("/settings/projects/acme", "/settings/projects")).toBe(true);
+    // ...the nearest one only: Engines' Activity sub screen lights Engines, not Infinitus.
+    expect(
+      isSettingsSectionActive(
+        "/settings/infinitus/engines/activity",
+        "/settings/infinitus/engines",
+      ),
+    ).toBe(true);
+    expect(
+      isSettingsSectionActive("/settings/infinitus/engines/activity", "/settings/infinitus"),
+    ).toBe(false);
   });
 
   it("finds keybinding commands by label, command id, and default key", () => {
