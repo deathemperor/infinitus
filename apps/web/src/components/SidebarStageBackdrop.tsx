@@ -535,11 +535,22 @@ function TideArt({ compact = false }: { compact?: boolean }) {
   );
 }
 
-// Lifted for the same masking reason as the tide's swells.
-const DAWN_RIDGES: ReadonlyArray<{ d: string; opacity: number }> = [
-  { d: "M0 50C36 38 62 45 96 38C130 31 158 42 192 36C226 30 256 40 288 34V96H0Z", opacity: 0.5 },
-  { d: "M0 60C30 50 58 56 92 49C126 42 156 53 190 47C224 41 258 51 288 45V96H0Z", opacity: 0.7 },
-  { d: "M0 70C34 62 60 66 94 60C128 54 160 64 194 58C228 52 258 62 288 56V96H0Z", opacity: 0.9 },
+// Lifted for the same masking reason as the tide's swells. Generated rather
+// than hand-written so each ridge starts and ends at the same y: a tile whose
+// two ends disagree steps at every repeat, which reads as a vertical seam.
+function dawnRidgePath(y: number, rise: number): string {
+  const segments: Array<string> = [`M0 ${y}`];
+  for (let x = 0; x < 288; x += 96) {
+    segments.push(`C${x + 24} ${y - rise} ${x + 48} ${y - rise * 0.4} ${x + 96} ${y}`);
+  }
+  segments.push("V96H0Z");
+  return segments.join(" ");
+}
+
+const DAWN_RIDGES: ReadonlyArray<{ y: number; rise: number; opacity: number }> = [
+  { y: 50, rise: 13, opacity: 0.5 },
+  { y: 60, rise: 10, opacity: 0.7 },
+  { y: 70, rise: 8, opacity: 0.9 },
 ];
 
 /** Ember: a low sun behind layered ridges. */
@@ -602,14 +613,6 @@ function DawnArt({ compact = false }: { compact?: boolean }) {
           <circle
             cx="210"
             cy="40"
-            r="12"
-            style={{ fill: "var(--stage-night-highlight)" }}
-            fillOpacity="0.45"
-            filter={`url(#${softId})`}
-          />
-          <circle
-            cx="210"
-            cy="40"
             r="7.5"
             style={{ fill: "var(--stage-night-line)" }}
             fillOpacity="0.95"
@@ -619,7 +622,7 @@ function DawnArt({ compact = false }: { compact?: boolean }) {
           {DAWN_RIDGES.map((ridge) => (
             <path
               key={ridge.opacity}
-              d={ridge.d}
+              d={dawnRidgePath(ridge.y, ridge.rise)}
               fill={`url(#${ridgeId})`}
               fillOpacity={ridge.opacity}
             />
@@ -629,6 +632,17 @@ function DawnArt({ compact = false }: { compact?: boolean }) {
 
       <rect width="100%" height="96" fill={`url(#${skyId})`} />
       <rect width="100%" height="96" fill={`url(#${sunsId})`} />
+      {/* Outside the pattern: a filtered shape inside one is clipped to the
+          tile, seaming at every repeat. */}
+      <g filter={`url(#${softId})`}>
+        <circle
+          cx="210"
+          cy="40"
+          r="12"
+          style={{ fill: "var(--stage-night-highlight)" }}
+          fillOpacity="0.45"
+        />
+      </g>
       <rect width="100%" height="96" fill={`url(#${ridgesId})`} />
     </svg>
   );
@@ -666,6 +680,28 @@ const NEBULA_STARS: ReadonlyArray<{ cx: number; cy: number; r: number; opacity: 
   { cx: 284, cy: 14, r: 0.45, opacity: 0.58 },
 ];
 
+/**
+ * One continuous cloud band across the full canvas: repeating a blurred shape
+ * needs a long path, since a `<pattern>` would clip the blur at each tile edge
+ * (the seam this replaced). Each 288-unit span starts and ends at the same y,
+ * so the joins are invisible. Built once, not per render.
+ */
+function nebulaCloudPath(baseY: number, crest: number): string {
+  const span = 288;
+  const segments: Array<string> = [`M-8 ${baseY}`];
+  for (let x = 0; x < 8192 + span; x += span) {
+    segments.push(
+      `C${x + 48} ${baseY - crest} ${x + 96} ${baseY - crest * 0.45} ${x + 144} ${baseY - crest * 0.7}`,
+      `C${x + 192} ${baseY - crest} ${x + 240} ${baseY - crest * 0.3} ${x + span} ${baseY}`,
+    );
+  }
+  segments.push("V96H-8Z");
+  return segments.join(" ");
+}
+
+const NEBULA_CLOUD_BACK = nebulaCloudPath(62, 16);
+const NEBULA_CLOUD_FRONT = nebulaCloudPath(80, 10);
+
 /** T3 Chat and Iris: banded cloud with a dense star field. */
 function NebulaArt({ compact = false }: { compact?: boolean }) {
   const idPrefix = useId().replaceAll(":", "");
@@ -674,7 +710,7 @@ function NebulaArt({ compact = false }: { compact?: boolean }) {
   const coreId = `${idPrefix}-stage-nebula-core`;
   const softId = `${idPrefix}-stage-nebula-soft`;
   const starsId = `${idPrefix}-stage-nebula-stars`;
-  const cloudsId = `${idPrefix}-stage-nebula-clouds`;
+  const glowsId = `${idPrefix}-stage-nebula-glows`;
 
   return (
     <svg
@@ -698,7 +734,9 @@ function NebulaArt({ compact = false }: { compact?: boolean }) {
           <stop offset="0.48" style={{ stopColor: "var(--stage-night-mid)" }} />
           <stop offset="1" style={{ stopColor: "var(--stage-night-top)" }} />
         </linearGradient>
-        <linearGradient id={cloudId} x1="0" y1="20" x2="288" y2="84" gradientUnits="userSpaceOnUse">
+        {/* objectBoundingBox: a user-space 0..288 gradient flat-lined past the
+            first span once the band became canvas-wide. */}
+        <linearGradient id={cloudId} x1="0" y1="0" x2="0" y2="1">
           <stop style={{ stopColor: "var(--stage-night-tertiary)" }} stopOpacity="0.46" />
           <stop
             offset="0.5"
@@ -727,7 +765,7 @@ function NebulaArt({ compact = false }: { compact?: boolean }) {
           />
           <stop offset="1" style={{ stopColor: "var(--stage-night-bottom)" }} stopOpacity="0" />
         </radialGradient>
-        <filter id={softId} x="-32" y="-32" width="352" height="160" filterUnits="userSpaceOnUse">
+        <filter id={softId} x="-32" y="-32" width="8256" height="160" filterUnits="userSpaceOnUse">
           <feGaussianBlur stdDeviation="7" />
         </filter>
         <pattern id={starsId} width="288" height="96" patternUnits="userSpaceOnUse">
@@ -755,25 +793,23 @@ function NebulaArt({ compact = false }: { compact?: boolean }) {
             <path d="M250 38H255M252.5 35.5V40.5" />
           </g>
         </pattern>
-        <pattern id={cloudsId} width="288" height="96" patternUnits="userSpaceOnUse">
-          <rect width="288" height="96" fill={`url(#${coreId})`} />
-          <g filter={`url(#${softId})`}>
-            <path
-              d="M-8 74C10 62 34 66 52 58C74 48 96 56 118 50C142 44 164 52 188 48C214 44 240 54 268 48C280 46 288 48 296 52V96H-8V74Z"
-              fill={`url(#${cloudId})`}
-            />
-            <path
-              d="M-8 88C16 80 40 84 66 78C94 72 120 80 148 76C178 72 206 80 236 76C258 73 276 78 296 82V96H-8V88Z"
-              fill={`url(#${cloudId})`}
-              fillOpacity="0.7"
-            />
-          </g>
+        <pattern id={glowsId} width="576" height="96" patternUnits="userSpaceOnUse">
+          <rect width="576" height="96" fill={`url(#${coreId})`} />
         </pattern>
       </defs>
 
       <rect width="100%" height="96" fill={`url(#${skyId})`} />
+      <rect width="100%" height="96" fill={`url(#${glowsId})`} />
       <rect width="100%" height="96" fill={`url(#${starsId})`} />
-      <rect width="100%" height="96" fill={`url(#${cloudsId})`} />
+
+      {/* Outside every pattern: a blurred band drawn in a <pattern> is clipped
+          to its tile, which put a hard seam at each repeat. */}
+      <g filter={`url(#${softId})`}>
+        <path d={NEBULA_CLOUD_BACK} fill={`url(#${cloudId})`} />
+      </g>
+      <g filter={`url(#${softId})`}>
+        <path d={NEBULA_CLOUD_FRONT} fill={`url(#${cloudId})`} fillOpacity="0.7" />
+      </g>
     </svg>
   );
 }

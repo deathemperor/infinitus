@@ -35,6 +35,17 @@ describe("SidebarStageBackdrop", () => {
     expect(resolveEnvironmentIdentificationPillLabel("Alpha")).toBe("Alpha");
   });
 
+  // A <pattern> clips to its own tile, so a blurred or overflowing shape drawn
+  // inside one is cut at every repeat — a hard vertical seam across the header
+  // (the nebula shipped with exactly that). Blurs belong outside the patterns,
+  // as the night sky already does with its clouds.
+  it.each(STAGE_ART_SCENES)("keeps %s blurs out of tiled patterns", (variant) => {
+    const markup = renderToStaticMarkup(<StageBackdropArt variant={variant} />);
+    for (const [, pattern] of markup.matchAll(/<pattern\b[^>]*>([\s\S]*?)<\/pattern>/g)) {
+      expect(pattern).not.toMatch(/filter="url\(#/);
+    }
+  });
+
   it.each(STAGE_ART_SCENES)(
     "uses unique SVG definition ids when %s artwork is rendered more than once",
     (variant) => {
