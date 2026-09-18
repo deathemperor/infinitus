@@ -20,6 +20,7 @@ import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
+import { Route as SettingsStorageRouteImport } from './routes/settings.storage'
 import { Route as SettingsSourceControlRouteImport } from './routes/settings.source-control'
 import { Route as SettingsSnapShotRouteImport } from './routes/settings.snap-shot'
 import { Route as SettingsProvidersRouteImport } from './routes/settings.providers'
@@ -98,6 +99,11 @@ const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ChatRoute,
+} as any)
+const SettingsStorageRoute = SettingsStorageRouteImport.update({
+  id: '/storage',
+  path: '/storage',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsSourceControlRoute = SettingsSourceControlRouteImport.update({
   id: '/source-control',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
@@ -287,6 +294,7 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
   '/': typeof ChatIndexRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
@@ -325,6 +333,7 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
@@ -364,6 +373,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
     | '/settings/infinitus/animations'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
     | '/'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
@@ -436,6 +447,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
     | '/_chat/'
     | '/_chat/$environmentId/$threadId'
     | '/_chat/draft/$draftId'
@@ -541,6 +553,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof ChatRoute
+    }
+    '/settings/storage': {
+      id: '/settings/storage'
+      path: '/storage'
+      fullPath: '/settings/storage'
+      preLoaderRoute: typeof SettingsStorageRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/settings/source-control': {
       id: '/settings/source-control'
@@ -750,6 +769,7 @@ interface SettingsRouteChildren {
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
   SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
   SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
+  SettingsStorageRoute: typeof SettingsStorageRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -773,6 +793,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
   SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
   SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
+  SettingsStorageRoute: SettingsStorageRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
