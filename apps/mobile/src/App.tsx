@@ -8,11 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createStaticNavigation } from "@react-navigation/native";
 
 import { RegistryContext } from "@effect/atom-react";
-import {
-  pairingUrlFromUniversalLink,
-  UNIVERSAL_PAIR_HOST,
-} from "./features/connection/universalPairLink.logic";
-import { teamJoinLinkCode } from "./features/team/team.logic";
+import { teamJoinLinkCode, UNIVERSAL_LINK_HOST } from "./features/team/team.logic";
 import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet";
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
 import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
@@ -42,19 +38,12 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
   // The native module can be unavailable in non-native test environments.
 });
 
-/** Fork (#724): a universal link from the Devices card
-    (`https://infinitus.run/pair#token=…&to=<origin>`) becomes the
-    add-environment route with the Mac's own pairing link, the same prefill a
-    scanned QR takes (#746); any other URL passes through untouched. */
+/** Fork (#1313): a team invite (`https://infinitus.run/join#<code>`) opens
+    Settings › Team with the code; any other URL passes through untouched. */
 const rewriteIncomingUrl = (url: string | null): string | null => {
   if (url === null) return null;
-  // #1313: a team invite (`https://infinitus.run/join#<code>`) opens Settings › Team with the code.
   const teamCode = teamJoinLinkCode(url);
-  if (teamCode !== null) return Linking.createURL("team", { queryParams: { code: teamCode } });
-  const pairingUrl = pairingUrlFromUniversalLink(url);
-  return pairingUrl === null
-    ? url
-    : Linking.createURL("environment-new", { queryParams: { pairingUrl } });
+  return teamCode === null ? url : Linking.createURL("team", { queryParams: { code: teamCode } });
 };
 
 const appLinking = {
@@ -63,8 +52,8 @@ const appLinking = {
     "t3code://",
     "t3code-dev://",
     "t3code-preview://",
-    // Fork (#724): the site's universal link, rewritten above before routing.
-    `https://${UNIVERSAL_PAIR_HOST}`,
+    // Fork (#1313): the site's universal link, rewritten above before routing.
+    `https://${UNIVERSAL_LINK_HOST}`,
   ],
   getInitialURL: async () => rewriteIncomingUrl(await Linking.getInitialURL()),
   subscribe: (listener: (url: string) => void) => {

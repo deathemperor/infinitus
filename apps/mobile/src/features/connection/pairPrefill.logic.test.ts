@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { routePairingPrefill } from "./pairPrefill.logic";
 
-const LINK = " https://example-words.trycloudflare.com/pair#token=fixture-token&for=phone ";
+const LINK = " https://example-words.trycloudflare.com/pair#token=fixture-token ";
 
 describe("routePairingPrefill", () => {
   it("fills the sheet for the Infinitus variant in a release build, but never auto-connects", () => {

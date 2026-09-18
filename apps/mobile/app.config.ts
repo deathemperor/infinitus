@@ -143,8 +143,8 @@ const VARIANT_CONFIG = {
     // the publishable key encodes (upstream's variants pin clerk.t3.codes);
     // a build without the key gets a placeholder that entitles nothing real.
     relyingParty: infinitusRelyingParty(repoEnv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY),
-    // Fork (#724): the Devices card's QR is `https://infinitus.run/pair#…`, so
-    // a Camera scan opens this app (AASA `applinks` + assetlinks on the site).
+    // Fork (#1313): a team invite is `https://infinitus.run/join#…`, so a
+    // Camera scan opens this app (AASA `applinks` + assetlinks on the site).
     universalLinkHost: "infinitus.run",
     assets: INFINITUS_ASSETS,
   },
@@ -351,17 +351,13 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: true,
     ...("universalLinkHost" in variant
       ? {
-          // Fork (#724): the site's /pair opens the app; verified against
-          // `/.well-known/assetlinks.json` on that host.
+          // Fork (#1313): a team invite, infinitus.run/join#<code>, opens the
+          // app; verified against `/.well-known/assetlinks.json` on that host.
           intentFilters: [
             {
               action: "VIEW",
               autoVerify: true,
-              data: [
-                { scheme: "https", host: variant.universalLinkHost, pathPrefix: "/pair" },
-                // #1313: a team invite, infinitus.run/join#<code>.
-                { scheme: "https", host: variant.universalLinkHost, pathPrefix: "/join" },
-              ],
+              data: [{ scheme: "https", host: variant.universalLinkHost, pathPrefix: "/join" }],
               category: ["BROWSABLE", "DEFAULT"],
             },
           ],

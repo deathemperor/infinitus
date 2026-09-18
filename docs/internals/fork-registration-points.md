@@ -504,8 +504,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
   `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
-  to the iOS associated domains and `autoVerify` intent filters for
-  `https://infinitus.run/pair` and `/join` (#1313) on Android (the site serves the AASA
+  to the iOS associated domains and an `autoVerify` intent filter for
+  `https://infinitus.run/join` (#1313) on Android (the site serves the AASA
   `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
   `extra.productVersion` is the root `VERSION` (#823 layer 3), which
   `SettingsAboutRouteScreen` shows in place of the store version.
@@ -569,7 +569,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fork's build fell through to upstream's T3 mark and drew the T3 logo
   beside the Infinitus wordmark on every loading screen. Any new
   variant-keyed asset needs an `infinitus` branch for the same reason.
-- `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
+- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
   `infinitusComposerSendMode` (#807, `"queue" | "steer"`) keys (interface
