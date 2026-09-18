@@ -113,7 +113,8 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     // its own row's text — the capture joins a row's spans with a space — so
     // a kind that lost its chip fails here, on the exact row, instead of
     // reaching a screen unlabelled (#1111).
-    route: "/activity",
+    // Moved under Engines in #1446; the standalone /activity route is gone.
+    route: "/settings/infinitus/engines/activity",
     label: "Activity",
     marker: "all out all exhausted",
     shows: [

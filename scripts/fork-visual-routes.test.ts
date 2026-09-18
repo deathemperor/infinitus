@@ -43,7 +43,7 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/infinitus/devices",
       "/settings/infinitus/engines",
       "/accounts",
-      "/activity",
+      "/settings/infinitus/engines/activity",
       "/utilization",
       "/stats",
     ]);
@@ -87,7 +87,9 @@ describe("routeFailures", () => {
   });
 
   it("names each `shows` phrase the capture is missing, beside the marker", () => {
-    const activity = FORK_VISUAL_ROUTES.find((route) => route.route === "/activity")!;
+    const activity = FORK_VISUAL_ROUTES.find(
+      (route) => route.route === "/settings/infinitus/engines/activity",
+    )!;
     expect(
       routeFailures(activity, "Activity 8:46 PM ignite ignited linus-fixture — window"),
     ).toEqual([
