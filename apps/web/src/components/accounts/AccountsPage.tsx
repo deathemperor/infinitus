@@ -56,7 +56,6 @@ import { ForecastStrip } from "./ForecastStrip";
 import {
   fleetRunsShellOAuth,
   oauthSignInBridge,
-  shellOAuthWindowLabel,
   SIGN_IN_POLL_MS,
   signInBeginCommandArgs,
   signInBeginReply,
@@ -425,7 +424,7 @@ export function AccountsPage() {
     setSignInFlow(base);
     shellFlowIdRef.current = flowId;
     const result = await shellOAuthSignIn
-      .begin({ flowId, provider, label: shellOAuthWindowLabel(fleetKey, targetLabel) })
+      .begin({ flowId, provider })
       .catch((cause: unknown) => ({
         ok: false as const,
         error: cause instanceof Error ? cause.message : String(cause),
