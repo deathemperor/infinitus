@@ -710,14 +710,13 @@ export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
 /** Fork (#1213): a sign-in the desktop shell runs itself, through the engine's
     own `add-oauth` verb — swapd is the OAuth client, so its loopback listener
     catches the redirect and there is no code to paste. `provider` is the
-    engine's own provider name (`swapd --provider <p>`), `label` titles the
-    child window. No slot and no relogin target: `add-oauth` resolves the
+    engine's own provider name (`swapd --provider <p>`); the page opens in the
+    system browser. No slot and no relogin target: `add-oauth` resolves the
     account from the sign-in itself and lands a known address back in its own
     slot, so signing in again just works. */
 export const InfinitusOAuthSignInInput = Schema.Struct({
   flowId: Schema.String,
   provider: Schema.String,
-  label: Schema.String,
 });
 export type InfinitusOAuthSignInInput = typeof InfinitusOAuthSignInInput.Type;
 

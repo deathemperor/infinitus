@@ -56,7 +56,6 @@ import { ForecastStrip } from "./ForecastStrip";
 import {
   fleetRunsShellOAuth,
   oauthSignInBridge,
-  shellOAuthWindowLabel,
   SIGN_IN_POLL_MS,
   signInBeginCommandArgs,
   signInBeginReply,
@@ -143,9 +142,9 @@ export function AccountsPage() {
   // Each add/re-login gets a run number; a newer run or an unmount retires
   // the polling loop of the one before it.
   const addRunRef = useRef(0);
-  /** The shell's own sign-in outlives this page: the engine's child process and
-      its window keep running until something ends them, and once the page is
-      gone nothing here can (#1213). Leaving it retires the flow. */
+  /** The shell's own sign-in outlives this page: the engine's child process
+      keeps listening until something ends it, and once the page is gone
+      nothing here can (#1213). Leaving it retires the flow. */
   const shellFlowIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
@@ -397,8 +396,8 @@ export function AccountsPage() {
   // The shell's own sign-in (#1213): one call for the whole flow. The shell
   // opens the provider's page as soon as the engine prints its URL, so the
   // flow waits for the provider from the moment it starts — there is no
-  // status to poll and no code to paste, and the window is the only place
-  // anything happens.
+  // status to poll and no code to paste, and the page runs in the system
+  // browser, so only Cancel here or the engine's timeout ends it.
   const startShellOAuthSignIn = async (
     fleetKey: string,
     provider: string,
@@ -424,12 +423,10 @@ export function AccountsPage() {
     };
     setSignInFlow(base);
     shellFlowIdRef.current = flowId;
-    const result = await shellOAuthSignIn
-      .begin({ flowId, provider, label: shellOAuthWindowLabel(fleetKey, targetLabel) })
-      .catch((cause: unknown) => ({
-        ok: false as const,
-        error: cause instanceof Error ? cause.message : String(cause),
-      }));
+    const result = await shellOAuthSignIn.begin({ flowId, provider }).catch((cause: unknown) => ({
+      ok: false as const,
+      error: cause instanceof Error ? cause.message : String(cause),
+    }));
     if (shellFlowIdRef.current === flowId) shellFlowIdRef.current = null;
     if (!live()) return;
     if (result.ok) {
