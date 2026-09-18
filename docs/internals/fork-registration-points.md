@@ -445,6 +445,21 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
   and `resolveWebAssetBrandForPackageVersion` mapping every version but an
   upstream nightly (first prerelease id `nightly`) to it (#823 layer 3, #1042).
+- `apps/web/public/{favicon.ico,favicon-16x16.png,favicon-32x32.png,apple-touch-icon.png}`
+  — the fork's mark, checked in. `applyWebBrandAssets` brands only a BUILD's
+  output (`build-desktop-artifact.ts`, `build-cli-archive.ts` → `dist/client`),
+  so anything serving `public/` directly — a dev server, the hosted web app —
+  served upstream's T3 blueprint tile, favicon and boot-shell splash logo
+  (`index.html`'s `#boot-shell-logo` is `/apple-touch-icon.png`), against the
+  #823 layer 1 rule that the upstream name and mark never reach a screen. The
+  text beside them was already fine: `vite.config.ts`'s `productNamePlugin`
+  rewrites index.html wholesale, so `alt` and `aria-label` follow
+  `PRODUCT_NAME`. These four files therefore diverge from
+  `DEVELOPMENT_PUBLIC_ICON_OVERRIDES` on purpose: `vp run icons:export` would
+  put the dev blueprint back, and `icons:check` lists them as stale — it is not
+  in any CI workflow and already reports 21 other pre-existing drifts on main,
+  so a fork sync leaves it alone rather than "fixing" it. The build-time brand
+  pass still runs and is now idempotent for `infinitus` versions.
 - `apps/desktop/scripts/electron-launcher.mjs` — `APP_PROTOCOL_SCHEMES`
   mirrors the shared constants (a node script cannot import the workspace's
   TypeScript); the dev-only bundle id stays `com.t3tools.*`. The dev bundle
