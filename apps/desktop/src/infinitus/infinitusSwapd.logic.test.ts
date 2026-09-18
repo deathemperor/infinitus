@@ -1,6 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { parseAddOauthLine, resolveSwapdBinary } from "./infinitusSwapd.logic.ts";
+import {
+  parseAddOauthLine,
+  privateWindowFlag,
+  resolveSwapdBinary,
+} from "./infinitusSwapd.logic.ts";
 
 const HOME = "/Users/me";
 const BUNDLE = "/Applications/Infinitus.app";
@@ -79,5 +83,14 @@ describe("parseAddOauthLine (#1213)", () => {
     assert.equal(parseAddOauthLine('{"schemaVersion":1}'), null);
     // An envelope missing its slot is not an account that was stored.
     assert.equal(parseAddOauthLine('{"email":"a@b.c"}'), null);
+  });
+});
+
+describe("privateWindowFlag", () => {
+  it("knows the Chromium family's switches and nothing else", () => {
+    assert.equal(privateWindowFlag("com.google.Chrome"), "--incognito");
+    assert.equal(privateWindowFlag("com.microsoft.edgemac"), "--inprivate");
+    assert.equal(privateWindowFlag("com.apple.Safari"), null);
+    assert.equal(privateWindowFlag("org.mozilla.firefox"), null);
   });
 });
