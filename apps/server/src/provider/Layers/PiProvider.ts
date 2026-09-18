@@ -51,6 +51,13 @@ const EMPTY_CAPABILITIES: ModelCapabilities = createModelCapabilities({ optionDe
 const VERSION_PROBE_TIMEOUT_MS = 4_000;
 // `--list-models` reads the local catalogue but may refresh provider metadata.
 const MODELS_PROBE_TIMEOUT_MS = 15_000;
+// `--offline` keeps extension discovery (extensions register providers, and
+// their models belong in the picker) but skips Pi's startup network work: the
+// catalogue refresh and the npm install of a configured package that is not
+// installed yet. Left on, the probe's timeout can kill that install mid-rename
+// and leave npm's retire dir behind, after which every Pi launch, sessions
+// included, fails with ENOTEMPTY.
+const MODELS_PROBE_ARGS = ["--offline", "--list-models"];
 
 const PI_BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
   {
@@ -214,7 +221,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
     });
   }
 
-  const modelsResult = yield* runPiCliCommand(piSettings, ["--list-models"], environment).pipe(
+  const modelsResult = yield* runPiCliCommand(piSettings, MODELS_PROBE_ARGS, environment).pipe(
     Effect.timeoutOption(MODELS_PROBE_TIMEOUT_MS),
     Effect.result,
   );

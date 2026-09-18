@@ -102,6 +102,36 @@ it.layer(NodeServices.layer)("checkPiProviderStatus", (it) => {
     }),
   );
 
+  it.effect("lists models offline", () =>
+    Effect.gen(function* () {
+      // Online, the listing installs any configured package that is missing.
+      // The probe's timeout can kill that install mid-rename and leave npm's
+      // retire dir behind, after which every Pi launch fails with ENOTEMPTY.
+      const fileSystem = yield* FileSystem.FileSystem;
+      const directory = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "pi-provider-offline-",
+      });
+      const binaryPath = writeFakeCli({
+        directory,
+        name: "pi",
+        source: [
+          'if (process.argv.includes("--version")) {',
+          '  process.stdout.write("0.85.1\\n");',
+          "  process.exit(0);",
+          "}",
+          'if (!process.argv.includes("--offline")) process.exit(3);',
+          'process.stdout.write("\\n");',
+          "process.exit(0);",
+        ].join("\n"),
+      });
+
+      const snapshot = yield* checkPiProviderStatus(
+        decodePiSettings({ enabled: true, binaryPath }),
+      );
+      expect(snapshot.auth.status).toBe("unauthenticated");
+    }),
+  );
+
   it.effect("probes the instance's own home, never an ambient Oh My Pi one", () =>
     Effect.gen(function* () {
       // The probe has to read the same config the session will. Oh My Pi is a
