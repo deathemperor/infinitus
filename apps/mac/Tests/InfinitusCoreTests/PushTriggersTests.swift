@@ -67,6 +67,20 @@ final class PushTriggersTests: XCTestCase {
         XCTAssertEqual(t.tick(accounts: dead, flags: all).count, 1)
     }
 
+    func testAllDeadNamesTheModelWhenItAloneKilledEveryone() {
+        var t = PushTriggers()
+        let fable = (1...2).map {
+            PushTriggers.Account(number: $0, name: "a\($0)", dead: true, worstPct: 100, spentModel: "Fable")
+        }
+        _ = t.tick(accounts: [acct(1, dead: false, pct: 10), acct(2, dead: true)], flags: all)
+        XCTAssertEqual(t.tick(accounts: fable, flags: all),
+                       ["all 2 accounts out of Fable — nothing left to switch to"])
+        // One death by a plan window: the plain line.
+        _ = t.tick(accounts: [acct(1, dead: false, pct: 10), acct(2, dead: true)], flags: all)
+        XCTAssertEqual(t.tick(accounts: [fable[0], acct(2, dead: true)], flags: all),
+                       ["all 2 accounts exhausted — nothing left to switch to"])
+    }
+
     func testAllDeadAtLaunchIsSeededSilently() {
         var t = PushTriggers()
         let dead = [acct(1, dead: true), acct(2, dead: true)]

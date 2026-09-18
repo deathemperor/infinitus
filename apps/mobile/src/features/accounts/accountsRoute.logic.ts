@@ -93,14 +93,16 @@ export function macAccountsModel(
   };
 }
 
-/** The band's one line: the revival as a clock time, "tomorrow at …" or a
-    date when further out, and who comes back first when known. The phone has
+/** The band's one line: what ran out (every plan window, or one model only),
+    the revival as a clock time, "tomorrow at …" or a date when further out,
+    and who comes back first when known. The phone has
     no timestamp-format setting, so the device locale formats it. */
 export function exhaustedCopy(band: ExhaustedBandModel, nowMs: number): string {
+  const what = band.model === null ? "All accounts exhausted" : `All accounts out of ${band.model}`;
   const when = band.revivalAt === null ? "" : upcoming(band.revivalAt, nowMs);
-  if (when === "") return "All accounts exhausted";
+  if (when === "") return what;
   const who = band.revivesFirst === null ? "" : ` (${band.revivesFirst})`;
-  return `All accounts exhausted · next revival ${when}${who}`;
+  return `${what} · next revival ${when}${who}`;
 }
 
 function upcoming(iso: string, nowMs: number): string {

@@ -179,6 +179,33 @@ final class DeadCauseTests: XCTestCase {
         XCTAssertNil(AccountVitals.cause(Usage(fiveHour: window(40, resetsAt: "2026-09-13T06:00:00Z"))))
     }
 
+    func testSpentModelIsTheOneModelWindowThatAloneKills() {
+        let fable = Usage(fiveHour: window(30, resetsAt: "2026-09-13T06:00:00Z"),
+                          scoped: [window(100, resetsAt: "2026-09-15T11:00:00Z", name: "Fable"),
+                                   window(3, resetsAt: "2026-09-15T11:00:00Z", name: "Opus")])
+        XCTAssertEqual(AccountVitals.spentModel(fable), "Fable")
+        // A spent plan window, two spent models, or nothing spent: no model.
+        XCTAssertNil(AccountVitals.spentModel(Usage(
+            fiveHour: window(100, resetsAt: "2026-09-13T06:00:00Z"),
+            scoped: [window(100, resetsAt: "2026-09-15T11:00:00Z", name: "Fable")])))
+        XCTAssertNil(AccountVitals.spentModel(Usage(
+            scoped: [window(100, resetsAt: "2026-09-15T11:00:00Z", name: "Fable"),
+                     window(100, resetsAt: "2026-09-15T11:00:00Z", name: "Opus")])))
+        XCTAssertNil(AccountVitals.spentModel(Usage(fiveHour: window(40, resetsAt: "2026-09-13T06:00:00Z"))))
+
+        func account(_ n: Int, _ usage: Usage, disabled: Bool = false) -> Account {
+            Account(number: n, email: "a\(n)@x.com", organizationName: "", organizationUuid: "",
+                    isOrganization: false, active: false, usageStatus: "ok", usage: usage,
+                    disabled: disabled)
+        }
+        let session = Usage(fiveHour: window(100, resetsAt: "2026-09-13T06:00:00Z"))
+        XCTAssertEqual(AccountVitals.spentModel(across: [account(1, fable), account(2, fable)]), "Fable")
+        // A held account's death does not vote; a session death anywhere wins.
+        XCTAssertEqual(AccountVitals.spentModel(across: [account(1, fable), account(2, session, disabled: true)]), "Fable")
+        XCTAssertNil(AccountVitals.spentModel(across: [account(1, fable), account(2, session)]))
+        XCTAssertNil(AccountVitals.spentModel(across: []))
+    }
+
     func testACauseBlocksOnlyItsOwnWindow() {
         let fable = AccountVitals.cause(Usage(
             fiveHour: window(0, resetsAt: "2026-09-13T06:00:00Z"),

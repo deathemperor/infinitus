@@ -1850,7 +1850,8 @@ final class AppModel: ObservableObject {
                 number: a.number,
                 name: a.alias ?? String(a.email.prefix(while: { $0 != "@" })),
                 dead: AccountVitals.isDead(a.usage),
-                worstPct: PushTriggers.worstPlanPct(a.usage)) }
+                worstPct: PushTriggers.worstPlanPct(a.usage),
+                spentModel: AccountVitals.spentModel(a.usage)) }
         let pushes = pushTriggers.tick(
             accounts: health,
             flags: .init(allDead: pushAllDead, lastAlive: pushLastAlive),

@@ -77,7 +77,9 @@ these bullets.
   `AccountVitals.isDead` / `RecoveryMath.revival`. Drawn by
   `apps/web/src/components/accounts/ExhaustedBand.tsx` inside each fleet
   section ("All accounts exhausted · next revival HH:MM (account)", the
-  time in the user's timestamp format), replacing the pop-out's reviver band.
+  time in the user's timestamp format; "All accounts out of Fable" when one
+  per-model window alone blocks every account and the plan windows still
+  have room), replacing the pop-out's reviver band.
 - `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
 - `apps/web/src/routes/settings.engines_.activity.tsx`,
   `apps/web/src/components/activity/` — Settings › Engines ›
