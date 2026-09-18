@@ -21,10 +21,10 @@ import * as Schema from "effect/Schema";
 
 import { expandHomePath } from "../../pathExpansion.ts";
 
-export const PI_PROXY_BASE_URL_VAR = "PI_PROXY_BASE_URL";
-export const PI_PROXY_API_KEY_VAR = "PI_PROXY_API_KEY";
+const PI_PROXY_BASE_URL_VAR = "PI_PROXY_BASE_URL";
+const PI_PROXY_API_KEY_VAR = "PI_PROXY_API_KEY";
 /** Pi provider id the proxy's models live under, so a slug reads `proxy/<id>`. */
-export const PI_PROXY_PROVIDER = "proxy";
+const PI_PROXY_PROVIDER = "proxy";
 
 const decodeModelsFile = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
