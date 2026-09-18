@@ -37,10 +37,11 @@ export interface EngineDefinition {
   /** The executable's name in the directories searched. */
   readonly binary: string;
   /**
-   * Arguments the child is started with. Deliberately NOT 9Router's `-t`
-   * (tray): that mode is for when nobody supervises it, and a process that
-   * backgrounds itself reads to us as one that exited the moment it started.
-   * The shell is the supervisor here, so the engine runs in the foreground.
+   * Arguments the child is started with. 9Router needs `-t` (tray): without it
+   * the CLI is a terminal menu, and a child has no terminal — the menu reads
+   * that as "Exit" and takes the server down seconds after it came up. Tray
+   * mode stays in the foreground and exits cleanly on SIGTERM, which is all a
+   * supervisor needs.
    */
   readonly args: ReadonlyArray<string>;
   /** The Homebrew formula whose launchd job means this engine is already
@@ -60,7 +61,7 @@ export const ENGINE_DEFINITIONS: ReadonlyArray<EngineDefinition> = [
     key: "9router",
     label: "9Router",
     binary: "9router",
-    args: ["-n", "-H", "127.0.0.1"],
+    args: ["-t", "-n", "-H", "127.0.0.1"],
     brewFormula: null,
   },
 ];

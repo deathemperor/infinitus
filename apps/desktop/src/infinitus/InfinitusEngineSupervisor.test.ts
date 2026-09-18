@@ -102,7 +102,7 @@ describe("engine supervisor", () => {
     supervisor.reconcile();
     assert.lengthOf(fake.spawned, 1);
     assert.strictEqual(fake.last!.binary, NINE_ROUTER_BINARY);
-    assert.deepStrictEqual(fake.last!.args, ["-n", "-H", "127.0.0.1"]);
+    assert.deepStrictEqual(fake.last!.args, ["-t", "-n", "-H", "127.0.0.1"]);
     const state = stateOf(supervisor, "9router");
     assert.strictEqual(state.state, "running");
     assert.strictEqual(state.pid, 1001);
