@@ -8,19 +8,23 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const {
   appendSwitchMock,
+  configureWebAuthnMock,
   getSwitchValueMock,
   hasSwitchMock,
   registerSchemesMock,
   setDesktopNameMock,
   mkdirSyncMock,
+  readFileSyncMock,
   writeFileSyncMock,
 } = vi.hoisted(() => ({
   appendSwitchMock: vi.fn(),
+  configureWebAuthnMock: vi.fn(),
   getSwitchValueMock: vi.fn(),
   hasSwitchMock: vi.fn(),
   registerSchemesMock: vi.fn(),
   setDesktopNameMock: vi.fn(),
   mkdirSyncMock: vi.fn(),
+  readFileSyncMock: vi.fn(),
   writeFileSyncMock: vi.fn(),
 }));
 
@@ -28,6 +32,9 @@ vi.mock("electron", () => ({
   app: {
     setDesktopName: setDesktopNameMock,
     getVersion: () => "0.0.37",
+    getAppPath: () => "/Applications/Infinitus.app/Contents/Resources/app.asar",
+    isPackaged: true,
+    configureWebAuthn: configureWebAuthnMock,
     on: () => undefined,
     commandLine: {
       appendSwitch: appendSwitchMock,
@@ -41,7 +48,7 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("node:fs", () => ({
-  readFileSync: () => "{}",
+  readFileSync: readFileSyncMock,
   mkdirSync: mkdirSyncMock,
   writeFileSync: writeFileSyncMock,
 }));
@@ -51,12 +58,57 @@ import * as DesktopPreReadyPlatform from "./DesktopPreReadyPlatform.ts";
 describe("DesktopPreReadyPlatform", () => {
   beforeEach(() => {
     appendSwitchMock.mockReset();
+    configureWebAuthnMock.mockReset();
     getSwitchValueMock.mockReset();
     hasSwitchMock.mockReset();
     registerSchemesMock.mockReset();
     setDesktopNameMock.mockReset();
     mkdirSyncMock.mockReset();
+    readFileSyncMock.mockReset();
+    readFileSyncMock.mockReturnValue("{}");
     writeFileSyncMock.mockReset();
+  });
+
+  it.effect("enables the Touch ID authenticator on macOS with the group the build signed", () => {
+    readFileSyncMock.mockImplementation((path: string) =>
+      path === "/Applications/Infinitus.app/Contents/Resources/app.asar/package.json"
+        ? JSON.stringify({
+            webauthnKeychainAccessGroup: "ABC1234567.run.infinitus.desktop.webauthn",
+          })
+        : "{}",
+    );
+
+    return DesktopPreReadyPlatform.make.pipe(
+      Effect.provideService(HostProcessPlatform, "darwin"),
+      Effect.map(() => {
+        assert.deepEqual(configureWebAuthnMock.mock.calls, [
+          [{ touchID: { keychainAccessGroup: "ABC1234567.run.infinitus.desktop.webauthn" } }],
+        ]);
+      }),
+    );
+  });
+
+  it.effect("leaves WebAuthn unconfigured when the build signed no keychain access group", () =>
+    DesktopPreReadyPlatform.make.pipe(
+      Effect.provideService(HostProcessPlatform, "darwin"),
+      Effect.map(() => {
+        assert.equal(configureWebAuthnMock.mock.calls.length, 0);
+      }),
+    ),
+  );
+
+  it.effect("never configures the macOS authenticator on Linux", () => {
+    readFileSyncMock.mockReturnValue(
+      JSON.stringify({ webauthnKeychainAccessGroup: "ABC1234567.run.infinitus.desktop.webauthn" }),
+    );
+    getSwitchValueMock.mockReturnValue("");
+
+    return DesktopPreReadyPlatform.make.pipe(
+      Effect.provideService(HostProcessPlatform, "linux"),
+      Effect.map(() => {
+        assert.equal(configureWebAuthnMock.mock.calls.length, 0);
+      }),
+    );
   });
 
   it.effect("preserves an explicit Linux password-store switch", () => {
