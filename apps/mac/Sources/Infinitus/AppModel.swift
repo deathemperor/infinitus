@@ -558,8 +558,6 @@ final class AppModel: ObservableObject {
     let leases = LeaseTable()
     /// Agent CLI socket (ControlServer.swift); the real model only.
     private(set) lazy var controlServer = ControlServer(model: self)
-    /// The biometric lock (LockModel.swift); the surfaces and the Lock pane read it.
-    private(set) lazy var lock = LockModel(defaults: defaults)
     /// The desktop's CLI credential (#822): stored by `desktop-credential`, read by `desktop-token`.
     private(set) lazy var desktopCredential: DesktopCredential = {
         let credential = DesktopCredential(defaults: defaults)
@@ -1965,7 +1963,7 @@ extension AppModel: FleetModel {
 
     /// The onboarding card's "Engine settings" button: Settings ›
     /// Infinitus › Engines is the desktop app's (#1177).
-    func openSettings() { openDesktop?("infinitus/engines") }
+    func openSettings() { openDesktop?("engines") }
 
     /// The "at this pace" line's click. The Utilization page is the
     /// desktop app's (#654, #774).

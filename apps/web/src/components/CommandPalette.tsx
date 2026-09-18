@@ -2095,7 +2095,7 @@ function OpenCommandPaletteDialog(props: {
         title: "Open activity",
         icon: <ActivityIcon className={ITEM_ICON_CLASS} />,
         run: async () => {
-          await navigate({ to: "/settings/infinitus/engines/activity" });
+          await navigate({ to: "/settings/engines/activity" });
         },
       },
       {

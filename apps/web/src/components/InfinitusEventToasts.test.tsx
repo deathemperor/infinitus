@@ -212,7 +212,7 @@ describe("InfinitusEventToasts — pairing requests (#710)", () => {
     expect(`${toast.title} ${toast.description}`).not.toContain("AB12");
     expect(`${toast.title} ${toast.description}`).not.toContain("Approve");
     toast.actionProps.onClick();
-    expect(testState.navigate).toHaveBeenCalledWith({ to: "/settings/infinitus/devices" });
+    expect(testState.navigate).toHaveBeenCalledWith({ to: "/settings/devices" });
 
     await deliverPairing(renderer, pending(pairingRequest("req-1")));
     expect(testState.addToast).toHaveBeenCalledTimes(1);

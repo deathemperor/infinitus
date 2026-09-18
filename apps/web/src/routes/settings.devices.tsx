@@ -4,7 +4,7 @@ import { InfinitusCrashesCard } from "../components/settings/infinitus/Infinitus
 import { InfinitusPairingRequestsCard } from "../components/settings/infinitus/InfinitusPairingRequestsCard";
 import { InfinitusPrefsPanel } from "../components/settings/infinitus/InfinitusPrefsPanel";
 
-function SettingsInfinitusDevicesRoute() {
+function SettingsDevicesRoute() {
   return (
     <InfinitusPrefsPanel
       sectionSlugs={["devices"]}
@@ -15,6 +15,6 @@ function SettingsInfinitusDevicesRoute() {
   );
 }
 
-export const Route = createFileRoute("/settings/infinitus/devices")({
-  component: SettingsInfinitusDevicesRoute,
+export const Route = createFileRoute("/settings/devices")({
+  component: SettingsDevicesRoute,
 });

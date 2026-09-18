@@ -5,7 +5,7 @@ import { useEnvironment } from "../state/environments";
 
 import { InfinitusEnginesPanel } from "../components/settings/infinitus/InfinitusEnginesPanel";
 
-function SettingsInfinitusEnginesRoute() {
+function SettingsEnginesRoute() {
   const { environmentId } = Route.useSearch();
   const environment = useEnvironment(environmentId ?? null);
   return (
@@ -16,10 +16,10 @@ function SettingsInfinitusEnginesRoute() {
   );
 }
 
-export const Route = createFileRoute("/settings/infinitus/engines")({
+export const Route = createFileRoute("/settings/engines")({
   validateSearch: (raw: Record<string, unknown>): { environmentId?: EnvironmentId } =>
     typeof raw.environmentId === "string" && raw.environmentId.trim()
       ? { environmentId: EnvironmentId.make(raw.environmentId) }
       : {},
-  component: SettingsInfinitusEnginesRoute,
+  component: SettingsEnginesRoute,
 });

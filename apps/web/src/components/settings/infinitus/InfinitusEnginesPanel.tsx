@@ -35,7 +35,7 @@ function InfinitusEngineStatusList({
   // The Activity sub screen reads the primary environment's log, so the way
   // in is drawn only when this page manages that environment.
   const activityLink = environment ? null : (
-    <Button render={<Link to="/settings/infinitus/engines/activity" />} size="sm" variant="outline">
+    <Button render={<Link to="/settings/engines/activity" />} size="sm" variant="outline">
       View activity
     </Button>
   );

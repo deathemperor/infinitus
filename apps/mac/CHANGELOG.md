@@ -10,6 +10,26 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.25
+
+### Mac
+- A full 9Router session gauge no longer stays on “respawning…” after its old reset time has passed.
+- Fully available accounts show their session, weekly and model gauges instead of a “full HP” summary, including in compact layouts.
+- Accounts show ahead/behind pace from one minute after a weekly reset across swapd, 9Router and CLIProxyAPI.
+- The menu bar app's Settings window is gone — every setting lives in the desktop app's Settings. Its last pane held settings export/import and account backup; both retire with it (`swapd export` / `swapd import` from a terminal remain the account backup path). The "Dock icon while Settings is open" preference went with the window.
+- ⌘, and the status menu's Settings… open Infinitus straight on its Menu bar settings page; the onboarding card's Engine settings lands on Engines.
+
+### Desktop
+- Activity moved from the sidebar to Settings › Engines, behind swapd's "View activity" button.
+- Each account on the Accounts page can be kept warm: with it on, swapd starts the account's 5h window whenever it has gone cold, so a switch onto it lands on a clock already running (needs swapd 0.3).
+- Add account signs in through your browser instead of a window inside the app, so passkeys work.
+- Settings has no "Infinitus" group any more; Menu bar, Animations, Priority, Lock, Team, Notifications, Devices and Engines are pages of their own, and the old links still land.
+- The theme picker now lives on the Menu bar settings page; the separate Themes page is gone.
+
+### Phone
+- The Accounts page offers the same keep-warm toggle per account.
+- Settings has no "Infinitus" section any more; Accounts, Team and the reset alarms sit under Configuration, the sending mode under General.
+
 ## 0.5.0-alpha.24
 
 ### Mac

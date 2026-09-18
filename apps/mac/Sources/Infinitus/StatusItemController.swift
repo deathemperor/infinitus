@@ -149,7 +149,6 @@ final class StatusItemController {
     }
 
     private func showAnchored() {
-        model.lock.surfaceShown()
         if anchored == nil {
             let host = NSHostingController(rootView: AnchoredRoot(
                 model: model,
@@ -188,13 +187,7 @@ final class StatusItemController {
         model.introOpened()
     }
 
-    /// `feedLock: false` only at the popOut() call site — it moves the
-    /// same content to the pop-out, nothing hides from the user (brief
-    /// step 3). Every other caller is a genuine dismiss and keeps the
-    /// default: the global click-outside monitor, the local one, and
-    /// togglePopover()'s close branch.
-    private func closeAnchored(feedLock: Bool = true) {
-        if feedLock { model.lock.surfaceHidden() }
+    private func closeAnchored() {
         anchored?.orderOut(nil)
         syncLocalLease()
         updateDismissMonitors()
@@ -294,7 +287,7 @@ final class StatusItemController {
             showAnchored()
             return
         }
-        if anchored?.isVisible == true { closeAnchored(feedLock: false) }
+        if anchored?.isVisible == true { closeAnchored() }
         showPinnedWindow()
     }
 
@@ -394,7 +387,7 @@ final class StatusItemController {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
     }
     @objc private func menuOpenFork() { openFork() }
-    @objc private func menuSettings() { openFork(settingsPage: "infinitus") }
+    @objc private func menuSettings() { openFork(settingsPage: "menu-bar") }
     /// Opens the desktop app; with a Settings page, at that section over
     /// its `infinitus://settings/<page>` deep link (the desktop is the
     /// scheme's one claimant on a Mac, `docs/internals/desktop-deep-links.md`).
@@ -474,7 +467,7 @@ final class StatusItemController {
             // the stay-visible-while-working-elsewhere HUD behavior.
             w.level = .floating
             NotificationCenter.default.addObserver(
-                self, selector: #selector(pinnedBecameKey),
+                self, selector: #selector(pinnedKeyChanged),
                 name: NSWindow.didBecomeKeyNotification, object: w)
             NotificationCenter.default.addObserver(
                 self, selector: #selector(pinnedKeyChanged),
@@ -502,7 +495,6 @@ final class StatusItemController {
                 clampOnScreen(w)
             }
         }
-        model.lock.surfaceShown()
         AppDefaults.standard.set(true, forKey: "popout_shown")
         if activate {
             NSApp.activate(ignoringOtherApps: true)
@@ -516,18 +508,10 @@ final class StatusItemController {
 
     /// The pop-out's level follows key status and the pin, so a pin
     /// toggle retargets it live (apply() calls this on every model
-    /// snapshot too — window-level upkeep only, no lock feed, since it
-    /// isn't an interaction by itself).
+    /// snapshot too).
     @objc private func pinnedKeyChanged() {
         guard let w = pinned else { return }
         w.level = model.popoverPinned || w.isKeyWindow ? .floating : .normal
-    }
-
-    /// Real didBecomeKey edge only (not apply()'s repeated snapshots) —
-    /// the actual user interaction that should feed the re-lock clock.
-    @objc private func pinnedBecameKey() {
-        model.lock.surfaceShown()
-        pinnedKeyChanged()
     }
 
     @objc private func pinnedMoved() {
@@ -540,7 +524,6 @@ final class StatusItemController {
     @objc private func pinnedClosed() {
         // App-quit closes the window too; only a USER close drops the flag.
         guard !AppDelegate.terminating else { return }
-        model.lock.surfaceHidden()
         AppDefaults.standard.set(false, forKey: "popout_shown")
         syncLocalLease()
     }
@@ -632,7 +615,7 @@ private struct AnchoredRoot: View {
     let onSize: (CGSize) -> Void
 
     var body: some View {
-        LockGate(lock: model.lock) { MenuContent(model: model) }
+        MenuContent(model: model)
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -650,9 +633,7 @@ private struct PinnedRoot: View {
         VStack(spacing: 0) {
             InfinitusHeader(model: model)
                 .frame(height: 30)
-            LockGate(lock: model.lock) {
-                MenuContent(model: model, showHeader: false)
-            }
+            MenuContent(model: model, showHeader: false)
         }
         // fixedSize = the content's ideal, independent of the window; the
         // window then follows THAT (fitPinned) instead of the other way

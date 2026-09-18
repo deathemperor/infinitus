@@ -18,7 +18,7 @@ these bullets.
   nothing of its input and the request observer sees the method only).
 - `apps/web/src/hooks/useInfinitusPairingToasts.ts` — a toast per phone
   asking to pair (#710): title with the device name, one Open action to
-  `/settings/infinitus/devices`. Never an Approve in the toast (a spoofed
+  `/settings/devices`. Never an Approve in the toast (a spoofed
   device name must not be let in by reflex) and never the match code; every
   unseen id is toasted once, including those already pending at load. Mounted
   from `InfinitusEventToasts` beside the events hook. Silent when the stream
@@ -37,18 +37,6 @@ these bullets.
   once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that line and `CaptureGestureCoordinator`'s are the
   fork's only edits there).
-- `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
-  `lock.logic.ts`, route `settings.infinitus.lock.tsx`) — Settings › Infinitus
-  › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
-  `lock-status` / `lock on|off|now|relock <arg>` / `unlock` (native #788),
-  each answering `{enabled, locked, relock}`. The switch turns the lock on
-  (the Mac's own prompt runs there; the row says "Confirm on the Mac" while
-  it waits) or off (the team refusal and its `--yes` left with Team, #1061).
-  Re-lock is a select over the four native labels
-  (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
-  Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
-  the app's text verbatim; the pane holds no secret. Gated on the manifest
-  carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
 - `apps/web/src/components/captures/`, `apps/web/src/state/captures.ts` — the composer's Captures popover (#433, PR B): `ComposerCapturesBadge`, `ComposerCapturesMenu`, `captures.logic`, `capturesUiStore`, `useCaptures`, and `CaptureGestureCoordinator` (+ `captureGesture.logic`), the desktop gesture's landing. Rules and traps: `docs/internals/captures.md`.
 - `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G): `promptSnippets.logic`, `promptsUiStore`, `ComposerPromptsBadge`, `ComposerPromptsMenu`, `useProjectPromptSnippets`, `ProjectPromptSnippetsSection`, `promptSnippetSlashItems`; the phone's half is `apps/mobile/src/features/threads/promptSnippetItems.ts`. Rules and traps: `docs/internals/prompt-snippets.md`.
 - `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
@@ -76,7 +64,7 @@ these bullets.
   (`isSettingsDeepLinkPath`) and ignores any other path.
   `join` (#1313, the Team rebuild) parks the whole link — it is the team
   code, a secret — in `pendingTeamJoin.ts` (memory only, taken once) and
-  opens Settings › Infinitus; the Team page's Join field takes it when that
+  opens Settings › Team; the Team page's Join field takes it when that
   page lands, and nothing joins on its own. Only the link's kind is ever
   logged; `pair` stays the native app's.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`, `packages/client-runtime/src/state/captures.ts` (exported as `@infinitus/client-runtime/state/captures`) — captures (#433): one list per project, kept as `<stateDir>/captures/<projectId>.json`, streamed by `subscribeCaptures`, written by `captures.apply`. Rules and traps: `docs/internals/captures.md`.
@@ -91,9 +79,9 @@ these bullets.
   section ("All accounts exhausted · next revival HH:MM (account)", the
   time in the user's timestamp format), replacing the pop-out's reviver band.
 - `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
-- `apps/web/src/routes/settings.infinitus.engines_.activity.tsx`,
-  `apps/web/src/components/activity/` — Settings › Infinitus › Engines ›
-  Activity (#659; `/settings/infinitus/engines/activity`, the `engines_`
+- `apps/web/src/routes/settings.engines_.activity.tsx`,
+  `apps/web/src/components/activity/` — Settings › Engines ›
+  Activity (#659; `/settings/engines/activity`, the `engines_`
   keeping it out of the Engines panel's tree): the pop-out's Activity pane in
   the fork — the app's event log newest first, sectioned by local day (`activity.logic.ts`),
   a kind chip per line. Reads `events --limit 100` once through
@@ -111,8 +99,8 @@ these bullets.
 - Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table on `/usage` (#779): `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads the app's `history <fleet>` verb once per scan, `infinitusUsageAttribution.logic.ts` gives `accountAt(ms)`, `UsageAggregator`'s `attribute` hook sums the optional `UsageSummary.accounts`. Rules and traps: `docs/internals/usage-attribution.md`.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the Accounts page and its Sign-ins section (`SignInsSection.tsx`, `signIns.logic.ts`; models in `packages/client-runtime/src/state/infinitusAccounts.ts`, `infinitusPageState` #693); Add account / Sign in again (`addAccount.logic.ts`, #671, #1213), the desktop's in-app sign-in (`apps/desktop/src/infinitus/InfinitusSignIn.ts`, `signIn.logic.ts`, #677) and the paste-code path over `infinitus.secret` (#747 step 2). Rules and traps: `docs/internals/accounts-page.md`.
-- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
-  — the four Settings › Infinitus routes, thin shells over the panes above.
+- `apps/web/src/routes/settings.{menu-bar,notifications,devices,engines}.tsx`
+  — four of the Settings routes, thin shells over the panes above.
   Profiles (#165, the Mac's "named way to start a session") left with the
   #1041 sessions sweep, its `profiles` contract with it, and the fixture's
   canned reply with the Mac's own verb (#1091).
@@ -170,7 +158,7 @@ these bullets.
 - `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus` group in `packages/contracts/src/environmentHttp.ts` — the server half of `infinitusctl`'s desktop verbs (#822): the `infinitusctl` session and its 60 s heartbeat (#1137), `GET /api/infinitus/holds`, `POST /api/infinitus/release-thread`, `GET /api/infinitus/thread-defaults` (#1315). Rules and traps: `docs/internals/infinitusctl-desktop-verbs.md`.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control client, the `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command` (`events --after`, #346), the fork-port publisher (`prefs set fork_server_port`, withheld from dev and worktree servers, #640), the verb-only spans (#676). Rules and traps: `docs/internals/server-adapter.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlackSocket.ts` (+ `infinitusSlackSocket.logic.ts` — `parseSocketFrame`, `reconnectDelaySeconds`; test) — the Socket Mode client, `SlackClientLive` (#574, PR 4). Rules and traps: `docs/internals/slack-bridge.md`.
-- `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+ `slack.logic.ts` — `parseAllowedUserIds`, `slackStatusLine`; test) — Settings › Infinitus › Slack (#574, PR 3), mounted from `settings.infinitus.index.tsx`'s footer, search item `infinitus-slack`. Rules and traps: `docs/internals/slack-bridge.md`.
+- `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+ `slack.logic.ts` — `parseAllowedUserIds`, `slackStatusLine`; test) — Settings › Menu bar › Slack (#574, PR 3), mounted from `settings.menu-bar.tsx`'s footer, search item `infinitus-slack`. Rules and traps: `docs/internals/slack-bridge.md`.
   `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
   resume-on-limit for the threads this server runs (#648), and since the
   sessions sweep (#1041) the only one left — the Mac's terminal nudge went
@@ -208,7 +196,7 @@ these bullets.
   user sends again. Once per stop, 2-min cooldown per thread,
   a user turn cancels; off by the `infinitusResumeOnLimit` server setting
   (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
-  Settings › Infinitus).
+  Settings › Menu bar).
   `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
   Mac whose socket is still quiet 3 s after the server starts it runs `open
 -g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
@@ -269,7 +257,7 @@ these bullets.
   per process, skipped for an updater-driven quit. Reached from the web over
   the bridge's optional `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp`
   (`ipc/methods/infinitus.ts`); the switch is the "This window" card on
-  Settings › Infinitus (`InfinitusDesktopCard.tsx`, hidden in a browser or
+  Settings › Menu bar (`InfinitusDesktopCard.tsx`, hidden in a browser or
   under an older shell). `InfinitusLaunchButton.tsx` is the launch button on
   the Accounts offline card and every Infinitus pane's unavailable notice,
   drawn only when the server's host is a Mac.

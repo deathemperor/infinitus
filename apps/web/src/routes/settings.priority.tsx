@@ -6,10 +6,10 @@ import { InfinitusPrefsPanel } from "../components/settings/infinitus/InfinitusP
     catalog's `priority` section carries — the mode, and the two thresholds
     native's headroom verdict binds on. The Mac files them there since #1069;
     a build before that answers `sessions`, so both slugs are read. */
-function SettingsInfinitusSessionsRoute() {
+function SettingsPriorityRoute() {
   return <InfinitusPrefsPanel sectionSlugs={["priority", "sessions"]} title="Priority" />;
 }
 
-export const Route = createFileRoute("/settings/infinitus/sessions")({
-  component: SettingsInfinitusSessionsRoute,
+export const Route = createFileRoute("/settings/priority")({
+  component: SettingsPriorityRoute,
 });

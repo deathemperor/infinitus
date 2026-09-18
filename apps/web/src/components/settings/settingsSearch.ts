@@ -23,14 +23,13 @@ export type SettingsPath =
   | "/settings/source-control"
   | "/settings/storage"
   | "/settings/connections"
-  | "/settings/infinitus"
-  | "/settings/infinitus/animations"
-  | "/settings/infinitus/sessions"
-  | "/settings/infinitus/lock"
-  | "/settings/infinitus/team"
-  | "/settings/infinitus/notifications"
-  | "/settings/infinitus/devices"
-  | "/settings/infinitus/engines"
+  | "/settings/menu-bar"
+  | "/settings/animations"
+  | "/settings/priority"
+  | "/settings/team"
+  | "/settings/notifications"
+  | "/settings/devices"
+  | "/settings/engines"
   | "/settings/archived";
 
 /**
@@ -105,14 +104,13 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/connections": "Connections",
   // The app is Infinitus, so its pages carry no prefix (user 2026-09-11); the
   // catalog page is named for what it holds, the menu bar and popup prefs.
-  "/settings/infinitus": "Menu bar",
-  "/settings/infinitus/animations": "Animations",
-  "/settings/infinitus/sessions": "Priority",
-  "/settings/infinitus/lock": "Lock",
-  "/settings/infinitus/team": "Team",
-  "/settings/infinitus/notifications": "Notifications",
-  "/settings/infinitus/devices": "Devices",
-  "/settings/infinitus/engines": "Engines",
+  "/settings/menu-bar": "Menu bar",
+  "/settings/animations": "Animations",
+  "/settings/priority": "Priority",
+  "/settings/team": "Team",
+  "/settings/notifications": "Notifications",
+  "/settings/devices": "Devices",
+  "/settings/engines": "Engines",
   "/settings/archived": "Archive",
 };
 
@@ -824,7 +822,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     // row by row; `targetId` is the first section the page renders.
     id: "infinitus-preferences",
     title: "Infinitus preferences",
-    to: "/settings/infinitus",
+    to: "/settings/menu-bar",
     targetId: "infinitus-display",
     infinitusOnly: true,
     searchTerms: ["menu bar popup startup about threads hide icon"],
@@ -833,7 +831,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     // Fork (#574): the Slack bridge sits on the Menu bar page under Threads.
     id: "infinitus-slack",
     title: "Start threads from Slack",
-    to: "/settings/infinitus",
+    to: "/settings/menu-bar",
     targetId: "infinitus-slack",
     searchTerms: ["slack bot mention token socket mode bridge channel"],
     infinitusOnly: true,
@@ -842,7 +840,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     // The theme picker sits on the Menu bar page, under its own section.
     id: "infinitus-themes",
     title: "Infinitus themes",
-    to: "/settings/infinitus",
+    to: "/settings/menu-bar",
     targetId: "infinitus-themes",
     infinitusOnly: true,
     searchTerms: ["theme gamification style rpg movie hades picker look"],
@@ -850,7 +848,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-animations",
     title: "Infinitus animations",
-    to: "/settings/infinitus/animations",
+    to: "/settings/animations",
     targetId: "infinitus-animations",
     infinitusOnly: true,
     searchTerms: ["animation intro slide fade zoom burn ember flame speed motion"],
@@ -858,7 +856,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-sessions",
     title: "Infinitus priority",
-    to: "/settings/infinitus/sessions",
+    to: "/settings/priority",
     // The Mac files these keys under `priority` since #1069; a build older than
     // that still answers `sessions`, and the anchor then only loses its scroll.
     targetId: "infinitus-priority",
@@ -873,23 +871,15 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "desktop-badge",
     title: "Dock badge",
-    to: "/settings/infinitus/notifications",
+    to: "/settings/notifications",
     targetId: "desktop-notifications",
     infinitusOnly: true,
     searchTerms: ["dock icon badge count unread attention"],
   },
   {
-    id: "infinitus-lock",
-    title: "Infinitus lock",
-    to: "/settings/infinitus/lock",
-    targetId: "infinitus-lock",
-    infinitusOnly: true,
-    searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
-  },
-  {
     id: "infinitus-team",
     title: "Infinitus team",
-    to: "/settings/infinitus/team",
+    to: "/settings/team",
     targetId: "infinitus-team",
     infinitusOnly: true,
     searchTerms: ["team members invite code join create share transcripts leader roster"],
@@ -897,7 +887,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-push",
     title: "Infinitus notifications",
-    to: "/settings/infinitus/notifications",
+    to: "/settings/notifications",
     targetId: "infinitus-push",
     infinitusOnly: true,
     // The four rows left are account events (#1041 took `push_waiting` and
@@ -908,7 +898,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-devices",
     title: "Infinitus devices",
-    to: "/settings/infinitus/devices",
+    to: "/settings/devices",
     targetId: "infinitus-devices",
     infinitusOnly: true,
     // "live activity" went with the Mac's cards and the phone mirror with its
@@ -921,7 +911,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-engines",
     title: "Infinitus engines",
-    to: "/settings/infinitus/engines",
+    to: "/settings/engines",
     targetId: "infinitus-engines",
     infinitusOnly: true,
     searchTerms: [
@@ -964,16 +954,15 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/storage": "project-defaults",
   "/settings/connections": "connections",
   "/settings/archived": "project-defaults",
-  // Fork: the Infinitus pages read the primary environment's menu bar app and
-  // need no selection scope to render.
-  "/settings/infinitus": null,
-  "/settings/infinitus/animations": null,
-  "/settings/infinitus/sessions": null,
-  "/settings/infinitus/lock": null,
-  "/settings/infinitus/team": null,
-  "/settings/infinitus/notifications": null,
-  "/settings/infinitus/devices": null,
-  "/settings/infinitus/engines": null,
+  // Fork: the menu bar app's pages read the primary environment and need no
+  // selection scope to render.
+  "/settings/menu-bar": null,
+  "/settings/animations": null,
+  "/settings/priority": null,
+  "/settings/team": null,
+  "/settings/notifications": null,
+  "/settings/devices": null,
+  "/settings/engines": null,
 };
 
 /** Search keeps the selected target. A missing row can explain its owning scope instead. */
@@ -1100,9 +1089,9 @@ const SETTINGS_SECTION_PATHS = new Set<string>(Object.keys(SETTINGS_SECTION_LABE
 
 /**
  * Whether a nav item is the one the current path belongs to. A section that
- * nests under another (Infinitus and its pages) would otherwise light both up,
- * so a prefix match only counts for the deepest nav item above the path: a
- * sub screen of Engines lights Engines, not Infinitus too.
+ * nests under another would otherwise light both up, so a prefix match only
+ * counts for the deepest nav item above the path: a sub screen of Engines
+ * lights Engines alone.
  */
 export function isSettingsSectionActive(pathname: string, to: SettingsPath): boolean {
   const normalized = pathname.replace(/\/+$/, "") || "/";

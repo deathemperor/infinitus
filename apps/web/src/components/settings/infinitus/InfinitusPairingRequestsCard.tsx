@@ -1,5 +1,5 @@
 /**
- * "Pairing requests" on Settings › Infinitus › Devices (#710): every phone
+ * "Pairing requests" on Settings › Devices (#710): every phone
  * currently asking this server to let it in, each with the match code the
  * user compares against the phone's screen, its time left, and Approve /
  * Deny. Approving mints the one-time credential the phone then collects by

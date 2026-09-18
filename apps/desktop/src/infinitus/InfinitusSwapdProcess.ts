@@ -4,8 +4,9 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 
 import type { InfinitusOAuthSignInResult } from "@infinitus/contracts/infinitus";
+import * as Electron from "electron";
 
-import { parseAddOauthLine } from "./infinitusSwapd.logic.ts";
+import { parseAddOauthLine, privateWindowFlag } from "./infinitusSwapd.logic.ts";
 
 /** The engine locator's existence test, the Mac app's `isExecutableFile`. */
 export function isExecutableFile(path: string): boolean {
@@ -35,6 +36,39 @@ export function fileExists(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+const run = (file: string, args: ReadonlyArray<string>): Promise<string | null> =>
+  new Promise((resolve) => {
+    NodeChildProcess.execFile(file, [...args], (error, stdout) => {
+      resolve(error === null ? stdout.trim() : null);
+    });
+  });
+
+/**
+ * The sign-in page in a private window of the default browser, so the
+ * browser's signed-in account never meets the one being added. `false` when
+ * there is no such window to open — no default browser, one with no private
+ * switch — and the caller opens the URL the plain way.
+ *
+ * `open -na <browser> --args <flag> <url>`: a running browser gets a URL over
+ * Apple Events and ignores launch arguments, so the flag only counts on a NEW
+ * instance, which hands its command line to the running one (the Mac app's
+ * `openInDefaultBrowser`, probed on Chrome 152). macOS only: the caller asks.
+ */
+export async function openInPrivateWindow(url: string): Promise<boolean> {
+  if (!/^https?:\/\//i.test(url)) return false;
+  const browser = await Electron.app.getApplicationInfoForProtocol(url).catch(() => null);
+  if (browser === null) return false;
+  const bundleId = await run("/usr/bin/plutil", [
+    "-extract",
+    "CFBundleIdentifier",
+    "raw",
+    `${browser.path}/Contents/Info.plist`,
+  ]);
+  const flag = bundleId === null ? null : privateWindowFlag(bundleId);
+  if (flag === null) return false;
+  return (await run("/usr/bin/open", ["-na", browser.path, "--args", flag, url])) !== null;
 }
 
 /**

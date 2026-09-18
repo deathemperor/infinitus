@@ -11,9 +11,10 @@
  * we can tell, is the browser's to use and not an Electron window's), and a
  * browser is where a user's passkeys already are. The redirect lands on the
  * engine's listener whichever
- * browser rendered the page, so the flow is unchanged; what is lost is the
- * per-flow cookie jar, so the provider's page may offer the browser's current
- * account first, and a re-added account lands in its existing slot.
+ * browser rendered the page, so the flow is unchanged. The per-flow cookie jar
+ * becomes the browser's private window where it has a switch for one (the
+ * Chromium family); elsewhere the provider's page may offer the browser's
+ * current account first, and a re-added account lands in its existing slot.
  *
  * It bends the fork's "one API" rule, which is about talking to the menu-bar
  * app: this spawns the engine's CLI directly, so `apps/desktop` knows the name
@@ -33,7 +34,11 @@ import * as Layer from "effect/Layer";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
-import { isExecutableFile, startSwapdAddOAuth } from "./InfinitusSwapdProcess.ts";
+import {
+  isExecutableFile,
+  openInPrivateWindow,
+  startSwapdAddOAuth,
+} from "./InfinitusSwapdProcess.ts";
 import { resolveSwapdBinary } from "./infinitusSwapd.logic.ts";
 
 const NO_ENGINE_ERROR = "No account engine on this Mac.";
@@ -96,7 +101,10 @@ const make = Effect.gen(function* () {
     // it ever was.
     const url = yield* Effect.promise(() => Promise.race([announced, run.result.then(() => null)]));
     if (url !== null) {
-      const opened = yield* electronShell.openExternal(url);
+      const opened =
+        (environment.platform === "darwin" &&
+          (yield* Effect.promise(() => openInPrivateWindow(url)))) ||
+        (yield* electronShell.openExternal(url));
       if (!opened) {
         // Nothing will ever open that URL, and the engine would sit on its
         // listener for the whole timeout. End it here and say why.

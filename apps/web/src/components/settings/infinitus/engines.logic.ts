@@ -7,7 +7,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * Settings › Infinitus › Engines (#1177): the two proxy engines' base URL and
+ * Settings › Engines (#1177): the two proxy engines' base URL and
  * secret, read over `infinitus.command` (`proxy` / `9router`) and written over
  * `infinitus.secret` (`proxy-key` / `9router-password`, whose only argument
  * besides the stdin secret is `--url`). Pure so the pane only renders; the

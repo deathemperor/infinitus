@@ -53,13 +53,13 @@ describe("parseDesktopDeepLink (#270 D)", () => {
   });
 
   it("names a Settings page as its route path", () => {
-    expect(parseDesktopDeepLink("infinitus://settings/infinitus", "infinitus")).toEqual({
+    expect(parseDesktopDeepLink("infinitus://settings/menu-bar", "infinitus")).toEqual({
       kind: "settings",
-      path: "/settings/infinitus",
+      path: "/settings/menu-bar",
     });
-    expect(parseDesktopDeepLink("infinitus://settings/infinitus/engines/", "infinitus")).toEqual({
+    expect(parseDesktopDeepLink("infinitus://settings/engines/", "infinitus")).toEqual({
       kind: "settings",
-      path: "/settings/infinitus/engines",
+      path: "/settings/engines",
     });
     expect(parseDesktopDeepLink("infinitus://settings", "infinitus")).toEqual({
       kind: "settings",

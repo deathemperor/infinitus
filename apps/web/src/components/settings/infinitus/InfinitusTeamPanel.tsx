@@ -1,5 +1,5 @@
 /**
- * Settings › Infinitus › Team (#1313): the team this Mac is in, read over the
+ * Settings › Team (#1313): the team this Mac is in, read over the
  * control socket's `team-status`, with Fetch now / Publish now; for a
  * leader the pending requests' Approve / Decline, Remove / Promote on the
  * roster, the invite code and who
@@ -494,7 +494,7 @@ export function InfinitusTeamPanel() {
               </div>
               <p className="text-[13px] text-muted-foreground">
                 The link opens the Infinitus app on a phone or this desktop; the code pastes into
-                Settings › Infinitus › Team on any Mac.
+                Settings › Team on any Mac.
               </p>
             </div>
           )}

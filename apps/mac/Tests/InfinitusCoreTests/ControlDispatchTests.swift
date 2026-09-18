@@ -28,7 +28,7 @@ final class ControlDispatchTests: XCTestCase {
 
     func testEverythingElseSaysNotOnLinuxYet() {
         let recorder = Recorder()
-        for command in ["fleets", "switch", "approve", "lock-status", "nonsense"] {
+        for command in ["fleets", "switch", "approve", "perf", "nonsense"] {
             let reply = ControlDispatch.reply(to: ControlRequest(command: command), handlers: recorder.handlers)
             XCTAssertFalse(reply.ok, command)
             XCTAssertEqual(reply.error, "\(command) is not available on Linux yet")

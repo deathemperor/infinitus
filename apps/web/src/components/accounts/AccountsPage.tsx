@@ -706,11 +706,11 @@ function AccountsBody({
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <Link
-            to="/settings/infinitus/engines"
+            to="/settings/engines"
             search={environmentId ? { environmentId } : {}}
             className="w-fit text-sm text-foreground underline underline-offset-2"
           >
-            Open Settings › Infinitus › Engines
+            Open Settings › Engines
           </Link>
           <a
             href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"

@@ -4,6 +4,7 @@ import {
   DEFAULT_SERVER_SETTINGS,
   EventId,
   type OrchestrationCommand,
+  type OrchestrationThreadActivity,
   type OrchestrationThreadShell,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -25,7 +26,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
@@ -156,6 +156,10 @@ const testCrypto = Crypto.make({
 });
 
 interface Harness {
+  readonly nextTurn: Effect.Effect<void>;
+  readonly reported: Effect.Effect<ReadonlyArray<{ account: string; resetsAt: string | null }>>;
+  readonly nextWatch: Effect.Effect<void>;
+  readonly nextReport: Effect.Effect<{ account: string; resetsAt: string | null }>;
   readonly setBackground: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly emit: (event: ProviderRuntimeEvent) => Effect.Effect<void>;
   readonly poll: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
@@ -174,9 +178,10 @@ interface Harness {
 const makeHarnessWith = (
   gate?: TurnStartGateShape,
   threadShell: OrchestrationThreadShell = shell,
+  history: ReadonlyArray<OrchestrationThreadActivity> = [],
 ) =>
   Effect.gen(function* () {
-    const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
+    const events = yield* Queue.unbounded<ProviderRuntimeEvent>();
     const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
     const current = yield* Ref.make<InfinitusSnapshot>(stale);
     const enabled = yield* Ref.make(true);
@@ -187,8 +192,14 @@ const makeHarnessWith = (
     });
     const interrupts = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>([]);
     const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input?: string }>>([]);
+    const turnSent = yield* Queue.unbounded<void>();
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
     const watchers = yield* Ref.make(0);
+    const watchStarts = yield* Queue.unbounded<void>();
+    const reported = yield* Ref.make<ReadonlyArray<{ account: string; resetsAt: string | null }>>(
+      [],
+    );
+    const reports = yield* Queue.unbounded<{ account: string; resetsAt: string | null }>();
 
     const layer = InfinitusResumeOnLimitLive.pipe(
       Layer.provide(
@@ -196,7 +207,7 @@ const makeHarnessWith = (
           gate === undefined ? TurnStartGatePassthrough : Layer.succeed(TurnStartGate, gate),
           Layer.mock(ProviderService)({
             get streamEvents() {
-              return Stream.fromPubSub(events);
+              return Stream.fromQueue(events);
             },
             interruptTurn: (input) =>
               Ref.update(interrupts, (previous) => [
@@ -207,7 +218,10 @@ const makeHarnessWith = (
               Ref.update(turns, (previous) => [
                 ...previous,
                 { threadId: input.threadId, ...(input.input ? { input: input.input } : {}) },
-              ]).pipe(Effect.as({ turnId, resumeCursor: null } as never)),
+              ]).pipe(
+                Effect.andThen(Queue.offer(turnSent, undefined)),
+                Effect.as({ turnId, resumeCursor: null } as never),
+              ),
           }),
           Layer.mock(OrchestrationEngineService)({
             dispatch: (command) =>
@@ -216,6 +230,15 @@ const makeHarnessWith = (
               ),
           }),
           Layer.mock(ProjectionSnapshotQuery)({
+            listActivitiesByKind: (kind) =>
+              Effect.succeed(history.filter((row) => row.kind === kind)),
+            getShellSnapshot: () =>
+              Effect.succeed({
+                snapshotSequence: 0,
+                projects: [],
+                threads: [threadShell],
+                updatedAt: "2026-09-11T10:00:00Z",
+              }),
             // The harness's thread, or the second, proxied one (#1088).
             getThreadShellById: (id) =>
               Effect.succeed(Option.some(id === threadId ? threadShell : { ...proxiedShell, id })),
@@ -233,13 +256,22 @@ const makeHarnessWith = (
               })),
             ),
           }),
-          Layer.succeed(InfinitusSwapdProbe, { snapshot: Ref.get(background) }),
+          Layer.succeed(InfinitusSwapdProbe, {
+            snapshot: Ref.get(background),
+            reportLimit: (account, resetsAt) =>
+              Ref.update(reported, (previous) => [...previous, { account, resetsAt }]).pipe(
+                Effect.andThen(Queue.offer(reports, { account, resetsAt })),
+                Effect.asVoid,
+              ),
+          }),
           Layer.mock(InfinitusService)({
             snapshot: Ref.get(current),
             changes: () =>
               Stream.unwrap(
                 Effect.acquireRelease(
-                  Ref.update(watchers, (n) => n + 1),
+                  Ref.update(watchers, (n) => n + 1).pipe(
+                    Effect.andThen(Queue.offer(watchStarts, undefined)),
+                  ),
                   () => Ref.update(watchers, (n) => n - 1),
                 ).pipe(Effect.as(Stream.fromQueue(snapshots))),
               ),
@@ -253,7 +285,11 @@ const makeHarnessWith = (
     const limitStops = Context.get(context, InfinitusLimitStops);
 
     return {
-      emit: (event) => PubSub.publish(events, event).pipe(Effect.asVoid),
+      nextTurn: Queue.take(turnSent),
+      nextWatch: Queue.take(watchStarts),
+      reported: Ref.get(reported),
+      nextReport: Queue.take(reports),
+      emit: (event) => Queue.offer(events, event).pipe(Effect.asVoid),
       poll: (snapshot) =>
         Ref.set(current, snapshot).pipe(
           Effect.andThen(Queue.offer(snapshots, snapshot)),
@@ -288,6 +324,134 @@ const settle = <A>(read: Effect.Effect<A>, check: (value: A) => boolean) =>
 const at = (offsetSeconds: number) => DateTime.formatIso(DateTime.makeUnsafe(offsetSeconds * 1000));
 
 describe("InfinitusResumeOnLimitLive", () => {
+  effectIt.effect("restores a limit after restart and resumes when the daemon switches", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarnessWith(
+          undefined,
+          {
+            ...shell,
+            latestTurn: {
+              turnId,
+              state: "error",
+              requestedAt: at(50),
+              startedAt: at(50),
+              completedAt: at(101),
+              assistantMessageId: null,
+            },
+            latestUserMessageAt: at(50),
+            session: { ...session, status: "error", activeTurnId: null },
+          },
+          [
+            {
+              id: EventId.make("saved-limit"),
+              kind: LIMIT_MARKER_KIND,
+              tone: "info",
+              summary: "Limit hit on one@example.com",
+              turnId,
+              createdAt: at(100),
+              payload: {
+                stop: "parked",
+                accounts: ["one@example.com"],
+                resetsAt: at(3600),
+                proxy: null,
+              },
+            },
+          ],
+        );
+        const offline: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
+        yield* h.setCurrent(offline);
+        yield* h.nextWatch;
+        expect(yield* h.isStopped).toBe(true);
+        expect(yield* h.dispatched).toEqual([]);
+        expect(yield* h.reported).toEqual([]);
+        yield* h.setBackground(swapped(at(150)));
+        yield* h.poll(offline);
+        yield* h.nextTurn;
+        expect(yield* h.turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
+        expect(yield* h.interrupts).toEqual([]);
+        expect(yield* h.isStopped).toBe(false);
+        expect(
+          (yield* h.dispatched)
+            .filter((command) => command.type === "thread.activity.append")
+            .map((command) => command.activity.kind),
+        ).toEqual([RESUME_MARKER_KIND]);
+      }),
+    ),
+  );
+  effectIt.effect("reports refusals before quota polling, once per stopped turn", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        const offline: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
+        yield* h.setCurrent(offline);
+        yield* h.setBackground(stale);
+        yield* h.emit(parkedWarning());
+        expect(yield* h.nextReport).toEqual({
+          account: "one@example.com",
+          resetsAt: "2025-09-11T14:13:20.000Z",
+        });
+        // The original SDK turn can repeat its refusal after credentials change.
+        yield* h.setBackground(swapped(at(150)));
+        yield* h.emit(parkedWarning());
+        yield* h.emit(runtimeEvent("turn.completed", { state: "failed", usageLimited: true }));
+        yield* h.emit(runtimeEvent("turn.started", {}, TurnId.make("turn-2")));
+        yield* h.emit(
+          runtimeEvent(
+            "turn.completed",
+            { state: "failed", usageLimited: true },
+            TurnId.make("turn-2"),
+          ),
+        );
+        // This receipt also proves the preceding duplicate events were processed.
+        expect(yield* h.nextReport).toEqual({ account: "two@example.com", resetsAt: null });
+        expect(yield* h.reported).toHaveLength(2);
+        expect(yield* h.turns).toEqual([]);
+      }),
+    ),
+  );
+
+  effectIt.effect("does not report proxy or unrecognized limits", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* h.emit(
+          runtimeEvent(
+            "turn.completed",
+            { state: "failed", usageLimited: true },
+            turnId,
+            proxiedThreadId,
+          ),
+        );
+        yield* h.emit(
+          runtimeEvent("turn.completed", { state: "failed", errorMessage: "usage limit" }),
+        );
+        // A subsequent valid report is the receipt for all preceding inputs.
+        yield* h.emit(parkedWarning(TurnId.make("turn-2")));
+        expect(yield* h.nextReport).toEqual({
+          account: "one@example.com",
+          resetsAt: "2025-09-11T14:13:20.000Z",
+        });
+        expect(yield* h.reported).toHaveLength(1);
+      }),
+    ),
+  );
+  effectIt.effect("does not report when resume is disabled or the account is unknown", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        for (const unknown of [false, true]) {
+          const h = yield* makeHarness;
+          if (unknown) yield* h.setCurrent({ available: true, fleets: [], commands: [] });
+          else yield* h.setEnabled(false);
+          yield* h.emit(parkedWarning());
+          // Watching starts after the report decision has completed.
+          yield* h.nextWatch;
+          expect(yield* h.reported).toEqual([]);
+        }
+      }),
+    ),
+  );
+
   effectIt.effect("resumes through the background daemon while the menu bar is closed", () =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -1233,7 +1233,7 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
   // Fork (#648): a thread's turn stopped by a Claude usage limit resumes on the
-  // account Infinitus swapped to. Default on; the switch is Settings › Infinitus.
+  // account Infinitus swapped to. Default on; the switch is Settings › Menu bar.
   infinitusResumeOnLimit: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   // Fork (#574): the Slack bridge; its tokens are redacted for clients.
   infinitusSlack: InfinitusSlackSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),

@@ -627,8 +627,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
-- `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
-  routes directory; Animations is an `InfinitusPrefsPanel` page over
+- `apps/web/src/routes/settings.{menu-bar,animations,priority,lock,team,notifications,devices,engines}.tsx`
+  and `settings.infinitus.$.tsx` (new files in upstream's routes
+  directory; the pages are top-level since 2026-09-18 — no "Infinitus"
+  section, the whole app is Infinitus — and the splat redirects the old
+  `/settings/infinitus[/…]` paths older menu bar apps and bookmarks still
+  send, `settingsInfinitusRedirect.logic.ts`; Animations is an `InfinitusPrefsPanel` page over
   the catalog's `animations` section, #747 step 1, and Priority
   over its `priority` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`,
@@ -636,7 +640,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the Menu bar page keeps `display` + `themes` + `about`; the Priority page reads the
   catalog's `priority` section and, on a build before that rename,
   `sessions`; a section the build lacks
-  renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
+  renders "no … settings yet")
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
@@ -646,7 +650,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/settings/settingsSearch.ts` —
   `isSettingsSectionActive` counts a prefix match only for the deepest nav
   item above the path, so Engines' Activity sub screen
-  (`/settings/infinitus/engines/activity`) lights Engines alone.
+  (`/settings/engines/activity`) lights Engines alone.
 - `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts utility
   item and its `infinitus` capability gate, and `/accounts`
   in the `currentFooterPage` selector (so the Back button appears on the page).
