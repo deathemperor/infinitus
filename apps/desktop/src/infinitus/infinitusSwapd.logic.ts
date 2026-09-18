@@ -49,6 +49,27 @@ export const resolveSwapdBinary = (input: SwapdBinaryInput): string | null => {
   return swapdBinaryCandidates(input).find((path) => input.exists(path)) ?? null;
 };
 
+/** The command-line switch a browser takes for a private window, by bundle
+    identifier — the Mac app's `SignInSheetRoute.privateFlags`, the Chromium
+    family's only (Safari has none). `null` leaves the page to the profile. */
+const PRIVATE_WINDOW_FLAGS: Readonly<Record<string, string>> = {
+  "com.google.Chrome": "--incognito",
+  "com.google.Chrome.beta": "--incognito",
+  "com.google.Chrome.canary": "--incognito",
+  "com.google.Chrome.dev": "--incognito",
+  "org.chromium.Chromium": "--incognito",
+  "com.brave.Browser": "--incognito",
+  "com.vivaldi.Vivaldi": "--incognito",
+  "company.thebrowser.Browser": "--incognito",
+  "com.microsoft.edgemac": "--inprivate",
+  "com.microsoft.edgemac.Beta": "--inprivate",
+  "com.microsoft.edgemac.Dev": "--inprivate",
+  "com.microsoft.edgemac.Canary": "--inprivate",
+};
+
+export const privateWindowFlag = (bundleId: string): string | null =>
+  PRIVATE_WINDOW_FLAGS[bundleId] ?? null;
+
 /** One line of `add-oauth --json`: the URL to open, the account it stored, or
     the engine's refusal. An unreadable line is `null` — swapd writes nothing
     else on stdout, so it is noise, not a failure. */
