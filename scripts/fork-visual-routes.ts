@@ -42,8 +42,13 @@ export const ALWAYS_ABSENT: ReadonlyArray<string> = [
 ];
 
 export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
-  { route: "/settings/infinitus", label: "Menu bar", marker: "Show the account name" },
-  { route: "/settings/infinitus/themes", label: "Themes", marker: "Off — plain numbers" },
+  {
+    route: "/settings/infinitus",
+    label: "Menu bar",
+    marker: "Show the account name",
+    // The theme picker's selected value, on this page since the Themes page folded in.
+    shows: ["Off — plain numbers"],
+  },
   {
     route: "/settings/infinitus/animations",
     label: "Animations",
