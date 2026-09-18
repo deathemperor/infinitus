@@ -52,7 +52,7 @@ const USAGE_PROBE_TIMEOUT_MS = 15_000;
 const OMP_UNAUTHENTICATED_MESSAGE = "Run `omp` once to sign in to a provider.";
 
 /** omp's own `defaultThinkingLevel` default; used when `omp config get` cannot answer. */
-export const OMP_FALLBACK_THINKING_LEVEL = "high";
+const OMP_FALLBACK_THINKING_LEVEL = "high";
 // Levels omp's ACP thinking selector accepts: `off`, `auto`, and the ladder.
 const OMP_THINKING_LEVELS: Record<string, true> = {
   off: true,
