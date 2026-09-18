@@ -14,7 +14,6 @@ describe("isBackablePathname", () => {
       "/pull-requests",
       "/accounts",
       "/stats",
-      "/activity",
       "/utilization",
     ]) {
       expect(isBackablePathname(pathname), pathname).toBe(true);

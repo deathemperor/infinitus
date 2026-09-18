@@ -929,6 +929,7 @@ export const SETTINGS_SEARCH_ITEMS = [
       "management key dashboard password base url test connection",
       "routing strategy session affinity daemon",
       "about version build release",
+      "activity events switches log",
     ],
   },
   {
@@ -1100,13 +1101,20 @@ const SETTINGS_SECTION_PATHS = new Set<string>(Object.keys(SETTINGS_SECTION_LABE
 /**
  * Whether a nav item is the one the current path belongs to. A section that
  * nests under another (Infinitus and its pages) would otherwise light both up,
- * so a prefix match only counts while the deeper path owns no nav item itself.
+ * so a prefix match only counts for the deepest nav item above the path: a
+ * sub screen of Engines lights Engines, not Infinitus too.
  */
 export function isSettingsSectionActive(pathname: string, to: SettingsPath): boolean {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   if (normalized === to) return true;
   if (!normalized.startsWith(`${to}/`)) return false;
-  return !SETTINGS_SECTION_PATHS.has(normalized);
+  for (const section of SETTINGS_SECTION_PATHS) {
+    if (section.length > to.length && normalized.startsWith(section)) {
+      const rest = normalized.slice(section.length);
+      if (rest === "" || rest.startsWith("/")) return false;
+    }
+  }
+  return true;
 }
 
 export function searchSettings(

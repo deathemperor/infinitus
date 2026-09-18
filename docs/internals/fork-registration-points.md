@@ -590,6 +590,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
   added; the upstream sync re-generates it.
+- `apps/web/src/components/settings/settingsSearch.ts` —
+  `isSettingsSectionActive` counts a prefix match only for the deepest nav
+  item above the path, so Engines' Activity sub screen
+  (`/settings/infinitus/engines/activity`) lights Engines alone.
 - `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts utility
   item and its `infinitus` capability gate, and `/accounts`
   in the `currentFooterPage` selector (so the Back button appears on the page).
