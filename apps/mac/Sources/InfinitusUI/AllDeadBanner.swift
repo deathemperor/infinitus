@@ -25,10 +25,14 @@ public struct AllDeadBanner<M: FleetModel>: View {
             let name = model.accounts.first { $0.number == rec.number }
                 .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) }
                 ?? "#\(rec.number)"
+            // One model alone ran out: say which, the plan windows still
+            // have room for the rest.
+            let what = AccountVitals.spentModel(across: model.accounts)
+                .map { "All accounts out of \($0)" } ?? "All accounts limited"
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 (Text(Image(systemName: "arrowtriangle.right"))
                     .foregroundStyle(.orange)
-                 + Text(" All accounts limited — \(name) recovers in ")
+                 + Text(" \(what) — \(name) recovers in ")
                  + Text(RecoveryCountdown.label(until: date, now: ctx.date))
                     .bold().monospacedDigit().foregroundStyle(.orange))
                     .font(PopupFont.caption)

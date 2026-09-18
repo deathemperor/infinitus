@@ -15,11 +15,10 @@ export function ExhaustedBand({ band }: { readonly band: ExhaustedBandModel }) {
       ? null
       : formatUpcomingTimestamp(band.revivalAt, timestampFormat, Date.parse(minute));
   const who = band.revivesFirst === null ? "" : ` (${band.revivesFirst})`;
+  const what = band.model === null ? "All accounts exhausted" : `All accounts out of ${band.model}`;
   return (
     <p role="status" className="rounded-md bg-warning/16 px-2 py-1 text-warning-foreground text-xs">
-      {revival === null || revival === ""
-        ? "All accounts exhausted"
-        : `All accounts exhausted · next revival ${revival}${who}`}
+      {revival === null || revival === "" ? what : `${what} · next revival ${revival}${who}`}
     </p>
   );
 }

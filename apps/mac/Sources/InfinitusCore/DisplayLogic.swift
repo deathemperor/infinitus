@@ -419,6 +419,28 @@ public enum AccountVitals {
         if pcts.isEmpty, let spend = usage.spend { return spend.pct >= 100 }
         return pcts.contains { $0 >= 100 }
     }
+
+    /// The one per-model window that alone kills this account ("Fable"):
+    /// nil when a plan window (5h/7d) is spent too, when two models are,
+    /// or when nothing is. The account still has plan headroom for other
+    /// models, so an all-dead line naming the model reads true where
+    /// "all accounts exhausted" did not (user 2026-09-18).
+    public static func spentModel(_ usage: Usage?) -> String? {
+        guard let usage else { return nil }
+        if let p = usage.fiveHour?.pct, p >= 100 { return nil }
+        if let p = usage.sevenDay?.pct, p >= 100 { return nil }
+        let spent = (usage.scoped ?? []).filter { $0.pct >= 100 }.compactMap(\.name)
+        guard let first = spent.first, spent.allSatisfy({ $0 == first }) else { return nil }
+        return first
+    }
+
+    /// The model every dead, unheld account is out of — nil unless each
+    /// one's death is that same model window and nothing else.
+    public static func spentModel(across accounts: [Account]) -> String? {
+        let dead = accounts.filter { $0.disabled != true && isDead($0.usage) }
+        guard let first = dead.first.flatMap({ spentModel($0.usage) }) else { return nil }
+        return dead.allSatisfy { spentModel($0.usage) == first } ? first : nil
+    }
 }
 
 /// Live countdown to a recovery instant, for the all-limited state

@@ -47,6 +47,7 @@ import { AddProjectLocalRoute } from "./features/projects/AddProjectLocalRoute";
 import { AddProjectRepositoryRoute } from "./features/projects/AddProjectRepositoryRoute";
 import { AddProjectSourceRoute } from "./features/projects/AddProjectSourceRoute";
 import { NewTaskDraftRouteScreen } from "./features/threads/NewTaskDraftRouteScreen";
+import { ShareToThreadRouteScreen } from "./features/sharing/ShareToThreadRouteScreen";
 import {
   NewTaskBranchPickerRouteScreen,
   NewTaskEnvironmentPickerRouteScreen,
@@ -389,6 +390,14 @@ const NewTaskSheetStack = createNativeStackNavigator({
       options: {
         headerBackVisible: false,
         title: "",
+      },
+    }),
+    // Fork: a native share can land in an existing thread instead of a new task.
+    NewTaskShareThread: createNativeStackScreen({
+      screen: ShareToThreadRouteScreen,
+      linking: "share/thread",
+      options: {
+        title: "Choose thread",
       },
     }),
     NewTaskEnvironment: createNativeStackScreen({

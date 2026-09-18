@@ -77,7 +77,9 @@ these bullets.
   `AccountVitals.isDead` / `RecoveryMath.revival`. Drawn by
   `apps/web/src/components/accounts/ExhaustedBand.tsx` inside each fleet
   section ("All accounts exhausted · next revival HH:MM (account)", the
-  time in the user's timestamp format), replacing the pop-out's reviver band.
+  time in the user's timestamp format; "All accounts out of Fable" when one
+  per-model window alone blocks every account and the plan windows still
+  have room), replacing the pop-out's reviver band.
 - `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
 - `apps/web/src/routes/settings.engines_.activity.tsx`,
   `apps/web/src/components/activity/` — Settings › Engines ›
@@ -301,6 +303,12 @@ these bullets.
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure (the held banner still offers Pin).
+- `apps/mobile/src/features/sharing/ShareToThreadRouteScreen.tsx` (+
+  `share-to-thread.ts`, `.test.ts`) — "Add to an existing thread" on the
+  share sheet's project picker: the thread list (unarchived, newest first,
+  searchable), and the pick merges the share into that thread's composer
+  draft (`mergeComposerDraftContent` with the share id as receipt, then
+  `consumeShare`) and replaces the sheet with the thread.
 
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives
