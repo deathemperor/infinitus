@@ -1,2 +1,0 @@
-Mac: The menu bar app's Settings window is gone — every setting lives in the desktop app's Settings. Its last pane held settings export/import and account backup; both retire with it (`swapd export` / `swapd import` from a terminal remain the account backup path). The "Dock icon while Settings is open" preference went with the window.
-Mac: ⌘, and the status menu's Settings… open Infinitus straight on its Menu bar settings page; the onboarding card's Engine settings lands on Engines.
