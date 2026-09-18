@@ -147,6 +147,7 @@ describe("restoreLimitStops", () => {
     for (const payload of [
       null,
       {},
+      { stop: "failed", accounts: [] },
       { stop: "parked", accounts: [], resetsAt: "invalid" },
       { stop: "failed", accounts: [], proxy: "Router" },
     ]) {

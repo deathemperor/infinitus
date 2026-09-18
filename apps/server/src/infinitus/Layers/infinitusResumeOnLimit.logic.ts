@@ -124,12 +124,13 @@ export function restoreLimitStops(
     // This feature has always tracked just the CLI credential fleet. Older
     // markers saved its label as an array without the fleet key.
     const account = payload.accounts[0];
+    if (account === undefined) continue;
     stops.push({
       threadId: thread.id,
       turnId: turn.turnId,
       kind: "failed",
       stoppedAt,
-      activeAtStop: new Map(account === undefined ? [] : [["swapd/claude", account]]),
+      activeAtStop: new Map([["swapd/claude", account]]),
       resetsAt: payload.resetsAt == null ? null : DateTime.toEpochMillis(payload.resetsAt),
       limitType: payload.limitType ?? null,
       proxy: null,
