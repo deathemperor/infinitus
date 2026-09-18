@@ -267,8 +267,8 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
     var body: some View {
         if model.compactRows {
             // Compact stacked: a flat roster, one line per account — no
-            // cards, no per-window lines, just the BINDING window's pct
-            // (full mode and compact "looked the same", user 2026-08-30).
+            // cards or per-window lines. Used accounts show the binding
+            // percentage; fully available accounts keep their gauges.
             VStack(alignment: .leading, spacing: 5) {
                 ForEach(Array(model.displayAccounts.enumerated()),
                         id: \.element.number) { i, account in
@@ -285,6 +285,7 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
 
     /// One roster line: marker, number, name, then the tightest limit
     /// (the one that will actually stop the account) or the dead verb.
+    /// Fully available accounts show each gauge on that same line.
     @ViewBuilder private func compactLine(_ account: Account) -> some View {
         let cells = AccountCells(model: model, usage: usage, account: account, banded: false)
         HStack(spacing: 4) {
@@ -306,6 +307,12 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
             Spacer(minLength: 8)
             if cells.showAsDead {
                 cells.deadCell
+            } else if cells.allFresh {
+                HStack(spacing: 8) {
+                    cells.windowCell(account.usage?.fiveHour, session: true, timer: false)
+                    cells.windowCell(account.usage?.sevenDay, session: false, timer: false)
+                    cells.scopedCells
+                }
             } else if let (label, pct) = bindingWindow(account) {
                 Text(label)
                     .font(PopupFont.caption).bold()
