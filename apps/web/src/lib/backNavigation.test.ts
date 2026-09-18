@@ -7,7 +7,6 @@ describe("isBackablePathname", () => {
     for (const pathname of [
       "/settings",
       "/settings/general",
-      "/settings/lock",
       "/projects/abc",
       "/projects/abc/",
       "/usage",

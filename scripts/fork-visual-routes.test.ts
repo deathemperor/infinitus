@@ -16,7 +16,6 @@ const ALWAYS_ON_SCREEN = [
   "Themes",
   "Animations",
   "Priority",
-  "Lock",
   "Team",
   "Notifications",
   "Devices",
@@ -37,7 +36,6 @@ describe("FORK_VISUAL_ROUTES", () => {
       "/settings/menu-bar",
       "/settings/animations",
       "/settings/priority",
-      "/settings/lock",
       "/settings/team",
       "/settings/notifications",
       "/settings/devices",
@@ -61,29 +59,31 @@ describe("FORK_VISUAL_ROUTES", () => {
 
   it("names the capture files the way the harness does", () => {
     expect(captureName("/settings/menu-bar")).toBe("settings-menu-bar");
-    expect(captureName("/settings/lock")).toBe("settings-lock");
+    expect(captureName("/settings/priority")).toBe("settings-priority");
     expect(captureName("/utilization")).toBe("utilization");
     expect(captureName("/")).toBe("home");
   });
 });
 
 describe("routeFailures", () => {
-  const lock = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/lock")!;
+  const priority = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/priority")!;
 
   it("passes text that shows the marker and none of the empty states", () => {
-    expect(routeFailures(lock, "Settings Lock Re-lock after 5 min")).toEqual([]);
+    expect(routeFailures(priority, "Settings Priority Thread priority first")).toEqual([]);
   });
 
   it("fails a missing capture, a missing marker, and each forbidden phrase", () => {
-    expect(routeFailures(lock, null)).toEqual(["no text capture"]);
-    expect(routeFailures(lock, "Settings Lock Still connecting")).toEqual([
-      'missing "Re-lock"',
+    expect(routeFailures(priority, null)).toEqual(["no text capture"]);
+    expect(routeFailures(priority, "Settings Priority Still connecting")).toEqual([
+      'missing "Thread priority"',
       'shows "Still connecting"',
     ]);
-    expect(routeFailures(lock, `Re-lock ${ALWAYS_ABSENT[0]}`)).toEqual([
+    expect(routeFailures(priority, `Thread priority ${ALWAYS_ABSENT[0]}`)).toEqual([
       `shows "${ALWAYS_ABSENT[0]}"`,
     ]);
-    expect(routeFailures(lock, "Re-lock · T3 Code (Alpha)")).toEqual(['shows "T3 Code"']);
+    expect(routeFailures(priority, "Thread priority · T3 Code (Alpha)")).toEqual([
+      'shows "T3 Code"',
+    ]);
   });
 
   it("names each `shows` phrase the capture is missing, beside the marker", () => {
@@ -112,8 +112,10 @@ describe("routeFailures", () => {
   });
 
   it("fails a row humanised from a fork_ pref key the web has no copy for", () => {
-    expect(routeFailures(lock, "Re-lock Fork tunnel enabled")).toEqual(['shows "Fork "']);
-    expect(routeFailures(lock, "Re-lock Tunnel hostname")).toEqual([]);
+    expect(routeFailures(priority, "Thread priority Fork tunnel enabled")).toEqual([
+      'shows "Fork "',
+    ]);
+    expect(routeFailures(priority, "Thread priority Tunnel hostname")).toEqual([]);
   });
 
   it("fails a field whose label rendered but whose value did not", () => {
@@ -145,15 +147,15 @@ describe("checkVisualPass", () => {
 
   it("reads one capture per route and reports every failure", () => {
     const captures = new Map<string, string>([
-      ["settings-lock", "Unlocking Re-lock Locked"],
+      ["settings-priority", "Priority Thread priority"],
       ["stats", `Stats ${[stats.marker, ...stats.shows!].join(" ")}`],
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [byRoute("/settings/lock"), stats, byRoute("/utilization")],
+      [byRoute("/settings/priority"), stats, byRoute("/utilization")],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
-      ["Lock", []],
+      ["Priority", []],
       ["Stats", []],
       ["Utilization", ["no text capture"]],
     ]);
