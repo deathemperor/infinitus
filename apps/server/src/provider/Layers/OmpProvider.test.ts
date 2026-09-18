@@ -100,12 +100,12 @@ describe("parseOmpModelsCliOutput", () => {
 
   it("preselects the configured default level, including auto", () => {
     const [gemini] = parseOmpModelsCliOutput(AUTHENTICATED_MODELS_JSON, "auto").models;
-    expect(gemini?.capabilities?.optionDescriptors[0]).toMatchObject({ currentValue: "auto" });
+    expect(gemini?.capabilities?.optionDescriptors?.[0]).toMatchObject({ currentValue: "auto" });
   });
 
   it("leaves the level unselected when the model lacks the configured default", () => {
     const [, sonnet] = parseOmpModelsCliOutput(AUTHENTICATED_MODELS_JSON, "minimal").models;
-    expect(sonnet?.capabilities?.optionDescriptors[0]).not.toHaveProperty("currentValue");
+    expect(sonnet?.capabilities?.optionDescriptors?.[0]).not.toHaveProperty("currentValue");
   });
 
   it("parses `omp config get defaultThinkingLevel`, falling back to omp's default", () => {
@@ -252,7 +252,7 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
 
       const levels = snapshot.models
         .filter((model) => model.slug !== "omp-default")
-        .map((model) => model.capabilities?.optionDescriptors[0])
+        .map((model) => model.capabilities?.optionDescriptors?.[0])
         .map((descriptor) => (descriptor?.type === "select" ? descriptor.currentValue : null));
       expect(levels).toEqual(["medium", "medium"]);
     }),
@@ -274,7 +274,7 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
       );
 
       expect(snapshot.status).toBe("ready");
-      const descriptor = snapshot.models[1]?.capabilities?.optionDescriptors[0];
+      const descriptor = snapshot.models[1]?.capabilities?.optionDescriptors?.[0];
       expect(descriptor?.type === "select" ? descriptor.currentValue : null).toBe("high");
     }),
   );
