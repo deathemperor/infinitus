@@ -929,6 +929,7 @@ export const SETTINGS_SEARCH_ITEMS = [
       "management key dashboard password base url test connection",
       "routing strategy session affinity daemon",
       "about version build release",
+      "activity events switches log",
     ],
   },
   {

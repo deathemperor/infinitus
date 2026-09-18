@@ -7,8 +7,11 @@
  *
  * @module InfinitusEnginesPanel
  */
+import { Link } from "@tanstack/react-router";
+
 import type { EnvironmentPresentation } from "~/state/environments";
 import { Badge } from "../../ui/badge";
+import { Button } from "../../ui/button";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 
 import { InfinitusEngineControls } from "./InfinitusEngineControls";
@@ -29,6 +32,13 @@ function InfinitusEngineStatusList({
   const { snapshot } = useInfinitusEnvironment(environment);
   const rows = buildEngineStatusRows(snapshot?.status);
   if (rows.length === 0) return null;
+  // The Activity sub screen reads the primary environment's log, so the way
+  // in is drawn only when this page manages that environment.
+  const activityLink = environment ? null : (
+    <Button render={<Link to="/settings/infinitus/engines/activity" />} size="sm" variant="outline">
+      View activity
+    </Button>
+  );
 
   return (
     <SettingsSection id="infinitus-engine-status" title="Engine status">
@@ -37,6 +47,7 @@ function InfinitusEngineStatusList({
           key={row.key}
           title={row.label}
           description={row.detail ?? undefined}
+          control={row.key === "swapd" ? activityLink : undefined}
           status={
             <span className="flex flex-wrap items-center gap-1.5">
               <Badge variant={row.enabled ? "default" : "outline"}>

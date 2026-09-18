@@ -16,7 +16,6 @@ import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as ConnectRouteImport } from './routes/connect'
-import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
@@ -45,6 +44,7 @@ import { Route as SettingsInfinitusDevicesRouteImport } from './routes/settings.
 import { Route as SettingsInfinitusAnimationsRouteImport } from './routes/settings.infinitus.animations'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
+import { Route as SettingsInfinitusEnginesActivityRouteImport } from './routes/settings.infinitus.engines_.activity'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -79,11 +79,6 @@ const PairRoute = PairRouteImport.update({
 const ConnectRoute = ConnectRouteImport.update({
   id: '/connect',
   path: '/connect',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ActivityRoute = ActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountsRoute = AccountsRouteImport.update({
@@ -232,11 +227,16 @@ const ChatEnvironmentIdThreadIdRoute =
     path: '/$environmentId/$threadId',
     getParentRoute: () => ChatRoute,
   } as any)
+const SettingsInfinitusEnginesActivityRoute =
+  SettingsInfinitusEnginesActivityRouteImport.update({
+    id: '/infinitus/engines_/activity',
+    path: '/infinitus/engines/activity',
+    getParentRoute: () => SettingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
   '/accounts': typeof AccountsRoute
-  '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -269,10 +269,10 @@ export interface FileRoutesByFullPath {
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
+  '/settings/infinitus/engines/activity': typeof SettingsInfinitusEnginesActivityRoute
 }
 export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
-  '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -306,12 +306,12 @@ export interface FileRoutesByTo {
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
   '/settings/infinitus': typeof SettingsInfinitusIndexRoute
+  '/settings/infinitus/engines/activity': typeof SettingsInfinitusEnginesActivityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
   '/accounts': typeof AccountsRoute
-  '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -345,13 +345,13 @@ export interface FileRoutesById {
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
+  '/settings/infinitus/engines_/activity': typeof SettingsInfinitusEnginesActivityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/accounts'
-    | '/activity'
     | '/connect'
     | '/pair'
     | '/settings'
@@ -384,10 +384,10 @@ export interface FileRouteTypes {
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
     | '/settings/infinitus/'
+    | '/settings/infinitus/engines/activity'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/accounts'
-    | '/activity'
     | '/connect'
     | '/pair'
     | '/settings'
@@ -421,11 +421,11 @@ export interface FileRouteTypes {
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
     | '/settings/infinitus'
+    | '/settings/infinitus/engines/activity'
   id:
     | '__root__'
     | '/_chat'
     | '/accounts'
-    | '/activity'
     | '/connect'
     | '/pair'
     | '/settings'
@@ -459,12 +459,12 @@ export interface FileRouteTypes {
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
     | '/settings/infinitus/'
+    | '/settings/infinitus/engines_/activity'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
   AccountsRoute: typeof AccountsRoute
-  ActivityRoute: typeof ActivityRoute
   ConnectRoute: typeof ConnectRoute
   PairRoute: typeof PairRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -524,13 +524,6 @@ declare module '@tanstack/react-router' {
       path: '/connect'
       fullPath: '/connect'
       preLoaderRoute: typeof ConnectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/activity': {
-      id: '/activity'
-      path: '/activity'
-      fullPath: '/activity'
-      preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/accounts': {
@@ -729,6 +722,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatEnvironmentIdThreadIdRouteImport
       parentRoute: typeof ChatRoute
     }
+    '/settings/infinitus/engines_/activity': {
+      id: '/settings/infinitus/engines_/activity'
+      path: '/infinitus/engines/activity'
+      fullPath: '/settings/infinitus/engines/activity'
+      preLoaderRoute: typeof SettingsInfinitusEnginesActivityRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
 
@@ -761,6 +761,7 @@ interface SettingsRouteChildren {
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsSnapShotRoute: typeof SettingsSnapShotRoute
   SettingsSourceControlRoute: typeof SettingsSourceControlRoute
+  SettingsStorageRoute: typeof SettingsStorageRoute
   SettingsInfinitusAnimationsRoute: typeof SettingsInfinitusAnimationsRoute
   SettingsInfinitusDevicesRoute: typeof SettingsInfinitusDevicesRoute
   SettingsInfinitusEnginesRoute: typeof SettingsInfinitusEnginesRoute
@@ -769,7 +770,7 @@ interface SettingsRouteChildren {
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
   SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
   SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
-  SettingsStorageRoute: typeof SettingsStorageRoute
+  SettingsInfinitusEnginesActivityRoute: typeof SettingsInfinitusEnginesActivityRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -785,6 +786,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsProvidersRoute: SettingsProvidersRoute,
   SettingsSnapShotRoute: SettingsSnapShotRoute,
   SettingsSourceControlRoute: SettingsSourceControlRoute,
+  SettingsStorageRoute: SettingsStorageRoute,
   SettingsInfinitusAnimationsRoute: SettingsInfinitusAnimationsRoute,
   SettingsInfinitusDevicesRoute: SettingsInfinitusDevicesRoute,
   SettingsInfinitusEnginesRoute: SettingsInfinitusEnginesRoute,
@@ -793,7 +795,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
   SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
   SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
-  SettingsStorageRoute: SettingsStorageRoute,
+  SettingsInfinitusEnginesActivityRoute: SettingsInfinitusEnginesActivityRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
@@ -803,7 +805,6 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
   AccountsRoute: AccountsRoute,
-  ActivityRoute: ActivityRoute,
   ConnectRoute: ConnectRoute,
   PairRoute: PairRoute,
   SettingsRoute: SettingsRouteWithChildren,

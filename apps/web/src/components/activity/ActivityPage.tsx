@@ -15,7 +15,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
-import { isElectron } from "../../env";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { usePrimarySettings } from "../../hooks/useSettings";
@@ -25,13 +24,9 @@ import { useEnvironmentQuery } from "../../state/query";
 import { primaryServerConfigAtom } from "../../state/server";
 import { formatShortTimestamp } from "../../timestampFormat";
 import { AccountsUnavailable } from "../accounts/AccountsUnavailable";
+import { SettingsPageContainer, SettingsSection } from "../settings/settingsLayout";
 import { Button } from "../ui/button";
-import { ScrollArea } from "../ui/scroll-area";
-import { SidebarInset } from "../ui/sidebar";
 import { Skeleton } from "../ui/skeleton";
-import { WorkspaceBreadcrumb, WorkspaceBreadcrumbItem } from "../WorkspaceBreadcrumb";
-import { WorkspacePageContainer } from "../WorkspacePageContainer";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { activityDays } from "./activity.logic";
 
 const EVENTS_INPUT = { command: "events", args: [], options: { limit: "100" } } as const;
@@ -39,8 +34,9 @@ const EVENTS_INPUT = { command: "events", args: [], options: { limit: "100" } } 
 const SHOW_POLLS_KEY = "infinitus.activityShowPolls";
 
 /**
- * `/activity` (#659): the pop-out's Activity pane, in the fork — every
- * account change Infinitus made, newest first. `events --limit 100` is read
+ * Settings › Infinitus › Engines › Activity (#659): the pop-out's Activity
+ * pane, in the fork — every account change Infinitus made, newest first,
+ * reached from swapd's row on the Engines page. `events --limit 100` is read
  * once through the events query atom (dropped a minute after the page
  * leaves); everything after arrives as the snapshot subscription's deltas,
  * the same stream the toasts read, so the page never polls on its own.
@@ -95,15 +91,9 @@ export function ActivityPage() {
   const hiddenPolls = rows.length - visible.length;
   const days = useMemo(() => activityDays(visible, Date.parse(minute)), [visible, minute]);
 
-  const topbarContent = (
-    <div className="flex w-full min-w-0 items-center gap-x-3 py-2">
-      <WorkspaceBreadcrumb ariaLabel="Activity breadcrumb" className="min-w-0">
-        <WorkspaceBreadcrumbItem current>
-          <h1>Activity</h1>
-        </WorkspaceBreadcrumbItem>
-      </WorkspaceBreadcrumb>
+  const headerAction = (
+    <div className="flex items-center gap-x-2">
       <Button
-        className="ms-auto"
         size="sm"
         variant={showPolls ? "secondary" : "ghost"}
         aria-pressed={showPolls}
@@ -197,16 +187,16 @@ export function ActivityPage() {
   }
 
   return (
-    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground isolate">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
-        <WorkspacePageHeader electron={isElectron} className="h-auto">
-          {topbarContent}
-        </WorkspacePageHeader>
-        <ScrollArea className="min-h-0 flex-1">
-          <WorkspacePageContainer width="wide">{body}</WorkspacePageContainer>
-        </ScrollArea>
-      </div>
-    </SidebarInset>
+    <SettingsPageContainer>
+      <SettingsSection
+        id="infinitus-activity"
+        title="Activity"
+        variant="plain"
+        headerAction={headerAction}
+      >
+        <div className="px-3 sm:px-4">{body}</div>
+      </SettingsSection>
+    </SettingsPageContainer>
   );
 }
 
