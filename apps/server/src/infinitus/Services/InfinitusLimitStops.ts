@@ -9,7 +9,8 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 export interface InfinitusLimitStopsShape {
   /** The threads whose turn stopped on a usage limit and wait for a swap
       (#648, #270 I), oldest first: the list on subscribe, then the whole list
-      again on every change. Lost with a restart, like the stops. */
+      again on every change. Unresolved failed turns are restored from their
+      saved limit markers at startup. */
   readonly stopped: Stream.Stream<ReadonlyArray<InfinitusHeldThread>>;
   readonly isStopped: (threadId: ThreadId) => Effect.Effect<boolean>;
   readonly setStopped: (threads: ReadonlyArray<InfinitusHeldThread>) => Effect.Effect<void>;

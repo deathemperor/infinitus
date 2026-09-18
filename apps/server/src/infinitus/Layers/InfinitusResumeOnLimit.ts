@@ -37,6 +37,7 @@ import {
   RESUME_MARKER_KIND,
   resumeMarkerSummary,
   resumeTarget,
+  restoreLimitStops,
   type LimitStop,
   type ResumeTarget,
 } from "./infinitusResumeOnLimit.logic.ts";
@@ -46,6 +47,7 @@ import {
 const RESUMED_LIMIT = 500;
 
 type Input =
+  | { readonly source: "restore" }
   | { readonly source: "runtime"; readonly event: ProviderRuntimeEvent }
   | { readonly source: "snapshot"; readonly snapshot: InfinitusSnapshot };
 
@@ -214,6 +216,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               stop: stop.kind,
               accounts: [...stop.activeAtStop.values()],
               resetsAt,
+              limitType: stop.limitType,
               proxy: stop.proxy,
             },
             turnId: stop.turnId,
@@ -282,10 +285,16 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               ) ?? plain)
             : proxyStop(plain, proxy);
         const known = stops.get(fresh.threadId);
-        const stop =
+        const updated =
           known !== undefined && fresh.resetsAt === null
             ? { ...fresh, resetsAt: known.resetsAt, limitType: known.limitType }
             : fresh;
+        const repeated = known !== undefined && known.turnId === fresh.turnId;
+        // A parked turn can repeat its refusal after the daemon has swapped.
+        // It still belongs to the account that originally stopped the turn.
+        const stop = repeated
+          ? { ...updated, activeAtStop: known.activeAtStop, stoppedAt: known.stoppedAt }
+          : updated;
         if (known !== undefined) scheduled.delete(known);
         stops.set(stop.threadId, stop);
         if (known === undefined) yield* mark(stop);
@@ -297,7 +306,15 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           proxy: stop.proxy !== null,
         });
         // A proxy's stop waits for nothing on this Mac: no poll for it.
-        if (stop.proxy === null) yield* startWatching;
+        if (stop.proxy === null) {
+          const account = stop.activeAtStop.get("swapd/claude");
+          if (!repeated && account !== undefined && (yield* enabled)) {
+            // Quota reads lag refusals by minutes. Report the refusal directly
+            // instead of waiting for the usage endpoint to confirm it.
+            yield* swapd.reportLimit(account, resetsAtIso(stop));
+          }
+          yield* startWatching;
+        }
       });
 
     const onSnapshot = (snapshot: InfinitusSnapshot): Effect.Effect<void> =>
@@ -358,8 +375,37 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         }
       });
 
+    const restore = Effect.gen(function* () {
+      if (!(yield* enabled)) return;
+      const limits = yield* projectionSnapshotQuery.listActivitiesByKind(LIMIT_MARKER_KIND);
+      if (limits.length === 0) return;
+      const resumes = yield* projectionSnapshotQuery.listActivitiesByKind(RESUME_MARKER_KIND);
+      const snapshot = yield* projectionSnapshotQuery.getShellSnapshot();
+      for (const stop of restoreLimitStops(snapshot.threads, limits, resumes)) {
+        if ((yield* proxyFor(stop.threadId)) !== null) continue;
+        stops.set(stop.threadId, stop);
+        const resetsAt = resetsAtIso(stop);
+        marks.set(stop.threadId, {
+          threadId: stop.threadId,
+          since: DateTime.formatIso(DateTime.makeUnsafe(stop.stoppedAt)),
+          summary: limitMarkerSummary(stop),
+          kind: "limited",
+          ...(resetsAt === null ? {} : { resetsAt }),
+        });
+      }
+      if (stops.size === 0) return;
+      yield* publish;
+      yield* Effect.logInfo("infinitus.resume-on-limit.restored", { count: stops.size });
+      yield* startWatching;
+    });
+
     const worker = yield* makeDrainableWorker((input: Input) =>
-      (input.source === "runtime" ? onRuntimeEvent(input.event) : onSnapshot(input.snapshot)).pipe(
+      (input.source === "restore"
+        ? restore
+        : input.source === "runtime"
+          ? onRuntimeEvent(input.event)
+          : onSnapshot(input.snapshot)
+      ).pipe(
         // One bad input must not end the worker for every later one.
         Effect.catchCause((cause) =>
           Effect.logWarning("infinitus.resume-on-limit.input-failed", {
@@ -371,17 +417,20 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     );
 
     yield* forkParked(
-      providerService.streamEvents.pipe(
-        // Only what can record or cancel a stop; the content stream stays out.
-        Stream.filter(
-          (event) =>
-            event.type === "runtime.warning" ||
-            event.type === "turn.started" ||
-            event.type === "turn.completed" ||
-            event.type === "turn.aborted" ||
-            event.type === "session.exited",
+      Effect.andThen(
+        worker.enqueue({ source: "restore" }),
+        providerService.streamEvents.pipe(
+          // Only what can record or cancel a stop; the content stream stays out.
+          Stream.filter(
+            (event) =>
+              event.type === "runtime.warning" ||
+              event.type === "turn.started" ||
+              event.type === "turn.completed" ||
+              event.type === "turn.aborted" ||
+              event.type === "session.exited",
+          ),
+          Stream.runForEach((event) => worker.enqueue({ source: "runtime", event })),
         ),
-        Stream.runForEach((event) => worker.enqueue({ source: "runtime", event })),
       ),
     );
   }),
