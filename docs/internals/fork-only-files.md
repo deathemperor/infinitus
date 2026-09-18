@@ -37,17 +37,6 @@ these bullets.
   once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that line and `CaptureGestureCoordinator`'s are the
   fork's only edits there).
-- `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
-  `lock.logic.ts`, route `settings.lock.tsx`) — Settings › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
-  `lock-status` / `lock on|off|now|relock <arg>` / `unlock` (native #788),
-  each answering `{enabled, locked, relock}`. The switch turns the lock on
-  (the Mac's own prompt runs there; the row says "Confirm on the Mac" while
-  it waits) or off (the team refusal and its `--yes` left with Team, #1061).
-  Re-lock is a select over the four native labels
-  (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
-  Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
-  the app's text verbatim; the pane holds no secret. Gated on the manifest
-  carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
 - `apps/web/src/components/captures/`, `apps/web/src/state/captures.ts` — the composer's Captures popover (#433, PR B): `ComposerCapturesBadge`, `ComposerCapturesMenu`, `captures.logic`, `capturesUiStore`, `useCaptures`, and `CaptureGestureCoordinator` (+ `captureGesture.logic`), the desktop gesture's landing. Rules and traps: `docs/internals/captures.md`.
 - `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G): `promptSnippets.logic`, `promptsUiStore`, `ComposerPromptsBadge`, `ComposerPromptsMenu`, `useProjectPromptSnippets`, `ProjectPromptSnippetsSection`, `promptSnippetSlashItems`; the phone's half is `apps/mobile/src/features/threads/promptSnippetItems.ts`. Rules and traps: `docs/internals/prompt-snippets.md`.
 - `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window

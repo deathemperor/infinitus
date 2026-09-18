@@ -26,7 +26,6 @@ export type SettingsPath =
   | "/settings/menu-bar"
   | "/settings/animations"
   | "/settings/priority"
-  | "/settings/lock"
   | "/settings/team"
   | "/settings/notifications"
   | "/settings/devices"
@@ -108,7 +107,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/menu-bar": "Menu bar",
   "/settings/animations": "Animations",
   "/settings/priority": "Priority",
-  "/settings/lock": "Lock",
   "/settings/team": "Team",
   "/settings/notifications": "Notifications",
   "/settings/devices": "Devices",
@@ -879,14 +877,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["dock icon badge count unread attention"],
   },
   {
-    id: "infinitus-lock",
-    title: "Infinitus lock",
-    to: "/settings/lock",
-    targetId: "infinitus-lock",
-    infinitusOnly: true,
-    searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
-  },
-  {
     id: "infinitus-team",
     title: "Infinitus team",
     to: "/settings/team",
@@ -969,7 +959,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/menu-bar": null,
   "/settings/animations": null,
   "/settings/priority": null,
-  "/settings/lock": null,
   "/settings/team": null,
   "/settings/notifications": null,
   "/settings/devices": null,

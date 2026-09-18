@@ -261,14 +261,6 @@ echo "aws: orphan login wrapper swept at launch"
 # --- functional ---------------------------------------------------------
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"
 "$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='signin-code')['stdin']=='secret' and 'stdin' not in next(c for c in d['commands'] if c['name']=='status')" || fail "manifest: stdin flag (#747)"
-"$CTL" lock-status | expect "d['enabled'] is False and d['locked'] is False and d['relock']=='1 h'" || fail "biometric lock must default to off, unlocked, re-lock 1 h"
-# #747: the fork's Lock pane drives the setting through `lock`; `on` and
-# `unlock` need the biometric prompt (a human), so only the rest runs here.
-"$CTL" lock relock 5m | expect "d['relock']=='5 min'" || fail "lock relock 5m"
-"$CTL" lock relock 1h | expect "d['relock']=='1 h'" || fail "lock relock 1h"
-"$CTL" lock now | expect "d['locked'] is False" || fail "lock now must stay unlocked while the lock is off"
-"$CTL" lock relock never >/dev/null 2>&1 && fail "lock relock must refuse an unknown choice"
-"$CTL" unlock 2>&1 | grep -q "the lock is off" || fail "unlock must say the lock is off"
 "$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
 # #1177: the swapd pane's read-only lines ride `status` (binary path, daemon word).
 "$CTL" status | expect "d['engines']['swapd']['binaryPath'].endswith('demo-swapd') and d['engines']['swapd']['daemon'] in ('stopped','running','backingOff','refused','schemaMismatch')" || fail "status swapd binary/daemon"

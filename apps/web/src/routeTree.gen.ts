@@ -29,7 +29,6 @@ import { Route as SettingsPriorityRouteImport } from './routes/settings.priority
 import { Route as SettingsOpenSourceLicensesRouteImport } from './routes/settings.open-source-licenses'
 import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SettingsMenuBarRouteImport } from './routes/settings.menu-bar'
-import { Route as SettingsLockRouteImport } from './routes/settings.lock'
 import { Route as SettingsKeybindingsRouteImport } from './routes/settings.keybindings'
 import { Route as SettingsIntegrationsRouteImport } from './routes/settings.integrations'
 import { Route as SettingsGeneralRouteImport } from './routes/settings.general'
@@ -147,11 +146,6 @@ const SettingsMenuBarRoute = SettingsMenuBarRouteImport.update({
   path: '/menu-bar',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsLockRoute = SettingsLockRouteImport.update({
-  id: '/lock',
-  path: '/lock',
-  getParentRoute: () => SettingsRoute,
-} as any)
 const SettingsKeybindingsRoute = SettingsKeybindingsRouteImport.update({
   id: '/keybindings',
   path: '/keybindings',
@@ -256,7 +250,6 @@ export interface FileRoutesByFullPath {
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
-  '/settings/lock': typeof SettingsLockRoute
   '/settings/menu-bar': typeof SettingsMenuBarRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
@@ -293,7 +286,6 @@ export interface FileRoutesByTo {
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
-  '/settings/lock': typeof SettingsLockRoute
   '/settings/menu-bar': typeof SettingsMenuBarRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
@@ -333,7 +325,6 @@ export interface FileRoutesById {
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
-  '/settings/lock': typeof SettingsLockRoute
   '/settings/menu-bar': typeof SettingsMenuBarRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
@@ -374,7 +365,6 @@ export interface FileRouteTypes {
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
-    | '/settings/lock'
     | '/settings/menu-bar'
     | '/settings/notifications'
     | '/settings/open-source-licenses'
@@ -411,7 +401,6 @@ export interface FileRouteTypes {
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
-    | '/settings/lock'
     | '/settings/menu-bar'
     | '/settings/notifications'
     | '/settings/open-source-licenses'
@@ -450,7 +439,6 @@ export interface FileRouteTypes {
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
-    | '/settings/lock'
     | '/settings/menu-bar'
     | '/settings/notifications'
     | '/settings/open-source-licenses'
@@ -623,13 +611,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsMenuBarRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/settings/lock': {
-      id: '/settings/lock'
-      path: '/lock'
-      fullPath: '/settings/lock'
-      preLoaderRoute: typeof SettingsLockRouteImport
-      parentRoute: typeof SettingsRoute
-    }
     '/settings/keybindings': {
       id: '/settings/keybindings'
       path: '/keybindings'
@@ -772,7 +753,6 @@ interface SettingsRouteChildren {
   SettingsGeneralRoute: typeof SettingsGeneralRoute
   SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
   SettingsKeybindingsRoute: typeof SettingsKeybindingsRoute
-  SettingsLockRoute: typeof SettingsLockRoute
   SettingsMenuBarRoute: typeof SettingsMenuBarRoute
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsOpenSourceLicensesRoute: typeof SettingsOpenSourceLicensesRoute
@@ -798,7 +778,6 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsGeneralRoute: SettingsGeneralRoute,
   SettingsIntegrationsRoute: SettingsIntegrationsRoute,
   SettingsKeybindingsRoute: SettingsKeybindingsRoute,
-  SettingsLockRoute: SettingsLockRoute,
   SettingsMenuBarRoute: SettingsMenuBarRoute,
   SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsOpenSourceLicensesRoute: SettingsOpenSourceLicensesRoute,

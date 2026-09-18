@@ -447,8 +447,6 @@ function answer(request, socketPath) {
       return { logins: [] };
     case "client-activity":
       return { clientId: "fixture" };
-    case "lock-status":
-      return { enabled: true, locked: false, relock: "5 min" };
     case "team-status":
       return {
         id: "papaya",

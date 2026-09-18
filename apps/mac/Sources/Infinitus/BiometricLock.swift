@@ -7,37 +7,13 @@ import LocalAuthentication
 /// not `…WithBiometrics`: Touch ID, an Apple Watch, or — when biometrics
 /// are missing, unenrolled or fail — the account password all count, the
 /// way the OS itself falls back. Nothing here is a security boundary; it
-/// is the gesture the lock asks for.
+/// is the gesture asked for before the team recovery key is shown.
 enum BiometricLock {
     enum Outcome: Equatable {
         case ok
-        /// The user backed out; the surfaces stay locked, nothing to show.
+        /// The user backed out; nothing to show.
         case cancelled
         case failed(String)
-    }
-
-    /// "Touch ID" / "Face ID" / "password" — for toggle and button copy.
-    static var methodName: String {
-        #if canImport(LocalAuthentication)
-        let ctx = LAContext()
-        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else { return "password" }
-        switch ctx.biometryType {
-        case .faceID: return "Face ID"
-        case .touchID: return "Touch ID"
-        default: return "password"
-        }
-        #else
-        return "password"
-        #endif
-    }
-
-    /// The SF Symbol for the locked state.
-    static var symbol: String {
-        switch methodName {
-        case "Face ID": return "faceid"
-        case "Touch ID": return "touchid"
-        default: return "lock.fill"
-        }
     }
 
     /// One prompt. `reason` completes "Infinitus wants to …" in the

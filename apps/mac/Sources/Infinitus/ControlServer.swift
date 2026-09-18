@@ -195,16 +195,6 @@ final class ControlServer {
         init(_ m: String) { errorDescription = m }
     }
 
-    /// The lock's current state, for `lock-status`/`lock on|off|now|relock|unlock`.
-    private func lockReply() -> ControlReply {
-        let policy = model.lock.policy
-        return ControlReply(ok: true, result: .object([
-            "enabled": .bool(policy.enabled),
-            "locked": .bool(policy.locked),
-            "relock": .string(policy.relock.label),
-        ]))
-    }
-
     /// The team snapshot after an action, or the action's error.
     private func teamReply() throws -> ControlReply {
         if let err = model.team.lastError { throw Fail(err) }
@@ -647,42 +637,6 @@ final class ControlServer {
                 "threads": .number(Double(threadCount)),
                 "uptimeSeconds": .number(Date().timeIntervalSince(launchedAt)),
             ]))
-
-        case "lock-status":
-            return lockReply()
-
-        case "lock":
-            // #747: the fork's Lock pane drives the biometric lock through
-            // these; `on` and `unlock` run the prompt on this Mac.
-            switch r.args.first {
-            case "on":
-                if !model.lock.enabled {
-                    let on = await model.lock.turnOn()
-                    guard on else { throw Fail(model.lock.lastError ?? "the unlock prompt was cancelled") }
-                }
-            case "off":
-                model.lock.turnOff()
-            case "now":
-                model.lock.lockNow()
-            case "relock":
-                let choices: [String: LockPolicy.Relock] = ["immediately": .immediately, "5m": .fiveMinutes,
-                                                             "1h": .oneHour, "sleep": .onSleep]
-                guard r.args.count >= 2, let relock = choices[r.args[1]] else {
-                    throw Fail("usage: lock relock immediately|5m|1h|sleep")
-                }
-                model.lock.relock = relock
-            default:
-                throw Fail("usage: lock on|off|now|relock immediately|5m|1h|sleep")
-            }
-            return lockReply()
-
-        case "unlock":
-            guard model.lock.enabled else { throw Fail("the lock is off") }
-            guard model.lock.policy.locked else { return lockReply() }
-            await model.lock.unlock()
-            if let err = model.lock.lastError { throw Fail(err) }
-            guard !model.lock.policy.locked else { throw Fail("the unlock prompt was cancelled") }
-            return lockReply()
 
         case "show":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {

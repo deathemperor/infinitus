@@ -625,7 +625,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the Menu bar page keeps `display` + `themes` + `about`; the Priority page reads the
   catalog's `priority` section and, on a build before that rename,
   `sessions`; a section the build lacks
-  renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
+  renders "no … settings yet")
   and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
