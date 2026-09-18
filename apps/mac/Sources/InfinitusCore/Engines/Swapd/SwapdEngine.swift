@@ -33,7 +33,7 @@ public struct SwapdEngine: AccountEngine {
     public static let engineCapabilities: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
         .addToken, .autoSwitch, .history, .settings, .prefer, .ignite,
-        .backup, .refreshAccount,
+        .refreshAccount,
     ]
 
     public func snapshot() async throws -> [EngineFleet] {
@@ -98,12 +98,6 @@ public struct SwapdEngine: AccountEngine {
     /// provider is claude, which is the fleet this can be reached from.
     public func addCurrent() async throws { try await cli.addCurrent(provider: .claude) }
     public func addToken(_ token: String) async throws { try await cli.addToken(provider: .claude, token) }
-    public func exportAccounts(to path: URL, account: Int?, full: Bool) async throws {
-        try await cli.exportAccounts(provider: .claude, to: path, slot: account, full: full)
-    }
-    public func importAccounts(from path: URL, force: Bool) async throws {
-        try await cli.importAccounts(provider: .claude, from: path, force: force)
-    }
 }
 
 /// The one bit of state `SwapdEngine` (a struct) can't hold itself: the

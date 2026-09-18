@@ -224,9 +224,9 @@ final class AppModel: ObservableObject {
     /// snapshot cache, notifications, resume nudges, push, sync, power
     /// assertions, the engine supervisor — stay put until they are swept.
     let isPlayground = false
-    /// Set by StatusItemHolder — opens the controller-owned Settings window
-    /// (the SwiftUI Settings scene is unreachable from popover hosts).
-    var showSettings: (() -> Void)?
+    /// Set by StatusItemHolder — opens the Infinitus desktop app, where
+    /// every setting lives since the Mac's Settings window retired.
+    var openDesktop: (() -> Void)?
     /// Set by StatusItemHolder — closes and re-shows an open popover.
     /// NSPopover keeps a stale fitting size when the content swaps shape
     /// wholesale (wide<->stacked left it clipped or oversized until a
@@ -459,10 +459,6 @@ final class AppModel: ObservableObject {
     // icon, so it no longer needs the popup to be reachable. Off, the app
     // runs headless — the socket, the mirror and the pinned window stay.
     @Published var menuBarIconShown: Bool { didSet { defaults.set(menuBarIconShown, forKey: "menu_bar_enabled") } }
-    // Off by default: the Dock icon only ever appeared while Settings was
-    // open, and a menu bar app in the Dock is what most asked to be rid of.
-    // On, Settings takes a Dock icon and a Cmd+Tab entry as it did before.
-    @Published var dockIconShown: Bool { didSet { defaults.set(dockIconShown, forKey: "dock_icon_enabled") } }
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
@@ -807,7 +803,6 @@ final class AppModel: ObservableObject {
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
-        dockIconShown = defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
             // Isolation is the contract: no demo script, no data at all
@@ -1045,7 +1040,6 @@ final class AppModel: ObservableObject {
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
-        set(\.dockIconShown, defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkServerProbe.defaultPort)
         // #1178: the Devices page's prefs land on their owners; each didSet
@@ -1967,15 +1961,13 @@ extension AppModel: FleetModel {
         }
     }
 
-    /// The footer's update chip opens Settings through the closure the
-    /// status item injects.
-    func openSettings() { showSettings?() }
+    /// The onboarding card's "Engine settings" button: Settings ›
+    /// Infinitus › Engines is the desktop app's (#1177).
+    func openSettings() { openDesktop?() }
 
-    /// The "at this pace" line's click. The Utilization pane is the
-    /// desktop app's now (#654, #774); Settings is what the Mac still opens.
-    func openForecast() {
-        showSettings?()
-    }
+    /// The "at this pace" line's click. The Utilization page is the
+    /// desktop app's (#654, #774).
+    func openForecast() { openDesktop?() }
 
     /// The primary fleet's engine decides what the mac-only panes may do.
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }

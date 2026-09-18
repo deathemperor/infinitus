@@ -1,0 +1,1 @@
+Mac: The menu bar app's Settings window is gone — every setting lives in Infinitus › Settings › Infinitus. Its last pane held settings export/import and account backup; both retire with it (`swapd export` / `swapd import` from a terminal remain the account backup path). The "Dock icon while Settings is open" preference went with the window.

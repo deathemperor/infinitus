@@ -10,15 +10,11 @@ import InfinitusCore
 /// at 0% locked or not. Holds no key material: re-locking swaps views.
 @MainActor
 final class LockModel: ObservableObject {
-    /// The Settings tab's title — `revealSetting()` selects it by name.
-    static let paneTitle = "Lock"
 
     @Published private(set) var policy: LockPolicy
     /// The last prompt's failure, shown under the Unlock button; cleared
     /// on the next attempt. A cancel leaves it nil.
     @Published private(set) var lastError: String?
-    /// Set by StatusItemHolder: opens the Settings window.
-    var showSettings: (() -> Void)?
     private let defaults: UserDefaults
     private var observers: [NSObjectProtocol] = []
 
@@ -101,15 +97,5 @@ final class LockModel: ObservableObject {
     func turnOff() {
         mutate { $0.setEnabled(false) }
         defaults.set(false, forKey: LockSetting.enabledKey)
-    }
-
-    /// Opens Settings on the Lock pane. The pane's `onReceive` subscribes
-    /// on its first body evaluation, so the selection posts one turn later.
-    func revealSetting() {
-        showSettings?()
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: Notification.Name("infinitus.selectPane"),
-                                            object: LockModel.paneTitle)
-        }
     }
 }

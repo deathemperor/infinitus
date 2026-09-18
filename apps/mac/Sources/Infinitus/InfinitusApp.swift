@@ -52,21 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// `open Infinitus.app` on an already-running instance lands here: show
     /// the pinned window. This is the guaranteed way into the UI when the
-    /// menu bar is too full to display the status item at all.
-    /// `open Infinitus.app` lands here, as does a Dock click on a build
-    /// whose `dock_icon_enabled` is on (the app is `.regular` only while
-    /// Settings is open then; off — the default — there is no Dock icon at
-    /// all). It must raise Settings, not the pop-out: returning false stops
-    /// AppKit's own window-raising, so a buried Settings never came back
-    /// (user 2026-09-09).
+    /// menu bar is too full to display the status item at all. Returning
+    /// false stops AppKit's own window-raising.
     func applicationShouldHandleReopen(_ app: NSApplication,
                                        hasVisibleWindows: Bool) -> Bool {
         guard let controller = statusHolder?.controller else { return false }
-        if controller.settings?.isVisible == true {
-            controller.showSettingsWindow()
-        } else {
-            controller.showPinnedWindow()
-        }
+        controller.showPinnedWindow()
         return false
     }
 }
@@ -96,9 +87,7 @@ struct InfinitusApp: App {
         _model = StateObject(wrappedValue: model)
         appDelegate.model = model
         appDelegate.makeStatusItem = { [weak appDelegate] in
-            appDelegate?.statusHolder = StatusItemHolder(
-                model: model,
-                settingsTabs: { settingsTabs(model: model) })
+            appDelegate?.statusHolder = StatusItemHolder(model: model)
         }
         model.startFeeds()
         // Deferred past didFinishLaunching: requesting in App.init — before
@@ -115,258 +104,18 @@ struct InfinitusApp: App {
         // by StatusItemController (see its header for why). Keep-alive with
         // zero windows comes from KeepAliveDelegate.
 
-        // macOS 26 puts this scene's window on screen by itself at launch
-        // — and SwiftUI keeps it non-resizable whatever .windowResizability
-        // says (it re-strips the .resizable bit on every update; probed
-        // 2026-09-02). StatusItemController hides it as it appears; the
-        // controller-owned window is the one Settings window.
-        // (.defaultLaunchBehavior(.suppressed) would be cleaner but is
-        // macOS 15+, and SceneBuilder takes no #available branch.)
-        Settings {
-            SettingsRoot(tabs: settingsTabs(model: model))
-        }
-        // ⌘, would raise that hidden scene window (and the controller
-        // would hide it again — "opened and closed immediately", user
-        // 2026-09-03). Route the standard Settings command to ours.
-        .commands {
-            CommandGroup(replacing: .appSettings) {
-                Button("Settings…") { model.showSettings?() }
-                    .keyboardShortcut(",", modifiers: .command)
+        // An App needs one Scene, and this is the only one. It draws
+        // nothing: the Settings window retired (every setting is the
+        // desktop app's), and macOS 26 still puts this scene's window on
+        // screen by itself at launch, so StatusItemController hides it as
+        // it appears. (.defaultLaunchBehavior(.suppressed) would be
+        // cleaner but is macOS 15+, and SceneBuilder takes no #available
+        // branch.) ⌘, would raise it too; the command is replaced with
+        // nothing.
+        Settings { EmptyView() }
+            .commands {
+                CommandGroup(replacing: .appSettings) {}
             }
-        }
-    }
-}
-
-/// The settings panes, declared once. The Settings scene (the standard
-/// app-menu path, unreachable for an accessory app with no app menu)
-/// renders them as a SwiftUI TabView; the controller-owned window the
-/// popup's Settings… button opens renders them as an AppKit
-/// NSTabViewController(tabStyle: .toolbar) — the REAL icon-toolbar
-/// Settings look, which no public SwiftUI TabViewStyle reproduces.
-@MainActor func settingsTabs(model: AppModel) -> [SettingsTab] {
-    // Ordered by how often each pane is reached for (user 2026-08-30:
-    // "reorder the settings"): everyday looks first, plumbing after.
-    // About left on 2026-09-14 with its Homebrew updater: the menu bar
-    // app ships inside the desktop bundle and updates with it, and the
-    // desktop's Settings › Infinitus › Engines shows its version. The
-    // three engine panes (swapd, CLIProxyAPI, 9Router) left on
-    // 2026-09-15 (#1177): that Engines page draws everything they drew,
-    // over the engine verbs and the catalog's engine prefs.
-    // Display, Push and Lock left on 2026-09-14 (#569): all three are
-    // Settings › Infinitus pages in the desktop app now, and the native
-    // window keeps only what cannot leave the Mac. The prefs themselves
-    // stay in PrefCatalog — that is what the fork's pages write — and
-    // the lock's biometric prompt stays native, driven by `lock` /
-    // `unlock` / `lock-status`. Accounts left the same day (#1179): the
-    // desktop's Accounts page adds, re-logs, renames, reorders and
-    // removes; the sign-in flow it drives stays native (SignInFlow.swift)
-    // and account backup, a file panel over the keychain-backed store,
-    // moved to Devices. Devices itself shrank on 2026-09-15 (#1178): this
-    // Mac's name and the iCloud toggle are the desktop's Devices page, over
-    // their prefs (phone alerts need no setup since #1375).
-    [
-        // "Sync" until 2026-09-02: the pane grew the phone companion and
-        // its routes, and syncing settings is now the smaller half.
-        SettingsTab(title: "Devices", symbol: "iphone.and.arrow.right.inward", tint: .cyan,
-                    keywords: ["settings", "file", "devices", "crash", "phone",
-                               "cloudflare", "tunnel", "backup", "restore",
-                               "accounts", "export", "import"],
-                    view: AnyView(SyncPane(sync: model.sync, app: model))),
-    ]
-}
-
-/// The settings shell: a searchable, grouped sidebar on the left and
-/// the selected pane on the right. The sidebar is a `List(selection:)`
-/// (arrow keys, type-select, focus ring and accessible rows, all free)
-/// inside our own HStack — NOT a NavigationSplitView, whose
-/// List-selection → detail hop froze under synthetic clicks
-/// (2026-08-30). The plain-Button sidebar that replaced it back then
-/// had none of those affordances and announced every row as "button"
-/// (design critique 2026-09-06, P0); a bare List does not take the
-/// split view's hop and restores them.
-struct SettingsRoot: View {
-    let tabs: [SettingsTab]
-    @State private var selection: String?
-    /// The pane actually on screen. Usually the selection; a search hit
-    /// selects a ROW and opens the pane that row lives on.
-    @State private var pane: String?
-    @State private var query = ""
-    @State private var highlight: String?
-    @State private var clearHighlight: Task<Void, Never>?
-    @FocusState private var searchFocused: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var index: SettingsSearchIndex { SettingsSearchCatalog.index(tabs: tabs) }
-    private var searching: Bool {
-        !query.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-    private var results: [(pane: String, entries: [SettingsSearchEntry])] {
-        searching ? index.grouped(query) : []
-    }
-    private var current: SettingsTab? {
-        tabs.first { $0.title == pane } ?? tabs.first
-    }
-    private var group: SettingsGroup {
-        current.map { SettingsGroup.of($0) } ?? .general
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                searchField
-                    .padding(.top, 14)
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
-                SettingsSidebar(tabs: tabs, results: results,
-                                searching: searching, query: query,
-                                selection: $selection)
-            }
-            .frame(width: 215)
-            Divider()
-            detail
-        }
-        .frame(minWidth: 700, idealWidth: 960, minHeight: 480, idealHeight: 640)
-        .background(WindowTitler(title: "Settings", subtitle: current?.title ?? ""))
-        // ⌘F puts the caret in the field; an accessory app has no menu
-        // bar to hang the standard Find item off (critique: Alex "has
-        // no ⌘F").
-        .overlay {
-            Group {
-                Button("") { searchFocused = true }
-                    .keyboardShortcut("f", modifiers: .command)
-            }
-            .buttonStyle(.plain)
-            .opacity(0)
-            .frame(width: 0, height: 0)
-            .accessibilityHidden(true)
-        }
-        .onAppear {
-            if selection == nil {
-                selection = tabs.first?.title
-                pane = tabs.first?.title
-            }
-        }
-        .onChange(of: selection) { _, new in select(new) }
-        .onChange(of: query) { _, _ in retargetForQuery() }
-        // Dev harness: `playctl settings <Title>` lands on a named pane
-        // (pane screenshots without synthetic sidebar clicks).
-        .onReceive(NotificationCenter.default.publisher(
-            for: Notification.Name("infinitus.selectPane"))) { note in
-            if let title = note.object as? String,
-               tabs.contains(where: { $0.title == title }) {
-                query = ""
-                highlight = nil
-                selection = title
-                pane = title
-            }
-        }
-        .reloadOnInjection()
-    }
-
-    // MARK: detail
-
-    @ViewBuilder private var detail: some View {
-        ScrollViewReader { proxy in
-            Group {
-                if searching, results.isEmpty {
-                    // Nothing stale left on screen: the old shell blanked
-                    // the sidebar and kept the previous pane showing with
-                    // nothing selected (critique P1).
-                    ContentUnavailableView.search(text: query)
-                } else if let tab = current {
-                    tab.view
-                        .frame(maxWidth: group.contentWidth)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .environment(\.settingsHighlight, highlight)
-            .onChange(of: highlight) { _, anchor in
-                guard let anchor else { return }
-                // The pane has to render before its sections have ids.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    if reduceMotion {
-                        proxy.scrollTo(anchor, anchor: .center)
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            proxy.scrollTo(anchor, anchor: .center)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: search field
-
-    private var searchField: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "magnifyingglass")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            TextField("Search settings", text: $query)
-                .textFieldStyle(.plain)
-                .font(.callout)
-                .focused($searchFocused)
-            if searching {
-                Button {
-                    query = ""
-                    searchFocused = true
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear the search")
-                .help("Clear the search")
-            }
-        }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 7)
-            .fill(Color.primary.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 7)
-            .strokeBorder(Color.secondary.opacity(0.25)))
-    }
-
-    // MARK: selection
-
-    /// A sidebar selection is either a pane title or a search hit's id.
-    private func select(_ id: String?) {
-        guard let id else { return }
-        if tabs.contains(where: { $0.title == id }) {
-            pane = id
-            flash(nil)
-        } else if let hit = index.entry(id: id) {
-            pane = hit.pane
-            flash(hit.anchor)
-        }
-    }
-
-    /// Keeps the detail honest while the query changes: the selected
-    /// pane stays if it still has hits, otherwise the first hit wins.
-    private func retargetForQuery() {
-        // Clearing the field: the sidebar goes back to pane rows, so a
-        // selection still holding a search hit's id would highlight
-        // nothing. Hand it back the pane that is showing.
-        guard searching else { flash(nil); selection = pane; return }
-        let groups = results
-        guard !groups.isEmpty else { return }
-        if let pane, groups.contains(where: { $0.pane == pane }) { return }
-        if let first = groups.first?.entries.first {
-            selection = first.id
-        }
-    }
-
-    private func flash(_ anchor: String?) {
-        clearHighlight?.cancel()
-        highlight = anchor
-        guard anchor != nil else { return }
-        clearHighlight = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
-            guard !Task.isCancelled else { return }
-            highlight = nil
-        }
     }
 }
 
@@ -513,12 +262,6 @@ struct MenuContent: View {
                                 serviceChrome: StatusHoverCard(status: status))
                             if !model.footerActionsHidden {
                                 Button {
-                                    model.showSettings?()
-                                } label: {
-                                    Image(systemName: "gearshape")
-                                }
-                                .instantTip("Settings", edge: .above)
-                                Button {
                                     model.relaunchApp()
                                 } label: {
                                     Image(systemName: "arrow.trianglehead.clockwise")
@@ -607,10 +350,6 @@ struct MenuContent: View {
     /// the Compact (compress) toggle.
     @ViewBuilder private var stackedRail: some View {
         if !model.footerActionsHidden {
-        Button { model.showSettings?() } label: {
-            Image(systemName: "gearshape")
-        }
-        .instantTip("Settings")
         Button { model.popoverPinned.toggle() } label: {
             Image(systemName: model.popoverPinned ? "pin.fill" : "pin")
         }
@@ -665,10 +404,6 @@ struct MenuContent: View {
     /// rail grid vs horizontal strip.
     @ViewBuilder private var compactControls: some View {
         if !model.footerActionsHidden {
-        Button { model.showSettings?() } label: {
-            Image(systemName: "gearshape")
-        }
-        .instantTip("Settings")
         Button { model.popoverPinned.toggle() } label: {
             Image(systemName: model.popoverPinned ? "pin.fill" : "pin")
         }
@@ -813,7 +548,6 @@ private struct PopupScale: ViewModifier {
 
 // ThemeColor moved to InfinitusUI/ThemeColor.swift (#9 phase A) — shared
 // with the iOS app.
-
 
 /// First-run card when no swapd binary exists (todo 2026-08-30):
 /// explains the engine and quotes its install line. The rest of the

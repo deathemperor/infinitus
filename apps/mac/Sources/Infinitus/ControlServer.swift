@@ -678,10 +678,11 @@ final class ControlServer {
             }
             switch r.args.first {
             case "popout": controller.showPinnedWindow()
-            case "settings": controller.showSettingsWindow()
+            case "settings":
+                throw Fail("retired: the Settings window is gone — every setting is in the Infinitus desktop app")
             case "wall", "workspace", "session":
                 throw Fail("retired: the wall, workspace and session windows moved to the Infinitus desktop app")
-            default: throw Fail("usage: show popout|settings")
+            default: throw Fail("usage: show popout")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
@@ -733,10 +734,11 @@ final class ControlServer {
             }
             switch r.args.first {
             case "popout": controller.hidePinnedWindow()
-            case "settings": controller.hideSettingsWindow()
+            case "settings":
+                throw Fail("retired: the Settings window is gone — every setting is in the Infinitus desktop app")
             case "workspace":
                 throw Fail("retired: the workspace window moved to the Infinitus desktop app")
-            default: throw Fail("usage: hide popout|settings")
+            default: throw Fail("usage: hide popout")
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
 
@@ -1252,7 +1254,7 @@ final class ControlServer {
             (.rename, "rename"), (.remove, "remove"), (.addCurrent, "addCurrent"),
             (.addToken, "addToken"), (.addOAuth, "addOAuth"), (.autoSwitch, "autoSwitch"),
             (.costReport, "costReport"), (.history, "history"), (.settings, "settings"),
-            (.prefer, "prefer"), (.ignite, "ignite"), (.backup, "backup"),
+            (.prefer, "prefer"), (.ignite, "ignite"),
             (.refreshAccount, "refreshAccount"),
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
