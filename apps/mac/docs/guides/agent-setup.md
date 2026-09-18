@@ -80,8 +80,9 @@ reads a setup token / API key from stdin.
 
 ## 4. Auto-switching
 
-Infinitus runs `swapd auto` itself while it is open (Settings → Engines
-shows the supervisor); nothing to start. The knobs are the engine's,
+Infinitus starts a background account service that keeps running when you quit
+the menu bar and starts again at login. Settings → Engines shows its status;
+turn off the swapd engine there to stop it. The knobs are the engine's,
 one set per provider (never re-implement them app-side):
 
 ```sh

@@ -1,3 +1,4 @@
+import type { ClientSettings } from "@infinitus/contracts/settings";
 import type { AssistantCitation, ComposerSendMode } from "@infinitus/contracts";
 import {
   serializeAssistantCitation,
@@ -13,8 +14,17 @@ export type ComposerSlashCommand = "model" | "plan" | "default";
 /** `queue` (#806): the message waits on the server for the running turn to finish. */
 // Fork (#270 F, #806, #1318): `queue` and `steer` hand the message to the
 // server's queue while a turn runs; a `steer` row is due at the turn's next
-// finished tool call, a `queue` row when the thread is idle.
-export type ComposerSubmissionIntent = "foreground" | "background" | "queue" | "steer";
+// finished tool call, a `queue` row when the thread is idle. Upstream's
+// `alternate` (#11964) is its own form of the same ⌘↩ flip: it stays in the
+// union so upstream's `composerSubmissionIntentForEnter` and its tests hold,
+// but on a server thread `submitComposer` replaces it with the fork's send
+// mode, and every other consumer reads it as a plain foreground send.
+export type ComposerSubmissionIntent =
+  | "foreground"
+  | "background"
+  | "queue"
+  | "steer"
+  | "alternate";
 
 export interface ComposerTrigger {
   kind: ComposerTriggerKind;
@@ -32,9 +42,17 @@ export function composerSubmissionIntentForEnter(input: {
   shiftKey: boolean;
   modifierKey: boolean;
   isDraftThread: boolean;
+  isRunning?: boolean;
+  sendShortcut?: ClientSettings["sendShortcut"];
+  prompt?: string;
 }): ComposerSubmissionIntent | null {
-  if (input.isMobileViewport || input.shiftKey) {
-    return null;
+  const requiresModifier =
+    input.sendShortcut === "mod-enter" ||
+    (input.sendShortcut === "mod-enter-multiline" && /[\r\n]/.test(input.prompt ?? ""));
+  if (input.isMobileViewport || (requiresModifier && !input.modifierKey)) return null;
+  if (input.shiftKey && !(requiresModifier && input.modifierKey && input.isRunning)) return null;
+  if (input.isRunning && input.modifierKey && (!requiresModifier || input.shiftKey)) {
+    return "alternate";
   }
   return input.modifierKey && input.isDraftThread ? "background" : "foreground";
 }
@@ -97,7 +115,7 @@ export function expandCollapsedComposerCursor(text: string, cursorInput: number)
       continue;
     }
     if (segment.type === "skill") {
-      const expandedLength = segment.name.length + 1;
+      const expandedLength = segment.source.length;
       if (remaining <= 1) {
         return expandedCursor + (remaining === 0 ? 0 : expandedLength);
       }
@@ -173,7 +191,7 @@ export function collapseExpandedComposerCursor(text: string, cursorInput: number
       continue;
     }
     if (segment.type === "skill") {
-      const expandedLength = segment.name.length + 1;
+      const expandedLength = segment.source.length;
       if (remaining === 0) {
         return collapsedCursor;
       }
@@ -253,10 +271,11 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
       rangeEnd: cursor,
     };
   }
-  if (token.startsWith("$")) {
+  const skillPrefix = /^\p{Sc}/u.exec(token);
+  if (skillPrefix) {
     return {
       kind: "skill",
-      query: token.slice(1),
+      query: token.slice(skillPrefix[0].length),
       rangeStart: tokenStart,
       rangeEnd: cursor,
     };

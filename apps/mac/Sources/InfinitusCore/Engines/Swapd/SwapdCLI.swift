@@ -232,27 +232,5 @@ public struct SwapdCLI: Sendable {
     public func removeAccount(provider: Provider, slot: Int) async throws -> Data {
         try await run(try arguments(["remove", String(slot), "--yes"], provider: provider))
     }
-
-    /// Write accounts to `path`. The result is a CREDENTIAL file — the path
-    /// is argv (it is not the secret; the FILE is), the same as cswap's.
-    @discardableResult
-    public func exportAccounts(provider: Provider, to path: URL, slot: Int? = nil,
-                               full: Bool = false) async throws -> Data {
-        var verb = ["export", path.path]
-        if let slot { verb += ["--slot", String(slot)] }
-        if full { verb.append("--full") }
-        return try await run(try arguments(verb, provider: provider))
-    }
-
-    /// Read accounts back. `force` overwrites slots holding another account,
-    /// so a caller must confirm it first.
-    @discardableResult
-    public func importAccounts(provider: Provider, from path: URL,
-                               force: Bool = false) async throws -> Data {
-        var verb = ["import", path.path]
-        if force { verb.append("--force") }
-        return try await run(try arguments(verb, provider: provider))
-    }
-
 }
 #endif

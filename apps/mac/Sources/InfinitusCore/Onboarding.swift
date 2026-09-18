@@ -113,9 +113,9 @@ public enum OnboardingBrief {
                    + "For command-line setup, run `swapd add` using the full Binary path shown in "
                    + "Settings → Engines. The bundled engine is not installed on PATH. "
                    + "Use Accounts to add more logins once the fleet appears.")
-        out.append("- [ ] 4. Start auto-rotation: Infinitus runs `swapd auto` itself once the "
+        out.append("- [ ] 4. Start auto-rotation: Infinitus installs a background account service once the "
                    + "fleet has accounts (Settings → Engines shows it; `infinitusctl status` from "
-                   + "Infinitus.app/Contents/MacOS confirms).")
+                   + "Infinitus.app/Contents/MacOS confirms). It keeps switching accounts when the menu bar is closed.")
         out.append("- [ ] 5. Optional, CLIProxyAPI as a second engine: `brew install cliproxyapi` "
                    + "(or the release binary), start it, then in Infinitus Settings → Engines → "
                    + "CLIProxyAPI paste the management key (the human pastes secrets) and add "

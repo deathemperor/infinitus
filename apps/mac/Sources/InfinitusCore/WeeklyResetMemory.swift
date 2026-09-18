@@ -56,7 +56,7 @@ public final class WeeklyResetMemory: @unchecked Sendable {
     }
 }
 
-/// The Ready cell's weekly-reset caption, decided as pure data so it's
+/// The untouched weekly gauge's reset caption, decided as pure data so it's
 /// testable without the singleton above. `remembered` is passed in
 /// rather than read here.
 public enum ReadyWeeklyCaption {

@@ -1346,6 +1346,11 @@ const makeWsRpcLayer = (
               return completionFiber;
             });
 
+          // Fork (#269 H): set when the cap refuses this bootstrap, so the
+          // failure handler below can tell the fork's refusal (which records no
+          // row) from every other pre-create failure (which records one).
+          let worktreeCapRefused = false;
+
           const bootstrapProgram = Effect.gen(function* () {
             // Fork (#269 H): the slot is reserved before the reads, so members
             // started together see each other. Reserving is not yet refusing:
@@ -1427,6 +1432,12 @@ const makeWsRpcLayer = (
             }
 
             if (prepareWorktree && !shouldPrepareWorktree) {
+              if (prepareWorktree.requireWorktree) {
+                return yield* new OrchestrationDispatchCommandError({
+                  message:
+                    "A separate worktree requires a Git repository and a base branch with a commit.",
+                });
+              }
               // Not a git repo, or the base has no commit: the thread runs in
               // the project checkout instead. The card says so and moves on.
               // It takes no worktree, so it gives its slot back before members
@@ -1452,6 +1463,7 @@ const makeWsRpcLayer = (
               const refusal = yield* worktreeCapRefusalNow(1);
               if (refusal !== null) {
                 worktreesInFlight.delete(command.threadId);
+                worktreeCapRefused = true;
                 return yield* Effect.fail(
                   new OrchestrationDispatchCommandError({ message: refusal }),
                 );
@@ -1480,8 +1492,8 @@ const makeWsRpcLayer = (
               // every delete for the prior incarnation committed before it.
               // Drain through that event before setup or turn start can own
               // terminals and provider sessions under the reused thread id.
-              yield* threadDeletionReactor.drainThrough(created.sequence);
               createdThread = true;
+              yield* threadDeletionReactor.drainThrough(created.sequence);
               // Persist the send now rather than with the turn: the thread is
               // real from here on, so any client (or a reload) sees the message
               // while the worktree is still being prepared. The turn start
@@ -1685,13 +1697,16 @@ const makeWsRpcLayer = (
                   ),
                 onSuccess: (threadDeleted) =>
                   Effect.fail(
-                    threadDeleted
+                    threadDeleted ||
+                      (bootstrap?.createThread &&
+                        bootstrap.prepareWorktree?.requireWorktree === true &&
+                        !createdThread)
                       ? new OrchestrationDispatchCommandError({
                           message: dispatchError.message,
                           ...(dispatchError.cause !== undefined
                             ? { cause: dispatchError.cause }
                             : {}),
-                          bootstrapThreadDisposition: "deleted",
+                          bootstrapThreadDisposition: threadDeleted ? "deleted" : "not-created",
                         })
                       : dispatchError,
                   ),
@@ -1702,6 +1717,7 @@ const makeWsRpcLayer = (
             // #269 H: the slot reserved before the reads is released however
             // this ends, so a refused or failed bootstrap never leaks one.
             Effect.ensuring(Effect.sync(() => worktreesInFlight.delete(command.threadId))),
+            Effect.interruptible,
             Effect.catchCause((cause) => {
               const dispatchError = toBootstrapDispatchCommandCauseError(cause);
               if (Cause.hasInterruptsOnly(cause)) {
@@ -1760,19 +1776,25 @@ const makeWsRpcLayer = (
                 );
               }
               // Fork (#269 H): a bootstrap refused over the worktree limit
-              // fails before `thread.create`, so there is no thread to hold
-              // the row; the tracker still finishes for whoever streams it.
-              const threadExists = !bootstrap?.createThread || createdThread;
+              // records nothing — the refusal costs no thread, so a row would
+              // go to a thread that never existed, and the refusal's contract
+              // is that it dispatches no command at all. Every other failure
+              // records the row, including upstream's `requireWorktree`
+              // refusal, which also fails before the create: the append is
+              // best effort (`recordWorktreeSetup` ignores its cause), so a
+              // missing thread costs a log line, not the caller's error.
               return track(
                 worktreeSetupTracker
                   .finish(threadId, "failed", dispatchError.message)
                   .pipe(
                     Effect.flatMap((snapshot) =>
-                      snapshot && threadExists ? recordWorktreeSetup(snapshot) : Effect.void,
+                      snapshot && !worktreeCapRefused ? recordWorktreeSetup(snapshot) : Effect.void,
                     ),
                   ),
               ).pipe(Effect.andThen(cleanupAndFail(cause, dispatchError)));
             }),
+            // Cancellation must finish recording and rollback after the bootstrap is interrupted.
+            Effect.uninterruptible,
           );
 
           // The bootstrap outlives the connection that asked for it: a reload
@@ -1893,6 +1915,7 @@ const makeWsRpcLayer = (
                 }),
             threadResumeCompletionMarker: true,
             threadSnapshotPagination: true,
+            reasoningMessages: true,
           };
         });
 
@@ -2223,7 +2246,7 @@ const makeWsRpcLayer = (
                 Stream.filter(isThisThreadDetailEvent),
                 Stream.map((event) => ({
                   kind: "event" as const,
-                  event,
+                  event: projectActivityEvent(event, input.reasoningMessages === true),
                 })),
               );
 
@@ -2293,7 +2316,7 @@ const makeWsRpcLayer = (
                       Stream.filter(isThisThreadDetailEvent),
                       Stream.map((event) => ({
                         kind: "event" as const,
-                        event: projectActivityEvent(event),
+                        event: projectActivityEvent(event, input.reasoningMessages === true),
                       })),
                       Stream.mapError(
                         (cause) =>
@@ -2364,7 +2387,10 @@ const makeWsRpcLayer = (
               return Stream.concat(
                 Stream.make({
                   kind: "snapshot" as const,
-                  snapshot: projectThreadDetailSnapshot(snapshot.value),
+                  snapshot: projectThreadDetailSnapshot(
+                    snapshot.value,
+                    input.reasoningMessages === true,
+                  ),
                 }),
                 afterSnapshot,
               );
@@ -2897,7 +2923,7 @@ const makeWsRpcLayer = (
         [WS_METHODS.pullRequestsInvalidate]: (input) =>
           observeRpcEffect(
             WS_METHODS.pullRequestsInvalidate,
-            pullRequests.invalidate(input).pipe(
+            pullRequests.invalidate(input, { notifyReaders: true }).pipe(
               // A reader asking for fresh host state also wants the thread badges it feeds to
               // catch up, including a merged link the sweep would otherwise never revisit.
               Effect.andThen(
@@ -3172,6 +3198,8 @@ const makeWsRpcLayer = (
               if (
                 input.resource._tag === "attachment" ||
                 input.resource._tag === "native-app-icon" ||
+                // GitHub media names the repository it authenticates through itself.
+                input.resource._tag === "github-media" ||
                 (input.resource._tag === "media-file" && path.isAbsolute(input.resource.path))
               ) {
                 return yield* issueAssetUrl({ resource: input.resource });

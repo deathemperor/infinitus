@@ -2,7 +2,7 @@ import type { WorkspaceState } from "../../state/workspaceModel";
 
 export interface WorkspaceConnectionStatusPresentation {
   readonly label: string;
-  /** True while actively working (connecting/syncing) — render a spinner. False for offline/error/idle states — render a wifi-slash icon. */
+  /** True while the label describes work in flight (connecting/syncing) — render a spinner. False when the label says we cannot connect — render a wifi-slash icon. */
   readonly showsProgress: boolean;
 }
 
@@ -16,19 +16,38 @@ function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
   );
 }
 
-function workspaceConnectionStatusLabel(state: WorkspaceState): string {
-  if (state.networkStatus === "offline") return "You are offline";
+/**
+ * Label and icon are decided together so they can never disagree: a retry in
+ * flight reads "Reconnecting" beside a spinner, and the wifi-slash icon is
+ * reserved for the states whose label says we cannot connect. A recorded
+ * failure does not stop the spinner — the supervisor is still retrying.
+ */
+function workspaceConnectionStatus(state: WorkspaceState): WorkspaceConnectionStatusPresentation {
+  if (state.networkStatus === "offline") {
+    return { label: "You are offline", showsProgress: false };
+  }
   if (state.connectingEnvironments.length === 1) {
-    return `Reconnecting to ${state.connectingEnvironments[0]!.environmentLabel}`;
+    return {
+      label: `Reconnecting to ${state.connectingEnvironments[0]!.environmentLabel}`,
+      showsProgress: true,
+    };
   }
   if (state.connectingEnvironments.length > 1) {
-    return `Reconnecting ${state.connectingEnvironments.length} environments`;
+    return {
+      label: `Reconnecting ${state.connectingEnvironments.length} environments`,
+      showsProgress: true,
+    };
   }
-  if (state.connectionError !== null) return state.connectionError;
+  if (state.connectionError !== null) {
+    return { label: state.connectionError, showsProgress: false };
+  }
   if (state.hasPendingShellSnapshot) {
-    return state.hasLoadedShellSnapshot ? "Syncing threads..." : "Loading threads...";
+    return {
+      label: state.hasLoadedShellSnapshot ? "Syncing threads..." : "Loading threads...",
+      showsProgress: true,
+    };
   }
-  return "Not connected";
+  return { label: "Not connected", showsProgress: false };
 }
 
 /** Header-title presentation of the connection state, or null while connected. */
@@ -36,11 +55,5 @@ export function workspaceConnectionStatusPresentation(
   state: WorkspaceState,
 ): WorkspaceConnectionStatusPresentation | null {
   if (!shouldShowWorkspaceConnectionStatus(state)) return null;
-  return {
-    label: workspaceConnectionStatusLabel(state),
-    showsProgress:
-      state.networkStatus !== "offline" &&
-      state.connectionError === null &&
-      (state.connectingEnvironments.length > 0 || state.hasPendingShellSnapshot),
-  };
+  return workspaceConnectionStatus(state);
 }

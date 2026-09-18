@@ -31,7 +31,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (its list of every built-in instance id — a new driver fails the suite until
   it is listed) and `knip.jsonc` (`scripts/pi-rpc-mock-agent.ts` as an
   `apps/server` entry: its test spawns it by path, so nothing reaches it
-  statically). Rules and traps: `docs/internals/pi-driver.md`.
+  statically). Upstream's own Pi PRs add a `pi` arm at these same points and
+  are all closed; the merge rule is on that page. Rules and traps:
+  `docs/internals/pi-driver.md`.
 - `packages/contracts/src/rpc.ts` — `subscribeInfinitus` and
   `infinitus.command` in `WS_METHODS`, their two `Rpc.make`s, both in
   `WsRpcGroup`; `provider.proxyModels` (the add-instance wizard lists an
@@ -278,6 +280,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `Alert` shows at most three buttons; #269 F's PR menu reaches four).
 - `apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx` — the
   `roamingHostsLine` under a saved environment's host (#663).
+- `apps/mobile/src/features/connection/EnvironmentConnectionNotice.tsx` and
+  `apps/mobile/src/features/home/workspace-connection-status.ts` — the
+  connection icon says what the label says. The header status returns label
+  and `showsProgress` from one function, so a retry that recorded a failure
+  keeps its spinner instead of reading "Reconnecting to X" beside a
+  wifi-slash; the full-screen notice drops `bolt.horizontal.circle` and
+  shows wifi-slash for every non-retrying phase.
 - `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — mounts
   `InfinitusNearbyServers` above the Host field (#651) and
   `InfinitusAskToApprove` under the code field (#710), whose approved
@@ -499,6 +508,34 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
   `SettingsInfinitusSection` (Accounts and Team rows, the reset alarms
   toggle, sending mode) after General.
+- `apps/mobile/src/features/settings/lib/legal-document-url.ts` and its
+  test — the marketing-site base is `infinitus.run`, not `t3.codes`:
+  Settings › App › Legal is the one client surface that shows a legal
+  document, and upstream's bind T3 Tools, Inc. and describe services this
+  fork does not run. Everything else (the four document URLs, the WebView
+  allowlist) derives from that one constant. The test pins the old host as
+  rejected, which is the regression. The documents themselves are the
+  fork's, under `apps/mac/site/public/` — deployed by hand with
+  `npx wrangler deploy`, never by CI.
+- `.github/SECURITY.md` — reports go to this fork's maintainer (GitHub
+  private vulnerability reporting, or the maintainer's email) and the
+  policy link is `infinitus.run/security-policy`; upstream's routes them
+  to `security@ping.gg`, who do not maintain this fork.
+- `third-party-licenses.config.json`, `apps/web/src/components/settings/OpenSourceLicenses.tsx`,
+  `apps/mobile/src/features/settings/SettingsOpenSourceLicensesRouteScreen.tsx` — the fork ships
+  upstream's MIT-licensed source, whose license requires the notice travel with "substantial
+  portions" of it. A `customNotices` entry named "T3 Code" carries upstream's copyright line and
+  MIT text into the generated manifest, and both licenses screens lead with a "Built on T3 Code"
+  section (hidden while searching) crediting the fork's origin — the generated entry alone sorts
+  to position ~703 of 771, among the npm packages.
+- `apps/mobile/src/components/BrandMark.tsx` and
+  `apps/mobile/src/lib/mobileBranding.ts` — the brand lockup's icon is
+  chosen through `resolveMobileBrandMarkVariant`, which maps the fork's
+  `infinitus` variant to `apps/mobile/assets/infinitus-ios-1024.png`.
+  Upstream's chain knows only `development` / `preview` / `prod`, so the
+  fork's build fell through to upstream's T3 mark and drew the T3 logo
+  beside the Infinitus wordmark on every loading screen. Any new
+  variant-keyed asset needs an `infinitus` branch for the same reason.
 - `apps/mobile/src/App.tsx` — `appLinking`'s universal pair-link rewrite (`features/connection/universalPairLink.logic.ts`, #724, #746), the team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
@@ -559,8 +596,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
 - `apps/web/src/components/settings/settingsSearch.ts` — the eight Infinitus
-  `SettingsPath`s and their labels (Themes and Animations since #747 step 1,
-  Priority since #743, Lock since #747 step 3), the `infinitusOnly` search flag with the
+  `SettingsPath`s and their labels (Animations since #747 step 1,
+  Priority since #743, Lock since #747 step 3; the Themes page of #747 step 1
+  folded into the Menu bar page), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, and
   `isSettingsSectionActive` so a nested page's nav item is the only one lit.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts`, and one block in upstream's `ThreadNotificationCoordinator.tsx` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
@@ -572,12 +610,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
 - `apps/web/src/routes/settings.infinitus*.tsx` (eight new files in upstream's
-  routes directory; Themes and Animations are `InfinitusPrefsPanel` pages over
-  the catalog's `themes` / `animations` sections, #747 step 1, and Priority
+  routes directory; Animations is an `InfinitusPrefsPanel` page over
+  the catalog's `animations` section, #747 step 1, and Priority
   over its `priority` section (#743: `priority_mode` with the `interrupt`
   choice, `priority_low_pct`, `priority_abundant_pct`, copy in `PREF_COPY`,
   the mode row labelled "Thread priority" since #1069) —
-  the Menu bar page keeps `display` + `about`; the Priority page reads the
+  the Menu bar page keeps `display` + `themes` + `about`; the Priority page reads the
   catalog's `priority` section and, on a build before that rename,
   `sessions`; a section the build lacks
   renders "no … settings yet"; Lock is `InfinitusLockPanel`, #747 step 3)
@@ -625,5 +663,5 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   workflows, pull requests — write), since the default token cannot push a
   branch that touches `.github/workflows` (#658); without it such a sync
   is done by hand.
-- **Oh My Pi as a provider driver.** `omp` speaks ACP natively (`omp acp`), so the driver is one more tenant of the existing ACP runtime; its own files are in `fork-only-files.md`. The registration points are the ones every driver has: `packages/contracts/src/settings.ts` (`OmpSettings` / `OmpSettingsPatch`, the `omp` key of `providers` and its patch, `enabled` false by default), `packages/contracts/src/model.ts` (`DEFAULT_MODEL_BY_PROVIDER.omp`, `PROVIDER_DISPLAY_NAMES.omp`), `apps/server/src/provider/builtInDrivers.ts`, `providerStatusCache.ts`, `apps/server/src/serverSettings.ts`, `textGeneration/TextGeneration.ts`, `apps/server/scripts/acp-mock-agent.ts` (`T3_ACP_OMP=1`), `packages/contracts/src/agentSessions.ts` (`"omp"` on `AgentSessionSource`) `apps/server/src/project/AgentSessionScanner.ts` and `AgentSessionImporter.ts` (the omp resume cursor, plus its test); web `Icons.tsx`, `chat/providerIconUtils.ts`, `settings/providerDriverMeta.ts`, `settings/customModelEditor.logic.ts`, `settings/settingsSearch.ts` and `onboarding/WelcomeWizard.tsx`; mobile `ProviderIcon.tsx`; docs `README.md`, `docs/user/install.md`, `docs/user/permission-modes.md`. Rules and traps: `docs/internals/omp-driver.md`.
+- **Oh My Pi as a provider driver.** `omp` speaks ACP natively (`omp acp`), so the driver is one more tenant of the existing ACP runtime; its own files are in `fork-only-files.md`. The registration points are the ones every driver has: `packages/contracts/src/settings.ts` (`OmpSettings` / `OmpSettingsPatch`, the `omp` key of `providers` and its patch, `enabled` false by default), `packages/contracts/src/model.ts` (`DEFAULT_MODEL_BY_PROVIDER.omp`, `PROVIDER_DISPLAY_NAMES.omp`), `apps/server/src/provider/builtInDrivers.ts`, `providerStatusCache.ts`, `apps/server/src/serverSettings.ts`, `textGeneration/TextGeneration.ts`, `apps/server/scripts/acp-mock-agent.ts` (`T3_ACP_OMP=1`), `packages/contracts/src/agentSessions.ts` (`"omp"` on `AgentSessionSource`) `apps/server/src/project/AgentSessionScanner.ts` and `AgentSessionImporter.ts` (the omp resume cursor, plus its test); web `Icons.tsx`, `chat/providerIconUtils.ts`, `settings/providerDriverMeta.ts`, `settings/customModelEditor.logic.ts`, `settings/settingsSearch.ts` and `onboarding/WelcomeWizard.tsx`; mobile `ProviderIcon.tsx`; docs `README.md`, `docs/user/install.md`, `docs/user/permission-modes.md`. Upstream's own unmerged omp PRs add an `omp` arm at every one of these points; on the sync that brings one, ours stays and theirs goes — a second `omp` key or `case` is a type error at best. Rules and traps: `docs/internals/omp-driver.md`.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.

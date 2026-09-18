@@ -48,7 +48,6 @@ everything in `index.json` and installs a copy into the user's local
 | `deadMarker` | prefix on a dead account's name |
 | `revivePrefix` | prepended to an exhausted window's reset label |
 | `deadVerb` | verb for a dead limit ("out", "MIA", "sold out") |
-| `readyLabel` | the all-fresh row's word ("ready", "full HP") |
 | `flashColor` | tint for switch/data-change animations ("" = accent) |
 | `modelAlias` | per-model rename map ({"Fable": "Dragon"}) |
 | `planPrefix` | replaces "Max " in plan strings ("Lv " → "Lv 20x") |

@@ -8,7 +8,7 @@ import InfinitusUI
 
 /// Main-actor state the MenuBarExtra renders. Feeds per spec §2:
 /// snapshots from `swapd list --json` (timer + right after any switch
-/// event), events from the supervised `swapd auto --json`.
+/// event), events from the background `swapd auto --json` service.
 @MainActor
 final class AppModel: ObservableObject {
     // MARK: fleets (#8 multi-engine seam)
@@ -224,9 +224,11 @@ final class AppModel: ObservableObject {
     /// snapshot cache, notifications, resume nudges, push, sync, power
     /// assertions, the engine supervisor — stay put until they are swept.
     let isPlayground = false
-    /// Set by StatusItemHolder — opens the controller-owned Settings window
-    /// (the SwiftUI Settings scene is unreachable from popover hosts).
-    var showSettings: (() -> Void)?
+    /// Set by StatusItemHolder — opens the Infinitus desktop app, where
+    /// every setting lives since the Mac's Settings window retired; with a
+    /// page (`infinitus`, `infinitus/engines`) it lands on that Settings
+    /// section through the desktop's `settings` deep link.
+    var openDesktop: ((_ settingsPage: String?) -> Void)?
     /// Set by StatusItemHolder — closes and re-shows an open popover.
     /// NSPopover keeps a stale fitting size when the content swaps shape
     /// wholesale (wide<->stacked left it clipped or oversized until a
@@ -240,7 +242,7 @@ final class AppModel: ObservableObject {
     // dev loop, or a manual make-app.sh) — surfaced as "restart to update".
     @Published var appUpdatePending = false
     private let launchExecutableDate = AppModel.executableDate()
-    private var swapdSupervisor: EngineSupervisor?
+    private var swapdSupervisor: (any EngineLifecycle)?
     private var refreshTask: Task<Void, Never>?
     private var lastNotifiedActive: Int?
 
@@ -459,10 +461,6 @@ final class AppModel: ObservableObject {
     // icon, so it no longer needs the popup to be reachable. Off, the app
     // runs headless — the socket, the mirror and the pinned window stay.
     @Published var menuBarIconShown: Bool { didSet { defaults.set(menuBarIconShown, forKey: "menu_bar_enabled") } }
-    // Off by default: the Dock icon only ever appeared while Settings was
-    // open, and a menu bar app in the Dock is what most asked to be rid of.
-    // On, Settings takes a Dock icon and a Cmd+Tab entry as it did before.
-    @Published var dockIconShown: Bool { didSet { defaults.set(dockIconShown, forKey: "dock_icon_enabled") } }
     // Pin holds the popover open (click-outside stops closing it).
     // Persisted by request — a pinned popup stays pinned across relaunches.
     @Published var popoverPinned: Bool { didSet { defaults.set(popoverPinned, forKey: "popover_pinned") } }
@@ -807,7 +805,6 @@ final class AppModel: ObservableObject {
         machineNameOverride = defaults.string(forKey: MachineName.overrideKey) ?? ""
         menuBarThemed = defaults.object(forKey: "menubar_themed") as? Bool ?? true
         menuBarIconShown = defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true
-        dockIconShown = defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false
         menuBarEffects = defaults.object(forKey: "menubar_effects") as? Bool ?? true
         if playground {
             // Isolation is the contract: no demo script, no data at all
@@ -1045,7 +1042,6 @@ final class AppModel: ObservableObject {
         set(\.machineNameOverride, defaults.string(forKey: MachineName.overrideKey) ?? "")
         set(\.menuBarThemed, defaults.object(forKey: "menubar_themed") as? Bool ?? true)
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
-        set(\.dockIconShown, defaults.object(forKey: "dock_icon_enabled") as? Bool ?? false)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkServerProbe.defaultPort)
         // #1178: the Devices page's prefs land on their owners; each didSet
@@ -1430,19 +1426,20 @@ final class AppModel: ObservableObject {
         return false
     }
 
-    /// `swapd auto --json` under `SWAPD_SUPERVISED=1` (#475): the daemon's
-    /// NDJSON stream, restarted by the supervisor; its state feeds the
-    /// Engines pane and the badge.
+    /// launchd owns the production engine; fixture overrides stay process-local.
     private func startSwapd(binary: String) {
-        let supervisor = EngineSupervisor(
-            binaryPath: binary, arguments: ["auto", "--json"], environmentFlag: "SWAPD_SUPERVISED",
-            onLine: { [weak self] line in
-                Task { @MainActor in self?.consume(line) }
-            },
-            onState: { [weak self] state in
-                Task { @MainActor in self?.swapdState = state }
-            }
-        )
+        let onLine: @Sendable (EventLine) -> Void = { [weak self] line in
+            Task { @MainActor in self?.consume(line) }
+        }
+        let onState: @Sendable (EngineSupervisor.State) -> Void = { [weak self] state in
+            Task { @MainActor in self?.swapdState = state }
+        }
+        let supervisor: any EngineLifecycle
+        if mockMode || ProcessInfo.processInfo.environment["INFINITUS_SWAPD_CLI"] != nil {
+            supervisor = EngineSupervisor(binaryPath: binary, onLine: onLine, onState: onState)
+        } else {
+            supervisor = SwapdLaunchAgent(binaryPath: binary, onLine: onLine, onState: onState)
+        }
         swapdSupervisor = supervisor
         Task { await supervisor.start() }
     }
@@ -1609,8 +1606,10 @@ final class AppModel: ObservableObject {
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
         let team = team
+        let keepEngine = swapdEnabled && !mockMode
         Task {
-            await oldSwapd?.stop()
+            if keepEngine { await oldSwapd?.disconnect() }
+            else { await oldSwapd?.stop() }
             // The team's now.json delete (bounded by TeamModel.quitBound), so
             // teammates stop seeing this Mac "on" across the relaunch.
             await team.quit()
@@ -1901,17 +1900,13 @@ final class AppModel: ObservableObject {
 
     @Published var reorderError: String?
 
-    /// Apply a drag-reorder: `order` is the account numbers in their new
-    /// top-to-bottom sequence. Optimistically re-sorts the local rows so the
-    /// row lands where it was dropped, then lets the snapshot confirm.
-    /// Quit path: stop the supervised engine BEFORE the process dies, so
-    /// the child never outlives the app holding the mutex (the engine also
-    /// watches its stdin pipe for EOF as the backstop against a hard kill).
+    /// Closing the UI leaves automatic switching with launchd. Only the
+    /// explicit engine toggle disables that service.
     func shutdown() {
         let swapdSupervisor = swapdSupervisor
         let team = team
         Task {
-            await swapdSupervisor?.stop()
+            await swapdSupervisor?.disconnect()
             await team.quit()
             await MainActor.run {
                 NSApplication.shared.terminate(nil)
@@ -1968,15 +1963,13 @@ extension AppModel: FleetModel {
         }
     }
 
-    /// The footer's update chip opens Settings through the closure the
-    /// status item injects.
-    func openSettings() { showSettings?() }
+    /// The onboarding card's "Engine settings" button: Settings ›
+    /// Infinitus › Engines is the desktop app's (#1177).
+    func openSettings() { openDesktop?("infinitus/engines") }
 
-    /// The "at this pace" line's click. The Utilization pane is the
-    /// desktop app's now (#654, #774); Settings is what the Mac still opens.
-    func openForecast() {
-        showSettings?()
-    }
+    /// The "at this pace" line's click. The Utilization page is the
+    /// desktop app's (#654, #774).
+    func openForecast() { openDesktop?(nil) }
 
     /// The primary fleet's engine decides what the mac-only panes may do.
     var capabilities: EngineCapabilities { primary?.capabilities ?? .all }

@@ -93,7 +93,7 @@ One line per feature; the site and the CHANGELOG carry the detail.
 - **One account, one card** — a single account gets big gauges and full reset text; two or more get the grid.
 - **Every account at a glance** — live 5-hour, weekly and per-model gauges, pace markers, reset countdowns, dead rows with the cause.
 - **Auto-switch aware** — the next-candidate pick, a themed marker on the active account, switch history, a sweep on every switch.
-- **Themes** — RPG, Movie, Hades, Metal Gear, Sci-Fi, Cyberpunk, Ocean and more, picked in the desktop app's Settings › Infinitus › Themes, your own via `themes.json`; the phone follows.
+- **Themes** — RPG, Movie, Hades, Metal Gear, Sci-Fi, Cyberpunk, Ocean and more, picked in the desktop app's Settings › Menu bar, your own via `themes.json`; the phone follows.
 - **Themed menu bar** — the loop in the theme's color with its icon, a glow on switch, death and revival, an ember breath while burning ahead of pace.
 - **Glass popup** — real backdrop blur in every focus state with a transparency dial, and a launch intro.
 - **Right-click menu** on the bar icon — open the desktop app, rotate, refresh, capture, pin, pop out, settings, restart, quit.
@@ -159,23 +159,23 @@ Every theme reskins the whole row: gauge labels, the model name, the
 active / next / dead markers, the reset countdown wording and the
 tokens/minute chip.
 
-| Theme | "Fable" becomes | active · next · dead | ready / resetting | tokens/min |
+| Theme | "Fable" becomes | active · next · dead | resetting | tokens/min |
 |---|---|---|---|---|
 | Off — plain numbers | Fable | — | — | — |
-| RPG — HP/MP gauges + gold | Dragon | 👑 🎲 💀 | full HP / respawning… | 🔮 mana/min |
-| Movie — reels & box office | Epic | 🌟 🍿 🔚 | now showing / premiering… | 🎞 reels/min |
-| Hades — blades & darkness | Hydra | 🌿 🕯 ☠ | unscathed / raising the dead… | 💀 souls/min |
-| Metal Gear — tactical espionage | FOXHOUND | 🐍 🎯 ☠ | all clear / extraction inbound… | 📻 codec/min |
-| AI Agentic — tokens & context | frontier | 🧠 ⏭ 🔌 | ready to ship / rate limit lifting… | 🧮 tok/min |
-| Classic SWE — hand-written, no AI | mainframe | ⌨️ ⏭ 🐛 | compiles clean / recompiling… | 💻 LOC/min |
-| Sci-Fi — warp cores & shields | Mothership | 🧑‍🚀 📡 💥 | all systems go / recharging… | 🛸 warp/min |
-| Wild West — six-guns & gold rush | Outlaw | 🏇 🌵 🪦 | saddled up / sun's rising… | 🐎 stampede |
-| Cyberpunk — chrome & neon | Netrunner | ⚡ 🕶 💀 | jacked in / rebooting… | 📶 baud |
-| Gothic — candles & cathedrals | Vampire Lord | 🕯 🌹 ⚰️ | immortal / tolling midnight… | 🦇 whispers |
-| Musical — tempo & encores | Maestro | 🎷 🎻 🔇 | in tune / tuning up… | 🎵 notes/min |
-| Planet Earth — wild documentary | Blue Whale | 🦁 🦋 🦴 | thriving / migrating… | 🐝 buzz/min |
-| Cosmos — stars & black holes | Galaxy | 🪐 🔭 🕳 | shining / orbiting back… | 🌠 flux/min |
-| Ocean — tides & deep water | Leviathan | ⛵ 🐬 ⚓ | smooth sailing / tide turning… | 🌊 knots |
+| RPG — HP/MP gauges + gold | Dragon | 👑 🎲 💀 | respawning… | 🔮 mana/min |
+| Movie — reels & box office | Epic | 🌟 🍿 🔚 | premiering… | 🎞 reels/min |
+| Hades — blades & darkness | Hydra | 🌿 🕯 ☠ | raising the dead… | 💀 souls/min |
+| Metal Gear — tactical espionage | FOXHOUND | 🐍 🎯 ☠ | extraction inbound… | 📻 codec/min |
+| AI Agentic — tokens & context | frontier | 🧠 ⏭ 🔌 | rate limit lifting… | 🧮 tok/min |
+| Classic SWE — hand-written, no AI | mainframe | ⌨️ ⏭ 🐛 | recompiling… | 💻 LOC/min |
+| Sci-Fi — warp cores & shields | Mothership | 🧑‍🚀 📡 💥 | recharging… | 🛸 warp/min |
+| Wild West — six-guns & gold rush | Outlaw | 🏇 🌵 🪦 | sun's rising… | 🐎 stampede |
+| Cyberpunk — chrome & neon | Netrunner | ⚡ 🕶 💀 | rebooting… | 📶 baud |
+| Gothic — candles & cathedrals | Vampire Lord | 🕯 🌹 ⚰️ | tolling midnight… | 🦇 whispers |
+| Musical — tempo & encores | Maestro | 🎷 🎻 🔇 | tuning up… | 🎵 notes/min |
+| Planet Earth — wild documentary | Blue Whale | 🦁 🦋 🦴 | migrating… | 🐝 buzz/min |
+| Cosmos — stars & black holes | Galaxy | 🪐 🔭 🕳 | orbiting back… | 🌠 flux/min |
+| Ocean — tides & deep water | Leviathan | ⛵ 🐬 ⚓ | tide turning… | 🌊 knots |
 
 ### Gallery
 

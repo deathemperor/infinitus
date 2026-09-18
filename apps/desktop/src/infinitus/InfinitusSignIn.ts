@@ -110,7 +110,7 @@ const SIGN_IN_POPUP_WINDOW_OPTIONS = {
  * that decides which flow Google serves is its first one. `parent` makes the
  * pop-up this window's child, so it cannot outlive the flow holding the jar it
  * was opened in. */
-export const prepareSignInWindow = (window: Electron.BrowserWindow): void => {
+const prepareSignInWindow = (window: Electron.BrowserWindow): void => {
   const userAgent = signInUserAgent(window.webContents.getUserAgent());
   // Session-wide covers what is opened next; this window's contents already
   // exist and keep their own.

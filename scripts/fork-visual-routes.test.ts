@@ -35,7 +35,6 @@ describe("FORK_VISUAL_ROUTES", () => {
   it("covers every fork page once", () => {
     expect(FORK_VISUAL_ROUTES.map((route) => route.route)).toEqual([
       "/settings/infinitus",
-      "/settings/infinitus/themes",
       "/settings/infinitus/animations",
       "/settings/infinitus/sessions",
       "/settings/infinitus/lock",
@@ -62,7 +61,7 @@ describe("FORK_VISUAL_ROUTES", () => {
 
   it("names the capture files the way the harness does", () => {
     expect(captureName("/settings/infinitus")).toBe("settings-infinitus");
-    expect(captureName("/settings/infinitus/themes")).toBe("settings-infinitus-themes");
+    expect(captureName("/settings/infinitus/lock")).toBe("settings-infinitus-lock");
     expect(captureName("/utilization")).toBe("utilization");
     expect(captureName("/")).toBe("home");
   });
@@ -143,7 +142,8 @@ describe("routeFailures", () => {
 });
 
 describe("checkVisualPass", () => {
-  const stats = FORK_VISUAL_ROUTES.find((route) => route.route === "/stats")!;
+  const byRoute = (path: string) => FORK_VISUAL_ROUTES.find((route) => route.route === path)!;
+  const stats = byRoute("/stats");
 
   it("reads one capture per route and reports every failure", () => {
     const captures = new Map<string, string>([
@@ -152,7 +152,7 @@ describe("checkVisualPass", () => {
     ]);
     const results = checkVisualPass(
       (name) => captures.get(name) ?? null,
-      [FORK_VISUAL_ROUTES[4]!, FORK_VISUAL_ROUTES[12]!, FORK_VISUAL_ROUTES[11]!],
+      [byRoute("/settings/infinitus/lock"), stats, byRoute("/utilization")],
     );
     expect(results.map((result) => [result.route.label, result.failures])).toEqual([
       ["Lock", []],

@@ -339,9 +339,6 @@ pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null || fail "swapd auto m
 "$CTL" prefs set menu_bar_enabled false | expect "d['value'] is False" || fail "prefs set menu_bar_enabled false"
 "$CTL" status | expect "d['badge']" || fail "the socket must keep answering with the menu bar off (#828)"
 "$CTL" prefs set menu_bar_enabled true | expect "d['value'] is True" || fail "prefs set menu_bar_enabled true"
-# The Dock icon is a pref too, default off: Settings takes one only when it is on.
-"$CTL" prefs set dock_icon_enabled true | expect "d['value'] is True" || fail "prefs set dock_icon_enabled true"
-"$CTL" prefs set dock_icon_enabled false | expect "d['value'] is False" || fail "prefs set dock_icon_enabled false"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
 echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 # #743: the interrupt mode says critical where hold says low, same line.
@@ -359,27 +356,8 @@ echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" utilization --days 400 >/dev/null 2>&1 && fail "utilization must refuse an out-of-range day count"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
-# --- windows: Settings open idles too ------------------------------------
-# The Settings-open case sat at 18% for a week (#346: transcript reads
-# and the machine sampler all ran on behind it)
-# while the pop-out gate read 0.5%; this is the gate
-# that would have caught it. Settle first: the window builds its tabs on
-# the first open.
-settings_visible() { "$CTL" windows | expect "any(w['visible'] and w.get('title')=='Settings' for w in d)"; }
-"$CTL" show settings | expect "d['shown']=='settings'" || fail "show settings"
-sleep 3
-settings_visible || fail "Settings window not visible after show settings"
-sleep 9
-SA="$("$CTL" perf | json "d['cpuSeconds']")"
-sleep 15
-SB="$("$CTL" perf | json "d['cpuSeconds']")"
-SPCT="$(python3 -c "print(round(($SB-$SA)/15*100,1))")"
-echo "idle CPU with Settings open: ${SPCT}%"
-idle_cpu_ok "Settings idle CPU" "$SPCT" 15
-"$CTL" hide settings | expect "d['hidden']=='settings'" || fail "hide settings"
-sleep 1
-settings_visible && fail "Settings still visible after hide"
-echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
+# `show settings` / `hide settings` refuse since the Settings window retired.
+"$CTL" show settings >/dev/null 2>&1 && fail "show settings must refuse (retired)"
 
 # The preference catalog (#558): the table with values, and `get` narrowed.
 "$CTL" prefs | expect "any(s['slug']=='display' and s['name']=='Display' for s in d['sections']) and any(p['key']=='popup_layout' and p['section']=='display' and p['effect']=='live' for p in d['prefs'])" || fail "prefs"

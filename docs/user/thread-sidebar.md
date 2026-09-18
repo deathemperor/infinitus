@@ -51,6 +51,11 @@ Dock badge to count threads waiting for approval or input.
 Desktop alerts need no Infinitus Connect account. Allow Infinitus notifications in macOS
 System Settings. For alerts on a phone, see [Mobile notifications](./mobile-notifications.md).
 
+To send the same prompt to several models on web or desktop, **Shift-click** models
+in a new thread's model picker to add or remove them. A regular click returns to a
+single model. Choose a base branch and send. Each selection starts a separate thread
+and worktree while you stay in the new thread composer. This requires a Git project.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.

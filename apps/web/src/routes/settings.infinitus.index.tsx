@@ -8,7 +8,7 @@ import { InfinitusSlackCard } from "../components/settings/infinitus/InfinitusSl
 function SettingsInfinitusRoute() {
   return (
     <InfinitusPrefsPanel
-      sectionSlugs={["display", "about"]}
+      sectionSlugs={["display", "themes", "about"]}
       title="Menu bar"
       footer={
         <>

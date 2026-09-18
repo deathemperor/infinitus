@@ -113,3 +113,26 @@ Docs: `README.md`'s provider line, `docs/user/install.md`'s provider table and
 `PATH` note, and `docs/user/permission-modes.md`'s provider differences (Oh My
 Pi never prompts for a plain edit, so **Auto-accept edits** reads as
 **Supervised** there).
+
+## Upstream's own Oh My Pi
+
+Upstream `main` carries no omp driver (checked 2026-09-18), but two community
+PRs are open for one — `pingdotgg/t3code#11973`, built on current main and a
+superset of this driver (its own `Drivers/OmpUsage.ts`, `OmpModelCatalog.ts`,
+`OmpCommands.ts`, `OmpSkillDispatch.ts`, `OmpMaintenance.ts` and
+`acp/OmpAnsi.ts`), and `#10893`, whose file set is this one's. Both claim the
+paths above and the `omp` driver kind, down to `OmpSettings`'
+`placeholder: "omp"`. So the sync that brings either in is a collision in the
+files listed above, not a second provider appearing beside this one.
+
+Resolve it by keeping this driver whole and dropping upstream's arm at every
+shared registration point. Two `omp` keys in one object is a type error at
+best; two `case "omp"` branches in a switch compiles and silently runs the
+first. This side is the one exercised against the real binary, and the
+divergences are deliberate: `DEFAULT_MODEL_BY_PROVIDER.omp` is the
+`omp-default` sentinel here and absent in #11973, and the quota fold lives in
+`Layers/ompUsage.logic.ts` rather than its `Drivers/OmpUsage.ts`. A duplicate
+user page (#11973 adds `docs/user/providers-oh-my-pi.md`) folds into
+`docs/user/install.md` and this page instead of landing next to them.
+Anything upstream's version does better is a PR of its own here — never a
+reason to take their file wholesale mid-merge.

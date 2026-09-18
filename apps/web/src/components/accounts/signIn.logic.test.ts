@@ -4,7 +4,6 @@ import {
   fleetRunsShellOAuth,
   fleetSignInGate,
   oauthSignInBridge,
-  shellOAuthWindowLabel,
   signInBeginCommandArgs,
   signInBeginReply,
   signInBridge,
@@ -85,14 +84,12 @@ describe("the shell's own sign-in (#1213)", () => {
     });
   });
 
-  it("sends the user to the window, since there is no page link and no code", () => {
+  it("sends the user to the browser, since there is no page link and no code", () => {
     const shell = flow({ kind: "shell", url: null, pasteCode: false, phase: "waitingForToken" });
-    expect(signInStatusText(shell)).toBe("Sign in in the window.");
+    expect(signInStatusText(shell)).toBe("Sign in in your browser.");
     expect(signInStatusText({ ...shell, target: "two@example.com" })).toBe(
-      "Sign in as two@example.com in the window.",
+      "Sign in as two@example.com in your browser.",
     );
-    expect(shellOAuthWindowLabel("claude", null)).toBe("Sign in to claude");
-    expect(shellOAuthWindowLabel("claude", "two@example.com")).toBe("Sign in as two@example.com");
   });
 });
 

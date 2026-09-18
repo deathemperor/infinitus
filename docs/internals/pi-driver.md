@@ -137,3 +137,20 @@ The scanner resolves Pi's home from the instance's `homePath` setting alone,
 defaulting to `~/.pi/agent`. It deliberately consults no environment variable
 — see "Pi is not Oh My Pi" above. Pi also ships disabled, so a scan reads that
 home only once the user has turned the provider on.
+
+## Upstream's own Pi
+
+Upstream `main` carries no Pi driver either (checked 2026-09-18), and every
+upstream PR for one is closed: `pingdotgg/t3code#10474` drives `pi --mode rpc`
+from this driver's own paths (`Drivers/PiDriver.ts`, `Services/PiAdapter.ts`,
+`Layers/PiProvider.ts`) with the protocol split out under `provider/pi/`, and
+#5688, #9648, #4355 and #2800 went the same way. `#7211` was merged into the
+upstream branch `t3code/codex-turn-mapping`, where Pi is an orchestration-v2
+adapter (`orchestration-v2/Adapters/PiAdapterV2.ts`, `PiRpc.ts`) rather than a
+provider under `provider/Layers/` — a shape this tree does not have.
+
+Pi therefore reaches a sync only if upstream revives one of them, and the rule
+is Oh My Pi's (see that page's last section): keep this driver, drop upstream's
+arm at each shared registration point, treat a better idea as a separate PR.
+Where the two read the protocol independently, this side is the tested one —
+LF-only framing and `agent_settled` above are what the real binary does.

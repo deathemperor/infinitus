@@ -20,6 +20,7 @@ import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
+import { Route as SettingsStorageRouteImport } from './routes/settings.storage'
 import { Route as SettingsSourceControlRouteImport } from './routes/settings.source-control'
 import { Route as SettingsSnapShotRouteImport } from './routes/settings.snap-shot'
 import { Route as SettingsProvidersRouteImport } from './routes/settings.providers'
@@ -35,7 +36,6 @@ import { Route as SettingsAppearanceRouteImport } from './routes/settings.appear
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as SettingsInfinitusIndexRouteImport } from './routes/settings.infinitus.index'
-import { Route as SettingsInfinitusThemesRouteImport } from './routes/settings.infinitus.themes'
 import { Route as SettingsInfinitusTeamRouteImport } from './routes/settings.infinitus.team'
 import { Route as SettingsInfinitusSessionsRouteImport } from './routes/settings.infinitus.sessions'
 import { Route as SettingsInfinitusNotificationsRouteImport } from './routes/settings.infinitus.notifications'
@@ -99,6 +99,11 @@ const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ChatRoute,
+} as any)
+const SettingsStorageRoute = SettingsStorageRouteImport.update({
+  id: '/storage',
+  path: '/storage',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsSourceControlRoute = SettingsSourceControlRouteImport.update({
   id: '/source-control',
@@ -174,11 +179,6 @@ const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
 const SettingsInfinitusIndexRoute = SettingsInfinitusIndexRouteImport.update({
   id: '/infinitus/',
   path: '/infinitus/',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const SettingsInfinitusThemesRoute = SettingsInfinitusThemesRouteImport.update({
-  id: '/infinitus/themes',
-  path: '/infinitus/themes',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsInfinitusTeamRoute = SettingsInfinitusTeamRouteImport.update({
@@ -258,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
   '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
@@ -267,7 +268,6 @@ export interface FileRoutesByFullPath {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRoutesByTo {
@@ -294,6 +294,7 @@ export interface FileRoutesByTo {
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
   '/': typeof ChatIndexRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
@@ -304,7 +305,6 @@ export interface FileRoutesByTo {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRoutesById {
@@ -333,6 +333,7 @@ export interface FileRoutesById {
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
@@ -343,7 +344,6 @@ export interface FileRoutesById {
   '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
   '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
   '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
   '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
 }
 export interface FileRouteTypes {
@@ -373,6 +373,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
     | '/settings/infinitus/animations'
@@ -382,7 +383,6 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
     | '/settings/infinitus/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -409,6 +409,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
     | '/'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
@@ -419,7 +420,6 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
     | '/settings/infinitus'
   id:
     | '__root__'
@@ -447,6 +447,7 @@ export interface FileRouteTypes {
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
     | '/_chat/'
     | '/_chat/$environmentId/$threadId'
     | '/_chat/draft/$draftId'
@@ -457,7 +458,6 @@ export interface FileRouteTypes {
     | '/settings/infinitus/notifications'
     | '/settings/infinitus/sessions'
     | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
     | '/settings/infinitus/'
   fileRoutesById: FileRoutesById
 }
@@ -553,6 +553,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof ChatRoute
+    }
+    '/settings/storage': {
+      id: '/settings/storage'
+      path: '/storage'
+      fullPath: '/settings/storage'
+      preLoaderRoute: typeof SettingsStorageRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/settings/source-control': {
       id: '/settings/source-control'
@@ -659,13 +666,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsInfinitusIndexRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/settings/infinitus/themes': {
-      id: '/settings/infinitus/themes'
-      path: '/infinitus/themes'
-      fullPath: '/settings/infinitus/themes'
-      preLoaderRoute: typeof SettingsInfinitusThemesRouteImport
-      parentRoute: typeof SettingsRoute
-    }
     '/settings/infinitus/team': {
       id: '/settings/infinitus/team'
       path: '/infinitus/team'
@@ -768,8 +768,8 @@ interface SettingsRouteChildren {
   SettingsInfinitusNotificationsRoute: typeof SettingsInfinitusNotificationsRoute
   SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
   SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
-  SettingsInfinitusThemesRoute: typeof SettingsInfinitusThemesRoute
   SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
+  SettingsStorageRoute: typeof SettingsStorageRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -792,8 +792,8 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsInfinitusNotificationsRoute: SettingsInfinitusNotificationsRoute,
   SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
   SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
-  SettingsInfinitusThemesRoute: SettingsInfinitusThemesRoute,
   SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
+  SettingsStorageRoute: SettingsStorageRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(

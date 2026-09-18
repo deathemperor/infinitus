@@ -200,10 +200,10 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             .compactMap { $0 }.joined(separator: " ")
     }
 
-    /// Compact mode drops cells that carry no signal: untouched (0%) and
-    /// exhausted (100% — the dead marker already says it).
+    /// Compact mode drops untouched/exhausted cells, but a fully available
+    /// account keeps all its gauges so the row never goes blank.
     func hiddenInCompact(_ pct: Double) -> Bool {
-        model.compactRows
+        model.compactRows && !allFresh
             && (pct <= 0 || (pct >= 100 && !model.dying.contains(account.number)))
     }
 
@@ -273,54 +273,15 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             && !hiddenInCompact(weekly.pct)
     }
 
-    /// Every present window untouched — in compact mode all its cells are
-    /// hidden, so the row needs SOMETHING or it reads as broken.
+    /// Every present plan window untouched: keep their gauges even in
+    /// compact mode. Extra usage credit does not change plan availability.
     var allFresh: Bool {
         guard let u = account.usage else { return false }
         var pcts: [Double] = []
         if let p = u.fiveHour?.pct { pcts.append(p) }
         if let p = u.sevenDay?.pct { pcts.append(p) }
         for w in u.scoped ?? [] { pcts.append(w.pct) }
-        // Spend is deliberately absent: a spent credit cap left account 1
-        // (0%/0%) rendering as anything but ready (user report 2026-08-30);
-        // like AccountVitals, only the plan windows carry the verdict —
-        // the ready cell wears the spent credit as a footnote.
         return !pcts.isEmpty && pcts.allSatisfy { $0 <= 0 }
-    }
-
-    @ViewBuilder var readyCell: some View {
-        let spent = (account.usage?.spend?.pct ?? 0) >= 100
-        HStack(spacing: 3) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(PopupFont.caption).foregroundStyle(.green)
-            Text(theme.plain ? "ready" : PopupGlyph.text(theme.readyLabel))
-                .font(PopupFont.caption).foregroundStyle(.secondary)
-            // The weekly clock keeps ticking on an untouched account —
-            // show when it rolls ("full hp: also show 7d time", user
-            // 2026-09-02). The engine drops resetsAt at 0% (issue #16):
-            // fall back to the account's remembered weekly slot, stepped
-            // to its next occurrence (Anthropic's weekly reset is a fixed
-            // per-account time), else say the slot is unknown.
-            if let weekly = account.usage?.sevenDay,
-               let when = ReadyWeeklyCaption.text(
-                    pct: weekly.pct, resetsAt: weekly.resetsAt,
-                    countdown: weekly.countdown, clock: weekly.clock,
-                    remembered: WeeklyResetMemory.shared.futureReset(email: account.email),
-                    compact: compactText) {
-                Text("·").font(PopupFont.caption).foregroundStyle(.tertiary)
-                Text(when).font(PopupFont.caption).foregroundStyle(.tertiary)
-            }
-            if spent {
-                Text("·").font(PopupFont.caption).foregroundStyle(.tertiary)
-                Text("\(PopupGlyph.text(theme.creditLabel)) spent")
-                    .font(PopupFont.caption).foregroundStyle(.tertiary)
-            }
-        }
-        .help(spent
-              ? "All plan limits untouched — usage credit spent (footnote only; the account is fully usable)"
-              : "All plan limits untouched")
-        .fixedSize()
-        .activeBand(banded && account.active)
     }
 
     /// The dead line as a cell of its own (the narrow list's one-liner).
@@ -504,7 +465,19 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                             lucky: luckyPair)
                     }
                     if timer {
-                        resetLabelView(resetsAt: w.resetsAt, staticText: resetText(w))
+                        if !session, w.pct <= 0 {
+                            // Untouched accounts still show their weekly slot
+                            // when the engine omits it from a zero-usage reply.
+                            if let when = ReadyWeeklyCaption.text(
+                                pct: w.pct, resetsAt: w.resetsAt,
+                                countdown: w.countdown, clock: w.clock,
+                                remembered: WeeklyResetMemory.shared.futureReset(email: account.email),
+                                compact: compactText) {
+                                Text(when).font(PopupFont.caption).foregroundStyle(.secondary)
+                            }
+                        } else {
+                            resetLabelView(resetsAt: w.resetsAt, staticText: resetText(w))
+                        }
                     }
                 }
                 .instantTip(WindowSummary.line(

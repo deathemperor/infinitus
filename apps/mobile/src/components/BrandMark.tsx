@@ -3,17 +3,18 @@ import { Image } from "expo-image";
 import { View } from "react-native";
 
 import { AppText as Text } from "./AppText";
+import { resolveMobileBrandMarkVariant, resolveMobileStageLabel } from "../lib/mobileBranding";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const appVariant = Constants.expoConfig?.extra?.appVariant;
-const BRAND_MARK_SOURCE =
-  appVariant === "development"
-    ? require("../../../../assets/dev/blueprint-ios-1024.png")
-    : appVariant === "preview"
-      ? require("../../../../assets/nightly/nightly-ios-1024.png")
-      : require("../../../../assets/prod/black-ios-1024.png");
-const DEFAULT_STAGE_LABEL =
-  appVariant === "development" ? "Dev" : appVariant === "preview" ? "Preview" : "Alpha";
+const BRAND_MARK_SOURCES = {
+  infinitus: require("../../assets/infinitus-ios-1024.png"),
+  development: require("../../../../assets/dev/blueprint-ios-1024.png"),
+  preview: require("../../../../assets/nightly/nightly-ios-1024.png"),
+  prod: require("../../../../assets/prod/black-ios-1024.png"),
+} as const;
+const BRAND_MARK_SOURCE = BRAND_MARK_SOURCES[resolveMobileBrandMarkVariant(appVariant)];
+const DEFAULT_STAGE_LABEL = resolveMobileStageLabel(appVariant);
 
 export function BrandMark(props: { readonly compact?: boolean; readonly stageLabel?: string }) {
   const compact = props.compact ?? false;

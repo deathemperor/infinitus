@@ -1,3 +1,4 @@
+import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { LegendList } from "@legendapp/list/react-native";
 import { type StaticScreenProps, useNavigation } from "@react-navigation/native";
 import {
@@ -7,19 +8,26 @@ import {
   thirdPartyLicenseEntryKey,
   type ThirdPartyLicenseEntry,
 } from "@infinitus/shared/thirdPartyLicenses";
+import {
+  PRODUCT_NAME,
+  UPSTREAM_PRODUCT_NAME,
+  UPSTREAM_PUBLISHER_NAME,
+  UPSTREAM_REPOSITORY_URL,
+} from "@infinitus/shared/productName";
 import { useCallback, useMemo, useState } from "react";
-import { Linking, Platform, Pressable, ScrollView, View } from "react-native";
+import { Linking, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { SymbolView } from "../../components/AppSymbol";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
 import {
   createNativeMailSearchToolbarItem,
   NATIVE_MAIL_SEARCH_TOOLBAR_CONTENT_INSET,
   NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED,
 } from "../layout/native-mail-search-toolbar";
+
 import { getMobileThirdPartyLicenses } from "./mobileThirdPartyLicenses";
 
 function useMobileThirdPartyLicenses() {
@@ -30,6 +38,44 @@ function useMobileThirdPartyLicenses() {
       return null;
     }
   }, []);
+}
+
+/**
+ * Credits the upstream project the fork is built on. The formal notice is the
+ * "T3 Code" entry in the list below (MIT requires shipping its text), but that
+ * sits among hundreds of npm packages; a fork's debt to its upstream deserves
+ * to be read, so it gets its own section at the top.
+ */
+function UpstreamCreditSection() {
+  return (
+    <View className="gap-2 border-b border-border bg-card px-5 py-4">
+      <Text className="text-base font-infinitus-medium text-foreground">
+        Built on {UPSTREAM_PRODUCT_NAME}
+      </Text>
+      <Text className="text-sm leading-normal text-foreground-muted">
+        {PRODUCT_NAME} is a fork of {UPSTREAM_PRODUCT_NAME} by {UPSTREAM_PUBLISHER_NAME}, used under
+        the MIT license. It is an independent project, not affiliated with or endorsed by{" "}
+        {UPSTREAM_PUBLISHER_NAME}.
+      </Text>
+      <Pressable
+        accessibilityHint={`Opens the ${UPSTREAM_PRODUCT_NAME} project on GitHub`}
+        accessibilityRole="link"
+        onPress={() => void Linking.openURL(UPSTREAM_REPOSITORY_URL).catch(() => undefined)}
+        className="min-h-12 flex-row items-center gap-2 self-start py-2 active:opacity-60"
+      >
+        <Text className="font-infinitus-medium text-primary">
+          {UPSTREAM_PRODUCT_NAME} on GitHub
+        </Text>
+        <SymbolView
+          name="arrow.up.right"
+          size={16}
+          tintColorClassName={"accent-primary"}
+          type="monochrome"
+          weight="semibold"
+        />
+      </Pressable>
+    </View>
+  );
 }
 
 function LicenseRow(props: {
@@ -97,24 +143,18 @@ export function SettingsOpenSourceLicensesRouteScreen() {
 
   if (!manifest) {
     return (
-      <View collapsable={false} className="flex-1 bg-sheet">
-        {Platform.OS === "android" ? (
-          <>
-            <NativeStackScreenOptions options={{ headerShown: false }} />
-            <AndroidScreenHeader title="Open source licenses" onBack={() => navigation.goBack()} />
-          </>
-        ) : null}
+      <SettingsScreen title="Open source licenses">
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-base text-foreground-muted">
             License notices are unavailable in this build.
           </Text>
         </View>
-      </View>
+      </SettingsScreen>
     );
   }
 
   return (
-    <View collapsable={false} className="flex-1 bg-sheet">
+    <SettingsScreen title="Open source licenses">
       {Platform.OS === "ios" ? (
         <NativeStackScreenOptions
           options={{
@@ -148,12 +188,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
           <NativeHeaderToolbar.SearchBarSlot />
         </NativeHeaderToolbar>
       ) : null}
-      {Platform.OS === "android" ? (
-        <>
-          <NativeStackScreenOptions options={{ headerShown: false }} />
-          <AndroidScreenHeader title="Open source licenses" onBack={() => navigation.goBack()} />
-        </>
-      ) : null}
+
       <LegendList
         className="flex-1"
         contentContainerStyle={{
@@ -177,32 +212,34 @@ export function SettingsOpenSourceLicensesRouteScreen() {
           </View>
         }
         ListHeaderComponent={
-          Platform.OS !== "ios" ? (
-            <View className="px-5 pt-4 pb-5">
-              <TextInput
-                accessibilityLabel="Search open-source licenses"
-                autoCapitalize="none"
-                autoCorrect={false}
-                clearButtonMode="while-editing"
-                onChangeText={setQuery}
-                placeholder="Search packages"
-                returnKeyType="search"
-                value={query}
-              />
-            </View>
-          ) : null
+          <>
+            {Platform.OS !== "ios" ? (
+              <View className="px-5 pt-4 pb-5">
+                <TextInput
+                  accessibilityLabel="Search open-source licenses"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                  onChangeText={setQuery}
+                  placeholder="Search packages"
+                  returnKeyType="search"
+                  value={query}
+                />
+              </View>
+            ) : null}
+            {query.trim() === "" ? <UpstreamCreditSection /> : null}
+          </>
         }
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SettingsScreen>
   );
 }
 
 type LicenseDetailProps = StaticScreenProps<{ readonly entryKey: string }>;
 
 export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailProps) {
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const manifest = useMobileThirdPartyLicenses();
   const entry = manifest
@@ -212,30 +249,18 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
 
   if (!entry) {
     return (
-      <View collapsable={false} className="flex-1 bg-sheet">
-        {Platform.OS === "android" ? (
-          <>
-            <NativeStackScreenOptions options={{ headerShown: false }} />
-            <AndroidScreenHeader title="License notice" onBack={() => navigation.goBack()} />
-          </>
-        ) : null}
+      <SettingsScreen title="License notice">
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-base text-foreground-muted">
             This license notice is unavailable.
           </Text>
         </View>
-      </View>
+      </SettingsScreen>
     );
   }
 
   return (
-    <View collapsable={false} className="flex-1 bg-sheet">
-      {Platform.OS === "android" ? (
-        <>
-          <NativeStackScreenOptions options={{ headerShown: false }} />
-          <AndroidScreenHeader title="License notice" onBack={() => navigation.goBack()} />
-        </>
-      ) : null}
+    <SettingsScreen title="License notice">
       <ScrollView
         className="flex-1"
         contentInsetAdjustmentBehavior="automatic"
@@ -275,6 +300,6 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </SettingsScreen>
   );
 }

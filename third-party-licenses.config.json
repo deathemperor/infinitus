@@ -95,6 +95,21 @@
       ]
     },
     {
+      "bundles": ["desktop", "mobile", "server", "web"],
+      "license": "MIT",
+      "name": "T3 Code",
+      "sourceUrl": "https://github.com/pingdotgg/t3code",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2026 T3 Tools Inc."],
+          "preamble": [
+            "Infinitus is a fork of T3 Code by T3 Tools, Inc., and is built on its source code. Upstream releases are merged in regularly.\n\nUpstream project: https://github.com/pingdotgg/t3code\nThis fork: https://github.com/deathemperor/infinitus\n\nInfinitus is an independent project. It is not affiliated with, endorsed by, or supported by T3 Tools, Inc. Please report issues with Infinitus to this fork, not to upstream."
+          ]
+        }
+      ]
+    },
+    {
       "bundles": ["android", "assets", "mobile", "web"],
       "license": "MIT",
       "name": "libghostty-vt",

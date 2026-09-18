@@ -1,3 +1,10 @@
+import { SETTINGS_SECTION_LABELS, type SettingsPath } from "../settings/settingsSearch";
+
+/** `settings/<page>` navigates only to a section the sidebar lists. */
+export function isSettingsDeepLinkPath(path: string): path is SettingsPath {
+  return Object.hasOwn(SETTINGS_SECTION_LABELS, path);
+}
+
 /**
  * Deep links (#270 D): `new?project=…` names a project by id, by title, or by
  * the last segment of its workspace root — a link is typed or pasted, so the

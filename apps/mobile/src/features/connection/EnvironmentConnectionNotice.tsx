@@ -52,6 +52,12 @@ function noticeDetail(
   }
 }
 
+/**
+ * The full-screen stand-in for a resource an unavailable environment owns.
+ * Icon follows the title: a spinner while a connect or retry is in flight,
+ * otherwise wifi-slash, which every remaining phase earns — offline, error,
+ * unsupported and available all mean the phone cannot reach the environment.
+ */
 export function EnvironmentConnectionNotice(props: {
   readonly environmentLabel: string;
   readonly connection: EnvironmentConnectionPresentation;
@@ -68,7 +74,7 @@ export function EnvironmentConnectionNotice(props: {
           <ActivityIndicator size="small" colorClassName={"accent-icon-muted"} />
         ) : (
           <SymbolView
-            name={props.connection.phase === "offline" ? "wifi.slash" : "bolt.horizontal.circle"}
+            name="wifi.slash"
             size={24}
             tintColorClassName={"accent-icon-muted"}
             type="monochrome"

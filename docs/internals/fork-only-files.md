@@ -7,7 +7,7 @@ file or directory. Upstream files the fork edits are in
 per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
-- `apps/server/src/provider/Drivers/OmpDriver.ts`, `Layers/OmpProvider.ts`, `Layers/OmpAdapter.ts`, `Services/OmpAdapter.ts`, `acp/OmpAcpSupport.ts`, `Layers/ompUsage.logic.ts` and `textGeneration/OmpTextGeneration.ts` (each with its test) — the Oh My Pi driver, one more tenant of the ACP runtime, templated on Cursor. Text generation rides `omp -p` (no schema flag, so OpenCode's decode path), quota comes from `omp usage --json --redact`'s `capacity` fold (no email, hence no `resetsAt`), and session import reads `~/.omp/agent/sessions`. Rules and traps: `docs/internals/omp-driver.md`.
+- `apps/server/src/provider/Drivers/OmpDriver.ts`, `Layers/OmpProvider.ts`, `Layers/OmpAdapter.ts`, `Services/OmpAdapter.ts`, `acp/OmpAcpSupport.ts`, `Layers/ompUsage.logic.ts` and `textGeneration/OmpTextGeneration.ts` (each with its test) — the Oh My Pi driver, one more tenant of the ACP runtime, templated on Cursor. Text generation rides `omp -p` (no schema flag, so OpenCode's decode path), quota comes from `omp usage --json --redact`'s `capacity` fold (no email, hence no `resetsAt`), and session import reads `~/.omp/agent/sessions`. Upstream has its own unmerged omp driver claiming these exact paths, so a sync collides here rather than adding a provider. Rules and traps: `docs/internals/omp-driver.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlack.ts` (+ `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts` — the `SlackClient` seam, tests) — the Slack bridge's reactor (#574, PR 2 of 4); state in `<stateDir>/infinitus-slack/threads.json`. Rules and traps: `docs/internals/slack-bridge.md`.
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
@@ -72,7 +72,8 @@ these bullets.
   project (`deepLink.logic` `resolveDeepLinkProject`: id, then title, then
   workspace-root basename, case-insensitive) and opens the composer through
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
-  unknown project toasts.
+  unknown project toasts; `settings` navigates to a listed Settings section
+  (`isSettingsDeepLinkPath`) and ignores any other path.
   `join` (#1313, the Team rebuild) parks the whole link — it is the team
   code, a secret — in `pendingTeamJoin.ts` (memory only, taken once) and
   opens Settings › Infinitus; the Team page's Join field takes it when that
@@ -119,7 +120,13 @@ these bullets.
 - `packages/contracts/src/productName.ts` — `PRODUCT_NAME`, the one constant
   every user-facing string routes through (#601 phase 2); contracts holds it
   because shared depends on contracts, and `packages/shared/src/productName.ts`
-  re-exports it so `@infinitus/shared/productName` imports keep working.
+  re-exports it so `@infinitus/shared/productName` imports keep working. It
+  also carries the upstream attribution constants (`UPSTREAM_PRODUCT_NAME`,
+  `UPSTREAM_PUBLISHER_NAME`, `UPSTREAM_REPOSITORY_URL`) the
+  licenses screens' "Built on T3 Code" section reads: the guard test treats a
+  bare "T3 Tools" as a stray literal, so the credit routes through them like
+  every other upstream reference. `productNamePlugin` rewrites only
+  `index.html` and `bootError.ts`, so these constants survive the build.
 - `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A). Rules and traps: `docs/internals/infinitus-rename.md`.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
@@ -242,7 +249,7 @@ these bullets.
   that file twice, in two formats. A sink that cannot write swallows it: a
   log file is never worth failing a turn over.
 - `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+ `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins read off the Claude driver's tool results (#1076): one `infinitus.signin.needed` row per hit and the Mac's `aws-login` / `gcloud-login` flow through `InfinitusService.command`. Rules and traps: `docs/internals/sign-in-lapse.md`.
-- `apps/server/src/infinitus/Layers/InfinitusAlertRelay.ts` (+ `Services/InfinitusAlertRelay.ts`, test; `packages/contracts/src/infinitusAlert.ts`) — the server half of an account alert (#1375): `POST /api/infinitus/alert` on the desktop credential's operate scope, signed with the environment's relay link key for the relay's `infinitusAlert` route (`relayInfinitusAlert.ts`), deep link `/settings/accounts`. Unlinked answers 503 `InfinitusAlertRelayUnlinked` (the Mac keeps the notice local); a relay refusal is logged with its cause and answers 500. The link is read per call, as `AgentAwarenessRelay` reads it. It replaced the Mac-key thread-card fold (`InfinitusAgentActivity.ts`, #1047 part 3): the relay draws the card now.
+- `apps/server/src/infinitus/Layers/InfinitusAlertRelay.ts` (+ `Services/InfinitusAlertRelay.ts`, test; `packages/contracts/src/infinitusAlert.ts`) — the server half of an account alert (#1375): `POST /api/infinitus/alert` on the desktop credential's operate scope, signed with the environment's relay link key for the relay's `infinitusAlert` route (`relayInfinitusAlert.ts`), deep link `/settings/accounts` unless the caller names one (a lapsed sign-in's alert lands on the home screen's sign-in cards, `/`). Unlinked answers 503 `InfinitusAlertRelayUnlinked` (the Mac keeps the notice local); a relay refusal is logged with its cause and answers 500. The link is read per call, as `AgentAwarenessRelay` reads it. It replaced the Mac-key thread-card fold (`InfinitusAgentActivity.ts`, #1047 part 3): the relay draws the card now.
 - `apps/desktop/resources/dmg/dmg-background-infinitus.svg` — the DMG window's
   artwork for the `infinitus` channel (#732), rasterized by sips at build time
   (`stageDesktopDmgBackground`), so gradients, shapes and text only: no filters,
@@ -277,7 +284,7 @@ these bullets.
   `claude` (`resolvePosixCliDirFallback`, pure over `exists` /
   `listDirectory`); one info line names the dirs added and the one holding
   `claude`. darwin only; a probe that answers in time still wins.
-- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new` and `join` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
+- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new`, `join` and `settings` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
 - `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the
@@ -401,7 +408,8 @@ these bullets.
   (+ tests), `apps/server/src/textGeneration/PiTextGeneration.ts`,
   `apps/server/scripts/pi-rpc-mock-agent.ts` — the Pi provider: the one
   shipped driver speaking neither ACP nor an app-server protocol, but Pi's
-  own JSONL RPC (`pi --mode rpc`). Rules and traps:
+  own JSONL RPC (`pi --mode rpc`). Upstream's own Pi PRs claim these same
+  paths and are all closed. Rules and traps:
   `docs/internals/pi-driver.md`.
 - `apps/server/src/vcs/checkpointDiffPathspec.ts` (+ its test) — restricts a
   checkpoint-to-checkpoint diff (turn cards, the panel's turn and full-thread

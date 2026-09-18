@@ -52,6 +52,23 @@ describe("parseDesktopDeepLink (#270 D)", () => {
     expect(parseDesktopDeepLink("infinitus://join", "infinitus")).toBeNull();
   });
 
+  it("names a Settings page as its route path", () => {
+    expect(parseDesktopDeepLink("infinitus://settings/infinitus", "infinitus")).toEqual({
+      kind: "settings",
+      path: "/settings/infinitus",
+    });
+    expect(parseDesktopDeepLink("infinitus://settings/infinitus/engines/", "infinitus")).toEqual({
+      kind: "settings",
+      path: "/settings/infinitus/engines",
+    });
+    expect(parseDesktopDeepLink("infinitus://settings", "infinitus")).toEqual({
+      kind: "settings",
+      path: "/settings",
+    });
+    expect(parseDesktopDeepLink("infinitus://settings/..%2Fx", "infinitus")).toBeNull();
+    expect(parseDesktopDeepLink("infinitus://settings/Menu%20bar", "infinitus")).toBeNull();
+  });
+
   it("claims nothing else", () => {
     expect(parseDesktopDeepLink("infinitus://app/index.html", "infinitus")).toBeNull();
     expect(parseDesktopDeepLink("infinitus-dev://thread/e/t", "infinitus")).toBeNull();
