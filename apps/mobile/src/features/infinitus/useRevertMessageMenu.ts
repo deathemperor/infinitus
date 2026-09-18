@@ -90,6 +90,7 @@ export function useRevertMessageMenu(
     thread === null ? null : (threadProviderSnapshot(config, thread)?.driver ?? null),
   );
   const canFork = driver === "claudeAgent" || driver === "codex";
+  const canRestoreFiles = thread !== null && thread.worktreePath !== null;
   // The web's gate: a snapshot that says nothing supports rollback.
   const canRollback = useAtomValue(
     configAtom,
@@ -235,14 +236,17 @@ export function useRevertMessageMenu(
   );
 
   const actions = useMemo(
-    () => revertMenuActions({ canRollback, canFork }).map((action) => MENU_ACTIONS[action]),
-    [canFork, canRollback],
+    () =>
+      revertMenuActions({ canRollback, canRestoreFiles, canFork }).map(
+        (action) => MENU_ACTIONS[action],
+      ),
+    [canFork, canRestoreFiles, canRollback],
   );
 
   return useCallback(
     (messageId: MessageId) => {
       const turnCount = turnCounts?.get(messageId);
-      if (turnCount === undefined) return null;
+      if (turnCount === undefined || actions.length === 0) return null;
       return {
         actions,
         onPressAction: ({ nativeEvent }) => {

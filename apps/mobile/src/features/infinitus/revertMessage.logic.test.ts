@@ -66,7 +66,7 @@ describe("revertTurnCountByUserMessageId", () => {
 
 describe("revertMenuActions", () => {
   it("offers every mode in the web's order when the provider rolls back and forks", () => {
-    expect(revertMenuActions({ canRollback: true, canFork: true })).toEqual([
+    expect(revertMenuActions({ canRollback: true, canRestoreFiles: true, canFork: true })).toEqual([
       "files",
       "restore-files",
       "chat",
@@ -75,11 +75,21 @@ describe("revertMenuActions", () => {
   });
 
   it("keeps only the file restore and the fork without conversation rollback", () => {
-    expect(revertMenuActions({ canRollback: false, canFork: true })).toEqual([
-      "restore-files",
-      "fork",
-    ]);
-    expect(revertMenuActions({ canRollback: false, canFork: false })).toEqual(["restore-files"]);
+    expect(revertMenuActions({ canRollback: false, canRestoreFiles: true, canFork: true })).toEqual(
+      ["restore-files", "fork"],
+    );
+    expect(
+      revertMenuActions({ canRollback: false, canRestoreFiles: true, canFork: false }),
+    ).toEqual(["restore-files"]);
+  });
+
+  it("drops the two file modes in a shared project directory", () => {
+    expect(revertMenuActions({ canRollback: true, canRestoreFiles: false, canFork: true })).toEqual(
+      ["chat", "fork"],
+    );
+    expect(
+      revertMenuActions({ canRollback: false, canRestoreFiles: false, canFork: false }),
+    ).toEqual([]);
   });
 });
 
