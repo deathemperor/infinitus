@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as PlatformError from "effect/PlatformError";
 import { beforeEach, vi } from "vite-plus/test";
 
-const { fromPartition, sessions } = vi.hoisted(() => ({
+const { fromPartition, sessions, showMessageBox } = vi.hoisted(() => ({
   fromPartition: vi.fn(),
   sessions: new Map<
     string,
@@ -14,14 +14,19 @@ const { fromPartition, sessions } = vi.hoisted(() => ({
       readonly clearCache: ReturnType<typeof vi.fn>;
       readonly clearStorageData: ReturnType<typeof vi.fn>;
       readonly getUserAgent: ReturnType<typeof vi.fn<() => string>>;
+      readonly on: ReturnType<typeof vi.fn>;
       readonly setPermissionRequestHandler: ReturnType<typeof vi.fn>;
       readonly setPermissionCheckHandler: ReturnType<typeof vi.fn>;
       readonly setUserAgent: ReturnType<typeof vi.fn>;
     }
   >(),
+  showMessageBox: vi.fn(),
 }));
 
 vi.mock("electron", () => ({
+  dialog: {
+    showMessageBox,
+  },
   session: {
     fromPartition,
   },
@@ -34,12 +39,14 @@ const layer = BrowserSession.layer.pipe(Layer.provide(NodeServices.layer));
 describe("BrowserSession", () => {
   beforeEach(() => {
     sessions.clear();
+    showMessageBox.mockReset();
     fromPartition.mockReset();
     fromPartition.mockImplementation((partition: string) => {
       const browserSession = {
         clearCache: vi.fn(() => Promise.resolve()),
         clearStorageData: vi.fn(() => Promise.resolve()),
         getUserAgent: vi.fn(() => "Mozilla/5.0 Electron/41.5.0 t3code/0.0.27"),
+        on: vi.fn(),
         setPermissionRequestHandler: vi.fn(),
         setPermissionCheckHandler: vi.fn(),
         setUserAgent: vi.fn(),
@@ -47,6 +54,106 @@ describe("BrowserSession", () => {
       sessions.set(partition, browserSession);
       return browserSession;
     });
+  });
+
+  // Electron cancels a discoverable-credential sign-in with NotAllowedError
+  // unless a listener picks the account, and never picks one itself.
+  describe("select-webauthn-account", () => {
+    const account = (credentialId: string, name?: string) => ({
+      credentialId,
+      userHandle: `user-${credentialId}`,
+      ...(name === undefined ? {} : { name }),
+    });
+    const selectAccount = (accounts: ReadonlyArray<ReturnType<typeof account>>) =>
+      Effect.gen(function* () {
+        const browserSessions = yield* BrowserSession.BrowserSession;
+        const partition = yield* browserSessions.getPartition("scope-a");
+        yield* browserSessions.getSession("scope-a");
+        const browserSession = sessions.get(partition);
+        assert.isDefined(browserSession);
+        const listener = browserSession.on.mock.calls.find(
+          ([event]) => event === "select-webauthn-account",
+        )?.[1];
+        assert.isFunction(listener);
+
+        const outcomes: Array<string | null | undefined> = [];
+        // The listener answers asynchronously; the first callback settles the wait.
+        yield* Effect.promise(
+          () =>
+            new Promise<void>((resolve) => {
+              listener(
+                {},
+                { relyingPartyId: "google.com", accounts, frame: null },
+                (id?: string | null) => {
+                  outcomes.push(id);
+                  resolve();
+                },
+              );
+            }),
+        );
+        return outcomes;
+      }).pipe(Effect.provide(layer));
+
+    it.effect("answers a single account without asking", () =>
+      Effect.gen(function* () {
+        const outcomes = yield* selectAccount([account("cred-1", "loc@example.com")]);
+
+        assert.deepEqual(outcomes, ["cred-1"]);
+        assert.equal(showMessageBox.mock.calls.length, 0);
+      }),
+    );
+
+    it.effect("offers a native chooser for several accounts and returns the pick", () =>
+      Effect.gen(function* () {
+        showMessageBox.mockResolvedValue({ response: 1, checkboxChecked: false });
+
+        const outcomes = yield* selectAccount([
+          account("cred-1", "loc@example.com"),
+          account("cred-2", "ops@example.com"),
+          account("cred-3"),
+        ]);
+
+        assert.deepEqual(outcomes, ["cred-2"]);
+        const [options] = showMessageBox.mock.calls[0] ?? [];
+        assert.deepEqual(options.buttons, [
+          "loc@example.com",
+          "ops@example.com",
+          "Passkey 3",
+          "Cancel",
+        ]);
+        assert.equal(options.cancelId, 3);
+        assert.include(options.message, "google.com");
+      }),
+    );
+
+    it.effect("cancels when the chooser is dismissed", () =>
+      Effect.gen(function* () {
+        showMessageBox.mockResolvedValue({ response: 2, checkboxChecked: false });
+
+        const outcomes = yield* selectAccount([account("cred-1"), account("cred-2")]);
+
+        assert.deepEqual(outcomes, [null]);
+      }),
+    );
+
+    it.effect("still answers exactly once when the chooser fails", () =>
+      Effect.gen(function* () {
+        showMessageBox.mockRejectedValue(new Error("no display"));
+
+        const outcomes = yield* selectAccount([account("cred-1"), account("cred-2")]);
+
+        assert.deepEqual(outcomes, [null]);
+      }),
+    );
+
+    it.effect("cancels an empty account list without a chooser", () =>
+      Effect.gen(function* () {
+        const outcomes = yield* selectAccount([]);
+
+        assert.deepEqual(outcomes, [null]);
+        assert.equal(showMessageBox.mock.calls.length, 0);
+      }),
+    );
   });
 
   it.effect("derives deterministic partitions and memoizes sessions", () =>
@@ -120,6 +227,7 @@ describe("BrowserSession", () => {
           clearCache: vi.fn(() => Promise.resolve()),
           clearStorageData: vi.fn(() => Promise.resolve()),
           getUserAgent: vi.fn(() => userAgent),
+          on: vi.fn(),
           setPermissionRequestHandler: vi.fn(),
           setPermissionCheckHandler: vi.fn(),
           setUserAgent: vi.fn((next: string) => {

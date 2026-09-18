@@ -948,6 +948,8 @@ interface StagePackageJson {
   readonly version: string;
   readonly buildVersion: string;
   readonly t3codeCommitHash: string;
+  /** Present only on a signed macOS build; see resolveMacWebAuthnKeychainAccessGroup. */
+  readonly webauthnKeychainAccessGroup?: string;
   readonly private: true;
   readonly packageManager: string;
   readonly description: string;
@@ -1325,6 +1327,20 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
+/**
+ * Keychain access group Electron's Touch ID WebAuthn authenticator stores the
+ * preview browser's passkeys under (`app.configureWebAuthn`). Electron requires
+ * the same value in the signed `keychain-access-groups` entitlement, so the
+ * build writes it into the entitlements AND the staged package.json, which is
+ * how the running app learns what it was signed with (DesktopWebAuthn.ts).
+ * Shape follows Electron's documented `<TEAM_ID>.<BUNDLE_ID>.webauthn`.
+ */
+export function resolveMacWebAuthnKeychainAccessGroup(
+  configuration: Pick<MacPasskeySigningConfiguration, "appId" | "teamId">,
+): string {
+  return `${configuration.teamId}.${configuration.appId}.webauthn`;
+}
+
 export function renderMacPasskeyEntitlements(
   configuration: MacPasskeySigningConfiguration,
 ): string {
@@ -1343,6 +1359,10 @@ export function renderMacPasskeyEntitlements(
     <key>com.apple.developer.associated-domains</key>
     <array>
 ${associatedDomains}
+    </array>
+    <key>keychain-access-groups</key>
+    <array>
+      <string>${escapeXml(resolveMacWebAuthnKeychainAccessGroup(configuration))}</string>
     </array>
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
@@ -3799,6 +3819,9 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
+    ...(macPasskeySigning
+      ? { webauthnKeychainAccessGroup: resolveMacWebAuthnKeychainAccessGroup(macPasskeySigning) }
+      : {}),
     private: true,
     packageManager: rootPackageJson.packageManager,
     description: `${DESKTOP_PRODUCT_NAME} desktop build`,
