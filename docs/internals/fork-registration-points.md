@@ -467,9 +467,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (Settings › Team, #1313; `team?code=…` is where an invite link lands).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` and `SettingsTeam` in the settings target union.
-- `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the
-  `SettingsInfinitusSection` (Accounts and Team rows, the reset alarms
-  toggle, sending mode) after General.
+- `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the rows of
+  `SettingsInfinitusRows.tsx`, spread over upstream's sections (no
+  "Infinitus" section: the whole app is Infinitus): Accounts and Team after
+  Environments and the reset alarms toggle at the end of Configuration, the
+  sending mode at the end of General, in both the local and the configured
+  screen.
 - `apps/mobile/src/features/settings/lib/legal-document-url.ts` and its
   test — the marketing-site base is `infinitus.run`, not `t3.codes`:
   Settings › App › Legal is the one client surface that shows a legal

@@ -24,8 +24,8 @@ export const INFINITUS_ALARM_DEEP_LINK = "t3code://settings/accounts";
 /** Headless. Re-plans the phone's reset and swap alarms from every paired
     Mac's snapshot (#572 task 5) and schedules them as local notifications;
     a tap opens Settings › Accounts. Off until preferences load, when the
-    toggle is off, or when notifications are not granted — the switch in
-    Settings › Infinitus asks for the permission. */
+    toggle is off, or when notifications are not granted — the Reset alarms
+    switch in Settings › Configuration asks for the permission. */
 export function InfinitusAlarmsBridge() {
   const preferences = useAtomValue(mobilePreferencesAtom);
   const configs = useAtomValue(environmentServerConfigsAtom);
