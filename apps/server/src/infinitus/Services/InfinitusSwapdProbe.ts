@@ -36,12 +36,14 @@ const List = Schema.Struct({
 const decodeList = Schema.decodeUnknownEffect(Schema.fromJsonString(List));
 const unavailable: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
 
-/** Only the resume worker uses this read-only fallback. Native commands and
+/** Only the resume worker uses this daemon bridge. Native commands and
  * UI availability still belong to the menu bar's control socket. */
 export class InfinitusSwapdProbe extends Context.Service<
   InfinitusSwapdProbe,
   {
     readonly snapshot: Effect.Effect<InfinitusSnapshot>;
+    /** Report the account that was refused; the daemon owns switching policy. */
+    readonly reportLimit: (account: string, resetsAt: string | null) => Effect.Effect<void>;
   }
 >()("t3/infinitus/Services/InfinitusSwapdProbe") {}
 
@@ -108,6 +110,32 @@ export const InfinitusSwapdProbeLive = Layer.effect(
         })),
       } satisfies InfinitusSnapshot;
     }).pipe(Effect.catch(() => Effect.succeed(unavailable)));
-    return { snapshot };
+    const reportLimit = Effect.fn("InfinitusSwapdProbe.reportLimit")(
+      function* (account: string, resetsAt: string | null) {
+        if (platform !== "darwin" || binary === "") return;
+        const result = yield* runner.run({
+          command: binary,
+          args: [
+            "--json",
+            "--provider",
+            "claude",
+            "limit-hit",
+            account,
+            ...(resetsAt === null ? [] : ["--resets-at", resetsAt]),
+          ],
+          timeout: "10 seconds",
+          maxOutputBytes: 1024 * 1024,
+        });
+        if (result.code !== 0 || result.timedOut) {
+          yield* Effect.logWarning("infinitus.swapd.limit-report-failed", {
+            code: result.code,
+            timedOut: result.timedOut,
+          });
+        }
+      },
+      // Older or unavailable engines must not prevent watching for a switch.
+      Effect.catch(() => Effect.logWarning("infinitus.swapd.limit-report-failed")),
+    );
+    return { snapshot, reportLimit };
   }),
 );

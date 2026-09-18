@@ -2,9 +2,9 @@ import { it } from "@effect/vitest";
 import { expect } from "vite-plus/test";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { ThreadId } from "@infinitus/contracts";
-import { ProcessRunner } from "../../processRunner.ts";
+import { ProcessRunner, ProcessSpawnError } from "../../processRunner.ts";
 import { resumeTarget, type LimitStop } from "../Layers/infinitusResumeOnLimit.logic.ts";
 import { InfinitusSwapdProbe, InfinitusSwapdProbeLive } from "./InfinitusSwapdProbe.ts";
 
@@ -34,10 +34,17 @@ const wire = (accounts: unknown = [account], provider = {}) => ({
   schemaVersion: 1,
   providers: [{ provider: "claude", activeSlot: 2, accounts, ...provider }],
 });
-const read = (value: unknown, platform: NodeJS.Platform = "darwin", code = 0) => {
+const read = (
+  value: unknown,
+  platform: NodeJS.Platform = "darwin",
+  code: number | "spawn-failed" = 0,
+  report?: { account: string; resetsAt: string | null },
+  environment: NodeJS.ProcessEnv = {},
+) => {
   const calls: string[][] = [];
   return Effect.gen(function* () {
     const service = yield* InfinitusSwapdProbe;
+    if (report !== undefined) yield* service.reportLimit(report.account, report.resetsAt);
     return { snapshot: yield* service.snapshot, calls };
   }).pipe(
     Effect.provide(
@@ -46,6 +53,15 @@ const read = (value: unknown, platform: NodeJS.Platform = "darwin", code = 0) =>
           Layer.succeed(ProcessRunner, {
             run: (input) => {
               calls.push([...input.args]);
+              if (code === "spawn-failed") {
+                return Effect.fail(
+                  new ProcessSpawnError({
+                    command: input.command,
+                    argumentCount: input.args.length,
+                    cause: new Error("missing engine"),
+                  }),
+                );
+              }
               return Effect.succeed({
                 stdout: typeof value === "string" ? value : JSON.stringify(value),
                 stderr: "",
@@ -62,8 +78,53 @@ const read = (value: unknown, platform: NodeJS.Platform = "darwin", code = 0) =>
       ),
     ),
     Effect.provideService(HostProcessPlatform, platform),
+    Effect.provideService(HostProcessEnvironment, environment),
   );
 };
+it.effect("reports the refused identity and reset before reading lagging quota", () =>
+  Effect.gen(function* () {
+    const { snapshot, calls } = yield* read(wire(), "darwin", 0, {
+      account: "one@example.com",
+      resetsAt: "2026-09-17T14:00:00.000Z",
+    });
+    expect(calls).toEqual([
+      [
+        "--json",
+        "--provider",
+        "claude",
+        "limit-hit",
+        "one@example.com",
+        "--resets-at",
+        "2026-09-17T14:00:00.000Z",
+      ],
+      ["--json", "--provider", "claude", "list"],
+    ]);
+    expect(snapshot.available).toBe(true);
+  }),
+);
+it.effect("leaves unknown resets to the engine and survives a refused report", () =>
+  Effect.gen(function* () {
+    for (const code of [1, "spawn-failed"] as const) {
+      const { calls } = yield* read(wire(), "darwin", code, {
+        account: "one@example.com",
+        resetsAt: null,
+      });
+      expect(calls).toEqual([
+        ["--json", "--provider", "claude", "limit-hit", "one@example.com"],
+        ["--json", "--provider", "claude", "list"],
+      ]);
+    }
+  }),
+);
+it.effect("does not report to a disabled or unsupported engine", () =>
+  Effect.gen(function* () {
+    const report = { account: "one@example.com", resetsAt: null };
+    expect((yield* read(wire(), "linux", 0, report)).calls).toEqual([]);
+    expect((yield* read(wire(), "darwin", 0, report, { INFINITUS_SWAPD_CLI: "" })).calls).toEqual(
+      [],
+    );
+  }),
+);
 it.effect("maps the daemon's current credentials and quota windows for resume", () =>
   Effect.gen(function* () {
     const { snapshot, calls } = yield* read(wire());
