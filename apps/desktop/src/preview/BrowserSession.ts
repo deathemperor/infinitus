@@ -1,5 +1,5 @@
-import type { Session } from "electron";
-import { session } from "electron";
+import type { SelectWebauthnAccountDetails, Session } from "electron";
+import { dialog, session } from "electron";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -131,6 +131,36 @@ export class BrowserSession extends Context.Service<
  * "every partition" behaviour, which callers now only use for an explicit
  * "all profiles" action — a per-profile clear must never reach across profiles.
  */
+/**
+ * A discoverable-credential sign-in (`navigator.credentials.get()` with no
+ * allow list) that finds Touch ID passkeys needs the app to pick the account:
+ * Electron cancels it with NotAllowedError when no listener answers, and
+ * deliberately never picks one itself. One account needs no choice; several
+ * get a native chooser. Resolves the credential id, or null to cancel.
+ */
+const chooseWebAuthnAccount = async (
+  details: SelectWebauthnAccountDetails,
+): Promise<string | null> => {
+  const [only] = details.accounts;
+  if (details.accounts.length === 1 && only !== undefined) {
+    return only.credentialId;
+  }
+  if (details.accounts.length === 0) {
+    return null;
+  }
+  const labels = details.accounts.map(
+    (account, index) => account.name ?? account.displayName ?? `Passkey ${index + 1}`,
+  );
+  const { response } = await dialog.showMessageBox({
+    type: "question",
+    message: `Choose a passkey for ${details.relyingPartyId}`,
+    buttons: [...labels, "Cancel"],
+    defaultId: 0,
+    cancelId: labels.length,
+  });
+  return details.accounts[response]?.credentialId ?? null;
+};
+
 const selectSessions = (
   sessions: ReadonlyMap<string, Session>,
   partitions: ReadonlyArray<string> | undefined,
@@ -209,6 +239,11 @@ export const make = Effect.gen(function* BrowserSessionMake() {
           browserSession.setPermissionCheckHandler((_webContents, permission) =>
             ALLOWED_PREVIEW_PERMISSIONS.has(permission),
           );
+          // The request stays pending until the callback runs, so it runs on
+          // every path, exactly once — a failed chooser cancels the sign-in.
+          browserSession.on("select-webauthn-account", (_event, details, callback) => {
+            void chooseWebAuthnAccount(details).then(callback, () => callback(null));
+          });
           const next = new Map(sessions);
           next.set(partition, browserSession);
           return [browserSession, next] as const;
