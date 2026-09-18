@@ -381,7 +381,7 @@ these bullets.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`), `scripts/fork-visual-check.ts` — the route table the pass asserts (one marker per populated page, `ALWAYS_ABSENT` phrases) and the checker that applies it. Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `.github/workflows/fork-visual-pass.yml` — "Fork visual pass", on every PR to `main` and by hand: fixture, server from source, `fork-visual-pass.mjs`, `fork-visual-check.ts`; artifact `fork-visual-pass` (#825, #831). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `.github/workflows/infinitus-nightly.yml` — the nightly (#1042, "One
-  release" above): a `version` job dates the root `VERSION`, `build` is
+  release" in `INFINITUS.md`): a `version` job dates the root `VERSION`, `build` is
   `infinitus-release.yml` through `workflow_call` with that version
   (`secrets: inherit`, so the Mac job signs and notarizes as for a release),
   `publish` — `main` only, on the schedule or a dispatch with `publish` —

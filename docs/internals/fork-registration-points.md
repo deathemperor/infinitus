@@ -258,7 +258,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   harness's stub stack, since the routes layer now needs the service; a
   `Layer.mock(InfinitusPairing)` and a `Layer.mock(CaptureStore)` beside it.
 - `apps/server/src/serverLogger.ts` — `ServerLoggerLive` adds the fork's file
-  logger (`infinitus/serverLogFile.ts`, below) beside `consolePretty` and
+  logger (`infinitus/serverLogFile.ts`, in `fork-only-files.md`) beside `consolePretty` and
   `tracerLogger` (#1182); `apps/server/src/config.ts` — `serverLogNdjsonPath`
   (`<logsDir>/server.log.ndjson`) on `ServerDerivedPaths` beside upstream's
   `serverLogPath`; `apps/server/src/cli/triage.ts` and `triagePrompt.ts` —
