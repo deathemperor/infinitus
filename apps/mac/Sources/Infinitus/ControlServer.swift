@@ -18,7 +18,11 @@ final class ControlServer {
     /// The inode we bound — `heal()` checks the path still leads to it.
     private var boundInode: ino_t = 0
     private let queue = DispatchQueue(label: "infinitus.control")
-    private var busy = false
+    /// Writes run one at a time, in arrival order: the next press waits
+    /// for the one in flight instead of being refused (#1481: "busy" met
+    /// every second keep-warm press while the first was still on its
+    /// engine pass). Reads still run alongside.
+    private var writeTail: Task<ControlReply, Never>?
     private var task: Task<Void, Never>?
 
     init(model: AppModel) { self.model = model }
@@ -179,13 +183,27 @@ final class ControlServer {
         // status/fleets/events/sessions continuously, and a blanket guard
         // handed the CLI (and the phone) "busy" whenever a poll was in
         // flight — a `perf` probe hit it on the live bundle (#346).
-        if command.effect != .read {
-            guard !busy else { return .failure("busy: another control command is running") }
-            busy = true
+        guard command.effect != .read else { return await answer(request) }
+        let prior = writeTail
+        let mine = Task { @MainActor [self] in
+            _ = await prior?.value
+            return await answer(request)
         }
-        defer { if command.effect != .read { busy = false } }
+        writeTail = mine
+        let reply = await mine.value
+        if writeTail == mine { writeTail = nil }
+        return reply
+    }
+
+    private func answer(_ request: ControlRequest) async -> ControlReply {
         do { return try await dispatch(request) }
         catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
+    }
+
+    /// After a flag edit: the fleet the engine answered with is the
+    /// snapshot, and only an engine that answered nothing costs a refresh.
+    private func settle(_ edited: EngineFleet?) async {
+        if let edited { model.publish(edited) } else { await model.refreshSnapshot() }
     }
 
     // MARK: dispatch
@@ -267,19 +285,20 @@ final class ControlServer {
             guard fleet.accounts.contains(where: { $0.number == n }) else {
                 throw Fail("no account #\(n) in \(fleet.id)")
             }
+            var edited: EngineFleet?
             switch r.command {
             case "switch": try await fleet.engine.switchTo(fleet: fleet.provider, number: n)
-            case "hold": try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: true)
-            case "unhold": try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: false)
+            case "hold": edited = try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: true)
+            case "unhold": edited = try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: false)
             case "rename":
                 guard r.args.count >= 3 else { throw Fail("usage: rename <fleet> <n> <alias>") }
-                try await fleet.engine.rename(fleet: fleet.provider, number: n, r.args[2])
+                edited = try await fleet.engine.rename(fleet: fleet.provider, number: n, r.args[2])
             case "remove":
                 guard r.options["yes"] != nil else { throw Fail("remove deletes the credential; pass --yes") }
                 try await fleet.engine.remove(fleet: fleet.provider, number: n)
             default: break
             }
-            await model.refreshSnapshot()
+            await settle(edited)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "randomize-names":
@@ -335,8 +354,7 @@ final class ControlServer {
             guard order.count == r.args.count - 1, order.count == have.count, Set(order) == Set(have) else {
                 throw Fail("reorder needs every account number exactly once, top first: \(have.sorted().map(String.init).joined(separator: " "))")
             }
-            try await fleet.engine.reorder(fleet: fleet.provider, order)
-            await model.refreshSnapshot()
+            await settle(try await fleet.engine.reorder(fleet: fleet.provider, order))
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "prefer":
@@ -347,8 +365,7 @@ final class ControlServer {
             guard account.preferred != nil else {
                 throw Fail("the engine reports no pick-first flag for \(fleet.id)")
             }
-            try await fleet.engine.setPreferred(fleet: fleet.provider, number: n, r.args[2] == "on")
-            await model.refreshSnapshot()
+            await settle(try await fleet.engine.setPreferred(fleet: fleet.provider, number: n, r.args[2] == "on"))
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "auto-ignite":
@@ -359,8 +376,7 @@ final class ControlServer {
             guard account.autoIgnite != nil else {
                 throw Fail("the engine reports no keep-warm flag for \(fleet.id); update swapd")
             }
-            try await fleet.engine.setAutoIgnite(fleet: fleet.provider, number: n, r.args[2] == "on")
-            await model.refreshSnapshot()
+            await settle(try await fleet.engine.setAutoIgnite(fleet: fleet.provider, number: n, r.args[2] == "on"))
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "crashes":

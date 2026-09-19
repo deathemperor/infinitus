@@ -213,9 +213,10 @@ public actor NineRouterEngine: AccountEngine {
         _ = try await request("PUT", "providers/\(id)", json: ["priority": 0])
     }
 
-    public func setHold(fleet: Provider, number: Int, held: Bool) async throws {
+    public func setHold(fleet: Provider, number: Int, held: Bool) async throws -> EngineFleet? {
         let id = try connectionID(fleet, number)
         _ = try await request("PUT", "providers/\(id)", json: ["isActive": !held])
+        return nil
     }
 
     public func remove(fleet: Provider, number: Int) async throws {

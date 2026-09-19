@@ -1641,6 +1641,14 @@ final class AppModel: ObservableObject {
         await refreshFlight.run { [weak self] in await self?.refreshSnapshotPass() }
     }
 
+    /// One fleet an engine just answered with (a flag edit's reply), made
+    /// the current reading without a full pass — what `igniteReset` does
+    /// with a forced fetch. The next poll still runs the pass's own
+    /// bookkeeping (deaths, revivals, shared usage) over it.
+    func publish(_ fleet: EngineFleet) {
+        _ = registry.state(for: fleet).apply(fleet)
+    }
+
     private let refreshFlight = SingleFlight()
 
     private func refreshSnapshotPass() async {

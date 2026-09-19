@@ -165,19 +165,30 @@ public protocol AccountEngine: Sendable {
     func refresh(fleet: Provider, number: Int) async throws -> EngineFleet
     func switchTo(fleet: Provider, number: Int) async throws
     func rotate(fleet: Provider) async throws
-    func reorder(fleet: Provider, _ numbers: [Int]) async throws
-    func setHold(fleet: Provider, number: Int, held: Bool) async throws
+    /// The flag edits (`reorder`, hold, star, keep-warm, rename) answer
+    /// with the provider's fleet as it reads afterwards when the engine
+    /// already has it — swapd returns the board with every edit — so the
+    /// caller publishes that instead of paying a second full snapshot
+    /// (#1481: one keep-warm press ran two engine passes). `nil` means
+    /// the caller refreshes.
+    @discardableResult
+    func reorder(fleet: Provider, _ numbers: [Int]) async throws -> EngineFleet?
+    @discardableResult
+    func setHold(fleet: Provider, number: Int, held: Bool) async throws -> EngineFleet?
     /// Star/unstar: the engine lands on starred accounts first when it
     /// switches. Reported back per account as `Account.preferred`.
-    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws
+    @discardableResult
+    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet?
     /// Keep-warm on/off: the engine's daemon ignites the account whenever
     /// its 5h window has gone cold. Only with `.autoIgnite`.
-    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws
+    @discardableResult
+    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet?
     /// One tiny request as account n so its 5h window starts now; the
     /// fleet's active account is untouched. Returns when the request is
     /// done (seconds).
     func ignite(fleet: Provider, number: Int) async throws
-    func rename(fleet: Provider, number: Int, _ name: String) async throws
+    @discardableResult
+    func rename(fleet: Provider, number: Int, _ name: String) async throws -> EngineFleet?
     func remove(fleet: Provider, number: Int) async throws
     func addCurrent() async throws
     func addToken(_ token: String) async throws
@@ -230,12 +241,12 @@ public extension AccountEngine {
     }
     func switchTo(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("switch") }
     func rotate(fleet: Provider) async throws { throw EngineError.unsupported("rotate") }
-    func reorder(fleet: Provider, _ numbers: [Int]) async throws { throw EngineError.unsupported("reorder") }
-    func setHold(fleet: Provider, number: Int, held: Bool) async throws { throw EngineError.unsupported("hold") }
-    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws { throw EngineError.unsupported("prefer") }
-    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws { throw EngineError.unsupported("auto-ignite") }
+    func reorder(fleet: Provider, _ numbers: [Int]) async throws -> EngineFleet? { throw EngineError.unsupported("reorder") }
+    func setHold(fleet: Provider, number: Int, held: Bool) async throws -> EngineFleet? { throw EngineError.unsupported("hold") }
+    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? { throw EngineError.unsupported("prefer") }
+    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? { throw EngineError.unsupported("auto-ignite") }
     func ignite(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("ignite") }
-    func rename(fleet: Provider, number: Int, _ name: String) async throws { throw EngineError.unsupported("rename") }
+    func rename(fleet: Provider, number: Int, _ name: String) async throws -> EngineFleet? { throw EngineError.unsupported("rename") }
     func remove(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("remove") }
     func addCurrent() async throws { throw EngineError.unsupported("addCurrent") }
     func addToken(_ token: String) async throws { throw EngineError.unsupported("addToken") }

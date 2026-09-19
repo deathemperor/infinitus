@@ -16,6 +16,7 @@ import {
   InfinitusControlClientConfig,
   type InfinitusControlClientShape,
   type InfinitusControlRequestInput,
+  type InfinitusControlRequestOptions,
 } from "../Services/InfinitusControlClient.ts";
 
 const makeInfinitusControlClient = Effect.gen(function* () {
@@ -26,7 +27,7 @@ const makeInfinitusControlClient = Effect.gen(function* () {
   // and the configured limits.
   const request: InfinitusControlClientShape["request"] = Effect.fn(
     "InfinitusControlClient.request",
-  )(function* (input: InfinitusControlRequestInput) {
+  )(function* (input: InfinitusControlRequestInput, options?: InfinitusControlRequestOptions) {
     // The verb only (#676): args and options stay on the service span above.
     yield* Effect.annotateCurrentSpan({ "infinitus.command": input.command });
     const socketPath = config.socketPath;
@@ -36,7 +37,7 @@ const makeInfinitusControlClient = Effect.gen(function* () {
     return yield* requestInfinitusControl({
       socketPath,
       request: input,
-      timeoutMs: config.timeoutMs,
+      timeoutMs: options?.timeoutMs ?? config.timeoutMs,
       maxReplyBytes: config.maxReplyBytes,
     });
   });

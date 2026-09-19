@@ -10,6 +10,11 @@ import type { InfinitusControlRequestInput } from "@infinitus/shared/infinitusCo
 
 export type { InfinitusControlRequestInput };
 
+export interface InfinitusControlRequestOptions {
+  /** Overrides the configured reply budget for this one request. */
+  readonly timeoutMs?: number;
+}
+
 export interface InfinitusControlClientShape {
   /** Resolved once at layer construction; null means Infinitus cannot run here. */
   readonly socketPath: string | null;
@@ -19,6 +24,7 @@ export interface InfinitusControlClientShape {
    */
   readonly request: (
     input: InfinitusControlRequestInput,
+    options?: InfinitusControlRequestOptions,
   ) => Effect.Effect<
     unknown,
     InfinitusUnavailable | InfinitusProtocolError | InfinitusCommandFailed

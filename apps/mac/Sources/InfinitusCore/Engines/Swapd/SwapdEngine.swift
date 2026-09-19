@@ -51,12 +51,7 @@ public struct SwapdEngine: AccountEngine {
     /// One forced fetch for account n, then the fleet as it reads AFTER it
     /// — the caller publishes that instead of waiting for the next poll.
     public func refresh(fleet: Provider, number: Int) async throws -> EngineFleet {
-        let list = try await cli.refresh(provider: fleet, slot: number)
-        let result = try Self.fleet(from: list, provider: fleet, carriedActive: memory.last(fleet))
-        if let view = list.providers.first(where: { SwapdMapping.provider(for: $0.provider) == fleet }) {
-            memory.remember(result, unreadable: view.activeUnreadable != nil)
-        }
-        return result
+        try edited(await cli.refresh(provider: fleet, slot: number), fleet)
     }
 
     /// The provider's view out of a list reply. swapd answers a
@@ -74,25 +69,35 @@ public struct SwapdEngine: AccountEngine {
         try await cli.switchTo(provider: fleet, slot: number)
     }
     public func rotate(fleet: Provider) async throws { try await cli.rotate(provider: fleet) }
-    public func reorder(fleet: Provider, _ numbers: [Int]) async throws {
-        _ = try await cli.reorder(provider: fleet, numbers)
+    /// Every flag edit answers with the provider's board as it reads
+    /// after the write — the same reply `refresh` gets — so the caller
+    /// publishes it instead of running `list` again (#1481).
+    public func reorder(fleet: Provider, _ numbers: [Int]) async throws -> EngineFleet? {
+        try edited(await cli.reorder(provider: fleet, numbers), fleet)
     }
-    public func setHold(fleet: Provider, number: Int, held: Bool) async throws {
-        _ = try await cli.setHold(provider: fleet, slot: number, held: held)
+    public func setHold(fleet: Provider, number: Int, held: Bool) async throws -> EngineFleet? {
+        try edited(await cli.setHold(provider: fleet, slot: number, held: held), fleet)
     }
-    public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws {
-        _ = try await cli.setPreferred(provider: fleet, slot: number, on)
+    public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? {
+        try edited(await cli.setPreferred(provider: fleet, slot: number, on), fleet)
     }
-    public func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws {
-        _ = try await cli.setAutoIgnite(provider: fleet, slot: number, on)
+    public func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? {
+        try edited(await cli.setAutoIgnite(provider: fleet, slot: number, on), fleet)
+    }
+    private func edited(_ list: SwapdList, _ provider: Provider) throws -> EngineFleet {
+        let result = try Self.fleet(from: list, provider: provider, carriedActive: memory.last(provider))
+        if let view = list.providers.first(where: { SwapdMapping.provider(for: $0.provider) == provider }) {
+            memory.remember(result, unreadable: view.activeUnreadable != nil)
+        }
+        return result
     }
     /// `swapd ignite <slot>`: the driver's cheapest request under that
     /// slot's own login, then a forced fetch. The fleet stays put.
     public func ignite(fleet: Provider, number: Int) async throws {
         _ = try await cli.ignite(provider: fleet, slot: number)
     }
-    public func rename(fleet: Provider, number: Int, _ name: String) async throws {
-        _ = try await cli.setAlias(provider: fleet, slot: number, name)
+    public func rename(fleet: Provider, number: Int, _ name: String) async throws -> EngineFleet? {
+        try edited(await cli.setAlias(provider: fleet, slot: number, name), fleet)
     }
     public func remove(fleet: Provider, number: Int) async throws {
         try await cli.removeAccount(provider: fleet, slot: number)

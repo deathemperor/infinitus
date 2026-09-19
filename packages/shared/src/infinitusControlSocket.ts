@@ -18,6 +18,11 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 export const INFINITUS_CONTROL_DEFAULT_TIMEOUT_MS = 10_000;
+/** A write's budget: the app runs the engine's subprocess to completion before
+    it answers, and one flag edit measured 11 s under a daemon tick (#1481). A
+    reply that outlives the read budget is late, not lost — so a write waits
+    longer instead of reporting the app as absent. */
+export const INFINITUS_CONTROL_WRITE_TIMEOUT_MS = 30_000;
 export const INFINITUS_CONTROL_DEFAULT_MAX_REPLY_BYTES = 8 * 1024 * 1024;
 
 /**
