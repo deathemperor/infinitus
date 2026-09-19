@@ -1,1 +1,0 @@
-Desktop: A thread resumed after an account swap now always continues on the new account; before, its running Claude process could keep using the account that had just run out and stop on the same limit again.

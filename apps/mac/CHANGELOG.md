@@ -10,6 +10,30 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.27
+
+### Mac
+- The Team publisher no longer shares this Mac's crash reports; a crashes.json published by an older build is removed from the team store on the next publish.
+- Hold and star in the menu bar panes answer in one engine pass instead of two.
+- The all-limited banner and push say which model ran out ("out of Fable") when only that model's window is spent.
+
+### Desktop
+- Keep-warm, star and hold flip on the row the moment they are pressed, several rows can be pressed in a row, and a slow reply reads as slow instead of as an error.
+- Keep-warm, star and hold presses answer in one engine pass, queue behind each other instead of failing as busy, and get a 30 s reply budget.
+- The accounts page's exhausted band names the model when one per-model window alone blocks every account.
+- A thread resumed after an account swap now always continues on the new account; before, its running Claude process could keep using the account that had just run out and stop on the same limit again.
+- A thread stopped on a usage limit still resumes on its own after sitting idle for half an hour; before, the idle cleanup made it forget the stop, so it waited for you even once an account came back.
+
+### Phone
+- The app no longer carries the rewrite for the retired infinitus.run/pair link; pairing links come from Settings › Connections.
+- The Warm, First and Held badges flip on press, and a reply that times out no longer says Infinitus is not running.
+- The accounts screen's exhausted band names the model when one per-model window alone blocks every account.
+- Settings draws its grouped cards again; an Android-only style had leaked onto iOS.
+- Sharing into Infinitus from another app can land in an existing thread instead of always starting a new task.
+
+### Linux
+- the tray's `--help` and the Omarchy panel plugin name the Infinitus fleet instead of the old engine project.
+
 ## 0.5.0-alpha.26
 
 ### Mac
