@@ -1,0 +1,1 @@
+Desktop: A thread stopped on a usage limit resumes as soon as the engine swaps accounts; before, one stopped a moment after the engine's last usage check could wait minutes beside threads that had already resumed.

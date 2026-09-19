@@ -581,7 +581,6 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* settle(h.watchers, (n) => n === 1);
 
         yield* h.poll(stale);
-        yield* h.poll(swapped(at(50)));
         yield* Effect.yieldNow;
         expect(yield* h.turns).toEqual([]);
 
