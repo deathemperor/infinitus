@@ -94,7 +94,8 @@ export function AccountRow(props: {
       });
       setBusy(null);
       if (result._tag !== "Success") {
-        if (next !== null) setFlip(null);
+        // Only this press's flip: a later press may have drawn its own.
+        if (next !== null) setFlip((current) => (current === next ? null : current));
         setError(commandFailureMessage(result.cause));
       }
     },

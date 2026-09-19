@@ -209,11 +209,18 @@ export function FleetSection({
             source,
             flips.find((flip) => flip.number === source.number),
           );
+          // Hold and unhold are one button: the flip has already swapped which
+          // of the two the row offers, and the spinner belongs on that one.
+          const asked = pending.find((entry) => entry.number === row.number)?.action ?? null;
+          const pendingAction =
+            asked === "hold" || asked === "unhold"
+              ? (row.actions.find((action) => action === "hold" || action === "unhold") ?? asked)
+              : asked;
           return (
             <AccountRow
               key={row.number}
               row={row}
-              pendingAction={pending.find((entry) => entry.number === row.number)?.action ?? null}
+              pendingAction={pendingAction}
               failure={failure?.number === row.number ? failure.message : null}
               onAction={(action, alias) => onAction(row, action, alias)}
               onRelogin={(canAdd || inApp) && row.reloginNeeded ? () => onStart(row) : undefined}
