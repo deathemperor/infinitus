@@ -132,13 +132,19 @@ const GCLOUD_LOGIN_ACCOUNT = /\blogin\s+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)/;
  * The sign-in a Bash command is itself running, or null: an agent that types
  * `aws login` blocks on a browser nobody is shown, and prints no lapse
  * signature at all. Only a login that OPENS a command counts — quoted spans
- * are dropped and the rest split on the shell's separators — so a grep for
- * the words, an echo of them or a commit message stays quiet (same incident
- * as `lineStarts`). A heredoc body line that opens with the command still
- * matches; accepted.
+ * are flattened to one word and the rest split on the shell's separators —
+ * so a grep for the words, an echo of them or a commit message stays quiet
+ * (same incident as `lineStarts`). A heredoc body line that opens with the
+ * command still matches; accepted.
  */
 export function signInRun(command: string): SignInLapse | null {
-  const bare = command.replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '""');
+  // A quoted span keeps its name characters (a quoted profile still reads)
+  // and loses the rest, spaces and separators included, so it is one word.
+  const bare = command
+    .replace(/\\\n/g, " ")
+    .replace(/"((?:[^"\\]|\\.)*)"|'([^']*)'/g, (_, double?: string, single?: string) =>
+      (double ?? single ?? "").replace(/[^A-Za-z0-9._%+@-]/g, "_"),
+    );
   for (const part of bare.split(/&&|\|\||[;|\n(]/)) {
     const segment = part.trim();
     const run = segment.replace(ENV_PREFIX, "");

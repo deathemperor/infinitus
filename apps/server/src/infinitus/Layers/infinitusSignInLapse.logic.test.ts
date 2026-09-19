@@ -126,6 +126,18 @@ describe("signInRun", () => {
       profile: "banyan",
     });
     expect(signInRun("aws login")).toEqual({ provider: "aws", profile: "default" });
+    expect(signInRun('AWS_PROFILE="banyan" aws sso login')).toEqual({
+      provider: "aws",
+      profile: "banyan",
+    });
+    expect(signInRun("aws login \\\n  --profile 'prod'")).toEqual({
+      provider: "aws",
+      profile: "prod",
+    });
+    expect(signInRun('gcloud auth login --account "me@example.com"')).toEqual({
+      provider: "gcloud",
+      profile: "me@example.com",
+    });
     expect(signInRun("cd /tmp && gcloud auth application-default login")).toEqual({
       provider: "gcloud",
       profile: "application-default",
