@@ -32,7 +32,10 @@ import {
 import { resolveAssetUrl } from "@infinitus/client-runtime/state/assets";
 import { formatAttachmentSize } from "@infinitus/client-runtime/state/attachments";
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
+<<<<<<< HEAD
 import { turnFooterLabel } from "@infinitus/client-runtime/turnFooter";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import {
   classifyMarkdownImageSource,
   markdownImageSourceFragment,
@@ -902,7 +905,7 @@ function MarkdownCodeBlock(props: {
       >
         <NativeText
           selectable
-          selectionColorClassName={Platform.OS === "android" ? "accent-primary/32" : undefined}
+          selectionColorClassName={Platform.OS === "android" ? "accent-focus/32" : undefined}
           className="font-mono"
           style={{
             color: props.textColor,
@@ -1416,7 +1419,7 @@ function renderFeedEntry(
         accessibilityState={{ expanded: entry.expanded }}
         onPress={() => props.onToggleTurnFold(entry.turnId)}
         hitSlop={4}
-        className="mb-1 min-h-11 flex-row items-center gap-2 border-b border-adaptive-neutral-200-a80-white-a8 px-2"
+        className="mb-1 min-h-11 flex-row items-center gap-2 border-b border-border-subtle px-2"
         style={{
           minHeight: Math.max(TURN_FOLD_HEIGHT - 3.5, props.workRowSizing.estimatedRowHeight),
         }}
@@ -1483,7 +1486,7 @@ function renderFeedEntry(
         accessibilityLabel={label}
         className="mb-3 flex-row items-center gap-3 px-1 py-1"
       >
-        <View className="h-px flex-1 bg-adaptive-neutral-200-a80-white-a8" />
+        <View className="h-px flex-1 bg-subtle" />
         <View className="shrink-0 flex-row items-center gap-1.5">
           <SymbolView
             name="arrow.down.right.and.arrow.up.left"
@@ -1493,7 +1496,7 @@ function renderFeedEntry(
           />
           <Text className="font-infinitus-medium text-xs text-foreground-muted">{label}</Text>
         </View>
-        <View className="h-px flex-1 bg-adaptive-neutral-200-a80-white-a8" />
+        <View className="h-px flex-1 bg-subtle" />
       </View>
     );
   }
@@ -1663,6 +1666,7 @@ function renderFeedEntry(
       );
       return (
         <View className="mb-5 items-end">
+<<<<<<< HEAD
           {messageMenu ? (
             <ControlPillMenu
               actions={[...messageMenu.actions]}
@@ -1673,6 +1677,77 @@ function renderFeedEntry(
                 accessibilityHint="Long press for message actions"
                 className="min-w-0 gap-2 rounded-[20px] px-3.5 py-2.5"
                 style={bubbleStyle}
+=======
+          <View
+            className="min-w-0 gap-2 rounded-[20px] px-3.5 py-2.5"
+            style={{
+              backgroundColor: userBubbleColor,
+              maxWidth: props.userBubbleMaxWidth,
+              ...(hasReviewCommentContext
+                ? { width: props.reviewCommentBubbleWidth }
+                : hasWideBlock
+                  ? { width: props.userBubbleMaxWidth }
+                  : null),
+            }}
+          >
+            {entry.pendingMessage?.attachments.map((attachment) =>
+              attachment.type === "image" && attachment.uploadedAttachmentId ? (
+                <MessageAttachmentImage
+                  key={attachment.id}
+                  environmentId={props.environmentId}
+                  attachmentId={attachment.uploadedAttachmentId}
+                  name={attachment.name}
+                  mimeType={attachment.mimeType}
+                  className="h-[140px] w-[180px] rounded-[14px]"
+                  onPressPreview={props.onPressPreview}
+                />
+              ) : attachment.type === "image" ? (
+                <Image
+                  key={attachment.id}
+                  source={{ uri: attachment.previewUri }}
+                  accessibilityLabel={attachment.name}
+                  style={{ width: 180, height: 140, borderRadius: 14 }}
+                />
+              ) : (
+                <MessageAttachmentUnknown key={attachment.id} name={attachment.name} />
+              ),
+            )}
+            {/* An empty container still takes a gap, which pads every attachment-free bubble. */}
+            {visibleAttachments.length > 0 ? (
+              <View className={inlineAttachmentIds.size ? "flex-row flex-wrap gap-2" : "gap-2"}>
+                {visibleAttachments.map((attachment) => {
+                  return isImageAttachment(attachment) ? (
+                    <MessageAttachmentImage
+                      key={attachment.id}
+                      environmentId={props.environmentId}
+                      attachmentId={attachment.id}
+                      name={attachment.name}
+                      mimeType={attachment.mimeType}
+                      className={
+                        inlineAttachmentIds.size
+                          ? "h-24 w-24 rounded-[14px] bg-user-bubble-foreground/15"
+                          : "aspect-[1.3] w-full rounded-[14px] bg-user-bubble-foreground/15"
+                      }
+                      onPressPreview={props.onPressPreview}
+                    />
+                  ) : isFileAttachment(attachment) ? (
+                    <MessageAttachmentFile
+                      key={attachment.id}
+                      environmentId={props.environmentId}
+                      attachment={attachment}
+                      onPressPreview={props.onPressPreview}
+                      onPressVideo={props.onPressVideo}
+                    />
+                  ) : (
+                    <MessageAttachmentUnknown key={attachment.id} name={attachment.name} />
+                  );
+                })}
+              </View>
+            ) : null}
+            {message.text.trim().length > 0 ? (
+              <MarkdownImageAvailableWidthContext
+                value={props.userBubbleMaxWidth - USER_BUBBLE_HORIZONTAL_PADDING * 2}
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
               >
                 {bubbleContent}
               </Pressable>
@@ -1683,7 +1758,11 @@ function renderFeedEntry(
             </View>
           )}
           <View className="mt-1 flex-row items-center justify-end gap-1 pr-0.5">
+<<<<<<< HEAD
             <Text className="font-infinitus-medium text-xs tabular-nums text-adaptive-neutral-600-400">
+=======
+            <Text className="font-infinitus-medium text-xs tabular-nums text-foreground-secondary">
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
               {entry.pendingMessage && !entry.acknowledged ? "Pending" : timestampLabel}
             </Text>
             {entry.pendingMessage &&
@@ -1762,7 +1841,7 @@ function renderFeedEntry(
               attachmentId={attachment.id}
               name={attachment.name}
               mimeType={attachment.mimeType}
-              className="mt-1.5 aspect-[1.3] w-full rounded-[18px] bg-adaptive-neutral-200-800"
+              className="mt-1.5 aspect-[1.3] w-full rounded-[18px] bg-subtle-strong"
               onPressPreview={props.onPressPreview}
             />
           ) : isFileAttachment(attachment) ? (
@@ -1786,8 +1865,13 @@ function renderFeedEntry(
               buttonSize={28}
               iconSize={13}
             />
+<<<<<<< HEAD
             <Text className="font-infinitus-medium text-xs tabular-nums text-adaptive-neutral-600-400">
               {assistantMetaLabel}
+=======
+            <Text className="font-infinitus-medium text-xs tabular-nums text-foreground-secondary">
+              {timestampLabel}
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
             </Text>
           </View>
         ) : null}

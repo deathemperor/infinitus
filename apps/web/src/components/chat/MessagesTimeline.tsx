@@ -23,8 +23,11 @@ import {
   type WorktreeSetupSnapshot,
 } from "@infinitus/contracts";
 import { parseScopedThreadKey } from "@infinitus/client-runtime/environment";
+<<<<<<< HEAD
 import { turnFooterLabel } from "@infinitus/client-runtime/turnFooter";
 import type { TurnFooters } from "./useTurnFooters";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import { replaceComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 import type { CodexArtifactTemplate } from "@infinitus/client-runtime/codex-artifact-templates";
 import {
@@ -57,7 +60,10 @@ const NOOP_OPEN_ATTACHMENT = (_attachment: ChatFileAttachment) => {};
 import { resolveChatListAnchoredEndSpace } from "@infinitus/shared/chatList";
 import { toolActivityFaviconUrl } from "@infinitus/shared/favicon";
 import { formatDuration } from "@infinitus/shared/orchestrationTiming";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import { getProjectFaviconCacheKey } from "@infinitus/shared/projectFavicon";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import {

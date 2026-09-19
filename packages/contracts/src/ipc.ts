@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type {
   VcsCreateRefInput,
   VcsCreateRefResult,
@@ -49,45 +50,20 @@ import type {
   TerminalSessionSnapshot,
   TerminalWriteInput,
 } from "./terminal.ts";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import * as Schema from "effect/Schema";
-import type {
-  DiscoveredLocalServerList,
-  PreviewCloseInput,
-  PreviewEvent,
-  PreviewListInput,
-  PreviewListResult,
-  PreviewNavigateInput,
-  PreviewOpenInput,
-  PreviewRefreshInput,
-  PreviewReportStatusInput,
-  PreviewResizeInput,
-  PreviewSessionSnapshot,
-} from "./preview.ts";
+
 import {
   PreviewAutomationClickInput,
   PreviewAutomationEvaluateInput,
-  PreviewAutomationHost,
-  PreviewAutomationHostFocus,
   PreviewAutomationPressInput,
-  PreviewAutomationResponse,
   PreviewAutomationScrollInput,
   PreviewAutomationSnapshot,
   PreviewAutomationStatus,
-  PreviewAutomationStreamEvent,
   PreviewAutomationTypeInput,
   PreviewAutomationWaitForInput,
 } from "./previewAutomation.ts";
-import type {
-  ClientOrchestrationCommand,
-  OrchestrationGetFullThreadDiffInput,
-  OrchestrationGetFullThreadDiffResult,
-  OrchestrationGetTurnDiffInput,
-  OrchestrationGetTurnDiffResult,
-  OrchestrationShellSnapshot,
-  OrchestrationShellStreamItem,
-  OrchestrationSubscribeThreadInput,
-  OrchestrationThreadStreamItem,
-} from "./orchestration.ts";
 import { SnapShotSource } from "./orchestration.ts";
 import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { BrowserProfileId } from "./browserProfile.ts";
@@ -112,14 +88,7 @@ import type {
 } from "./infinitus.ts";
 import { type ClientSettings, type QuitConfirmationMode, SnapShotShortcut } from "./settings.ts";
 import type { EditorId } from "./editor.ts";
-import type {
-  SourceControlCloneRepositoryInput,
-  SourceControlCloneRepositoryResult,
-  SourceControlPublishRepositoryInput,
-  SourceControlPublishRepositoryResult,
-  SourceControlRepositoryInfo,
-  SourceControlRepositoryLookupInput,
-} from "./sourceControl.ts";
+
 import type {
   DesktopAppActivationRequest,
   DesktopAppActivationResponse,
@@ -750,19 +719,6 @@ export interface DesktopPreviewFavicon {
   capturedAt: number;
 }
 
-export const DesktopPreviewFaviconSchema: Schema.Codec<DesktopPreviewFavicon> = Schema.Struct({
-  dataUrl: Schema.String.check(
-    Schema.isMaxLength(FAVICON_DATA_URL_MAX_LENGTH),
-    Schema.isPattern(/^data:image\/png;base64,[a-z0-9+/]+={0,2}$/i),
-  ),
-  pageUrl: Schema.String.check(Schema.isMaxLength(2_048)),
-  capturedAt: Schema.Number.check(
-    Schema.isFinite(),
-    Schema.isGreaterThanOrEqualTo(0),
-    Schema.isLessThanOrEqualTo(FAVICON_CAPTURED_AT_MAX),
-  ),
-});
-
 export interface DesktopPreviewTabState {
   tabId: string;
   webContentsId: number | null;
@@ -801,27 +757,6 @@ export const DesktopPreviewAutomationStatusSchema = Schema.Struct({
   tabId: Schema.NullOr(DesktopPreviewTabIdSchema),
 });
 export type DesktopPreviewAutomationStatus = typeof DesktopPreviewAutomationStatusSchema.Type;
-
-export const DesktopPreviewNavStatusSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("Idle") }),
-  Schema.Struct({
-    kind: Schema.Literal("Loading"),
-    url: Schema.String,
-    title: Schema.String,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("Success"),
-    url: Schema.String,
-    title: Schema.String,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("LoadFailed"),
-    url: Schema.String,
-    title: Schema.String,
-    code: Schema.Number,
-    description: Schema.String,
-  }),
-]);
 
 export interface DesktopPreviewPointerEvent {
   tabId: string;
@@ -1603,6 +1538,7 @@ export interface LocalApi {
     setClientSettings: (settings: ClientSettings) => Promise<void>;
   };
 }
+<<<<<<< HEAD
 
 /**
  * APIs bound to a specific backend environment connection.
@@ -1735,3 +1671,5 @@ export interface EnvironmentApi {
     ) => () => void;
   };
 }
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed

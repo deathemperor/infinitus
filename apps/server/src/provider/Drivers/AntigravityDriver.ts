@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { withProviderSessionEnvironment } from "../../mcp/McpProviderSession.ts";
+=======
+import { withAgentDeviceEnvironment } from "../../mcp/McpProviderSession.ts";
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import { AntigravitySettings, ProviderDriverKind, ProviderSetupError } from "@infinitus/contracts";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import {

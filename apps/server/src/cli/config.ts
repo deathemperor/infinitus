@@ -1,5 +1,8 @@
 import * as NetService from "@infinitus/shared/Net";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import { OtlpHeadersFromString, OtlpProtocol } from "@infinitus/shared/observability";
 import { parsePersistedServerObservabilitySettings } from "@infinitus/shared/serverSettings";
 import { DesktopBackendBootstrap, PortSchema } from "@infinitus/contracts";
@@ -94,6 +97,10 @@ const EnvServerConfig = Config.all({
     Config.map(Option.getOrUndefined),
   ),
   otlpMetricsUrl: Config.String("T3CODE_OTLP_METRICS_URL").pipe(
+    Config.option,
+    Config.map(Option.getOrUndefined),
+  ),
+  otlpLogsUrl: Config.String("T3CODE_OTLP_LOGS_URL").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
@@ -228,7 +235,7 @@ const loadPersistedObservabilitySettings = Effect.fn(function* (settingsPath: st
   const fs = yield* FileSystem.FileSystem;
   const exists = yield* fs.exists(settingsPath).pipe(Effect.orElseSucceed(() => false));
   if (!exists) {
-    return { otlpTracesUrl: undefined, otlpMetricsUrl: undefined };
+    return { otlpTracesUrl: undefined, otlpMetricsUrl: undefined, otlpLogsUrl: undefined };
   }
 
   const raw = yield* fs.readFileString(settingsPath).pipe(Effect.orElseSucceed(() => ""));
@@ -394,6 +401,8 @@ export const resolveServerConfig = (
         env.otlpMetricsUrl ??
         bootstrap?.otlpMetricsUrl ??
         persistedObservabilitySettings.otlpMetricsUrl,
+      otlpLogsUrl:
+        env.otlpLogsUrl ?? bootstrap?.otlpLogsUrl ?? persistedObservabilitySettings.otlpLogsUrl,
       otlpExportIntervalMs: env.otlpExportIntervalMs,
       otlpServiceName: env.otlpServiceName,
       otlpHeaders: env.otlpHeaders,

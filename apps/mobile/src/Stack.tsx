@@ -32,6 +32,7 @@ import {
 import { ReviewCommentComposerSheet } from "./features/review/ReviewCommentComposerSheet";
 import { ReviewSheet } from "./features/review/ReviewSheet";
 import { ThreadTerminalRouteScreen } from "./features/terminal/ThreadTerminalRouteScreen";
+import { DevicePreviewRouteScreen } from "./features/devices/DevicePreviewRouteScreen";
 import { GitBranchesSheet } from "./features/threads/git/GitBranchesSheet";
 import { GitCommitSheet } from "./features/threads/git/GitCommitSheet";
 import { GitConfirmSheet } from "./features/threads/git/GitConfirmSheet";
@@ -479,7 +480,11 @@ const WORKSPACE_OVERLAY_ROUTES = new Set([
   "SettingsSheet",
   "SideQuestionSheet",
   "ThreadReviewComment",
+<<<<<<< HEAD
   "ThreadUsageSheet",
+=======
+  "ThreadDevicePreview",
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
   "ThreadSettingsSheet",
 ]);
 
@@ -625,6 +630,15 @@ export const RootStack = createNativeStackNavigator({
       screen: ThreadTerminalRouteScreen,
       linking: `${THREAD_LINKING_PREFIX}/terminal`,
       options: SOLID_HEADER_OPTIONS,
+    }),
+    ThreadDevicePreview: createNativeStackScreen({
+      screen: DevicePreviewRouteScreen,
+      linking: `${THREAD_LINKING_PREFIX}/devices`,
+      options: {
+        presentation: "fullScreenModal",
+        headerShown: false,
+        gestureEnabled: false,
+      },
     }),
     ThreadReview: createNativeStackScreen({
       screen: ReviewSheet,
