@@ -495,7 +495,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   Release Smoke job with `ERR_PNPM_UNUSED_PATCH`. Drop the pin when upstream
   bumps the package and its patch together.
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
-  `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon;
+  `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon
+  and the splash images `scripts/export-infinitus-splash.ts` renders from it;
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
   `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
   to the iOS associated domains and an `autoVerify` intent filter for

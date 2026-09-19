@@ -216,6 +216,12 @@ these bullets.
 - `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new`, `join` and `settings` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
+- `apps/mobile/assets/infinitus-splash-1024.png`,
+  `apps/mobile/assets/android-splash-icon-infinitus.png` and
+  `scripts/export-infinitus-splash.ts` — the phone's splash artwork: the icon
+  under iOS's rounded silhouette, and for Android 12+'s circle mask the icon's
+  gradient with the widget's twin-loop mark kept inside it. Rerun the script
+  when the icon or mark changes.
 - `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the
   lock-screen card's header (#941), monochrome so the widget's foreground
   tint applies: the same geometry `apps/mac/make-icon.swift` draws (rings at

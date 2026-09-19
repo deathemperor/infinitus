@@ -79,15 +79,16 @@ const RELEASE_ASSETS = {
 // The Infinitus phone (fork, #572): the native SwiftUI phone's bundle id, so
 // the Mac's Live Activity pushes (APNs topic keyed on it) reach this app and
 // installing it replaces the native phone on the device. Signed with the
-// Infinitus team; the icon is the native phone's.
+// Infinitus team; the icon is the native phone's. The splash images are
+// rendered from it by scripts/export-infinitus-splash.ts.
 const INFINITUS_ASSETS = {
   appIcon: "./assets/infinitus-ios-1024.png",
   iosIcon: "./assets/infinitus-ios-1024.png",
-  splashIcon: "./assets/infinitus-ios-1024.png",
+  splashIcon: "./assets/infinitus-splash-1024.png",
   androidAdaptiveForeground,
   androidAdaptiveBackgroundColor: "#000000",
   androidAdaptiveBackgroundImage: undefined,
-  androidSplashIcon: "./assets/android-splash-icon-prod.png",
+  androidSplashIcon: "./assets/android-splash-icon-infinitus.png",
   androidMonochromeIcon: "./assets/android-icon-mark.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
   androidNotificationColor: "#FFFFFF",
