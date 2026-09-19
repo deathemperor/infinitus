@@ -342,6 +342,37 @@ export async function pickComposerFiles(input: {
 }
 
 /**
+ * Largest still image sent byte for byte. A full-resolution phone screenshot is a 5-10 MB PNG,
+ * which a model reads no better than its 2048px JPEG and which a slow relay cannot finish
+ * uploading before it cuts the request.
+ */
+export const ORIGINAL_STILL_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The mime type to keep when a picked image may pass through unchanged, or null when it must be
+ * rendered to a bounded JPEG off the JS thread (HEIC/HEIF, large stills, unmeasurable sources).
+ * Small originals pass through so transparency survives. A GIF keeps the provider cap: rendering
+ * it would drop its animation.
+ */
+export function originalImagePassthroughMimeType(input: {
+  readonly mimeType: string | undefined;
+  readonly sourceBytes: number | null;
+}): string | null {
+  const { mimeType, sourceBytes } = input;
+  if (
+    mimeType === undefined ||
+    !isProviderSendTurnSupportedImageMimeType(mimeType) ||
+    sourceBytes === null ||
+    sourceBytes <= 0
+  ) {
+    return null;
+  }
+  const maxBytes =
+    mimeType === "image/gif" ? PROVIDER_SEND_TURN_MAX_IMAGE_BYTES : ORIGINAL_STILL_IMAGE_MAX_BYTES;
+  return sourceBytes <= maxBytes ? mimeType : null;
+}
+
+/**
  * Longest edge kept when a photo has to be re-encoded. Matches the web composer's
  * MAX_DIMENSION so every client hands providers the same resolution.
  */
@@ -514,17 +545,7 @@ export async function pickComposerMedia(input: {
     } catch {
       sourceBytes = null;
     }
-    // Originals the provider can read and that fit the cap pass through byte for byte so
-    // transparency and animation survive. Everything else (HEIC/HEIF, oversized JPEGs,
-    // unmeasurable sources) is rendered to a bounded JPEG off the JS thread.
-    const originalMimeType =
-      mimeType !== undefined &&
-      isProviderSendTurnSupportedImageMimeType(mimeType) &&
-      sourceBytes !== null &&
-      sourceBytes > 0 &&
-      sourceBytes <= PROVIDER_SEND_TURN_MAX_IMAGE_BYTES
-        ? mimeType
-        : null;
+    const originalMimeType = originalImagePassthroughMimeType({ mimeType, sourceBytes });
 
     let image: { base64: string; mimeType: string; name: string; previewUri: string };
     try {
