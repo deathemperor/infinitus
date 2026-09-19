@@ -108,7 +108,8 @@ export function restoreLimitStops(
       thread.archivedAt !== null ||
       turn === null ||
       turn.state !== "error" ||
-      thread.session?.status !== "error" ||
+      // `stopped` is the same stop after the idle reaper took its session.
+      (thread.session?.status !== "error" && thread.session?.status !== "stopped") ||
       thread.session.activeTurnId !== null ||
       resumed.has(turn.turnId)
     )
@@ -226,8 +227,12 @@ export function eventCancelsStop(event: ProviderRuntimeEvent, stop: LimitStop): 
     case "turn.started":
       return true;
     case "turn.aborted":
-    case "session.exited":
       return true;
+    case "session.exited":
+      // A parked turn goes with its session. A failed one already ended: the
+      // idle reaper stops its session long before the window resets, and the
+      // resume's send starts a new one from the resume cursor.
+      return stop.kind === "parked";
     case "turn.completed":
       // A parked turn that completes did so on its own; a failed stop's own
       // completion is the event that recorded it.

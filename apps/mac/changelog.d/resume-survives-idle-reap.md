@@ -1,0 +1,1 @@
+Desktop: A thread stopped on a usage limit still resumes on its own after sitting idle for half an hour; before, the idle cleanup made it forget the stop, so it waited for you even once an account came back.

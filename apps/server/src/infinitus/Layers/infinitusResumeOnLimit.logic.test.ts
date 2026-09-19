@@ -122,6 +122,11 @@ describe("restoreLimitStops", () => {
     ]);
   });
 
+  it("recovers a stop whose idle session the reaper stopped", () => {
+    const reaped = { ...thread, session: { ...thread.session!, status: "stopped" as const } };
+    expect(restoreLimitStops([reaped], [marker], [])).toHaveLength(1);
+  });
+
   it("does not revive a resumed, cancelled, archived, active or superseded turn", () => {
     expect(
       restoreLimitStops([thread], [marker], [{ ...marker, kind: RESUME_MARKER_KIND }]),
@@ -290,13 +295,17 @@ describe("eventCancelsStop", () => {
       payload: type === "turn.completed" ? { state: "completed" } : {},
     }) as ProviderRuntimeEvent;
 
-  it("drops the stop when the thread moves on or its session goes", () => {
+  it("drops the stop when the thread moves on or its session takes the parked turn", () => {
     expect(eventCancelsStop(event("turn.started"), parked)).toBe(true);
     expect(eventCancelsStop(event("turn.aborted"), parked)).toBe(true);
-    expect(eventCancelsStop(event("session.exited"), failed)).toBe(true);
+    expect(eventCancelsStop(event("session.exited"), parked)).toBe(true);
     expect(
       eventCancelsStop({ ...event("turn.started"), threadId: ThreadId.make("other") }, parked),
     ).toBe(false);
+  });
+
+  it("a failed stop outlives its session: the idle reaper stops it long before the reset", () => {
+    expect(eventCancelsStop(event("session.exited"), failed)).toBe(false);
   });
 
   it("a completion ends a parked stop but is the failed stop's own record", () => {

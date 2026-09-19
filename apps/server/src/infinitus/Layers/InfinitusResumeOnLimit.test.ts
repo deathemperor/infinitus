@@ -725,6 +725,21 @@ describe("InfinitusResumeOnLimitLive", () => {
     ),
   );
 
+  effectIt.effect("a failed stop outlives the idle reaper and still resumes", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(runtimeEvent("turn.completed", { state: "failed", usageLimited: true }));
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.emit(runtimeEvent("session.exited", { exitKind: "graceful" }));
+        yield* h.poll(swapped(at(150)));
+        yield* h.nextTurn;
+        expect(yield* h.turns).toHaveLength(1);
+      }),
+    ),
+  );
+
   effectIt.effect("the setting off drops the stop instead of resuming", () =>
     Effect.scoped(
       Effect.gen(function* () {
