@@ -120,7 +120,7 @@ these bullets.
   bare "T3 Tools" as a stray literal, so the credit routes through them like
   every other upstream reference. `productNamePlugin` rewrites only
   `index.html` and `bootError.ts`, so these constants survive the build.
-- `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A). Rules and traps: `docs/internals/infinitus-rename.md`.
+- `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A); `docs/user` by the rename table's `docs/user/` entries and CI's `--check`. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
@@ -326,7 +326,7 @@ these bullets.
   `docs/internals/<feature>.md` page and one ledger line here.
 - `scripts/phone.sh` (+ `.agents/skills/drive-phone/SKILL.md`) — drives the developer's paired physical iPhone from a session with the server's pinned `agent-device` (launch, deep links, screenshots, console; snapshots and taps once the Mac's `DevToolsSecurity` is on). The CLI installs under the worktree's `.t3/tools`, never on the Mac. Usage and traps: the skill.
 - `.github/workflows/upstream-sync.yml` — the daily upstream merge as a PR (INFINITUS.md); once `scripts/infinitus-rename.ts --check` passes on `main` it renames upstream's tip on its own branch before merging (#1368 C).
-- `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
+- `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components, and the product name in `docs/user` prose) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`, `fork-visual-fixture.guard.test.ts`) — the canned Infinitus control socket the pass runs against in CI, kept honest against `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift` (#1091, #1139). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`), `scripts/fork-visual-check.ts` — the route table the pass asserts (one marker per populated page, `ALWAYS_ABSENT` phrases) and the checker that applies it. Rules and traps: `docs/internals/fork-visual-pass.md`.

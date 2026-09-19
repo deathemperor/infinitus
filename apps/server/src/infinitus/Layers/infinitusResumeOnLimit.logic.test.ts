@@ -222,6 +222,63 @@ describe("limitStopFromEvent", () => {
     ).toBeNull();
   });
 
+  // A CLI keeps the login it started on for a while after a swap. Fifteen
+  // seconds after one, two turns were refused on the previous account's weekly
+  // limit; blamed on the live account, a healthy one was reported spent until a
+  // reset five days off and benched 70 s after the engine swapped to it.
+  describe("names the account the refusal's own figures belong to", () => {
+    const usage = (fiveHour: number, sevenDay: number) => ({
+      fiveHour: { pct: fiveHour },
+      sevenDay: { pct: sevenDay },
+    });
+    const refusal = (fiveHour: number, sevenDay: number) => ({
+      ...parkedWarning,
+      payload: {
+        ...parkedWarning.payload,
+        detail: {
+          status: "rejected",
+          rateLimitType: "seven_day_overage_included",
+          resetsAt: 1_790_236_800,
+          unifiedWindows: {
+            five_hour: { utilization: fiveHour },
+            seven_day: { utilization: sevenDay },
+          },
+        },
+      },
+    });
+    const swappedTo = (previous: object, another: object = usage(0, 72)) =>
+      snapshotWith([
+        account(1, "previous@example.com", { usage: previous }),
+        account(2, "live@example.com", { active: true, usage: usage(62, 33) }),
+        account(3, "another@example.com", { usage: another }),
+      ]);
+    const named = (event: typeof parkedWarning, snapshot: InfinitusSnapshot) => [
+      ...(limitStopFromEvent(event, NOW, snapshot)?.activeAtStop.values() ?? []),
+    ];
+
+    it("the live account when its reading agrees, or nothing can be compared", () => {
+      expect(named(refusal(0.64, 0.34), swappedTo(usage(38, 72)))).toEqual(["live@example.com"]);
+      expect(named(parkedWarning, swappedTo(usage(38, 72)))).toEqual(["live@example.com"]);
+      expect(
+        named(
+          refusal(0.41, 0.73),
+          snapshotWith([account(2, "live@example.com", { active: true })]),
+        ),
+      ).toEqual(["live@example.com"]);
+    });
+
+    it("the one other account whose reading agrees when the live one's does not", () => {
+      expect(named(refusal(0.41, 0.73), swappedTo(usage(38, 72)))).toEqual([
+        "previous@example.com",
+      ]);
+    });
+
+    it("nobody when the live account's disagrees and no single other one fits", () => {
+      expect(named(refusal(0.41, 0.73), swappedTo(usage(38, 72), usage(40, 73)))).toEqual([]);
+      expect(named(refusal(0.41, 0.73), swappedTo(usage(5, 5)))).toEqual([]);
+    });
+  });
+
   it("reads a failed turn off the adapter's structured limit flag", () => {
     const failed = {
       ...base,

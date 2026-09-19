@@ -70,7 +70,7 @@ closes when you dismiss it or send your next message. It uses the same snapshot 
 anything. The command is offered only for providers that appear under **Usage → Limits**.
 
 OpenCode Go reports its session, weekly, and monthly allowance when OpenCode runs locally in
-the environment. T3 cannot report limits for external OpenCode servers because their credentials
+the environment. Infinitus cannot report limits for external OpenCode servers because their credentials
 belong to the remote server. Cursor reports
 its monthly allowance, including separate Auto and API usage, using a file-based CLI login or
 `CURSOR_AUTH_TOKEN`. Cursor's default macOS keychain login does not currently report limits.
@@ -100,4 +100,4 @@ settings section when you no longer need it.
 
 Add **Subscription usage** from your iOS or Android widget gallery to see remaining Codex and
 Claude quotas. Tap it to open **Usage → Limits**. On iOS, use **Edit Widget** to choose Session,
-Weekly, or both for each provider. Reopen T3 to refresh expired readings.
+Weekly, or both for each provider. Reopen Infinitus to refresh expired readings.

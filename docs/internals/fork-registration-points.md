@@ -382,6 +382,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (`ProviderCommandReactor.buildGeneratedWorktreeBranchName` strips both);
   `GitManager.ts` / `BitbucketApi.ts` build fork-PR checkout branches from the
   constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
+- `packages/shared/src/agentAwareness.ts` — `resolveThreadAwarenessPhase` answers `running` for a settled thread whose `backgroundLiveness` is `working`, so the lock-screen card counts the threads the lists call Working; `monitoring` stays Done. With it, `shouldPublishAgentAwarenessEvent` in `apps/server/src/relay/AgentAwarenessRelay.ts` lets `task.started`, `task.updated` and `task.completed` activities publish (never `task.progress`), so the card follows background work ending instead of waiting out the relay's two-hour row expiry. Both carry a test.
 - `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); re-flipped after every sync with its two fixtures, `packages/shared/src/cliRelease.test.ts` and `packages/ssh/src/tunnel.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.

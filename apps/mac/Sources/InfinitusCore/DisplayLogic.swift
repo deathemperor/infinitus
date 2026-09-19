@@ -381,30 +381,42 @@ public enum AccountVitals {
     }
 
     public static func cause(_ usage: Usage?) -> DeadCause? {
-        guard let usage else { return nil }
-        var dead: [(DeadCause, Date?)] = []
-        if let w = usage.fiveHour, w.pct >= 100 {
-            dead.append((DeadCause(kind: .session, name: nil, resetsAt: w.resetsAt,
-                                   countdown: w.countdown, clock: w.clock),
-                         WeeklyRoll.parse(w.resetsAt)))
-        }
-        if let w = usage.sevenDay, w.pct >= 100 {
-            dead.append((DeadCause(kind: .weekly, name: nil, resetsAt: w.resetsAt,
-                                   countdown: w.countdown, clock: w.clock),
-                         WeeklyRoll.parse(w.resetsAt)))
-        }
-        for w in usage.scoped ?? [] where w.pct >= 100 {
-            dead.append((DeadCause(kind: .scoped, name: w.name, resetsAt: w.resetsAt,
-                                   countdown: w.countdown, clock: w.clock),
-                         WeeklyRoll.parse(w.resetsAt)))
-        }
         // The spend cap is deliberately NOT here: spent usage credit only
         // means the overflow buffer is gone — the account stays usable on
         // its subscription windows (user-verified: papaya at 0%/0% with a
         // spent cap was marked dead and is perfectly alive).
-        return dead.max {
-            ($0.1 ?? .distantFuture) < ($1.1 ?? .distantFuture)
-        }?.0
+        deadCauses(usage).max {
+            (WeeklyRoll.parse($0.resetsAt) ?? .distantFuture)
+                < (WeeklyRoll.parse($1.resetsAt) ?? .distantFuture)
+        }
+    }
+
+    /// Every spent window in the row's cell order (5h, 7d, then each
+    /// model): each one's cell reads "down", not only the governing
+    /// cause's — a spent Fable beside a spent weekly drew "0%" (user
+    /// 2026-09-19).
+    public static func deadCauses(_ usage: Usage?) -> [DeadCause] {
+        guard let usage else { return [] }
+        func cause(_ w: UsageWindow, _ kind: DeadCause.Kind) -> DeadCause {
+            DeadCause(kind: kind, name: kind == .scoped ? w.name : nil,
+                      resetsAt: w.resetsAt, countdown: w.countdown, clock: w.clock)
+        }
+        var dead: [DeadCause] = []
+        if let w = usage.fiveHour, w.pct >= 100 { dead.append(cause(w, .session)) }
+        if let w = usage.sevenDay, w.pct >= 100 { dead.append(cause(w, .weekly)) }
+        for w in usage.scoped ?? [] where w.pct >= 100 { dead.append(cause(w, .scoped)) }
+        return dead
+    }
+
+    /// Whether a dead cell to this one's left already counts down the
+    /// same reset (within a minute): the row says each clock once.
+    public static func resetRepeatsEarlierCause(_ cause: DeadCause, in usage: Usage?) -> Bool {
+        let all = deadCauses(usage)
+        guard let index = all.firstIndex(of: cause),
+              let reset = WeeklyRoll.parse(cause.resetsAt) else { return false }
+        return all[..<index].contains {
+            WeeklyRoll.parse($0.resetsAt).map { abs($0.timeIntervalSince(reset)) < 60 } ?? false
+        }
     }
 
     public static func isDead(_ usage: Usage?) -> Bool {
