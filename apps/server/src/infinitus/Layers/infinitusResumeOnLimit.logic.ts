@@ -350,7 +350,7 @@ function refusalDistance(
  * when its reading agrees (or nothing can be compared), else the one other
  * account whose reading does, else nobody — an unnamed stop reports nothing.
  */
-export function refusedClaudeAccounts(
+function refusedClaudeAccounts(
   detail: object,
   snapshot: InfinitusSnapshot,
 ): ReadonlyMap<string, string> {
