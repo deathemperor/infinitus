@@ -7,6 +7,7 @@ import {
   signInLapse,
   signInLapseFromEvent,
   signInMarkerSummary,
+  signInRun,
   signInVerb,
 } from "./infinitusSignInLapse.logic.ts";
 
@@ -29,6 +30,15 @@ describe("signInLapse (#1076)", () => {
       provider: "aws",
       profile: "banyan",
     });
+  });
+
+  it("reads a wrapper script's advisory that swallowed the CLI's own error", () => {
+    expect(
+      signInLapse(
+        "[codebuild] AWS auth failed — run 'aws login --profile banyan-login' then retry\nexit=3",
+        "tail -12 /tmp/check-codebuild.log",
+      ),
+    ).toEqual({ provider: "aws", profile: "banyan-login" });
   });
 
   it("takes the profile the error itself names over the command's", () => {
@@ -110,6 +120,60 @@ describe("signInLapseFromEvent (#1076)", () => {
     expect(
       signInLapseFromEvent({ ...itemUpdated(undefined), type: "item.completed" } as never),
     ).toBeNull();
+  });
+});
+
+describe("signInRun", () => {
+  it("reads a login the command runs itself, and the profile it names", () => {
+    expect(
+      signInRun(
+        "cp ~/.aws/config ~/.aws/config.bak-$(date +%s) && aws login --profile papaya-login 2>&1 | tail -5; AWS_PROFILE=papaya aws sts get-caller-identity",
+      ),
+    ).toEqual({ provider: "aws", profile: "papaya-login" });
+    expect(signInRun("AWS_PROFILE=banyan aws sso login")).toEqual({
+      provider: "aws",
+      profile: "banyan",
+    });
+    expect(signInRun("aws login")).toEqual({ provider: "aws", profile: "default" });
+    expect(signInRun('AWS_PROFILE="banyan" aws sso login')).toEqual({
+      provider: "aws",
+      profile: "banyan",
+    });
+    expect(signInRun("aws login \\\n  --profile 'prod'")).toEqual({
+      provider: "aws",
+      profile: "prod",
+    });
+    expect(signInRun('gcloud auth login --account "me@example.com"')).toEqual({
+      provider: "gcloud",
+      profile: "me@example.com",
+    });
+    expect(signInRun("cd /tmp && gcloud auth application-default login")).toEqual({
+      provider: "gcloud",
+      profile: "application-default",
+    });
+    expect(signInRun("gcloud auth login me@example.com --no-launch-browser")).toEqual({
+      provider: "gcloud",
+      profile: "me@example.com",
+    });
+  });
+
+  it("ignores the words searched for, echoed or passed as a message", () => {
+    expect(signInRun("git grep -il \"aws login\\|awsLogin\" -- ':!.repos' | head -40")).toBeNull();
+    expect(signInRun('echo "run: aws login --profile papaya"')).toBeNull();
+    expect(signInRun("git commit -m 'fix: aws login card'")).toBeNull();
+    expect(signInRun("grep -rn aws login src")).toBeNull();
+    expect(signInRun("aws login --help")).toBeNull();
+    expect(signInRun("gcloud auth login --help | head -40")).toBeNull();
+    expect(signInRun("AWS_PROFILE=papaya aws sts get-caller-identity")).toBeNull();
+  });
+
+  it("is read off a tool's start, the event with an input and no result yet", () => {
+    expect(
+      signInLapseFromEvent(
+        itemUpdated({ toolName: "Bash", input: { command: "aws login --profile papaya-login" } }),
+      ),
+    ).toEqual({ provider: "aws", profile: "papaya-login" });
+    expect(signInLapseFromEvent(itemUpdated({ toolName: "Bash", input: {} }))).toBeNull();
   });
 });
 

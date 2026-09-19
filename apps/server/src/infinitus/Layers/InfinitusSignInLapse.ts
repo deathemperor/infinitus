@@ -39,7 +39,9 @@ const SEEN_LIMIT = 500;
  * the fork's counterpart to the Mac's transcript scan (retired with the
  * terminal-session features, #1041). Every tool result the Claude driver
  * relays (`item.updated` with the raw `tool_result` block) is read for the
- * CLIs' expired-credentials signatures; a hit leaves one
+ * CLIs' expired-credentials signatures, and every Bash command as it starts
+ * for a login the agent runs itself (`aws login`, `gcloud auth login`: it
+ * blocks on a browser no client shows); a hit leaves one
  * `infinitus.signin.needed` work-log row on the thread ("AWS sign-in needed
  * on <profile>") and, on an app whose manifest lists the verb, starts the
  * Mac's own `aws-login <profile>` / `gcloud-login <account>` flow — through
@@ -195,7 +197,7 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
 
     yield* forkParked(
       providerService.streamEvents.pipe(
-        // Only the relayed tool results; the content stream stays out.
+        // Only the relayed tool starts and results; the content stream stays out.
         Stream.filter((event) => event.type === "item.updated"),
         Stream.runForEach((event) => worker.enqueue(event)),
       ),

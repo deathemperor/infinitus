@@ -357,6 +357,26 @@ describe("resumeTarget", () => {
     ).toEqual({ fleetKey: "swapd/claude", account: "two@example.com", from: "one@example.com" });
   });
 
+  // swapd rations the usage endpoint: the sweep that decides a swap reads
+  // every account, then leaves the idle one it landed on alone for minutes. A
+  // thread stopped a second after that sweep waited six minutes for a newer
+  // reading while four stopped before it resumed at once.
+  it("a swapped-to account counts on a reading from before the stop", () => {
+    const swapped = (usageOf: object | undefined) =>
+      snapshotWith([
+        account(1, "one@example.com"),
+        account(2, "two@example.com", {
+          active: true,
+          usageFetchedAt: before,
+          ...(usageOf === undefined ? {} : { usage: usageOf }),
+        }),
+      ]);
+    expect(resumeTarget(parked, swapped(usage(0)), NOW)?.account).toBe("two@example.com");
+    expect(resumeTarget(stop, swapped(undefined), NOW)?.account).toBe("two@example.com");
+    // Its own window full still holds it back.
+    expect(resumeTarget(parked, swapped(usage(100)), NOW)).toBeNull();
+  });
+
   // swapd's `ok` is a credential status, not headroom: the account that just
   // ran out reads `ok` on the very next poll. The same account only counts
   // once its window reset, or once a probe shows that window with room.

@@ -316,7 +316,12 @@ export interface ResumeTarget {
  * Native's ResumeGate, with headroom read where the engine reports it: an
  * active account of the CLI-credentials fleet whose credentials read `ok`
  * from a probe taken after the stop — a probe from before it would only
- * repeat the account that just ran out. `ok` alone is not headroom (the
+ * repeat the account that just ran out. A different account than the one at
+ * the stop needs no newer probe: its reading says nothing of the account that
+ * ran out, and the engine rations the usage endpoint, so an idle account the
+ * swap lands on is next read minutes later (a thread stopped a second after
+ * the engine's sweep sat six minutes beside four that resumed). `ok` alone is
+ * not headroom (the
  * account that hit the limit reads `ok` on the very next poll, which is how a
  * turn was resumed on it every cooldown until its window reset), so:
  * a reading that carries the stop's window decides — under 100 % counts,
@@ -338,7 +343,10 @@ export function resumeTarget(
     const from = stop.activeAtStop.get(fleet.key) ?? null;
     const label = accountLabel(active);
     const fetchedAt = active.usageFetchedAt === undefined ? NaN : Date.parse(active.usageFetchedAt);
-    const fresh = Number.isFinite(fetchedAt) ? fetchedAt > stop.stoppedAt : label !== from;
+    const swapped = from !== null && label !== from;
+    const fresh = Number.isFinite(fetchedAt)
+      ? swapped || fetchedAt > stop.stoppedAt
+      : label !== from;
     if (!fresh) continue;
     const target = { fleetKey: fleet.key, account: label, from };
     const pct = stopWindowPct(stop.limitType, active);

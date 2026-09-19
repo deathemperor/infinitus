@@ -139,10 +139,18 @@ it.effect("maps the daemon's current credentials and quota windows for resume", 
     ).toBeNull();
   }),
 );
-it.effect("does not resume on stale, undated, held or unreadable credentials", () =>
+// swapd rations the usage endpoint, so the account a swap lands on keeps the
+// reading from the sweep that chose it; how old a reading may be is the
+// engine's call (`stale`), never the stop's.
+it.effect("resumes on the swapped-to account's reading from before the stop", () =>
+  Effect.gen(function* () {
+    const { snapshot } = yield* read(wire([{ ...account, fetchedAt: "2026-09-17T11:59:00Z" }]));
+    expect(resumeTarget(stop, snapshot, stop.stoppedAt)?.account).toBe("two@example.com");
+  }),
+);
+it.effect("does not resume on undated, held or unreadable credentials", () =>
   Effect.gen(function* () {
     for (const value of [
-      wire([{ ...account, fetchedAt: "2026-09-17T11:59:00Z" }]),
       wire([{ ...account, fetchedAt: undefined }]),
       wire([{ ...account, fetchedAt: "bad-date" }]),
       wire([{ ...account, disabled: true }]),
