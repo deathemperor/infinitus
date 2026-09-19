@@ -28,7 +28,10 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeOS from "node:os";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
+<<<<<<< HEAD
 import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
+=======
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";

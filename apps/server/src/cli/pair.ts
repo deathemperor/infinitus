@@ -15,7 +15,10 @@ import {
   PortSchema,
 } from "@infinitus/contracts";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
+<<<<<<< HEAD
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
 import {
   buildTailscaleHttpsBaseUrl,
   DEFAULT_TAILSCALE_SERVE_PORT,
@@ -321,6 +324,7 @@ const makePairServerConfig = Effect.fn(function* (input: {
     traceMaxFiles: 10,
     otlpTracesUrl: undefined,
     otlpMetricsUrl: undefined,
+    otlpLogsUrl: undefined,
     otlpExportIntervalMs: 10_000,
     otlpServiceName: "t3-server",
     otlpHeaders: undefined,

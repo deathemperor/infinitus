@@ -7,13 +7,12 @@ import * as Struct from "effect/Struct";
 
 import { toPersistenceSqlError } from "../Errors.ts";
 import {
-  DeleteProjectionThreadInput,
   GetProjectionThreadInput,
-  ListProjectionThreadsByProjectInput,
   ProjectionThread,
   ProjectionThreadRepository,
   type ProjectionThreadRepositoryShape,
 } from "../Services/ProjectionThreads.ts";
+<<<<<<< HEAD
 import {
   ModelSelection,
   ThreadBabysit,
@@ -22,6 +21,9 @@ import {
   ThreadTitleState,
   ThreadLinkedPullRequest,
 } from "@infinitus/contracts";
+=======
+import { ModelSelection, ThreadLinkedPullRequest, ThreadTitleState } from "@infinitus/contracts";
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
 
 const ProjectionThreadDbRow = ProjectionThread.mapFields(
   Struct.assign({
@@ -36,7 +38,6 @@ const ProjectionThreadDbRow = ProjectionThread.mapFields(
     groupId: Schema.NullOr(Schema.String),
   }),
 );
-type ProjectionThreadDbRow = typeof ProjectionThreadDbRow.Type;
 
 const makeProjectionThreadRepository = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -204,6 +205,7 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
       `,
   });
 
+<<<<<<< HEAD
   const listProjectionThreadRows = SqlSchema.findAll({
     Request: ListProjectionThreadsByProjectInput,
     Result: ProjectionThreadDbRow,
@@ -260,6 +262,8 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
       `,
   });
 
+=======
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
   const upsert: ProjectionThreadRepositoryShape["upsert"] = (row) =>
     upsertProjectionThreadRow(row).pipe(
       Effect.mapError(toPersistenceSqlError("ProjectionThreadRepository.upsert:query")),
@@ -270,21 +274,9 @@ const makeProjectionThreadRepository = Effect.gen(function* () {
       Effect.mapError(toPersistenceSqlError("ProjectionThreadRepository.getById:query")),
     );
 
-  const listByProjectId: ProjectionThreadRepositoryShape["listByProjectId"] = (input) =>
-    listProjectionThreadRows(input).pipe(
-      Effect.mapError(toPersistenceSqlError("ProjectionThreadRepository.listByProjectId:query")),
-    );
-
-  const deleteById: ProjectionThreadRepositoryShape["deleteById"] = (input) =>
-    deleteProjectionThreadRow(input).pipe(
-      Effect.mapError(toPersistenceSqlError("ProjectionThreadRepository.deleteById:query")),
-    );
-
   return {
     upsert,
     getById,
-    listByProjectId,
-    deleteById,
   } satisfies ProjectionThreadRepositoryShape;
 });
 

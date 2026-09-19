@@ -1,7 +1,10 @@
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { CameraView, useCameraPermissions } from "expo-camera";
+<<<<<<< HEAD
 import Constants from "expo-constants";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
+=======
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
 import {
   StackActions,
   useNavigation,
@@ -231,7 +234,8 @@ export function ConnectionsNewRouteScreen({
       actions={[
         {
           accessibilityLabel: showScanner ? "Close scanner" : "Scan QR code",
-          icon: showScanner ? "xmark" : "camera",
+          icon: showScanner ? "xmark" : Platform.OS === "ios" ? "qrcode.viewfinder" : "camera",
+          tintColor: headerIconColor,
           onPress: () => {
             if (showScanner) {
               closeScanner();
@@ -242,26 +246,6 @@ export function ConnectionsNewRouteScreen({
         },
       ]}
     >
-      <NativeStackScreenOptions
-        options={{ title: showScanner ? "Scan QR Code" : "Add Environment" }}
-      />
-      {Platform.OS !== "android" ? (
-        <NativeHeaderToolbar placement="right">
-          <NativeHeaderToolbar.Button
-            icon={showScanner ? "xmark" : "qrcode.viewfinder"}
-            onPress={() => {
-              if (showScanner) {
-                closeScanner();
-              } else {
-                void openScanner();
-              }
-            }}
-            separateBackground
-            tintColor={headerIconColor}
-          />
-        </NativeHeaderToolbar>
-      ) : null}
-
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
