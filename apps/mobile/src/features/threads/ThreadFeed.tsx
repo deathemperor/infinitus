@@ -311,7 +311,8 @@ function MessageAttachmentImage(props: {
     }),
     [props.attachmentId, props.name, props.mimeType],
   );
-  const uri = useAssetUrl(props.environmentId, resource);
+  const assetUrl = useAssetUrlState(props.environmentId, resource);
+  const uri = assetUrl._tag === "Success" ? assetUrl.url : null;
   const refreshAssetUrl = useRefreshAssetUrl(props.environmentId, resource);
   const retriedImage = useRef(false);
 
@@ -328,12 +329,17 @@ function MessageAttachmentImage(props: {
       <Pressable
         accessibilityRole="imagebutton"
         accessibilityLabel={`Open ${props.name}`}
-        onPress={() =>
-          // The viewer mints its own URL from the resource so the image survives a refresh.
+        onPress={() => {
+          void Haptics.selectionAsync();
+          // The viewer opens on the thumbnail's URL while it has time left, and mints its
+          // own from the resource otherwise, so the image survives a refresh.
           props.onPressPreview({
             kind: "image",
             environmentId: props.environmentId,
             resource,
+            ...(assetUrl._tag === "Success"
+              ? { cachedUrl: { url: assetUrl.url, expiresAt: assetUrl.expiresAt } }
+              : {}),
             name: props.name,
             sourceIdentifier,
             actionsSource: {
@@ -342,8 +348,8 @@ function MessageAttachmentImage(props: {
               environmentId: props.environmentId,
               resource,
             },
-          })
-        }
+          });
+        }}
       >
         <Image
           source={{ uri }}

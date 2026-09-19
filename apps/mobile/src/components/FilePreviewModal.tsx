@@ -1,11 +1,12 @@
 import { useIsFocused } from "@react-navigation/native";
 import type { AssetResource, EnvironmentId } from "@infinitus/contracts";
-import { useEffect, useEffectEvent, useState } from "react";
-import { Alert, Keyboard } from "react-native";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { Alert, Keyboard, Platform } from "react-native";
 
 import type { FileBackedComposerAttachment } from "../lib/composerImages";
 import { loadLocalAttachmentPreview } from "../lib/localAttachmentPreview";
 import type { MediaActionsSource } from "../lib/mediaActions";
+import { reusablePreviewUrl } from "../features/infinitus/previewUrlReuse.logic";
 import { useRefreshAssetUrl } from "../state/assets";
 import { FilePreview } from "./FilePreview";
 
@@ -23,7 +24,12 @@ export type FilePreviewSource = Omit<ResolvedFilePreviewSource, "uri"> &
   (
     | { readonly uri: string }
     | { readonly attachment: FileBackedComposerAttachment }
-    | { readonly environmentId: EnvironmentId; readonly resource: AssetResource }
+    | {
+        readonly environmentId: EnvironmentId;
+        readonly resource: AssetResource;
+        /** The URL the thumbnail is showing, so an attachment opens without a round trip. */
+        readonly cachedUrl?: { readonly url: string; readonly expiresAt: number };
+      }
   );
 
 function ResolvedFilePreview(props: {
@@ -38,7 +44,22 @@ function ResolvedFilePreview(props: {
     "resource" in source ? source.resource : null,
   );
   // Resolve once per presentation; background URL refreshes must not reopen the native viewer.
-  const [uri, setUri] = useState<string | null>("uri" in source ? source.uri : null);
+  const [uri, setUri] = useState<string | null>(() => {
+    if ("uri" in source) return source.uri;
+    // iOS only: its native preview reports a refused download, which the retry below needs.
+    // Android's in-app viewer has no such signal, so it keeps minting a fresh URL.
+    if (!("resource" in source) || Platform.OS !== "ios") return null;
+    const reused = reusablePreviewUrl({
+      resource: source.resource,
+      cached: source.cachedUrl,
+      now: Date.now(),
+    });
+    return reused === null ? null : reused + (source.srcFragment ?? "");
+  });
+  // A reused URL can still be refused (the phone's clock runs behind the server's); the
+  // first failure falls back to a fresh one instead of reporting the file as broken.
+  const [reusedUrl, setReusedUrl] = useState(uri !== null && "resource" in source);
+  const retrying = useRef(false);
   const onRequestClose = useEffectEvent(props.onRequestClose);
   const onResolutionError = useEffectEvent((error: unknown, fallbackMessage: string) => {
     if (props.onOpenError) props.onOpenError(error);
@@ -92,7 +113,25 @@ function ResolvedFilePreview(props: {
     };
   }, [source]);
 
-  return uri === null ? null : (
+  if (uri === null) return null;
+  if (reusedUrl) {
+    return (
+      <FilePreview
+        source={{ ...source, uri }}
+        onOpenError={() => {
+          setReusedUrl(false);
+          retrying.current = true;
+          setUri(null);
+        }}
+        onRequestClose={() => {
+          // The failed open closes itself right after reporting; the retry owns the preview now.
+          if (retrying.current) retrying.current = false;
+          else props.onRequestClose();
+        }}
+      />
+    );
+  }
+  return (
     <FilePreview
       source={{ ...source, uri }}
       onRequestClose={props.onRequestClose}
