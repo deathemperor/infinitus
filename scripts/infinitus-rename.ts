@@ -84,6 +84,8 @@ export const RENAMES: ReadonlyArray<Rename> = [
     what: "the product name's article in the user guides (a T3 Code theme → an Infinitus theme)",
     // Upstream hard-wraps its prose, so the name can straddle a line
     // ("T3\nCode installs"): the break survives, the orphaned "Code " goes.
+    // A wrap straight before punctuation ("T3\nCode.") is not handled and
+    // leaves a "Code" `--check` cannot see; read the sync's docs/user diff.
     pattern: /\b([Aa])(\s+)T3(?:[ \t]+Code\b|(\n)Code[ \t]|(?![_A-Za-z0-9]))/g,
     replacement: "$1n$2Infinitus$3",
     within: "docs/user/",
