@@ -1637,27 +1637,25 @@ final class AppModel: ObservableObject {
     /// One pass at a time (#1310): the timer, a control verb and the
     /// revival probe all land here, and a request made mid-pass runs once
     /// more after it instead of alongside it.
-    func refreshSnapshot() async {
-        await refreshFlight.run { [weak self] in await self?.refreshSnapshotPass() }
-    }
-
-    /// One fleet an engine just answered with (a flag edit's reply), made
-    /// the current reading without a full pass — what `igniteReset` does
-    /// with a forced fetch. The next poll still runs the pass's own
-    /// bookkeeping (deaths, revivals, shared usage) over it.
-    func publish(_ fleet: EngineFleet) {
-        _ = registry.state(for: fleet).apply(fleet)
+    /// `seeded` is a snapshot an engine already handed over (a flag edit's
+    /// reply, #1481), by engine id: the pass takes it instead of asking
+    /// that engine again, and runs all of its bookkeeping over it. A pass
+    /// coalesced behind another drops nothing — every pass that is not
+    /// seeded asks the engine.
+    func refreshSnapshot(seeded: [String: [EngineFleet]] = [:]) async {
+        await refreshFlight.run { [weak self] in await self?.refreshSnapshotPass(seeded: seeded) }
     }
 
     private let refreshFlight = SingleFlight()
 
-    private func refreshSnapshotPass() async {
+    private func refreshSnapshotPass(seeded: [String: [EngineFleet]] = [:]) async {
         let engines = registry.engines
         guard !engines.isEmpty else { return }
         var results: [(id: String, fleets: [EngineFleet]?, error: Error?)] = []
         await withTaskGroup(of: (String, [EngineFleet]?, Error?).self) { group in
             for engine in engines {
                 group.addTask {
+                    if let fleets = seeded[engine.id] { return (engine.id, fleets, nil) }
                     do { return (engine.id, try await engine.snapshot(), nil) }
                     catch { return (engine.id, nil, error) }
                 }

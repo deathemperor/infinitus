@@ -379,7 +379,7 @@ public actor CLIProxyEngine: AccountEngine {
     /// credential before an unstarred one. A star joins the tier just
     /// above the floor — under anything switched to (top+1), so the active
     /// credential stays the top pick; unstarring drops to the floor.
-    public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? {
+    public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? {
         let target = try name(fleet, number)
         let floor = (ordinals[fleet] ?? []).map { priorityByName[$0] ?? 0 }.min() ?? 0
         let current = priorityByName[target] ?? 0
@@ -396,14 +396,14 @@ public actor CLIProxyEngine: AccountEngine {
         priorityByName[target] = priority
     }
 
-    public func setHold(fleet: Provider, number: Int, held: Bool) async throws -> EngineFleet? {
+    public func setHold(fleet: Provider, number: Int, held: Bool) async throws -> [EngineFleet]? {
         let target = try name(fleet, number)
         _ = try await request("PATCH", "auth-files/status",
                               json: ["name": target, "disabled": held])
         return nil
     }
 
-    public func rename(fleet: Provider, number: Int, _ alias: String) async throws -> EngineFleet? {
+    public func rename(fleet: Provider, number: Int, _ alias: String) async throws -> [EngineFleet]? {
         let target = try name(fleet, number)
         _ = try await request("PATCH", "auth-files/fields",
                               json: ["name": target,

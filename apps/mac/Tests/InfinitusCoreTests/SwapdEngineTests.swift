@@ -394,6 +394,35 @@ final class SwapdEngineTests: XCTestCase {
         XCTAssertEqual(fleets[0].accounts.map(\.number), [1])
     }
 
+    /// #1481: an edit's reply is the engine's next snapshot, so the refresh
+    /// pass that follows costs no second `list`.
+    func testAnEditAnswersWithTheSnapshotOnceAListHasBeenRead() async throws {
+        let engine = try makeEngine()
+        let early = try await engine.setAutoIgnite(fleet: .claude, number: 1, true)
+        XCTAssertNil(early, "nothing to lay the reply over before the first list")
+        _ = try await engine.snapshot()
+        let fleets = try await engine.setAutoIgnite(fleet: .claude, number: 1, true)
+        XCTAssertEqual(fleets?.map(\.key), ["swapd/claude"])
+        XCTAssertEqual(try argv().filter { $0.hasPrefix("list") }, ["list --json"], "no second list")
+    }
+
+    /// A single-provider verb answers with that provider alone; the others
+    /// keep their last reading instead of vanishing from the snapshot.
+    func testAnEditsReplyIsLaidOverTheLastFullList() throws {
+        func list(_ providers: String) throws -> SwapdList {
+            try JSONDecoder().decode(SwapdList.self, from: Data(#"{"schemaVersion":1,"providers":[\#(providers)]}"#.utf8))
+        }
+        func view(_ provider: String, slot: Int) -> String {
+            #"{"provider":"\#(provider)","installed":true,"accounts":[\#(SwapdMappingTests.account(slot: slot))]}"#
+        }
+        let memory = SwapdActiveMemory()
+        XCTAssertNil(memory.merged(with: try list(view("claude", slot: 1))))
+        memory.keep(try list(view("claude", slot: 1) + "," + view("gemini", slot: 5)))
+        let merged = try XCTUnwrap(memory.merged(with: try list(view("claude", slot: 2))))
+        XCTAssertEqual(merged.providers.map(\.provider), ["claude", "gemini"])
+        XCTAssertEqual(merged.providers.map { $0.accounts.map(\.slot) }, [[2], [5]])
+    }
+
     func testAutoIgniteIsTheEnginesOwnVerb() async throws {
         let engine = try makeEngine()
         try await engine.setAutoIgnite(fleet: .claude, number: 1, true)

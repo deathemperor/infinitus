@@ -38,6 +38,11 @@ public struct SwapdEngine: AccountEngine {
 
     public func snapshot() async throws -> [EngineFleet] {
         let list = try await cli.list()
+        memory.keep(list)
+        return fleets(of: list)
+    }
+
+    private func fleets(of list: SwapdList) -> [EngineFleet] {
         let fleets = SwapdMapping.fleets(from: list, engineID: Self.engineID,
                                          carriedActive: { [memory] provider in memory.last(provider) })
         for view in list.providers {
@@ -51,7 +56,12 @@ public struct SwapdEngine: AccountEngine {
     /// One forced fetch for account n, then the fleet as it reads AFTER it
     /// — the caller publishes that instead of waiting for the next poll.
     public func refresh(fleet: Provider, number: Int) async throws -> EngineFleet {
-        try edited(await cli.refresh(provider: fleet, slot: number), fleet)
+        let list = try await cli.refresh(provider: fleet, slot: number)
+        let result = try Self.fleet(from: list, provider: fleet, carriedActive: memory.last(fleet))
+        if let view = list.providers.first(where: { SwapdMapping.provider(for: $0.provider) == fleet }) {
+            memory.remember(result, unreadable: view.activeUnreadable != nil)
+        }
+        return result
     }
 
     /// The provider's view out of a list reply. swapd answers a
@@ -69,35 +79,33 @@ public struct SwapdEngine: AccountEngine {
         try await cli.switchTo(provider: fleet, slot: number)
     }
     public func rotate(fleet: Provider) async throws { try await cli.rotate(provider: fleet) }
-    /// Every flag edit answers with the provider's board as it reads
-    /// after the write — the same reply `refresh` gets — so the caller
-    /// publishes it instead of running `list` again (#1481).
-    public func reorder(fleet: Provider, _ numbers: [Int]) async throws -> EngineFleet? {
-        try edited(await cli.reorder(provider: fleet, numbers), fleet)
+    /// Every flag edit answers with its provider's board as it reads after
+    /// the write. Laid over the last full list that is the engine's next
+    /// snapshot, so the refresh pass takes it instead of running `list`
+    /// again (#1481). Nil before the first `list`: there is nothing to
+    /// lay it over, and the pass asks as usual.
+    public func reorder(fleet: Provider, _ numbers: [Int]) async throws -> [EngineFleet]? {
+        edited(try await cli.reorder(provider: fleet, numbers))
     }
-    public func setHold(fleet: Provider, number: Int, held: Bool) async throws -> EngineFleet? {
-        try edited(await cli.setHold(provider: fleet, slot: number, held: held), fleet)
+    public func setHold(fleet: Provider, number: Int, held: Bool) async throws -> [EngineFleet]? {
+        edited(try await cli.setHold(provider: fleet, slot: number, held: held))
     }
-    public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? {
-        try edited(await cli.setPreferred(provider: fleet, slot: number, on), fleet)
+    public func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? {
+        edited(try await cli.setPreferred(provider: fleet, slot: number, on))
     }
-    public func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> EngineFleet? {
-        try edited(await cli.setAutoIgnite(provider: fleet, slot: number, on), fleet)
+    public func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? {
+        edited(try await cli.setAutoIgnite(provider: fleet, slot: number, on))
     }
-    private func edited(_ list: SwapdList, _ provider: Provider) throws -> EngineFleet {
-        let result = try Self.fleet(from: list, provider: provider, carriedActive: memory.last(provider))
-        if let view = list.providers.first(where: { SwapdMapping.provider(for: $0.provider) == provider }) {
-            memory.remember(result, unreadable: view.activeUnreadable != nil)
-        }
-        return result
+    private func edited(_ reply: SwapdList) -> [EngineFleet]? {
+        memory.merged(with: reply).map(fleets(of:))
     }
     /// `swapd ignite <slot>`: the driver's cheapest request under that
     /// slot's own login, then a forced fetch. The fleet stays put.
     public func ignite(fleet: Provider, number: Int) async throws {
         _ = try await cli.ignite(provider: fleet, slot: number)
     }
-    public func rename(fleet: Provider, number: Int, _ name: String) async throws -> EngineFleet? {
-        try edited(await cli.setAlias(provider: fleet, slot: number, name), fleet)
+    public func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]? {
+        edited(try await cli.setAlias(provider: fleet, slot: number, name))
     }
     public func remove(fleet: Provider, number: Int) async throws {
         try await cli.removeAccount(provider: fleet, slot: number)
@@ -115,6 +123,28 @@ public struct SwapdEngine: AccountEngine {
 final class SwapdActiveMemory: @unchecked Sendable {
     private let lock = NSLock()
     private var lastActive: [Provider: Int] = [:]
+    private var lastList: SwapdList?
+
+    func keep(_ list: SwapdList) {
+        lock.lock(); defer { lock.unlock() }
+        lastList = list
+    }
+
+    /// The last full list with `reply`'s providers laid over it — a
+    /// single-provider verb answers with that provider alone — kept as the
+    /// new last list. Nil when no full list has been read yet.
+    func merged(with reply: SwapdList) -> SwapdList? {
+        lock.lock(); defer { lock.unlock() }
+        guard let last = lastList else { return nil }
+        let fresh = Dictionary(reply.providers.map { ($0.provider, $0) }, uniquingKeysWith: { first, _ in first })
+        let known = Set(last.providers.map(\.provider))
+        let list = SwapdList(
+            schemaVersion: reply.schemaVersion,
+            providers: last.providers.map { fresh[$0.provider] ?? $0 }
+                + reply.providers.filter { !known.contains($0.provider) })
+        lastList = list
+        return list
+    }
 
     /// `activeSlot` present ⇒ remember it (this also re-remembers a
     /// carried slot, harmlessly). Absent with `unreadable` ⇒ swapd knows
