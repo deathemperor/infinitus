@@ -242,26 +242,31 @@ final class FleetState: ObservableObject, Identifiable {
 
     // MARK: actions — engine first, then a fresh snapshot
 
+    /// `op` answers with the engine's snapshot when its verb already
+    /// returned one (a flag edit, #1481): the refresh pass takes it instead
+    /// of asking the engine again. Nil asks as usual.
     private func perform(after settle: @escaping @MainActor () -> Void = {},
-                         _ op: @escaping @Sendable () async throws -> Void) {
+                         _ op: @escaping @Sendable () async throws -> [EngineFleet]?) {
+        let engineID = engineID
         Task {
+            var seeded: [String: [EngineFleet]] = [:]
             do {
-                try await op()
+                if let fleets = try await op() { seeded[engineID] = fleets }
                 host.lastError = nil
             } catch { host.lastError = EngineFailure.sentence(error) }
-            await host.refreshSnapshot()
+            await host.refreshSnapshot(seeded: seeded)
             settle()
         }
     }
 
     func switchTo(_ number: Int) {
         let engine = engine, provider = provider
-        perform { try await engine.switchTo(fleet: provider, number: number) }
+        perform { try await engine.switchTo(fleet: provider, number: number); return nil }
     }
 
     func rotate() {
         let engine = engine, provider = provider
-        perform { try await engine.rotate(fleet: provider) }
+        perform { try await engine.rotate(fleet: provider); return nil }
     }
 
     /// Hold an account out of rotation / return it (engine-side flag; a
@@ -287,14 +292,17 @@ final class FleetState: ObservableObject, Identifiable {
             && !(accounts.first { $0.number == number }?.active ?? true)
         pendingPreferred[number] = on
         perform(after: { [weak self] in self?.pendingPreferred[number] = nil }) {
-            try await engine.setPreferred(fleet: provider, number: number, on)
-            if land { try await engine.switchTo(fleet: provider, number: number) }
+            let edited = try await engine.setPreferred(fleet: provider, number: number, on)
+            guard land else { return edited }
+            // The switch moves the active account after the edit's reply.
+            try await engine.switchTo(fleet: provider, number: number)
+            return nil
         }
     }
 
     func remove(_ number: Int) {
         let engine = engine, provider = provider
-        perform { try await engine.remove(fleet: provider, number: number) }
+        perform { try await engine.remove(fleet: provider, number: number); return nil }
     }
 
     /// The in-flight rename pass from `randomizeNames`/`restoreNames`, so
