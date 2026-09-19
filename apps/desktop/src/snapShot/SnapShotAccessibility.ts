@@ -3,7 +3,7 @@
 import {
   SNAP_SHOT_ACCESSIBLE_TEXT_MAX_CHARS,
   type SnapShotAccessibility,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import type * as Electron from "electron";
 
 import {

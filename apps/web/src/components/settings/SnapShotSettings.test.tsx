@@ -2,7 +2,7 @@ import {
   DEFAULT_CLIENT_SETTINGS,
   type ClientSettingsPatch,
   type DesktopSnapShotState,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 import { reactHookHarness as hooks } from "../../test/reactHookHarness";
 import { visitElements } from "../../test/reactElementTree";

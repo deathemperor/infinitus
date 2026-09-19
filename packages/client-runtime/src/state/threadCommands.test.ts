@@ -8,7 +8,7 @@ import {
   ThreadId,
   type ClientOrchestrationCommand,
   type OrchestrationShellSnapshot,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";

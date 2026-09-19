@@ -2,7 +2,7 @@ import type {
   PullRequestAction,
   PullRequestMergeMethod,
   PullRequestStackHead,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 import * as Clock from "effect/Clock";
 import * as Result from "effect/Result";

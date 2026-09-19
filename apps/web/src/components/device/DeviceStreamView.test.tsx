@@ -1,6 +1,6 @@
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 vi.mock("~/state/device", () => ({
@@ -8,7 +8,7 @@ vi.mock("~/state/device", () => ({
   refreshDeviceHubAccess: vi.fn(),
 }));
 const access = { httpBase: "http://test", wsBase: "ws://test", query: {}, credentials: true };
-vi.mock("@t3tools/client-runtime/device/stream", () => ({
+vi.mock("@infinitus/client-runtime/device/stream", () => ({
   createDeviceStreamClient: (
     _target: unknown,
     _canvas: unknown,

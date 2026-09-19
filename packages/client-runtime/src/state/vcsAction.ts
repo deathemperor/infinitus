@@ -8,7 +8,7 @@ import {
   GitStackedAction,
   type ThreadId,
   WS_METHODS,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

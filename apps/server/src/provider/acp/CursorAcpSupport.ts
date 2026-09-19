@@ -2,7 +2,7 @@ import {
   type CursorSettings,
   type ProviderOptionSelection,
   type RuntimeMode,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

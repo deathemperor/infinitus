@@ -14,7 +14,9 @@ export function EmptyState(props: {
   if (props.variant === "plain") {
     return (
       <View className="items-center px-8 py-8">
-        <Text className="text-center text-xl font-t3-bold text-foreground">{props.title}</Text>
+        <Text className="text-center text-xl font-infinitus-bold text-foreground">
+          {props.title}
+        </Text>
         <Text className="mt-2 text-center font-sans text-base leading-normal text-foreground-muted">
           {props.detail}
         </Text>
@@ -25,7 +27,7 @@ export function EmptyState(props: {
             className="mt-5 rounded-full bg-primary px-5 py-3 active:opacity-70"
             onPress={props.onAction}
           >
-            <Text className="text-sm font-t3-bold text-primary-foreground">
+            <Text className="text-sm font-infinitus-bold text-primary-foreground">
               {props.actionLabel}
             </Text>
           </Pressable>
@@ -36,7 +38,7 @@ export function EmptyState(props: {
 
   return (
     <View className="rounded-[22px] border border-border bg-card p-5">
-      <Text className="font-t3-bold text-lg text-foreground">{props.title}</Text>
+      <Text className="font-infinitus-bold text-lg text-foreground">{props.title}</Text>
       <Text className="mt-2 font-sans text-sm leading-relaxed text-foreground-muted">
         {props.detail}
       </Text>
@@ -47,7 +49,9 @@ export function EmptyState(props: {
           className="mt-4 self-start rounded-full bg-primary px-4 py-2.5 active:opacity-70"
           onPress={props.onAction}
         >
-          <Text className="text-sm font-t3-bold text-primary-foreground">{props.actionLabel}</Text>
+          <Text className="text-sm font-infinitus-bold text-primary-foreground">
+            {props.actionLabel}
+          </Text>
         </Pressable>
       ) : null}
     </View>

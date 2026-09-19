@@ -7,7 +7,7 @@ import {
   THREAD_JUMP_KEYBINDING_COMMANDS,
   type ModelPickerJumpKeybindingCommand,
   type ThreadJumpKeybindingCommand,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { isElectron } from "./env";
 import { isMacPlatform } from "./lib/utils";
 

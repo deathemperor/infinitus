@@ -1,5 +1,5 @@
-import type { StorageCleanupSettings, WorktreeCleanupRules } from "@t3tools/contracts";
-import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
+import type { StorageCleanupSettings, WorktreeCleanupRules } from "@infinitus/contracts";
+import { resolveWorktreeCleanup } from "@infinitus/shared/projectSettings";
 import { useState } from "react";
 
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";

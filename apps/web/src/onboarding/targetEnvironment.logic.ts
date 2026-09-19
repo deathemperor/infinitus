@@ -1,5 +1,5 @@
-import type { ConnectionTarget } from "@t3tools/client-runtime/connection";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { ConnectionTarget } from "@infinitus/client-runtime/connection";
+import type { EnvironmentId } from "@infinitus/contracts";
 
 interface OnboardingEnvironment {
   readonly environmentId: EnvironmentId;

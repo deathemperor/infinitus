@@ -15,8 +15,8 @@ export function SettingsSection(props: {
           <Text
             className={
               Platform.OS === "android"
-                ? "px-4 text-sm font-t3-medium text-primary-text"
-                : "px-2 text-sm font-t3-medium text-foreground-muted"
+                ? "px-4 text-sm font-infinitus-medium text-primary-text"
+                : "px-2 text-sm font-infinitus-medium text-foreground-muted"
             }
           >
             {props.title}

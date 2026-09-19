@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/mobile-markdown-text",
+  "name": "@infinitus/mobile-markdown-text",
   "version": "0.0.0",
   "private": true,
   "source": "./index.ts",
@@ -29,8 +29,8 @@
     "./types": "./src/SelectableMarkdownText.types.ts"
   },
   "peerDependencies": {
-    "@t3tools/client-runtime": "*",
-    "@t3tools/shared": "*",
+    "@infinitus/client-runtime": "*",
+    "@infinitus/shared": "*",
     "expo": "*",
     "expo-asset": "*",
     "expo-clipboard": "*",

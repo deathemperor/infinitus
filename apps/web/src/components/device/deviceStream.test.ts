@@ -6,7 +6,7 @@ import {
   avcCodecString,
   parseSemuPacket,
   scanAccessUnit,
-} from "@t3tools/client-runtime/device/stream";
+} from "@infinitus/client-runtime/device/stream";
 
 const envelope = (tag: number, payload: number[]) => {
   const length = 1 + payload.length;

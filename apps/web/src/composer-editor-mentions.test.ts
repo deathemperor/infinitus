@@ -1,5 +1,5 @@
-import { EnvironmentId, MessageId, ThreadId, type AssistantCitation } from "@t3tools/contracts";
-import { serializeAssistantCitation } from "@t3tools/shared/assistantCitations";
+import { EnvironmentId, MessageId, ThreadId, type AssistantCitation } from "@infinitus/contracts";
+import { serializeAssistantCitation } from "@infinitus/shared/assistantCitations";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

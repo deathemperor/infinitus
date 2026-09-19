@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { MOBILE_THEME_IDS } from "@t3tools/shared/themePalettes";
+import { MOBILE_THEME_IDS } from "@infinitus/shared/themePalettes";
 
 import { getMobileThemeVariables } from "../../lib/mobileTheme";
 import { getThreadListV2RowAppearance as iosAppearance } from "./thread-list-v2-row-appearance";

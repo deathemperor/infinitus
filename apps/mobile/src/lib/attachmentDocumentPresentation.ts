@@ -1,4 +1,4 @@
-import type { FilePreviewKind } from "@t3tools/shared/filePreview";
+import type { FilePreviewKind } from "@infinitus/shared/filePreview";
 
 /** The available preview and selected body must agree, including source-only draft files. */
 export function attachmentDocumentPresentation(input: {

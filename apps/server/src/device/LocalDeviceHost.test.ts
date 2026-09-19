@@ -4,7 +4,7 @@ import {
   HostProcessEnvironment,
   HostProcessPlatform,
   HostProcessIsExecutable,
-} from "@t3tools/shared/hostProcess";
+} from "@infinitus/shared/hostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
@@ -14,7 +14,7 @@ import * as LocalDeviceHost from "./LocalDeviceHost.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 import { HttpClient } from "effect/unstable/http";
-import * as NetService from "@t3tools/shared/Net";
+import * as NetService from "@infinitus/shared/Net";
 import * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 

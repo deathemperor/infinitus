@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import { beforeEach, expect, it, vi } from "vite-plus/test";
 
 const state = vi.hoisted(() => ({
@@ -41,7 +41,7 @@ vi.mock("../../state/server", () => ({ serverEnvironment: { refreshProviders: nu
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.refreshProviders }));
 
 import { useRefreshLimits } from "./UsageLimitsSection";
-import { refreshUsageLimits } from "@t3tools/client-runtime/state/usage";
+import { refreshUsageLimits } from "@infinitus/client-runtime/state/usage";
 
 beforeEach(() => {
   state.values = [];

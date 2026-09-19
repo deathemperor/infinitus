@@ -1,7 +1,7 @@
 import type {
   RelayAgentActivityAggregateState,
   RelayAgentActivityState,
-} from "@t3tools/contracts/relay";
+} from "@infinitus/contracts/relay";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import {

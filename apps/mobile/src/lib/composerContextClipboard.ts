@@ -7,14 +7,17 @@ import {
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
   COMPOSER_CONTEXT_MAX_RECORDS,
   type EnvironmentId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   decodeComposerContextClipboardHtml,
   decodeComposerContextFragment,
   encodeComposerContextFragment,
-} from "@t3tools/shared/composerContextClipboard";
-import { executeAtomQuery, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { resolveAssetUrl } from "@t3tools/client-runtime/state/assets";
+} from "@infinitus/shared/composerContextClipboard";
+import {
+  executeAtomQuery,
+  squashAtomCommandFailure,
+} from "@infinitus/client-runtime/state/runtime";
+import { resolveAssetUrl } from "@infinitus/client-runtime/state/assets";
 import * as Option from "effect/Option";
 import { appAtomRegistry } from "../state/atom-registry";
 import { assetEnvironment } from "../state/assets";

@@ -1,6 +1,6 @@
 // @effect-diagnostics globalDate:off -- Tests exercise local calendar snooze boundaries.
-import { ThreadId } from "@t3tools/contracts";
-import { TurnId } from "@t3tools/contracts";
+import { ThreadId } from "@infinitus/contracts";
+import { TurnId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -13,7 +13,7 @@ import {
   threadWokeAt,
   type ThreadSnoozeShell,
 } from "./threadSettled.ts";
-import type { OrchestrationThreadShell } from "@t3tools/contracts";
+import type { OrchestrationThreadShell } from "@infinitus/contracts";
 
 const NOW = "2026-04-10T12:00:00.000Z";
 const SNOOZED_AT = "2026-04-10T09:00:00.000Z";

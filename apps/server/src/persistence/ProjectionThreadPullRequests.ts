@@ -1,4 +1,4 @@
-import { normalizeThreadPullRequestKey } from "@t3tools/shared/threadPullRequests";
+import { normalizeThreadPullRequestKey } from "@infinitus/shared/threadPullRequests";
 import {
   IsoDateTime,
   PositiveInt,
@@ -8,7 +8,7 @@ import {
   ThreadPullRequestSnapshot,
   ThreadPullRequestStack,
   TrimmedNonEmptyString,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";

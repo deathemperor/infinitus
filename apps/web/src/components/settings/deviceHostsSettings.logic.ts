@@ -1,4 +1,4 @@
-import type { SshDeviceHostConfig } from "@t3tools/contracts";
+import type { SshDeviceHostConfig } from "@infinitus/contracts";
 
 /** Apply one host change without replacing another environment's host list. */
 export function updateDeviceHosts(

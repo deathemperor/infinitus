@@ -4,7 +4,7 @@ import {
   PullRequestOperationError,
   WS_METHODS,
   type PullRequestStack,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Data from "effect/Data";
 import * as Deferred from "effect/Deferred";
