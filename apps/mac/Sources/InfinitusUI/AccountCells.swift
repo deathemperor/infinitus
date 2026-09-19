@@ -261,6 +261,16 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
 
     var deadCause: AccountVitals.DeadCause? { AccountVitals.cause(account.usage) }
 
+    /// The spent window a cell stands for: every dead window reads "down"
+    /// in its own cell, not only the governing one (user 2026-09-19).
+    func ownCause(_ isMine: (AccountVitals.DeadCause) -> Bool) -> AccountVitals.DeadCause? {
+        AccountVitals.deadCauses(account.usage).first(where: isMine)
+    }
+
+    func repeatsClock(_ cause: AccountVitals.DeadCause) -> Bool {
+        AccountVitals.resetRepeatsEarlierCause(cause, in: account.usage)
+    }
+
     /// Whether the weekly cell of THIS row already counts down the clock a
     /// dead model window would repeat — Fable's quota rolls with the 7d one
     /// (user 2026-09-15: "fable has reset time of 7d so when fable is down
@@ -299,8 +309,12 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     /// `timer: false` drops the reset: a dead per-model window whose
     /// clock the weekly cell already counts down says it twice otherwise
     /// (user 2026-09-15). The tooltip keeps the countdown either way.
-    @ViewBuilder func deadLine(timer: Bool = true) -> some View {
-        if let cause = deadCause {
+    ///
+    /// `of:` is the cell's own spent window; the governing cause when
+    /// omitted (the narrow list's one-liner).
+    @ViewBuilder func deadLine(of own: AccountVitals.DeadCause? = nil,
+                               timer: Bool = true) -> some View {
+        if let cause = own ?? deadCause {
             HStack(spacing: 4) {
                 // Themed label + themed verb ("MP down", "🎬 sold out");
                 // the plain theme keeps plain words. The tooltip carries
@@ -424,8 +438,8 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     @ViewBuilder func windowCell(_ w: UsageWindow?, session: Bool,
                                  timer: Bool = true) -> some View {
         Group {
-            if showAsDead, let cause = deadCause, cause.blocks(session: session) {
-                deadLine().fixedSize()
+            if showAsDead, let cause = ownCause({ $0.blocks(session: session) }) {
+                deadLine(of: cause, timer: !repeatsClock(cause)).fixedSize()
             } else if let w, !hiddenInCompact(w.pct) {
                 HStack(spacing: 3) {
                     // No ahead-of-pace badge: the burn effect on the bar
@@ -618,8 +632,9 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         }) { entry in
             let w = entry.win
             Group {
-                if showAsDead, let cause = deadCause, cause.blocks(scoped: w.name) {
-                    deadLine(timer: !weeklyAlreadyShows(cause))
+                if showAsDead, let cause = ownCause({ $0.blocks(scoped: w.name) }) {
+                    deadLine(of: cause,
+                             timer: !weeklyAlreadyShows(cause) && !repeatsClock(cause))
                 } else if hiddenInCompact(w.pct) {
                     if banded, !model.compactRows {
                         Text(verbatim: "")
