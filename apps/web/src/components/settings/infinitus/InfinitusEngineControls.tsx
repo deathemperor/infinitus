@@ -6,20 +6,24 @@
  * engine instead — it is the app on the machine the engine runs on, and unlike
  * the menu-bar app it is the one the user is already looking at.
  *
- * Shown only in the desktop shell, and only for this computer: the buttons act
- * on the machine running this window, never on a named remote environment.
+ * Drawn inside each engine's own section, under its connection rows, only in
+ * the desktop shell and only for this computer: the buttons act on the machine
+ * running this window, never on a named remote environment.
  *
  * @module InfinitusEngineControls
  */
-import type { InfinitusEngineSupervision, InfinitusEngines } from "@infinitus/contracts/infinitus";
+import type {
+  InfinitusEngineKey,
+  InfinitusEngineSupervision,
+  InfinitusEngines,
+} from "@infinitus/contracts/infinitus";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Switch } from "../../ui/switch";
-import { SettingsRow, SettingsSection } from "../settingsLayout";
-import { PROXY_ENGINES } from "./engines.logic";
+import { SettingsRow } from "../settingsLayout";
 import {
   engineBadge,
   engineControlsEnabled,
@@ -34,7 +38,10 @@ const BADGE_VARIANT = {
   down: "outline",
 } as const;
 
-export function InfinitusEngineControls() {
+/** The engines this shell runs and the calls that change them; `null` where
+    there is no desktop bridge, or before it first answers. One per page, so a
+    call on one engine locks the other's buttons too. */
+export function useInfinitusEngineProcesses() {
   // A window global, fixed for the page's life.
   const bridge = useMemo(
     () => infinitusEngineBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
@@ -43,7 +50,7 @@ export function InfinitusEngineControls() {
   const [engines, setEngines] = useState<InfinitusEngines | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ key: string | null; message: string } | null>(null);
 
   const apply = useCallback((next: InfinitusEngines) => {
     setEngines(next);
@@ -65,7 +72,9 @@ export function InfinitusEngineControls() {
         if (!cancelled) apply(loaded);
       },
       (cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
+        if (!cancelled) {
+          setError({ key: null, message: cause instanceof Error ? cause.message : String(cause) });
+        }
       },
     );
     return () => {
@@ -79,7 +88,7 @@ export function InfinitusEngineControls() {
       setBusy(key);
       change
         .then(apply, (cause: unknown) => {
-          setError(cause instanceof Error ? cause.message : String(cause));
+          setError({ key, message: cause instanceof Error ? cause.message : String(cause) });
         })
         .finally(() => setBusy(null));
     },
@@ -87,51 +96,52 @@ export function InfinitusEngineControls() {
   );
 
   if (bridge === null || engines === null) return null;
+  return { bridge, engines, drafts, setDrafts, locked: busy !== null, error, run };
+}
 
+export type InfinitusEngineProcesses = NonNullable<ReturnType<typeof useInfinitusEngineProcesses>>;
+
+/** One engine's process rows, for the foot of that engine's section. */
+export function InfinitusEngineProcessRows({
+  processes,
+  engineKey,
+  label,
+}: {
+  readonly processes: InfinitusEngineProcesses;
+  readonly engineKey: InfinitusEngineKey;
+  readonly label: string;
+}) {
+  const { bridge, engines, drafts, setDrafts, locked, error, run } = processes;
+  const engine = engines.engines.find((entry) => entry.key === engineKey);
+  if (engine === undefined) return null;
+  const draft = drafts[engine.key] ?? "";
   return (
-    <SettingsSection id="infinitus-engine-processes" title="On this computer">
-      <p className="px-3 text-sm text-muted-foreground sm:px-4">
-        Engines this window runs. A managed engine starts with the app, is restarted if it stops,
-        and shuts down when the app quits.
-      </p>
-      {engines.engines.map((engine) => {
-        const definition = PROXY_ENGINES.find((entry) => entry.key === engine.key);
-        const label = definition?.label ?? engine.key;
-        const badge = engineBadge(engine);
-        const controllable = engineControlsEnabled(engine);
-        const locked = busy !== null;
-        const draft = drafts[engine.key] ?? "";
-        const commandChanged = draft.trim() !== (engine.command ?? "").trim();
-        return (
-          <EngineRows
-            key={engine.key}
-            engine={engine}
-            label={label}
-            badge={badge}
-            controllable={controllable}
-            locked={locked}
-            draft={draft}
-            commandChanged={commandChanged}
-            onDraft={(value) => setDrafts((current) => ({ ...current, [engine.key]: value }))}
-            onManaged={(managed) =>
-              run(engine.key, bridge.setInfinitusEngineSettings({ key: engine.key, managed }))
-            }
-            onSaveCommand={() =>
-              run(
-                engine.key,
-                bridge.setInfinitusEngineSettings({ key: engine.key, command: draft }),
-              )
-            }
-            onAction={(action) =>
-              run(engine.key, bridge.controlInfinitusEngine({ key: engine.key, action }))
-            }
-          />
-        );
-      })}
-      {error === null ? null : (
-        <p className="px-3 py-2 text-[13px] text-destructive sm:px-4">{error}</p>
-      )}
-    </SettingsSection>
+    <>
+      <EngineRows
+        engine={engine}
+        label={label}
+        badge={engineBadge(engine)}
+        controllable={engineControlsEnabled(engine)}
+        locked={locked}
+        draft={draft}
+        commandChanged={draft.trim() !== (engine.command ?? "").trim()}
+        onDraft={(value) => setDrafts((current) => ({ ...current, [engine.key]: value }))}
+        onManaged={(managed) =>
+          run(engine.key, bridge.setInfinitusEngineSettings({ key: engine.key, managed }))
+        }
+        onSaveCommand={() =>
+          run(engine.key, bridge.setInfinitusEngineSettings({ key: engine.key, command: draft }))
+        }
+        onAction={(action) =>
+          run(engine.key, bridge.controlInfinitusEngine({ key: engine.key, action }))
+        }
+      />
+      {error !== null && error.key === engine.key ? (
+        <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+          {error.message}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -164,7 +174,7 @@ function EngineRows({
   return (
     <>
       <SettingsRow
-        title={label}
+        title="On this computer"
         description={engineStateLine(engine)}
         status={<Badge variant={BADGE_VARIANT[badge.tone]}>{badge.label}</Badge>}
         control={
