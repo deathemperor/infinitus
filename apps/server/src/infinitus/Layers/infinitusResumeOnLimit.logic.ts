@@ -174,6 +174,7 @@ export function limitStopFromEvent(
       const limitType = "rateLimitType" in detail ? detail.rateLimitType : undefined;
       return {
         ...base,
+        activeAtStop: refusedClaudeAccounts(detail, snapshot),
         kind: "parked",
         // Epoch seconds on the wire, as the adapter reads it.
         resetsAt:
@@ -301,6 +302,73 @@ export function activeClaudeAccounts(snapshot: InfinitusSnapshot): ReadonlyMap<s
   for (const fleet of claudeFleets(snapshot)) {
     const active = fleet.accounts.find((account) => account.active);
     if (active !== undefined) out.set(fleet.key, accountLabel(active));
+  }
+  return out;
+}
+
+/** How far a refusal's window figure may sit from an account's reading and
+    still be that account's: readings trail the refusal by a poll or two. */
+const REFUSAL_MATCH_PCT = 10;
+
+/** The 0–1 utilization the SDK's refusal carries for one window, in percent. */
+function refusalWindowPct(detail: object, window: string): number | null {
+  const windows = "unifiedWindows" in detail ? detail.unifiedWindows : undefined;
+  if (typeof windows !== "object" || windows === null || !(window in windows)) return null;
+  const entry = (windows as Record<string, unknown>)[window];
+  if (typeof entry !== "object" || entry === null || !("utilization" in entry)) return null;
+  const utilization = entry.utilization;
+  return typeof utilization === "number" && Number.isFinite(utilization) ? utilization * 100 : null;
+}
+
+/** The widest gap between the refusal's figures and the account's reading over
+    the windows both carry; null when they share none. */
+function refusalDistance(
+  detail: object,
+  account: InfinitusFleet["accounts"][number],
+): number | null {
+  const decoded = account.usage === undefined ? undefined : decodeUsage(account.usage);
+  if (decoded === undefined || decoded._tag !== "Some") return null;
+  const pairs: ReadonlyArray<readonly [number | null, number | undefined]> = [
+    [refusalWindowPct(detail, "five_hour"), decoded.value.fiveHour?.pct],
+    [refusalWindowPct(detail, "seven_day"), decoded.value.sevenDay?.pct],
+  ];
+  let widest: number | null = null;
+  for (const [refused, read] of pairs) {
+    if (refused === null || read === undefined) continue;
+    widest = Math.max(widest ?? 0, Math.abs(refused - read));
+  }
+  return widest;
+}
+
+/**
+ * Whose limit a parked turn's refusal is, by fleet key. Normally the active
+ * account's. A CLI keeps the login it started on for a while after a swap, so
+ * a refusal seconds after one can still be the previous account's: blaming the
+ * live account reported a healthy one to the engine as spent until a weekly
+ * reset five days off, and the engine benched it 70 s after swapping to it.
+ * The refusal names its own window figures, so they decide: the active account
+ * when its reading agrees (or nothing can be compared), else the one other
+ * account whose reading does, else nobody — an unnamed stop reports nothing.
+ */
+export function refusedClaudeAccounts(
+  detail: object,
+  snapshot: InfinitusSnapshot,
+): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const fleet of claudeFleets(snapshot)) {
+    const active = fleet.accounts.find((account) => account.active);
+    if (active === undefined) continue;
+    const ofActive = refusalDistance(detail, active);
+    if (ofActive === null || ofActive <= REFUSAL_MATCH_PCT) {
+      out.set(fleet.key, accountLabel(active));
+      continue;
+    }
+    const others = fleet.accounts.filter((account) => {
+      if (account === active) return false;
+      const distance = refusalDistance(detail, account);
+      return distance !== null && distance <= REFUSAL_MATCH_PCT;
+    });
+    if (others.length === 1) out.set(fleet.key, accountLabel(others[0]!));
   }
   return out;
 }
