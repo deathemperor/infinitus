@@ -1,5 +1,8 @@
 import type { RelayClientDeviceRecord } from "@infinitus/contracts/relay";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
 
 const mobileClientUpdatedAtFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",

@@ -23,7 +23,11 @@ export function SettingsProjectOverridesSection(props: {
             onPress={props.onClear}
             className="px-2 py-2 active:opacity-70"
           >
+<<<<<<< HEAD
             <Text className="text-sm font-infinitus-medium text-primary">Use defaults</Text>
+=======
+            <Text className="text-sm font-infinitus-medium text-primary-text">Use defaults</Text>
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
           </Pressable>
         ) : null}
       </View>

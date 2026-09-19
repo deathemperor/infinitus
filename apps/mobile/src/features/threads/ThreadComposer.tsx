@@ -20,7 +20,10 @@ import {
   hasProviderUsageLimits,
   isUsageLimitsCommand,
 } from "@infinitus/shared/usageLimits";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-408ff8ae9-upstream-renamed
 import { StackActions, useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
 import {
@@ -247,12 +250,8 @@ export function ComposerSurface(props: {
     >
       <AnimatedGlassSurface
         chrome="none"
-        fallbackColor={
-          Platform.OS === "android" ? colors["--color-composer-surface"] : colors["--color-card"]
-        }
-        fallbackClassName={
-          Platform.OS === "android" ? "border border-composer-border" : "border border-border"
-        }
+        fallbackColor={colors["--color-composer-surface"]}
+        fallbackClassName="border border-composer-border"
         glassEffectStyle="regular"
         // The composer is a passive material containing interactive controls.
         // Keep native glass out of the interactive content's layout path.
