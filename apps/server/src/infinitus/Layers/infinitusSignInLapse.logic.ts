@@ -148,6 +148,8 @@ export function signInRun(command: string): SignInLapse | null {
   for (const part of bare.split(/&&|\|\||[;|\n(]/)) {
     const segment = part.trim();
     const run = segment.replace(ENV_PREFIX, "");
+    // Reading the manual opens no browser.
+    if (/\s(?:--help|-h|help)(?:\s|$)/.test(run)) continue;
     if (AWS_LOGIN_RUN.test(run)) {
       return { provider: "aws", profile: AWS_COMMAND_PROFILE.exec(segment)?.[1] ?? "default" };
     }

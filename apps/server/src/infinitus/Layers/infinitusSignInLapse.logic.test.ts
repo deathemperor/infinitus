@@ -153,6 +153,8 @@ describe("signInRun", () => {
     expect(signInRun('echo "run: aws login --profile papaya"')).toBeNull();
     expect(signInRun("git commit -m 'fix: aws login card'")).toBeNull();
     expect(signInRun("grep -rn aws login src")).toBeNull();
+    expect(signInRun("aws login --help")).toBeNull();
+    expect(signInRun("gcloud auth login --help | head -40")).toBeNull();
     expect(signInRun("AWS_PROFILE=papaya aws sts get-caller-identity")).toBeNull();
   });
 
