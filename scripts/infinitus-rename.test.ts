@@ -59,6 +59,34 @@ describe("infinitus-rename", () => {
     }
   });
 
+  it("rewrites the product name in the user guides, and nowhere else", () => {
+    const guide = [
+      "Press the shortcut and T3 Code attaches the image. Import a T3 Code theme.",
+      "T3 checks the SDK; only T3-managed worktrees qualify. Sign in to T3 Connect.",
+      "There is no npm package: `npx t3` installs upstream's T3 Code, not Infinitus.",
+      "Set `T3CODE_TELEMETRY_ENABLED=false`; state lives in `~/.t3/userdata`. © T3 Tools, Inc.",
+      "Agents drive the device through the command line. T3",
+      "Code installs it on demand, and a",
+      "T3 Code theme follows.",
+    ].join("\n");
+    const out = applyRenames(guide, "docs/user/telemetry.md");
+    expect(out).toBe(
+      [
+        "Press the shortcut and Infinitus attaches the image. Import an Infinitus theme.",
+        "Infinitus checks the SDK; only Infinitus-managed worktrees qualify. Sign in to Infinitus Connect.",
+        "There is no npm package: `npx t3` installs upstream's T3 Code, not Infinitus.",
+        "Set `T3CODE_TELEMETRY_ENABLED=false`; state lives in `~/.t3/userdata`. © T3 Tools, Inc.",
+        "Agents drive the device through the command line. Infinitus",
+        "installs it on demand, and an",
+        "Infinitus theme follows.",
+      ].join("\n"),
+    );
+    expect(applyRenames(out, "docs/user/telemetry.md")).toBe(out);
+    expect(remainingRenames(out, "docs/user/telemetry.md")).toEqual([]);
+    expect(applyRenames(guide, "docs/internals/glossary.md")).toBe(guide);
+    expect(remainingRenames(guide, "docs/internals/glossary.md")).toEqual([]);
+  });
+
   it("leaves the compat-read identifiers alone", () => {
     // The names a user's disk, a shipped build or an external service holds
     // (#1368's checklist) are not the table's to rewrite.
