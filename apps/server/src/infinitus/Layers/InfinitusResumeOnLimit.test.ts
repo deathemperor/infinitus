@@ -166,6 +166,7 @@ interface Harness {
   readonly setCurrent: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly setEnabled: (enabled: boolean) => Effect.Effect<void>;
   readonly interrupts: Effect.Effect<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>;
+  readonly sessionStops: Effect.Effect<ReadonlyArray<ThreadId>>;
   readonly turns: Effect.Effect<ReadonlyArray<{ threadId: ThreadId; input?: string }>>;
   readonly dispatched: Effect.Effect<ReadonlyArray<OrchestrationCommand>>;
   readonly watchers: Effect.Effect<number>;
@@ -191,6 +192,7 @@ const makeHarnessWith = (
       commands: [],
     });
     const interrupts = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>([]);
+    const sessionStops = yield* Ref.make<ReadonlyArray<ThreadId>>([]);
     const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input?: string }>>([]);
     const turnSent = yield* Queue.unbounded<void>();
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
@@ -214,6 +216,8 @@ const makeHarnessWith = (
                 ...previous,
                 { threadId: input.threadId, ...(input.turnId ? { turnId: input.turnId } : {}) },
               ]),
+            stopSession: (input) =>
+              Ref.update(sessionStops, (previous) => [...previous, input.threadId]),
             sendTurn: (input) =>
               Ref.update(turns, (previous) => [
                 ...previous,
@@ -299,6 +303,7 @@ const makeHarnessWith = (
       setBackground: (snapshot: InfinitusSnapshot) => Ref.set(background, snapshot),
       setEnabled: (value) => Ref.set(enabled, value),
       interrupts: Ref.get(interrupts),
+      sessionStops: Ref.get(sessionStops),
       turns: Ref.get(turns),
       dispatched: Ref.get(dispatched),
       watchers: Ref.get(watchers),
@@ -625,7 +630,9 @@ describe("InfinitusResumeOnLimitLive", () => {
     ),
   );
 
-  effectIt.effect("a failed turn is continued without an interrupt", () =>
+  // The live CLI can keep spending the account it started on after a swap;
+  // the turn sent into it was refused on the old account's limit again.
+  effectIt.effect("a failed turn is continued in a fresh session, without an interrupt", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const h = yield* makeHarness;
@@ -642,6 +649,7 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* h.poll(swapped(at(150)));
         yield* settle(h.turns, (list) => list.length === 1);
         expect(yield* h.interrupts).toEqual([]);
+        expect(yield* h.sessionStops).toEqual([threadId]);
       }),
     ),
   );

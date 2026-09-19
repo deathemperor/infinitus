@@ -114,11 +114,16 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       if (Option.isNone(shell) || shell.value.archivedAt !== null) return;
       const context = yield* projectionSnapshotQuery.getThreadRuntimeContext(stop.threadId);
       if (Option.isNone(context) || context.value.session === null) return;
+      // The resumed turn always runs in a fresh CLI: a live process can keep
+      // spending the account it started on for minutes after the swap, and the
+      // turn sent into it is refused on the old account's limit again.
       if (stop.kind === "parked") {
         yield* providerService.interruptTurn({
           threadId: stop.threadId,
           ...(stop.turnId === null ? {} : { turnId: stop.turnId }),
         });
+      } else {
+        yield* providerService.stopSession({ threadId: stop.threadId });
       }
       const createdAt = DateTime.formatIso(yield* DateTime.now);
       yield* orchestrationEngine.dispatch({
