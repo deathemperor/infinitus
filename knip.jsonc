@@ -26,6 +26,7 @@
         "fold-changelog.mjs",
         "fold-changelog.d.mts",
         "infinitus-rename.ts",
+        "export-infinitus-splash.ts",
       ],
     },
     "apps/server": {

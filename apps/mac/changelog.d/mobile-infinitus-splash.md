@@ -1,1 +1,1 @@
-Phone: The launch screen shows the Infinitus icon with rounded corners on iOS, and the Infinitus mark instead of T3's on Android.
+Phone: The launch screen shows the Infinitus icon as a rounded tile on iOS and as the Infinitus mark on Android.
