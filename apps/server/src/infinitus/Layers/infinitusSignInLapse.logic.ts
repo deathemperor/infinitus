@@ -122,6 +122,39 @@ export function signInLapse(text: string, command?: string): SignInLapse | null 
   return null;
 }
 
+/** Env assignments a shell allows ahead of the command word. */
+const ENV_PREFIX = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*/;
+const AWS_LOGIN_RUN = /^aws\s+(?:sso\s+)?login\b/;
+const GCLOUD_LOGIN_RUN = /^gcloud\s+auth\s+(application-default\s+)?login\b/;
+const GCLOUD_LOGIN_ACCOUNT = /\blogin\s+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)/;
+
+/**
+ * The sign-in a Bash command is itself running, or null: an agent that types
+ * `aws login` blocks on a browser nobody is shown, and prints no lapse
+ * signature at all. Only a login that OPENS a command counts — quoted spans
+ * are dropped and the rest split on the shell's separators — so a grep for
+ * the words, an echo of them or a commit message stays quiet (same incident
+ * as `lineStarts`). A heredoc body line that opens with the command still
+ * matches; accepted.
+ */
+export function signInRun(command: string): SignInLapse | null {
+  const bare = command.replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '""');
+  for (const part of bare.split(/&&|\|\||[;|\n(]/)) {
+    const segment = part.trim();
+    const run = segment.replace(ENV_PREFIX, "");
+    if (AWS_LOGIN_RUN.test(run)) {
+      return { provider: "aws", profile: AWS_COMMAND_PROFILE.exec(segment)?.[1] ?? "default" };
+    }
+    const gcloud = GCLOUD_LOGIN_RUN.exec(run);
+    if (gcloud === null) continue;
+    if (gcloud[1] !== undefined) return { provider: "gcloud", profile: "application-default" };
+    const account =
+      GCLOUD_COMMAND_ACCOUNT.exec(segment)?.[1] ?? GCLOUD_LOGIN_ACCOUNT.exec(run)?.[1];
+    return { provider: "gcloud", profile: account ?? "default" };
+  }
+  return null;
+}
+
 /** A tool result block's text: a string, or its text parts joined. */
 function toolResultText(value: unknown): string {
   if (typeof value === "string") return value;
@@ -134,23 +167,25 @@ function toolResultText(value: unknown): string {
 /**
  * The lapse an `item.updated` event carries, or null: the Claude driver
  * relays each tool result as one, with the raw `tool_result` block under
- * `payload.data.result` and the tool's input beside it. Every other event
- * is null.
+ * `payload.data.result` and the tool's input beside it, and a tool's start
+ * as one with the input alone — read for a login the command runs itself
+ * (`signInRun`). Every other event is null.
  */
 export function signInLapseFromEvent(event: ProviderRuntimeEvent): SignInLapse | null {
   if (event.type !== "item.updated") return null;
   const data = event.payload.data;
   if (data === null || typeof data !== "object") return null;
   const { result, input } = data as { readonly result?: unknown; readonly input?: unknown };
+  const command =
+    input !== null && typeof input === "object" && "command" in input
+      ? (input as { readonly command?: unknown }).command
+      : undefined;
+  if (result === undefined) return typeof command === "string" ? signInRun(command) : null;
   if (result === null || typeof result !== "object") return null;
   const block = result as { readonly type?: unknown; readonly content?: unknown };
   if (block.type !== "tool_result") return null;
   const text = toolResultText(block.content);
   if (text.length === 0) return null;
-  const command =
-    input !== null && typeof input === "object" && "command" in input
-      ? (input as { readonly command?: unknown }).command
-      : undefined;
   return signInLapse(text, typeof command === "string" ? command : undefined);
 }
 
