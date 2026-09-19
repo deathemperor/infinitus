@@ -298,10 +298,6 @@ async function uploadFileBytes(
       httpMethod: "POST",
       uploadType: UploadType.BINARY_CONTENT,
       headers: { "Content-Type": composerAttachmentWireMimeType(attachment) },
-      // iOS defaults to a background session, which replays a failed transfer
-      // on its own, long after the signed URL expired. The sender is waiting
-      // on the result, so the transfer has to fail where it can see.
-      sessionType: "foreground",
       signal: transfer.signal,
       ...(onProgress
         ? {
@@ -312,7 +308,8 @@ async function uploadFileBytes(
         : {}),
     });
     // Raced, not just aborted: the bound must hold even if the native task
-    // never reports the cancellation.
+    // never reports the cancellation. The abort also ends the transfer on
+    // iOS, whose background session otherwise replays a failed one on its own.
     upload.catch(() => undefined);
     const result = await Promise.race([upload, timedOut.promise]);
     if (result.status < 200 || result.status >= 300) {

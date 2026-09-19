@@ -332,20 +332,6 @@ describe("prepareTurnAttachments", () => {
     }
   });
 
-  it("uploads on the foreground session so a failed transfer is reported, not replayed", async () => {
-    await prepareTurnAttachments({
-      environmentId,
-      attachments: [fileBackedImage],
-      supportsImageUploads: true,
-    });
-
-    expect(mocks.upload).toHaveBeenCalledWith(
-      fileBackedImage.fileUri,
-      "https://environment.example/api/attachments/upload/signed",
-      expect.objectContaining({ sessionType: "foreground" }),
-    );
-  });
-
   it("uploads a file-backed image from its owned copy without staging base64", async () => {
     const prepared = await prepareTurnAttachments({
       environmentId,
