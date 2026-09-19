@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import type {
   DesktopHostTelemetrySnapshot,
   ResourceMonitorSnapshotEvent,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

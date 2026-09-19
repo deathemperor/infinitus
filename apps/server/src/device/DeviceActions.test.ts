@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { DeviceActionInput } from "@t3tools/contracts";
+import type { DeviceActionInput } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 
 import { readDeviceDetail, runDeviceAction, supportsAction } from "./DeviceActions.ts";

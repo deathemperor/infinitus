@@ -7,10 +7,10 @@ import {
   type ServerLifecycleWelcomePayload,
   type ServerProvider,
   type ServerSettings,
-} from "@t3tools/contracts";
-import { createServerEnvironmentAtoms } from "@t3tools/client-runtime/state/server";
-import { createEnvironmentServerConfigsAtom } from "@t3tools/client-runtime/state/shell";
-import { mergeWithDefaultKeybindings } from "@t3tools/shared/keybindings";
+} from "@infinitus/contracts";
+import { createServerEnvironmentAtoms } from "@infinitus/client-runtime/state/server";
+import { createEnvironmentServerConfigsAtom } from "@infinitus/client-runtime/state/shell";
+import { mergeWithDefaultKeybindings } from "@infinitus/shared/keybindings";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
 

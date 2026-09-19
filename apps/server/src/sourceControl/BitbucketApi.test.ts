@@ -14,7 +14,7 @@ import {
   HttpClientResponse,
 } from "effect/unstable/http";
 
-import { GitCommandError } from "@t3tools/contracts";
+import { GitCommandError } from "@infinitus/contracts";
 import * as BitbucketApi from "./BitbucketApi.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";

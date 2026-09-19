@@ -20,7 +20,7 @@
  * hidden panel calls `stop()` so an idle device costs nothing on the GPU.
  */
 import { type DeviceHubAccess, withDeviceHubQuery } from "./hubAccess.ts";
-import type { DevicePlatform } from "@t3tools/contracts";
+import type { DevicePlatform } from "@infinitus/contracts";
 
 export type DeviceStreamStatus = "connecting" | "streaming" | "error";
 

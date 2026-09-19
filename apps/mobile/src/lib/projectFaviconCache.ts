@@ -4,7 +4,7 @@ import {
   PROJECT_FAVICON_MAX_DATA_URL_LENGTH,
   PROJECT_FAVICON_THUMBNAIL_SIZE,
   type ProjectFaviconEntry,
-} from "@t3tools/client-runtime/project-favicon-cache";
+} from "@infinitus/client-runtime/project-favicon-cache";
 import * as Effect from "effect/Effect";
 
 import * as MobileDatabase from "../persistence/mobile-database";

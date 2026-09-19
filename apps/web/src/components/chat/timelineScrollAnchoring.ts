@@ -1,4 +1,4 @@
-import type { TurnId } from "@t3tools/contracts";
+import type { TurnId } from "@infinitus/contracts";
 
 // Match the titlebar fade inset so draft promotion preserves the first row's position.
 export const CHAT_TIMELINE_ANCHOR_OFFSET = 24;

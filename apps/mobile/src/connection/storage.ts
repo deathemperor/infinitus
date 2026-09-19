@@ -8,15 +8,15 @@ import {
   setConnectionEnabledInCatalog,
   removeCatalogValue,
   replaceCatalogValue,
-} from "@t3tools/client-runtime/platform";
-import { TokenStore } from "@t3tools/client-runtime/authorization";
+} from "@infinitus/client-runtime/platform";
+import { TokenStore } from "@infinitus/client-runtime/authorization";
 import {
   ConnectionTransientError,
   CredentialStore,
   ProfileStore,
   GitHubRoutingPermissions,
   makeGitHubRoutingPermissions,
-} from "@t3tools/client-runtime/connection";
+} from "@infinitus/client-runtime/connection";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

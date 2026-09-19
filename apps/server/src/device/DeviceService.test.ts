@@ -5,7 +5,7 @@ import {
   LOCAL_DEVICE_HOST_ID,
   ThreadId,
   type DeviceServiceState,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
@@ -15,7 +15,7 @@ import * as Stream from "effect/Stream";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { ServerSettingsService } from "../serverSettings.ts";
 import * as DeviceHost from "./DeviceHost.ts";
-import { NodeRuntimeUnavailableError } from "@t3tools/shared/nodeRuntime";
+import { NodeRuntimeUnavailableError } from "@infinitus/shared/nodeRuntime";
 
 import { type DeviceService, makeWithHosts, stateStream } from "./DeviceService.ts";
 

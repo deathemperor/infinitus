@@ -5,8 +5,8 @@ import {
   type KeybindingShortcut,
   type SnapShotModifier,
   type SnapShotShortcut,
-} from "@t3tools/contracts";
-import { parseKeybindingShortcut } from "@t3tools/shared/keybindings";
+} from "@infinitus/contracts";
+import { parseKeybindingShortcut } from "@infinitus/shared/keybindings";
 
 import { formatShortcutKeyLabel, formatShortcutLabel, shortcutConflictKey } from "../keybindings";
 import { isMacPlatform, isWindowsPlatform } from "./utils";

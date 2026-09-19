@@ -1,15 +1,15 @@
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import type {
   ExecutionEnvironmentCapabilities,
   ThreadPullRequestLink,
   VcsStatusResult,
-} from "@t3tools/contracts";
-import { resolveChangeRequestPresentation } from "@t3tools/shared/sourceControl";
+} from "@infinitus/contracts";
+import { resolveChangeRequestPresentation } from "@infinitus/shared/sourceControl";
 
 import {
   resolveThreadCurrentPullRequestLink,
   resolveThreadPullRequestBadge,
-} from "@t3tools/shared/threadPullRequests";
+} from "@infinitus/shared/threadPullRequests";
 
 export type ThreadPr = NonNullable<VcsStatusResult["pr"]>;
 

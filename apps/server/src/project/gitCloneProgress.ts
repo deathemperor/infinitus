@@ -1,4 +1,4 @@
-import type { ProjectCloneStage } from "@t3tools/contracts";
+import type { ProjectCloneStage } from "@infinitus/contracts";
 
 export interface GitCloneProgressLine {
   readonly stage: ProjectCloneStage;

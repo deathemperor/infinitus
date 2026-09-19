@@ -1,4 +1,4 @@
-import { ProjectId, ThreadId } from "@t3tools/contracts";
+import { ProjectId, ThreadId } from "@infinitus/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import {
   planThreadPullRequestMutation,

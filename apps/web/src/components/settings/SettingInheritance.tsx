@@ -2,7 +2,7 @@ import {
   DEFAULT_SERVER_SETTINGS,
   resolveEnvironmentMachineKind,
   type ServerSettings,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { CheckIcon, LayersIcon } from "lucide-react";
 import * as Equal from "effect/Equal";
 

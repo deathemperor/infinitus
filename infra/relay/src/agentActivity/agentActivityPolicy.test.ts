@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
-import type { RelayAgentActivityState } from "@t3tools/contracts/relay";
+import { EnvironmentId, ThreadId } from "@infinitus/contracts";
+import type { RelayAgentActivityState } from "@infinitus/contracts/relay";
 import { makeAggregateState } from "./agentActivityAggregate.ts";
 import {
   attentionTransitionRows,

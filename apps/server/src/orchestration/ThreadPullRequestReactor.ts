@@ -1,15 +1,15 @@
 import {
   canonicalRepositoryKey,
   sourceControlRepositorySelector,
-} from "@t3tools/shared/sourceControl";
+} from "@infinitus/shared/sourceControl";
 import {
   CommandId,
   type OrchestrationEvent,
   type OrchestrationProjectShell,
   type ThreadId,
   type ThreadLinkedPullRequest,
-} from "@t3tools/contracts";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+} from "@infinitus/contracts";
+import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";

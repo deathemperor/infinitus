@@ -1,6 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import { ProviderInstanceId, ProviderSetupError, type ProviderAuthState } from "@t3tools/contracts";
+import {
+  ProviderInstanceId,
+  ProviderSetupError,
+  type ProviderAuthState,
+} from "@infinitus/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";

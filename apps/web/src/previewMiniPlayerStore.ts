@@ -1,5 +1,5 @@
-import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import type { DevicePlatform, ScopedThreadRef } from "@t3tools/contracts";
+import { scopedThreadKey } from "@infinitus/client-runtime/environment";
+import type { DevicePlatform, ScopedThreadRef } from "@infinitus/contracts";
 import { create } from "zustand";
 
 export interface PreviewMiniPlayerPosition {

@@ -1,7 +1,7 @@
 import {
   formatFilePathPosition,
   splitFilePathPosition,
-} from "@t3tools/client-runtime/markdown-links";
+} from "@infinitus/client-runtime/markdown-links";
 
 import { isMacPlatform } from "./lib/utils";
 

@@ -1,8 +1,8 @@
-import { filePreviewDelimiter } from "@t3tools/shared/delimitedPreview";
-import type { EnvironmentId } from "@t3tools/contracts";
-import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
-import { readFilePreviewResponse } from "@t3tools/client-runtime/file-preview";
-import { filePreviewKind, FILE_TEXT_PREVIEW_MAX_BYTES } from "@t3tools/shared/filePreview";
+import { filePreviewDelimiter } from "@infinitus/shared/delimitedPreview";
+import type { EnvironmentId } from "@infinitus/contracts";
+import { formatAttachmentSize } from "@infinitus/client-runtime/state/attachments";
+import { readFilePreviewResponse } from "@infinitus/client-runtime/file-preview";
+import { filePreviewKind, FILE_TEXT_PREVIEW_MAX_BYTES } from "@infinitus/shared/filePreview";
 import {
   CheckIcon,
   ChevronRightIcon,

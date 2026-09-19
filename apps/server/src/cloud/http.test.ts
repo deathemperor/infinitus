@@ -14,8 +14,8 @@ import {
   type HttpClientRequest,
 } from "effect/unstable/http";
 
-import { EnvironmentId } from "@t3tools/contracts";
-import { RelayClientTracer } from "@t3tools/shared/relayTracing";
+import { EnvironmentId } from "@infinitus/contracts";
+import { RelayClientTracer } from "@infinitus/shared/relayTracing";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfigModule from "../config.ts";
@@ -29,7 +29,7 @@ import {
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { CLOUD_CLI_DESIRED_LINK_SECRET } from "./CliState.ts";
 import * as CliTokenManager from "./CliTokenManager.ts";
-import type { RelayLinkProofRequest } from "@t3tools/contracts/relay";
+import type { RelayLinkProofRequest } from "@infinitus/contracts/relay";
 import { CLOUD_ENDPOINT_RUNTIME_CONFIG, RELAY_URL_SECRET } from "./config.ts";
 import {
   consumeCloudReplayGuards,

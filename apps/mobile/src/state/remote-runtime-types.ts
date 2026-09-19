@@ -1,5 +1,5 @@
-import { type EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
-import { EnvironmentId, ThreadId, type ServerConfig } from "@t3tools/contracts";
+import { type EnvironmentConnectionPhase } from "@infinitus/client-runtime/connection";
+import { EnvironmentId, ThreadId, type ServerConfig } from "@infinitus/contracts";
 
 export interface EnvironmentRuntimeState {
   readonly connectionState: EnvironmentConnectionPhase;

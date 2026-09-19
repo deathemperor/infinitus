@@ -1,4 +1,4 @@
-import { EnvironmentId, MessageId, ThreadId, type AssistantCitation } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, ThreadId, type AssistantCitation } from "@infinitus/contracts";
 import {
   createMemoryHistory,
   createRootRoute,

@@ -12,7 +12,7 @@ type ConnectionFormFieldProps = Omit<AppTextInputProps, "className"> & {
 export function ConnectionFormField({ label, className, ...inputProps }: ConnectionFormFieldProps) {
   return (
     <View collapsable={false} className={cn("gap-1.5", className)}>
-      <AppText className="text-2xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
+      <AppText className="text-2xs font-infinitus-bold tracking-[0.8px] uppercase text-foreground-muted">
         {label}
       </AppText>
       <AppTextInput

@@ -3,9 +3,9 @@ import {
   type OrchestrationEvent,
   type ServerSettings as ServerSettingsValue,
   type ThreadId,
-} from "@t3tools/contracts";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+} from "@infinitus/contracts";
+import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
+import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";

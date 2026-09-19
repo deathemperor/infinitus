@@ -1,5 +1,5 @@
-import { DEFAULT_TERMINAL_ID, EnvironmentId, ThreadId } from "@t3tools/contracts";
-import { type KnownTerminalSession } from "@t3tools/client-runtime/state/terminal";
+import { DEFAULT_TERMINAL_ID, EnvironmentId, ThreadId } from "@infinitus/contracts";
+import { type KnownTerminalSession } from "@infinitus/client-runtime/state/terminal";
 import { SymbolView } from "../../components/AppSymbol";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";

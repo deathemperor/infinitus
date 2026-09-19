@@ -10,8 +10,8 @@ import {
   pullRequestCandidateUrlFromReferenceAutolink,
   shouldOpenPullRequestExternally,
 } from "./openPullRequestLink";
-import { ProjectId, type RepositoryIdentity } from "@t3tools/contracts";
-import { normalizeGitRemoteUrl } from "@t3tools/shared/git";
+import { ProjectId, type RepositoryIdentity } from "@infinitus/contracts";
+import { normalizeGitRemoteUrl } from "@infinitus/shared/git";
 
 function repositoryIdentity(
   provider: string,

@@ -1,4 +1,8 @@
-import type { ClientSettingsPatch, DesktopSnapShotState, SnapShotSound } from "@t3tools/contracts";
+import type {
+  ClientSettingsPatch,
+  DesktopSnapShotState,
+  SnapShotSound,
+} from "@infinitus/contracts";
 import {
   captureSetupBackend,
   captureSetupDesktopName,

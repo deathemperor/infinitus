@@ -2,7 +2,7 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeCrypto from "node:crypto";
-import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 
 import {
   type DeviceServiceState,
@@ -46,14 +46,14 @@ import {
   EditorId,
   WorktreeSetupSnapshot,
   type WorktreeSetupStageId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   computeDpopAccessTokenHash,
   computeDpopJwkThumbprint,
   type DpopPublicJwk,
-} from "@t3tools/shared/dpop";
-import { RELAY_HEALTH_REQUEST_TYP, RELAY_MINT_REQUEST_TYP } from "@t3tools/shared/relayJwt";
-import * as RelayClient from "@t3tools/shared/relayClient";
+} from "@infinitus/shared/dpop";
+import { RELAY_HEALTH_REQUEST_TYP, RELAY_MINT_REQUEST_TYP } from "@infinitus/shared/relayJwt";
+import * as RelayClient from "@infinitus/shared/relayClient";
 import { assert, it } from "@effect/vitest";
 import { assertFailure, assertInclude, assertTrue } from "@effect/vitest/utils";
 import * as Clock from "effect/Clock";
@@ -217,8 +217,8 @@ import {
   type TransferBudgetRun,
   transferBudgetViolations,
 } from "../integration/TransferBudgetReport.integration.ts";
-import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
-import { otlpSerializationLayer } from "@t3tools/shared/observability";
+import { symlinksSupported } from "@infinitus/shared/testing/symlinks";
+import { otlpSerializationLayer } from "@infinitus/shared/observability";
 
 const defaultProjectId = ProjectId.make("project-default");
 const defaultThreadId = ThreadId.make("thread-default");

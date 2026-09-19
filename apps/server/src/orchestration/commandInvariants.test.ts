@@ -8,7 +8,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationReadModel,
   ProviderInstanceId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 
 import { listThreadsByProjectId, requireThread, requireThreadAbsent } from "./commandInvariants.ts";

@@ -56,7 +56,7 @@ export class DesktopWslServerTree extends Context.Service<
     // extraction that the mounted fallback is preparing.
     readonly cleanupLegacy: Effect.Effect<void>;
   }
->()("@t3tools/desktop/wsl/DesktopWslServerTree") {}
+>()("@infinitus/desktop/wsl/DesktopWslServerTree") {}
 
 // Child scheduling stays here instead of inside `visit`, so nested directories
 // cannot create independent concurrency pools. The LIFO work list also keeps

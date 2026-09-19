@@ -1,4 +1,4 @@
-import type { DeviceServiceState, ThreadId } from "@t3tools/contracts";
+import type { DeviceServiceState, ThreadId } from "@infinitus/contracts";
 
 /** Host identity is part of the selection because Android serials repeat across hosts. */
 export function threadDevicePreviews(state: DeviceServiceState | null, threadId: ThreadId) {

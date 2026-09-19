@@ -1,4 +1,4 @@
-import { EventId, TurnId } from "@t3tools/contracts";
+import { EventId, TurnId } from "@infinitus/contracts";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";

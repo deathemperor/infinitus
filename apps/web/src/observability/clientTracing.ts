@@ -5,8 +5,11 @@ import * as Scope from "effect/Scope";
 import { HttpClient } from "effect/unstable/http";
 import { OtlpExporter, OtlpSerialization, OtlpTracer } from "effect/unstable/observability";
 
-import { settleAsyncResult, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
+import {
+  settleAsyncResult,
+  squashAtomCommandFailure,
+} from "@infinitus/client-runtime/state/runtime";
+import { safeErrorLogAttributes } from "@infinitus/client-runtime/errors";
 import { resolvePrimaryEnvironmentHttpUrl } from "../environments/primary";
 import * as ClientTracer from "./clientTracer";
 import { primaryEnvironmentHttpLayer } from "../environments/primary/httpLayer";

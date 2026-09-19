@@ -1,4 +1,4 @@
-import type { PreviewAnnotationPayload } from "@t3tools/contracts";
+import type { PreviewAnnotationPayload } from "@infinitus/contracts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { capturePreviewAnnotationScreenshot } from "./previewAnnotation";

@@ -3,11 +3,11 @@ import {
   EnvironmentHttpApi,
   type RelayClientInstallProgressEvent,
   type RelayClientInstallProgressStage,
-} from "@t3tools/contracts";
-import { RelayOkResponse } from "@t3tools/contracts/relay";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import * as RelayClient from "@t3tools/shared/relayClient";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
+} from "@infinitus/contracts";
+import { RelayOkResponse } from "@infinitus/contracts/relay";
+import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as RelayClient from "@infinitus/shared/relayClient";
+import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
 import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";

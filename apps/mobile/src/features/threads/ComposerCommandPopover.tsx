@@ -1,13 +1,13 @@
 import {
   resolveProviderSkillSourceKind,
   type ProviderSkillSourceKind,
-} from "@t3tools/client-runtime/providerSkills";
+} from "@infinitus/client-runtime/providerSkills";
 import type {
   PullRequestContextMetadata,
   ServerProviderSkill,
   ServerProviderSlashCommand,
-} from "@t3tools/contracts";
-import type { ComposerTriggerKind } from "@t3tools/shared/composerTrigger";
+} from "@infinitus/contracts";
+import type { ComposerTriggerKind } from "@infinitus/shared/composerTrigger";
 import { memo } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 
@@ -160,7 +160,7 @@ const CommandRow = memo(function CommandRow(props: {
           type="monochrome"
         />
       ) : null}
-      <Text className="shrink-0 text-base font-t3-medium text-foreground" numberOfLines={1}>
+      <Text className="shrink-0 text-base font-infinitus-medium text-foreground" numberOfLines={1}>
         {props.isSlashSkill && props.item.type === "skill" ? (
           <>
             <Text className="text-foreground-muted">skill:</Text>
@@ -188,7 +188,7 @@ export const ComposerCommandPopover = memo(function ComposerCommandPopover(
     <PopoverSurface>
       {label ? (
         <View className="px-3.5 pt-2.5 pb-1">
-          <Text className="text-3xs font-t3-bold tracking-[0.8px] uppercase text-foreground-muted">
+          <Text className="text-3xs font-infinitus-bold tracking-[0.8px] uppercase text-foreground-muted">
             {label}
           </Text>
         </View>

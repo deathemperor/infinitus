@@ -11,7 +11,7 @@ import type {
   ProviderDriverKind,
   ServerProvider,
   ServerProviderUpdateState,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type * as Stream from "effect/Stream";

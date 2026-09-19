@@ -10,7 +10,7 @@ import { ServerConfig } from "../config.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import { detectPrTemplate } from "./PrTemplateDetection.ts";
-import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { symlinksSupported } from "@infinitus/shared/testing/symlinks";
 
 const SINGLE_TEMPLATE_PATHS = [
   ".github/pull_request_template.md",

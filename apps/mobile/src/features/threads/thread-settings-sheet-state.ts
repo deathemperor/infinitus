@@ -1,5 +1,5 @@
 import type { ModelOption, ProviderGroup } from "../../lib/modelOptions";
-import type { ProviderInstanceId } from "@t3tools/contracts";
+import type { ProviderInstanceId } from "@infinitus/contracts";
 
 export type ModelFavorite = {
   readonly provider: ProviderInstanceId;

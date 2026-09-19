@@ -76,7 +76,7 @@ vi.mock("./use-thread-detail", () => ({
   }),
 }));
 
-import { ApprovalRequestId, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { ApprovalRequestId, EnvironmentId, ThreadId } from "@infinitus/contracts";
 import { questionAttachmentDraftKey } from "./question-attachments";
 import { useSelectedThreadRequests } from "./use-selected-thread-requests";
 

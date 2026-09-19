@@ -4,14 +4,14 @@ import {
   type ServerProviderModel,
   type ServerProviderSkill,
   type ServerProviderSlashCommand,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
-import { createModelCapabilities } from "@t3tools/shared/model";
-import { compareSemverVersions } from "@t3tools/shared/semver";
+import { createModelCapabilities } from "@infinitus/shared/model";
+import { compareSemverVersions } from "@infinitus/shared/semver";
 import {
   buildServerProvider,
   COMPACT_SLASH_COMMAND,

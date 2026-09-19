@@ -7,7 +7,7 @@ import {
   type ServerSettings,
   type ThreadEnvMode,
   type WorktreeCleanupRules,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { isModelSelectionProviderEnabled } from "./serverSettings.ts";
 
 export type ProjectSettingSource = "environment" | "project";

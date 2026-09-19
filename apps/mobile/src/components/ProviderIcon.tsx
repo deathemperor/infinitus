@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { Path, Svg } from "react-native-svg";
 import { View } from "react-native";
-import { providerInstanceInitials } from "@t3tools/client-runtime/state/provider-instance-display";
+import { providerInstanceInitials } from "@infinitus/client-runtime/state/provider-instance-display";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 import { AppText as Text } from "./AppText";
 

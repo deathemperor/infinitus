@@ -14,17 +14,20 @@ import {
   type ProviderInteractionMode,
   type RuntimeMode,
   type ThreadId,
-} from "@t3tools/contracts";
-import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
-import { clampFileAttachmentUploadBytes } from "@t3tools/client-runtime/state/attachments";
-import { nextPastedTextFileName, pastedTextDisposition } from "@t3tools/client-runtime/text-paste";
+} from "@infinitus/contracts";
+import { safeErrorLogAttributes } from "@infinitus/client-runtime/errors";
+import { clampFileAttachmentUploadBytes } from "@infinitus/client-runtime/state/attachments";
+import {
+  nextPastedTextFileName,
+  pastedTextDisposition,
+} from "@infinitus/client-runtime/text-paste";
 import {
   parseCodexFeedbackCommand,
   submitCodexFeedback,
   type CodexFeedbackSubmission,
-} from "@t3tools/client-runtime/state/threads";
-import { deriveActiveWorkStartedAt } from "@t3tools/shared/orchestrationTiming";
-import { upgradeLegacyContextMessage } from "@t3tools/shared/composerContextLegacy";
+} from "@infinitus/client-runtime/state/threads";
+import { deriveActiveWorkStartedAt } from "@infinitus/shared/orchestrationTiming";
+import { upgradeLegacyContextMessage } from "@infinitus/shared/composerContextLegacy";
 import { composerContextSendBlockReason, reidentifyComposerContext } from "../lib/composerContext";
 import { uuidv4 } from "../lib/uuid";
 
