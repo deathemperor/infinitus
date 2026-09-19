@@ -1,7 +1,7 @@
 import Foundation
 
 /// Client-side mirror of the engine's `_next_recovery` advisory
-/// (claude_swap/switcher.py), minus its active-account exclusion.
+/// (the engine's switcher), minus its active-account exclusion.
 ///
 /// The engine skips the active account when ranking who recovers soonest
 /// — reasonable for "should the auto-switcher wait on someone else", but

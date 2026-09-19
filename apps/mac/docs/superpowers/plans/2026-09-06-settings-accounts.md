@@ -362,7 +362,7 @@ Three things vanish in that replacement and must NOT come back anywhere in this 
     }
 ```
 
-That deletes the last "cswap"/"PR #312" string in this pane. Verify with `grep -n "PR #312\|claude-swap\|cswap" Sources/Infinitus/AccountsPane.swift` — the only survivors must be the `CswapEngine.engineID` comparison, the `CswapAddFlow` type name and the doc comments, never a user-visible `Text` or `Button` label.
+That deletes the last "cswap"/"PR #312" string in this pane. Verify with `grep -n "PR #312\|cswap" Sources/Infinitus/AccountsPane.swift` — the only survivors must be the `CswapEngine.engineID` comparison, the `CswapAddFlow` type name and the doc comments, never a user-visible `Text` or `Button` label.
 
 - [ ] **Step 5: The prominent Add Account button (OAuth engines).** Replace `OAuthAddRow.body` (lines 828–845) with:
 

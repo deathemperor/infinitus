@@ -148,6 +148,28 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     );
   }
 
+  async function selectExistingThread(): Promise<void> {
+    if (!incomingShare) {
+      return;
+    }
+    if (incomingShare.destination && !reservedDestinationProject) {
+      try {
+        await releaseShareReservation(incomingShare.id, incomingShare.destination);
+      } catch (error) {
+        Alert.alert(
+          "Could not change destination",
+          error instanceof Error
+            ? error.message
+            : "The shared content reservation could not be updated.",
+        );
+        return;
+      }
+    }
+    navigation.dispatch(
+      StackActions.push("NewTaskShareThread", { incomingShareId: incomingShare.id }),
+    );
+  }
+
   useEffect(() => {
     const destination = incomingShare?.destination;
     if (!destination) {
@@ -245,6 +267,59 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               : {}),
           }}
         >
+          {/* Fork: a share can also land in an existing thread. */}
+          {incomingShare && projectScopes.length > 0 ? (
+            <View
+              collapsable={false}
+              className={cn(
+                "overflow-hidden bg-card",
+                Platform.OS === "android" ? "rounded-[28px]" : "rounded-[24px]",
+              )}
+            >
+              {Platform.OS === "android" ? (
+                <MaterialListRow
+                  title="Add to an existing thread"
+                  disabled={reservedDestinationProject !== null}
+                  onPress={() => void selectExistingThread()}
+                  leading={
+                    <SymbolView
+                      name="text.bubble"
+                      size={24}
+                      tintColorClassName="accent-icon-muted"
+                    />
+                  }
+                />
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Add to an existing thread"
+                  disabled={reservedDestinationProject !== null}
+                  onPress={() => void selectExistingThread()}
+                  className="flex-row items-center gap-3 bg-card px-4 py-3.5"
+                >
+                  <View className="h-7 w-7 items-center justify-center">
+                    <SymbolView
+                      name="text.bubble"
+                      size={20}
+                      tintColorClassName="accent-icon-muted"
+                      type="monochrome"
+                    />
+                  </View>
+                  <View className="min-w-0 flex-1">
+                    <Text className="text-base leading-snug font-infinitus-bold">
+                      Add to an existing thread
+                    </Text>
+                  </View>
+                  <SymbolView
+                    name="chevron.right"
+                    size={14}
+                    tintColorClassName="accent-chevron"
+                    type="monochrome"
+                  />
+                </Pressable>
+              )}
+            </View>
+          ) : null}
           {projectScopes.length === 0 ? (
             <View
               collapsable={false}

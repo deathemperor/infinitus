@@ -9,6 +9,7 @@ import { OmpSettings } from "@infinitus/contracts";
 import {
   buildInitialOmpProviderSnapshot,
   checkOmpProviderStatus,
+  parseOmpDefaultThinkingLevel,
   parseOmpModelsCliOutput,
 } from "./OmpProvider.ts";
 import { writeFakeCli } from "../../testUtils/fakeCli.ts";
@@ -77,12 +78,17 @@ describe("parseOmpModelsCliOutput", () => {
       "google-antigravity/claude-sonnet-4-6",
     ]);
     expect(parsed.models[0]?.name).toBe("Gemini 3.1 Pro");
+    // Off and Auto lead, as in omp's own ACP selector; omp's default level is
+    // preselected so a fresh thread's picker is not blank.
     expect(parsed.models[0]?.capabilities?.optionDescriptors).toEqual([
       {
         id: "thinking",
         label: "Thinking",
         type: "select",
+        currentValue: "high",
         options: [
+          { id: "off", label: "Off" },
+          { id: "auto", label: "Auto" },
           { id: "minimal", label: "minimal" },
           { id: "low", label: "low" },
           { id: "medium", label: "medium" },
@@ -90,6 +96,24 @@ describe("parseOmpModelsCliOutput", () => {
         ],
       },
     ]);
+  });
+
+  it("preselects the configured default level, including auto", () => {
+    const [gemini] = parseOmpModelsCliOutput(AUTHENTICATED_MODELS_JSON, "auto").models;
+    expect(gemini?.capabilities?.optionDescriptors?.[0]).toMatchObject({ currentValue: "auto" });
+  });
+
+  it("leaves the level unselected when the model lacks the configured default", () => {
+    const [, sonnet] = parseOmpModelsCliOutput(AUTHENTICATED_MODELS_JSON, "minimal").models;
+    expect(sonnet?.capabilities?.optionDescriptors?.[0]).not.toHaveProperty("currentValue");
+  });
+
+  it("parses `omp config get defaultThinkingLevel`, falling back to omp's default", () => {
+    expect(parseOmpDefaultThinkingLevel("medium\n")).toBe("medium");
+    expect(parseOmpDefaultThinkingLevel("Auto")).toBe("auto");
+    expect(parseOmpDefaultThinkingLevel("")).toBe("high");
+    expect(parseOmpDefaultThinkingLevel(undefined)).toBe("high");
+    expect(parseOmpDefaultThinkingLevel("Unknown setting: defaultThinkingLevel")).toBe("high");
   });
 
   it("treats unauthenticated prose as not authenticated", () => {
@@ -136,6 +160,8 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
     readonly modelsExitCode?: number;
     readonly usageOutput?: string;
     readonly usageExitCode?: number;
+    readonly thinkingLevelOutput?: string;
+    readonly thinkingLevelExitCode?: number;
   }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -157,6 +183,10 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
           // @effect-diagnostics-next-line preferSchemaOverJson:off
           `  process.stdout.write(${JSON.stringify(input.modelsOutput)});`,
           `  process.exit(${input.modelsExitCode ?? 0});`,
+          "}",
+          'if (process.argv[2] === "config" && process.argv[3] === "get") {',
+          `  process.stdout.write(${JSON.stringify(input.thinkingLevelOutput ?? "high\n")});`,
+          `  process.exit(${input.thinkingLevelExitCode ?? 0});`,
           "}",
           'if (process.argv[2] === "usage") {',
           // @effect-diagnostics-next-line preferSchemaOverJson:off
@@ -203,6 +233,49 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
       ]);
       expect(snapshot.models[0]?.name).toBe("Session default");
       expect(snapshot.supportsTextGeneration).toBeUndefined();
+    }),
+  );
+
+  it.effect("preselects the level omp config reports for every listed model", () =>
+    Effect.gen(function* () {
+      const snapshot = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const { path: ompPath } = yield* writeFakeOmpCli({
+            modelsOutput: AUTHENTICATED_MODELS_JSON,
+            thinkingLevelOutput: "medium\n",
+          });
+          return yield* checkOmpProviderStatus(
+            decodeOmpSettings({ enabled: true, binaryPath: ompPath }),
+          );
+        }),
+      );
+
+      const levels = snapshot.models
+        .filter((model) => model.slug !== "omp-default")
+        .map((model) => model.capabilities?.optionDescriptors?.[0])
+        .map((descriptor) => (descriptor?.type === "select" ? descriptor.currentValue : null));
+      expect(levels).toEqual(["medium", "medium"]);
+    }),
+  );
+
+  it.effect("falls back to omp's default level when the config probe fails", () =>
+    Effect.gen(function* () {
+      const snapshot = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const { path: ompPath } = yield* writeFakeOmpCli({
+            modelsOutput: AUTHENTICATED_MODELS_JSON,
+            thinkingLevelOutput: "",
+            thinkingLevelExitCode: 2,
+          });
+          return yield* checkOmpProviderStatus(
+            decodeOmpSettings({ enabled: true, binaryPath: ompPath }),
+          );
+        }),
+      );
+
+      expect(snapshot.status).toBe("ready");
+      const descriptor = snapshot.models[1]?.capabilities?.optionDescriptors?.[0];
+      expect(descriptor?.type === "select" ? descriptor.currentValue : null).toBe("high");
     }),
   );
 
@@ -329,7 +402,7 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
     }),
   );
 
-  it.effect("probes with --version, models, and usage, never starting ACP", () =>
+  it.effect("probes with --version, models, config, and usage, never starting ACP", () =>
     Effect.gen(function* () {
       const invocations = yield* Effect.scoped(
         Effect.gen(function* () {
@@ -348,10 +421,15 @@ it.layer(NodeServices.layer)("checkOmpProviderStatus", (it) => {
       expect(invocations.some((argv) => argv.split(" ").includes("acp"))).toBe(false);
       expect(invocations).toContain("--version");
       expect(invocations.some((argv) => argv.startsWith("models"))).toBe(true);
+      expect(invocations).toContain("config get defaultThinkingLevel");
       expect(invocations).toContain("usage --json --redact");
       expect(
         invocations.every(
-          (argv) => argv === "--version" || argv.startsWith("models") || argv.startsWith("usage"),
+          (argv) =>
+            argv === "--version" ||
+            argv.startsWith("models") ||
+            argv === "config get defaultThinkingLevel" ||
+            argv.startsWith("usage"),
         ),
       ).toBe(true);
     }),

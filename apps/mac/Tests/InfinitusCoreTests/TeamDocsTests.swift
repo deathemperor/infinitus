@@ -6,7 +6,10 @@ final class TeamDocsTests: XCTestCase {
         XCTAssertEqual(TeamKinds.expected(at: "m/abc/threads/index.json")?.kind, "threads")
         XCTAssertEqual(TeamKinds.expected(at: "m/abc/threads/index.json")?.from, "abc")
         XCTAssertNil(TeamKinds.expected(at: "m/abc/sessions/index.json"))
-        XCTAssertEqual(TeamKinds.memberKinds, ["stats", "now", "threads", "transcripts", "crashes", "fleet"])
+        XCTAssertEqual(TeamKinds.memberKinds, ["stats", "now", "threads", "transcripts", "fleet"])
+        // Retired (#1422): still a readable kind with its path shape, so
+        // old members' crashes.json envelopes keep decoding.
+        XCTAssertEqual(TeamKinds.expected(at: "m/abc/crashes.json")?.kind, TeamKinds.crashes)
     }
 
     func testNowRoundTripsLiveThreads() throws {

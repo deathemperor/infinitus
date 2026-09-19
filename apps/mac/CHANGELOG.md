@@ -909,7 +909,7 @@ release cut folds the fragments and `## Unreleased` into the new section.
 - Phone dictation never sits on "Translating…": a missing language pack asks to download, and after ten seconds the take goes out as spoken.
 - A chat opens in well under a second on sessions with hundreds of sub-agents; the Mac read every sub-agent's log per request and the phone gave up after three ("the Mac didn't answer").
 - The phone's composer no longer floats mid-screen after the keyboard is dragged away.
-- Mac notifications are titled Infinitus, not claude-swap; engine update notices name the engine in the body.
+- Mac notifications are titled Infinitus, not the engine's name; engine update notices name the engine in the body.
 - A chat swipes back from anywhere on the screen, not only from the left edge.
 - The terminal's own "[Image: original …]" note after a screenshot is read no longer shows as a message you sent.
 

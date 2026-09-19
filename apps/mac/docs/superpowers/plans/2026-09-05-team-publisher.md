@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Worktree /Users/deathemperor/death/limitless-t-publisher, branch team-publisher; stage by explicit path; every commit ends with "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"; push nothing.
-- No cswap anywhere; never read engine internals (~/.claude-swap-backup/*, proxy config/auth files, ~/.9router); Claude Code's own files (~/.claude/sessions/*.json, ~/.claude/projects/*/*.jsonl) are fine; never ~/.aws/login or ~/.aws/sso.
+- No cswap anywhere; never read engine internals (the engine's own backup dir, proxy config/auth files, ~/.9router); Claude Code's own files (~/.claude/sessions/*.json, ~/.claude/projects/*/*.jsonl) are fine; never ~/.aws/login or ~/.aws/sso.
 - Secrets never in argv or logs; shown masked only.
 - Every new InfinitusCore/InfinitusCLI file compiles on Linux: no Darwin imports outside #if canImport(Darwin); no Foundation APIs missing from swift-foundation; Process is unavailable on iOS (fence like TeamGit.run).
 - Crypto.SHA256 fully qualified (MirrorRendezvous.swift declares an internal enum SHA256 that shadows it).

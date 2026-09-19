@@ -77,7 +77,7 @@ final class TeamPublisherTests: XCTestCase {
     }
 
     /// Stats from the fixture scan; two threads, one per project, each
-    /// with a two-row transcript; the running one live; a crash and a fleet.
+    /// with a two-row transcript; the running one live; and a fleet.
     func sources(_ projects: URL) -> TeamPublisher.Sources {
         var s = TeamPublisher.Sources(home: "/Users/alice", machine: "alice-mac")
         s.entries = StatsScanner.scan(projectsDir: projects, cacheURL: nil, calendar: .current, maxAge: 10_000 * 86_400).entries
@@ -86,7 +86,6 @@ final class TeamPublisherTests: XCTestCase {
         s.threads = [thread("t1", "app", status: "running"), thread("t2", "secret")]
         s.live = [TeamDocs.LiveThread(id: "t1", title: "Thread t1", project: "app", startedAt: 1)]
         s.transcripts = [transcript("t1", "app"), transcript("t2", "secret")]
-        s.crashes = [CrashReport(platform: "mac", device: "Mac", appVersion: "1", osVersion: "26", at: Date(), kind: "crash", reason: "SIGSEGV")]
         s.fleets = [TeamDocs.Fleet(engine: "opaque", account: "acct-1", windows: [TeamDocs.Window(label: "5h", pct: 40)])]
         return s
     }
@@ -113,7 +112,7 @@ final class TeamPublisherTests: XCTestCase {
         let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
         let report = try publisher.publish(sources: sources(projects), now: Date(timeIntervalSince1970: 1_788_609_600))
         let me = "m/\(t.alice.identity.kid)/", mine = "t/\(t.alice.identity.kid)/"
-        XCTAssertEqual(Set(report.published), [me + "days/2026-09-04.json", me + "threads/index.json", me + "now.json", me + "crashes.json",
+        XCTAssertEqual(Set(report.published), [me + "days/2026-09-04.json", me + "threads/index.json", me + "now.json",
                                                mine + "transcripts/t1/1.jsonl"])
         XCTAssertEqual(report.transcriptChunks, 1, "the excluded project's thread is never chunked")
         XCTAssertEqual(report.skipped, 0)
@@ -132,7 +131,8 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertEqual(index.threads.map(\.id), ["t1"]); XCTAssertEqual(index.fleets.map(\.engine), ["opaque"])
         let now = try CanonicalJSON.decode(TeamDocs.Now.self, from: try t.leader.read(me + "now.json").1)
         XCTAssertEqual(now.machine, "alice-mac"); XCTAssertTrue(now.desktop); XCTAssertEqual(now.live.map(\.id), ["t1"])
-        XCTAssertEqual(now.crashesToday, 1); XCTAssertEqual(now.sharesTo[TeamKinds.stats], .team)
+        XCTAssertEqual(now.crashesToday, 0, "the team stopped carrying crash reports (#1422)")
+        XCTAssertEqual(now.sharesTo[TeamKinds.stats], .team)
         // The transcript rides t/<kid>, fetched on demand, redacted.
         try t.leader.fetchTranscripts(from: t.alice.identity.kid, session: "t1")
         XCTAssertEqual(try rows(t.leader, mine + "transcripts/t1/1.jsonl").map(\.text), ["use [redacted-key] please", "sure"])
@@ -140,10 +140,10 @@ final class TeamPublisherTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: publisher.copiesDir.appendingPathComponent("transcripts/t1/1.jsonl").path))
         XCTAssertEqual(TeamPublishState.load(teamDir: teamDir).transcripts["t1"], TeamPublishState.Cursor(seq: 1, offset: 2))
 
-        // A second pass with nothing new: the day and the crashes are
-        // skipped by hash, the index and now.json go out again, no chunk.
+        // A second pass with nothing new: the day is skipped by hash, the
+        // index and now.json go out again, no chunk.
         let again = try publisher.publish(sources: sources(projects), now: Date(timeIntervalSince1970: 1_788_609_700))
-        XCTAssertEqual(again.skipped, 2)
+        XCTAssertEqual(again.skipped, 1)
         XCTAssertEqual(Set(again.published), [me + "threads/index.json", me + "now.json"])
         XCTAssertEqual(again.transcriptChunks, 0)
     }
@@ -242,6 +242,39 @@ final class TeamPublisherTests: XCTestCase {
         _ = try publisher.publish(sources: s)
         _ = try t.leader.fetch()
         XCTAssertFalse(try t.leader.readable().map(\.path).contains(me + "fleet.json"))
+    }
+
+    /// The crashes kind is retired (#1422): a crashes.json published by an
+    /// older build is removed on the next publish, and a lingering
+    /// plaintext copy is never re-shared back into the store.
+    func testLegacyCrashesFileIsRetiredAndNeverReshared() throws {
+        let t = try team()
+        let teamDir = t.alicePaths.teamDir(t.alice.config.id)
+        let publisher = TeamPublisher(client: t.alice, paths: t.alicePaths)
+        let me = "m/\(t.alice.identity.kid)/"
+        let doc = try CanonicalJSON.encode(TeamDocs.Crashes(crashes: ["Mac · crash · SIGSEGV"]))
+        // What an older build left behind: the envelope, its state hash,
+        // and the plaintext copy under published/.
+        try t.alice.publish(kind: TeamKinds.crashes, path: "crashes.json", plaintext: doc, audience: .leaders, now: 1_030)
+        var state = TeamPublishState.load(teamDir: teamDir)
+        state.hashes["crashes.json"] = TeamPublisher.hex(doc)
+        try state.save(teamDir: teamDir)
+        let copy = publisher.copiesDir.appendingPathComponent("crashes.json")
+        try FileManager.default.createDirectory(at: publisher.copiesDir, withIntermediateDirectories: true)
+        try doc.write(to: copy)
+        _ = try t.leader.fetch()
+        XCTAssertTrue(try t.leader.readable().map(\.path).contains(me + "crashes.json"))
+
+        _ = try publisher.publish(sources: TeamPublisher.Sources(home: "/h", machine: "m"))
+        _ = try t.leader.fetch()
+        XCTAssertFalse(try t.leader.readable().map(\.path).contains(me + "crashes.json"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: copy.path), "the copy goes with it")
+        XCTAssertNil(TeamPublishState.load(teamDir: teamDir).hashes["crashes.json"])
+
+        // A copy that survived anyway (a reshare before the first publish)
+        // is skipped like now.json.
+        try doc.write(to: copy)
+        XCTAssertFalse(try publisher.reshare(days: 10_000).published.contains { $0.hasSuffix("crashes.json") })
     }
 
     func testReshareRewrapsHistoryToTheCurrentAudienceAfterPromotion() throws {

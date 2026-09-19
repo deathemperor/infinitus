@@ -54,22 +54,30 @@ warning. Screenshots keep working.
 From a worktree whose `.env` carries the relay's public config
 (`T3CODE_CLERK_JWT_TEMPLATE=infinitus-relay`, the value GitHub's
 `production` environment gives releases; a `t3-relay` left over from before
-#1388 builds a phone that cannot mint tokens) and `APP_VARIANT=infinitus`:
+#1388 builds a phone that cannot mint tokens), `APP_VARIANT=infinitus` and
+`INFINITUS_APS_ENVIRONMENT=sandbox`:
 
 ```bash
 cd apps/mobile
-APP_VARIANT=infinitus EXPO_NO_GIT_STATUS=1 CI=1 \
+APP_VARIANT=infinitus INFINITUS_APS_ENVIRONMENT=sandbox EXPO_NO_GIT_STATUS=1 CI=1 \
   expo prebuild --clean --platform ios
-APP_VARIANT=infinitus CI=1 \
+APP_VARIANT=infinitus INFINITUS_APS_ENVIRONMENT=sandbox CI=1 \
   expo run:ios --device 00008110-000631E81409801E --configuration Release --no-bundler
 ```
 
-Set `APP_VARIANT` on both commands: prebuild reads it for the bundle id and
-team, the Xcode bundle step reads it again for the embedded app config. A
-locked phone fails only the final launch; the install has landed. Confirm
-with `xcrun devicectl device info apps --device <udid>` and the
-`EXConstants.bundle/app.config` inside the built `.app` under DerivedData
-(`extra.appVariant`, `extra.clerk.jwtTemplate`, `extra.relay.url`).
+Set both variables on both commands: prebuild reads them for the bundle id
+and team, the Xcode bundle step reads them again for the embedded app
+config. `INFINITUS_APS_ENVIRONMENT=sandbox` is not optional: Xcode signs
+this build with the `development` push entitlement, so its APNs tokens are
+sandbox tokens, and without the override the app registers with the relay as
+a `production` device. Apple then rejects every push (`BadDeviceToken`), the
+lock-screen card freezes at whatever the app last drew in the foreground and
+completion alerts never arrive (a build without it did exactly this on
+2026-09-18). A locked phone fails only the final launch; the install has
+landed. Confirm with `xcrun devicectl device info apps --device <udid>` and
+the `EXConstants.bundle/app.config` inside the built `.app` under DerivedData
+(`extra.appVariant`, `extra.apsEnvironment` = `sandbox`,
+`extra.clerk.jwtTemplate`, `extra.relay.url`).
 
 ## Rules
 

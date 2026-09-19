@@ -1,6 +1,6 @@
 import Foundation
 
-// Display-side logic ported from claude_swap/menubar.py — the JSON feed is
+// Display-side logic ported from the engine's menubar — the JSON feed is
 // deliberately raw (resetsAt preserved, pct as stored), so each frontend
 // rolls weekly windows against its own clock.
 
@@ -188,7 +188,7 @@ public extension Account {
 }
 
 /// Human notes for non-"ok" `usageStatus` values. Strings are word-for-word
-/// `SENTINEL_NOTES` from claude_swap/switcher.py — the codebase's stated
+/// `SENTINEL_NOTES` from the engine's switcher — the codebase's stated
 /// invariant is that every surface renders these identically.
 public enum SentinelNotes {
     public static let notes: [String: String] = [
@@ -418,6 +418,28 @@ public enum AccountVitals {
         // windows it stays a footnote.
         if pcts.isEmpty, let spend = usage.spend { return spend.pct >= 100 }
         return pcts.contains { $0 >= 100 }
+    }
+
+    /// The one per-model window that alone kills this account ("Fable"):
+    /// nil when a plan window (5h/7d) is spent too, when two models are,
+    /// or when nothing is. The account still has plan headroom for other
+    /// models, so an all-dead line naming the model reads true where
+    /// "all accounts exhausted" did not (user 2026-09-18).
+    public static func spentModel(_ usage: Usage?) -> String? {
+        guard let usage else { return nil }
+        if let p = usage.fiveHour?.pct, p >= 100 { return nil }
+        if let p = usage.sevenDay?.pct, p >= 100 { return nil }
+        let spent = (usage.scoped ?? []).filter { $0.pct >= 100 }.compactMap(\.name)
+        guard let first = spent.first, spent.allSatisfy({ $0 == first }) else { return nil }
+        return first
+    }
+
+    /// The model every dead, unheld account is out of — nil unless each
+    /// one's death is that same model window and nothing else.
+    public static func spentModel(across accounts: [Account]) -> String? {
+        let dead = accounts.filter { $0.disabled != true && isDead($0.usage) }
+        guard let first = dead.first.flatMap({ spentModel($0.usage) }) else { return nil }
+        return dead.allSatisfy { spentModel($0.usage) == first } ? first : nil
     }
 }
 

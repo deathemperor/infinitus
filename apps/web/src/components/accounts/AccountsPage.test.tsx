@@ -311,6 +311,34 @@ describe("AccountsPage", () => {
     expect(markup).toContain("(one@example.com)");
   });
 
+  it("names the model when one per-model window alone blocks every account", () => {
+    const revivalAt = new Date(Date.parse(NOW_ISO) + 2 * 60 * 60 * 1000).toISOString();
+    testState.snapshot = {
+      ...readySnapshot,
+      fleets: [
+        {
+          ...readySnapshot.fleets[0]!,
+          accounts: [
+            account({
+              number: 1,
+              email: "one@example.com",
+              active: true,
+              usage: {
+                fiveHour: { pct: 30 },
+                scoped: [{ name: "Fable", pct: 100, resetsAt: revivalAt }],
+              },
+            }),
+          ],
+        },
+      ],
+    };
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+
+    expect(markup).toContain("All accounts out of Fable · next revival ");
+    expect(markup).not.toContain("All accounts exhausted ·");
+  });
+
   it("shows no exhausted band while an account has room", () => {
     testState.snapshot = readySnapshot;
 

@@ -239,24 +239,36 @@ describe("exhausted band (#706)", () => {
   it("the model carries a band only for a fleet whose every account is at a limit", () => {
     expect(macAccountsModel(readySnapshot, NOW).bands.size).toBe(0);
     const bands = macAccountsModel(exhaustedSnapshot, NOW).bands;
-    expect(bands.get("swapd/claude")).toEqual({ revivalAt: RESET, revivesFirst: "death1" });
+    expect(bands.get("swapd/claude")).toEqual({
+      revivalAt: RESET,
+      revivesFirst: "death1",
+      model: null,
+    });
     // Past the reset the reading belongs to a window that rolled: no band.
     expect(macAccountsModel(exhaustedSnapshot, Date.parse(RESET) + 1).bands.size).toBe(0);
   });
 
   it("the copy names the revival and who comes back first", () => {
     const time = new Date(RESET).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: "death1" }, NOW)).toBe(
+    const plan = { model: null };
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: "death1", ...plan }, NOW)).toBe(
       `All accounts exhausted · next revival ${time} (death1)`,
     );
-    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: null }, NOW)).toBe(
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: null, ...plan }, NOW)).toBe(
       `All accounts exhausted · next revival ${time}`,
     );
-    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: null }, NOW - 86_400_000)).toBe(
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: null, ...plan }, NOW - 86_400_000)).toBe(
       `All accounts exhausted · next revival tomorrow at ${time}`,
     );
-    expect(exhaustedCopy({ revivalAt: null, revivesFirst: null }, NOW)).toBe(
+    expect(exhaustedCopy({ revivalAt: null, revivesFirst: null, ...plan }, NOW)).toBe(
       "All accounts exhausted",
+    );
+    // One model alone ran out: the band says which, not "exhausted".
+    expect(exhaustedCopy({ revivalAt: RESET, revivesFirst: "death1", model: "Fable" }, NOW)).toBe(
+      `All accounts out of Fable · next revival ${time} (death1)`,
+    );
+    expect(exhaustedCopy({ revivalAt: null, revivesFirst: null, model: "Fable" }, NOW)).toBe(
+      "All accounts out of Fable",
     );
   });
 });

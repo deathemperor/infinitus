@@ -33,14 +33,20 @@ import {
 
 const REPO_ROOT = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
 const MOBILE_ROOT = NodePath.join(REPO_ROOT, "apps/mobile");
-const ANDROID_PACKAGE = "com.t3tools.t3code";
+// Fork: `SHOWCASE_APP_VARIANT=infinitus` captures the Infinitus build (its
+// own bundle id and Xcode project name) instead of upstream's production one.
+const SHOWCASE_APP_VARIANT =
+  NodeProcess.env.SHOWCASE_APP_VARIANT === "infinitus" ? "infinitus" : "production";
+const IOS_PROJECT_NAME = SHOWCASE_APP_VARIANT === "infinitus" ? "Infinitus" : "T3Code";
+const ANDROID_PACKAGE =
+  SHOWCASE_APP_VARIANT === "infinitus" ? "run.infinitus.mobile" : "com.t3tools.t3code";
 const APP_SCHEME = "t3code";
 const IOS_READY_FILENAME = "T3ShowcaseReadyScene";
 const SERVER_HOST = "0.0.0.0";
 const IOS_SIMULATOR_ARCH = NodeProcess.arch === "arm64" ? "arm64" : "x86_64";
 const IOS_APP_PATH = NodePath.join(
   MOBILE_ROOT,
-  ".showcase/ios-derived-data/Build/Products/Debug-iphonesimulator/T3Code.app",
+  `.showcase/ios-derived-data/Build/Products/Debug-iphonesimulator/${IOS_PROJECT_NAME}.app`,
 );
 const ANDROID_APK_PATH = NodePath.join(
   MOBILE_ROOT,
@@ -61,7 +67,7 @@ const ANDROID_SDK_ROOT = resolveAndroidSdkRoot(NodeProcess.env);
 const MOBILE_BUILD_ENV = {
   ...NodeProcess.env,
   ANDROID_HOME: ANDROID_SDK_ROOT,
-  APP_VARIANT: "production",
+  APP_VARIANT: SHOWCASE_APP_VARIANT,
   EXPO_NO_GIT_STATUS: "1",
   // Lets the capture build require full screen on iPad so the app can rotate
   // itself to landscape (see app.config.ts).
@@ -716,9 +722,9 @@ async function buildIos(): Promise<string> {
     "xcodebuild",
     [
       "-workspace",
-      NodePath.join(MOBILE_ROOT, "ios/T3Code.xcworkspace"),
+      NodePath.join(MOBILE_ROOT, `ios/${IOS_PROJECT_NAME}.xcworkspace`),
       "-scheme",
-      "T3Code",
+      IOS_PROJECT_NAME,
       "-configuration",
       "Debug",
       "-sdk",
@@ -1350,7 +1356,10 @@ async function main(): Promise<void> {
   }
   const hasIos = captures.some((capture) => capture.device.platform === "ios");
   const hasAndroid = captures.some((capture) => capture.device.platform === "android");
-  const metroHost = hasIos ? lanIpv4Address() : "127.0.0.1";
+  // The simulator shares the host loopback; SHOWCASE_METRO_HOST overrides the
+  // LAN address when the simulator cannot reach it.
+  const metroHost =
+    NodeProcess.env.SHOWCASE_METRO_HOST ?? (hasIos ? lanIpv4Address() : "127.0.0.1");
   await NodeFSP.mkdir(outputDirectory, { recursive: true });
   for (const capture of captures) {
     const directory = showcaseCaptureDirectory(outputDirectory, capture);

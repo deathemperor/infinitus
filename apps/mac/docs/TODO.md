@@ -1,4 +1,4 @@
-# Open items (carried over from the claude-swap session, 2026-08-29)
+# Open items (carried over from the pre-Infinitus session, 2026-08-29)
 
 ## Done 2026-08-30
 - ~~Caffeine integration~~ → built as a native power assertion instead
@@ -333,7 +333,7 @@ file keeps the shipped log and the deferred-by-design notes.
   fixed per-account slot; the usage endpoint omits `resets_at` at 0 %
   for some tokens. Infinitus remembers each account's last reset and
   steps it by whole weeks; the ENGINE now carries the slot forward too
-  (claude-swap PR #309, cherry-picked into the deploy branch and
+  (engine PR #309, cherry-picked into the deploy branch and
   installed) — consume-first then ranks a 0 % account by its real
   reset instead of "unknown → last" (the user's "why is P2 burning
   while P5/P6 sit at 0 %"). 5h-dead rows keep their 7d reset.
@@ -351,7 +351,7 @@ file keeps the shipped log and the deferred-by-design notes.
   (footer chips, `infinitus-tray serve/pair`; in progress), hot reload
   (InjectionIII download still awaiting permission), ~~#15 pick-first~~
   → engine knob only (user 2026-09-03): cswap `autoswitch.preferred`
-  (claude-swap PR #312, star hidden until the installed cswap has it),
+  (engine PR #312, star hidden until the installed cswap has it),
   proxy priority tier; the app-side auto-order writer and `auto-order`
   verb are gone, headroom sort is display-only.
 
@@ -475,7 +475,7 @@ file keeps the shipped log and the deferred-by-design notes.
   without stealing focus (position verified to the point); Cmd+W
   clears. ~~Off-screen overflow~~ → clampOnScreen on every re-fit +
   anchored bottom clamp.
-- ~~Switch push lists the fleet~~ → ENGINE side (claude-swap commit
+- ~~Switch push lists the fleet~~ → ENGINE side (engine commit
   572e073): switch_text(fleet=…) + switcher.fleet_status_rows —
   '→ 2 bravo: 5h 45% · 7d 12%' lines under the head. Tests green
   (pre-existing env-dependent failures in move/swap/store-guard
@@ -500,7 +500,7 @@ file keeps the shipped log and the deferred-by-design notes.
   celebrations) recorded off a fabricated LIMITLESS_CSWAP shim
   fleet — no real account data in the published gif.
 - ~~Linux/AUR ask~~ → app is AppKit (no Linux build); shipped the
-  engine instead: claude-swap formula in the tap (Linux-capable,
+  engine instead: the engine formula in the tap (Linux-capable,
   resources pinned, E2E-installed) + packaging/aur/PKGBUILD
   (publishing needs the user's AUR account).
 - ~~Omarchy~~ → app not compatible (macOS-only) — README says so
