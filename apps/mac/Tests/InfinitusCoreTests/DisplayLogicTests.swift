@@ -179,6 +179,18 @@ final class DeadCauseTests: XCTestCase {
         XCTAssertNil(AccountVitals.cause(Usage(fiveHour: window(40, resetsAt: "2026-09-13T06:00:00Z"))))
     }
 
+    func testEverySpentWindowIsACauseAndASharedClockIsSaidOnce() {
+        let usage = Usage(fiveHour: window(100, resetsAt: "2026-09-13T06:00:00Z"),
+                          sevenDay: window(100, resetsAt: "2026-09-22T11:00:00Z"),
+                          scoped: [window(100, resetsAt: "2026-09-22T11:00:30Z", name: "Fable"),
+                                   window(40, resetsAt: "2026-09-22T11:00:00Z", name: "Opus")])
+        let causes = AccountVitals.deadCauses(usage)
+        XCTAssertEqual(causes.map(\.kind), [.session, .weekly, .scoped])
+        XCTAssertEqual(causes.last?.name, "Fable")
+        XCTAssertEqual(causes.map { AccountVitals.resetRepeatsEarlierCause($0, in: usage) },
+                       [false, false, true])
+    }
+
     func testSpentModelIsTheOneModelWindowThatAloneKills() {
         let fable = Usage(fiveHour: window(30, resetsAt: "2026-09-13T06:00:00Z"),
                           scoped: [window(100, resetsAt: "2026-09-15T11:00:00Z", name: "Fable"),
