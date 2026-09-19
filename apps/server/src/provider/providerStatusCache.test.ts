@@ -6,7 +6,10 @@ import {
   type ServerProvider,
 } from "@infinitus/contracts";
 import { createModelCapabilities } from "@infinitus/shared/model";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";

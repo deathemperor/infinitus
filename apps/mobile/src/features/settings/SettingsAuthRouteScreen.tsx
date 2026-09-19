@@ -6,7 +6,10 @@ import { View } from "react-native";
 
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { InfinitusConnectProfilePage } from "../cloud/InfinitusConnectProfilePage";
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 
 // Custom rows in Clerk's native profile. Mirrors the web UserButton pages.
 const USER_PROFILE_CUSTOM_PAGES = [

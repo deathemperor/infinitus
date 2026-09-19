@@ -5,7 +5,10 @@ import {
   type DesktopAppActivationRequest,
   type DesktopAppActivationResponse,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 
 interface PendingActivation {
   readonly request: DesktopAppActivationRequest;

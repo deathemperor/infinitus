@@ -55,8 +55,11 @@ import { readPastedComposerContext } from "./composerInlineTokenPaste";
 import { isPasteAsTextShortcut } from "@infinitus/client-runtime/text-paste";
 import { type CodexArtifactTemplate } from "@infinitus/client-runtime/codex-artifact-templates";
 import { effectiveSnoozed, threadWokeAt } from "@infinitus/client-runtime/state/thread-settled";
+<<<<<<< HEAD
 import { useInfinitusHoldBanner } from "./chat/useInfinitusHoldBanner";
 import { PinAtCreationToggle, usePinAtCreation } from "./chat/PinAtCreationToggle";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 import {
   parseCodexFeedbackCommand,
   submitCodexFeedback,

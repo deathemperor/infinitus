@@ -8,7 +8,10 @@ import type {
   ScopedProjectRef,
   ThreadId,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-803f94e78-upstream-renamed
 
 export interface DesktopAppActivationProject {
   readonly id: ProjectId;
