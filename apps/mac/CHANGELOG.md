@@ -10,6 +10,18 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.28
+
+### Mac
+- The account engine reads its keychain items a few at a time, so every accounts refresh on a many-account fleet is about 2.5x faster.
+
+### Desktop
+- A thread stopped on a usage limit resumes as soon as the engine swaps accounts; before, one stopped a moment after the engine's last usage check could wait minutes beside threads that had already resumed.
+- An agent that runs `aws login` or `gcloud auth login` itself now raises the sign-in card and the phone alert, instead of waiting on a browser nobody was shown.
+
+### Phone
+- The launch screen shows the Infinitus icon as a rounded tile on iOS and as the Infinitus mark on Android.
+
 ## 0.5.0-alpha.27
 
 ### Mac
