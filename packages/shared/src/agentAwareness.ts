@@ -40,6 +40,7 @@ export interface ProjectThreadAwarenessInput {
     | "updatedAt"
     | "hasPendingApprovals"
     | "hasPendingUserInput"
+    | "backgroundLiveness"
   >;
 }
 
@@ -90,6 +91,13 @@ function resolveThreadAwarenessPhase(
     return "starting";
   }
   if (thread.session?.status === "running" || thread.latestTurn?.state === "running") {
+    return "running";
+  }
+  // Fork: a settled turn whose subagents or workflows run on is still an
+  // active agent. The thread lists say Working for it (`backgroundLiveness`),
+  // so the card has to, or its count runs short and Done rings early. A watch
+  // loop alone ("monitoring") is not agent work and stays Done.
+  if (thread.backgroundLiveness === "working") {
     return "running";
   }
   if (thread.latestTurn?.state === "completed") {
