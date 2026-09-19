@@ -1,4 +1,7 @@
-import type { AccountRowModel } from "@infinitus/client-runtime/state/infinitusAccounts";
+import {
+  type AccountRowModel,
+  INFINITUS_COMMAND_TIMEOUT_MESSAGE,
+} from "@infinitus/client-runtime/state/infinitusAccounts";
 import { EnvironmentId } from "@infinitus/contracts";
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
@@ -220,6 +223,11 @@ describe("commandFailureMessage", () => {
     expect(
       commandFailureMessage(Cause.fail({ _tag: "InfinitusUnavailable", path: "/x", cause: "y" })),
     ).toBe("Infinitus is not running on this Mac.");
+    expect(
+      commandFailureMessage(
+        Cause.fail({ _tag: "InfinitusUnavailable", path: "/x", cause: "timeout" }),
+      ),
+    ).toBe(INFINITUS_COMMAND_TIMEOUT_MESSAGE);
     expect(commandFailureMessage(Cause.fail(new Error("socket hung up")))).toBe("socket hung up");
     expect(commandFailureMessage(Cause.fail(new Error("   ")))).toBe(
       "The command did not reach the Mac.",

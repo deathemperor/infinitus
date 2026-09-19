@@ -11,6 +11,8 @@ import {
   WAIT_ADD_STILL_RUNNING,
   accountCommandArgs,
   accountsPageState,
+  rowFlip,
+  withFlip,
   addAccountCommandArgs,
   buildFleetSection,
   buildForecast,
@@ -286,6 +288,39 @@ describe("command arguments", () => {
     });
     const warm = rowAt(fleet({ accounts: [account({ number: 3, autoIgnite: true })] }));
     expect(accountCommandArgs("claude", warm, "autoIgnite").args).toEqual(["claude", "3", "off"]);
+  });
+});
+
+describe("row flips (#1481)", () => {
+  const row = rowAt(twoAccounts, 1);
+
+  it("names the side each toggle lands on and nothing for the rest", () => {
+    expect(rowFlip(row, "autoIgnite")).toEqual({ number: 2, field: "autoIgnite", to: true });
+    expect(rowFlip(row, "prefer")).toEqual({ number: 2, field: "preferred", to: true });
+    expect(rowFlip(row, "hold")).toEqual({ number: 2, field: "held", to: true });
+    const held = rowAt(fleet({ accounts: [account({ number: 3, disabled: true })] }));
+    expect(rowFlip(held, "unhold")).toEqual({ number: 3, field: "held", to: false });
+    expect(rowFlip(row, "switch")).toBeNull();
+    expect(rowFlip(row, "rename")).toBeNull();
+  });
+
+  it("draws the flag and the hold action that follows it, on that row only", () => {
+    const warm = withFlip(row, rowFlip(row, "autoIgnite"));
+    expect(warm.autoIgnite).toBe(true);
+    expect(accountCommandArgs("claude", warm, "autoIgnite").args).toEqual(["claude", "2", "off"]);
+    const held = withFlip(row, rowFlip(row, "hold"));
+    expect(held.held).toBe(true);
+    expect(held.actions).toContain("unhold");
+    expect(held.actions).not.toContain("hold");
+    const other = rowAt(twoAccounts, 0);
+    expect(withFlip(other, rowFlip(row, "hold"))).toBe(other);
+    expect(withFlip(row, null)).toBe(row);
+  });
+
+  it("draws nothing once the snapshot has caught up", () => {
+    const flip = rowFlip(row, "autoIgnite");
+    const landed = rowAt(fleet({ accounts: [account({ number: 2, autoIgnite: true })] }));
+    expect(withFlip(landed, flip)).toBe(landed);
   });
 });
 

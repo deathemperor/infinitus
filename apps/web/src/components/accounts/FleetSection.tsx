@@ -1,7 +1,9 @@
-import type {
-  AccountAction,
-  AccountRowModel,
-  FleetSectionModel,
+import {
+  type AccountAction,
+  type AccountRowModel,
+  type FleetSectionModel,
+  type RowFlip,
+  withFlip,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import type { ExhaustedBandModel } from "@infinitus/client-runtime/state/infinitusExhausted";
 
@@ -42,6 +44,7 @@ export function FleetSection({
   section,
   band,
   pending,
+  flips,
   failure,
   offersAdd,
   addFlow,
@@ -53,7 +56,9 @@ export function FleetSection({
   readonly section: FleetSectionModel;
   /** The all-exhausted band, when every unheld account is at a limit. */
   readonly band: ExhaustedBandModel | null;
-  readonly pending: { readonly number: number; readonly action: AccountAction } | null;
+  readonly pending: ReadonlyArray<{ readonly number: number; readonly action: AccountAction }>;
+  /** Toggles pressed and not yet confirmed, drawn on their rows (#1481). */
+  readonly flips: ReadonlyArray<RowFlip>;
   readonly failure: { readonly number: number; readonly message: string } | null;
   /** The running build lists the `add` verb at all. */
   readonly offersAdd: boolean;
@@ -197,17 +202,32 @@ export function FleetSection({
       )}
       {band === null ? null : <ExhaustedBand band={band} />}
       <div className="flex flex-col">
-        {section.rows.map((row) => (
-          <AccountRow
-            key={row.number}
-            row={row}
-            pendingAction={pending?.number === row.number ? pending.action : null}
-            failure={failure?.number === row.number ? failure.message : null}
-            onAction={(action, alias) => onAction(row, action, alias)}
-            onRelogin={(canAdd || inApp) && row.reloginNeeded ? () => onStart(row) : undefined}
-            reloginBusy={busy}
-          />
-        ))}
+        {section.rows.map((source) => {
+          // A second press toggles from what the row shows, not from the
+          // snapshot it is still waiting on.
+          const row = withFlip(
+            source,
+            flips.find((flip) => flip.number === source.number),
+          );
+          // Hold and unhold are one button: the flip has already swapped which
+          // of the two the row offers, and the spinner belongs on that one.
+          const asked = pending.find((entry) => entry.number === row.number)?.action ?? null;
+          const pendingAction =
+            asked === "hold" || asked === "unhold"
+              ? (row.actions.find((action) => action === "hold" || action === "unhold") ?? asked)
+              : asked;
+          return (
+            <AccountRow
+              key={row.number}
+              row={row}
+              pendingAction={pendingAction}
+              failure={failure?.number === row.number ? failure.message : null}
+              onAction={(action, alias) => onAction(row, action, alias)}
+              onRelogin={(canAdd || inApp) && row.reloginNeeded ? () => onStart(row) : undefined}
+              reloginBusy={busy}
+            />
+          );
+        })}
       </div>
     </section>
   );
