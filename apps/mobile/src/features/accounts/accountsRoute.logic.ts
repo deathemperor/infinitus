@@ -8,6 +8,7 @@ import {
   buildForecast,
   type FleetSectionModel,
   type ForecastModel,
+  INFINITUS_COMMAND_TIMEOUT_MESSAGE,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   exhaustedBand,
@@ -212,6 +213,7 @@ export function commandFailureMessage(cause: Cause.Cause<unknown>): string {
     readonly error?: string;
     readonly restarting?: boolean;
     readonly message?: string;
+    readonly cause?: unknown;
   } | null;
   if (error && error._tag === "InfinitusCommandFailed") {
     if (error.restarting === true)
@@ -220,8 +222,11 @@ export function commandFailureMessage(cause: Cause.Cause<unknown>): string {
       ? error.error
       : "Infinitus refused the command.";
   }
-  if (error && error._tag === "InfinitusUnavailable")
+  if (error && error._tag === "InfinitusUnavailable") {
+    // A reply that outlived the socket's budget is late, not absent (#1481).
+    if (error.cause === "timeout") return INFINITUS_COMMAND_TIMEOUT_MESSAGE;
     return "Infinitus is not running on this Mac.";
+  }
   return error && typeof error.message === "string" && error.message.trim().length > 0
     ? error.message
     : "The command did not reach the Mac.";

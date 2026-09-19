@@ -1,7 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
 import {
+  INFINITUS_COMMAND_TIMEOUT_MESSAGE,
   accountCommandArgs,
   accountsPageState,
+  rowFlip,
   addAccountCommandArgs,
   buildFleetSection,
   buildForecast,
@@ -16,6 +18,7 @@ import {
   waitAddCommandArgs,
   type AccountAction,
   type AccountRowModel,
+  type RowFlip,
   type SignInRowModel,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { exhaustedBand } from "@infinitus/client-runtime/state/infinitusExhausted";
@@ -71,7 +74,9 @@ import {
 } from "./signIn.logic";
 import { SignInsSection } from "./SignInsSection";
 
-/** How long a command may hold its row's spinner when no snapshot follows it. */
+/** How long a sign-in may hold its row's spinner when no snapshot follows it,
+    and how long a flipped flag is drawn on a row the snapshots never confirm
+    (a write the app answered without changing anything). */
 const COMMAND_SETTLE_TIMEOUT_MS = 10_000;
 
 interface CommandTarget {
@@ -79,12 +84,16 @@ interface CommandTarget {
   readonly number: number;
 }
 
-/** A command whose row shows a spinner, tagged with the snapshot it was sent
-    against: any newer snapshot is the app's answer and retires the spinner. */
+/** A command in flight: its row shows a spinner until the socket answers.
+    Several rows may be in flight at once (#1481: the Mac queues writes). */
 interface PendingCommand extends CommandTarget {
   readonly action: AccountAction;
-  readonly snapshot: InfinitusSnapshot | null;
 }
+
+/** A toggle drawn on its row before the engine confirms it. It draws nothing
+    once a snapshot agrees, and retires `COMMAND_SETTLE_TIMEOUT_MS` after the
+    reply. */
+interface PendingFlip extends CommandTarget, RowFlip {}
 
 /** A sign-in just started, keyed by its row; the next snapshot carries the
     login's own phase and takes over from the spinner. */
@@ -103,6 +112,7 @@ function commandErrorMessage(cause: Cause.Cause<unknown>): string {
     }
     if (tagged._tag === "InfinitusUnavailable") {
       const unavailable = error as { readonly cause?: unknown };
+      if (unavailable.cause === "timeout") return INFINITUS_COMMAND_TIMEOUT_MESSAGE;
       if (typeof unavailable.cause === "string") return unavailable.cause;
     }
     if (error instanceof Error && error.message.trim() !== "") return error.message;
@@ -121,7 +131,8 @@ export function AccountsPage() {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
   const [chosenEnvironmentId, setChosenEnvironmentId] = useState<EnvironmentId | null>(null);
-  const [pending, setPending] = useState<PendingCommand | null>(null);
+  const [pending, setPending] = useState<ReadonlyArray<PendingCommand>>([]);
+  const [flips, setFlips] = useState<ReadonlyArray<PendingFlip>>([]);
   const [failure, setFailure] = useState<(CommandTarget & { message: string }) | null>(null);
   const [pendingSignIn, setPendingSignIn] = useState<PendingSignIn | null>(null);
   const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
@@ -193,15 +204,6 @@ export function AccountsPage() {
   // without the shell. The value lives in the form field until submitted.
   const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
 
-  // The spinner lives only as long as the snapshot the command was sent
-  // against; the timeout covers a command the app answered without changing
-  // anything a snapshot would carry.
-  const inFlight = pending !== null && pending.snapshot === snapshot ? pending : null;
-  useEffect(() => {
-    if (pending === null) return;
-    const timer = setTimeout(() => setPending(null), COMMAND_SETTLE_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pending]);
   const signInInFlight =
     pendingSignIn !== null && pendingSignIn.snapshot === snapshot ? pendingSignIn.key : null;
   useEffect(() => {
@@ -218,17 +220,33 @@ export function AccountsPage() {
   ) => {
     if (environmentId === null) return;
     const { command, args, options } = accountCommandArgs(fleetKey, row, action, alias);
-    setPending({ fleetKey, number: row.number, action, snapshot });
+    const target = { fleetKey, number: row.number };
+    const sameRow = (entry: CommandTarget) =>
+      entry.fleetKey === target.fleetKey && entry.number === target.number;
+    const command_ = { ...target, action };
+    const flip = rowFlip(row, action);
+    const pendingFlip = flip === null ? null : { ...target, ...flip };
+    setPending((prev) => [...prev, command_]);
+    if (pendingFlip !== null) {
+      setFlips((prev) => [...prev.filter((entry) => !sameRow(entry)), pendingFlip]);
+    }
     const result = await runCommand({
       environmentId,
       input: { command, args, options: options ?? {} },
     });
+    setPending((prev) => prev.filter((entry) => entry !== command_));
     if (result._tag === "Success") {
       setFailure(null);
+      if (pendingFlip !== null) {
+        setTimeout(
+          () => setFlips((prev) => prev.filter((entry) => entry !== pendingFlip)),
+          COMMAND_SETTLE_TIMEOUT_MS,
+        );
+      }
       return;
     }
-    setPending(null);
-    setFailure({ fleetKey, number: row.number, message: commandErrorMessage(result.cause) });
+    if (pendingFlip !== null) setFlips((prev) => prev.filter((entry) => entry !== pendingFlip));
+    setFailure({ ...target, message: commandErrorMessage(result.cause) });
   };
 
   const signIn = async (row: SignInRowModel) => {
@@ -585,7 +603,8 @@ export function AccountsPage() {
               state={state}
               snapshot={snapshot}
               nowMs={Date.parse(minute)}
-              pending={inFlight}
+              pending={pending}
+              flips={flips}
               failure={failure}
               pendingSignIn={signInInFlight}
               signInFailure={signInFailure}
@@ -623,6 +642,7 @@ function AccountsBody({
   snapshot,
   nowMs,
   pending,
+  flips,
   failure,
   pendingSignIn,
   signInFailure,
@@ -640,7 +660,8 @@ function AccountsBody({
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly nowMs: number;
-  readonly pending: (CommandTarget & { action: AccountAction }) | null;
+  readonly pending: ReadonlyArray<PendingCommand>;
+  readonly flips: ReadonlyArray<PendingFlip>;
   readonly failure: (CommandTarget & { message: string }) | null;
   readonly pendingSignIn: string | null;
   readonly signInFailure: { readonly key: string; readonly message: string } | null;
@@ -743,11 +764,8 @@ function AccountsBody({
             key={section.key}
             section={section}
             band={exhaustedBand(fleet, nowMs)}
-            pending={
-              pending?.fleetKey === section.key
-                ? { number: pending.number, action: pending.action }
-                : null
-            }
+            pending={pending.filter((entry) => entry.fleetKey === section.key)}
+            flips={flips.filter((entry) => entry.fleetKey === section.key)}
             failure={
               failure?.fleetKey === section.key
                 ? { number: failure.number, message: failure.message }
