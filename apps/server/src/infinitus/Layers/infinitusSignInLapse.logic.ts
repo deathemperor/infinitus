@@ -52,6 +52,7 @@ const AWS: Signature = {
     "pending authorization to retrieve an sso token has expired",
     "the security token included in the request is expired",
     "waiting for the refresh lock held by pid",
+    "aws auth failed — run 'aws login",
   ],
   lineStarts: [
     "aws: [error]",
@@ -59,6 +60,7 @@ const AWS: Signature = {
     "error when retrieving token from sso",
     "the sso session",
     "  fix: aws login",
+    "[codebuild] aws auth failed",
   ],
 };
 

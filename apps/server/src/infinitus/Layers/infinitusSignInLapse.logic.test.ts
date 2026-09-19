@@ -32,6 +32,15 @@ describe("signInLapse (#1076)", () => {
     });
   });
 
+  it("reads a wrapper script's advisory that swallowed the CLI's own error", () => {
+    expect(
+      signInLapse(
+        "[codebuild] AWS auth failed — run 'aws login --profile banyan-login' then retry\nexit=3",
+        "tail -12 /tmp/check-codebuild.log",
+      ),
+    ).toEqual({ provider: "aws", profile: "banyan-login" });
+  });
+
   it("takes the profile the error itself names over the command's", () => {
     expect(signInLapse(BROKER, "aws s3 ls --profile other")).toEqual({
       provider: "aws",
