@@ -282,6 +282,16 @@ echo "functional: ok ($N demo accounts, pop-out visible)"
 "$CTL" rename swapd/claude 3 "" | expect "$(acct 3).get('alias')!='E2E Alias'" || fail "rename clear didn't take"   # demo accounts carry default aliases
 "$CTL" prefer swapd/claude 2 on | expect "$(acct 2).get('preferred')==True" || fail "prefer 2 didn't take"
 "$CTL" prefer swapd/claude 2 off | expect "$(acct 2).get('preferred')==False" || fail "unprefer 2 didn't take"
+# #1481: two writes at once queue in arrival order; the second used to be
+# refused with "busy: another control command is running".
+"$CTL" prefer swapd/claude 2 on >/dev/null & first=$!
+"$CTL" hold swapd/claude 3 >/dev/null & second=$!
+wait "$first" || fail "a write racing another was refused (prefer)"
+wait "$second" || fail "a write racing another was refused (hold)"
+"$CTL" fleets | expect "(lambda by: by[2].get('preferred')==True and by[3].get('disabled')==True)({a['number']: a for a in d[0]['accounts']})" \
+    || fail "racing writes didn't both land"
+"$CTL" prefer swapd/claude 2 off >/dev/null || fail "unprefer 2 after the race"
+"$CTL" unhold swapd/claude 3 >/dev/null || fail "unhold 3 after the race"
 NEXT="$("$CTL" fleets | json "d[0]['nextCandidate']")"
 "$CTL" rotate swapd/claude | expect "d['fleet']['activeNumber']==$NEXT" || fail "rotate didn't land on the next candidate ($NEXT)"
 "$CTL" history swapd/claude --limit 5 | expect "d['fleet']=='swapd/claude' and d['history']['schemaVersion']==1 and d['history']['switches'][0]['to']['slot']==2 and d['history']['switches'][0]['trigger']=='at-limit'" || fail "history hands the engine's switch log on"
