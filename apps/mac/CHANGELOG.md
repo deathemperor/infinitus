@@ -10,6 +10,27 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.29
+
+### Mac
+- An account the engine benched for a dead refresh token now says so and offers its re-login, instead of showing healthy usage the engine will never rotate onto.
+- Every spent window in a row reads "down", not only the one with the latest reset.
+- Adding or re-logging a swapd account finishes on its own through the OAuth redirect — no code to copy and paste, same private sign-in window.
+
+### Desktop
+- The maintainer docs say Infinitus too; a quoted or upstream-named T3 Code stays.
+- The user guides say Infinitus throughout.
+- Settings › Engines shows each engine once: its Start, Stop, Keep it running and Command rows now sit in the same card as its URL and key.
+- A usage limit hit right after an account swap is charged to the account that actually ran out; before, the account just swapped to could be marked spent for days and skipped by the rotation.
+- A thread resumed on a swapped-to account after a usage limit no longer ends up stuck on "Working" forever; a queued message could be sent into the same session as the resume, leaving a turn that never finished.
+- A CodeBuild check that fails on expired AWS credentials now raises the sign-in card straight away.
+
+### Phone
+- The lock-screen card counts a thread whose background agents are still running, so its number matches the thread list and Done waits for the work to end.
+- Tapping an image in a message opens it without first asking the Mac for a new link, and answers the tap with a haptic.
+- A large attachment that cannot finish uploading now comes back to the composer with an error instead of holding every other queued reply and new thread behind it.
+- A large screenshot picked from the photo library is downscaled before it is queued, so it uploads in seconds over the relay instead of timing out.
+
 ## 0.5.0-alpha.28
 
 ### Mac

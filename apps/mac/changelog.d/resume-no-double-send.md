@@ -1,1 +1,0 @@
-Desktop: A thread resumed on a swapped-to account after a usage limit no longer ends up stuck on "Working" forever; a queued message could be sent into the same session as the resume, leaving a turn that never finished.
