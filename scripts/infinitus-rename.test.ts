@@ -59,7 +59,7 @@ describe("infinitus-rename", () => {
     }
   });
 
-  it("rewrites the product name in the user guides, and nowhere else", () => {
+  it("rewrites the product name in the docs, and nowhere else", () => {
     const guide = [
       "Press the shortcut and T3 Code attaches the image. Import a T3 Code theme.",
       "T3 checks the SDK; only T3-managed worktrees qualify. Sign in to T3 Connect.",
@@ -83,8 +83,27 @@ describe("infinitus-rename", () => {
     );
     expect(applyRenames(out, "docs/user/telemetry.md")).toBe(out);
     expect(remainingRenames(out, "docs/user/telemetry.md")).toEqual([]);
-    expect(applyRenames(guide, "docs/internals/glossary.md")).toBe(guide);
-    expect(remainingRenames(guide, "docs/internals/glossary.md")).toEqual([]);
+    expect(applyRenames(guide, "apps/web/README.md")).toBe(guide);
+    expect(remainingRenames(guide, "apps/web/README.md")).toEqual([]);
+  });
+
+  it("keeps a maintainer page's literals: the other product, quoted and code-formatted names", () => {
+    const page = [
+      "Terms whose meaning matters across T3 Code; a T3 Code theme; T3 home; the T3 glyph.",
+      'the installed app\'s real `T3 Code (Alpha)`, "Built on T3 Code", named "T3 Code" here',
+      '"/Applications/T3 Code.app/Contents/MacOS/T3 Code"',
+      "which would hand it the real T3 Code; upstream's T3 Code stays too",
+    ].join("\n");
+    const out = applyRenames(page, "docs/internals/glossary.md");
+    expect(out).toBe(
+      [
+        "Terms whose meaning matters across Infinitus; an Infinitus theme; T3 home; the T3 glyph.",
+        'the installed app\'s real `T3 Code (Alpha)`, "Built on T3 Code", named "T3 Code" here',
+        '"/Applications/T3 Code.app/Contents/MacOS/T3 Code"',
+        "which would hand it the real T3 Code; upstream's T3 Code stays too",
+      ].join("\n"),
+    );
+    expect(remainingRenames(out, "docs/internals/glossary.md")).toEqual([]);
   });
 
   it("leaves the compat-read identifiers alone", () => {

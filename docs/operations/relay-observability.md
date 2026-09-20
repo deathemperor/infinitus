@@ -1,6 +1,6 @@
 # Relay observability
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Using Infinitus? See [docs/user](../user/).
 
 The relay Alchemy stack owns a shared Axiom trace setup:
 

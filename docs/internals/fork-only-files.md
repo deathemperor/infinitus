@@ -120,7 +120,7 @@ these bullets.
   bare "T3 Tools" as a stray literal, so the credit routes through them like
   every other upstream reference. `productNamePlugin` rewrites only
   `index.html` and `bootError.ts`, so these constants survive the build.
-- `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A); `docs/user` by the rename table's `docs/user/` entries and CI's `--check`. Rules and traps: `docs/internals/infinitus-rename.md`.
+- `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A); `docs` by the rename table's prose entries and CI's `--check`. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
