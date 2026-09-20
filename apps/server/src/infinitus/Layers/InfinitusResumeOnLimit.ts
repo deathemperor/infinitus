@@ -364,7 +364,13 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
                 }
                 lastResumeAt.set(stop.threadId, resumedAt);
                 yield* forget(stop.threadId);
-                yield* resume(stop, current);
+                // Claimed for the whole replace-then-send, which reports an
+                // idle session in the middle of itself: the queue drain reads
+                // this so its own send cannot land in that window (#1509).
+                yield* limitStops.setResuming(stop.threadId, true);
+                yield* resume(stop, current).pipe(
+                  Effect.ensuring(limitStops.setResuming(stop.threadId, false)),
+                );
               }).pipe(
                 Effect.ensuring(Effect.sync(() => scheduled.delete(stop))),
                 Effect.catchCause((cause) =>

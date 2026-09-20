@@ -168,6 +168,9 @@ interface Harness {
   readonly interrupts: Effect.Effect<ReadonlyArray<{ threadId: ThreadId; turnId?: TurnId }>>;
   readonly sessionStops: Effect.Effect<ReadonlyArray<ThreadId>>;
   readonly turns: Effect.Effect<ReadonlyArray<{ threadId: ThreadId; input?: string }>>;
+  /** Whether the thread was claimed as resuming (#1509) as each send went. */
+  readonly claims: Effect.Effect<ReadonlyArray<boolean>>;
+  readonly isResuming: Effect.Effect<boolean>;
   readonly dispatched: Effect.Effect<ReadonlyArray<OrchestrationCommand>>;
   readonly watchers: Effect.Effect<number>;
   /** The sidebar's view of the stops (#270 I). */
@@ -195,6 +198,10 @@ const makeHarnessWith = (
     const sessionStops = yield* Ref.make<ReadonlyArray<ThreadId>>([]);
     const turns = yield* Ref.make<ReadonlyArray<{ threadId: ThreadId; input?: string }>>([]);
     const turnSent = yield* Queue.unbounded<void>();
+    const claims = yield* Ref.make<ReadonlyArray<boolean>>([]);
+    // Assigned once the layer is built; the mock below closes over it so a
+    // send can read the very service the layer claims the thread on.
+    let live: InfinitusLimitStops["Service"] | null = null;
     const dispatched = yield* Ref.make<ReadonlyArray<OrchestrationCommand>>([]);
     const watchers = yield* Ref.make(0);
     const watchStarts = yield* Queue.unbounded<void>();
@@ -219,10 +226,14 @@ const makeHarnessWith = (
             stopSession: (input) =>
               Ref.update(sessionStops, (previous) => [...previous, input.threadId]),
             sendTurn: (input) =>
-              Ref.update(turns, (previous) => [
-                ...previous,
-                { threadId: input.threadId, ...(input.input ? { input: input.input } : {}) },
-              ]).pipe(
+              Effect.gen(function* () {
+                const claimed = live === null ? false : yield* live.isResuming(input.threadId);
+                yield* Ref.update(claims, (previous) => [...previous, claimed]);
+                yield* Ref.update(turns, (previous) => [
+                  ...previous,
+                  { threadId: input.threadId, ...(input.input ? { input: input.input } : {}) },
+                ]);
+              }).pipe(
                 Effect.andThen(Queue.offer(turnSent, undefined)),
                 Effect.as({ turnId, resumeCursor: null } as never),
               ),
@@ -287,6 +298,7 @@ const makeHarnessWith = (
     );
     const context = yield* Layer.build(layer);
     const limitStops = Context.get(context, InfinitusLimitStops);
+    live = limitStops;
 
     return {
       nextTurn: Queue.take(turnSent),
@@ -305,10 +317,12 @@ const makeHarnessWith = (
       interrupts: Ref.get(interrupts),
       sessionStops: Ref.get(sessionStops),
       turns: Ref.get(turns),
+      claims: Ref.get(claims),
       dispatched: Ref.get(dispatched),
       watchers: Ref.get(watchers),
       stopped: limitStops.stopped,
       isStopped: limitStops.isStopped(threadId),
+      isResuming: limitStops.isResuming(threadId),
     } satisfies Harness;
   });
 const makeHarness = makeHarnessWith();
@@ -453,6 +467,25 @@ describe("InfinitusResumeOnLimitLive", () => {
           yield* h.nextWatch;
           expect(yield* h.reported).toEqual([]);
         }
+      }),
+    ),
+  );
+
+  // #1509: the send replaces the thread's CLI first, and the session it
+  // leaves in between reports ready with no turn on it. The claim is what
+  // keeps the queue drain out of that window; without it both sends run and
+  // the turn the CLI does not answer never completes.
+  effectIt.effect("claims the thread for the whole send, and lets it go after", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.poll(swapped(at(150)));
+        expect(yield* settle(h.turns, (value) => value.length === 1)).toHaveLength(1);
+        expect(yield* h.claims).toEqual([true]);
+        expect(yield* h.isResuming).toBe(false);
       }),
     ),
   );

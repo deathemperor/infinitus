@@ -20,6 +20,7 @@ import { OrchestrationEngineService } from "../../orchestration/Services/Orchest
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { threadHasQueuedTurnStart } from "../../orchestration/ThreadSettlementPolicy.ts";
 import { forkParked } from "../../serverActivation.ts";
+import { InfinitusLimitStops, InfinitusLimitStopsLive } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 import {
@@ -103,8 +104,9 @@ const activityInput = (event: OrchestrationEvent, threadId: ThreadId): Input | n
  * the decider removes the row in the same batch as the send, whenever the
  * thread is idle by every gate the client drain used (`queueDrainVerdict`):
  * no turn running or pending, not held (#616), not paused (#743), not
- * archived, and no send of ours still in flight. One send per thread at a
- * time; the next row waits for the session to settle again. A row queued
+ * mid-resume on a usage limit (#1509), not archived, and no send of ours
+ * still in flight. One send per thread at a time; the next row waits for
+ * the session to settle again. A row queued
  * `sendAt: "tool-boundary"` (#1318) also goes while the turn runs, once a
  * tool call of that turn (`activeTurnId`, so a stale row's boundary is not
  * the next turn's) finishes — into the running turn, as "Send now" does.
@@ -133,6 +135,7 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const sessionHold = yield* InfinitusSessionHold;
     const sessionInterrupt = yield* InfinitusSessionInterrupt;
+    const limitStops = yield* InfinitusLimitStops;
     const crypto = yield* Crypto.Crypto;
     const commandId = crypto.randomUUIDv4.pipe(Effect.map(CommandId.make));
 
@@ -254,6 +257,7 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         const verdict = queueDrainVerdict(shell.value, {
           held: held.has(threadId),
           paused: paused.has(threadId),
+          resuming: yield* limitStops.isResuming(threadId),
           inFlight: inFlight.has(threadId),
           pendingStart: threadHasQueuedTurnStart(shell.value, createdAt),
           failed,
@@ -394,4 +398,8 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
       }),
     );
   }),
+).pipe(
+  // The same layer value every other consumer merges, so the resume layer's
+  // claim and this drain's reading of it are one set.
+  Layer.provideMerge(InfinitusLimitStopsLive),
 );
