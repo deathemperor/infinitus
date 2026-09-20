@@ -38,6 +38,7 @@ import {
   resumeMarkerSummary,
   resumeTarget,
   restoreLimitStops,
+  turnOvertookStop,
   type LimitStop,
   type ResumeTarget,
 } from "./infinitusResumeOnLimit.logic.ts";
@@ -112,6 +113,13 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     ) {
       const shell = yield* projectionSnapshotQuery.getThreadShellById(stop.threadId);
       if (Option.isNone(shell) || shell.value.archivedAt !== null) return;
+      if (turnOvertookStop(shell.value, stop)) {
+        return yield* Effect.logInfo("infinitus.resume-on-limit.overtaken", {
+          threadId: stop.threadId,
+          turnId: stop.turnId,
+          startedTurnId: shell.value.latestTurn?.turnId ?? null,
+        });
+      }
       const context = yield* projectionSnapshotQuery.getThreadRuntimeContext(stop.threadId);
       if (Option.isNone(context) || context.value.session === null) return;
       // The resumed turn always runs in a fresh CLI: a live process can keep
@@ -364,12 +372,13 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
                 }
                 lastResumeAt.set(stop.threadId, resumedAt);
                 yield* forget(stop.threadId);
-                // Claimed for the whole replace-then-send, which reports an
-                // idle session in the middle of itself: the queue drain reads
-                // this so its own send cannot land in that window (#1509).
-                yield* limitStops.setResuming(stop.threadId, true);
-                yield* resume(stop, current).pipe(
-                  Effect.ensuring(limitStops.setResuming(stop.threadId, false)),
+                // Claimed for the whole replace-then-send (#1509). Acquired
+                // and released as one bracket so an interrupt between the two
+                // cannot leave the thread claimed for the process's life.
+                yield* Effect.acquireUseRelease(
+                  limitStops.setResuming(stop.threadId, true),
+                  () => resume(stop, current),
+                  () => limitStops.setResuming(stop.threadId, false),
                 );
               }).pipe(
                 Effect.ensuring(Effect.sync(() => scheduled.delete(stop))),

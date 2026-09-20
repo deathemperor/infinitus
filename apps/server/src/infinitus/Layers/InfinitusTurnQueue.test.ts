@@ -341,13 +341,10 @@ describe("InfinitusTurnQueueLive (#806)", () => {
     ),
   );
 
-  // #1509: resume-on-limit replaces the thread's CLI and then sends its
-  // continuation, and the session it leaves in between reports `ready` with
-  // no turn on it. A row drained into that window is a second send into one
-  // session: the CLI answers one of the two turns and the other never
-  // completes, so the session stays `running` and the row reads "Working"
-  // until someone interrupts it.
-  effectIt.effect("waits while a limit resume is sending, then drains after it", () =>
+  // #1509: a row drained into the resume's replace-then-send window is a
+  // second send into one session. The release is its own wake — no session
+  // event need follow it — so the row goes on the claim being let go alone.
+  effectIt.effect("waits while a limit resume is sending, and the release wakes it", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const h = yield* makeHarness([idle(one)]);
@@ -356,7 +353,6 @@ describe("InfinitusTurnQueueLive (#806)", () => {
         yield* nothingYet(h.starts);
 
         yield* h.setResuming(one, false);
-        yield* h.emit(domainEvent("thread.session-set", one));
         yield* settle(h.starts, (list) => list.length === 1);
         expect((yield* h.starts)[0]?.threadId).toBe(one);
       }),

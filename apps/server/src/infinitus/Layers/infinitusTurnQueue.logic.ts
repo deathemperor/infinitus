@@ -15,9 +15,7 @@ import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.t
  * thread is idle by every gate the client drain used: no turn running or
  * starting, no turn start pending in the projection, not held by session
  * priority mode (#616), not paused by interrupt mode (#743), not mid-resume
- * on a usage limit (#1509, the one gate the projection cannot show: that
- * send replaces the CLI first, and the new session reports `ready` with no
- * turn on it until the continuation reaches it), and no send of ours still
+ * on a usage limit (#1509), and no send of ours still
  * in flight. A session in `error` is never drained: a queue that keeps
  * sending into a broken session is the failure #832 (retry after a
  * transport failure) owns, and the next manual send clears the state.
@@ -97,9 +95,8 @@ export function queueDrainVerdict(
   gates: {
     readonly held: boolean;
     readonly paused: boolean;
-    /** A resume-on-limit send is in flight (#1509). It replaces the thread's
-        CLI and then sends, and the session reports `ready` with no turn on it
-        in between: idle by every reading below, though a turn is on its way. */
+    /** A resume-on-limit send is in flight (#1509): idle by every reading
+        below, though a turn is on its way. `docs/internals/turn-queue.md`. */
     readonly resuming: boolean;
     readonly inFlight: boolean;
     /** A start requested and not yet running (the reactor is starting the
@@ -122,9 +119,8 @@ export function queueDrainVerdict(
   }
   if (gates.held) return { kind: "wait", reason: "held" };
   if (gates.paused) return { kind: "wait", reason: "paused" };
-  // Ahead of the session reads, and of the tool boundary with them: the
-  // window this covers is the one where the session looks idle and no turn
-  // is running to steer.
+  // Ahead of the session reads, and of the tool boundary with them: no turn
+  // is running to steer in that window.
   if (gates.resuming) return { kind: "wait", reason: "resuming" };
   const session = thread.session;
   if (session !== null) {

@@ -25,6 +25,7 @@ import {
   resumeMarkerSummary,
   resumeTarget,
   restoreLimitStops,
+  turnOvertookStop,
   type LimitStop,
 } from "./infinitusResumeOnLimit.logic.ts";
 
@@ -336,6 +337,60 @@ describe("limitStopFromEvent", () => {
         snapshot,
       ),
     ).toBeNull();
+  });
+});
+
+describe("turnOvertookStop (#1509)", () => {
+  const stop = { turnId, stoppedAt: NOW };
+  const latestTurn = (input: {
+    turnId: TurnId;
+    requestedAt: number;
+    completedAt?: number;
+  }): OrchestrationThreadShell["latestTurn"] =>
+    ({
+      turnId: input.turnId,
+      state: input.completedAt === undefined ? "running" : "completed",
+      requestedAt: DateTime.formatIso(DateTime.makeUnsafe(input.requestedAt)),
+      startedAt: null,
+      completedAt:
+        input.completedAt === undefined
+          ? null
+          : DateTime.formatIso(DateTime.makeUnsafe(input.completedAt)),
+      assistantMessageId: null,
+    }) as OrchestrationThreadShell["latestTurn"];
+
+  it("reads an open turn requested after the stop as another send's", () => {
+    expect(
+      turnOvertookStop(
+        { latestTurn: latestTurn({ turnId: TurnId.make("turn-2"), requestedAt: NOW + 1_000 }) },
+        stop,
+      ),
+    ).toBe(true);
+  });
+
+  it("is not the stop's own parked turn, a settled turn, or an older one", () => {
+    expect(
+      turnOvertookStop({ latestTurn: latestTurn({ turnId, requestedAt: NOW - 1_000 }) }, stop),
+    ).toBe(false);
+    expect(
+      turnOvertookStop(
+        {
+          latestTurn: latestTurn({
+            turnId: TurnId.make("turn-2"),
+            requestedAt: NOW + 1_000,
+            completedAt: NOW + 2_000,
+          }),
+        },
+        stop,
+      ),
+    ).toBe(false);
+    expect(
+      turnOvertookStop(
+        { latestTurn: latestTurn({ turnId: TurnId.make("turn-0"), requestedAt: NOW - 1_000 }) },
+        stop,
+      ),
+    ).toBe(false);
+    expect(turnOvertookStop({ latestTurn: null }, stop)).toBe(false);
   });
 });
 

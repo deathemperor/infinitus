@@ -485,7 +485,38 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* h.poll(swapped(at(150)));
         expect(yield* settle(h.turns, (value) => value.length === 1)).toHaveLength(1);
         expect(yield* h.claims).toEqual([true]);
-        expect(yield* h.isResuming).toBe(false);
+        // The release runs in the resume's own tail, after the send: wait on
+        // it rather than on the send that precedes it.
+        expect(yield* settle(h.isResuming, (value) => value === false)).toBe(false);
+      }),
+    ),
+  );
+
+  // #1509, the other ordering: a send of the thread's own got in first and is
+  // a pending turn in the projection. Resuming now would tear that turn's CLI
+  // down and put a second turn in the session that replaces it.
+  effectIt.effect("stands down when a turn of the thread's own started first", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarnessWith(undefined, {
+          ...shell,
+          latestTurn: {
+            turnId: TurnId.make("turn-drained"),
+            state: "running",
+            requestedAt: at(120),
+            startedAt: null,
+            completedAt: null,
+            assistantMessageId: null,
+          },
+        } as unknown as OrchestrationThreadShell);
+        yield* TestClock.adjust(Duration.seconds(100));
+        yield* h.emit(parkedWarning());
+        yield* settle(h.watchers, (n) => n === 1);
+        yield* h.poll(swapped(at(150)));
+        yield* settle(h.isResuming, (value) => value === false);
+        expect(yield* h.turns).toEqual([]);
+        expect(yield* h.interrupts).toEqual([]);
+        expect(yield* h.sessionStops).toEqual([]);
       }),
     ),
   );

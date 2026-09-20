@@ -37,6 +37,7 @@ type Input =
   | { readonly kind: "thread"; readonly threadId: ThreadId }
   | { readonly kind: "held"; readonly threadIds: ReadonlyArray<ThreadId> }
   | { readonly kind: "paused"; readonly threadIds: ReadonlyArray<ThreadId> }
+  | { readonly kind: "resuming"; readonly threadIds: ReadonlyArray<ThreadId> }
   | {
       readonly kind: "start-failed";
       readonly threadId: ThreadId;
@@ -141,6 +142,7 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
 
     let held: ReadonlySet<ThreadId> = new Set();
     let paused: ReadonlySet<ThreadId> = new Set();
+    let resuming: ReadonlySet<ThreadId> = new Set();
     const inFlight = new Set<ThreadId>();
     /** Rows the decider refused, by `queuedTurnSignature`. */
     const failed = new Set<string>();
@@ -257,7 +259,7 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         const verdict = queueDrainVerdict(shell.value, {
           held: held.has(threadId),
           paused: paused.has(threadId),
-          resuming: yield* limitStops.isResuming(threadId),
+          resuming: resuming.has(threadId),
           inFlight: inFlight.has(threadId),
           pendingStart: threadHasQueuedTurnStart(shell.value, createdAt),
           failed,
@@ -338,6 +340,15 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
             for (const threadId of released) yield* consider(threadId);
             return;
           }
+          // No boot gate beside the other two: nothing is mid-resume when the
+          // process starts, so the sweep cannot race a claim that predates it.
+          case "resuming": {
+            const next = new Set(input.threadIds);
+            const released = releasedThreads(resuming, next);
+            resuming = next;
+            for (const threadId of released) yield* consider(threadId);
+            return;
+          }
           case "start-failed":
             yield* onStartFailed(input.threadId, input.requestId);
             return yield* consider(input.threadId);
@@ -390,6 +401,14 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         worker.enqueue({ kind: "paused", threadIds }),
       ),
     );
+    // The release matters as much as the claim: a resume that returns at one
+    // of its own guards, or whose send fails, leaves no session event behind,
+    // and a row that waited on the claim would sit there unlooked-at.
+    yield* forkParked(
+      Stream.runForEach(limitStops.resuming, (threadIds) =>
+        worker.enqueue({ kind: "resuming", threadIds }),
+      ),
+    );
     yield* forkParked(
       Effect.gen(function* () {
         yield* Deferred.await(heldKnown).pipe(Effect.timeoutOption(SWEEP_GATE_TIMEOUT));
@@ -400,6 +419,6 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
   }),
 ).pipe(
   // The same layer value every other consumer merges, so the resume layer's
-  // claim and this drain's reading of it are one set.
+  // claim and this drain's reading of it are one list.
   Layer.provideMerge(InfinitusLimitStopsLive),
 );

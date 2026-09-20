@@ -217,6 +217,26 @@ export function proxyStop(stop: LimitStop, proxy: string): LimitStop {
 }
 
 /**
+ * Whether a turn of the thread's own is already under way, so the resume must
+ * not run: it would tear that turn's CLI down and send a second time into the
+ * session that replaces it, and only one of the two turns is ever answered
+ * (#1509). The mirror of the queue drain's `resuming` gate, for the ordering
+ * where the other send goes first — `eventCancelsStop` covers only a
+ * `turn.started` the worker has already reached, and a start dispatched
+ * moments earlier is a pending turn in the projection long before that.
+ * The stop's own turn is not such a turn: a parked one is still open here.
+ */
+export function turnOvertookStop(
+  thread: Pick<OrchestrationThreadShell, "latestTurn">,
+  stop: Pick<LimitStop, "turnId" | "stoppedAt">,
+): boolean {
+  const turn = thread.latestTurn ?? null;
+  if (turn === null || turn.completedAt !== null) return false;
+  if (stop.turnId !== null && turn.turnId === stop.turnId) return false;
+  return Date.parse(turn.requestedAt) > stop.stoppedAt;
+}
+
+/**
  * Whether one runtime event means the stop is no longer ours to resume: the
  * turn moved on (the user interrupted or re-sent, the CLI recovered) or the
  * session went away. Our own interrupt lands after the record is gone, so it
