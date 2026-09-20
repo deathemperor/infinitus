@@ -1,5 +1,8 @@
 import type { ServerProvider, ServerProviderVersionAdvisory } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 
 /**
  * Visual treatment for each server-reported provider status. Centralized so

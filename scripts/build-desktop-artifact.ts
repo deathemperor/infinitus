@@ -13,7 +13,10 @@ import {
   type DirectoryRecord,
 } from "@electron/asar";
 
+<<<<<<< HEAD
 import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@infinitus/shared/desktopIdentity";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { fromYaml } from "@infinitus/shared/schemaYaml";
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@infinitus/shared/relayAuth";

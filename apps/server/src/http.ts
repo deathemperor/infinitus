@@ -4,7 +4,10 @@ import {
   AuthOrchestrationReadScope,
   EnvironmentHttpApi,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@infinitus/shared/desktopIdentity";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { isDevProxiedPath } from "@infinitus/shared/devProxy";
 import { decodeOtlpTraceRecords } from "@infinitus/shared/observability";
 import * as Data from "effect/Data";

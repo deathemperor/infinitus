@@ -1,7 +1,11 @@
 import { act, type ReactElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { renderToStaticMarkup } from "react-dom/server";
+<<<<<<< HEAD
 import { type EnvironmentId, ServerSelfUpdateError, ThreadId, TurnId } from "@infinitus/contracts";
+=======
+import type { EnvironmentId } from "@infinitus/contracts";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";

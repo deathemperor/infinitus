@@ -8,7 +8,10 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import type { DesktopAppActivationRequest } from "@infinitus/contracts";
 import { resolveDesktopAppControlAddress } from "@infinitus/shared/desktopAppControl";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import {
   HostProcessPlatform,
   HostProcessUserId,

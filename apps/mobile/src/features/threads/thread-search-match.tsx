@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import { Platform } from "react-native";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import type { EnvironmentThreadSearchMatch } from "@infinitus/client-runtime/state/thread-search";
 
 import { AppText as Text } from "../../components/AppText";
@@ -49,6 +52,7 @@ export function ThreadSearchMatchExcerpt(props: {
   readonly query: string;
   readonly selected?: boolean;
   readonly compact?: boolean;
+  readonly sidebar?: boolean;
 }) {
   const isUser = props.match.source === "user";
   const parts = splitHighlightParts(props.match.snippet, props.query);
@@ -57,10 +61,10 @@ export function ThreadSearchMatchExcerpt(props: {
       className={cn(
         props.compact ? "text-sm" : "text-xs",
         props.selected
-          ? Platform.OS === "android"
-            ? "text-thread-selected-foreground-muted"
-            : "text-user-bubble-foreground-muted"
-          : "text-foreground-muted",
+          ? "text-thread-selected-foreground-muted"
+          : props.sidebar
+            ? "text-drawer-foreground-muted"
+            : "text-foreground-muted",
       )}
       numberOfLines={1}
     >
@@ -68,11 +72,11 @@ export function ThreadSearchMatchExcerpt(props: {
         className={cn(
           props.compact ? "text-sm font-infinitus-medium" : "text-xs font-infinitus-medium",
           props.selected
-            ? Platform.OS === "android"
-              ? "text-thread-selected-foreground"
-              : "text-user-bubble-foreground"
+            ? "text-thread-selected-foreground"
             : isUser
-              ? "text-foreground-secondary"
+              ? props.sidebar
+                ? "text-drawer-foreground-muted"
+                : "text-foreground-secondary"
               : "text-adaptive-emerald-600-400",
         )}
       >
@@ -84,12 +88,14 @@ export function ThreadSearchMatchExcerpt(props: {
             props.compact ? "text-sm" : "text-xs",
             part.highlighted && "font-infinitus-bold",
             props.selected
-              ? Platform.OS === "android"
-                ? "text-thread-selected-foreground"
-                : "text-user-bubble-foreground"
+              ? "text-thread-selected-foreground"
               : part.highlighted
-                ? "text-foreground"
-                : "text-foreground-muted",
+                ? props.sidebar
+                  ? "text-drawer-foreground"
+                  : "text-foreground"
+                : props.sidebar
+                  ? "text-drawer-foreground-muted"
+                  : "text-foreground-muted",
           )}
           key={part.start}
         >

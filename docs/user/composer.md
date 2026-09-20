@@ -25,7 +25,11 @@ before an upload finishes requires you to attach that file again.
 You can drag or paste images into the web or desktop composer. HEIC and HEIF
 photos are converted to JPEG there and when selected from the mobile photo
 library; photos over the image limit are also resized to fit. On mobile, you can
+<<<<<<< HEAD
 also send files to Infinitus through another app's system share sheet, into a new task or an existing thread.
+=======
+also send files to Infinitus through another app's system share sheet.
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 
 See [images and videos](#images-and-videos-in-messages) for previewing and saving media.
 

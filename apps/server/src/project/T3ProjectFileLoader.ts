@@ -20,7 +20,11 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
+<<<<<<< HEAD
 import { T3_PROJECT_FILE_NAMES, type T3ProjectFile } from "@infinitus/contracts";
+=======
+import { T3_PROJECT_FILE_NAME, type T3ProjectFile } from "@infinitus/contracts";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { T3ProjectFileFromJson } from "@infinitus/shared/t3ProjectFile";
 
 const decodeT3ProjectFileJson = Schema.decodeEffect(T3ProjectFileFromJson);

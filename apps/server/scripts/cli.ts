@@ -10,7 +10,11 @@ import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { DEVELOPMENT_ICON_OVERRIDES } from "../../../scripts/lib/brand-assets.ts";
+<<<<<<< HEAD
 import { findEsmImportsOfExternalPackages } from "../../../scripts/lib/cli-external-packages.ts";
+=======
+import { findEsmImportsOfExternalPackages } from "../../../scripts/lib/cli-executable-imports.ts";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import {
   ServerCliBuildAssetMissingError,

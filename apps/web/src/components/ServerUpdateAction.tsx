@@ -1,9 +1,13 @@
+<<<<<<< HEAD
 import type {
   EnvironmentId,
   ServerRunningTurn,
   ServerSelfUpdateCapability,
   ServerUpdateRunningTurnsPolicy,
 } from "@infinitus/contracts";
+=======
+import type { EnvironmentId, ServerSelfUpdateCapability } from "@infinitus/contracts";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import type { ServerUpdateStage, ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import {
   isAtomCommandInterrupted,

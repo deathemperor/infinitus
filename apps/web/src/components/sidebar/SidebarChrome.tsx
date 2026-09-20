@@ -14,6 +14,10 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
+<<<<<<< HEAD
+=======
+import { InfinitusWordmark } from "../InfinitusWordmark";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageFocusRingOffsetClass,
@@ -94,7 +98,22 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
       )}
       to="/"
     >
+<<<<<<< HEAD
       <span className="truncate text-sm font-medium tracking-tight">{PRODUCT_NAME}</span>
+=======
+      {/* Center the visible capitals, without the font's ascender/descender space. */}
+      <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
+        <InfinitusWordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+        <span
+          className={cn(
+            "truncate [text-box:trim-both_cap_alphabetic]",
+            onBackdrop ? "text-white/70" : "text-muted-foreground",
+          )}
+        >
+          Code
+        </span>
+      </span>
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
     </Link>
   );
 }

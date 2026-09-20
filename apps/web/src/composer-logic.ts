@@ -1,5 +1,9 @@
 import type { ClientSettings } from "@infinitus/contracts/settings";
+<<<<<<< HEAD
 import type { AssistantCitation, ComposerSendMode } from "@infinitus/contracts";
+=======
+import type { AssistantCitation } from "@infinitus/contracts";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import {
   serializeAssistantCitation,
   withAssistantCitationComment,
@@ -289,6 +293,18 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
     query: token.slice(1),
     rangeStart: tokenStart,
     rangeEnd: cursor,
+  };
+}
+
+/** Caret and trigger after replacing composer text and continuing at the end. */
+export function composerStateAtPromptEnd(text: string): {
+  cursor: number;
+  trigger: ComposerTrigger | null;
+} {
+  const cursor = collapseExpandedComposerCursor(text, text.length);
+  return {
+    cursor,
+    trigger: detectComposerTrigger(text, expandCollapsedComposerCursor(text, cursor)),
   };
 }
 

@@ -164,7 +164,11 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                     <Text
                       className={
                         Platform.OS === "android"
+<<<<<<< HEAD
                           ? "text-primary text-sm font-infinitus-medium"
+=======
+                          ? "text-primary-text text-sm font-infinitus-medium"
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
                           : "text-foreground text-2xs font-infinitus-bold uppercase"
                       }
                     >
@@ -183,7 +187,11 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                   <Text
                     className={
                       Platform.OS === "android"
+<<<<<<< HEAD
                         ? "text-primary text-sm font-infinitus-medium"
+=======
+                        ? "text-primary-text text-sm font-infinitus-medium"
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
                         : "text-foreground text-2xs font-infinitus-bold uppercase"
                     }
                   >
@@ -204,10 +212,17 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                     <Text className="text-foreground flex-1 text-sm font-medium" numberOfLines={1}>
                       {file.path}
                     </Text>
+<<<<<<< HEAD
                     <Text className="text-xs font-infinitus-bold text-emerald-500">
                       +{file.insertions}
                     </Text>
                     <Text className="text-xs font-infinitus-bold text-rose-500">
+=======
+                    <Text className="text-xs font-infinitus-bold text-adaptive-emerald-700-300">
+                      +{file.insertions}
+                    </Text>
+                    <Text className="text-xs font-infinitus-bold text-adaptive-rose-700-300">
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
                       -{file.deletions}
                     </Text>
                   </View>
@@ -288,10 +303,17 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                           ) : null}
                         </View>
                         <View className="items-end gap-1">
+<<<<<<< HEAD
                           <Text className="text-xs font-infinitus-bold text-emerald-500">
                             +{file.insertions}
                           </Text>
                           <Text className="text-xs font-infinitus-bold text-rose-500">
+=======
+                          <Text className="text-xs font-infinitus-bold text-adaptive-emerald-700-300">
+                            +{file.insertions}
+                          </Text>
+                          <Text className="text-xs font-infinitus-bold text-adaptive-rose-700-300">
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
                             -{file.deletions}
                           </Text>
                         </View>

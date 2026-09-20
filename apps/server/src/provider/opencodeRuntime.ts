@@ -33,7 +33,10 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { isWindowsCommandNotFound } from "../processRunner.ts";
 import { collectStreamAsString } from "./providerSnapshot.ts";
 import * as NetService from "@infinitus/shared/Net";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { compareSemverVersions, parseSemver } from "@infinitus/shared/semver";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";

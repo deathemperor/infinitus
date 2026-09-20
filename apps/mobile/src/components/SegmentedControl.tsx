@@ -40,7 +40,7 @@ export function SegmentedControl<Value extends number | string>(
         layout={LinearTransition.duration(200)
           .easing(Easing.out(Easing.cubic))
           .reduceMotion(ReduceMotion.System)}
-        className="absolute inset-y-0 rounded-full bg-subtle-strong"
+        className="absolute inset-y-0 rounded-full bg-secondary"
         style={{
           width: `${100 / props.options.length}%`,
           start: `${
@@ -70,7 +70,13 @@ export function SegmentedControl<Value extends number | string>(
             <Text
               className={cn(
                 compact ? "text-xs" : "text-sm",
+<<<<<<< HEAD
                 active ? "font-infinitus-medium text-foreground" : "text-foreground-muted",
+=======
+                active
+                  ? "font-infinitus-medium text-secondary-foreground"
+                  : "text-foreground-muted",
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
               )}
             >
               {option.label}

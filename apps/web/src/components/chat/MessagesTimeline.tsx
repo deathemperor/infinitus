@@ -23,8 +23,11 @@ import {
   type WorktreeSetupSnapshot,
 } from "@infinitus/contracts";
 import { parseScopedThreadKey } from "@infinitus/client-runtime/environment";
+<<<<<<< HEAD
 import { turnFooterLabel } from "@infinitus/client-runtime/turnFooter";
 import type { TurnFooters } from "./useTurnFooters";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { replaceComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 import type { CodexArtifactTemplate } from "@infinitus/client-runtime/codex-artifact-templates";
 import {
@@ -57,7 +60,10 @@ const NOOP_OPEN_ATTACHMENT = (_attachment: ChatFileAttachment) => {};
 import { resolveChatListAnchoredEndSpace } from "@infinitus/shared/chatList";
 import { toolActivityFaviconUrl } from "@infinitus/shared/favicon";
 import { formatDuration } from "@infinitus/shared/orchestrationTiming";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { getProjectFaviconCacheKey } from "@infinitus/shared/projectFavicon";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import {
@@ -106,6 +112,12 @@ import {
 } from "../../lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "../../lib/syntaxHighlighting";
 import ChatMarkdown, { ChatMarkdownAssetImage } from "../ChatMarkdown";
+<<<<<<< HEAD
+=======
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { Root, RootContent } from "mdast";
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { InfinitusWordmark } from "../InfinitusWordmark";
 import {
   BotIcon,
@@ -2763,6 +2775,28 @@ function ThinkingTimelineRow() {
   );
 }
 
+function remarkThoughtPreview(fallback: string) {
+  return (tree: Root) => {
+    const plainText = (node: Root | RootContent): string => {
+      if (node.type === "html" || node.type === "definition") return "";
+      if ("alt" in node) return node.alt ?? "";
+      if ("value" in node) return node.value;
+      if ("children" in node) {
+        const separator = ["root", "blockquote", "list", "listItem", "table", "tableRow"].includes(
+          node.type,
+        )
+          ? " "
+          : "";
+        return node.children.map(plainText).join(separator);
+      }
+      return node.type === "break" ? " " : "";
+    };
+    tree.children = [
+      { type: "text", value: plainText(tree).replace(/\s+/g, " ").trim() || fallback },
+    ];
+  };
+}
+
 /**
  * Thinking inside a tool group has its own disclosure, preserved across recycling.
  * A group whose row already reads "Thought" (no visible tool) skips the header.
@@ -2796,7 +2830,13 @@ function ReasoningTraceBlock({
   }
   const label = streaming ? "Thinking" : "Thought";
   const collapsedPreview = messages.find((message) => message.text.trim().length > 0)?.text.trim();
-  const headerText = expanded ? label : (collapsedPreview ?? label);
+  const headerText = expanded ? (
+    label
+  ) : (
+    <ReactMarkdown remarkPlugins={[remarkGfm, [remarkThoughtPreview, label]]}>
+      {collapsedPreview ?? label}
+    </ReactMarkdown>
+  );
   return (
     <div className="flex flex-col">
       {showHeader ? (

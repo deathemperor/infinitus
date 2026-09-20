@@ -15,7 +15,10 @@ import * as NodeOS from "node:os";
 import * as NodeReadlinePromises from "node:readline/promises";
 
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-7445aa733-upstream-renamed
 import { isCommandAvailable, resolveSpawnCommand } from "@infinitus/shared/shell";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";
