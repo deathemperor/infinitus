@@ -387,6 +387,95 @@ final class SwapdEngineTests: XCTestCase {
         return text.split(separator: "\n").map(String.init)
     }
 
+    /// A stub `add-oauth`: the URL line at once, then — after the marker
+    /// file appears, standing in for the redirect — the add envelope, or
+    /// the error envelope + exit 1 when `FAIL` is set. `refused` answers
+    /// the error envelope before any URL, the way a held port does.
+    func makeOAuthEngine(refused: Bool = false, fail: Bool = false) throws -> SwapdEngine {
+        let argv = dir.appendingPathComponent("argv").path
+        let redirect = dir.appendingPathComponent("redirect").path
+        let after = fail
+            ? #"echo '{"schemaVersion":1,"error":{"code":"invalid-input","message":"the sign-in was refused (access_denied)"}}'; exit 1"#
+            : #"echo '{"schemaVersion":1,"slot":2,"email":"b@b.c","created":true}'"#
+        let script = refused ? """
+        #!/bin/sh
+        echo "$@" >> "\(argv)"
+        echo '{"schemaVersion":1,"error":{"code":"io","message":"port 54545 is already in use"}}'
+        exit 1
+        """ : """
+        #!/bin/sh
+        echo "$@" >> "\(argv)"
+        echo '{"schemaVersion":1,"url":"https://claude.ai/oauth/authorize?state=s-1","port":54545}'
+        while [ ! -e "\(redirect)" ]; do sleep 0.05; done
+        \(after)
+        """
+        let binary = dir.appendingPathComponent("swapd")
+        try script.write(to: binary, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        return SwapdEngine(cli: SwapdCLI(binaryPath: binary.path))
+    }
+
+    func redirectLands() throws {
+        try Data().write(to: dir.appendingPathComponent("redirect"))
+    }
+
+    /// `add-oauth` answers in two lines: the URL comes back with the
+    /// engine still running, and `await` returns once the envelope does.
+    func testOAuthAddHandsBackTheURLBeforeTheRedirectLands() async throws {
+        let engine = try makeOAuthEngine()
+        let url = try await engine.beginOAuthAdd(fleet: .claude)
+        XCTAssertEqual(url.absoluteString, "https://claude.ai/oauth/authorize?state=s-1")
+        XCTAssertEqual(try argv(), ["add-oauth --provider claude --json"])
+        let waiting = Task { try await engine.awaitOAuthAdd() }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        try redirectLands()
+        try await waiting.value
+    }
+
+    /// The engine's own sentence when the sign-in fails after the URL,
+    /// not "exited 1".
+    func testOAuthAddReportsTheEnginesRefusalAfterTheURL() async throws {
+        let engine = try makeOAuthEngine(fail: true)
+        _ = try await engine.beginOAuthAdd(fleet: .claude)
+        try redirectLands()
+        do {
+            try await engine.awaitOAuthAdd()
+            XCTFail("expected the refusal")
+        } catch let error as CLIError {
+            XCTAssertEqual(error.message, "the sign-in was refused (access_denied)")
+        }
+    }
+
+    /// A refusal before any URL (the port held) surfaces from `begin`.
+    func testOAuthAddRefusedBeforeTheURLThrowsFromBegin() async throws {
+        let engine = try makeOAuthEngine(refused: true)
+        do {
+            _ = try await engine.beginOAuthAdd(fleet: .claude)
+            XCTFail("expected the refusal")
+        } catch let error as CLIError {
+            XCTAssertEqual(error.message, "port 54545 is already in use")
+        }
+    }
+
+    /// Cancelling the wait kills the engine, so the loopback port is free
+    /// for the next attempt rather than held by an orphan.
+    func testCancellingTheWaitTerminatesTheEngine() async throws {
+        let engine = try makeOAuthEngine()
+        _ = try await engine.beginOAuthAdd(fleet: .claude)
+        let waiting = Task { try await engine.awaitOAuthAdd() }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        waiting.cancel()
+        let started = Date()
+        do {
+            try await waiting.value
+            XCTFail("a terminated engine is a failed wait")
+        } catch {
+            // The stub loops until the redirect file exists; only a kill
+            // ends it this soon.
+            XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        }
+    }
+
     func testSnapshotIsOneListCallStampedWithTheEngineID() async throws {
         let fleets = try await makeEngine().snapshot()
         XCTAssertEqual(try argv(), ["list --json"], "one subprocess, no per-account calls")
@@ -581,7 +670,8 @@ final class SwapdEngineTests: XCTestCase {
     func testCapabilitiesOmitWhatSwapdHasNoVerbFor() async throws {
         let engine = try makeEngine()
         XCTAssertTrue(engine.capabilities.contains(.refreshAccount))
-        for missing in [EngineCapabilities.costReport, .addOAuth, .notify] {
+        XCTAssertTrue(engine.capabilities.contains(.addOAuth), "`add-oauth` (swapd 0.2)")
+        for missing in [EngineCapabilities.costReport, .notify] {
             XCTAssertFalse(engine.capabilities.contains(missing))
         }
         do {

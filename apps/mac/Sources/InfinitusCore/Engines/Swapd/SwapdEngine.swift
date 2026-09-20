@@ -15,24 +15,28 @@ public struct SwapdEngine: AccountEngine {
     /// active account" (#476). A struct engine can't hold state itself —
     /// this is the reference-typed sliver that does.
     let memory: SwapdActiveMemory
+    /// The `add-oauth` in flight between `beginOAuthAdd` and `awaitOAuthAdd`.
+    let oauth: SwapdOAuthPending
 
     public init(cli: SwapdCLI) {
         self.cli = cli
         self.memory = SwapdActiveMemory()
+        self.oauth = SwapdOAuthPending()
     }
 
     public var id: String { Self.engineID }
     public var displayName: String { "swapd" }
     public var capabilities: EngineCapabilities { Self.engineCapabilities }
 
-    /// Everything cswap does except the three swapd has no verb for:
-    /// `usage` (no cost report), OAuth sign-in (`add-token` and `add`
-    /// only), and away-push channels (`notify` reports status, and never
-    /// sets one). Plus `.refreshAccount`, which is its own: `refresh
-    /// --slot n` forces one fetch past the serve floor.
+    /// Everything cswap does except the two swapd has no verb for:
+    /// `usage` (no cost report) and away-push channels (`notify` reports
+    /// status, and never sets one). Plus `.refreshAccount`, which is its
+    /// own: `refresh --slot n` forces one fetch past the serve floor. And
+    /// `.addOAuth` (swapd 0.2, `add-oauth`): the engine takes the OAuth
+    /// redirect itself, so a sign-in pastes nothing.
     public static let engineCapabilities: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
-        .addToken, .autoSwitch, .history, .settings, .prefer, .ignite,
+        .addToken, .addOAuth, .autoSwitch, .history, .settings, .prefer, .ignite,
         .refreshAccount, .autoIgnite,
     ]
 
@@ -114,6 +118,46 @@ public struct SwapdEngine: AccountEngine {
     /// provider is claude, which is the fleet this can be reached from.
     public func addCurrent() async throws { try await cli.addCurrent(provider: .claude) }
     public func addToken(_ token: String) async throws { try await cli.addToken(provider: .claude, token) }
+
+    /// `swapd add-oauth`: the URL to open, with the engine's loopback
+    /// listener already up behind it. A run left over from a `begin` that
+    /// never reached `await` is terminated first — it holds the one port.
+    public func beginOAuthAdd(fleet: Provider) async throws -> URL {
+        let run = try await cli.beginOAuthAdd(provider: fleet)
+        guard let url = run.url else { throw EngineError.remote(status: 0, body: "swapd add-oauth answered without a URL") }
+        oauth.replace(with: run)
+        return url
+    }
+
+    /// Waits for the redirect to land and the credential to be stored.
+    /// swapd does not activate the slot (that is `switch`'s job), so the
+    /// live login is untouched throughout.
+    public func awaitOAuthAdd() async throws {
+        guard let run = oauth.take() else { throw EngineError.unsupported("no OAuth in progress") }
+        try await run.wait()
+    }
+}
+
+/// The one `add-oauth` a struct engine can't hold itself (`SwapdActiveMemory`'s
+/// precedent): set by `beginOAuthAdd`, taken by `awaitOAuthAdd`.
+final class SwapdOAuthPending: @unchecked Sendable {
+    private let lock = NSLock()
+    private var run: SwapdOAuthRun?
+
+    /// A run left over from a `begin` that never reached `await` still
+    /// holds the one loopback port: it is ended before the new one is kept.
+    func replace(with run: SwapdOAuthRun) {
+        lock.lock(); defer { lock.unlock() }
+        self.run?.terminate()
+        self.run = run
+    }
+
+    func take() -> SwapdOAuthRun? {
+        lock.lock(); defer { lock.unlock() }
+        let run = self.run
+        self.run = nil
+        return run
+    }
 }
 
 /// The one bit of state `SwapdEngine` (a struct) can't hold itself: the

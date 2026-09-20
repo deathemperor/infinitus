@@ -108,9 +108,10 @@ import InfinitusCore
     }
 
     /// The same chooser for an engine that signs accounts in through a
-    /// browser (the proxy): its Management API hands us the login URL,
-    /// the OAuth redirect lands on the engine's own callback, and we
-    /// poll until it reports the credential — nothing to paste. Same
+    /// browser (swapd's `add-oauth`, the proxy): the engine hands us the
+    /// login URL, the OAuth redirect lands on the engine's own loopback
+    /// callback, and we wait until it holds the credential — nothing to
+    /// paste. The private sheet / incognito window is the same one. Same
     /// per-account cookie jar as the cswap flow (user 2026-09-02:
     /// "share cookiejar with cswap"): a re-login for an address that
     /// already has a jar opens signed in, whichever engine made it.
@@ -162,7 +163,12 @@ import InfinitusCore
                     self.phase = .idle
                     onFinish(nil)
                 } else {
-                    let msg = (error as? SignInFailure)?.sentence ?? EngineFailure.sentence(error)
+                    // swapd's own refusal is a sentence already ("the
+                    // sign-in was refused (access_denied)"); the generic
+                    // "engine refused that change" would hide it.
+                    let msg = (error as? SignInFailure)?.sentence
+                        ?? (error as? CLIError)?.message
+                        ?? EngineFailure.sentence(error)
                     self.phase = .failed(msg)
                     onFinish(msg)
                 }

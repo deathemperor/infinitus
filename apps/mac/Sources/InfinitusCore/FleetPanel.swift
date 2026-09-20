@@ -71,7 +71,7 @@ public enum EngineCatalog {
         switch engineID {
         // `SwapdEngine.engineCapabilities`, spelled out (FleetPanelTests pins them equal).
         case "swapd": return [.switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
-                              .addToken, .autoSwitch, .history, .settings, .prefer, .ignite,
+                              .addToken, .addOAuth, .autoSwitch, .history, .settings, .prefer, .ignite,
                               .refreshAccount, .autoIgnite]
         case "cliproxy": return [.switch, .hold, .rename, .remove, .addOAuth, .costReport, .prefer]
         case "9router": return [.switch, .hold, .remove]
