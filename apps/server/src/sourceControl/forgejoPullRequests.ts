@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
-import type { ChangeRequest } from "@t3tools/contracts";
+import type { ChangeRequest } from "@infinitus/contracts";
 
 const Repository = Schema.Struct({
   full_name: Schema.String,

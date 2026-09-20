@@ -1,5 +1,5 @@
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { THREAD_JUMP_KEYBINDING_COMMANDS } from "@t3tools/contracts";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
+import { THREAD_JUMP_KEYBINDING_COMMANDS } from "@infinitus/contracts";
 import { useCallback } from "react";
 
 import type { HomeListItem } from "../home/homeListItems";

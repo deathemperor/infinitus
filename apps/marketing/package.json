@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/marketing",
+  "name": "@infinitus/marketing",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "typecheck": "astro check"
   },
   "dependencies": {
-    "@t3tools/shared": "workspace:*",
+    "@infinitus/shared": "workspace:*",
     "astro": "^7.2.8",
     "sharp": "0.35.4"
   },

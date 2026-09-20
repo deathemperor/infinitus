@@ -1,5 +1,8 @@
-import type { OrchestrationThreadShell, ProjectId } from "@t3tools/contracts";
-import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
+import type { OrchestrationThreadShell, ProjectId } from "@infinitus/contracts";
+import type {
+  SidebarProjectSortOrder,
+  SidebarThreadSortOrder,
+} from "@infinitus/contracts/settings";
 
 export interface ThreadSortInput {
   readonly createdAt: string;

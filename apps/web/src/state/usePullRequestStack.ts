@@ -1,4 +1,4 @@
-import type { EnvironmentId, PullRequestRef } from "@t3tools/contracts";
+import type { EnvironmentId, PullRequestRef } from "@infinitus/contracts";
 import { useMemo } from "react";
 import {
   savedPullRequestStack,

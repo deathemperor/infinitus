@@ -1,4 +1,4 @@
-import { FILL_PREVIEW_VIEWPORT } from "@t3tools/contracts";
+import { FILL_PREVIEW_VIEWPORT } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

@@ -118,7 +118,7 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
               <Text
                 className={cn(
                   "text-foreground text-base",
-                  Platform.OS === "android" ? "font-t3-medium" : "font-t3-bold",
+                  Platform.OS === "android" ? "font-infinitus-medium" : "font-infinitus-bold",
                 )}
               >
                 {gitStatus.data?.refName ?? "(detached HEAD)"}
@@ -142,7 +142,7 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                 <Text
                   className={cn(
                     "text-foreground text-base",
-                    Platform.OS === "android" ? "font-t3-medium" : "font-t3-bold",
+                    Platform.OS === "android" ? "font-infinitus-medium" : "font-infinitus-bold",
                   )}
                 >
                   Files
@@ -164,8 +164,8 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                     <Text
                       className={
                         Platform.OS === "android"
-                          ? "text-primary-text text-sm font-t3-medium"
-                          : "text-foreground text-2xs font-t3-bold uppercase"
+                          ? "text-primary-text text-sm font-infinitus-medium"
+                          : "text-foreground text-2xs font-infinitus-bold uppercase"
                       }
                     >
                       Reset
@@ -183,8 +183,8 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                   <Text
                     className={
                       Platform.OS === "android"
-                        ? "text-primary-text text-sm font-t3-medium"
-                        : "text-foreground text-2xs font-t3-bold uppercase"
+                        ? "text-primary-text text-sm font-infinitus-medium"
+                        : "text-foreground text-2xs font-infinitus-bold uppercase"
                     }
                   >
                     {isEditingFiles ? "Done" : "Edit"}
@@ -204,10 +204,10 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                     <Text className="text-foreground flex-1 text-sm font-medium" numberOfLines={1}>
                       {file.path}
                     </Text>
-                    <Text className="text-xs font-t3-bold text-adaptive-emerald-700-300">
+                    <Text className="text-xs font-infinitus-bold text-adaptive-emerald-700-300">
                       +{file.insertions}
                     </Text>
-                    <Text className="text-xs font-t3-bold text-adaptive-rose-700-300">
+                    <Text className="text-xs font-infinitus-bold text-adaptive-rose-700-300">
                       -{file.deletions}
                     </Text>
                   </View>
@@ -277,7 +277,7 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                         <View className="flex-1 gap-1">
                           <Text
                             selectable
-                            className={`text-sm font-t3-bold ${included ? "text-foreground" : "text-foreground-muted"}`}
+                            className={`text-sm font-infinitus-bold ${included ? "text-foreground" : "text-foreground-muted"}`}
                           >
                             {file.path}
                           </Text>
@@ -288,10 +288,10 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
                           ) : null}
                         </View>
                         <View className="items-end gap-1">
-                          <Text className="text-xs font-t3-bold text-adaptive-emerald-700-300">
+                          <Text className="text-xs font-infinitus-bold text-adaptive-emerald-700-300">
                             +{file.insertions}
                           </Text>
-                          <Text className="text-xs font-t3-bold text-adaptive-rose-700-300">
+                          <Text className="text-xs font-infinitus-bold text-adaptive-rose-700-300">
                             -{file.deletions}
                           </Text>
                         </View>
@@ -309,8 +309,8 @@ export function GitCommitSheet(_props: GitCommitSheetProps) {
             <Text
               className={
                 Platform.OS === "android"
-                  ? "text-foreground text-base font-t3-medium"
-                  : "text-foreground text-sm font-t3-bold"
+                  ? "text-foreground text-base font-infinitus-medium"
+                  : "text-foreground text-sm font-infinitus-bold"
               }
             >
               Commit message

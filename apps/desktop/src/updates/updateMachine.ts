@@ -3,7 +3,7 @@ import type {
   DesktopUpdateChannel,
   DesktopUpdateReleaseNote,
   DesktopUpdateState,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 function nextStatusAfterDownloadFailure(
   currentState: DesktopUpdateState,

@@ -16,7 +16,7 @@ import type {
   EnvironmentId,
   ReviewDiffFileStat,
   ReviewDiffPreviewSource,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";

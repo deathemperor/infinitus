@@ -55,7 +55,7 @@ export function SheetActionButton(props: {
       />
       <Text
         className={cn(
-          "text-xs font-t3-bold tracking-[0.9px] uppercase",
+          "text-xs font-infinitus-bold tracking-[0.9px] uppercase",
           tone === "primary"
             ? "text-primary-foreground"
             : tone === "danger"
@@ -78,7 +78,7 @@ export function MetaCard(props: { readonly label: string; readonly value: string
           : "rounded-[18px] border border-border bg-card px-4 py-3"
       }
     >
-      <Text className="text-foreground-muted text-2xs font-t3-bold tracking-[0.9px] uppercase">
+      <Text className="text-foreground-muted text-2xs font-infinitus-bold tracking-[0.9px] uppercase">
         {props.label}
       </Text>
       <Text selectable className="text-foreground text-sm font-medium" numberOfLines={1}>
@@ -123,8 +123,8 @@ export function SheetListRow(props: {
         <Text
           className={
             Platform.OS === "android"
-              ? "text-foreground text-base font-t3-medium"
-              : "text-foreground text-base font-t3-bold"
+              ? "text-foreground text-base font-infinitus-medium"
+              : "text-foreground text-base font-infinitus-bold"
           }
         >
           {props.title}

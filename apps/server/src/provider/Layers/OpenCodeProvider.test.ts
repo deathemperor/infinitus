@@ -11,7 +11,7 @@ import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { beforeEach } from "vite-plus/test";
 
-import { OpenCodeSettings } from "@t3tools/contracts";
+import { OpenCodeSettings } from "@infinitus/contracts";
 import { ServerConfig } from "../../config.ts";
 import {
   OpenCodeRuntime,

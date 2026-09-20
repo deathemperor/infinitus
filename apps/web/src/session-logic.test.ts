@@ -5,9 +5,9 @@ import {
   ThreadId,
   TurnId,
   type OrchestrationThreadActivity,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
-import { resolveWorkEntryToolPresentation } from "@t3tools/client-runtime/work-log/presentation";
+import { resolveWorkEntryToolPresentation } from "@infinitus/client-runtime/work-log/presentation";
 
 import {
   createMessageAttachmentPreviewProjector,

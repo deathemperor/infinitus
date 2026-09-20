@@ -1,5 +1,5 @@
 import type { LegendListRef } from "@legendapp/list/react";
-import { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, ThreadId } from "@infinitus/contracts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {

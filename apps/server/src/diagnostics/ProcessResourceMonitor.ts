@@ -2,7 +2,7 @@ import type {
   ResourceTelemetryProcessCategory,
   ServerProcessResourceHistoryInput,
   ServerProcessResourceHistoryResult,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

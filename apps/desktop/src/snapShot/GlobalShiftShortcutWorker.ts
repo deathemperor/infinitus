@@ -2,7 +2,7 @@
 // Windows modifier-pair listener. Runs in a forked Node-mode child so a stuck or
 // crashed FFI call cannot take the main process with it. Mirrors the macOS
 // poller: sample both physical keys at 20 Hz, fire on the rising edge.
-import { SNAP_SHOT_MODIFIERS, type SnapShotModifier } from "@t3tools/contracts";
+import { SNAP_SHOT_MODIFIERS, type SnapShotModifier } from "@infinitus/contracts";
 
 import { loadWindowsForegroundApi } from "../electron/WindowsForeground.ts";
 import { WINDOWS_MODIFIER_PAIR_VIRTUAL_KEYS } from "./snapShot.ts";

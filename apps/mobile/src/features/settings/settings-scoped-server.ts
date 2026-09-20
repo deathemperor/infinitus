@@ -5,11 +5,11 @@ import {
   type ProjectScopedServerSettingKey,
   type ServerSettings,
   type ServerSettingsPatch,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   clearProjectSettingsOverrides,
   resolveProjectSettings,
-} from "@t3tools/shared/projectSettings";
+} from "@infinitus/shared/projectSettings";
 
 import type { SettingsTarget } from "./settings-environment-filter";
 

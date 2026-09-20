@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/react";
-import { AuthAdministrativeScopes, AuthRelayWriteScope } from "@t3tools/contracts";
+import { AuthAdministrativeScopes, AuthRelayWriteScope } from "@infinitus/contracts";
 import { useEffect, useRef, useState } from "react";
 
 import {

@@ -7,7 +7,7 @@ import {
   type PullRequestRef,
   type PullRequestSummary,
   type VcsStatusResult,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

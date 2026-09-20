@@ -3,8 +3,8 @@ import {
   EnvironmentId,
   type ModelSelection,
   type ProviderInstanceId,
-} from "@t3tools/contracts";
-import { createModelSelection } from "@t3tools/shared/model";
+} from "@infinitus/contracts";
+import { createModelSelection } from "@infinitus/shared/model";
 import { useNavigate } from "@tanstack/react-router";
 
 import { useT3ProjectFileState } from "../../hooks/useT3ProjectFileScripts";

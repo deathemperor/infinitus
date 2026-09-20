@@ -7,7 +7,7 @@ import type {
   ProjectId,
   ScopedProjectRef,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 export interface DesktopAppActivationProject {
   readonly id: ProjectId;

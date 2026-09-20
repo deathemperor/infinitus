@@ -4,7 +4,7 @@ import { useSelectedThreadGitState } from "../../state/use-selected-thread-git-s
 import { useThreadSelection } from "../../state/use-thread-selection";
 import { vcsEnvironment } from "../../state/vcs";
 import { useThreadGitMenuDefinition } from "../threads/ThreadGitControls";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ThreadId } from "@infinitus/contracts";
 import type { ReviewSectionItem } from "./reviewModel";
 import type { ScreenHeaderMenuItem, ScreenHeaderMenu } from "../../components/ScreenHeader.types";
 import type { AppSymbolName } from "../../components/AppSymbol";

@@ -1,6 +1,6 @@
-import { ThreadId } from "@t3tools/contracts";
+import { ThreadId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
-import { collectComposerContextReferences } from "@t3tools/shared/composerContextReferences";
+import { collectComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 import { terminalContextRecord } from "./composerContextRecords";
 
 import {

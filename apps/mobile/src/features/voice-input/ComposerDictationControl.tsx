@@ -1,4 +1,4 @@
-import type { VoiceInputPhase, VoiceInputState } from "@t3tools/client-runtime/voice-input";
+import type { VoiceInputPhase, VoiceInputState } from "@infinitus/client-runtime/voice-input";
 import { memo, useCallback, useLayoutEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,

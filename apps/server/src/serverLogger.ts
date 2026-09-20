@@ -1,4 +1,4 @@
-import { otlpSerializationLayer } from "@t3tools/shared/observability";
+import { otlpSerializationLayer } from "@infinitus/shared/observability";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";

@@ -1,4 +1,4 @@
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+import { formatDuration } from "@infinitus/shared/orchestrationTiming";
 import { GlassContainer, GlassView } from "expo-glass-effect";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
@@ -266,7 +266,7 @@ function CompactingLabel(props: { readonly onLayout: (event: LayoutChangeEvent) 
         tintColorClassName="foreground"
         type="monochrome"
       />
-      <Text className="font-t3-medium text-xs text-foreground">Compacting…</Text>
+      <Text className="font-infinitus-medium text-xs text-foreground">Compacting…</Text>
     </StatusLabelRow>
   );
 }
@@ -286,7 +286,7 @@ function FloatingStatusLabel(props: {
         onLayout={props.onLayout}
       >
         <ActivityIndicator size="small" colorClassName="accent-icon-muted" />
-        <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
+        <Text className="shrink font-infinitus-medium text-xs text-foreground" numberOfLines={1}>
           {props.status.label}
         </Text>
       </StatusLabelRow>
@@ -311,7 +311,7 @@ function FloatingStatusLabel(props: {
           <View className="h-2 w-2 rounded-full bg-red-500" />
         )}
         <Text
-          className="max-w-[260px] shrink font-t3-medium text-xs text-foreground"
+          className="max-w-[260px] shrink font-infinitus-medium text-xs text-foreground"
           numberOfLines={1}
         >
           {props.status.label}
@@ -335,7 +335,7 @@ function FloatingStatusLabel(props: {
         />
         <ShimmeringWorkContent
           className="flex-none"
-          textClassName="font-t3-medium"
+          textClassName="font-infinitus-medium"
           compact
           icon="arrow.triangle.branch"
           iconSubtleColor="transparent"
@@ -402,7 +402,7 @@ function WorkingDuration(props: {
 
   return (
     <StatusLabelRow accessibilityLabel={label} onLayout={props.onLayout}>
-      <Text className="font-t3-medium text-xs text-foreground">Working for </Text>
+      <Text className="font-infinitus-medium text-xs text-foreground">Working for </Text>
       <SystemText
         className="text-xs text-foreground"
         style={{ fontVariant: ["tabular-nums"], fontWeight: "500" }}

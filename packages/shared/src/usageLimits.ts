@@ -16,7 +16,7 @@ import {
   type ServerProviderUsageLimits,
   type ServerProviderUsageWindow,
   type UsageLimitSourceSnapshots,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import * as DateTime from "effect/DateTime";
 

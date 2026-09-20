@@ -1,4 +1,4 @@
-import { ApprovalRequestId, EnvironmentId } from "@t3tools/contracts";
+import { ApprovalRequestId, EnvironmentId } from "@infinitus/contracts";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
