@@ -259,7 +259,10 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         const verdict = queueDrainVerdict(shell.value, {
           held: held.has(threadId),
           paused: paused.has(threadId),
-          resuming: resuming.has(threadId),
+          // Read live, not from the set below: that one is a subscription
+          // behind, and an input already in the worker when a claim lands
+          // would be judged against the state before it.
+          resuming: yield* limitStops.isResuming(threadId),
           inFlight: inFlight.has(threadId),
           pendingStart: threadHasQueuedTurnStart(shell.value, createdAt),
           failed,
@@ -340,8 +343,8 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
             for (const threadId of released) yield* consider(threadId);
             return;
           }
-          // No boot gate beside the other two: nothing is mid-resume when the
-          // process starts, so the sweep cannot race a claim that predates it.
+          // Only for the wake: the verdict reads the claim live. No boot gate
+          // beside the other two either — nothing is mid-resume at startup.
           case "resuming": {
             const next = new Set(input.threadIds);
             const released = releasedThreads(resuming, next);
