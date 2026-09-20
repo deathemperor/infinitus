@@ -450,10 +450,13 @@ final class ControlServer {
             guard !TokenFlow.shared.running, !model.addingFirstAccount else {
                 throw Fail("a sign-in is already running")
             }
-            if fleet.capabilities.contains(.addOAuth) {
-                model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider)
-            } else if fleet.capabilities.contains(.addCurrent) {
+            // A credential-swap engine captures the login its CLI already
+            // holds — the first-account onboarding this verb is for, with
+            // nothing to show; only an engine without that opens a sign-in.
+            if fleet.capabilities.contains(.addCurrent) {
                 model.addFirstAccount()
+            } else if fleet.capabilities.contains(.addOAuth) {
+                model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider)
             } else {
                 throw Fail("\(key) has no sign-in flow")
             }
@@ -489,11 +492,16 @@ final class ControlServer {
                 }
                 relogin = account
             }
-            if fleet.capabilities.contains(.addOAuth) {
+            // Headless, the caller shows the page on ITS machine, which may
+            // not be this one — an engine's loopback redirect would land
+            // there with nothing listening. So a credential-swap engine
+            // keeps the paste-back flow here even when it also takes the
+            // redirect (`.addOAuth`); the Mac's own Add / Re-login prefer it.
+            if fleet.capabilities.contains(.addCurrent) {
+                flow.start(model: model, relogin: relogin, headless: true)
+            } else if fleet.capabilities.contains(.addOAuth) {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
                                       relogin: relogin, headless: true)
-            } else if fleet.capabilities.contains(.addCurrent) {
-                flow.start(model: model, relogin: relogin, headless: true)
             } else {
                 throw Fail("\(key) has no sign-in flow")
             }

@@ -433,27 +433,26 @@ extension FleetState: FleetModel {
     var introTitle: String { host.introTitle }
     var introBarDelay: Double { host.introBarDelay }
 
-    /// A credential-swap engine's re-logins run the app's token flow
-    /// (`.addCurrent`); an OAuth engine (the proxy) signs in through the
-    /// browser instead.
+    /// An engine that takes the OAuth redirect itself (swapd's `add-oauth`,
+    /// the proxy) signs in through the browser with nothing to paste; only
+    /// a credential-swap engine without that runs the app's own token
+    /// flow (`claude auth login` on a PTY, the code pasted back).
     func startRelogin(_ account: Account) {
-        if capabilities.contains(.addCurrent) { host.startRelogin(account) }
-        else if capabilities.contains(.addOAuth) {
+        if capabilities.contains(.addOAuth) {
             host.addOAuthAccount(engineID: engineID, provider: provider, relogin: account)
-        }
+        } else if capabilities.contains(.addCurrent) { host.startRelogin(account) }
     }
     func toggleEngine() { host.toggleEngine() }
     func relaunchApp() { host.relaunchApp() }
     func openSettings() { host.openSettings() }
-    /// A second account: a credential-swap engine through the in-app
-    /// token flow (a fresh login, not a bare `swapd add` — that would
-    /// re-adopt the same account), an OAuth engine through its browser
-    /// sign-in.
+    /// A second account: an OAuth engine through its browser sign-in, a
+    /// credential-swap engine without one through the in-app token flow
+    /// (a fresh login, not a bare `swapd add` — that would re-adopt the
+    /// same account).
     func addAccount() {
-        if capabilities.contains(.addCurrent) { host.addAccount() }
-        else if capabilities.contains(.addOAuth) {
+        if capabilities.contains(.addOAuth) {
             host.addOAuthAccount(engineID: engineID, provider: provider)
-        }
+        } else if capabilities.contains(.addCurrent) { host.addAccount() }
     }
     var canAddAccount: Bool {
         capabilities.contains(.addCurrent) || capabilities.contains(.addOAuth)

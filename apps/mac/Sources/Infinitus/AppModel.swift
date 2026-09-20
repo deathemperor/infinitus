@@ -387,10 +387,11 @@ final class AppModel: ObservableObject {
     }()
 
     /// OAuth add / re-login for an engine that signs accounts in through
-    /// a browser (the proxy): the same native sign-in flow as swapd
-    /// (`TokenFlow`: the system sheet, or the default browser where the
-    /// sheet cannot present; the desktop's `signin-begin` path runs it
-    /// headless), polling the engine until the credential lands.
+    /// a browser and takes the redirect itself (swapd's `add-oauth`, the
+    /// proxy): the native sign-in flow (`TokenFlow`: the system sheet, or
+    /// the default browser's private window where the sheet cannot
+    /// present; the desktop's `signin-begin` path runs it headless),
+    /// waiting on the engine until the credential lands — no code to paste.
     func addOAuthAccount(engineID: String, provider: Provider, relogin: Account? = nil,
                          headless: Bool = false) {
         guard let engine = registry.engine(id: engineID),
@@ -1940,11 +1941,21 @@ extension AppModel: FleetModel {
         guard !TokenFlow.shared.running, !addingFirstAccount else {
             TokenFlow.shared.reopenAuth(); return
         }
+        // The primary's own sign-in when it takes the OAuth redirect
+        // itself (FleetState.startRelogin's rule); the PTY flow otherwise.
+        if let primary, primary.capabilities.contains(.addOAuth) {
+            addOAuthAccount(engineID: primary.engineID, provider: primary.provider, relogin: account)
+            return
+        }
         TokenFlow.shared.start(model: self, relogin: account)
     }
     func addAccount() {
         guard !TokenFlow.shared.running, !addingFirstAccount else {
             TokenFlow.shared.reopenAuth(); return
+        }
+        if let primary, primary.capabilities.contains(.addOAuth) {
+            addOAuthAccount(engineID: primary.engineID, provider: primary.provider)
+            return
         }
         TokenFlow.shared.start(model: self)
     }

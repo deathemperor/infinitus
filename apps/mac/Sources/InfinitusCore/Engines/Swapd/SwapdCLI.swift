@@ -45,7 +45,8 @@ public struct CLIError: Error, Sendable {
 /// Every verb runs with `--json`, so the engine answers with exactly one
 /// JSON object on stdout — including its failures: a refusal is the error
 /// envelope on STDOUT plus a non-zero exit (swapd `src/output.rs`), which
-/// is why a failed run reports `error.message` and not "exited 1".
+/// is why a failed run reports `error.message` and not "exited 1". The one
+/// exception is `add-oauth`, which answers in two lines (`beginOAuthAdd`).
 public struct SwapdCLI: Sendable {
     public let binaryPath: String
 
@@ -232,11 +233,163 @@ public struct SwapdCLI: Sendable {
         try await run(try arguments(["add-token", "-"], provider: provider), stdin: token)
     }
 
+    /// `swapd add-oauth`: the engine holds the OAuth client, listens on the
+    /// loopback port the redirect names, and redeems the code itself — no
+    /// paste. It prints two lines: `{url, port}` the moment its listener is
+    /// up, then the `add` envelope once the credential is stored. This
+    /// returns after the first line, with the process still running; the
+    /// handle's `wait()` takes the second.
+    public func beginOAuthAdd(provider: Provider) async throws -> SwapdOAuthRun {
+        let arguments = try arguments(["add-oauth"], provider: provider)
+        let run = SwapdOAuthRun(binaryPath: binaryPath, arguments: arguments)
+        let first = try await run.launch()
+        // A refusal before the URL (the port already held, no browser
+        // sign-in for this provider) is the error envelope on the first
+        // line and an exit — swapd's own words, the way `run` reports them.
+        guard let line = first, let start = try? JSONDecoder().decode(SwapdOAuthStart.self, from: line),
+              let url = URL(string: start.url) else {
+            // A first line that is not a refusal but not a usable URL either
+            // leaves the engine listening; end it rather than wait 5 min.
+            run.terminate()
+            let (stdout, stderr, status) = await run.finished()
+            throw CLIError(message: Self.failure(
+                arguments: arguments, stdout: (first ?? Data()) + stdout, stderr: stderr, status: status))
+        }
+        run.url = url
+        return run
+    }
+
     /// Forget a slot. `--yes` is the confirmation; without it swapd refuses,
     /// which is what makes the caller's own confirm the only way here.
     @discardableResult
     public func removeAccount(provider: Provider, slot: Int) async throws -> Data {
         try await run(try arguments(["remove", String(slot), "--yes"], provider: provider))
+    }
+}
+
+/// `add-oauth`'s first line: what to open, and the loopback port the
+/// redirect lands on.
+struct SwapdOAuthStart: Decodable {
+    let schemaVersion: Int
+    let url: String
+    let port: Int
+}
+
+/// One `swapd add-oauth` in flight: the process holding the loopback
+/// listener between the URL line and the redirect. Cancelling the task
+/// that waits on it kills the process, which frees the port for the next
+/// attempt — a listener left behind would refuse it.
+public final class SwapdOAuthRun: @unchecked Sendable {
+    /// The page to open, once the first line has been read.
+    public internal(set) var url: URL?
+    private let binaryPath: String
+    private let arguments: [String]
+    private let lock = NSLock()
+    private var process: Process?
+    private var outcome: (stdout: Data, stderr: Data, status: Int32)?
+    private var waiters: [CheckedContinuation<(stdout: Data, stderr: Data, status: Int32), Never>] = []
+
+    init(binaryPath: String, arguments: [String]) {
+        self.binaryPath = binaryPath
+        self.arguments = arguments
+    }
+
+    /// Spawns the engine and answers its first stdout line — nil when it
+    /// closed stdout before writing one. The whole Process lives on the one
+    /// GCD thread this starts (`SwapdCLI.run`'s rule: `waitUntilExit` off
+    /// the launching thread never returned, 2026-09-20): after the first
+    /// line it stays to drain both pipes and take the exit, which settles
+    /// `finished()`.
+    func launch() async throws -> Data? {
+        let binaryPath = self.binaryPath, arguments = self.arguments
+        return try await withCheckedThrowingContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: binaryPath)
+                process.arguments = arguments
+                let out = Pipe(), errors = Pipe()
+                process.standardOutput = out
+                process.standardError = errors
+                process.standardInput = FileHandle.nullDevice
+                do {
+                    try process.run()
+                } catch {
+                    cont.resume(throwing: error)
+                    return
+                }
+                self.lock.lock()
+                self.process = process
+                self.lock.unlock()
+
+                let fh = out.fileHandleForReading
+                var buffer = Data()
+                var first: Data?
+                while true {
+                    let chunk = fh.availableData
+                    if chunk.isEmpty { break }
+                    buffer.append(chunk)
+                    if let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                        first = Data(buffer[..<newline])
+                        buffer = Data(buffer[buffer.index(after: newline)...])
+                        break
+                    }
+                }
+                cont.resume(returning: first)
+
+                // Drain BOTH before waiting: either pipe filling up would
+                // deadlock the child against an unread reader.
+                let data = buffer + fh.readDataToEndOfFile()
+                let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                self.settle((data, errorData, process.terminationStatus))
+            }
+        }
+    }
+
+    private func settle(_ result: (stdout: Data, stderr: Data, status: Int32)) {
+        lock.lock()
+        outcome = result
+        let waiters = self.waiters
+        self.waiters = []
+        lock.unlock()
+        for waiter in waiters { waiter.resume(returning: result) }
+    }
+
+    /// The rest of both pipes and the exit status, once the process ends.
+    func finished() async -> (stdout: Data, stderr: Data, status: Int32) {
+        await withCheckedContinuation { cont in
+            lock.lock()
+            if let outcome {
+                lock.unlock()
+                cont.resume(returning: outcome)
+            } else {
+                waiters.append(cont)
+                lock.unlock()
+            }
+        }
+    }
+
+    /// Ends the engine early; `wait`/`finished` then report its exit.
+    func terminate() {
+        lock.lock(); defer { lock.unlock() }
+        if let process, process.isRunning { process.terminate() }
+    }
+
+    /// Blocks until the redirect has landed and the credential is stored
+    /// (the second line), or the engine gave up. Cancelling the waiting
+    /// task terminates the engine, which then reports a non-zero exit.
+    @discardableResult
+    public func wait() async throws -> Data {
+        try await withTaskCancellationHandler {
+            let (stdout, stderr, status) = await finished()
+            guard status == 0 else {
+                throw CLIError(message: SwapdCLI.failure(
+                    arguments: arguments, stdout: stdout, stderr: stderr, status: status))
+            }
+            return stdout
+        } onCancel: {
+            terminate()
+        }
     }
 }
 #endif
