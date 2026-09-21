@@ -107,7 +107,7 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         />
       ) : null}
       {model.sections.map((section) => (
-        <SettingsSection key={section.key} title={section.title} card>
+        <SettingsSection key={section.key} title={section.title}>
           {model.bands.has(section.key) ? (
             <ExhaustedBand band={model.bands.get(section.key)!} nowMs={now} />
           ) : null}

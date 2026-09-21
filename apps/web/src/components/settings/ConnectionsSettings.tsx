@@ -3418,8 +3418,8 @@ export function ConnectionsSettings() {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {pendingDesktopServerExposureMode === "network-accessible"
-                    ? `${PRODUCT_NAME} will restart to expose this environment over the network.`
-                    : `${PRODUCT_NAME} will restart and limit this environment back to this machine.`}
+                    ? `Let your other devices connect to ${PRODUCT_NAME} over the network. Pair devices to give them access. ${PRODUCT_NAME} will restart.`
+                    : `Devices connected over your local network will disconnect. Existing tunnels, such as ${CONNECT_NAME} or Tailscale HTTPS, keep working. ${PRODUCT_NAME} will restart.`}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -3427,27 +3427,23 @@ export function ConnectionsSettings() {
                   disabled={isUpdatingDesktopServerExposure}
                   render={<Button variant="outline" disabled={isUpdatingDesktopServerExposure} />}
                 >
-                  Cancel
+                  <span className="[text-box:trim-both_cap_alphabetic]">Cancel</span>
                 </AlertDialogClose>
                 <Button
-                  variant={
-                    pendingDesktopServerExposureMode === "local-only" ? "destructive" : "default"
-                  }
+                  variant="default"
                   onClick={handleConfirmDesktopServerExposureChange}
                   disabled={
                     pendingDesktopServerExposureMode === null || isUpdatingDesktopServerExposure
                   }
                 >
-                  {isUpdatingDesktopServerExposure ? (
-                    <>
-                      <Spinner className="size-3.5" />
-                      Restarting…
-                    </>
-                  ) : pendingDesktopServerExposureMode === "network-accessible" ? (
-                    "Restart and enable"
-                  ) : (
-                    "Restart and disable"
-                  )}
+                  {isUpdatingDesktopServerExposure && <Spinner className="size-3.5" />}
+                  <span className="[text-box:trim-both_cap_alphabetic]">
+                    {isUpdatingDesktopServerExposure
+                      ? "Restarting…"
+                      : pendingDesktopServerExposureMode === "network-accessible"
+                        ? "Restart and enable"
+                        : "Restart and disable"}
+                  </span>
                 </Button>
               </AlertDialogFooter>
             </AlertDialogPopup>
