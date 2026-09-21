@@ -479,7 +479,7 @@ final class ControlServer {
         case "signin-begin":
             guard let key = r.args.first,
                   let fleet = model.fleets.first(where: { $0.id == key }) else {
-                throw Fail("usage: signin-begin <fleet> [--relogin <email>]; fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
+                throw Fail("usage: signin-begin <fleet> [--relogin <email>] [--window]; fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
             }
             let flow = TokenFlow.shared
             guard !flow.running, !model.addingFirstAccount else {
@@ -492,16 +492,25 @@ final class ControlServer {
                 }
                 relogin = account
             }
-            // Headless, the caller shows the page on ITS machine, which may
-            // not be this one — an engine's loopback redirect would land
-            // there with nothing listening. So a credential-swap engine
-            // keeps the paste-back flow here even when it also takes the
-            // redirect (`.addOAuth`); the Mac's own Add / Re-login prefer it.
-            if fleet.capabilities.contains(.addCurrent) {
-                flow.start(model: model, relogin: relogin, headless: true)
-            } else if fleet.capabilities.contains(.addOAuth) {
+            // `--window`: this Mac shows its own sign-in window — the
+            // ephemeral system sheet, passkeys and all — for a caller on
+            // the same machine whose browser has no private window to give
+            // (the desktop app beside Safari). Headless, the caller shows
+            // the page on ITS machine, which may not be this one — an
+            // engine's loopback redirect would land there with nothing
+            // listening. So the window run takes the engine's redirect
+            // (`.addOAuth`, the Mac's own Add / Re-login rule) and the
+            // headless one keeps the paste-back flow of a credential-swap
+            // engine even when it also takes the redirect.
+            let headless = r.options["window"] == nil
+            let oauthFirst = !headless
+            let useOAuth = fleet.capabilities.contains(.addOAuth)
+                && (oauthFirst || !fleet.capabilities.contains(.addCurrent))
+            if useOAuth {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
-                                      relogin: relogin, headless: true)
+                                      relogin: relogin, headless: headless)
+            } else if fleet.capabilities.contains(.addCurrent) {
+                flow.start(model: model, relogin: relogin, headless: headless)
             } else {
                 throw Fail("\(key) has no sign-in flow")
             }
@@ -523,6 +532,7 @@ final class ControlServer {
                 "flowId": .string(flowID),
                 "url": .string(url.absoluteString),
                 "pasteCode": .bool(flow.pasteCode),
+                "window": .bool(!headless),
                 "label": .string(flow.reloginTarget.map { "Sign in again \u{2014} \($0)" } ?? "Add account"),
             ]))
 

@@ -47,6 +47,25 @@ const run = (file: string, args: ReadonlyArray<string>): Promise<string | null> 
     });
   });
 
+/** The default browser for `url` and its private-window switch, or null when
+    there is no default browser or it has no such switch (Safari). Asked before
+    a sign-in starts, since where the page will show decides who runs it. */
+export async function privateWindowBrowser(
+  url: string,
+): Promise<{ readonly path: string; readonly flag: string } | null> {
+  if (!/^https?:\/\//i.test(url)) return null;
+  const browser = await Electron.app.getApplicationInfoForProtocol(url).catch(() => null);
+  if (browser === null) return null;
+  const bundleId = await run("/usr/bin/plutil", [
+    "-extract",
+    "CFBundleIdentifier",
+    "raw",
+    `${browser.path}/Contents/Info.plist`,
+  ]);
+  const flag = bundleId === null ? null : privateWindowFlag(bundleId);
+  return flag === null ? null : { path: browser.path, flag };
+}
+
 /**
  * The sign-in page in a private window of a browser instance of its own, on
  * an empty profile, so the browser's signed-in account never meets the one
@@ -64,17 +83,8 @@ const run = (file: string, args: ReadonlyArray<string>): Promise<string | null> 
  * `openInDefaultBrowser`). macOS only: the caller asks.
  */
 export async function openInPrivateWindow(url: string): Promise<boolean> {
-  if (!/^https?:\/\//i.test(url)) return false;
-  const browser = await Electron.app.getApplicationInfoForProtocol(url).catch(() => null);
+  const browser = await privateWindowBrowser(url);
   if (browser === null) return false;
-  const bundleId = await run("/usr/bin/plutil", [
-    "-extract",
-    "CFBundleIdentifier",
-    "raw",
-    `${browser.path}/Contents/Info.plist`,
-  ]);
-  const flag = bundleId === null ? null : privateWindowFlag(bundleId);
-  if (flag === null) return false;
   const profile = NodePath.join(NodeOS.tmpdir(), "infinitus-signin-profile");
   NodeFS.rmSync(profile, { recursive: true, force: true });
   return (
@@ -82,7 +92,7 @@ export async function openInPrivateWindow(url: string): Promise<boolean> {
       "-na",
       browser.path,
       "--args",
-      flag,
+      browser.flag,
       `--user-data-dir=${profile}`,
       "--no-first-run",
       "--no-default-browser-check",
