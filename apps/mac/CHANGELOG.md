@@ -10,6 +10,22 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.30
+
+### Mac
+- `signin-begin --window` runs a sign-in with the Mac's own sheet for a caller on the same machine.
+- A sign-in routed to Chrome or Edge opens in a browser instance of its own on an empty profile, so the account already signed in there never gets in the way.
+- Signing an account in, or in again, works once more; claude.ai had started refusing the sign-in request on its first page with "Invalid request format".
+- A keep-warm account whose 5h window has stopped now says `cold` where its countdown would be, instead of a blank that looked identical to a running window, and one confirmed click starts it.
+- Keep-warm is on the account row's context menu, so the popup can turn it on and off.
+
+### Desktop
+- With Safari as the default browser, the desktop app's sign-in hands off to the menu bar app's private sign-in sheet, so passkeys work and no signed-in account gets in the way.
+- With Safari as the default browser, the desktop app's sign-in opens in a private window of its own instead of Safari's signed-in profile.
+- A thread stopped on a usage limit is no longer auto-settled, and its session stopped, in the seconds its turn is being resumed.
+- The desktop app's own sign-in, when routed to Chrome or Edge, opens in a browser instance of its own on an empty profile too.
+- Signing an account in from Settings › Accounts works once more; claude.ai had started refusing the request on its first page with "Invalid request format".
+
 ## 0.5.0-alpha.29
 
 ### Mac
