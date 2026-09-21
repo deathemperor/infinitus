@@ -312,6 +312,23 @@ function stopWindowPct(
   return window?.pct ?? null;
 }
 
+/**
+ * Whether a reading shows the account with room in every window it carries;
+ * false for a reading with no windows, which is no evidence. The test a
+ * failed stop gets: the CLI ended the turn with its synthetic rate-limit
+ * error and no rate-limit event, so the stop names no window and no reset.
+ */
+function everyWindowUnderFull(account: InfinitusFleet["accounts"][number]): boolean {
+  if (account.usage === undefined) return false;
+  const decoded = decodeUsage(account.usage);
+  if (decoded._tag !== "Some") return false;
+  const usage = decoded.value;
+  const windows = [usage.fiveHour, usage.sevenDay, ...(usage.scoped ?? [])].filter(
+    (window) => window !== undefined,
+  );
+  return windows.length > 0 && windows.every((window) => window.pct < 100);
+}
+
 function accountLabel(account: InfinitusFleet["accounts"][number]): string {
   return account.alias ?? account.email;
 }
@@ -414,9 +431,12 @@ export interface ResumeTarget {
  * turn was resumed on it every cooldown until its window reset), so:
  * a reading that carries the stop's window decides — under 100 % counts,
  * full does not, whichever account it is; without one, a different account
- * counts, and the same account only once the stop's reset has passed. An
- * engine that reports no probe time gets the weaker test, a different account
- * than the one at the stop.
+ * counts, and the same account only once the stop's reset has passed. A
+ * failed stop names neither window nor reset, so the same account counts
+ * there once a probe after the stop reads every window under full (a thread
+ * sat two hours past its reset on an account reading 20 %). An engine that
+ * reports no probe time gets the weaker test, a different account than the
+ * one at the stop.
  */
 export function resumeTarget(
   stop: LimitStop,
@@ -444,6 +464,7 @@ export function resumeTarget(
     }
     if (label !== from) return target;
     if (stop.resetsAt !== null && now >= stop.resetsAt) return target;
+    if (stop.limitType === null && everyWindowUnderFull(active)) return target;
   }
   return null;
 }

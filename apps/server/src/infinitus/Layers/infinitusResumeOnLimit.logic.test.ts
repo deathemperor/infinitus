@@ -509,6 +509,37 @@ describe("resumeTarget", () => {
     expect(resumeTarget(parked, roomy, NOW)?.account).toBe("one@example.com");
   });
 
+  // A turn the CLI failed outright names no window and no reset (the SDK
+  // sent no rate-limit event, only its synthetic assistant error), so the
+  // account it ran out on had no way back while it stayed the live one: a
+  // thread stopped at 05:10 sat two hours past the window's reset with the
+  // account reading 20 % on a fresh probe. Every window under full on a
+  // reading after the stop is the evidence such a stop can get.
+  it("a failed stop with no window resumes on the same account once every window reads under full", () => {
+    const failed: LimitStop = { ...stop, kind: "failed" };
+    const reading = (windows: object) =>
+      snapshotWith([
+        account(1, "one@example.com", { active: true, usageFetchedAt: after, usage: windows }),
+      ]);
+    expect(
+      resumeTarget(failed, reading(usage(20, [{ name: "Fable", pct: 51 }])), NOW),
+    ).toEqual({ fleetKey: "swapd/claude", account: "one@example.com", from: "one@example.com" });
+    expect(resumeTarget(failed, reading(usage(100)), NOW)).toBeNull();
+    expect(resumeTarget(failed, reading(usage(0, [{ name: "Fable", pct: 100 }])), NOW)).toBeNull();
+    // A reading with no windows at all is no evidence; neither is one from
+    // before the stop.
+    expect(resumeTarget(failed, reading({ scoped: [] }), NOW)).toBeNull();
+    expect(
+      resumeTarget(
+        failed,
+        snapshotWith([
+          account(1, "one@example.com", { active: true, usageFetchedAt: before, usage: usage(20) }),
+        ]),
+        NOW,
+      ),
+    ).toBeNull();
+  });
+
   it("a probe still showing the stop's window full does not count, even after the reset", () => {
     const full = (pct: number, scoped: ReadonlyArray<{ name: string; pct: number }> = []) =>
       snapshotWith([
