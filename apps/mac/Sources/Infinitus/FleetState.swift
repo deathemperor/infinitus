@@ -435,6 +435,13 @@ extension FleetState: FleetModel {
                    caveat: host.fleetCaveats[engineID])
     }
     var appUpdatePending: Bool { host.appUpdatePending }
+    /// The ignite trio, per fleet: the rows render with a FleetState, so
+    /// without these a row's ignite affordance sees the protocol's
+    /// `false`/no-op defaults and quietly never appears. `igniting` is the
+    /// host's single in-flight marker — one ignition at a time, fleet-wide.
+    var canIgnite: Bool { capabilities.contains(.ignite) }
+    var igniting: Int? { host.igniting }
+    func ignite(_ number: Int) { host.ignite(number, on: self) }
     var engineMissing: Bool { host.engineMissing }
     var introTick: Int { host.introTick }
     var introStyle: String { host.introStyle }

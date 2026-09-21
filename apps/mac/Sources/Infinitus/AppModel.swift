@@ -1215,11 +1215,17 @@ final class AppModel: ObservableObject {
     /// (`AccountEngine.ignite`, capability-gated): one tiny request as
     /// account n so its 5h clock starts now; the fleet stays put. Outcome
     /// in the event log; ~1K weekly tokens on n.
-    func ignite(_ number: Int) {
-        guard let primary, canIgnite, !isPlayground, igniting == nil else { return }
+    func ignite(_ number: Int) { ignite(number, on: primary) }
+
+    /// The same ignition on a NAMED fleet: a row's cold chip fires on the
+    /// fleet that row belongs to, which is not always the primary one.
+    func ignite(_ number: Int, on fleet: FleetState?) {
+        guard let fleet, fleet.capabilities.contains(.ignite),
+              !isPlayground, igniting == nil else { return }
         igniting = number
-        let fleet = primary
-        let name = accountName(number)
+        let name = fleet.accounts.first { $0.number == number }
+            .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) }
+            ?? accountName(number)
         logEvent("ignite", icon: "flag.checkered", "igniting \(name)'s 5h window")
         Task { [weak self] in
             var result: IgniteResult?
