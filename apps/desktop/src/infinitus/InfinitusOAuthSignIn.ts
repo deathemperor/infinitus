@@ -6,15 +6,17 @@
  * opens the URL the engine printed and reads the envelope it prints once the
  * account is stored. Nothing leaves this process but the URL.
  *
- * The URL opens in the system browser, not a child window: a passkey sign-in
- * never completed in the child window (the platform authenticator, as far as
- * we can tell, is the browser's to use and not an Electron window's), and a
- * browser is where a user's passkeys already are. The redirect lands on the
- * engine's listener whichever
- * browser rendered the page, so the flow is unchanged. The per-flow cookie jar
- * becomes the browser's private window where it has a switch for one (the
- * Chromium family); elsewhere the provider's page may offer the browser's
- * current account first, and a re-added account lands in its existing slot.
+ * The URL opens in a private window of the default browser where it has a
+ * switch for one (the Chromium family, on an empty profile): a passkey sign-in
+ * never completed in a child window (the platform authenticator, as far as we
+ * can tell, is the browser's to use and not an Electron window's), and a
+ * browser is where a user's passkeys already are. A browser with no such
+ * switch (Safari) gets the page in this shell's own child window on a fresh
+ * in-memory partition instead (#677's window) — never in the browser's
+ * signed-in profile, which offered the account already there and made the
+ * user switch accounts to add one (user 2026-09-21). The redirect lands on the
+ * engine's listener whichever window rendered the page, so the flow is
+ * unchanged.
  *
  * It bends the fork's "one API" rule, which is about talking to the menu-bar
  * app: this spawns the engine's CLI directly, so `apps/desktop` knows the name
@@ -33,7 +35,7 @@ import * as Layer from "effect/Layer";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
-import * as ElectronShell from "../electron/ElectronShell.ts";
+import { InfinitusSignInService } from "./InfinitusSignIn.ts";
 import {
   isExecutableFile,
   openInPrivateWindow,
@@ -42,7 +44,8 @@ import {
 import { resolveSwapdBinary } from "./infinitusSwapd.logic.ts";
 
 const NO_ENGINE_ERROR = "No account engine on this Mac.";
-const BROWSER_ERROR = "The browser could not be opened.";
+/** The child window's title, ahead of the product name. */
+const WINDOW_LABEL = "Sign in";
 
 export class InfinitusOAuthSignInService extends Context.Service<
   InfinitusOAuthSignInService,
@@ -58,7 +61,7 @@ const { logInfo, logWarning } = makeComponentLogger("infinitus-oauth-sign-in");
 
 const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
-  const electronShell = yield* ElectronShell.ElectronShell;
+  const signInWindow = yield* InfinitusSignInService;
   /** `…/Infinitus.app`, the bundle the menu-bar helper — and its copy of the
       engine — is nested in (#777). Only a packaged macOS build has one. */
   const desktopBundlePath =
@@ -101,32 +104,30 @@ const make = Effect.gen(function* () {
     // it ever was.
     const url = yield* Effect.promise(() => Promise.race([announced, run.result.then(() => null)]));
     if (url !== null) {
-      const opened =
-        (environment.platform === "darwin" &&
-          (yield* Effect.promise(() => openInPrivateWindow(url)))) ||
-        (yield* electronShell.openExternal(url));
-      if (!opened) {
-        // Nothing will ever open that URL, and the engine would sit on its
-        // listener for the whole timeout. End it here and say why.
-        yield* logWarning("sign-in browser failed", { flowId: input.flowId });
-        cancel();
-        yield* Effect.promise(() => run.result);
-        return { ok: false, error: BROWSER_ERROR };
+      const inBrowser =
+        environment.platform === "darwin" &&
+        (yield* Effect.promise(() => openInPrivateWindow(url)));
+      if (inBrowser) {
+        // No window of ours to close, so nothing but the page's Cancel or
+        // the engine's own timeout ends a flow the user walked away from.
+        yield* logInfo("sign-in opened in the browser", { flowId: input.flowId });
+      } else {
+        yield* signInWindow.open({ flowId: input.flowId, url, label: WINDOW_LABEL });
+        yield* logInfo("sign-in opened in a private window", { flowId: input.flowId });
       }
-      // No window to close, so nothing but the page's Cancel or the engine's
-      // own timeout ends a flow the user walked away from.
-      yield* logInfo("sign-in opened in the browser", { flowId: input.flowId });
     }
 
     const outcome = yield* Effect.promise(() => run.result);
     flows.delete(input.flowId);
+    yield* signInWindow.close(input.flowId);
     yield* logInfo("sign-in ended", { flowId: input.flowId, ok: outcome.ok });
     return outcome;
   });
 
   const cancel: InfinitusOAuthSignInService["Service"]["cancel"] = (flowId) =>
-    Effect.sync(() => {
+    Effect.gen(function* () {
       flows.get(flowId)?.();
+      yield* signInWindow.close(flowId);
     });
 
   return { begin, cancel } satisfies InfinitusOAuthSignInService["Service"];

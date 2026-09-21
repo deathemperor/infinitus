@@ -226,11 +226,12 @@ export function signInBusy(flow: SignInFlow | null): boolean {
 /** The line under the fleet's title while a flow runs or just ended. */
 export function signInStatusText(flow: SignInFlow): string {
   const who = flow.target === null ? "" : ` as ${flow.target}`;
-  // A shell flow (#1213) runs in the system browser, so passkeys work; the
-  // app's own (#677) is the desktop's child window or a link on this page.
+  // A shell flow (#1213) runs in a private window of the browser, or of the
+  // shell's own where the browser has none; the app's own (#677) is the
+  // desktop's child window or a link on this page.
   const where =
     flow.kind === "shell"
-      ? "in your browser"
+      ? "in the private window that opened"
       : flow.url === null
         ? "in the window"
         : "on the sign-in page";

@@ -18,7 +18,9 @@ import * as InfinitusSignIn from "./InfinitusSignIn.ts";
 export const layer = Layer.mergeAll(
   InfinitusQuitWithApp.layer,
   InfinitusSignIn.layer,
-  InfinitusOAuthSignIn.layer,
+  // The same layer value, so the sign-in the shell runs itself borrows the
+  // one window service (Effect memoises a layer by identity).
+  InfinitusOAuthSignIn.layer.pipe(Layer.provide(InfinitusSignIn.layer)),
   InfinitusCaptureGesture.layer,
   InfinitusDeepLinks.layer,
   InfinitusKeepAwake.layer,

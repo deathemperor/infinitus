@@ -86,9 +86,9 @@ describe("the shell's own sign-in (#1213)", () => {
 
   it("sends the user to the browser, since there is no page link and no code", () => {
     const shell = flow({ kind: "shell", url: null, pasteCode: false, phase: "waitingForToken" });
-    expect(signInStatusText(shell)).toBe("Sign in in your browser.");
+    expect(signInStatusText(shell)).toBe("Sign in in the private window that opened.");
     expect(signInStatusText({ ...shell, target: "two@example.com" })).toBe(
-      "Sign in as two@example.com in your browser.",
+      "Sign in as two@example.com in the private window that opened.",
     );
   });
 });
