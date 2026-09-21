@@ -217,9 +217,13 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           });
         }
 
+        // A stopped thread waits on a swap; a resuming one (#1509) is mid-send,
+        // and its recovered session reads ready with no turn on it until the
+        // continuation lands. A settle stops that session under the send.
         if (
           envelope.command.type === "thread.auto-settle" &&
-          (yield* limitStops.isStopped(envelope.command.threadId))
+          ((yield* limitStops.isStopped(envelope.command.threadId)) ||
+            (yield* limitStops.isResuming(envelope.command.threadId)))
         ) {
           return yield* new OrchestrationCommandInvariantError({
             commandType: envelope.command.type,

@@ -111,7 +111,10 @@ export const make = Effect.gen(function* () {
           (threadId === undefined || thread.id === threadId) &&
           isAutoSettlementCandidate(thread, now),
       ),
-      (thread) => limitStops.isStopped(thread.id).pipe(Effect.map((stopped) => !stopped)),
+      (thread) =>
+        Effect.all([limitStops.isStopped(thread.id), limitStops.isResuming(thread.id)]).pipe(
+          Effect.map(([stopped, resuming]) => !stopped && !resuming),
+        ),
     );
 
     // Return the thread when it still needs a pull request decision. A rejected
