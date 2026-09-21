@@ -124,7 +124,10 @@ const make = Effect.gen(function* () {
       {
         command: "signin-begin",
         args: [input.fleet],
-        options: { window: "1", ...(input.relogin === undefined ? {} : { relogin: input.relogin }) },
+        options: {
+          window: "1",
+          ...(input.relogin === undefined ? {} : { relogin: input.relogin }),
+        },
       },
       BEGIN_TIMEOUT_MS,
     ).pipe(
