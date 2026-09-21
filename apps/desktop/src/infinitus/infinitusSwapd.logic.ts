@@ -51,7 +51,8 @@ export const resolveSwapdBinary = (input: SwapdBinaryInput): string | null => {
 
 /** The command-line switch a browser takes for a private window, by bundle
     identifier — the Mac app's `SignInSheetRoute.privateFlags`, the Chromium
-    family's only (Safari has none). `null` leaves the page to the profile. */
+    family's only (Safari has none), which is also the family that takes the
+    empty `--user-data-dir` beside it. `null` leaves the page to the profile. */
 const PRIVATE_WINDOW_FLAGS: Readonly<Record<string, string>> = {
   "com.google.Chrome": "--incognito",
   "com.google.Chrome.beta": "--incognito",

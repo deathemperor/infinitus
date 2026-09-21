@@ -2,6 +2,8 @@
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 
 import type { InfinitusOAuthSignInResult } from "@infinitus/contracts/infinitus";
 import * as Electron from "electron";
@@ -46,15 +48,20 @@ const run = (file: string, args: ReadonlyArray<string>): Promise<string | null> 
   });
 
 /**
- * The sign-in page in a private window of the default browser, so the
- * browser's signed-in account never meets the one being added. `false` when
- * there is no such window to open — no default browser, one with no private
- * switch — and the caller opens the URL the plain way.
+ * The sign-in page in a private window of a browser instance of its own, on
+ * an empty profile, so the browser's signed-in account never meets the one
+ * being added. `false` when there is no such window to open — no default
+ * browser, one with no private switch — and the caller opens the URL the
+ * plain way.
  *
- * `open -na <browser> --args <flag> <url>`: a running browser gets a URL over
- * Apple Events and ignores launch arguments, so the flag only counts on a NEW
- * instance, which hands its command line to the running one (the Mac app's
- * `openInDefaultBrowser`, probed on Chrome 152). macOS only: the caller asks.
+ * `open -na <browser> --args <flag> --user-data-dir=<fresh> <url>`: a running
+ * browser gets a URL over Apple Events and ignores launch arguments, and a
+ * second instance handing `--incognito` to the running one was seen to open
+ * the page in the signed-in profile (user 2026-09-21, Chrome 153). A
+ * different `--user-data-dir` is what makes the Chromium family start a
+ * separate process instead of handing off, and the profile is wiped before
+ * every launch, so the page opens signed in to nothing (the Mac app's
+ * `openInDefaultBrowser`). macOS only: the caller asks.
  */
 export async function openInPrivateWindow(url: string): Promise<boolean> {
   if (!/^https?:\/\//i.test(url)) return false;
@@ -68,7 +75,20 @@ export async function openInPrivateWindow(url: string): Promise<boolean> {
   ]);
   const flag = bundleId === null ? null : privateWindowFlag(bundleId);
   if (flag === null) return false;
-  return (await run("/usr/bin/open", ["-na", browser.path, "--args", flag, url])) !== null;
+  const profile = NodePath.join(NodeOS.tmpdir(), "infinitus-signin-profile");
+  NodeFS.rmSync(profile, { recursive: true, force: true });
+  return (
+    (await run("/usr/bin/open", [
+      "-na",
+      browser.path,
+      "--args",
+      flag,
+      `--user-data-dir=${profile}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      url,
+    ])) !== null
+  );
 }
 
 /**
