@@ -525,6 +525,46 @@ describe("ThreadSettlementReactor", () => {
     ),
   );
 
+  // The resume claims the thread while it replaces the CLI and sends (#1509);
+  // the session in between reads ready with no turn on it, which settled the
+  // thread and stopped that session under the continuation.
+  it.effect("keeps a thread mid-resume pending until the continuation has gone", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse(NOW));
+        const resuming = makeThread("resuming");
+        const fixture = yield* makeHarness({
+          snapshot: makeSnapshot([resuming, makeThread("unrelated")]),
+          settings: {
+            ...DEFAULT_SERVER_SETTINGS,
+            sidebarAutoSettleOnMerge: true,
+            sidebarAutoSettleAfterDays: 3,
+          },
+          branchPullRequest: () => Effect.succeed(makeBranchPullRequest("merged")),
+        });
+        yield* Effect.gen(function* () {
+          const stops = yield* InfinitusLimitStops;
+          const reactor = yield* ThreadSettlementReactor.ThreadSettlementReactor;
+          yield* stops.setResuming(resuming.id, true);
+          yield* startHarness(reactor, fixture.activation, fixture.snapshotReads);
+          assert.deepStrictEqual(
+            (yield* Ref.get(fixture.commands)).map(({ threadId }) => threadId),
+            [ThreadId.make("unrelated")],
+          );
+
+          yield* stops.setResuming(resuming.id, false);
+          yield* TestClock.adjust("1 minute");
+          yield* Queue.take(fixture.snapshotReads);
+          yield* reactor.drain;
+          assert.include(
+            (yield* Ref.get(fixture.commands)).map(({ threadId }) => threadId),
+            resuming.id,
+          );
+        }).pipe(Effect.provide(fixture.layer));
+      }),
+    ),
+  );
+
   it.effect("uses saved PRs without settling resumed threads or branches with newer PRs", () =>
     Effect.scoped(
       Effect.gen(function* () {

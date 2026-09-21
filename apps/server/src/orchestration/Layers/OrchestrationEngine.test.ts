@@ -720,6 +720,21 @@ describe("OrchestrationEngine", () => {
           threadId: manuallySettledThreadId,
         });
         yield* limitStops.setStopped([]);
+        // A resume in flight is the same pending continuation: the session
+        // it recovers reads ready with no turn on it, and a settle here
+        // stopped that session under the send.
+        yield* limitStops.setResuming(limitedThreadId, true);
+        const resumingError = yield* engine
+          .dispatch({
+            type: "thread.auto-settle",
+            commandId: CommandId.make("cmd-auto-settle-resuming"),
+            threadId: limitedThreadId,
+            snapshotSequence: yield* engine.latestSequence,
+            settledAt: lastActivityAt,
+          })
+          .pipe(Effect.flip);
+        expect(resumingError._tag).toBe("OrchestrationCommandInvariantError");
+        yield* limitStops.setResuming(limitedThreadId, false);
         yield* engine.dispatch({
           type: "thread.auto-settle",
           commandId: CommandId.make("cmd-auto-settle-limit-cleared"),

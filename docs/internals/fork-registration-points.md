@@ -153,6 +153,11 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   diff to the pathspec from `checkpointDiffPathspec.ts` (#1403): one call
   before the command and the `--literal-pathspecs` / `-- <paths>` arguments;
   this edit stays after that sync.
+- `apps/server/src/orchestration/Layers/OrchestrationEngine.ts` (the
+  `thread.auto-settle` invariant) and `apps/server/src/orchestration/ThreadSettlementReactor.ts`
+  (the candidate filter) — read `InfinitusLimitStops.isStopped` and
+  `isResuming`, so a thread waiting on a usage limit or mid-resume is never
+  auto-settled (#270 I, #1509). Why: `docs/internals/turn-queue.md`.
 - `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` — the turn
   start's session start + send run through `TurnStartGate.start` (#616);
   `serverRuntimeStartup.ts` — the post-update continuation's forked send does
