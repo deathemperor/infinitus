@@ -88,6 +88,40 @@ struct NextMarker<M: FleetModel>: View {
     }
 }
 
+/// A keep-warm account whose 5h clock has stopped. That slot is blank
+/// exactly then — the endpoint reports no reset for a window that is not
+/// running — so the word goes where the countdown would have been, and
+/// where the engine can ignite, one confirmed press starts the window.
+struct WarmChip<M: FleetModel>: View {
+    @ObservedObject var model: M
+    let number: Int
+    let name: String
+    let word: String
+
+    private var why: String {
+        "Keep-warm is on, but \(name)'s 5h window is not running — "
+        + "nothing counts down until a request starts one"
+    }
+
+    @ViewBuilder var body: some View {
+        if model.canIgnite {
+            IgniteAction(model: model, number: number) { armed in
+                armed ? "Click again within 6 s to start \(name)'s 5h window now"
+                      : why + ". Click to start it with one tiny request (asks again before it fires)"
+            } label: { armed in
+                (Text(Image(systemName: armed ? "flame.fill" : "flame"))
+                 + Text(armed ? " Sure?" : " " + word))
+                    .font(PopupFont.caption.weight(armed ? .semibold : .regular))
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(armed ? Color.orange : Color.secondary.opacity(0.15), in: Capsule())
+                    .foregroundStyle(armed ? .white : .secondary)
+            }
+        } else {
+            Text(word).font(PopupFont.caption).foregroundStyle(.secondary).instantTip(why)
+        }
+    }
+}
+
 public struct AccountRows<M: FleetModel, U: UsageSource>: View {
     @ObservedObject var model: M
     @ObservedObject var usage: U
@@ -490,6 +524,11 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                                 compact: compactText) {
                                 Text(when).font(PopupFont.caption).foregroundStyle(.secondary)
                             }
+                        } else if session, let word = SessionWarmth.caption(account: account) {
+                            WarmChip(model: model, number: account.number,
+                                     name: account.alias
+                                        ?? String(account.email.prefix(while: { $0 != "@" })),
+                                     word: word)
                         } else {
                             resetLabelView(resetsAt: w.resetsAt, staticText: resetText(w))
                         }

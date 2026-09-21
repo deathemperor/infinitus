@@ -1923,6 +1923,7 @@ final class AppModel: ObservableObject {
         primary?.setRotation(number, enabled: enabled)
     }
     func setPreferred(_ number: Int, _ on: Bool) { primary?.setPreferred(number, on) }
+    func setAutoIgnite(_ number: Int, _ on: Bool) { primary?.setAutoIgnite(number, on) }
     func reorder(_ order: [Int], done: (() -> Void)? = nil) {
         guard let primary else { done?(); return }
         primary.reorder(order, done: done)

@@ -471,3 +471,65 @@ final class RecoveryCountdownTests: XCTestCase {
         XCTAssertEqual(RecoveryCountdown.label(until: until, now: now), "00:00:00")
     }
 }
+
+/// The 5h slot's warm/cold word (#1524). The rule these all turn on was
+/// verified against the live usage endpoint 2026-09-21: an account
+/// ignited into a window it has barely touched reports `0%` WITH a
+/// `resetsAt`, so a missing reset means no window is running.
+final class SessionWarmthTests: XCTestCase {
+    private func acct(_ fields: String) throws -> Account {
+        try account(#"{\#(base), "usageStatus": "ok", \#(fields)}"#)
+    }
+
+    func testAnOpenWindowAtZeroPercentIsWarm() throws {
+        let a = try acct(#""autoIgnite": true, "usage": {"fiveHour": {"pct": 0, "resetsAt": "2999-01-01T00:00:00Z"}}"#)
+        guard case .warm(let at) = SessionWarmth.state(a.usage) else {
+            return XCTFail("a window with a reset ahead is running")
+        }
+        XCTAssertEqual(at, WeeklyRoll.parse("2999-01-01T00:00:00Z"))
+        XCTAssertNil(SessionWarmth.caption(account: a),
+                     "the reset label already counts this window down")
+    }
+
+    func testNoResetMeansTheClockIsNotRunning() throws {
+        let a = try acct(#""autoIgnite": true, "usage": {"fiveHour": {"pct": 0}}"#)
+        XCTAssertEqual(SessionWarmth.state(a.usage), .cold)
+        XCTAssertEqual(SessionWarmth.caption(account: a), "cold")
+    }
+
+    func testAResetAlreadyGoneByIsCold() throws {
+        let a = try acct(#""autoIgnite": true, "usage": {"fiveHour": {"pct": 0, "resetsAt": "2000-01-01T00:00:00Z"}}"#)
+        XCTAssertEqual(SessionWarmth.caption(account: a), "cold")
+    }
+
+    func testKeepWarmOffPromisedNothing() throws {
+        let off = try acct(#""autoIgnite": false, "usage": {"fiveHour": {"pct": 0}}"#)
+        let absent = try acct(#""usage": {"fiveHour": {"pct": 0}}"#)
+        XCTAssertNil(SessionWarmth.caption(account: off))
+        XCTAssertNil(SessionWarmth.caption(account: absent))
+    }
+
+    func testAStaleRowDoesNotClaimTheClockStopped() throws {
+        // #1118: the measurement is frozen, so its silence about a reset
+        // is the last fetch's, not the window's.
+        let a = try acct(#""autoIgnite": true, "stale": true, "usage": {"fiveHour": {"pct": 0}}"#)
+        XCTAssertNil(SessionWarmth.caption(account: a))
+    }
+
+    func testASpentWeeklySaysNothing() throws {
+        // Nothing to warm until the 7d rolls, and the row already wears
+        // its dead line.
+        let a = try acct(#""autoIgnite": true, "usage": {"fiveHour": {"pct": 0}, "sevenDay": {"pct": 100, "resetsAt": "2999-01-01T00:00:00Z"}}"#)
+        XCTAssertNil(SessionWarmth.caption(account: a))
+    }
+
+    func testAModelOnlyDeathStillSpeaks() throws {
+        // The case that separates this from `isDead`, which counts a
+        // spent per-model window: out of Fable with 7d headroom, the
+        // account still serves every other model, so a stopped clock is
+        // worth saying.
+        let a = try acct(#""autoIgnite": true, "usage": {"fiveHour": {"pct": 0}, "sevenDay": {"pct": 70, "resetsAt": "2999-01-01T00:00:00Z"}, "scoped": [{"pct": 100, "name": "Fable", "resetsAt": "2999-01-01T00:00:00Z"}]}"#)
+        XCTAssertTrue(AccountVitals.isDead(a.usage), "guards the premise")
+        XCTAssertEqual(SessionWarmth.caption(account: a), "cold")
+    }
+}

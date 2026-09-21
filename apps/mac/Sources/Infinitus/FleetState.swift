@@ -276,6 +276,15 @@ final class FleetState: ObservableObject, Identifiable {
         perform { try await engine.setHold(fleet: provider, number: number, held: !enabled) }
     }
 
+    /// Keep-warm on/off: the engine's daemon restarts this account's 5h
+    /// window whenever it has gone cold. The verb answers with the edited
+    /// fleet, so `perform` seeds it and the row flips without waiting for
+    /// the next poll.
+    func setAutoIgnite(_ number: Int, _ on: Bool) {
+        let engine = engine, provider = provider
+        perform { try await engine.setAutoIgnite(fleet: provider, number: number, on) }
+    }
+
     /// Stars flipped but not yet confirmed by the engine (the subprocess
     /// plus the snapshot refresh take a few seconds — user 2026-09-03
     /// "pressing star … is not responsive"): the row shows this at once.

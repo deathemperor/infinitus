@@ -455,6 +455,52 @@ public enum AccountVitals {
     }
 }
 
+/// Whether an account's 5h clock is ticking, and the one word the 5h
+/// slot says when it is not.
+///
+/// The rule is `WindowPlanner.AccountState.coldClock`'s, read off the
+/// row's own usage: the endpoint reports a `resets_at` for an OPEN 5h
+/// window whatever its pct — an account ignited into a window it has
+/// barely touched reads 0% WITH a reset (verified against the live
+/// endpoint 2026-09-21) — so a missing reset means no window is
+/// running, not a running one gone unreported.
+public enum SessionWarmth {
+    public enum State: Equatable, Sendable {
+        /// A window is running; it rolls at this instant.
+        case warm(Date)
+        /// No window ticking: the next request starts a fresh one.
+        case cold
+    }
+
+    public static func state(_ usage: Usage?, now: Date = Date()) -> State {
+        guard let reset = WeeklyRoll.parse(usage?.fiveHour?.resetsAt),
+              reset > now else { return .cold }
+        return .warm(reset)
+    }
+
+    /// The caption for a 5h slot that would otherwise be blank — nil
+    /// wherever the row already answers for itself:
+    ///
+    /// - keep-warm off: nothing was promised, and an idle clock is honest.
+    /// - stale: a frozen measurement cannot testify that the clock
+    ///   stopped, its reset having been true at the last good fetch —
+    ///   the rule `Account.resetIsKnowable` applies to the countdown
+    ///   (#1118), on the same question.
+    /// - 7d spent: the account serves nothing until that window rolls,
+    ///   the planner refuses to ignite it (`Config.reserveFloorPct`) and
+    ///   the row already wears its dead line. Deliberately NOT `isDead`,
+    ///   which counts a spent per-model window too: an account out of
+    ///   Fable alone still serves every other model, so its stopped
+    ///   clock is worth saying.
+    /// - warm: the reset label already counts the window down.
+    public static func caption(account: Account, now: Date = Date()) -> String? {
+        guard account.autoIgnite == true, account.stale != true else { return nil }
+        if let weekly = account.usage?.sevenDay?.pct, weekly >= 100 { return nil }
+        guard state(account.usage, now: now) == .cold else { return nil }
+        return "cold"
+    }
+}
+
 /// Live countdown to a recovery instant, for the all-limited state
 /// (todo 2026-09-01: "highlight the first to be revived with countdown
 /// active"). Ticks in the UI every second; pure here so it's testable.
