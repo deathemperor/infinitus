@@ -299,7 +299,11 @@ actor AwsLoginRunner {
         live.remove(process)
         guard var run = runs[key], run.process === process else { return }
         let prompt = run.state.providerOrAws.parseOutput(run.output)
-        if status == 0 || prompt.succeeded {
+        // The success line, never the exit code: `aws login` exits 0 after
+        // "The pending authorization to retrieve an SSO token has expired"
+        // too, and `script` passes that 0 on (2026-09-22), which recorded
+        // a timed-out login as "signed in" and cleared its card.
+        if prompt.succeeded {
             run.state.phase = .done
             run.state.message = "signed in"
         } else if run.state.phase == .failed, run.state.message != nil {
