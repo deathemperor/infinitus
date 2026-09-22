@@ -78,13 +78,18 @@ vi.mock("../../state/infinitus", () => ({
   },
 }));
 vi.mock("../../state/query", () => ({
-  useEnvironmentQuery: (atom: { environmentId: string }) => {
+  useEnvironmentQuery: (atom: { environmentId: string } | null) => {
+    // A disconnected machine subscribes to nothing and reads as pending.
     const snapshot =
-      atom.environmentId === "remote-environment" ? testState.remoteSnapshot : testState.snapshot;
+      atom === null
+        ? null
+        : atom.environmentId === "remote-environment"
+          ? testState.remoteSnapshot
+          : testState.snapshot;
     return {
       data: snapshot,
       error: null,
-      isPending: snapshot === null,
+      isPending: atom !== null && snapshot === null,
       isSuccess: snapshot !== null,
       refresh: testState.refresh,
     };
