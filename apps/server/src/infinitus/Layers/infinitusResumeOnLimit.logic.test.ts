@@ -521,9 +521,11 @@ describe("resumeTarget", () => {
       snapshotWith([
         account(1, "one@example.com", { active: true, usageFetchedAt: after, usage: windows }),
       ]);
-    expect(
-      resumeTarget(failed, reading(usage(20, [{ name: "Fable", pct: 51 }])), NOW),
-    ).toEqual({ fleetKey: "swapd/claude", account: "one@example.com", from: "one@example.com" });
+    expect(resumeTarget(failed, reading(usage(20, [{ name: "Fable", pct: 51 }])), NOW)).toEqual({
+      fleetKey: "swapd/claude",
+      account: "one@example.com",
+      from: "one@example.com",
+    });
     expect(resumeTarget(failed, reading(usage(100)), NOW)).toBeNull();
     expect(resumeTarget(failed, reading(usage(0, [{ name: "Fable", pct: 100 }])), NOW)).toBeNull();
     // A reading with no windows at all is no evidence; neither is one from
