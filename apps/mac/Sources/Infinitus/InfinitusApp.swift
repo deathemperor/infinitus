@@ -607,10 +607,9 @@ struct OnboardingCard: View {
             .textSelection(.enabled)
             .frame(width: onboardingTextWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-        Text("Then sign in with Claude Code and add the detected login in Infinitus.")
-            .font(.caption).monospaced()
+        Text("Then add your first account from Accounts in the Infinitus desktop app.")
+            .font(.caption)
             .foregroundStyle(.tertiary)
-            .textSelection(.enabled)
         DetectionLines(model: model, afterInstall: true)
         OnboardingBriefButton(model: model, engineInstalled: false)
     }
@@ -642,48 +641,57 @@ struct OnboardingBriefButton: View {
     }
 }
 
-/// Engine present, fleet empty: adopt whatever this machine already has
-/// (todo 2026-09-01). `swapd add` registers Claude Code's current login.
+/// Engine present, fleet empty (todo 2026-09-01, reworked 2026-09-22):
+/// the first account is a browser sign-in the desktop app's Accounts page
+/// runs through the engine itself (`swapd add-oauth`, #1213) — no prior
+/// Claude Code login, no relaunch. A login Claude Code already holds is
+/// the one-click shortcut (`swapd add`), gated on the engine's
+/// `.addCurrent`, never on its id.
 struct FirstAccountCard: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Almost there")
+            Text("Add your first account")
                 .font(.headline)
             Text("The engine is running but manages no accounts yet.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: onboardingTextWidth, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
-            if let claude = model.claudeCLI, let email = claude.email {
-                Button {
-                    model.addFirstAccount()
-                } label: {
-                    if model.addingFirstAccount {
-                        HStack(spacing: 5) {
-                            ProgressView().controlSize(.small)
-                            Text("Adding…")
-                        }
-                    } else {
-                        Label("Add \(email)", systemImage: "person.badge.plus")
+            HStack(spacing: 8) {
+                if model.desktopAppInstalled {
+                    Button {
+                        model.openDesktop?(nil)
+                    } label: {
+                        Label("Sign in…", systemImage: "person.crop.circle.badge.plus")
                     }
                 }
-                .disabled(model.addingFirstAccount)
-                // The button already names the account; this line says
-                // where it comes from. The org rides along only when it
-                // is a real one — "<email>'s Organization" is the default
-                // personal org and would print the address a third time.
-                Text(Self.signedInLine(email: email, organization: claude.organization))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(width: onboardingTextWidth, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text("Sign in with Claude Code, then relaunch Infinitus to add the detected login.")
-                    .font(.caption).monospaced()
-                    .foregroundStyle(.tertiary)
-                    .textSelection(.enabled)
+                if let claude = model.claudeCLI, let email = claude.email,
+                   model.currentLoginEngine != nil {
+                    Button {
+                        model.addFirstAccount()
+                    } label: {
+                        if model.addingFirstAccount {
+                            HStack(spacing: 5) {
+                                ProgressView().controlSize(.small)
+                                Text("Adding…")
+                            }
+                        } else {
+                            Label("Add \(email)", systemImage: "person.badge.plus")
+                        }
+                    }
+                    .disabled(model.addingFirstAccount)
+                }
             }
+            Text(Self.hint(desktop: model.desktopAppInstalled,
+                           adoptable: model.currentLoginEngine != nil,
+                           email: model.claudeCLI?.email, organization: model.claudeCLI?.organization,
+                           binary: model.swapd?.binaryPath))
+                .font(.caption).foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(width: onboardingTextWidth, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
             if let msg = model.firstAccountMessage {
                 Text(msg).font(.caption).foregroundStyle(.orange)
                     .frame(width: onboardingTextWidth, alignment: .leading)
@@ -695,8 +703,23 @@ struct FirstAccountCard: View {
         .padding(6)
     }
 
+    /// The line under the buttons: where the sign-in happens, and what the
+    /// adopt button adopts. Without the desktop app the CLI line stands in,
+    /// with the located binary — the bundled engine is not on PATH.
+    static func hint(desktop: Bool, adoptable: Bool, email: String?, organization: String?,
+                     binary: String?) -> String {
+        var parts: [String] = []
+        parts.append(desktop
+            ? "Sign in opens the Infinitus app; in Accounts, choose Add account to sign in through your browser."
+            : "Sign in from a terminal: \(binary ?? "swapd") add-oauth")
+        if adoptable, let email {
+            parts.append(signedInLine(email: email, organization: organization))
+        }
+        return parts.joined(separator: " ")
+    }
+
     static func signedInLine(email: String, organization: String?) -> String {
-        let base = "That is the account Claude Code on this Mac is signed in to"
+        let base = "Add \(email) adopts the login Claude Code on this Mac already holds"
         guard let org = organization?.trimmingCharacters(in: .whitespaces), !org.isEmpty,
               org.lowercased() != "\(email.lowercased())'s organization" else { return base + "." }
         return base + " (\(org))."

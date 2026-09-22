@@ -204,7 +204,7 @@ struct InfinitusTray {
                     tip += "Claude Code is signed in as \(email); "
                         + "adopt it with:\nswapd add"
                 } else {
-                    tip += "sign in with Claude Code, then:\nswapd add"
+                    tip += "sign one in through the browser with:\nswapd add-oauth"
                 }
                 emit(WaybarPayload(
                     text: "\(TitleFormatter.icon) no accounts",
