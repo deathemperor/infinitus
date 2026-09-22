@@ -1,9 +1,13 @@
+// @effect-diagnostics nodeBuiltinImport:off -- The stand-in listener is exercised over a real socket.
+
 import * as NodeHttp from "node:http";
 import * as NodeNet from "node:net";
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import { listenForSignInRedirect, signInRedirectResponse } from "./InfinitusSignInRedirect.ts";
+
+vi.mock("electron", () => ({ shell: { openExternal: vi.fn() } }));
 
 /** A port nothing holds right now. */
 const freePort = () =>
@@ -20,7 +24,9 @@ const freePort = () =>
 
 const get = (url: string) =>
   new Promise<{ status: number; body: string }>((resolve, reject) => {
-    NodeHttp.get(url, (response) => {
+    // A fresh connection every time: a kept-alive socket could reach a server
+    // that is closing, and the refused connect below is the point.
+    NodeHttp.get(url, { agent: false }, (response) => {
       let body = "";
       response.setEncoding("utf8");
       response.on("data", (chunk: string) => {

@@ -23,13 +23,13 @@ import type {
   InfinitusSignInRedirectListenInput,
   InfinitusSignInRedirectResult,
 } from "@infinitus/contracts/infinitus";
+import * as Electron from "electron";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
-import { InfinitusSignInService } from "./InfinitusSignIn.ts";
 import { openInPrivateWindow } from "./InfinitusSwapdProcess.ts";
 
 /** The engine's own path; anything else on the port is not the redirect. */
@@ -143,7 +143,6 @@ const { logInfo, logWarning } = makeComponentLogger("infinitus-sign-in-redirect"
 
 const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
-  const signInWindow = yield* InfinitusSignInService;
   const flows = new Map<string, () => void>();
 
   const listen: InfinitusSignInRedirectService["Service"]["listen"] = Effect.fn(
@@ -154,24 +153,27 @@ const make = Effect.gen(function* () {
     flows.set(input.flowId, listener.stop);
 
     // The page opens the way the shell's own sign-in does (#1213): a private
-    // window of the default browser, so passkeys work and no signed-in
-    // account gets in the way; the child window where there is none. Either
-    // way the redirect comes to this machine, which is where we listen.
-    const inBrowser =
+    // window of the default browser, so no signed-in account gets in the
+    // way; the plain default browser where it has no such window (Safari).
+    // Never the child window — a passkey sign-in never completes there —
+    // and the redirect comes to this machine either way, where we listen.
+    const privateWindow =
       environment.platform === "darwin" &&
       (yield* Effect.promise(() => openInPrivateWindow(input.url)));
-    if (!inBrowser) {
-      yield* signInWindow.open({ flowId: input.flowId, url: input.url, label: input.label });
+    if (!privateWindow) {
+      yield* Effect.promise(() => Electron.shell.openExternal(input.url)).pipe(
+        Effect.tapError((error) => logWarning("the browser did not open", { error })),
+        Effect.catch(() => Effect.void),
+      );
     }
     yield* logInfo("listening for the sign-in redirect", {
       flowId: input.flowId,
       port: input.port,
-      inBrowser,
+      privateWindow,
     });
 
     const outcome = yield* Effect.promise(() => listener.result);
     flows.delete(input.flowId);
-    yield* signInWindow.close(input.flowId);
     if (!outcome.ok && outcome.error !== undefined) {
       yield* logWarning("the sign-in redirect could not end here", { flowId: input.flowId });
     } else {
@@ -181,9 +183,8 @@ const make = Effect.gen(function* () {
   });
 
   const stop: InfinitusSignInRedirectService["Service"]["stop"] = (flowId) =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       flows.get(flowId)?.();
-      yield* signInWindow.close(flowId);
     });
 
   yield* Effect.addFinalizer(() =>

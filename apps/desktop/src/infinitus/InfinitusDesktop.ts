@@ -22,7 +22,7 @@ export const layer = Layer.mergeAll(
   // The same layer value, so the sign-in the shell runs itself borrows the
   // one window service (Effect memoises a layer by identity).
   InfinitusOAuthSignIn.layer.pipe(Layer.provide(InfinitusSignIn.layer)),
-  InfinitusSignInRedirect.layer.pipe(Layer.provide(InfinitusSignIn.layer)),
+  InfinitusSignInRedirect.layer,
   InfinitusCaptureGesture.layer,
   InfinitusDeepLinks.layer,
   InfinitusKeepAwake.layer,

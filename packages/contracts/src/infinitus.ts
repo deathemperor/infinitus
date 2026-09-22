@@ -717,13 +717,11 @@ export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
     callback`, and when this desktop looks at another Mac's environment the
     page opens in this machine's browser — so the shell binds `port` here,
     opens `url`, answers the browser, and hands the address back for the page
-    to send over `signin-code`. `label` titles the child window when no
-    private browser window can be opened. */
+    to send over `signin-code`. */
 export const InfinitusSignInRedirectListenInput = Schema.Struct({
   flowId: Schema.String,
   port: Schema.Number,
   url: Schema.String,
-  label: Schema.String,
 });
 export type InfinitusSignInRedirectListenInput = typeof InfinitusSignInRedirectListenInput.Type;
 

@@ -415,7 +415,7 @@ export function AccountsPage() {
         );
       redirectFlowIdRef.current = flowId;
       void redirectSignIn
-        .listen({ flowId, port, url: reply.url, label: reply.label })
+        .listen({ flowId, port, url: reply.url })
         .then(async (caught) => {
           if (redirectFlowIdRef.current === flowId) redirectFlowIdRef.current = null;
           if (!live()) return;
