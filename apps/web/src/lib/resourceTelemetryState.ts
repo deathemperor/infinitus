@@ -2,7 +2,7 @@ import type {
   EnvironmentId,
   ResourceTelemetryHistoryInput,
   ResourceTelemetrySnapshot,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import { useCallback } from "react";
 

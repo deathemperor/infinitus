@@ -7,7 +7,7 @@ import {
   HostProcessEnvironment,
   HostProcessHostname,
   HostProcessPlatform,
-} from "@t3tools/shared/hostProcess";
+} from "@infinitus/shared/hostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -33,7 +33,7 @@ import {
   sourcePathContext,
   windowsChromiumCookiesAreHeld,
 } from "./Sources.ts";
-import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { symlinksSupported } from "@infinitus/shared/testing/symlinks";
 
 const helium = BROWSER_IMPORT_SOURCES.find((source) => source.id === "helium")!;
 

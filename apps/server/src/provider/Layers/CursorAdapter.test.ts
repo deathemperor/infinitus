@@ -14,7 +14,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
-import { createModelSelection } from "@t3tools/shared/model";
+import { createModelSelection } from "@infinitus/shared/model";
 
 import {
   ApprovalRequestId,
@@ -23,7 +23,7 @@ import {
   type ProviderRuntimeEvent,
   ThreadId,
   ProviderInstanceId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import { ServerConfig } from "../../config.ts";
 import { buildRuntimeInstructions } from "../RuntimeInstructions.ts";
@@ -31,7 +31,7 @@ import { ServerSettingsService } from "../../serverSettings.ts";
 import type { CursorAdapterShape } from "../Services/CursorAdapter.ts";
 import { makeCursorAdapter } from "./CursorAdapter.ts";
 import { execScriptSource, writeFakeCli } from "../../testUtils/fakeCli.ts";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 const decodeCursorSettings = Schema.decodeSync(CursorSettings);
 
 // Test-local service tag so the rest of the file can keep using `yield* CursorAdapter`.

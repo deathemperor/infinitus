@@ -1,6 +1,6 @@
 import { type CSSProperties, memo } from "react";
-import { type ProviderDriverKind } from "@t3tools/contracts";
-import { providerInstanceInitials } from "@t3tools/client-runtime/state/provider-instance-display";
+import { type ProviderDriverKind } from "@infinitus/contracts";
+import { providerInstanceInitials } from "@infinitus/client-runtime/state/provider-instance-display";
 
 import { PROVIDER_ICON_BY_PROVIDER } from "./providerIconUtils";
 import { cn } from "~/lib/utils";

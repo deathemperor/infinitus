@@ -1,4 +1,4 @@
-import type { ClientSettings } from "@t3tools/contracts/settings";
+import type { ClientSettings } from "@infinitus/contracts/settings";
 
 import completionUrl from "./assets/notification-completion.mp3";
 import inputUrl from "./assets/notification-input.mp3";

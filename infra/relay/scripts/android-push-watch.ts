@@ -8,9 +8,9 @@ import {
   WsRpcGroup,
   type OrchestrationProjectShell,
   type OrchestrationThreadShell,
-} from "@t3tools/contracts";
-import type { RelayAgentActivityState } from "@t3tools/contracts/relay";
-import { projectThreadAwareness } from "@t3tools/shared/agentAwareness";
+} from "@infinitus/contracts";
+import type { RelayAgentActivityState } from "@infinitus/contracts/relay";
+import { projectThreadAwareness } from "@infinitus/shared/agentAwareness";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import * as Clock from "effect/Clock";

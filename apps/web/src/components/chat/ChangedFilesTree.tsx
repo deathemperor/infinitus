@@ -1,4 +1,4 @@
-import { type TurnId } from "@t3tools/contracts";
+import { type TurnId } from "@infinitus/contracts";
 import { type MouseEvent, memo, useCallback, useMemo, useState } from "react";
 import { type TurnDiffFileChange } from "../../types";
 import {

@@ -6,14 +6,14 @@ import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import type { DesktopAppActivationRequest } from "@t3tools/contracts";
-import { resolveDesktopAppControlAddress } from "@t3tools/shared/desktopAppControl";
+import type { DesktopAppActivationRequest } from "@infinitus/contracts";
+import { resolveDesktopAppControlAddress } from "@infinitus/shared/desktopAppControl";
 import {
   HostProcessPlatform,
   HostProcessUserId,
   HostProcessWorkingDirectory,
-} from "@t3tools/shared/hostProcess";
-import * as NetService from "@t3tools/shared/Net";
+} from "@infinitus/shared/hostProcess";
+import * as NetService from "@infinitus/shared/Net";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

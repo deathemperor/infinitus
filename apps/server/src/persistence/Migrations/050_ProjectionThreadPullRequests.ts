@@ -1,4 +1,4 @@
-import { legacyThreadPullRequestKey } from "@t3tools/shared/threadPullRequests";
+import { legacyThreadPullRequestKey } from "@infinitus/shared/threadPullRequests";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 

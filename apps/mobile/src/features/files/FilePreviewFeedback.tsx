@@ -24,7 +24,7 @@ export function FilePreviewNotice(props: { readonly title?: string; readonly chi
   return (
     <View className="border-b border-warning-border bg-warning px-4 py-2">
       {props.title ? (
-        <Text className="text-2xs font-t3-bold uppercase text-warning-foreground">
+        <Text className="text-2xs font-infinitus-bold uppercase text-warning-foreground">
           {props.title}
         </Text>
       ) : null}

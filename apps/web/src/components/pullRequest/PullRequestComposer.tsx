@@ -8,7 +8,7 @@
  * the toggle: they are separate texts going to separate places, and merging them would send a
  * summary as a comment or the reverse.
  */
-import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@t3tools/contracts";
+import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@infinitus/contracts";
 import { MessageSquareIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 

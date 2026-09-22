@@ -1,4 +1,4 @@
-import deviceStreamScript from "@t3tools/mobile-device-stream";
+import deviceStreamScript from "@infinitus/mobile-device-stream";
 import {
   useEffect,
   useEffectEvent,
@@ -11,7 +11,7 @@ import {
 } from "react";
 import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import { WebView } from "react-native-webview";
-import type { DeviceStreamStatus } from "@t3tools/client-runtime/device/stream";
+import type { DeviceStreamStatus } from "@infinitus/client-runtime/device/stream";
 
 import { AppText } from "../../components/AppText";
 

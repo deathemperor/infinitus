@@ -1,9 +1,9 @@
-import type { ComposerContextId, ComposerContextKind } from "@t3tools/contracts";
+import type { ComposerContextId, ComposerContextKind } from "@infinitus/contracts";
 import {
   collectComposerContextReferences,
   formatComposerContextReference,
   replaceComposerContextReferences,
-} from "@t3tools/shared/composerContextReferences";
+} from "@infinitus/shared/composerContextReferences";
 
 /**
  * Prompt-string operations on inline context references, independent of kind. Each context

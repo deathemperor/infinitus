@@ -4,13 +4,13 @@ import type {
   VcsRef,
   ProjectId,
   WorktreeSubmodules,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 import { toSortableTimestamp } from "../lib/threadSort";
 export {
   dedupeRemoteBranchesWithLocalMatches,
   deriveLocalBranchNameFromRemoteRef,
-} from "@t3tools/shared/git";
+} from "@infinitus/shared/git";
 
 export interface EnvironmentOption {
   environmentId: EnvironmentId;

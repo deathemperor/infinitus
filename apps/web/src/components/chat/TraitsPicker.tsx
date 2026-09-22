@@ -5,7 +5,7 @@ import {
   type ProviderOptionSelection,
   type ScopedThreadRef,
   type ServerProviderModel,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   applyClaudePromptEffortPrefix,
   buildProviderOptionSelectionsFromDescriptors,
@@ -14,7 +14,7 @@ import {
   getProviderOptionDescriptors,
   isClaudeUltrathinkPrompt,
   normalizeModelSlug,
-} from "@t3tools/shared/model";
+} from "@infinitus/shared/model";
 import { memo, useCallback } from "react";
 import type { VariantProps } from "class-variance-authority";
 import { GaugeIcon, ZapIcon } from "lucide-react";

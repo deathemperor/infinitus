@@ -1,5 +1,5 @@
-import type { DpopFailureReason } from "@t3tools/contracts";
-import type { RelayProtectedError } from "@t3tools/contracts/relay";
+import type { DpopFailureReason } from "@infinitus/contracts";
+import type { RelayProtectedError } from "@infinitus/contracts/relay";
 
 export const DPOP_CLOCK_HINT =
   "Hint: Check that automatic date and time is enabled on both devices, then try again.";

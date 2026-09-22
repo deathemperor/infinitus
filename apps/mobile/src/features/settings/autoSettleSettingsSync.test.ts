@@ -1,4 +1,4 @@
-import { DEFAULT_SERVER_SETTINGS, EnvironmentId, ProjectId } from "@t3tools/contracts";
+import { DEFAULT_SERVER_SETTINGS, EnvironmentId, ProjectId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { planAutoSettleSettingsSync } from "./autoSettleSettingsSync";

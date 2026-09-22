@@ -1,4 +1,4 @@
-import type { PullRequestRef, PullRequestStack, ThreadPullRequestLink } from "@t3tools/contracts";
+import type { PullRequestRef, PullRequestStack, ThreadPullRequestLink } from "@infinitus/contracts";
 
 /** Saved native membership is enough for navigation, but never supplies action head SHAs. */
 export function savedPullRequestStack(

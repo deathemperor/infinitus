@@ -1,5 +1,5 @@
-import type { RelayAgentActivityState } from "@t3tools/contracts/relay";
-import { RelayAgentActivityState as RelayAgentActivityStateSchema } from "@t3tools/contracts/relay";
+import type { RelayAgentActivityState } from "@infinitus/contracts/relay";
+import { RelayAgentActivityState as RelayAgentActivityStateSchema } from "@infinitus/contracts/relay";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

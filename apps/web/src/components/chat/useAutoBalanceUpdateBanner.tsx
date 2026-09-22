@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
+import type { ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import { Atom } from "effect/unstable/reactivity";
 import { useMemo, useState } from "react";
 

@@ -1,4 +1,4 @@
-import type { VoiceInputState } from "@t3tools/client-runtime/voice-input";
+import type { VoiceInputState } from "@infinitus/client-runtime/voice-input";
 
 export type VoiceComposerPresentation = {
   readonly leadingAction: "cancel" | null;

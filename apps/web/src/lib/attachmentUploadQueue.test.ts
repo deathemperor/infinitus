@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import { appAtomRegistry } from "../rpc/atomRegistry";
@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   readPreparedConnection: vi.fn(),
 }));
 
-vi.mock("@t3tools/client-runtime/state/runtime", () => ({
+vi.mock("@infinitus/client-runtime/state/runtime", () => ({
   executeAtomQuery: mocks.executeAtomQuery,
   runAtomCommand: mocks.runAtomCommand,
   squashAtomCommandFailure: (result: { readonly error: unknown }) => result.error,

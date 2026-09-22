@@ -2,7 +2,7 @@ import {
   RelayClientInstallProgressStageSchema,
   type RelayClientInstallProgressEvent,
   type RelayClientInstallProgressStage,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 
 export class RelayClientInstallConfirmationConflictError extends Schema.TaggedError<RelayClientInstallConfirmationConflictError>()(

@@ -6,7 +6,7 @@ import {
   EnvironmentId,
   FILL_PREVIEW_VIEWPORT,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { act, createElement, Profiler } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";

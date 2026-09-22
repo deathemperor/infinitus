@@ -1,5 +1,5 @@
 import { assert, expect, it } from "vite-plus/test";
-import { DEFAULT_CLIENT_SETTINGS, type DesktopSnapShotState } from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS, type DesktopSnapShotState } from "@infinitus/contracts";
 
 import {
   createRecordingRequestTracker,

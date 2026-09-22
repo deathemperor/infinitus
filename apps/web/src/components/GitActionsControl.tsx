@@ -1,9 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
-import { type ScopedThreadRef } from "@t3tools/contracts";
+import { type ScopedThreadRef } from "@infinitus/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@infinitus/client-runtime/state/runtime";
 import type {
   GitActionProgressEvent,
   GitRunStackedActionResult,
@@ -14,7 +14,7 @@ import type {
   SourceControlPublishRepositoryResult,
   SourceControlRepositoryVisibility,
   VcsStatusResult,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import {

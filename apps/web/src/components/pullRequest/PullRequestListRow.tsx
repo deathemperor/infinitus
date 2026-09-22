@@ -2,7 +2,7 @@ import type {
   PullRequestActor,
   PullRequestMergeability,
   PullRequestState,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import type { ReactNode } from "react";
 
 import { cn } from "~/lib/utils";

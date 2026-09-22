@@ -1,4 +1,4 @@
-import { ProviderSetupError, type ProviderInstanceId } from "@t3tools/contracts";
+import { ProviderSetupError, type ProviderInstanceId } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";

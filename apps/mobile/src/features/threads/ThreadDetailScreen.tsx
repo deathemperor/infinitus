@@ -1,16 +1,16 @@
 import type { WorktreeSetupCardProps } from "./worktree-setup-card";
 import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
-import { type EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
+import { type EnvironmentConnectionPhase } from "@infinitus/client-runtime/connection";
 import {
   appendCodexArtifactTemplateUsePrompt,
   type CodexArtifactTemplate,
-} from "@t3tools/client-runtime/codex-artifact-templates";
+} from "@infinitus/client-runtime/codex-artifact-templates";
 import type {
   CodexFeedbackSubmission,
   EnvironmentThreadStatus,
-} from "@t3tools/client-runtime/state/threads";
+} from "@infinitus/client-runtime/state/threads";
 import { useKeyboardChatComposerInset, useKeyboardScrollToEnd } from "@legendapp/list/keyboard";
-import { resolveProviderSkillsForCwd } from "@t3tools/client-runtime/providerSkills";
+import { resolveProviderSkillsForCwd } from "@infinitus/client-runtime/providerSkills";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { HeaderHeightContext } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
@@ -27,7 +27,7 @@ import type {
   ThreadId,
   UsageLimitsReport,
   UserInputQuestion,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Haptics from "expo-haptics";
 import {
   memo,
@@ -66,7 +66,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWorkspaceContentWidth } from "../layout/workspace-content-width";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
-import { collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
+import { collectProviderUsageLimits } from "@infinitus/shared/usageLimits";
 import type { ComposerEditorHandle } from "../../components/ComposerEditor";
 import type { StatusTone } from "../../components/StatusPill";
 import type { DraftComposerAttachment } from "../../lib/composerImages";

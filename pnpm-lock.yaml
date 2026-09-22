@@ -150,24 +150,24 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(bufferutil@4.1.0)(effect@4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5))(redis@6.2.1)(utf-8-validate@6.0.6)
+      '@infinitus/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@infinitus/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@infinitus/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@infinitus/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
+      '@infinitus/tailscale':
+        specifier: workspace:*
+        version: link:../../packages/tailscale
       '@napi-rs/keyring':
         specifier: ^1.3.0
         version: 1.3.0
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@t3tools/ssh':
-        specifier: workspace:*
-        version: link:../../packages/ssh
-      '@t3tools/tailscale':
-        specifier: workspace:*
-        version: link:../../packages/tailscale
       dbus-next:
         specifier: 0.10.2
         version: 0.10.2(patch_hash=cfff57561b0ee59b5addb3b2e6c6f20906e967507a530ab67e8db8108e520ba4)
@@ -217,7 +217,7 @@ importers:
 
   apps/marketing:
     dependencies:
-      '@t3tools/shared':
+      '@infinitus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       astro:
@@ -254,6 +254,24 @@ importers:
       '@expo/ui':
         specifier: ~57.0.14
         version: 57.0.14(@babel/core@7.29.7)(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(expo@57.0.18)(react-dom@19.2.3(react@19.2.3))(react-native-worklets@0.11.4(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+      '@infinitus/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@infinitus/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@infinitus/mobile-markdown-text':
+        specifier: file:./modules/t3-markdown-text
+        version: file:apps/mobile/modules/t3-markdown-text(b40e74ee3133da2c9d817193f8c75f81)
+      '@infinitus/mobile-review-diff-native':
+        specifier: file:./modules/t3-review-diff
+        version: file:apps/mobile/modules/t3-review-diff
+      '@infinitus/mobile-terminal-native':
+        specifier: file:./modules/t3-terminal
+        version: file:apps/mobile/modules/t3-terminal
+      '@infinitus/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@legendapp/list':
         specifier: 'catalog:'
         version: 3.3.5(patch_hash=680cc6a5c5b4a4032e467e7b3fde22f89a84c0ee2e6eac6fda737d6277cc0806)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -293,24 +311,6 @@ importers:
       '@shikijs/themes':
         specifier: 4.2.0
         version: 4.2.0
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/mobile-markdown-text':
-        specifier: file:./modules/t3-markdown-text
-        version: file:apps/mobile/modules/t3-markdown-text(6f0a94b6f541bbd4be3f343e27991996)
-      '@t3tools/mobile-review-diff-native':
-        specifier: file:./modules/t3-review-diff
-        version: file:apps/mobile/modules/t3-review-diff
-      '@t3tools/mobile-terminal-native':
-        specifier: file:./modules/t3-terminal
-        version: file:apps/mobile/modules/t3-terminal
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@tabler/icons-react-native':
         specifier: ^3.44.0
         version: 3.44.0(react-native-svg@15.15.4(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react@19.2.3)
@@ -547,19 +547,19 @@ importers:
       '@effect/vitest':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(patch_hash=172bd95ef73a13d322888984415d5d18d9d2aa8e13fa529eac235efac837e902)(effect@4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5))
-      '@t3tools/contracts':
+      '@infinitus/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@t3tools/shared':
+      '@infinitus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@t3tools/ssh':
+      '@infinitus/ssh':
         specifier: workspace:*
         version: link:../../packages/ssh
-      '@t3tools/tailscale':
+      '@infinitus/tailscale':
         specifier: workspace:*
         version: link:../../packages/tailscale
-      '@t3tools/web':
+      '@infinitus/web':
         specifier: workspace:*
         version: link:../web
       '@types/node':
@@ -610,6 +610,15 @@ importers:
       '@formkit/auto-animate':
         specifier: ^0.9.0
         version: 0.9.0
+      '@infinitus/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@infinitus/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@infinitus/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@legendapp/list':
         specifier: 'catalog:'
         version: 3.3.5(patch_hash=680cc6a5c5b4a4032e467e7b3fde22f89a84c0ee2e6eac6fda737d6277cc0806)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -622,15 +631,6 @@ importers:
       '@pierre/trees':
         specifier: 1.0.0-beta.4
         version: 1.0.0-beta.4(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@tanstack/react-pacer':
         specifier: ^0.19.4
         version: 0.19.4(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -788,21 +788,21 @@ importers:
       '@effect/sql-pg':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5))
+      '@infinitus/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@infinitus/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@infinitus/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@noble/curves':
         specifier: 'catalog:'
         version: 1.9.1
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       alchemy:
         specifier: 2.0.0-beta.79
         version: 2.0.0-beta.79(@effect/platform-node@4.0.0-rc.115(bufferutil@4.1.0)(effect@4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5))(redis@6.2.1)(utf-8-validate@6.0.6))(@effect/sql-pg@4.0.0-rc.115(effect@4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5)))(@types/node@24.12.4)(@types/react@19.2.16)(@voidzero-dev/vite-plus-core@0.3.3(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(yaml@2.9.0))(bufferutil@4.1.0)(drizzle-kit@1.0.0-rc.5-ab785fc)(drizzle-orm@1.0.0-rc.5-ab785fc(04a2b37736bdb04e55e63e86c7865f24))(effect@4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5))(mongodb@6.21.0(@aws-sdk/credential-providers@3.1062.0)(socks@2.8.9))(pg@8.23.0)(react-devtools-core@6.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@6.0.3)(utf-8-validate@6.0.6)(ws@8.21.3(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -856,10 +856,10 @@ importers:
 
   packages/client-runtime:
     dependencies:
-      '@t3tools/contracts':
+      '@infinitus/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@infinitus/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -950,15 +950,15 @@ importers:
 
   packages/shared:
     dependencies:
+      '@infinitus/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@noble/curves':
         specifier: 'catalog:'
         version: 1.9.1
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       effect:
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(patch_hash=0dfc4bb8ebd80fb3e06b91ef61346f5259517ab0f2437644fe95ae531084b1f5)
@@ -984,10 +984,10 @@ importers:
 
   packages/ssh:
     dependencies:
-      '@t3tools/contracts':
+      '@infinitus/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@infinitus/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1009,7 +1009,7 @@ importers:
 
   packages/tailscale:
     dependencies:
-      '@t3tools/shared':
+      '@infinitus/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1037,10 +1037,10 @@ importers:
       '@electron/osx-sign':
         specifier: 2.7.0
         version: 2.7.0
-      '@t3tools/shared':
+      '@infinitus/shared':
         specifier: workspace:*
         version: link:../packages/shared
-      '@t3tools/tailscale':
+      '@infinitus/tailscale':
         specifier: workspace:*
         version: link:../packages/tailscale
       effect:
@@ -3082,6 +3082,26 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@infinitus/mobile-markdown-text@file:apps/mobile/modules/t3-markdown-text':
+    resolution: {directory: apps/mobile/modules/t3-markdown-text, type: directory}
+    peerDependencies:
+      '@infinitus/client-runtime': '*'
+      '@infinitus/shared': '*'
+      expo: '*'
+      expo-asset: '*'
+      expo-clipboard: '*'
+      expo-haptics: '*'
+      expo-symbols: '*'
+      react: '*'
+      react-native: '*'
+      react-native-nitro-markdown: '*'
+
+  '@infinitus/mobile-review-diff-native@file:apps/mobile/modules/t3-review-diff':
+    resolution: {directory: apps/mobile/modules/t3-review-diff, type: directory}
+
+  '@infinitus/mobile-terminal-native@file:apps/mobile/modules/t3-terminal':
+    resolution: {directory: apps/mobile/modules/t3-terminal, type: directory}
+
   '@inquirer/ansi@1.0.2':
     resolution: {integrity: sha512-S8qNSZiYzFd0wAcyG5AXCvUHC5Sr7xpZ9wZ2py9XR88jUz8wooStVx5M6dRzczbBWjic9NP7+rY0Xi7qqK/aMQ==}
     engines: {node: '>=18'}
@@ -4846,26 +4866,6 @@ packages:
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
-
-  '@t3tools/mobile-markdown-text@file:apps/mobile/modules/t3-markdown-text':
-    resolution: {directory: apps/mobile/modules/t3-markdown-text, type: directory}
-    peerDependencies:
-      '@t3tools/client-runtime': '*'
-      '@t3tools/shared': '*'
-      expo: '*'
-      expo-asset: '*'
-      expo-clipboard: '*'
-      expo-haptics: '*'
-      expo-symbols: '*'
-      react: '*'
-      react-native: '*'
-      react-native-nitro-markdown: '*'
-
-  '@t3tools/mobile-review-diff-native@file:apps/mobile/modules/t3-review-diff':
-    resolution: {directory: apps/mobile/modules/t3-review-diff, type: directory}
-
-  '@t3tools/mobile-terminal-native@file:apps/mobile/modules/t3-terminal':
-    resolution: {directory: apps/mobile/modules/t3-terminal, type: directory}
 
   '@tabler/icons-react-native@3.44.0':
     resolution: {integrity: sha512-/Ppp68bpl9vQQsI/c+YiDC9dnLq4JUo0YI5qP72OQMC1WmCaRzdYn3CU79q01M2L3MfXO9a8WctWN8ay1Odkow==}
@@ -13597,6 +13597,23 @@ snapshots:
   '@img/sharp-win32-x64@0.35.4':
     optional: true
 
+  '@infinitus/mobile-markdown-text@file:apps/mobile/modules/t3-markdown-text(b40e74ee3133da2c9d817193f8c75f81)':
+    dependencies:
+      '@infinitus/client-runtime': link:packages/client-runtime
+      '@infinitus/shared': link:packages/shared
+      expo: 57.0.18(41fd11498a34454c91128cdad32f22f8)
+      expo-asset: 57.0.15(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@7.0.2)
+      expo-clipboard: 57.0.1(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+      expo-haptics: 57.0.2(expo@57.0.18)
+      expo-symbols: 57.0.2(expo-font@57.0.2(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+      react: 19.2.3
+      react-native: 0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
+      react-native-nitro-markdown: 0.5.8(react-native-nitro-modules@0.35.9(patch_hash=825622aae63a8fb5b904f3c77908a0e216261d727ea171709f2c0b6088422675)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-svg@15.15.4(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
+
+  '@infinitus/mobile-review-diff-native@file:apps/mobile/modules/t3-review-diff': {}
+
+  '@infinitus/mobile-terminal-native@file:apps/mobile/modules/t3-terminal': {}
+
   '@inquirer/ansi@1.0.2':
     optional: true
 
@@ -15048,23 +15065,6 @@ snapshots:
   '@szmarczak/http-timer@4.0.6':
     dependencies:
       defer-to-connect: 2.0.1
-
-  '@t3tools/mobile-markdown-text@file:apps/mobile/modules/t3-markdown-text(6f0a94b6f541bbd4be3f343e27991996)':
-    dependencies:
-      '@t3tools/client-runtime': link:packages/client-runtime
-      '@t3tools/shared': link:packages/shared
-      expo: 57.0.18(41fd11498a34454c91128cdad32f22f8)
-      expo-asset: 57.0.15(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@7.0.2)
-      expo-clipboard: 57.0.1(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
-      expo-haptics: 57.0.2(expo@57.0.18)
-      expo-symbols: 57.0.2(expo-font@57.0.2(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(expo@57.0.18)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
-      react: 19.2.3
-      react-native: 0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
-      react-native-nitro-markdown: 0.5.8(react-native-nitro-modules@0.35.9(patch_hash=825622aae63a8fb5b904f3c77908a0e216261d727ea171709f2c0b6088422675)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-svg@15.15.4(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
-
-  '@t3tools/mobile-review-diff-native@file:apps/mobile/modules/t3-review-diff': {}
-
-  '@t3tools/mobile-terminal-native@file:apps/mobile/modules/t3-terminal': {}
 
   '@tabler/icons-react-native@3.44.0(react-native-svg@15.15.4(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7)(bufferutil@4.1.0)(utf-8-validate@6.0.6))(@types/react@19.2.16)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react@19.2.3)':
     dependencies:

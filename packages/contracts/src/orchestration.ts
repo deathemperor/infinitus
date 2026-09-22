@@ -705,7 +705,7 @@ export type ThreadTitleRegeneration = typeof ThreadTitleRegeneration.Type;
 
 /**
  * Legacy single-PR link. Still emitted as the thread's derived current pull
- * request (see `@t3tools/shared/threadPullRequests`) so clients from before
+ * request (see `@infinitus/shared/threadPullRequests`) so clients from before
  * `pullRequests` keep working independently of their release schedule.
  */
 export const ThreadLinkedPullRequest = Schema.Struct({

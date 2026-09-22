@@ -8,7 +8,7 @@
  *
  * @module provider/Layers/codexResetCredit
  */
-import type { ProviderConsumeResetCreditOutcome } from "@t3tools/contracts";
+import type { ProviderConsumeResetCreditOutcome } from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Duration from "effect/Duration";

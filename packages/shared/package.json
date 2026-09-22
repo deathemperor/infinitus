@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/shared",
+  "name": "@infinitus/shared",
   "private": true,
   "type": "module",
   "exports": {
@@ -349,9 +349,9 @@
     "test": "vp test run"
   },
   "dependencies": {
+    "@infinitus/contracts": "workspace:*",
     "@noble/curves": "catalog:",
     "@noble/hashes": "catalog:",
-    "@t3tools/contracts": "workspace:*",
     "effect": "catalog:",
     "jose": "catalog:",
     "yaml": "catalog:"

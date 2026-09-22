@@ -1,4 +1,4 @@
-import { ApprovalRequestId, EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { ApprovalRequestId, EnvironmentId, ThreadId } from "@infinitus/contracts";
 import { beforeEach, expect, it, vi } from "vite-plus/test";
 import { useComposerDraftStore } from "./composerDraftStore";
 import {

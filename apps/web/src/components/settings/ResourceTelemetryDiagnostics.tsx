@@ -25,14 +25,14 @@ import type {
   ResourceTelemetrySourceHealth,
   ResourceTelemetrySourceStatus,
   ServerProcessSignal,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@infinitus/client-runtime/state/runtime";
 
 import {
   useResourceTelemetry,

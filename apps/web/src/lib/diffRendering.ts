@@ -1,7 +1,7 @@
 import { parsePatchFiles } from "@pierre/diffs/utils/parsePatchFiles";
 import { parseDiffFromFile } from "@pierre/diffs";
 import type { FileDiffMetadata } from "@pierre/diffs/types";
-import { unquoteGitPatchPath } from "@t3tools/shared/gitPatchPath";
+import { unquoteGitPatchPath } from "@infinitus/shared/gitPatchPath";
 
 const DIFF_THEME_NAMES = {
   light: "pierre-light",

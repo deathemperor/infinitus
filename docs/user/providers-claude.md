@@ -1,6 +1,6 @@
 # Claude
 
-T3 Code uses Claude Code's login and configuration. Start with the default provider
+Infinitus uses Claude Code's login and configuration. Start with the default provider
 for one account; [provider setup](./install.md#providers) covers installation and
 shared provider settings.
 
@@ -39,7 +39,7 @@ For presets that differ only in API keys or endpoints, use the instance's
 
 Claude Code's verbose mode can stay enabled when you use Claude for text generation, including
 thread titles, branch names, commit messages, and pull request descriptions. On a remote connection,
-T3 Code uses the Claude configuration on the connected server.
+Infinitus uses the Claude configuration on the connected server.
 
 ## Compact long conversations
 
@@ -88,11 +88,11 @@ If that Claude config directory has a cached Anthropic login, run `/logout` in a
 Claude Code session using that directory before starting the router setup. Cached
 login credentials can conflict with the router token.
 
-Select the model you want in T3 Code. For an OpenRouter model outside the built-in
+Select the model you want in Infinitus. For an OpenRouter model outside the built-in
 list, open that Claude instance in **Settings > Providers** and add its full model
 ID with **Add custom model**. Then select it in the chat model picker.
 `ANTHROPIC_DEFAULT_*_MODEL` variables map Claude Code aliases such as `sonnet`; they
-do not replace the explicit model ID selected in T3 Code. Custom models may have
+do not replace the explicit model ID selected in Infinitus. Custom models may have
 fewer effort, thinking, or context controls than built-in models.
 
 Verify the model used in OpenRouter's activity dashboard. For current compatibility

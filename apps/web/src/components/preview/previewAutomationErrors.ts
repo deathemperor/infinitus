@@ -11,7 +11,7 @@ import {
   PreviewTabId,
   ThreadId,
   TrimmedNonEmptyString,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 
 export interface PreviewAutomationOperationContext {

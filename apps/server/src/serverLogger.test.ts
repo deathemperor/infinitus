@@ -8,7 +8,7 @@ import * as Tracer from "effect/Tracer";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
 
-import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
+import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 
 import * as ServerConfig from "./config.ts";
 import { ServerLoggerLive } from "./serverLogger.ts";

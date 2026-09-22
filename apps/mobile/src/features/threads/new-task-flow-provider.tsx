@@ -8,7 +8,7 @@ import type {
   ProviderOptionSelection,
   RuntimeMode,
   ServerProvider,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
@@ -17,9 +17,9 @@ import {
   MessageId,
   T3_PROJECT_FILE_NAME,
   ThreadId,
-} from "@t3tools/contracts";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
+} from "@infinitus/contracts";
+import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
+import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
 
@@ -78,8 +78,8 @@ import {
   setPendingConnectionError,
   useSavedRemoteConnections,
 } from "../../state/use-remote-environment-registry";
-import { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import { type VcsRef } from "@t3tools/client-runtime/state/vcs";
+import { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
+import { type VcsRef } from "@infinitus/client-runtime/state/vcs";
 import {
   buildHomeProjectScopes,
   sortHomeProjectScopes,

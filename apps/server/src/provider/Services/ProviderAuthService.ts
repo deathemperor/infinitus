@@ -1,4 +1,8 @@
-import type { ProviderAuthState, ProviderInstanceId, ProviderSetupError } from "@t3tools/contracts";
+import type {
+  ProviderAuthState,
+  ProviderInstanceId,
+  ProviderSetupError,
+} from "@infinitus/contracts";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type * as Stream from "effect/Stream";

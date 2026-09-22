@@ -6,7 +6,7 @@ import {
   type OrchestrationReadModel,
   ProjectId,
   type ClientOrchestrationCommand,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Console from "effect/Console";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";

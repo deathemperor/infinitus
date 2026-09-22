@@ -3,10 +3,10 @@ import {
   EnvironmentId,
   ProjectId,
   type ServerSettings,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
-import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
+import { applyServerSettingsPatch } from "@infinitus/shared/serverSettings";
+import { resolveWorktreeCleanup } from "@infinitus/shared/projectSettings";
 
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {

@@ -1,7 +1,7 @@
 import { appAtomRegistry } from "../../state/atom-registry";
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
+import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
+import { effectiveSnoozed } from "@infinitus/client-runtime/state/thread-settled";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, FlatList, Modal, Pressable, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -373,7 +373,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
           style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         >
           <View className="flex-row items-center justify-between gap-3 px-5 py-3">
-            <Text className="flex-1 text-xl font-t3-semibold">Arrange threads</Text>
+            <Text className="flex-1 text-xl font-infinitus-semibold">Arrange threads</Text>
             <Pressable
               accessibilityRole="button"
               onPress={props.onClose}
@@ -517,7 +517,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
                             setExpanded((value) => ({ ...value, [section]: !value[section] }));
                         }}
                       >
-                        <Text className="text-sm font-t3-semibold text-foreground-muted">
+                        <Text className="text-sm font-infinitus-semibold text-foreground-muted">
                           {item.section[0]!.toUpperCase() + item.section.slice(1)} (
                           {sections[item.section].length})
                         </Text>
@@ -535,7 +535,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
               >
                 <Text
                   numberOfLines={visiblePreview.destination?.section ? 1 : 2}
-                  className="text-base font-t3-medium"
+                  className="text-base font-infinitus-medium"
                 >
                   {visiblePreview.thread.title}
                 </Text>
