@@ -69,11 +69,12 @@ struct NextMarker<M: FleetModel>: View {
                   recovery.number == number {
             // Orange, not secondary: the first row to recover is the
             // one to watch while everything is limited (todo 2026-09-01).
+            let what = AccountVitals.spentModel(across: model.accounts)
+                .map { "All accounts are out of \($0)" } ?? "All accounts are at a limit"
             Image(systemName: "arrowtriangle.right")
                 .font(PopupFont.caption2)
                 .foregroundStyle(ThemeColor.flash(theme))
-                .instantTip("All accounts are at a limit — this one "
-                            + "recovers first\(Self.eta(recovery.at))")
+                .instantTip("\(what) — this one recovers first\(Self.eta(recovery.at))")
         } else {
             Image(systemName: "arrowtriangle.right.fill")
                 .font(PopupFont.caption2)
@@ -84,6 +85,40 @@ struct NextMarker<M: FleetModel>: View {
     private static func eta(_ iso: String) -> String {
         guard let date = WeeklyRoll.parse(iso) else { return "" }
         return " (" + date.formatted(date: .abbreviated, time: .shortened) + ")"
+    }
+}
+
+/// A keep-warm account whose 5h clock has stopped. That slot is blank
+/// exactly then — the endpoint reports no reset for a window that is not
+/// running — so the word goes where the countdown would have been, and
+/// where the engine can ignite, one confirmed press starts the window.
+struct WarmChip<M: FleetModel>: View {
+    @ObservedObject var model: M
+    let number: Int
+    let name: String
+    let word: String
+
+    private var why: String {
+        "Keep-warm is on, but \(name)'s 5h window is not running — "
+        + "nothing counts down until a request starts one"
+    }
+
+    @ViewBuilder var body: some View {
+        if model.canIgnite {
+            IgniteAction(model: model, number: number) { armed in
+                armed ? "Click again within 6 s to start \(name)'s 5h window now"
+                      : why + ". Click to start it with one tiny request (asks again before it fires)"
+            } label: { armed in
+                (Text(Image(systemName: armed ? "flame.fill" : "flame"))
+                 + Text(armed ? " Sure?" : " " + word))
+                    .font(PopupFont.caption.weight(armed ? .semibold : .regular))
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(armed ? Color.orange : Color.secondary.opacity(0.15), in: Capsule())
+                    .foregroundStyle(armed ? .white : .secondary)
+            }
+        } else {
+            Text(word).font(PopupFont.caption).foregroundStyle(.secondary).instantTip(why)
+        }
     }
 }
 
@@ -200,10 +235,10 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             .compactMap { $0 }.joined(separator: " ")
     }
 
-    /// Compact mode drops cells that carry no signal: untouched (0%) and
-    /// exhausted (100% — the dead marker already says it).
+    /// Compact mode drops untouched/exhausted cells, but a fully available
+    /// account keeps all its gauges so the row never goes blank.
     func hiddenInCompact(_ pct: Double) -> Bool {
-        model.compactRows
+        model.compactRows && !allFresh
             && (pct <= 0 || (pct >= 100 && !model.dying.contains(account.number)))
     }
 
@@ -260,6 +295,16 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
 
     var deadCause: AccountVitals.DeadCause? { AccountVitals.cause(account.usage) }
 
+    /// The spent window a cell stands for: every dead window reads "down"
+    /// in its own cell, not only the governing one (user 2026-09-19).
+    func ownCause(_ isMine: (AccountVitals.DeadCause) -> Bool) -> AccountVitals.DeadCause? {
+        AccountVitals.deadCauses(account.usage).first(where: isMine)
+    }
+
+    func repeatsClock(_ cause: AccountVitals.DeadCause) -> Bool {
+        AccountVitals.resetRepeatsEarlierCause(cause, in: account.usage)
+    }
+
     /// Whether the weekly cell of THIS row already counts down the clock a
     /// dead model window would repeat — Fable's quota rolls with the 7d one
     /// (user 2026-09-15: "fable has reset time of 7d so when fable is down
@@ -273,54 +318,15 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
             && !hiddenInCompact(weekly.pct)
     }
 
-    /// Every present window untouched — in compact mode all its cells are
-    /// hidden, so the row needs SOMETHING or it reads as broken.
+    /// Every present plan window untouched: keep their gauges even in
+    /// compact mode. Extra usage credit does not change plan availability.
     var allFresh: Bool {
         guard let u = account.usage else { return false }
         var pcts: [Double] = []
         if let p = u.fiveHour?.pct { pcts.append(p) }
         if let p = u.sevenDay?.pct { pcts.append(p) }
         for w in u.scoped ?? [] { pcts.append(w.pct) }
-        // Spend is deliberately absent: a spent credit cap left account 1
-        // (0%/0%) rendering as anything but ready (user report 2026-08-30);
-        // like AccountVitals, only the plan windows carry the verdict —
-        // the ready cell wears the spent credit as a footnote.
         return !pcts.isEmpty && pcts.allSatisfy { $0 <= 0 }
-    }
-
-    @ViewBuilder var readyCell: some View {
-        let spent = (account.usage?.spend?.pct ?? 0) >= 100
-        HStack(spacing: 3) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(PopupFont.caption).foregroundStyle(.green)
-            Text(theme.plain ? "ready" : PopupGlyph.text(theme.readyLabel))
-                .font(PopupFont.caption).foregroundStyle(.secondary)
-            // The weekly clock keeps ticking on an untouched account —
-            // show when it rolls ("full hp: also show 7d time", user
-            // 2026-09-02). The engine drops resetsAt at 0% (issue #16):
-            // fall back to the account's remembered weekly slot, stepped
-            // to its next occurrence (Anthropic's weekly reset is a fixed
-            // per-account time), else say the slot is unknown.
-            if let weekly = account.usage?.sevenDay,
-               let when = ReadyWeeklyCaption.text(
-                    pct: weekly.pct, resetsAt: weekly.resetsAt,
-                    countdown: weekly.countdown, clock: weekly.clock,
-                    remembered: WeeklyResetMemory.shared.futureReset(email: account.email),
-                    compact: compactText) {
-                Text("·").font(PopupFont.caption).foregroundStyle(.tertiary)
-                Text(when).font(PopupFont.caption).foregroundStyle(.tertiary)
-            }
-            if spent {
-                Text("·").font(PopupFont.caption).foregroundStyle(.tertiary)
-                Text("\(PopupGlyph.text(theme.creditLabel)) spent")
-                    .font(PopupFont.caption).foregroundStyle(.tertiary)
-            }
-        }
-        .help(spent
-              ? "All plan limits untouched — usage credit spent (footnote only; the account is fully usable)"
-              : "All plan limits untouched")
-        .fixedSize()
-        .activeBand(banded && account.active)
     }
 
     /// The dead line as a cell of its own (the narrow list's one-liner).
@@ -337,8 +343,12 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     /// `timer: false` drops the reset: a dead per-model window whose
     /// clock the weekly cell already counts down says it twice otherwise
     /// (user 2026-09-15). The tooltip keeps the countdown either way.
-    @ViewBuilder func deadLine(timer: Bool = true) -> some View {
-        if let cause = deadCause {
+    ///
+    /// `of:` is the cell's own spent window; the governing cause when
+    /// omitted (the narrow list's one-liner).
+    @ViewBuilder func deadLine(of own: AccountVitals.DeadCause? = nil,
+                               timer: Bool = true) -> some View {
+        if let cause = own ?? deadCause {
             HStack(spacing: 4) {
                 // Themed label + themed verb ("MP down", "🎬 sold out");
                 // the plain theme keeps plain words. The tooltip carries
@@ -462,8 +472,8 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     @ViewBuilder func windowCell(_ w: UsageWindow?, session: Bool,
                                  timer: Bool = true) -> some View {
         Group {
-            if showAsDead, let cause = deadCause, cause.blocks(session: session) {
-                deadLine().fixedSize()
+            if showAsDead, let cause = ownCause({ $0.blocks(session: session) }) {
+                deadLine(of: cause, timer: !repeatsClock(cause)).fixedSize()
             } else if let w, !hiddenInCompact(w.pct) {
                 HStack(spacing: 3) {
                     // No ahead-of-pace badge: the burn effect on the bar
@@ -504,7 +514,24 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
                             lucky: luckyPair)
                     }
                     if timer {
-                        resetLabelView(resetsAt: w.resetsAt, staticText: resetText(w))
+                        if !session, w.pct <= 0 {
+                            // Untouched accounts still show their weekly slot
+                            // when the engine omits it from a zero-usage reply.
+                            if let when = ReadyWeeklyCaption.text(
+                                pct: w.pct, resetsAt: w.resetsAt,
+                                countdown: w.countdown, clock: w.clock,
+                                remembered: WeeklyResetMemory.shared.futureReset(email: account.email),
+                                compact: compactText) {
+                                Text(when).font(PopupFont.caption).foregroundStyle(.secondary)
+                            }
+                        } else if session, let word = SessionWarmth.caption(account: account) {
+                            WarmChip(model: model, number: account.number,
+                                     name: account.alias
+                                        ?? String(account.email.prefix(while: { $0 != "@" })),
+                                     word: word)
+                        } else {
+                            resetLabelView(resetsAt: w.resetsAt, staticText: resetText(w))
+                        }
                     }
                 }
                 .instantTip(WindowSummary.line(
@@ -644,8 +671,9 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         }) { entry in
             let w = entry.win
             Group {
-                if showAsDead, let cause = deadCause, cause.blocks(scoped: w.name) {
-                    deadLine(timer: !weeklyAlreadyShows(cause))
+                if showAsDead, let cause = ownCause({ $0.blocks(scoped: w.name) }) {
+                    deadLine(of: cause,
+                             timer: !weeklyAlreadyShows(cause) && !repeatsClock(cause))
                 } else if hiddenInCompact(w.pct) {
                     if banded, !model.compactRows {
                         Text(verbatim: "")

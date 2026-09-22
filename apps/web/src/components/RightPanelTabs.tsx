@@ -21,8 +21,6 @@ import {
   ChevronRight,
   FileDiff,
   Files,
-  GitPullRequest,
-  GitPullRequestArrow,
   Globe2,
   MessageCircleQuestionMark,
   Plus,
@@ -37,6 +35,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -65,7 +64,11 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { faviconUrlForOrigin } from "~/lib/favicon";
 import { useTheme } from "~/hooks/useTheme";
-import { pullRequestEnvironment } from "~/state/pullRequests";
+import {
+  newestPullRequestSummary,
+  pullRequestEnvironment,
+  useSharedPullRequestSummary,
+} from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 
@@ -75,6 +78,7 @@ import { previewBridge } from "./preview/previewBridge";
 import { PierreEntryIcon } from "./chat/PierreEntryIcon";
 import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
 interface RightPanelTabsProps {
   mode: PreviewPanelMode;
@@ -375,7 +379,7 @@ function RightPanelEmptyState(props: {
     },
     {
       label: "Pull request",
-      icon: GitPullRequest,
+      icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequest,
@@ -384,7 +388,7 @@ function RightPanelEmptyState(props: {
     },
     {
       label: "Linked pull requests",
-      icon: GitPullRequestArrow,
+      icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequests,
@@ -716,7 +720,7 @@ function SurfaceIcon({
         />
       );
     case "pull-requests":
-      return <GitPullRequestArrow className="size-3 shrink-0" />;
+      return <PullRequestGlyph.link className="size-3 shrink-0" />;
     case "agents":
       return <Bot className="size-3 shrink-0" />;
     case "side-question":
@@ -807,18 +811,26 @@ function PullRequestSurfaceIcon({
           },
         }),
   ).data;
-  // Only state and draft reach the tab. A list seed cannot know mergeability, so feeding the
-  // full detail would flip an open tab to the conflict glyph the moment its read lands.
-  const status =
-    linkedSnapshot !== null
-      ? linkedSnapshot
-      : detail === null
-        ? (seed ?? null)
-        : { state: detail.state, isDraft: detail.isDraft };
+  const reference = useMemo(
+    () => ({
+      projectId: surface.projectId as ProjectId,
+      repository: surface.repository,
+      number: surface.number,
+    }),
+    [surface.projectId, surface.repository, surface.number],
+  );
+  const sharedSummary = useSharedPullRequestSummary(resolvedEnvironmentId, reference, null);
+  // The compact tab intentionally shows lifecycle and draft state only. Conflict warnings have
+  // their own presentation on surfaces that have mergeability, while this tab stays stable as
+  // detail data arrives.
+  const status = linkedSnapshot ?? newestPullRequestSummary(detail, sharedSummary) ?? seed ?? null;
   if (status === null) {
-    return <GitPullRequest className="size-3 shrink-0 text-muted-foreground" />;
+    return <PullRequestGlyph.pullRequest className="size-3 shrink-0 text-muted-foreground" />;
   }
-  const presentation = resolvePullRequestState({ state: status.state, isDraft: status.isDraft });
+  const presentation = resolvePullRequestState({
+    state: status.state,
+    isDraft: status.isDraft ?? detail?.isDraft ?? seed?.isDraft ?? false,
+  });
   return <presentation.Icon className={cn("size-3 shrink-0", presentation.toneClassName)} />;
 }
 
@@ -901,7 +913,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     },
     {
       label: "Pull request",
-      icon: GitPullRequest,
+      icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.pullRequest,
@@ -909,7 +921,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     },
     {
       label: "Linked pull requests",
-      icon: GitPullRequestArrow,
+      icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.pullRequests,

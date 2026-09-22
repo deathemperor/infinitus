@@ -16,33 +16,33 @@ import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as ConnectRouteImport } from './routes/connect'
-import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
+import { Route as SettingsTeamRouteImport } from './routes/settings.team'
+import { Route as SettingsStorageRouteImport } from './routes/settings.storage'
 import { Route as SettingsSourceControlRouteImport } from './routes/settings.source-control'
 import { Route as SettingsSnapShotRouteImport } from './routes/settings.snap-shot'
 import { Route as SettingsProvidersRouteImport } from './routes/settings.providers'
 import { Route as SettingsProjectsRouteImport } from './routes/settings.projects'
+import { Route as SettingsPriorityRouteImport } from './routes/settings.priority'
 import { Route as SettingsOpenSourceLicensesRouteImport } from './routes/settings.open-source-licenses'
+import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
+import { Route as SettingsMenuBarRouteImport } from './routes/settings.menu-bar'
 import { Route as SettingsKeybindingsRouteImport } from './routes/settings.keybindings'
 import { Route as SettingsIntegrationsRouteImport } from './routes/settings.integrations'
 import { Route as SettingsGeneralRouteImport } from './routes/settings.general'
+import { Route as SettingsEnginesRouteImport } from './routes/settings.engines'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
+import { Route as SettingsDevicesRouteImport } from './routes/settings.devices'
 import { Route as SettingsConnectionsRouteImport } from './routes/settings.connections'
 import { Route as SettingsArchivedRouteImport } from './routes/settings.archived'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
+import { Route as SettingsAnimationsRouteImport } from './routes/settings.animations'
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
-import { Route as SettingsInfinitusIndexRouteImport } from './routes/settings.infinitus.index'
-import { Route as SettingsInfinitusThemesRouteImport } from './routes/settings.infinitus.themes'
-import { Route as SettingsInfinitusTeamRouteImport } from './routes/settings.infinitus.team'
-import { Route as SettingsInfinitusSessionsRouteImport } from './routes/settings.infinitus.sessions'
-import { Route as SettingsInfinitusNotificationsRouteImport } from './routes/settings.infinitus.notifications'
-import { Route as SettingsInfinitusLockRouteImport } from './routes/settings.infinitus.lock'
-import { Route as SettingsInfinitusEnginesRouteImport } from './routes/settings.infinitus.engines'
-import { Route as SettingsInfinitusDevicesRouteImport } from './routes/settings.infinitus.devices'
-import { Route as SettingsInfinitusAnimationsRouteImport } from './routes/settings.infinitus.animations'
+import { Route as SettingsInfinitusSplatRouteImport } from './routes/settings.infinitus.$'
+import { Route as SettingsEnginesActivityRouteImport } from './routes/settings.engines_.activity'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
 
@@ -81,11 +81,6 @@ const ConnectRoute = ConnectRouteImport.update({
   path: '/connect',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ActivityRoute = ActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AccountsRoute = AccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -99,6 +94,16 @@ const ChatIndexRoute = ChatIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ChatRoute,
+} as any)
+const SettingsTeamRoute = SettingsTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsStorageRoute = SettingsStorageRouteImport.update({
+  id: '/storage',
+  path: '/storage',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsSourceControlRoute = SettingsSourceControlRouteImport.update({
   id: '/source-control',
@@ -120,12 +125,27 @@ const SettingsProjectsRoute = SettingsProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsPriorityRoute = SettingsPriorityRouteImport.update({
+  id: '/priority',
+  path: '/priority',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsOpenSourceLicensesRoute =
   SettingsOpenSourceLicensesRouteImport.update({
     id: '/open-source-licenses',
     path: '/open-source-licenses',
     getParentRoute: () => SettingsRoute,
   } as any)
+const SettingsNotificationsRoute = SettingsNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsMenuBarRoute = SettingsMenuBarRouteImport.update({
+  id: '/menu-bar',
+  path: '/menu-bar',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsKeybindingsRoute = SettingsKeybindingsRouteImport.update({
   id: '/keybindings',
   path: '/keybindings',
@@ -141,9 +161,19 @@ const SettingsGeneralRoute = SettingsGeneralRouteImport.update({
   path: '/general',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsEnginesRoute = SettingsEnginesRouteImport.update({
+  id: '/engines',
+  path: '/engines',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsDiagnosticsRoute = SettingsDiagnosticsRouteImport.update({
   id: '/diagnostics',
   path: '/diagnostics',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsDevicesRoute = SettingsDevicesRouteImport.update({
+  id: '/devices',
+  path: '/devices',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsConnectionsRoute = SettingsConnectionsRouteImport.update({
@@ -161,6 +191,11 @@ const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
   path: '/appearance',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsAnimationsRoute = SettingsAnimationsRouteImport.update({
+  id: '/animations',
+  path: '/animations',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const ProjectsProjectKeyRoute = ProjectsProjectKeyRouteImport.update({
   id: '/projects/$projectKey',
   path: '/projects/$projectKey',
@@ -171,56 +206,16 @@ const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
   path: '/pull-requests',
   getParentRoute: () => ChatRoute,
 } as any)
-const SettingsInfinitusIndexRoute = SettingsInfinitusIndexRouteImport.update({
-  id: '/infinitus/',
-  path: '/infinitus/',
+const SettingsInfinitusSplatRoute = SettingsInfinitusSplatRouteImport.update({
+  id: '/infinitus/$',
+  path: '/infinitus/$',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsInfinitusThemesRoute = SettingsInfinitusThemesRouteImport.update({
-  id: '/infinitus/themes',
-  path: '/infinitus/themes',
+const SettingsEnginesActivityRoute = SettingsEnginesActivityRouteImport.update({
+  id: '/engines_/activity',
+  path: '/engines/activity',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsInfinitusTeamRoute = SettingsInfinitusTeamRouteImport.update({
-  id: '/infinitus/team',
-  path: '/infinitus/team',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const SettingsInfinitusSessionsRoute =
-  SettingsInfinitusSessionsRouteImport.update({
-    id: '/infinitus/sessions',
-    path: '/infinitus/sessions',
-    getParentRoute: () => SettingsRoute,
-  } as any)
-const SettingsInfinitusNotificationsRoute =
-  SettingsInfinitusNotificationsRouteImport.update({
-    id: '/infinitus/notifications',
-    path: '/infinitus/notifications',
-    getParentRoute: () => SettingsRoute,
-  } as any)
-const SettingsInfinitusLockRoute = SettingsInfinitusLockRouteImport.update({
-  id: '/infinitus/lock',
-  path: '/infinitus/lock',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const SettingsInfinitusEnginesRoute =
-  SettingsInfinitusEnginesRouteImport.update({
-    id: '/infinitus/engines',
-    path: '/infinitus/engines',
-    getParentRoute: () => SettingsRoute,
-  } as any)
-const SettingsInfinitusDevicesRoute =
-  SettingsInfinitusDevicesRouteImport.update({
-    id: '/infinitus/devices',
-    path: '/infinitus/devices',
-    getParentRoute: () => SettingsRoute,
-  } as any)
-const SettingsInfinitusAnimationsRoute =
-  SettingsInfinitusAnimationsRouteImport.update({
-    id: '/infinitus/animations',
-    path: '/infinitus/animations',
-    getParentRoute: () => SettingsRoute,
-  } as any)
 const ChatDraftDraftIdRoute = ChatDraftDraftIdRouteImport.update({
   id: '/draft/$draftId',
   path: '/draft/$draftId',
@@ -236,7 +231,6 @@ const ChatEnvironmentIdThreadIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof ChatIndexRoute
   '/accounts': typeof AccountsRoute
-  '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -246,33 +240,33 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+  '/settings/animations': typeof SettingsAnimationsRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/connections': typeof SettingsConnectionsRoute
+  '/settings/devices': typeof SettingsDevicesRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
+  '/settings/engines': typeof SettingsEnginesRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
+  '/settings/menu-bar': typeof SettingsMenuBarRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof SettingsPriorityRoute
   '/settings/projects': typeof SettingsProjectsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
+  '/settings/team': typeof SettingsTeamRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
-  '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
-  '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
-  '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
-  '/settings/infinitus/lock': typeof SettingsInfinitusLockRoute
-  '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
-  '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
-  '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
-  '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
+  '/settings/engines/activity': typeof SettingsEnginesActivityRoute
+  '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
 }
 export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
-  '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -282,36 +276,36 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+  '/settings/animations': typeof SettingsAnimationsRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/connections': typeof SettingsConnectionsRoute
+  '/settings/devices': typeof SettingsDevicesRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
+  '/settings/engines': typeof SettingsEnginesRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
+  '/settings/menu-bar': typeof SettingsMenuBarRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof SettingsPriorityRoute
   '/settings/projects': typeof SettingsProjectsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
+  '/settings/team': typeof SettingsTeamRoute
   '/': typeof ChatIndexRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
-  '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
-  '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
-  '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
-  '/settings/infinitus/lock': typeof SettingsInfinitusLockRoute
-  '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
-  '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
-  '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
-  '/settings/infinitus': typeof SettingsInfinitusIndexRoute
+  '/settings/engines/activity': typeof SettingsEnginesActivityRoute
+  '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_chat': typeof ChatRouteWithChildren
   '/accounts': typeof AccountsRoute
-  '/activity': typeof ActivityRoute
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -321,37 +315,37 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
+  '/settings/animations': typeof SettingsAnimationsRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/archived': typeof SettingsArchivedRoute
   '/settings/connections': typeof SettingsConnectionsRoute
+  '/settings/devices': typeof SettingsDevicesRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
+  '/settings/engines': typeof SettingsEnginesRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/settings/integrations': typeof SettingsIntegrationsRoute
   '/settings/keybindings': typeof SettingsKeybindingsRoute
+  '/settings/menu-bar': typeof SettingsMenuBarRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof SettingsPriorityRoute
   '/settings/projects': typeof SettingsProjectsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/snap-shot': typeof SettingsSnapShotRoute
   '/settings/source-control': typeof SettingsSourceControlRoute
+  '/settings/storage': typeof SettingsStorageRoute
+  '/settings/team': typeof SettingsTeamRoute
   '/_chat/': typeof ChatIndexRoute
   '/_chat/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
-  '/settings/infinitus/animations': typeof SettingsInfinitusAnimationsRoute
-  '/settings/infinitus/devices': typeof SettingsInfinitusDevicesRoute
-  '/settings/infinitus/engines': typeof SettingsInfinitusEnginesRoute
-  '/settings/infinitus/lock': typeof SettingsInfinitusLockRoute
-  '/settings/infinitus/notifications': typeof SettingsInfinitusNotificationsRoute
-  '/settings/infinitus/sessions': typeof SettingsInfinitusSessionsRoute
-  '/settings/infinitus/team': typeof SettingsInfinitusTeamRoute
-  '/settings/infinitus/themes': typeof SettingsInfinitusThemesRoute
-  '/settings/infinitus/': typeof SettingsInfinitusIndexRoute
+  '/settings/engines_/activity': typeof SettingsEnginesActivityRoute
+  '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/accounts'
-    | '/activity'
     | '/connect'
     | '/pair'
     | '/settings'
@@ -361,33 +355,33 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/pull-requests'
     | '/projects/$projectKey'
+    | '/settings/animations'
     | '/settings/appearance'
     | '/settings/archived'
     | '/settings/connections'
+    | '/settings/devices'
     | '/settings/diagnostics'
+    | '/settings/engines'
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
+    | '/settings/menu-bar'
+    | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
+    | '/settings/team'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
-    | '/settings/infinitus/animations'
-    | '/settings/infinitus/devices'
-    | '/settings/infinitus/engines'
-    | '/settings/infinitus/lock'
-    | '/settings/infinitus/notifications'
-    | '/settings/infinitus/sessions'
-    | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
-    | '/settings/infinitus/'
+    | '/settings/engines/activity'
+    | '/settings/infinitus/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/accounts'
-    | '/activity'
     | '/connect'
     | '/pair'
     | '/settings'
@@ -397,35 +391,35 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/pull-requests'
     | '/projects/$projectKey'
+    | '/settings/animations'
     | '/settings/appearance'
     | '/settings/archived'
     | '/settings/connections'
+    | '/settings/devices'
     | '/settings/diagnostics'
+    | '/settings/engines'
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
+    | '/settings/menu-bar'
+    | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
+    | '/settings/team'
     | '/'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
-    | '/settings/infinitus/animations'
-    | '/settings/infinitus/devices'
-    | '/settings/infinitus/engines'
-    | '/settings/infinitus/lock'
-    | '/settings/infinitus/notifications'
-    | '/settings/infinitus/sessions'
-    | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
-    | '/settings/infinitus'
+    | '/settings/engines/activity'
+    | '/settings/infinitus/$'
   id:
     | '__root__'
     | '/_chat'
     | '/accounts'
-    | '/activity'
     | '/connect'
     | '/pair'
     | '/settings'
@@ -435,36 +429,36 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/_chat/pull-requests'
     | '/projects/$projectKey'
+    | '/settings/animations'
     | '/settings/appearance'
     | '/settings/archived'
     | '/settings/connections'
+    | '/settings/devices'
     | '/settings/diagnostics'
+    | '/settings/engines'
     | '/settings/general'
     | '/settings/integrations'
     | '/settings/keybindings'
+    | '/settings/menu-bar'
+    | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/snap-shot'
     | '/settings/source-control'
+    | '/settings/storage'
+    | '/settings/team'
     | '/_chat/'
     | '/_chat/$environmentId/$threadId'
     | '/_chat/draft/$draftId'
-    | '/settings/infinitus/animations'
-    | '/settings/infinitus/devices'
-    | '/settings/infinitus/engines'
-    | '/settings/infinitus/lock'
-    | '/settings/infinitus/notifications'
-    | '/settings/infinitus/sessions'
-    | '/settings/infinitus/team'
-    | '/settings/infinitus/themes'
-    | '/settings/infinitus/'
+    | '/settings/engines_/activity'
+    | '/settings/infinitus/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   ChatRoute: typeof ChatRouteWithChildren
   AccountsRoute: typeof AccountsRoute
-  ActivityRoute: typeof ActivityRoute
   ConnectRoute: typeof ConnectRoute
   PairRoute: typeof PairRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -526,13 +520,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/activity': {
-      id: '/activity'
-      path: '/activity'
-      fullPath: '/activity'
-      preLoaderRoute: typeof ActivityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/accounts': {
       id: '/accounts'
       path: '/accounts'
@@ -553,6 +540,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ChatIndexRouteImport
       parentRoute: typeof ChatRoute
+    }
+    '/settings/team': {
+      id: '/settings/team'
+      path: '/team'
+      fullPath: '/settings/team'
+      preLoaderRoute: typeof SettingsTeamRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/storage': {
+      id: '/settings/storage'
+      path: '/storage'
+      fullPath: '/settings/storage'
+      preLoaderRoute: typeof SettingsStorageRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/settings/source-control': {
       id: '/settings/source-control'
@@ -582,11 +583,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsProjectsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/priority': {
+      id: '/settings/priority'
+      path: '/priority'
+      fullPath: '/settings/priority'
+      preLoaderRoute: typeof SettingsPriorityRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/open-source-licenses': {
       id: '/settings/open-source-licenses'
       path: '/open-source-licenses'
       fullPath: '/settings/open-source-licenses'
       preLoaderRoute: typeof SettingsOpenSourceLicensesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/notifications': {
+      id: '/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof SettingsNotificationsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/menu-bar': {
+      id: '/settings/menu-bar'
+      path: '/menu-bar'
+      fullPath: '/settings/menu-bar'
+      preLoaderRoute: typeof SettingsMenuBarRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/keybindings': {
@@ -610,11 +632,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsGeneralRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/engines': {
+      id: '/settings/engines'
+      path: '/engines'
+      fullPath: '/settings/engines'
+      preLoaderRoute: typeof SettingsEnginesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/diagnostics': {
       id: '/settings/diagnostics'
       path: '/diagnostics'
       fullPath: '/settings/diagnostics'
       preLoaderRoute: typeof SettingsDiagnosticsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/devices': {
+      id: '/settings/devices'
+      path: '/devices'
+      fullPath: '/settings/devices'
+      preLoaderRoute: typeof SettingsDevicesRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/connections': {
@@ -638,6 +674,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAppearanceRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/animations': {
+      id: '/settings/animations'
+      path: '/animations'
+      fullPath: '/settings/animations'
+      preLoaderRoute: typeof SettingsAnimationsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/projects/$projectKey': {
       id: '/projects/$projectKey'
       path: '/projects/$projectKey'
@@ -652,67 +695,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatPullRequestsRouteImport
       parentRoute: typeof ChatRoute
     }
-    '/settings/infinitus/': {
-      id: '/settings/infinitus/'
-      path: '/infinitus'
-      fullPath: '/settings/infinitus/'
-      preLoaderRoute: typeof SettingsInfinitusIndexRouteImport
+    '/settings/infinitus/$': {
+      id: '/settings/infinitus/$'
+      path: '/infinitus/$'
+      fullPath: '/settings/infinitus/$'
+      preLoaderRoute: typeof SettingsInfinitusSplatRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/settings/infinitus/themes': {
-      id: '/settings/infinitus/themes'
-      path: '/infinitus/themes'
-      fullPath: '/settings/infinitus/themes'
-      preLoaderRoute: typeof SettingsInfinitusThemesRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/team': {
-      id: '/settings/infinitus/team'
-      path: '/infinitus/team'
-      fullPath: '/settings/infinitus/team'
-      preLoaderRoute: typeof SettingsInfinitusTeamRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/sessions': {
-      id: '/settings/infinitus/sessions'
-      path: '/infinitus/sessions'
-      fullPath: '/settings/infinitus/sessions'
-      preLoaderRoute: typeof SettingsInfinitusSessionsRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/notifications': {
-      id: '/settings/infinitus/notifications'
-      path: '/infinitus/notifications'
-      fullPath: '/settings/infinitus/notifications'
-      preLoaderRoute: typeof SettingsInfinitusNotificationsRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/lock': {
-      id: '/settings/infinitus/lock'
-      path: '/infinitus/lock'
-      fullPath: '/settings/infinitus/lock'
-      preLoaderRoute: typeof SettingsInfinitusLockRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/engines': {
-      id: '/settings/infinitus/engines'
-      path: '/infinitus/engines'
-      fullPath: '/settings/infinitus/engines'
-      preLoaderRoute: typeof SettingsInfinitusEnginesRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/devices': {
-      id: '/settings/infinitus/devices'
-      path: '/infinitus/devices'
-      fullPath: '/settings/infinitus/devices'
-      preLoaderRoute: typeof SettingsInfinitusDevicesRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/settings/infinitus/animations': {
-      id: '/settings/infinitus/animations'
-      path: '/infinitus/animations'
-      fullPath: '/settings/infinitus/animations'
-      preLoaderRoute: typeof SettingsInfinitusAnimationsRouteImport
+    '/settings/engines_/activity': {
+      id: '/settings/engines_/activity'
+      path: '/engines/activity'
+      fullPath: '/settings/engines/activity'
+      preLoaderRoute: typeof SettingsEnginesActivityRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/_chat/draft/$draftId': {
@@ -749,51 +743,53 @@ const ChatRouteChildren: ChatRouteChildren = {
 const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface SettingsRouteChildren {
+  SettingsAnimationsRoute: typeof SettingsAnimationsRoute
   SettingsAppearanceRoute: typeof SettingsAppearanceRoute
   SettingsArchivedRoute: typeof SettingsArchivedRoute
   SettingsConnectionsRoute: typeof SettingsConnectionsRoute
+  SettingsDevicesRoute: typeof SettingsDevicesRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
+  SettingsEnginesRoute: typeof SettingsEnginesRoute
   SettingsGeneralRoute: typeof SettingsGeneralRoute
   SettingsIntegrationsRoute: typeof SettingsIntegrationsRoute
   SettingsKeybindingsRoute: typeof SettingsKeybindingsRoute
+  SettingsMenuBarRoute: typeof SettingsMenuBarRoute
+  SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsOpenSourceLicensesRoute: typeof SettingsOpenSourceLicensesRoute
+  SettingsPriorityRoute: typeof SettingsPriorityRoute
   SettingsProjectsRoute: typeof SettingsProjectsRoute
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsSnapShotRoute: typeof SettingsSnapShotRoute
   SettingsSourceControlRoute: typeof SettingsSourceControlRoute
-  SettingsInfinitusAnimationsRoute: typeof SettingsInfinitusAnimationsRoute
-  SettingsInfinitusDevicesRoute: typeof SettingsInfinitusDevicesRoute
-  SettingsInfinitusEnginesRoute: typeof SettingsInfinitusEnginesRoute
-  SettingsInfinitusLockRoute: typeof SettingsInfinitusLockRoute
-  SettingsInfinitusNotificationsRoute: typeof SettingsInfinitusNotificationsRoute
-  SettingsInfinitusSessionsRoute: typeof SettingsInfinitusSessionsRoute
-  SettingsInfinitusTeamRoute: typeof SettingsInfinitusTeamRoute
-  SettingsInfinitusThemesRoute: typeof SettingsInfinitusThemesRoute
-  SettingsInfinitusIndexRoute: typeof SettingsInfinitusIndexRoute
+  SettingsStorageRoute: typeof SettingsStorageRoute
+  SettingsTeamRoute: typeof SettingsTeamRoute
+  SettingsEnginesActivityRoute: typeof SettingsEnginesActivityRoute
+  SettingsInfinitusSplatRoute: typeof SettingsInfinitusSplatRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsAnimationsRoute: SettingsAnimationsRoute,
   SettingsAppearanceRoute: SettingsAppearanceRoute,
   SettingsArchivedRoute: SettingsArchivedRoute,
   SettingsConnectionsRoute: SettingsConnectionsRoute,
+  SettingsDevicesRoute: SettingsDevicesRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
+  SettingsEnginesRoute: SettingsEnginesRoute,
   SettingsGeneralRoute: SettingsGeneralRoute,
   SettingsIntegrationsRoute: SettingsIntegrationsRoute,
   SettingsKeybindingsRoute: SettingsKeybindingsRoute,
+  SettingsMenuBarRoute: SettingsMenuBarRoute,
+  SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsOpenSourceLicensesRoute: SettingsOpenSourceLicensesRoute,
+  SettingsPriorityRoute: SettingsPriorityRoute,
   SettingsProjectsRoute: SettingsProjectsRoute,
   SettingsProvidersRoute: SettingsProvidersRoute,
   SettingsSnapShotRoute: SettingsSnapShotRoute,
   SettingsSourceControlRoute: SettingsSourceControlRoute,
-  SettingsInfinitusAnimationsRoute: SettingsInfinitusAnimationsRoute,
-  SettingsInfinitusDevicesRoute: SettingsInfinitusDevicesRoute,
-  SettingsInfinitusEnginesRoute: SettingsInfinitusEnginesRoute,
-  SettingsInfinitusLockRoute: SettingsInfinitusLockRoute,
-  SettingsInfinitusNotificationsRoute: SettingsInfinitusNotificationsRoute,
-  SettingsInfinitusSessionsRoute: SettingsInfinitusSessionsRoute,
-  SettingsInfinitusTeamRoute: SettingsInfinitusTeamRoute,
-  SettingsInfinitusThemesRoute: SettingsInfinitusThemesRoute,
-  SettingsInfinitusIndexRoute: SettingsInfinitusIndexRoute,
+  SettingsStorageRoute: SettingsStorageRoute,
+  SettingsTeamRoute: SettingsTeamRoute,
+  SettingsEnginesActivityRoute: SettingsEnginesActivityRoute,
+  SettingsInfinitusSplatRoute: SettingsInfinitusSplatRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
@@ -803,7 +799,6 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRouteWithChildren,
   AccountsRoute: AccountsRoute,
-  ActivityRoute: ActivityRoute,
   ConnectRoute: ConnectRoute,
   PairRoute: PairRoute,
   SettingsRoute: SettingsRouteWithChildren,

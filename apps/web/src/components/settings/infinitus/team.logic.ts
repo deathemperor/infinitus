@@ -17,7 +17,7 @@ import * as Schema from "effect/Schema";
 import { infinitusCommandFailure } from "./panel.logic";
 
 /**
- * Settings › Infinitus › Team (#1313): what the page sends over
+ * Settings › Team (#1313): what the page sends over
  * `infinitus.command` (the secret-free `team-*` verbs) and
  * `infinitus.secret` (`team-join` with the code, `team-create` with the
  * remote's token), and how it reads `team-status`. Pure so the page only
@@ -69,7 +69,6 @@ export const TEAM_KINDS: ReadonlyArray<{ readonly kind: string; readonly label: 
   { kind: "now", label: "Now — what this Mac is on, blockers" },
   { kind: "threads", label: "Threads — the index of your threads" },
   { kind: "transcripts", label: "Transcripts — your threads' conversations, redacted" },
-  { kind: "crashes", label: "Crashes — crash reports" },
   { kind: "fleet", label: "Fleet — every account's headroom" },
 ];
 

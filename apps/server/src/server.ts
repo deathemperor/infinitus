@@ -39,6 +39,7 @@ import { pullRequestHttpApiLayer } from "./pullRequest/http.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import { layerConfig as SqlitePersistenceLayerLive } from "./persistence/Layers/Sqlite.ts";
+import * as PullRequestFilesViewed from "./persistence/PullRequestFilesViewed.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import { ProviderSessionDirectoryLive } from "./provider/Layers/ProviderSessionDirectory.ts";
@@ -87,6 +88,7 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { infinitusTeamControlHttpApiLayer } from "./infinitus/Layers/InfinitusTeamControlHttp.ts";
+import { InfinitusSwapdProbeLive } from "./infinitus/Services/InfinitusSwapdProbe.ts";
 import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
 import { InfinitusAlertRelayLive } from "./infinitus/Layers/InfinitusAlertRelay.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
@@ -110,6 +112,7 @@ import { CheckpointReactorLive } from "./orchestration/Layers/CheckpointReactor.
 import { ThreadDeletionReactorLive } from "./orchestration/Layers/ThreadDeletionReactor.ts";
 import { ThreadUsageBackfillLive } from "./orchestration/Layers/ThreadUsageBackfill.ts";
 import * as ThreadSettlementReactor from "./orchestration/ThreadSettlementReactor.ts";
+import * as StorageCleanup from "./storageCleanup.ts";
 import * as PullRequestSyncReactor from "./orchestration/PullRequestSyncReactor.ts";
 import * as ThreadPullRequestReactor from "./orchestration/ThreadPullRequestReactor.ts";
 import * as AgentAwarenessRelay from "./relay/AgentAwarenessRelay.ts";
@@ -273,6 +276,7 @@ const ReactorCoreLayerLive = Layer.empty.pipe(
   Layer.provideMerge(ProviderRuntimeIngestionLive),
   Layer.provideMerge(ProviderCommandReactorLive),
   Layer.provideMerge(CheckpointReactorLive),
+  Layer.provideMerge(StorageCleanup.layer),
   Layer.provideMerge(ThreadDeletionReactorLive),
   Layer.provideMerge(ThreadSettlementReactor.layer),
   // Fork (#834): estimates a legacy thread's usage from its Claude transcript
@@ -301,7 +305,11 @@ const ReactorCoreLayerLive = Layer.empty.pipe(
  */
 const ReactorLayerLive = ReactorCoreLayerLive.pipe(
   // Fork (#648): resumes a thread's turn on the account Infinitus swapped to.
-  Layer.provideMerge(InfinitusResumeOnLimitLive),
+  Layer.provideMerge(
+    InfinitusResumeOnLimitLive.pipe(
+      Layer.provide(InfinitusSwapdProbeLive.pipe(Layer.provide(ProcessRunner.layer))),
+    ),
+  ),
   // Fork (#1076): a lapsed AWS / gcloud sign-in in a tool result leaves a
   // work-log row and starts the Mac's login. The layer gets its own control
   // client, since InfinitusLayerLive's is private. (The phone's lock-screen
@@ -413,6 +421,8 @@ const RepositoryIdentityResolverLayerLive = Layer.effect(
 
 const PullRequestServiceLive = PullRequestService.layer.pipe(
   Layer.provide(PullRequestProviderRegistry.layer),
+  // Where the viewed-file marks live for a host that keeps none of its own.
+  Layer.provide(PullRequestFilesViewed.layer),
   Layer.provide(PullRequestReadCache.layer),
   Layer.provide(SourceControlProviderRegistryLayerLive),
   Layer.provide(SourceControlRateLimit.layer),
@@ -598,8 +608,10 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   // Core Services
   Layer.provideMerge(ServerSettingsLayerLive),
   Layer.provideMerge(CheckpointingLayerLive),
+  // `GitHubCli` is the registry's own instance, exposed because the asset route fetches
+  // GitHub-hosted pull request media with the repository's credential.
   Layer.provideMerge(
-    Layer.mergeAll(SourceControlProviderRegistryLayerLive, PullRequestServiceLive),
+    Layer.mergeAll(SourceControlProviderRegistryLayerLive, PullRequestServiceLive, GitHubCli.layer),
   ),
   Layer.provideMerge(GitLayerLive),
   Layer.provideMerge(VcsLayerLive),

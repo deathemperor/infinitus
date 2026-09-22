@@ -1,7 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
 import {
+  INFINITUS_COMMAND_TIMEOUT_MESSAGE,
   accountCommandArgs,
   accountsPageState,
+  rowFlip,
   addAccountCommandArgs,
   buildFleetSection,
   buildForecast,
@@ -16,6 +18,7 @@ import {
   waitAddCommandArgs,
   type AccountAction,
   type AccountRowModel,
+  type RowFlip,
   type SignInRowModel,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { exhaustedBand } from "@infinitus/client-runtime/state/infinitusExhausted";
@@ -56,7 +59,6 @@ import { ForecastStrip } from "./ForecastStrip";
 import {
   fleetRunsShellOAuth,
   oauthSignInBridge,
-  shellOAuthWindowLabel,
   SIGN_IN_POLL_MS,
   signInBeginCommandArgs,
   signInBeginReply,
@@ -72,7 +74,9 @@ import {
 } from "./signIn.logic";
 import { SignInsSection } from "./SignInsSection";
 
-/** How long a command may hold its row's spinner when no snapshot follows it. */
+/** How long a sign-in may hold its row's spinner when no snapshot follows it,
+    and how long a flipped flag is drawn on a row the snapshots never confirm
+    (a write the app answered without changing anything). */
 const COMMAND_SETTLE_TIMEOUT_MS = 10_000;
 
 interface CommandTarget {
@@ -80,12 +84,16 @@ interface CommandTarget {
   readonly number: number;
 }
 
-/** A command whose row shows a spinner, tagged with the snapshot it was sent
-    against: any newer snapshot is the app's answer and retires the spinner. */
+/** A command in flight: its row shows a spinner until the socket answers.
+    Several rows may be in flight at once (#1481: the Mac queues writes). */
 interface PendingCommand extends CommandTarget {
   readonly action: AccountAction;
-  readonly snapshot: InfinitusSnapshot | null;
 }
+
+/** A toggle drawn on its row before the engine confirms it. It draws nothing
+    once a snapshot agrees, and retires `COMMAND_SETTLE_TIMEOUT_MS` after the
+    reply. */
+interface PendingFlip extends CommandTarget, RowFlip {}
 
 /** A sign-in just started, keyed by its row; the next snapshot carries the
     login's own phase and takes over from the spinner. */
@@ -104,6 +112,7 @@ function commandErrorMessage(cause: Cause.Cause<unknown>): string {
     }
     if (tagged._tag === "InfinitusUnavailable") {
       const unavailable = error as { readonly cause?: unknown };
+      if (unavailable.cause === "timeout") return INFINITUS_COMMAND_TIMEOUT_MESSAGE;
       if (typeof unavailable.cause === "string") return unavailable.cause;
     }
     if (error instanceof Error && error.message.trim() !== "") return error.message;
@@ -122,7 +131,8 @@ export function AccountsPage() {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
   const [chosenEnvironmentId, setChosenEnvironmentId] = useState<EnvironmentId | null>(null);
-  const [pending, setPending] = useState<PendingCommand | null>(null);
+  const [pending, setPending] = useState<ReadonlyArray<PendingCommand>>([]);
+  const [flips, setFlips] = useState<ReadonlyArray<PendingFlip>>([]);
   const [failure, setFailure] = useState<(CommandTarget & { message: string }) | null>(null);
   const [pendingSignIn, setPendingSignIn] = useState<PendingSignIn | null>(null);
   const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
@@ -143,9 +153,9 @@ export function AccountsPage() {
   // Each add/re-login gets a run number; a newer run or an unmount retires
   // the polling loop of the one before it.
   const addRunRef = useRef(0);
-  /** The shell's own sign-in outlives this page: the engine's child process and
-      its window keep running until something ends them, and once the page is
-      gone nothing here can (#1213). Leaving it retires the flow. */
+  /** The shell's own sign-in outlives this page: the engine's child process
+      keeps listening until something ends it, and once the page is gone
+      nothing here can (#1213). Leaving it retires the flow. */
   const shellFlowIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
@@ -194,15 +204,6 @@ export function AccountsPage() {
   // without the shell. The value lives in the form field until submitted.
   const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
 
-  // The spinner lives only as long as the snapshot the command was sent
-  // against; the timeout covers a command the app answered without changing
-  // anything a snapshot would carry.
-  const inFlight = pending !== null && pending.snapshot === snapshot ? pending : null;
-  useEffect(() => {
-    if (pending === null) return;
-    const timer = setTimeout(() => setPending(null), COMMAND_SETTLE_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pending]);
   const signInInFlight =
     pendingSignIn !== null && pendingSignIn.snapshot === snapshot ? pendingSignIn.key : null;
   useEffect(() => {
@@ -219,17 +220,33 @@ export function AccountsPage() {
   ) => {
     if (environmentId === null) return;
     const { command, args, options } = accountCommandArgs(fleetKey, row, action, alias);
-    setPending({ fleetKey, number: row.number, action, snapshot });
+    const target = { fleetKey, number: row.number };
+    const sameRow = (entry: CommandTarget) =>
+      entry.fleetKey === target.fleetKey && entry.number === target.number;
+    const command_ = { ...target, action };
+    const flip = rowFlip(row, action);
+    const pendingFlip = flip === null ? null : { ...target, ...flip };
+    setPending((prev) => [...prev, command_]);
+    if (pendingFlip !== null) {
+      setFlips((prev) => [...prev.filter((entry) => !sameRow(entry)), pendingFlip]);
+    }
     const result = await runCommand({
       environmentId,
       input: { command, args, options: options ?? {} },
     });
+    setPending((prev) => prev.filter((entry) => entry !== command_));
     if (result._tag === "Success") {
       setFailure(null);
+      if (pendingFlip !== null) {
+        setTimeout(
+          () => setFlips((prev) => prev.filter((entry) => entry !== pendingFlip)),
+          COMMAND_SETTLE_TIMEOUT_MS,
+        );
+      }
       return;
     }
-    setPending(null);
-    setFailure({ fleetKey, number: row.number, message: commandErrorMessage(result.cause) });
+    if (pendingFlip !== null) setFlips((prev) => prev.filter((entry) => entry !== pendingFlip));
+    setFailure({ ...target, message: commandErrorMessage(result.cause) });
   };
 
   const signIn = async (row: SignInRowModel) => {
@@ -397,8 +414,8 @@ export function AccountsPage() {
   // The shell's own sign-in (#1213): one call for the whole flow. The shell
   // opens the provider's page as soon as the engine prints its URL, so the
   // flow waits for the provider from the moment it starts — there is no
-  // status to poll and no code to paste, and the window is the only place
-  // anything happens.
+  // status to poll and no code to paste, and the page runs in the system
+  // browser, so only Cancel here or the engine's timeout ends it.
   const startShellOAuthSignIn = async (
     fleetKey: string,
     provider: string,
@@ -425,7 +442,12 @@ export function AccountsPage() {
     setSignInFlow(base);
     shellFlowIdRef.current = flowId;
     const result = await shellOAuthSignIn
-      .begin({ flowId, provider, label: shellOAuthWindowLabel(fleetKey, targetLabel) })
+      .begin({
+        flowId,
+        provider,
+        fleet: fleetKey,
+        ...(target?.email === undefined ? {} : { relogin: target.email }),
+      })
       .catch((cause: unknown) => ({
         ok: false as const,
         error: cause instanceof Error ? cause.message : String(cause),
@@ -588,7 +610,8 @@ export function AccountsPage() {
               state={state}
               snapshot={snapshot}
               nowMs={Date.parse(minute)}
-              pending={inFlight}
+              pending={pending}
+              flips={flips}
               failure={failure}
               pendingSignIn={signInInFlight}
               signInFailure={signInFailure}
@@ -626,6 +649,7 @@ function AccountsBody({
   snapshot,
   nowMs,
   pending,
+  flips,
   failure,
   pendingSignIn,
   signInFailure,
@@ -643,7 +667,8 @@ function AccountsBody({
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly nowMs: number;
-  readonly pending: (CommandTarget & { action: AccountAction }) | null;
+  readonly pending: ReadonlyArray<PendingCommand>;
+  readonly flips: ReadonlyArray<PendingFlip>;
   readonly failure: (CommandTarget & { message: string }) | null;
   readonly pendingSignIn: string | null;
   readonly signInFailure: { readonly key: string; readonly message: string } | null;
@@ -705,16 +730,16 @@ function AccountsBody({
       <div className="flex flex-col gap-6">
         <p className="text-muted-foreground text-sm">
           Infinitus is running, but no engine reports accounts. swapd ships with Infinitus: turn
-          it on under Settings › Infinitus › Engines, then come back here and choose Add account
+          it on under Settings › Engines, then come back here and choose Add account
           to sign in through your browser.
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <Link
-            to="/settings/infinitus/engines"
+            to="/settings/engines"
             search={environmentId ? { environmentId } : {}}
             className="w-fit text-sm text-foreground underline underline-offset-2"
           >
-            Open Settings › Infinitus › Engines
+            Open Settings › Engines
           </Link>
           <a
             href="https://github.com/deathemperor/infinitus/blob/main/docs/user/accounts.md"
@@ -747,11 +772,8 @@ function AccountsBody({
             key={section.key}
             section={section}
             band={exhaustedBand(fleet, nowMs)}
-            pending={
-              pending?.fleetKey === section.key
-                ? { number: pending.number, action: pending.action }
-                : null
-            }
+            pending={pending.filter((entry) => entry.fleetKey === section.key)}
+            flips={flips.filter((entry) => entry.fleetKey === section.key)}
             failure={
               failure?.fleetKey === section.key
                 ? { number: failure.number, message: failure.message }

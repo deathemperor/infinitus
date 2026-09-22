@@ -11,7 +11,7 @@ import { useEnvironmentQuery } from "../../state/query";
 import { environmentShell } from "../../state/shell";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
-import { resolveDeepLinkProject } from "./deepLink.logic";
+import { resolveDeepLinkProject, settingsDeepLinkTarget } from "./deepLink.logic";
 import { usePendingTeamJoinStore } from "./pendingTeamJoin";
 
 /**
@@ -22,7 +22,8 @@ import { usePendingTeamJoinStore } from "./pendingTeamJoin";
  * path. `thread` navigates; `new` opens the composer on the project's
  * default env mode with the prompt prefilled and never sends it; `join`
  * (#1313) parks the team code for the Team page's Join field and never
- * joins on its own.
+ * joins on its own; `settings` opens a listed Settings section (the menu
+ * bar app's ⌘,) and ignores any other path.
  */
 export function DeepLinkCoordinator() {
   const primaryEnvironment = usePrimaryEnvironment();
@@ -46,11 +47,16 @@ export function DeepLinkCoordinator() {
       await navigate({ to: "/$environmentId/$threadId", params: buildThreadRouteParams(ref) });
       return;
     }
+    if (link.kind === "settings") {
+      const to = settingsDeepLinkTarget(link.path);
+      if (to) await navigate({ to });
+      return;
+    }
     if (link.kind === "join") {
       // The code goes to the Team page's Join field and leaves only when the
       // user presses Request to join; nothing joins on its own.
       usePendingTeamJoinStore.getState().offer(link.link);
-      await navigate({ to: "/settings/infinitus/team" });
+      await navigate({ to: "/settings/team" });
       return;
     }
     const project = resolveDeepLinkProject(readProjects(), link.project);

@@ -16,41 +16,14 @@ import InfinitusUI
 ///      snapshot ever completed. A raw NSStatusItem doesn't fight.
 /// StateObject-compatible owner so the App struct (a value type that gets
 /// recreated) keeps exactly one controller alive.
-/// One settings pane: toolbar label + SF Symbol + content.
-struct SettingsTab {
-    let title: String
-    let symbol: String
-    /// Sidebar icon tile color (CodexBar-style settings list).
-    var tint: Color = .accentColor
-    /// Extra search terms beyond the title.
-    var keywords: [String] = []
-    /// Providers render under a "Providers" section header with plain
-    /// icons (CodexBar sidebar, user screenshot 2026-08-30); nil = a
-    /// regular tab with the tinted tile.
-    var provider: ProviderBadge? = nil
-    /// A real image instead of the SF-symbol tile (About wears the
-    /// actual Infinitus icon, user 2026-08-30).
-    var image: NSImage? = nil
-    let view: AnyView
-}
-
-/// Sidebar state for a provider row: dimmed when not set up, a green
-/// dot when its engine is live.
-struct ProviderBadge {
-    var live = false
-    /// Rows for engines not built yet — visible roadmap, not selectable.
-    var placeholder = false
-}
-
 @MainActor
 final class StatusItemHolder: ObservableObject {
     let controller: StatusItemController
-    init(model: AppModel, settingsTabs: @escaping () -> [SettingsTab]) {
-        controller = StatusItemController(model: model, settingsTabs: settingsTabs)
-        model.showSettings = { [weak controller] in controller?.showSettingsWindow() }
+    init(model: AppModel) {
+        controller = StatusItemController(model: model)
+        model.openDesktop = { [weak controller] page in controller?.openFork(settingsPage: page) }
         model.reopenPopover = { [weak controller] in controller?.reopenPopover() }
         model.popOut = { [weak controller] in controller?.popOut() }
-        model.lock.showSettings = { [weak controller] in controller?.showSettingsWindow() }
     }
 }
 
@@ -77,15 +50,12 @@ final class StatusItemController {
     /// Last content size PinnedRoot reported — it fires during
     /// NSWindow(contentViewController:) itself, before `pinned` is set.
     private var pinnedIdeal: CGSize = .zero
-    private(set) var settings: NSWindow?
     private var effects = MenuBarEffects(button: nil)
     private let model: AppModel
-    private let settingsTabs: () -> [SettingsTab]
     private var sink: AnyCancellable?
 
-    init(model: AppModel, settingsTabs: @escaping () -> [SettingsTab]) {
+    init(model: AppModel) {
         self.model = model
-        self.settingsTabs = settingsTabs
         // A launch with the icon off (#828) never makes one.
         if model.menuBarIconShown { installItem() }
 
@@ -97,9 +67,9 @@ final class StatusItemController {
                 DispatchQueue.main.async { self?.apply() }
             }
 
-        // macOS 26 shows the Settings scene by itself at launch, without
-        // making it key; its occlusion state flips as it lands on screen
-        // — hide it right there (see hideSceneSettingsWindow).
+        // macOS 26 shows the empty Settings scene by itself at launch,
+        // without making it key; its occlusion state flips as it lands on
+        // screen — hide it right there (see hideSceneSettingsWindow).
         NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification, object: nil,
             queue: .main) { [weak self] _ in
@@ -158,9 +128,6 @@ final class StatusItemController {
         // Off = no status item at all; on = a fresh one (#828).
         if model.menuBarIconShown, item == nil { installItem() }
         if !model.menuBarIconShown { removeItem() }
-        // A live `dock_icon_enabled` toggle takes effect on the open
-        // Settings window; with no window up this is already accessory.
-        applyActivationPolicy(settingsShowing: settings?.isVisible == true)
         // The theme's color and icon on the item (#90), the template
         // loop under Off or with the toggle off.
         let theme = model.rowTheme
@@ -182,7 +149,6 @@ final class StatusItemController {
     }
 
     private func showAnchored() {
-        model.lock.surfaceShown()
         // A setup card names what this Mac has right now: a `claude /login`
         // done since launch shows up on the next open, no relaunch. Off
         // once a fleet has accounts, so the probe does not run per click.
@@ -225,13 +191,7 @@ final class StatusItemController {
         model.introOpened()
     }
 
-    /// `feedLock: false` only at the popOut() call site — it moves the
-    /// same content to the pop-out, nothing hides from the user (brief
-    /// step 3). Every other caller is a genuine dismiss and keeps the
-    /// default: the global click-outside monitor, the local one, and
-    /// togglePopover()'s close branch.
-    private func closeAnchored(feedLock: Bool = true) {
-        if feedLock { model.lock.surfaceHidden() }
+    private func closeAnchored() {
         anchored?.orderOut(nil)
         syncLocalLease()
         updateDismissMonitors()
@@ -331,7 +291,7 @@ final class StatusItemController {
             showAnchored()
             return
         }
-        if anchored?.isVisible == true { closeAnchored(feedLock: false) }
+        if anchored?.isVisible == true { closeAnchored() }
         showPinnedWindow()
     }
 
@@ -379,6 +339,7 @@ final class StatusItemController {
         // reach it, shown only when LaunchServices knows the bundle.
         if model.desktopAppInstalled {
             menu.addItem(menuItem("Open Infinitus", #selector(menuOpenFork)))
+            menu.addItem(menuItem("Settings…", #selector(menuSettings)))
             menu.addItem(.separator())
         }
 
@@ -407,7 +368,6 @@ final class StatusItemController {
                               ? "Pop Back Into Menu Bar" : "Pop Out Into a Window",
                               #selector(menuPopOut)))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Settings…", #selector(menuSettings)))
         menu.addItem(menuItem("Restart Infinitus", #selector(menuRestart)))
         menu.addItem(menuItem("Quit Infinitus", #selector(menuQuit)))
 
@@ -426,14 +386,28 @@ final class StatusItemController {
         guard let id = sender.representedObject as? String else { return }
         model.gamification = id
     }
-    @objc private func menuOpenFork() { model.openDesktopApp() }
+    /// The T3 Code fork's desktop bundle, wherever it is installed.
+    static var forkDesktopURL: URL? { AppModel.desktopAppURL }
+    @objc private func menuOpenFork() { openFork() }
+    @objc private func menuSettings() { openFork(settingsPage: "menu-bar") }
+    /// Opens the desktop app; with a Settings page, at that section over
+    /// its `infinitus://settings/<page>` deep link (the desktop is the
+    /// scheme's one claimant on a Mac, `docs/internals/desktop-deep-links.md`).
+    /// A link nothing claims falls back to plainly opening the bundle.
+    func openFork(settingsPage: String? = nil) {
+        if let settingsPage, let link = URL(string: "infinitus://settings/\(settingsPage)"),
+           NSWorkspace.shared.open(link) {
+            return
+        }
+        guard let url = Self.forkDesktopURL else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
     @objc private func menuRotate() { model.rotate() }
     @objc private func menuRefresh() {
         Task { await model.refreshSnapshot() }
     }
     @objc private func menuPin() { model.popoverPinned.toggle() }
     @objc private func menuPopOut() { popOut() }
-    @objc private func menuSettings() { showSettingsWindow() }
     @objc private func menuRestart() { model.relaunchApp() }
     @objc private func menuQuit() { model.shutdown() }
 
@@ -495,7 +469,7 @@ final class StatusItemController {
             // the stay-visible-while-working-elsewhere HUD behavior.
             w.level = .floating
             NotificationCenter.default.addObserver(
-                self, selector: #selector(pinnedBecameKey),
+                self, selector: #selector(pinnedKeyChanged),
                 name: NSWindow.didBecomeKeyNotification, object: w)
             NotificationCenter.default.addObserver(
                 self, selector: #selector(pinnedKeyChanged),
@@ -523,7 +497,6 @@ final class StatusItemController {
                 clampOnScreen(w)
             }
         }
-        model.lock.surfaceShown()
         AppDefaults.standard.set(true, forKey: "popout_shown")
         if activate {
             NSApp.activate(ignoringOtherApps: true)
@@ -537,18 +510,10 @@ final class StatusItemController {
 
     /// The pop-out's level follows key status and the pin, so a pin
     /// toggle retargets it live (apply() calls this on every model
-    /// snapshot too — window-level upkeep only, no lock feed, since it
-    /// isn't an interaction by itself).
+    /// snapshot too).
     @objc private func pinnedKeyChanged() {
         guard let w = pinned else { return }
         w.level = model.popoverPinned || w.isKeyWindow ? .floating : .normal
-    }
-
-    /// Real didBecomeKey edge only (not apply()'s repeated snapshots) —
-    /// the actual user interaction that should feed the re-lock clock.
-    @objc private func pinnedBecameKey() {
-        model.lock.surfaceShown()
-        pinnedKeyChanged()
     }
 
     @objc private func pinnedMoved() {
@@ -561,7 +526,6 @@ final class StatusItemController {
     @objc private func pinnedClosed() {
         // App-quit closes the window too; only a USER close drops the flag.
         guard !AppDelegate.terminating else { return }
-        model.lock.surfaceHidden()
         AppDefaults.standard.set(false, forKey: "popout_shown")
         syncLocalLease()
     }
@@ -635,116 +599,14 @@ final class StatusItemController {
     private var recentFits: [(size: NSSize, at: Date)] = []
     private var refusedFit: NSSize?
 
-    /// Controller-owned Settings window. NOT the SwiftUI Settings scene:
-    /// `NSApp.sendAction(showSettingsWindow:)` does nothing on macOS 26
-    /// (verified live — synthetic click on the button, no window), and the
-    /// openSettings environment action doesn't exist outside the scene
-    /// graph. Owning the window outright works from any host.
-    /// CodexBar-style chrome: searchable icon sidebar + detail pane
-    /// (SettingsRoot), replacing the old toolbar-tab NSTabViewController.
-    func showSettingsWindow() {
-        // Two Settings windows is how the user ended up resizing the
-        // wrong one (2026-09-02) — the scene's stays hidden.
-        hideSceneSettingsWindow()
-        if settings == nil {
-            // Tabs built once per window, as before; the gate re-evaluates
-            // only which of the two it shows.
-            let tabs = settingsTabs()
-            let host = NSHostingView(rootView: LockGate(lock: model.lock) {
-                SettingsRoot(tabs: tabs)
-            })
-            // No sizing input from the content: hosting-view constraints
-            // pin the window to SwiftUI's ideal size and beat the
-            // .resizable style bit — the window refused to grow even via
-            // AX (user 2026-09-02). A plain NSWindow with no
-            // contentViewController, an explicit content floor, and the
-            // frame autosaved: the user owns the size from there.
-            host.sizingOptions = []
-            let w = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 960, height: 640),
-                styleMask: [.titled, .closable, .resizable],
-                backing: .buffered, defer: false)
-            // Blur under the hosting view, outside SwiftUI (see the
-            // anchored panel note): the wrapped view is the content view;
-            // it retains the hosting view. The scrim keeps sidebar text
-            // readable over white apps.
-            w.contentView = GlassContainerView.wrap(host, scrim: true)
-            w.contentMinSize = NSSize(width: 700, height: 480)
-            // System Settings is not freely widenable, and for the same
-            // reason: a grouped Form self-limits to ~700pt, so every
-            // extra pixel of window became empty grey (design critique
-            // 2026-09-06, P1 — a 700pt column in an 1800pt window).
-            w.contentMaxSize = NSSize(width: 1200, height: CGFloat.greatestFiniteMagnitude)
-            w.title = "Settings"
-            w.toolbarStyle = .unified
-            w.isReleasedWhenClosed = false
-            // Float only while KEY: opened from the floating pop-out it
-            // must land in front of it, but a backgrounded Settings window
-            // has no business sitting over other apps (the "always on
-            // top" bug, 2026-08-30). The level follows key status.
-            w.level = .floating
-            NotificationCenter.default.addObserver(
-                self, selector: #selector(settingsKeyChanged),
-                name: NSWindow.didBecomeKeyNotification, object: w)
-            NotificationCenter.default.addObserver(
-                self, selector: #selector(settingsKeyChanged),
-                name: NSWindow.didResignKeyNotification, object: w)
-            w.center()
-            w.setFrameAutosaveName("InfinitusSettings")
-            // An autosaved frame from before the cap is restored as-is.
-            if w.frame.width > 1200 {
-                w.setContentSize(NSSize(width: 1200, height: w.contentLayoutRect.height))
-            }
-            NotificationCenter.default.addObserver(
-                self, selector: #selector(settingsClosed),
-                name: NSWindow.willCloseNotification, object: w)
-            settings = w
-        }
-        model.lock.surfaceShown()
-        applyActivationPolicy(settingsShowing: true)
-        NSApp.activate(ignoringOtherApps: true)
-        settings?.makeKeyAndOrderFront(nil)
-    }
-
-    /// The window is kept (`isReleasedWhenClosed = false`), so the next
-    /// `show settings` reopens it with its tabs built.
-    func hideSettingsWindow() { settings?.orderOut(nil) }
-
-    /// The SwiftUI Settings scene's window: macOS 26 shows it by itself
-    /// at launch, and SwiftUI keeps it non-resizable — it re-strips the
-    /// .resizable bit and resets contentMinSize on every update (probed
-    /// 2026-09-02), so it can't be adopted. It goes away; the
-    /// controller-owned window below is the one Settings window.
+    /// The SwiftUI Settings scene's window: an App needs a Scene and
+    /// that empty one is it, but macOS 26 shows it by itself at launch.
+    /// It goes away; the Settings window itself retired.
     private func hideSceneSettingsWindow() {
         for w in NSApp.windows where w.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
             && w.isVisible {
             w.orderOut(nil)
         }
-    }
-
-    @objc private func settingsClosed() {
-        model.lock.surfaceHidden()
-        NSApp.setActivationPolicy(.accessory)
-    }
-
-    /// An accessory app has no Cmd+Tab entry, so an open Settings window
-    /// was unreachable once buried (user bug 2026-08-30): becoming a
-    /// regular app while it is up brings a Dock icon and Cmd+Tab, and
-    /// `settingsClosed` drops back. `dock_icon_enabled` off — the default
-    /// — declines that, so the app is never in the Dock; the status item,
-    /// its Settings… item, `infinitusctl show settings` and the window's
-    /// floating level while key are how it is reached instead.
-    private func applyActivationPolicy(settingsShowing: Bool) {
-        let wanted: NSApplication.ActivationPolicy =
-            model.dockIconShown && settingsShowing ? .regular : .accessory
-        guard NSApp.activationPolicy() != wanted else { return }
-        NSApp.setActivationPolicy(wanted)
-    }
-
-    @objc private func settingsKeyChanged() {
-        guard let w = settings else { return }
-        if w.isKeyWindow { model.lock.surfaceShown() }
-        w.level = w.isKeyWindow ? .floating : .normal
     }
 }
 
@@ -755,7 +617,7 @@ private struct AnchoredRoot: View {
     let onSize: (CGSize) -> Void
 
     var body: some View {
-        LockGate(lock: model.lock) { MenuContent(model: model) }
+        MenuContent(model: model)
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { onSize($0) }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -773,9 +635,7 @@ private struct PinnedRoot: View {
         VStack(spacing: 0) {
             InfinitusHeader(model: model)
                 .frame(height: 30)
-            LockGate(lock: model.lock) {
-                MenuContent(model: model, showHeader: false)
-            }
+            MenuContent(model: model, showHeader: false)
         }
         // fixedSize = the content's ideal, independent of the window; the
         // window then follows THAT (fitPinned) instead of the other way

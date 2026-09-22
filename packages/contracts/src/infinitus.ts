@@ -119,6 +119,10 @@ export const InfinitusAccount = Schema.Struct({
       `unhold` write it). Absent from engines that have no hold knob. */
   disabled: Schema.optionalKey(Schema.Boolean),
   preferred: Schema.optionalKey(Schema.Boolean),
+  /** Kept warm: the engine's daemon ignites the account whenever its 5h
+      window has gone cold (`auto-ignite` writes it). Absent from engines
+      without the knob and from a swapd older than 0.3. */
+  autoIgnite: Schema.optionalKey(Schema.Boolean),
   isOrganization: Schema.Boolean,
   organizationName: Schema.optionalKey(Schema.String),
   organizationUuid: Schema.optionalKey(Schema.String),
@@ -499,8 +503,9 @@ export type InfinitusTeamRequest = typeof InfinitusTeamRequest.Type;
 
 /** The `team-status` reply: the team this Mac is in, or `null` when there is
     none. `remote` is masked by the Mac. `shares` maps a kind (stats, now,
-    threads, transcripts, crashes, fleet) to its audience (off, leaders, team);
-    `exclusions` are project slugs kept private. */
+    threads, transcripts, fleet; older Macs also send the retired crashes) to
+    its audience (off, leaders, team); `exclusions` are project slugs kept
+    private. */
 export const InfinitusTeamSnapshot = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -710,14 +715,19 @@ export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
 /** Fork (#1213): a sign-in the desktop shell runs itself, through the engine's
     own `add-oauth` verb — swapd is the OAuth client, so its loopback listener
     catches the redirect and there is no code to paste. `provider` is the
-    engine's own provider name (`swapd --provider <p>`), `label` titles the
-    child window. No slot and no relogin target: `add-oauth` resolves the
+    engine's own provider name (`swapd --provider <p>`); the page opens in a
+    private window of the system browser. No slot: `add-oauth` resolves the
     account from the sign-in itself and lands a known address back in its own
-    slot, so signing in again just works. */
+    slot, so signing in again just works. `fleet` and `relogin` are the
+    fleet's id and the address being signed in again, for the shell to hand
+    the sign-in to the menu-bar app (`signin-begin --window`) when the
+    browser has no private window to give — the Mac's own sheet then shows
+    it, passkeys and all. */
 export const InfinitusOAuthSignInInput = Schema.Struct({
   flowId: Schema.String,
   provider: Schema.String,
-  label: Schema.String,
+  fleet: Schema.optionalKey(Schema.String),
+  relogin: Schema.optionalKey(Schema.String),
 });
 export type InfinitusOAuthSignInInput = typeof InfinitusOAuthSignInInput.Type;
 

@@ -20,6 +20,63 @@ const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 
+describe("storage cleanup settings", () => {
+  it("keeps cleanup disabled for existing installations", () => {
+    expect(decodeServerSettings({}).worktreeCleanup).toBeNull();
+    expect(decodeServerSettings({}).storageCleanup).toEqual({
+      worktreeAfterDays: null,
+      worktreeOnMerge: false,
+      worktreeOnDelete: false,
+      worktreeUnchanged: false,
+      browserArtifactsAfterDays: null,
+      logsAfterDays: null,
+    });
+  });
+
+  it("accepts eight-day retention and disabling one rule without resetting others", () => {
+    expect(decodeServerSettingsPatch({ storageCleanup: { worktreeAfterDays: 8 } })).toEqual({
+      storageCleanup: { worktreeAfterDays: 8 },
+    });
+    expect(decodeServerSettingsPatch({ storageCleanup: { worktreeAfterDays: null } })).toEqual({
+      storageCleanup: { worktreeAfterDays: null },
+    });
+  });
+
+  it("accepts partial custom patches but requires complete stored project rules", () => {
+    expect(
+      decodeServerSettingsPatch({
+        worktreeCleanup: { mode: "custom", rules: { worktreeAfterDays: 8 } },
+      }),
+    ).toEqual({ worktreeCleanup: { mode: "custom", rules: { worktreeAfterDays: 8 } } });
+    expect(() =>
+      decodeServerSettings({
+        projectSettingsOverrides: {
+          project: { worktreeCleanup: { mode: "custom", rules: { worktreeAfterDays: 8 } } },
+        },
+      }),
+    ).toThrow();
+  });
+
+  it.each([0, -1, 1.5, 3651])("rejects invalid retention %s", (days) => {
+    expect(() =>
+      decodeServerSettingsPatch({ storageCleanup: { browserArtifactsAfterDays: days } }),
+    ).toThrow();
+  });
+});
+
+describe("ClientSettings rich text composer", () => {
+  it("enables rich text for new and existing settings without a saved preference", () => {
+    expect(decodeClientSettings({}).composerRichTextEnabled).toBe(true);
+    expect(decodeClientSettings({ sendShortcut: "mod-enter" }).composerRichTextEnabled).toBe(true);
+  });
+
+  it("preserves an explicit opt-out through patches and persistence", () => {
+    const preference = { composerRichTextEnabled: false };
+    expect(decodeClientSettingsPatch(preference)).toEqual(preference);
+    expect(encodeClientSettings(decodeClientSettings(preference))).toMatchObject(preference);
+  });
+});
+
 describe("ServerSettings default permissions", () => {
   it("keeps full access for settings saved before a default was configured", () => {
     expect(decodeServerSettings({}).defaultRuntimeMode).toBe("full-access");
@@ -249,8 +306,8 @@ describe("ClientSettings notifications", () => {
 });
 
 describe("ClientSettings default diff file state", () => {
-  it("keeps files expanded when existing settings omit the preference", () => {
-    expect(decodeClientSettings({}).diffFilesCollapsed).toBe(false);
+  it("keeps files collapsed when existing settings omit the preference", () => {
+    expect(decodeClientSettings({}).diffFilesCollapsed).toBe(true);
   });
 
   it.each([true, false])("preserves a saved collapsed preference of %s", (diffFilesCollapsed) => {
@@ -449,6 +506,23 @@ describe("ClientSettings browser recording frame rate", () => {
   });
 });
 
+describe("ClientSettings recording input overlays", () => {
+  it("defaults both overlays off and accepts independent opt-ins", () => {
+    const settings = decodeClientSettings({});
+    expect(settings.browserRecordingShowKeyPresses).toBe(false);
+    expect(settings.browserRecordingShowMousePresses).toBe(false);
+    expect(
+      decodeClientSettingsPatch({
+        browserRecordingShowKeyPresses: true,
+        browserRecordingShowMousePresses: false,
+      }),
+    ).toMatchObject({
+      browserRecordingShowKeyPresses: true,
+      browserRecordingShowMousePresses: false,
+    });
+  });
+});
+
 describe("ClientSettings glass opacity", () => {
   it("defaults to a readable translucent surface", () => {
     expect(decodeClientSettings({}).glassOpacity).toBe(80);
@@ -561,6 +635,17 @@ describe("ClientSettings context window meter", () => {
     expect(
       decodeClientSettingsPatch({ contextWindowMeterEnabled: true }).contextWindowMeterEnabled,
     ).toBe(true);
+  });
+});
+
+describe("ClientSettings send shortcut", () => {
+  it("defaults to Enter and validates the supported choices", () => {
+    expect(decodeClientSettings({}).sendShortcut).toBe("enter");
+    for (const sendShortcut of ["enter", "mod-enter-multiline", "mod-enter"]) {
+      expect(decodeClientSettings({ sendShortcut }).sendShortcut).toBe(sendShortcut);
+      expect(decodeClientSettingsPatch({ sendShortcut }).sendShortcut).toBe(sendShortcut);
+    }
+    expect(() => decodeClientSettingsPatch({ sendShortcut: "invalid" })).toThrow();
   });
 });
 
@@ -735,7 +820,15 @@ describe("provider enabled defaults", () => {
     expect(decoded.providers.claudeAgent.enabled).toBe(true);
     expect(decoded.providers.cursor.enabled).toBe(false);
     expect(decoded.providers.grok.enabled).toBe(false);
+    expect(decoded.providers.omp.enabled).toBe(false);
     expect(decoded.providers.opencode.enabled).toBe(false);
+    expect(decoded.providers.pi.enabled).toBe(false);
+  });
+
+  it("leaves Pi's config directory empty so the driver falls back to ~/.pi/agent", () => {
+    // Never `PI_CODING_AGENT_DIR`: Oh My Pi forked Pi and kept `APP_NAME = "pi"`,
+    // so its binary reads the same variable and the two would share a directory.
+    expect(decodeServerSettings({}).providers.pi.homePath).toBe("");
   });
 
   it("keeps Cursor enabled when an existing user explicitly opted in", () => {
@@ -757,6 +850,9 @@ describe("provider enabled defaults", () => {
     const codex = ProviderDriverKind.make("codex");
     // No flags anywhere: driver default applies.
     expect(resolveProviderInstanceEnabled({ driver: grok, config: {} })).toBe(false);
+    expect(
+      resolveProviderInstanceEnabled({ driver: ProviderDriverKind.make("omp"), config: {} }),
+    ).toBe(false);
     expect(resolveProviderInstanceEnabled({ driver: codex, config: {} })).toBe(true);
     // Unknown fork drivers stay enabled.
     expect(

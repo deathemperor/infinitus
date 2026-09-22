@@ -46,6 +46,10 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
 ];
 
 describe("searchSettings", () => {
+  it.each(["send shortcut", "multiline", "new line"])("finds Send shortcut for %s", (query) => {
+    expect(searchSettings(query).map((item) => item.id)).toContain("send-shortcut");
+  });
+
   it("matches titles, sections, and remembered setting details", () => {
     expect(searchSettings("word", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
     expect(searchSettings("network", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
@@ -175,7 +179,6 @@ describe("searchSettings", () => {
       "infinitus-themes",
       "infinitus-animations",
       "infinitus-sessions",
-      "infinitus-lock",
       "infinitus-team",
       "infinitus-push",
       "infinitus-devices",
@@ -241,7 +244,6 @@ describe("searchSettings", () => {
       "infinitus-themes",
       "infinitus-animations",
       "infinitus-sessions",
-      "infinitus-lock",
       "infinitus-team",
       "infinitus-push",
       "infinitus-devices",
@@ -307,15 +309,40 @@ describe("searchSettings", () => {
   });
 
   it("lights up the deepest Infinitus nav item only", () => {
-    expect(isSettingsSectionActive("/settings/infinitus", "/settings/infinitus")).toBe(true);
-    expect(isSettingsSectionActive("/settings/infinitus/devices", "/settings/infinitus")).toBe(
-      false,
-    );
-    expect(
-      isSettingsSectionActive("/settings/infinitus/devices", "/settings/infinitus/devices"),
-    ).toBe(true);
+    expect(isSettingsSectionActive("/settings/menu-bar", "/settings/menu-bar")).toBe(true);
+    expect(isSettingsSectionActive("/settings/devices", "/settings/menu-bar")).toBe(false);
+    expect(isSettingsSectionActive("/settings/devices", "/settings/devices")).toBe(true);
     // A path no nav item owns still belongs to its parent section.
     expect(isSettingsSectionActive("/settings/projects/acme", "/settings/projects")).toBe(true);
+    // ...the nearest one only: Engines' Activity sub screen lights Engines, not Infinitus.
+    expect(isSettingsSectionActive("/settings/engines/activity", "/settings/engines")).toBe(true);
+    expect(isSettingsSectionActive("/settings/engines/activity", "/settings/menu-bar")).toBe(false);
+  });
+
+  it("finds keybinding commands by label, command id, and default key", () => {
+    expect(searchSettings("toggle sidebar")[0]?.id).toBe("keybinding-sidebar.toggle");
+    expect(searchSettings("sidebar.toggle")[0]?.id).toBe("keybinding-sidebar.toggle");
+    expect(searchSettings("mod+b")[0]?.id).toBe("keybinding-sidebar.toggle");
+    expect(searchSettings("copy link")[0]).toMatchObject({
+      id: "keybinding-thread.copyReference",
+      to: "/settings/keybindings",
+    });
+  });
+
+  it("ranks keybinding commands after other settings", () => {
+    const ids = searchSettings("model").map((item) => item.id);
+    expect(ids[0]).toBe("default-model");
+    expect(ids.indexOf("keybinding-modelPicker.toggle")).toBeGreaterThan(
+      ids.indexOf("text-generation-model"),
+    );
+  });
+
+  it("sends commands without a default binding to the section", () => {
+    expect(searchSettings("thread.stop")[0]).toMatchObject({
+      id: "keybinding-thread.stop",
+      targetId: "keybindings",
+    });
+    expect(searchSettings("sidebar.toggle")[0]?.targetId).toBeUndefined();
   });
 
   it("keeps catalog result ids unique", () => {

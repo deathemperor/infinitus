@@ -144,9 +144,7 @@ function harness(input?: {
         }),
         Layer.succeed(EnvironmentLinks.EnvironmentLinks, {
           upsert: () => Effect.die("unused upsert"),
-          listUsersForEnvironment: () => Effect.die("unused listUsersForEnvironment"),
           listDeliveryUsersForEnvironment: () => Effect.succeed(users),
-          listPublicKeysForEnvironment: () => Effect.die("unused listPublicKeysForEnvironment"),
           listForUser: () => Effect.die("unused listForUser"),
           getForUser: () => Effect.die("unused getForUser"),
           revokeForUser: () => Effect.die("unused revokeForUser"),

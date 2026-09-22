@@ -15,7 +15,7 @@
 - Every commit ends with `Co-Authored-By: Claude Code <noreply@anthropic.com>` (the repo hook adds it; write it anyway).
 - Stage by explicit path; never `git add -A`; never amend, stash or rebase.
 - Surgical changes; match the surrounding style; no speculative abstractions; comments explain why, in the repo's voice.
-- No engine internals; no `~/.claude-swap-backup/*`. Never `NetworkFleetMirror.shared` in the four session screens after Task 5.
+- No engine internals; no engine backup dir. Never `NetworkFleetMirror.shared` in the four session screens after Task 5.
 - Every task ends with a green simulator build:
   `cd ios && xcodegen generate > /dev/null && xcodebuild -project InfinitusMobile.xcodeproj -scheme InfinitusMobile -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/infinitus-mm2-dd CODE_SIGNING_ALLOWED=NO build 2>&1 | grep -E "error:|BUILD" | head`
   Expected last line: `** BUILD SUCCEEDED **`. Run it from the repo root.

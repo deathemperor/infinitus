@@ -24,6 +24,8 @@ Accounts groups logins by fleet and shows each account's usage windows, limits, 
 
 Use **Switch** to choose an account manually. Automatic switching follows the engine's policy: swapd swaps the provider CLI's active login, while proxy engines route requests behind their own endpoint. Proxy session affinity can keep existing conversations on their current credential even after you switch. **Remove** deletes an account's credential from the engine after a confirmation; sign in again to add it back.
 
+A 5-hour window only starts when the account is used, so a switch onto an idle account starts its clock from zero. **Keep warm** (the flame on an account row, swapd only) makes swapd's daemon restart that account's 5-hour window whenever it has gone cold, so a later switch lands on a window that is already running. Each restart is one small request as that account and costs it a little weekly quota; an account whose weekly quota is nearly spent, held, or currently active is not restarted.
+
 When accounts run out of headroom, the fleet shows its exhausted state and reported reset timing. Whether a thread can resume automatically depends on its provider and your resume settings; adding another usable account or waiting for a reset restores capacity. A login that expires needs sign-in again rather than a quota reset. Use the account's re-login action, or the separate **Sign-ins** section for pending service logins.
 
 On a phone, Accounts displays each paired Mac's fleets. Configure engines and add accounts on the owning Mac. If Accounts has no fleets, check that an engine is enabled and reachable, then add its first account.

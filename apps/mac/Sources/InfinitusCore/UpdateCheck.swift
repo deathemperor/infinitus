@@ -1,6 +1,6 @@
 import Foundation
 
-/// PEP440-lite version ordering, enough for claude-swap's tags
+/// PEP440-lite version ordering, enough for the engine's tags
 /// ("0.25.0", "0.26.0b1"): release tuples compare first, and a
 /// pre-release only loses to the FINAL of its own release — 0.26.0b1
 /// still beats 0.25.0. (A naive "any beta < any final" rule would tell

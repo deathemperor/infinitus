@@ -42,7 +42,7 @@ final class TeamModel: ObservableObject {
 
     /// False in mock / playground instances: every action is a no-op.
     var enabled = true
-    /// Set by AppModel: what this Mac publishes (crashes, fleets, blockers).
+    /// Set by AppModel: what this Mac publishes (fleets, blockers).
     var sources: () -> TeamPublisher.Sources = { TeamPublisher.Sources(home: NSHomeDirectory(), machine: "Mac") }
     /// Set by AppModel: the desktop credential (#822) the loop reads the
     /// threads and transcripts with; nil publishes `desktop: false`.

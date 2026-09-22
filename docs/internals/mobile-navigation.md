@@ -51,6 +51,13 @@ configuration only if it still matches the preview's configuration. It must not
 deactivate the shared audio session, which may belong to another player or recorder.
 
 Video playback holds the first signed asset URL for the lifetime of the preview.
-Following credential refreshes reactively would restart playback. Quick Look copies
+Following credential refreshes reactively would restart playback. A file preview
+reauthorizes a workspace or host file on every open, because it may have been
+replaced on disk. An attachment's bytes never change under its id, so its preview
+[opens on the thumbnail's URL](../../apps/mobile/src/features/infinitus/previewUrlReuse.logic.ts)
+while that token has time left, and asks for a fresh one only if the download is
+refused. That saves the mint's round trip and nothing else: Quick Look still
+downloads the whole file. The reuse is iOS only, because Android's in-app viewer
+does not report a refused URL for the retry to act on. Quick Look copies
 original bytes into its own temporary directory so preview and sharing cannot
 mutate a draft or workspace file.

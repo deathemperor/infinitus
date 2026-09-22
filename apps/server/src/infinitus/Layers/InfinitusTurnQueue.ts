@@ -20,6 +20,7 @@ import { OrchestrationEngineService } from "../../orchestration/Services/Orchest
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
 import { threadHasQueuedTurnStart } from "../../orchestration/ThreadSettlementPolicy.ts";
 import { forkParked } from "../../serverActivation.ts";
+import { InfinitusLimitStops, InfinitusLimitStopsLive } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 import {
@@ -36,6 +37,7 @@ type Input =
   | { readonly kind: "thread"; readonly threadId: ThreadId }
   | { readonly kind: "held"; readonly threadIds: ReadonlyArray<ThreadId> }
   | { readonly kind: "paused"; readonly threadIds: ReadonlyArray<ThreadId> }
+  | { readonly kind: "resuming"; readonly threadIds: ReadonlyArray<ThreadId> }
   | {
       readonly kind: "start-failed";
       readonly threadId: ThreadId;
@@ -103,8 +105,9 @@ const activityInput = (event: OrchestrationEvent, threadId: ThreadId): Input | n
  * the decider removes the row in the same batch as the send, whenever the
  * thread is idle by every gate the client drain used (`queueDrainVerdict`):
  * no turn running or pending, not held (#616), not paused (#743), not
- * archived, and no send of ours still in flight. One send per thread at a
- * time; the next row waits for the session to settle again. A row queued
+ * mid-resume on a usage limit (#1509), not archived, and no send of ours
+ * still in flight. One send per thread at a time; the next row waits for
+ * the session to settle again. A row queued
  * `sendAt: "tool-boundary"` (#1318) also goes while the turn runs, once a
  * tool call of that turn (`activeTurnId`, so a stale row's boundary is not
  * the next turn's) finishes — into the running turn, as "Send now" does.
@@ -133,11 +136,13 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
     const projectionSnapshotQuery = yield* ProjectionSnapshotQuery;
     const sessionHold = yield* InfinitusSessionHold;
     const sessionInterrupt = yield* InfinitusSessionInterrupt;
+    const limitStops = yield* InfinitusLimitStops;
     const crypto = yield* Crypto.Crypto;
     const commandId = crypto.randomUUIDv4.pipe(Effect.map(CommandId.make));
 
     let held: ReadonlySet<ThreadId> = new Set();
     let paused: ReadonlySet<ThreadId> = new Set();
+    let resuming: ReadonlySet<ThreadId> = new Set();
     const inFlight = new Set<ThreadId>();
     /** Rows the decider refused, by `queuedTurnSignature`. */
     const failed = new Set<string>();
@@ -254,6 +259,10 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         const verdict = queueDrainVerdict(shell.value, {
           held: held.has(threadId),
           paused: paused.has(threadId),
+          // Read live, not from the set below: that one is a subscription
+          // behind, and an input already in the worker when a claim lands
+          // would be judged against the state before it.
+          resuming: yield* limitStops.isResuming(threadId),
           inFlight: inFlight.has(threadId),
           pendingStart: threadHasQueuedTurnStart(shell.value, createdAt),
           failed,
@@ -334,6 +343,15 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
             for (const threadId of released) yield* consider(threadId);
             return;
           }
+          // Only for the wake: the verdict reads the claim live. No boot gate
+          // beside the other two either — nothing is mid-resume at startup.
+          case "resuming": {
+            const next = new Set(input.threadIds);
+            const released = releasedThreads(resuming, next);
+            resuming = next;
+            for (const threadId of released) yield* consider(threadId);
+            return;
+          }
           case "start-failed":
             yield* onStartFailed(input.threadId, input.requestId);
             return yield* consider(input.threadId);
@@ -386,6 +404,14 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
         worker.enqueue({ kind: "paused", threadIds }),
       ),
     );
+    // The release matters as much as the claim: a resume that returns at one
+    // of its own guards, or whose send fails, leaves no session event behind,
+    // and a row that waited on the claim would sit there unlooked-at.
+    yield* forkParked(
+      Stream.runForEach(limitStops.resuming, (threadIds) =>
+        worker.enqueue({ kind: "resuming", threadIds }),
+      ),
+    );
     yield* forkParked(
       Effect.gen(function* () {
         yield* Deferred.await(heldKnown).pipe(Effect.timeoutOption(SWEEP_GATE_TIMEOUT));
@@ -394,4 +420,8 @@ export const InfinitusTurnQueueLive = Layer.effectDiscard(
       }),
     );
   }),
+).pipe(
+  // The same layer value every other consumer merges, so the resume layer's
+  // claim and this drain's reading of it are one list.
+  Layer.provideMerge(InfinitusLimitStopsLive),
 );

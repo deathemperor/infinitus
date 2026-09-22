@@ -32,7 +32,7 @@ public struct RowTheme: Codable, Equatable, Sendable, Identifiable {
     /// Verb for a dead limit: "MP down", "🎬 sold out", "LIFE MIA". The
     /// tooltip always carries the plain-English explanation.
     public var deadVerb: String
-    /// The all-fresh row's word ("✓ ready"); plain themes keep "ready".
+    /// Legacy ready caption retained for theme-file compatibility; rows show gauges.
     public var readyLabel: String
     /// Tint for the switch celebration and data-change glow; "" means the
     /// app accent color.

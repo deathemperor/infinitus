@@ -18,17 +18,16 @@ import {
   createLucideIcon,
   GaugeIcon,
   GitBranchIcon,
+  HardDriveIcon,
   InfinityIcon,
   KeyboardIcon,
   Link2Icon,
-  LockIcon,
   PaletteIcon,
   PanelsTopLeftIcon,
   SearchIcon,
   Settings2Icon,
   SmartphoneIcon,
   SparklesIcon,
-  SwatchBookIcon,
   UsersIcon,
   XIcon,
 } from "lucide-react";
@@ -95,30 +94,27 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/providers": BotIcon,
   "/settings/integrations": BlocksIcon,
   "/settings/source-control": GitBranchIcon,
+  "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
-  "/settings/infinitus": InfinityIcon,
-  "/settings/infinitus/themes": SwatchBookIcon,
-  "/settings/infinitus/animations": SparklesIcon,
-  "/settings/infinitus/sessions": GaugeIcon,
-  "/settings/infinitus/lock": LockIcon,
-  "/settings/infinitus/team": UsersIcon,
-  "/settings/infinitus/notifications": BellIcon,
-  "/settings/infinitus/devices": SmartphoneIcon,
-  "/settings/infinitus/engines": CpuIcon,
+  "/settings/menu-bar": InfinityIcon,
+  "/settings/animations": SparklesIcon,
+  "/settings/priority": GaugeIcon,
+  "/settings/team": UsersIcon,
+  "/settings/notifications": BellIcon,
+  "/settings/devices": SmartphoneIcon,
+  "/settings/engines": CpuIcon,
   "/settings/archived": ArchiveIcon,
 };
 
 /** The pages that only exist where a connected server drives an Infinitus app. */
 const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>([
-  "/settings/infinitus",
-  "/settings/infinitus/themes",
-  "/settings/infinitus/animations",
-  "/settings/infinitus/sessions",
-  "/settings/infinitus/lock",
-  "/settings/infinitus/team",
-  "/settings/infinitus/notifications",
-  "/settings/infinitus/devices",
-  "/settings/infinitus/engines",
+  "/settings/menu-bar",
+  "/settings/animations",
+  "/settings/priority",
+  "/settings/team",
+  "/settings/notifications",
+  "/settings/devices",
+  "/settings/engines",
 ]);
 
 const SETTINGS_NAV_ITEMS: ReadonlyArray<{
@@ -153,7 +149,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
     (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
   );
   // Upstream hides Projects outside the overview scope; the fork hides the
-  // Infinitus pages when no connected environment runs the menu bar app.
+  // menu bar app's pages when no connected environment runs it.
   const navItems = useMemo(
     () =>
       SETTINGS_NAV_ITEMS.filter(

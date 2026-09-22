@@ -7,14 +7,12 @@ describe("isBackablePathname", () => {
     for (const pathname of [
       "/settings",
       "/settings/general",
-      "/settings/infinitus/lock",
       "/projects/abc",
       "/projects/abc/",
       "/usage",
       "/pull-requests",
       "/accounts",
       "/stats",
-      "/activity",
       "/utilization",
     ]) {
       expect(isBackablePathname(pathname), pathname).toBe(true);

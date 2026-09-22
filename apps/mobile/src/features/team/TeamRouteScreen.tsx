@@ -211,7 +211,7 @@ function MacTeam(props: {
 
       {supported && team ? (
         <>
-          <SettingsSection title={team.name} card>
+          <SettingsSection title={team.name}>
             {team.members.map((member, index) => (
               <View
                 key={member.kid}
@@ -230,7 +230,7 @@ function MacTeam(props: {
           </SettingsSection>
 
           {teamLeads(team) ? (
-            <SettingsSection title="Requests" card>
+            <SettingsSection title="Requests">
               {(team.requests?.length ?? 0) === 0 ? (
                 <Text className="px-4 py-3 text-sm text-foreground-muted">
                   Nobody is waiting to join.
@@ -295,7 +295,7 @@ function MacTeam(props: {
       ) : null}
 
       {supported && team === null ? (
-        <SettingsSection title="Join a team" card>
+        <SettingsSection title="Join a team">
           <View className="gap-3 p-4">
             {joinSupported ? (
               <>

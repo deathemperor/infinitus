@@ -8,10 +8,11 @@ import Foundation
 /// for new request", unified log 2026-09-14 06:59) and presents nothing:
 /// the request stays queued until cancelled, the user sees a flash of
 /// Chrome and no page. Nothing on our side can pick the presenter, so
-/// such a browser gets the URL directly — in a private window where its
-/// command line has one, since the sheet's point was a fresh session.
-/// The private flags are the Chromium family's only (probed on Chrome
-/// 152 handed to its running instance): any other declaring browser
+/// such a browser gets the URL directly — in a private window of a
+/// browser instance of its own, since the sheet's point was a fresh
+/// session (`TokenFlow.openInDefaultBrowser`: the flag plus an empty
+/// `--user-data-dir`, which every browser below takes). The private
+/// flags are the Chromium family's only: any other declaring browser
 /// gets the page in its profile, and the companion window says so.
 public enum SignInSheetRoute: Equatable, Sendable {
     /// The system sheet: Safari, or a default browser without the key.

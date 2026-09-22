@@ -119,14 +119,14 @@ public enum OnboardingBrief {
                         + "popup's Add button adopts that login in one click (`swapd add`)."
                       : "")
                    + " For command-line setup, run `swapd add-oauth` (or `swapd add` to adopt "
-                   + "Claude Code's current login) using the full Binary path the desktop app shows under "
-                   + "Settings → Infinitus → Engines; the bundled engine is not installed on PATH.")
-        out.append("- [ ] 3. Start auto-rotation: Infinitus runs `swapd auto` itself once the "
-                   + "fleet has accounts (Settings → Infinitus → Engines shows it; `infinitusctl status` from "
-                   + "Infinitus.app/Contents/MacOS confirms).")
+                   + "Claude Code's current login) using the full Binary path shown under "
+                   + "the desktop app's Settings → Engines; the bundled engine is not installed on PATH.")
+        out.append("- [ ] 3. Start auto-rotation: Infinitus installs a background account service once the "
+                   + "fleet has accounts (the desktop app's Settings → Engines shows it; `infinitusctl status` from "
+                   + "Infinitus.app/Contents/MacOS confirms). It keeps switching accounts when the menu bar is closed.")
         out.append("- [ ] 4. Add more accounts the same way: Accounts → Add account, once per login.")
         out.append("- [ ] 5. Optional, CLIProxyAPI as a second engine: `brew install cliproxyapi` "
-                   + "(or the release binary), start it, then in the desktop app's Settings → Infinitus → Engines → "
+                   + "(or the release binary), start it, then in the desktop app's Settings → Engines → "
                    + "CLIProxyAPI paste the management key (the human pastes secrets) and add "
                    + "accounts from the same tab.")
         out.append("- [ ] 6. Optional, the phone: Infinitus Settings → Devices has its own "

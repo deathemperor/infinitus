@@ -1,6 +1,6 @@
 import Foundation
 
-// Display-side logic ported from claude_swap/menubar.py — the JSON feed is
+// Display-side logic ported from the engine's menubar — the JSON feed is
 // deliberately raw (resetsAt preserved, pct as stored), so each frontend
 // rolls weekly windows against its own clock.
 
@@ -188,7 +188,7 @@ public extension Account {
 }
 
 /// Human notes for non-"ok" `usageStatus` values. Strings are word-for-word
-/// `SENTINEL_NOTES` from claude_swap/switcher.py — the codebase's stated
+/// `SENTINEL_NOTES` from the engine's switcher — the codebase's stated
 /// invariant is that every surface renders these identically.
 public enum SentinelNotes {
     public static let notes: [String: String] = [
@@ -381,30 +381,42 @@ public enum AccountVitals {
     }
 
     public static func cause(_ usage: Usage?) -> DeadCause? {
-        guard let usage else { return nil }
-        var dead: [(DeadCause, Date?)] = []
-        if let w = usage.fiveHour, w.pct >= 100 {
-            dead.append((DeadCause(kind: .session, name: nil, resetsAt: w.resetsAt,
-                                   countdown: w.countdown, clock: w.clock),
-                         WeeklyRoll.parse(w.resetsAt)))
-        }
-        if let w = usage.sevenDay, w.pct >= 100 {
-            dead.append((DeadCause(kind: .weekly, name: nil, resetsAt: w.resetsAt,
-                                   countdown: w.countdown, clock: w.clock),
-                         WeeklyRoll.parse(w.resetsAt)))
-        }
-        for w in usage.scoped ?? [] where w.pct >= 100 {
-            dead.append((DeadCause(kind: .scoped, name: w.name, resetsAt: w.resetsAt,
-                                   countdown: w.countdown, clock: w.clock),
-                         WeeklyRoll.parse(w.resetsAt)))
-        }
         // The spend cap is deliberately NOT here: spent usage credit only
         // means the overflow buffer is gone — the account stays usable on
         // its subscription windows (user-verified: papaya at 0%/0% with a
         // spent cap was marked dead and is perfectly alive).
-        return dead.max {
-            ($0.1 ?? .distantFuture) < ($1.1 ?? .distantFuture)
-        }?.0
+        deadCauses(usage).max {
+            (WeeklyRoll.parse($0.resetsAt) ?? .distantFuture)
+                < (WeeklyRoll.parse($1.resetsAt) ?? .distantFuture)
+        }
+    }
+
+    /// Every spent window in the row's cell order (5h, 7d, then each
+    /// model): each one's cell reads "down", not only the governing
+    /// cause's — a spent Fable beside a spent weekly drew "0%" (user
+    /// 2026-09-19).
+    public static func deadCauses(_ usage: Usage?) -> [DeadCause] {
+        guard let usage else { return [] }
+        func cause(_ w: UsageWindow, _ kind: DeadCause.Kind) -> DeadCause {
+            DeadCause(kind: kind, name: kind == .scoped ? w.name : nil,
+                      resetsAt: w.resetsAt, countdown: w.countdown, clock: w.clock)
+        }
+        var dead: [DeadCause] = []
+        if let w = usage.fiveHour, w.pct >= 100 { dead.append(cause(w, .session)) }
+        if let w = usage.sevenDay, w.pct >= 100 { dead.append(cause(w, .weekly)) }
+        for w in usage.scoped ?? [] where w.pct >= 100 { dead.append(cause(w, .scoped)) }
+        return dead
+    }
+
+    /// Whether a dead cell to this one's left already counts down the
+    /// same reset (within a minute): the row says each clock once.
+    public static func resetRepeatsEarlierCause(_ cause: DeadCause, in usage: Usage?) -> Bool {
+        let all = deadCauses(usage)
+        guard let index = all.firstIndex(of: cause),
+              let reset = WeeklyRoll.parse(cause.resetsAt) else { return false }
+        return all[..<index].contains {
+            WeeklyRoll.parse($0.resetsAt).map { abs($0.timeIntervalSince(reset)) < 60 } ?? false
+        }
     }
 
     public static func isDead(_ usage: Usage?) -> Bool {
@@ -418,6 +430,74 @@ public enum AccountVitals {
         // windows it stays a footnote.
         if pcts.isEmpty, let spend = usage.spend { return spend.pct >= 100 }
         return pcts.contains { $0 >= 100 }
+    }
+
+    /// The one per-model window that alone kills this account ("Fable"):
+    /// nil when a plan window (5h/7d) is spent too, when two models are,
+    /// or when nothing is. The account still has plan headroom for other
+    /// models, so an all-dead line naming the model reads true where
+    /// "all accounts exhausted" did not (user 2026-09-18).
+    public static func spentModel(_ usage: Usage?) -> String? {
+        guard let usage else { return nil }
+        if let p = usage.fiveHour?.pct, p >= 100 { return nil }
+        if let p = usage.sevenDay?.pct, p >= 100 { return nil }
+        let spent = (usage.scoped ?? []).filter { $0.pct >= 100 }.compactMap(\.name)
+        guard let first = spent.first, spent.allSatisfy({ $0 == first }) else { return nil }
+        return first
+    }
+
+    /// The model every dead, unheld account is out of — nil unless each
+    /// one's death is that same model window and nothing else.
+    public static func spentModel(across accounts: [Account]) -> String? {
+        let dead = accounts.filter { $0.disabled != true && isDead($0.usage) }
+        guard let first = dead.first.flatMap({ spentModel($0.usage) }) else { return nil }
+        return dead.allSatisfy { spentModel($0.usage) == first } ? first : nil
+    }
+}
+
+/// Whether an account's 5h clock is ticking, and the one word the 5h
+/// slot says when it is not.
+///
+/// The rule is `WindowPlanner.AccountState.coldClock`'s, read off the
+/// row's own usage: the endpoint reports a `resets_at` for an OPEN 5h
+/// window whatever its pct — an account ignited into a window it has
+/// barely touched reads 0% WITH a reset (verified against the live
+/// endpoint 2026-09-21) — so a missing reset means no window is
+/// running, not a running one gone unreported.
+public enum SessionWarmth {
+    public enum State: Equatable, Sendable {
+        /// A window is running; it rolls at this instant.
+        case warm(Date)
+        /// No window ticking: the next request starts a fresh one.
+        case cold
+    }
+
+    public static func state(_ usage: Usage?, now: Date = Date()) -> State {
+        guard let reset = WeeklyRoll.parse(usage?.fiveHour?.resetsAt),
+              reset > now else { return .cold }
+        return .warm(reset)
+    }
+
+    /// The caption for a 5h slot that would otherwise be blank — nil
+    /// wherever the row already answers for itself:
+    ///
+    /// - keep-warm off: nothing was promised, and an idle clock is honest.
+    /// - stale: a frozen measurement cannot testify that the clock
+    ///   stopped, its reset having been true at the last good fetch —
+    ///   the rule `Account.resetIsKnowable` applies to the countdown
+    ///   (#1118), on the same question.
+    /// - 7d spent: the account serves nothing until that window rolls,
+    ///   the planner refuses to ignite it (`Config.reserveFloorPct`) and
+    ///   the row already wears its dead line. Deliberately NOT `isDead`,
+    ///   which counts a spent per-model window too: an account out of
+    ///   Fable alone still serves every other model, so its stopped
+    ///   clock is worth saying.
+    /// - warm: the reset label already counts the window down.
+    public static func caption(account: Account, now: Date = Date()) -> String? {
+        guard account.autoIgnite == true, account.stale != true else { return nil }
+        if let weekly = account.usage?.sevenDay?.pct, weekly >= 100 { return nil }
+        guard state(account.usage, now: now) == .cold else { return nil }
+        return "cold"
     }
 }
 

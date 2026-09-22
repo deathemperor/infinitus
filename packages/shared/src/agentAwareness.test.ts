@@ -29,6 +29,7 @@ function thread(
   | "updatedAt"
   | "hasPendingApprovals"
   | "hasPendingUserInput"
+  | "backgroundLiveness"
 > {
   return {
     id: "thread-1" as ThreadId,
@@ -152,6 +153,37 @@ describe("projectThreadAwareness", () => {
     });
 
     expect(state?.phase).toBe("completed");
+  });
+
+  it("keeps a settled thread running while background agents work on", () => {
+    // The thread list says Working for a settled turn whose subagents or
+    // workflows are still live; the card has to agree, or its active count
+    // runs one short and a Done alert rings while work continues.
+    const settled = {
+      latestTurn: {
+        turnId: "turn-1" as TurnId,
+        state: "completed" as const,
+        requestedAt: NOW,
+        startedAt: NOW,
+        completedAt: NOW,
+        assistantMessageId: null,
+      },
+    };
+    const working = projectThreadAwareness({
+      environmentId: "env-1" as EnvironmentId,
+      project,
+      thread: thread({ ...settled, backgroundLiveness: "working" }),
+    });
+    expect(working?.phase).toBe("running");
+
+    // A watch loop alone is not an active agent: the list shows Monitoring,
+    // never Working, so the card keeps Done.
+    const monitoring = projectThreadAwareness({
+      environmentId: "env-1" as EnvironmentId,
+      project,
+      thread: thread({ ...settled, backgroundLiveness: "monitoring" }),
+    });
+    expect(monitoring?.phase).toBe("completed");
   });
 
   it("projects failures with the session error detail", () => {

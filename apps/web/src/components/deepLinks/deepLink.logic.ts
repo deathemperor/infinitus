@@ -1,3 +1,20 @@
+import { redirectedInfinitusSettingsPath } from "../settings/infinitus/settingsInfinitusRedirect.logic";
+import { SETTINGS_SECTION_LABELS, type SettingsPath } from "../settings/settingsSearch";
+
+/** `settings/<page>` navigates only to a section the sidebar lists. */
+function isSettingsDeepLinkPath(path: string): path is SettingsPath {
+  return Object.hasOwn(SETTINGS_SECTION_LABELS, path);
+}
+
+/** The Settings page a `settings/<page>` link opens, or null for a path that
+    is no section. An older menu bar app still sends the retired
+    `settings/infinitus[/…]` group, which lands on the page's new route. */
+export function settingsDeepLinkTarget(path: string): SettingsPath | null {
+  const match = /^\/settings\/infinitus(?:\/(.*))?$/.exec(path);
+  const target = match ? redirectedInfinitusSettingsPath(match[1]) : path;
+  return isSettingsDeepLinkPath(target) ? target : null;
+}
+
 /**
  * Deep links (#270 D): `new?project=…` names a project by id, by title, or by
  * the last segment of its workspace root — a link is typed or pasted, so the

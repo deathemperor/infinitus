@@ -91,7 +91,13 @@ export function shouldPublishAgentAwarenessEvent(event: OrchestrationEvent): boo
         event.payload.activity.kind === "provider.approval.respond.failed" ||
         event.payload.activity.kind === "user-input.requested" ||
         event.payload.activity.kind === "user-input.resolved" ||
-        event.payload.activity.kind === "runtime.error"
+        event.payload.activity.kind === "runtime.error" ||
+        // Fork: a background task starting or ending flips the shell's
+        // `backgroundLiveness`, which the phase follows. `task.progress` is
+        // left out: it never changes liveness and fires constantly.
+        event.payload.activity.kind === "task.started" ||
+        event.payload.activity.kind === "task.updated" ||
+        event.payload.activity.kind === "task.completed"
       );
     default:
       return true;

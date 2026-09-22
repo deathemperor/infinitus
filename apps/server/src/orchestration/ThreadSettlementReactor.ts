@@ -1,4 +1,9 @@
-import { CommandId, type ServerSettings as ServerSettingsValue } from "@infinitus/contracts";
+import {
+  CommandId,
+  type OrchestrationEvent,
+  type ServerSettings as ServerSettingsValue,
+  type ThreadId,
+} from "@infinitus/contracts";
 import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
@@ -16,6 +21,10 @@ import * as GitManager from "../git/GitManager.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { forkParked } from "../serverActivation.ts";
+import {
+  InfinitusLimitStops,
+  InfinitusLimitStopsLive,
+} from "../infinitus/Services/InfinitusLimitStops.ts";
 import * as OrchestrationEngine from "./Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./Services/ProjectionSnapshotQuery.ts";
 import { pullRequestMatchesProject } from "./ThreadPullRequestReactor.ts";
@@ -81,9 +90,11 @@ export const make = Effect.gen(function* () {
   const pullRequests = yield* PullRequestService.PullRequestService;
   const crypto = yield* Crypto.Crypto;
   const fileSystem = yield* FileSystem.FileSystem;
+  const limitStops = yield* InfinitusLimitStops;
 
   const sweep = Effect.fn("ThreadSettlementReactor.sweep")(function* (
     mergedPullRequest: PullRequestService.PullRequestMergeEvent | null,
+    threadId?: ThreadId,
   ) {
     const settings = yield* settingsService.getSettings;
     if (!autoSettlementConfigured(settings)) {
@@ -94,7 +105,17 @@ export const make = Effect.gen(function* () {
     const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
     // A merge rechecks all candidates, including branches that discovery has
     // not linked yet. Those lookups can still have cached the PR as open.
-    const candidates = snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now));
+    const candidates = yield* Effect.filter(
+      snapshot.threads.filter(
+        (thread) =>
+          (threadId === undefined || thread.id === threadId) &&
+          isAutoSettlementCandidate(thread, now),
+      ),
+      (thread) =>
+        Effect.all([limitStops.isStopped(thread.id), limitStops.isResuming(thread.id)]).pipe(
+          Effect.map(([stopped, resuming]) => !stopped && !resuming),
+        ),
+    );
 
     // Return the thread when it still needs a pull request decision. A rejected
     // dispatch skips it for this snapshot instead of retrying through a lookup.
@@ -279,8 +300,11 @@ export const make = Effect.gen(function* () {
     );
   });
 
-  const runSweep = (mergedPullRequest: PullRequestService.PullRequestMergeEvent | null) =>
-    sweep(mergedPullRequest).pipe(
+  const runSweep = (
+    mergedPullRequest: PullRequestService.PullRequestMergeEvent | null,
+    threadId?: ThreadId,
+  ) =>
+    sweep(mergedPullRequest, threadId).pipe(
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.failCause(cause)
@@ -289,13 +313,36 @@ export const make = Effect.gen(function* () {
             }),
       ),
     );
-  const worker = yield* makeDrainableWorker(() => runSweep(null));
+  const worker = yield* makeDrainableWorker((threadId: ThreadId | undefined) =>
+    runSweep(null, threadId),
+  );
+
+  const processEvent = (event: OrchestrationEvent) => {
+    switch (event.type) {
+      case "thread.pull-request-linked":
+      case "thread.pull-request-synced":
+      case "thread.pull-request-unlinked":
+        // Merge notifications can arrive before the linked snapshot is projected.
+        // Recheck the persisted state so terminal links settle without the timer.
+        return worker.enqueue(event.payload.threadId);
+      case "thread.session-set":
+        if (
+          event.payload.session.status !== "running" &&
+          event.payload.session.status !== "starting"
+        ) {
+          return worker.enqueue(event.payload.threadId);
+        }
+        break;
+    }
+    return Effect.void;
+  };
 
   const start: ThreadSettlementReactor["Service"]["start"] = Effect.fn(
     "ThreadSettlementReactor.start",
   )(function* () {
     const settingsChanges = yield* settingsService.subscribeChanges;
     const mergedPullRequests = yield* pullRequests.subscribeMerges;
+    const events = yield* engine.subscribeDomainEvents;
     const initialSettings = yield* settingsService.getSettings.pipe(Effect.orDie);
     let lastSettlementSettings = autoSettlementSettingsKey(initialSettings);
     yield* forkParked(
@@ -314,10 +361,13 @@ export const make = Effect.gen(function* () {
         return worker.enqueue(undefined);
       }),
     );
-    yield* forkParked(Stream.runForEach(mergedPullRequests, runSweep));
+    yield* forkParked(Stream.runForEach(mergedPullRequests, (event) => runSweep(event)));
+    yield* forkParked(Stream.runForEach(events, processEvent));
   });
 
   return { start, drain: worker.drain } satisfies ThreadSettlementReactor["Service"];
 });
 
-export const layer = Layer.effect(ThreadSettlementReactor, make);
+export const layer = Layer.effect(ThreadSettlementReactor, make).pipe(
+  Layer.provideMerge(InfinitusLimitStopsLive),
+);

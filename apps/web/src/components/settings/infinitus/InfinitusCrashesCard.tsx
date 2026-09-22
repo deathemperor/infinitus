@@ -1,5 +1,5 @@
 /**
- * "Crash reports" on Settings › Infinitus › Devices: the crashes and hangs the
+ * "Crash reports" on Settings › Devices: the crashes and hangs the
  * Mac recorded — the phone's, filed over `crash-report` from MetricKit, and
  * the Mac app's own diagnostic reports — read over `infinitus.command`'s
  * `crashes` verb. Nothing leaves that Mac unless you copy a report: the list

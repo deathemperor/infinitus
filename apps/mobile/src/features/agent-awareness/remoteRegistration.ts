@@ -36,7 +36,8 @@ import {
   loadPreferences,
   saveAgentAwarenessRegistrationRecord,
 } from "../../persistence/imperative";
-import AgentActivity, { type AgentActivityProps } from "../../widgets/AgentActivity";
+import type { AgentActivityProps } from "../../widgets/AgentActivity";
+import { getAgentLiveActivities, startAgentLiveActivity } from "./agentLiveActivity";
 import { resolveCloudPublicConfig } from "../cloud/publicConfig";
 import { supportsAgentAwarenessPush } from "./capabilities";
 import { makeRelayDeviceRegistrationRequest, resolveApsEnvironment } from "./registrationPayload";
@@ -523,11 +524,11 @@ function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
   readonly projectTitle: string;
 }): void {
   try {
-    if (AgentActivity.getInstances().length > 0) {
+    if (getAgentLiveActivities().length > 0) {
       return;
     }
     const nowIso = new Date(Date.now()).toISOString();
-    const activity = AgentActivity.start({
+    const activity = startAgentLiveActivity({
       title: PRODUCT_NAME,
       subtitle: "Agent work in progress",
       activeCount: 1,
@@ -546,6 +547,9 @@ function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
         },
       ],
     });
+    if (!activity) {
+      return;
+    }
     logRegistrationDebug("live activity card armed for local work", {
       threadTitle: input.threadTitle,
     });
@@ -777,7 +781,12 @@ function registerDevice(
         appVersion: Constants.expoConfig?.version,
         ...(bundleId ? { bundleId } : {}),
         ...(Platform.OS === "ios"
-          ? { apsEnvironment: resolveApsEnvironment(Constants.expoConfig?.extra?.appVariant) }
+          ? {
+              apsEnvironment: resolveApsEnvironment(
+                Constants.expoConfig?.extra?.appVariant,
+                Constants.expoConfig?.extra?.apsEnvironment,
+              ),
+            }
           : {}),
         ...(pushTokenRegistration.pushToken ? { pushToken: pushTokenRegistration.pushToken } : {}),
         notificationsEnabled: pushTokenRegistration.notificationsEnabled,
@@ -843,7 +852,7 @@ function endLocalLiveActivities(context: string): void {
     return;
   }
   try {
-    for (const activity of AgentActivity.getInstances()) {
+    for (const activity of getAgentLiveActivities()) {
       activity.end("immediate").catch((error: unknown) => {
         logRegistrationError(context, error);
       });
@@ -1070,7 +1079,7 @@ export function refreshActiveLiveActivityRemoteRegistration(): Effect.Effect<
     }
 
     let activities = yield* Effect.try({
-      try: () => AgentActivity.getInstances(),
+      try: () => getAgentLiveActivities(),
       catch: (cause) =>
         new AgentAwarenessOperationError({
           operation: "list-active-live-activities",
@@ -1119,7 +1128,7 @@ export function refreshActiveLiveActivityRemoteRegistration(): Effect.Effect<
         // The snapshot request yields; an arm-on-send may have created the
         // card in the meantime. Re-check so two cards are never started.
         const armedMeanwhile = yield* Effect.try({
-          try: () => AgentActivity.getInstances(),
+          try: () => getAgentLiveActivities(),
           catch: () => [] as ReadonlyArray<LiveActivity<AgentActivityProps>>,
         }).pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<LiveActivity<AgentActivityProps>>));
         if (armedMeanwhile.length > 0) {
@@ -1128,7 +1137,7 @@ export function refreshActiveLiveActivityRemoteRegistration(): Effect.Effect<
           const aggregate = snapshot.aggregate;
           const primed = yield* Effect.try({
             try: () =>
-              AgentActivity.start({
+              startAgentLiveActivity({
                 title: aggregate.title,
                 subtitle: aggregate.subtitle,
                 activeCount: aggregate.activeCount,

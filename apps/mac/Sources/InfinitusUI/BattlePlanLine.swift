@@ -10,7 +10,6 @@ import InfinitusCore
 /// success read as "nothing happens").
 public struct BattlePlanLine<M: FleetModel>: View {
     @ObservedObject var model: M
-    @State private var armed = false
 
     public init(model: M) {
         self.model = model
@@ -41,34 +40,19 @@ public struct BattlePlanLine<M: FleetModel>: View {
         }
     }
 
-    @ViewBuilder private func igniteButton(_ n: Int) -> some View {
-        if model.igniting == n {
-            ProgressView().controlSize(.mini)
-        } else {
-            Button {
-                if armed {
-                    armed = false
-                    model.ignite(n)
-                } else {
-                    armed = true
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .seconds(6))
-                        armed = false
-                    }
-                }
-            } label: {
-                // Armed: a solid orange pill, not a tint under the caption
-                // font — the 6 s window has to be seen to be used (#338).
-                (Text(Image(systemName: armed ? "flame.fill" : "flame"))
-                 + Text(armed ? " Sure? Ignite \(name(n))" : " Ignite \(name(n))"))
-                    .font(PopupFont.caption.weight(armed ? .semibold : .regular))
-                    .padding(.horizontal, 6).padding(.vertical, 1)
-                    .background(armed ? Color.orange : Color.secondary.opacity(0.2), in: Capsule())
-                    .foregroundStyle(armed ? .white : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help(armed ? "Click again within 6 s to start \(name(n))'s window now"
-                        : "Starts \(name(n))'s 5h window now with one tiny request (asks again before it fires)")
+    private func igniteButton(_ n: Int) -> some View {
+        IgniteAction(model: model, number: n) { armed in
+            armed ? "Click again within 6 s to start \(name(n))'s window now"
+                  : "Starts \(name(n))'s 5h window now with one tiny request (asks again before it fires)"
+        } label: { armed in
+            // Armed: a solid orange pill, not a tint under the caption
+            // font — the 6 s window has to be seen to be used (#338).
+            (Text(Image(systemName: armed ? "flame.fill" : "flame"))
+             + Text(armed ? " Sure? Ignite \(name(n))" : " Ignite \(name(n))"))
+                .font(PopupFont.caption.weight(armed ? .semibold : .regular))
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(armed ? Color.orange : Color.secondary.opacity(0.2), in: Capsule())
+                .foregroundStyle(armed ? .white : .secondary)
         }
     }
 

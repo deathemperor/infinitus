@@ -298,36 +298,12 @@
         "summary": "Process cost: CPU seconds so far, RSS + live heap bytes, thread count — sample twice for an idle % and a heap growth rate (perf gate)."
       },
       {
-        "args": [],
-        "effect": "read",
-        "name": "lock-status",
-        "options": [],
-        "replyShape": "{enabled, locked, relock: immediately|5 min|1 h|on sleep}",
-        "summary": "Biometric lock (Settings › Lock): whether the setting is on, whether the pop-out and Settings are locked right now, and the re-lock choice. Off by default."
-      },
-      {
-        "args": ["on|off|now|relock", "[immediately|5m|1h|sleep]"],
-        "effect": "write",
-        "name": "lock",
-        "options": ["--yes"],
-        "replyShape": "lock-status",
-        "summary": "Biometric lock: `on` runs the unlock prompt on the Mac once and turns the setting on; `off` turns it off (--yes while in a team); `now` locks the pop-out and Settings; `relock <choice>` sets the re-lock delay."
-      },
-      {
-        "args": [],
-        "effect": "write",
-        "name": "unlock",
-        "options": [],
-        "replyShape": "lock-status",
-        "summary": "Run the unlock prompt on the Mac (Touch ID or password) and unlock the pop-out and Settings; refused with the reason when it fails or is cancelled."
-      },
-      {
-        "args": ["popout|settings"],
+        "args": ["popout"],
         "effect": "write",
         "name": "show",
         "options": [],
         "replyShape": "{shown}",
-        "summary": "Open a window: the pinned pop-out or Settings. The wall, workspace and session windows are retired — the Infinitus desktop app is the client."
+        "summary": "Open the pinned pop-out. The Settings, wall, workspace and session windows are retired — the Infinitus desktop app is the client."
       },
       {
         "args": ["[get <key>...]"],
@@ -362,12 +338,12 @@
         "summary": "Set one preference (`prefs set <key> <value>` is the same): the value is JSON, or a bare word for a string; refused when it is the wrong type or off the pref's choices. A `restart` pref relaunches the app after the reply, as `engine` does."
       },
       {
-        "args": ["popout|settings"],
+        "args": ["popout"],
         "effect": "write",
         "name": "hide",
         "options": [],
         "replyShape": "{hidden}",
-        "summary": "Close the pinned pop-out (the e2e no-lease window) or Settings."
+        "summary": "Close the pinned pop-out (the e2e no-lease window)."
       },
       {
         "args": ["swapd|cliproxy|9router", "on|off"],
@@ -530,14 +506,6 @@
         "section": "display",
         "type": "bool",
         "value": true
-      },
-      {
-        "default": false,
-        "effect": "live",
-        "key": "dock_icon_enabled",
-        "section": "display",
-        "type": "bool",
-        "value": false
       },
       {
         "choices": ["wide", "stacked", "hstack"],

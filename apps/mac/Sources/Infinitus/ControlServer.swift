@@ -18,7 +18,11 @@ final class ControlServer {
     /// The inode we bound — `heal()` checks the path still leads to it.
     private var boundInode: ino_t = 0
     private let queue = DispatchQueue(label: "infinitus.control")
-    private var busy = false
+    /// Writes run one at a time, in arrival order: the next press waits
+    /// for the one in flight instead of being refused (#1481: "busy" met
+    /// every second keep-warm press while the first was still on its
+    /// engine pass). Reads still run alongside.
+    private var writeTail: Task<ControlReply, Never>?
     private var task: Task<Void, Never>?
 
     init(model: AppModel) { self.model = model }
@@ -179,13 +183,27 @@ final class ControlServer {
         // status/fleets/events/sessions continuously, and a blanket guard
         // handed the CLI (and the phone) "busy" whenever a poll was in
         // flight — a `perf` probe hit it on the live bundle (#346).
-        if command.effect != .read {
-            guard !busy else { return .failure("busy: another control command is running") }
-            busy = true
+        guard command.effect != .read else { return await answer(request) }
+        let prior = writeTail
+        let mine = Task { @MainActor [self] in
+            _ = await prior?.value
+            return await answer(request)
         }
-        defer { if command.effect != .read { busy = false } }
+        writeTail = mine
+        let reply = await mine.value
+        if writeTail == mine { writeTail = nil }
+        return reply
+    }
+
+    private func answer(_ request: ControlRequest) async -> ControlReply {
         do { return try await dispatch(request) }
         catch { return .failure((error as? LocalizedError)?.errorDescription ?? "\(error)") }
+    }
+
+    /// After a flag edit: the refresh pass takes the snapshot the engine
+    /// answered with, and asks only an engine that answered nothing.
+    private func settle(_ edited: [EngineFleet]?, _ fleet: FleetState) async {
+        await model.refreshSnapshot(seeded: edited.map { [fleet.engineID: $0] } ?? [:])
     }
 
     // MARK: dispatch
@@ -193,16 +211,6 @@ final class ControlServer {
     private struct Fail: LocalizedError {
         let errorDescription: String?
         init(_ m: String) { errorDescription = m }
-    }
-
-    /// The lock's current state, for `lock-status`/`lock on|off|now|relock|unlock`.
-    private func lockReply() -> ControlReply {
-        let policy = model.lock.policy
-        return ControlReply(ok: true, result: .object([
-            "enabled": .bool(policy.enabled),
-            "locked": .bool(policy.locked),
-            "relock": .string(policy.relock.label),
-        ]))
     }
 
     /// The team snapshot after an action, or the action's error.
@@ -277,19 +285,20 @@ final class ControlServer {
             guard fleet.accounts.contains(where: { $0.number == n }) else {
                 throw Fail("no account #\(n) in \(fleet.id)")
             }
+            var edited: [EngineFleet]?
             switch r.command {
             case "switch": try await fleet.engine.switchTo(fleet: fleet.provider, number: n)
-            case "hold": try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: true)
-            case "unhold": try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: false)
+            case "hold": edited = try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: true)
+            case "unhold": edited = try await fleet.engine.setHold(fleet: fleet.provider, number: n, held: false)
             case "rename":
                 guard r.args.count >= 3 else { throw Fail("usage: rename <fleet> <n> <alias>") }
-                try await fleet.engine.rename(fleet: fleet.provider, number: n, r.args[2])
+                edited = try await fleet.engine.rename(fleet: fleet.provider, number: n, r.args[2])
             case "remove":
                 guard r.options["yes"] != nil else { throw Fail("remove deletes the credential; pass --yes") }
                 try await fleet.engine.remove(fleet: fleet.provider, number: n)
             default: break
             }
-            await model.refreshSnapshot()
+            await settle(edited, fleet)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "randomize-names":
@@ -345,8 +354,7 @@ final class ControlServer {
             guard order.count == r.args.count - 1, order.count == have.count, Set(order) == Set(have) else {
                 throw Fail("reorder needs every account number exactly once, top first: \(have.sorted().map(String.init).joined(separator: " "))")
             }
-            try await fleet.engine.reorder(fleet: fleet.provider, order)
-            await model.refreshSnapshot()
+            await settle(try await fleet.engine.reorder(fleet: fleet.provider, order), fleet)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "prefer":
@@ -357,8 +365,18 @@ final class ControlServer {
             guard account.preferred != nil else {
                 throw Fail("the engine reports no pick-first flag for \(fleet.id)")
             }
-            try await fleet.engine.setPreferred(fleet: fleet.provider, number: n, r.args[2] == "on")
-            await model.refreshSnapshot()
+            await settle(try await fleet.engine.setPreferred(fleet: fleet.provider, number: n, r.args[2] == "on"), fleet)
+            return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
+
+        case "auto-ignite":
+            let (fleet, n) = try target(r)
+            guard fleet.capabilities.contains(.autoIgnite) else { throw Fail("\(fleet.id) cannot keep a window running") }
+            guard r.args.count >= 3, ["on", "off"].contains(r.args[2]) else { throw Fail("usage: auto-ignite <fleet> <n> on|off") }
+            guard let account = fleet.accounts.first(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
+            guard account.autoIgnite != nil else {
+                throw Fail("the engine reports no keep-warm flag for \(fleet.id); update swapd")
+            }
+            await settle(try await fleet.engine.setAutoIgnite(fleet: fleet.provider, number: n, r.args[2] == "on"), fleet)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
         case "crashes":
@@ -432,10 +450,13 @@ final class ControlServer {
             guard !TokenFlow.shared.running, !model.addingFirstAccount else {
                 throw Fail("a sign-in is already running")
             }
-            if fleet.capabilities.contains(.addOAuth) {
-                model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider)
-            } else if fleet.capabilities.contains(.addCurrent) {
+            // A credential-swap engine captures the login its CLI already
+            // holds — the first-account onboarding this verb is for, with
+            // nothing to show; only an engine without that opens a sign-in.
+            if fleet.capabilities.contains(.addCurrent) {
                 model.addFirstAccount()
+            } else if fleet.capabilities.contains(.addOAuth) {
+                model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider)
             } else {
                 throw Fail("\(key) has no sign-in flow")
             }
@@ -458,7 +479,7 @@ final class ControlServer {
         case "signin-begin":
             guard let key = r.args.first,
                   let fleet = model.fleets.first(where: { $0.id == key }) else {
-                throw Fail("usage: signin-begin <fleet> [--relogin <email>]; fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
+                throw Fail("usage: signin-begin <fleet> [--relogin <email>] [--window]; fleets: \(model.fleets.map(\.id).joined(separator: ", "))")
             }
             let flow = TokenFlow.shared
             guard !flow.running, !model.addingFirstAccount else {
@@ -471,11 +492,25 @@ final class ControlServer {
                 }
                 relogin = account
             }
-            if fleet.capabilities.contains(.addOAuth) {
+            // `--window`: this Mac shows its own sign-in window — the
+            // ephemeral system sheet, passkeys and all — for a caller on
+            // the same machine whose browser has no private window to give
+            // (the desktop app beside Safari). Headless, the caller shows
+            // the page on ITS machine, which may not be this one — an
+            // engine's loopback redirect would land there with nothing
+            // listening. So the window run takes the engine's redirect
+            // (`.addOAuth`, the Mac's own Add / Re-login rule) and the
+            // headless one keeps the paste-back flow of a credential-swap
+            // engine even when it also takes the redirect.
+            let headless = r.options["window"] == nil
+            let oauthFirst = !headless
+            let useOAuth = fleet.capabilities.contains(.addOAuth)
+                && (oauthFirst || !fleet.capabilities.contains(.addCurrent))
+            if useOAuth {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
-                                      relogin: relogin, headless: true)
+                                      relogin: relogin, headless: headless)
             } else if fleet.capabilities.contains(.addCurrent) {
-                flow.start(model: model, relogin: relogin, headless: true)
+                flow.start(model: model, relogin: relogin, headless: headless)
             } else {
                 throw Fail("\(key) has no sign-in flow")
             }
@@ -497,6 +532,7 @@ final class ControlServer {
                 "flowId": .string(flowID),
                 "url": .string(url.absoluteString),
                 "pasteCode": .bool(flow.pasteCode),
+                "window": .bool(!headless),
                 "label": .string(flow.reloginTarget.map { "Sign in again \u{2014} \($0)" } ?? "Add account"),
             ]))
 
@@ -636,52 +672,17 @@ final class ControlServer {
                 "uptimeSeconds": .number(Date().timeIntervalSince(launchedAt)),
             ]))
 
-        case "lock-status":
-            return lockReply()
-
-        case "lock":
-            // #747: the fork's Lock pane drives the biometric lock through
-            // these; `on` and `unlock` run the prompt on this Mac.
-            switch r.args.first {
-            case "on":
-                if !model.lock.enabled {
-                    let on = await model.lock.turnOn()
-                    guard on else { throw Fail(model.lock.lastError ?? "the unlock prompt was cancelled") }
-                }
-            case "off":
-                model.lock.turnOff()
-            case "now":
-                model.lock.lockNow()
-            case "relock":
-                let choices: [String: LockPolicy.Relock] = ["immediately": .immediately, "5m": .fiveMinutes,
-                                                             "1h": .oneHour, "sleep": .onSleep]
-                guard r.args.count >= 2, let relock = choices[r.args[1]] else {
-                    throw Fail("usage: lock relock immediately|5m|1h|sleep")
-                }
-                model.lock.relock = relock
-            default:
-                throw Fail("usage: lock on|off|now|relock immediately|5m|1h|sleep")
-            }
-            return lockReply()
-
-        case "unlock":
-            guard model.lock.enabled else { throw Fail("the lock is off") }
-            guard model.lock.policy.locked else { return lockReply() }
-            await model.lock.unlock()
-            if let err = model.lock.lastError { throw Fail(err) }
-            guard !model.lock.policy.locked else { throw Fail("the unlock prompt was cancelled") }
-            return lockReply()
-
         case "show":
             guard let controller = AppDelegate.shared?.statusHolder?.controller else {
                 throw Fail("no status item yet")
             }
             switch r.args.first {
             case "popout": controller.showPinnedWindow()
-            case "settings": controller.showSettingsWindow()
+            case "settings":
+                throw Fail("retired: the Settings window is gone — every setting is in the Infinitus desktop app")
             case "wall", "workspace", "session":
                 throw Fail("retired: the wall, workspace and session windows moved to the Infinitus desktop app")
-            default: throw Fail("usage: show popout|settings")
+            default: throw Fail("usage: show popout")
             }
             return ControlReply(ok: true, result: .object(["shown": .string(r.args[0])]))
 
@@ -733,10 +734,11 @@ final class ControlServer {
             }
             switch r.args.first {
             case "popout": controller.hidePinnedWindow()
-            case "settings": controller.hideSettingsWindow()
+            case "settings":
+                throw Fail("retired: the Settings window is gone — every setting is in the Infinitus desktop app")
             case "workspace":
                 throw Fail("retired: the workspace window moved to the Infinitus desktop app")
-            default: throw Fail("usage: hide popout|settings")
+            default: throw Fail("usage: hide popout")
             }
             return ControlReply(ok: true, result: .object(["hidden": .string(r.args[0])]))
 
@@ -1252,8 +1254,8 @@ final class ControlServer {
             (.rename, "rename"), (.remove, "remove"), (.addCurrent, "addCurrent"),
             (.addToken, "addToken"), (.addOAuth, "addOAuth"), (.autoSwitch, "autoSwitch"),
             (.costReport, "costReport"), (.history, "history"), (.settings, "settings"),
-            (.prefer, "prefer"), (.ignite, "ignite"), (.backup, "backup"),
-            (.refreshAccount, "refreshAccount"),
+            (.prefer, "prefer"), (.ignite, "ignite"),
+            (.refreshAccount, "refreshAccount"), (.autoIgnite, "autoIgnite"),
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
     }

@@ -1,6 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { parseAddOauthLine, resolveSwapdBinary } from "./infinitusSwapd.logic.ts";
+import {
+  parseAddOauthLine,
+  privateWindowFlag,
+  resolveSwapdBinary,
+} from "./infinitusSwapd.logic.ts";
 
 const HOME = "/Users/me";
 const BUNDLE = "/Applications/Infinitus.app";
@@ -27,8 +31,14 @@ describe("resolveSwapdBinary (#1213)", () => {
     assert.equal(resolve({ present: [`${HOME}/.cargo/bin/swapd`] }), `${HOME}/.cargo/bin/swapd`);
   });
 
-  it("falls back to the menu-bar helper nested in the packaged bundle", () => {
+  it("takes the menu-bar helper nested in the packaged bundle ahead of a PATH copy (#1530)", () => {
     assert.equal(resolve({ desktopBundlePath: BUNDLE, present: [NESTED] }), NESTED);
+    assert.equal(
+      resolve({ desktopBundlePath: BUNDLE, present: [`${HOME}/.cargo/bin/swapd`, NESTED] }),
+      NESTED,
+    );
+    // No bundle (a dev run), so the PATH copy is all there is.
+    assert.equal(resolve({ present: [`${HOME}/.cargo/bin/swapd`] }), `${HOME}/.cargo/bin/swapd`);
   });
 
   it("is null when the engine is nowhere", () => {
@@ -79,5 +89,14 @@ describe("parseAddOauthLine (#1213)", () => {
     assert.equal(parseAddOauthLine('{"schemaVersion":1}'), null);
     // An envelope missing its slot is not an account that was stored.
     assert.equal(parseAddOauthLine('{"email":"a@b.c"}'), null);
+  });
+});
+
+describe("privateWindowFlag", () => {
+  it("knows the Chromium family's switches and nothing else", () => {
+    assert.equal(privateWindowFlag("com.google.Chrome"), "--incognito");
+    assert.equal(privateWindowFlag("com.microsoft.edgemac"), "--inprivate");
+    assert.equal(privateWindowFlag("com.apple.Safari"), null);
+    assert.equal(privateWindowFlag("org.mozilla.firefox"), null);
   });
 });

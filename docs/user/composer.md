@@ -14,9 +14,13 @@ to keep a large paste editable in the composer instead.
 
 ## Attach files
 
-Attach up to eight files per message. Images can be up to 10 MB; other files can
-be up to 50 MB, subject to the environment's upload support and limit. The agent
-receives them on the environment's machine.
+Attach up to 100 files per message. Each image can be up to 10 MiB, with at most
+80 MiB of images in one message. Other files, including videos, can be up to
+50 MiB each, subject to the environment's upload support and limit. The agent
+receives them on the environment's machine. Provider and model limits still
+apply, including images already in the conversation. A video attachment gives
+the agent a file path; it does not enable native video input. Antigravity does
+not accept video attachments.
 
 Uploads begin when you add an attachment. All uploads must finish before the
 message can send. Retry or remove a failed upload. On web and desktop, reloading
@@ -25,7 +29,7 @@ before an upload finishes requires you to attach that file again.
 You can drag or paste images into the web or desktop composer. HEIC and HEIF
 photos are converted to JPEG there and when selected from the mobile photo
 library; photos over the image limit are also resized to fit. On mobile, you can
-also send files to T3 Code through another app's system share sheet.
+also send files to Infinitus through another app's system share sheet, into a new task or an existing thread.
 
 See [images and videos](#images-and-videos-in-messages) for previewing and saving media.
 
@@ -57,7 +61,7 @@ uses its account catalog and does not support custom models.
 
 ## Model defaults
 
-T3 Code remembers your provider, model, and model options for new threads. A
+Infinitus remembers your provider, model, and model options for new threads. A
 project's configured model takes precedence; resetting that project setting
 returns to the remembered selection.
 
@@ -100,7 +104,10 @@ into a normal draft.
 On web and desktop, choose **Edit from here** beneath a sent message to rewind
 the conversation to before that message. Choose **Revert and keep changes** to
 leave workspace files as they are, or **Revert files too** to restore them as well.
-The selected prompt and its attachments return to the composer for editing and
+File restore is only offered for threads running in a worktree, and it is
+refused when another thread or agent session also uses that directory, since
+restoring would erase their changes. A thread that works in the project directory
+rewinds the conversation only. The selected prompt and its attachments return to the composer for editing and
 resending. Any unsent draft stays above the restored prompt.
 
 This removes the selected message and later conversation from the active thread
@@ -127,9 +134,10 @@ recording started, ready for you to review and edit before sending.
 The first use may download Apple's speech model and needs a network connection.
 Later transcription works offline for that language. Recordings can be up to five
 minutes long. Canceling, leaving the screen, or an audio interruption discards the
-recording and preserves your existing draft.
+recording and preserves your existing draft. While recording, the screen stays
+awake; it can sleep normally once recording stops.
 
-Transcription runs on your device. T3 Code deletes the temporary audio after
+Transcription runs on your device. Infinitus deletes the temporary audio after
 transcription or cancellation; only the message text is sent when you submit.
 
 ## Commands and skills
@@ -141,7 +149,7 @@ provider. On mobile, both are also available before starting a thread on
 The slash menu also includes skills unless you turn off **Settings → General →
 Show skills in slash menu**. Only skills enabled for the provider are listed.
 
-Provider commands must start the message to run. T3 Code commands such as
+Provider commands must start the message to run. Infinitus commands such as
 `/model` and `/plan`, and skill mentions, work on any line.
 
 Send `/compact` in an existing conversation to reduce context usage when the
@@ -172,7 +180,7 @@ exist only as chips: deleting a file's last chip removes the file from the messa
 Copy text that holds chips and paste it into another draft, in the same thread or another one,
 and the chips come along with what they point to. Images and files are fetched again from the
 environment they came from; while that happens the chip shows a dashed outline, and if it cannot
-complete T3 Code tells you and leaves the chip for you to remove or replace. A chip whose
+complete Infinitus tells you and leaves the chip for you to remove or replace. A chip whose
 context is no longer available shows the same dashed outline; hover it for what to do.
 
 Copying a message with the copy button, or copying text out of it, gives other apps readable
@@ -219,7 +227,7 @@ styles, or images from neighboring files.
 
 On web and desktop, HTML and PDF files open as rendered pages. Switch an HTML
 file to source view to read its markup; a link to a specific line opens source
-automatically. HTML previews cannot access your T3 Code session.
+automatically. HTML previews cannot access your Infinitus session.
 
 On mobile, select a PDF attachment or link to open it. iOS uses the native viewer;
 Android opens a compatible installed file viewer.

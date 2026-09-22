@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Infinitus</title>
+<meta name="description" content="How Infinitus handles information. Infinitus runs on your own devices; the optional account, push and tunnel features are the only parts that reach a server.">
+<link rel="icon" type="image/png" href="/img/icon.png">
+<style>
+  /* The landing page's palette, system fonts in place of its Google ones.
+     Inlined and script-free on purpose: the phone's Legal WebView runs with
+     javaScriptEnabled={false} and cacheEnabled={false}, and only allowlisted
+     URLs load, so an external stylesheet could render the page bare. */
+  :root {
+    --bg: #0a0d11; --panel: #11161d; --line: #232b35; --line-strong: #2f3945;
+    --text: #e6e1d6; --dim: #8b93a0; --faint: #7c8592; --orange: #f0a03c;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--mono); font-size: 15px; line-height: 1.7;
+    -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
+  .page { width: min(1100px, calc(100% - 48px)); margin: 0 auto; padding: 56px 0 72px; }
+  .back { display: inline-block; margin-bottom: 34px; color: var(--dim);
+    font-size: 12.5px; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
+  .back:hover { color: var(--text); }
+  .eyebrow { margin: 0; color: var(--orange); font-size: 11.5px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; }
+  h1 { margin: 14px 0 0; font-family: var(--serif); font-size: clamp(2.6rem, 7vw, 4.4rem);
+    font-weight: 400; letter-spacing: -0.02em; line-height: 1.02; }
+  .lede { max-width: 68ch; margin: 26px 0 0; color: var(--dim); font-size: 15.5px; line-height: 1.72; }
+  .dates { display: flex; flex-wrap: wrap; gap: 32px; margin: 32px 0 0; }
+  .dates div { display: grid; gap: 2px; }
+  .dates dt { color: var(--faint); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .dates dd { margin: 0; font-size: 13px; }
+  .rule { height: 1px; margin: 52px 0;
+    background: linear-gradient(90deg, var(--line-strong), var(--line) 65%, transparent); }
+  .layout { display: grid; grid-template-columns: 210px minmax(0, 720px);
+    gap: clamp(48px, 8vw, 110px); align-items: start; }
+  .toc { position: sticky; top: 40px; }
+  .toc p { margin: 0 0 14px; color: var(--faint); font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase; }
+  .toc ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .toc a { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 5px 8px 5px 0;
+    color: var(--dim); font-size: 12.5px; line-height: 1.4; text-decoration: none; }
+  .toc a span { color: var(--faint); font-size: 11px; }
+  .toc a:hover { color: var(--text); }
+  .copy { min-width: 0; }
+  .copy section { scroll-margin-top: 24px; }
+  .copy section + section { margin-top: 56px; padding-top: 56px; border-top: 1px solid var(--line); }
+  .num { margin: 0; color: var(--orange); font-size: 11.5px; letter-spacing: 0.12em; }
+  h2 { margin: 8px 0 22px; font-family: var(--serif); font-size: clamp(1.6rem, 3.4vw, 2.1rem);
+    font-weight: 400; letter-spacing: -0.015em; line-height: 1.15; }
+  h3 { margin: 30px 0 8px; font-size: 14.5px; font-weight: 600; }
+  p, li, address { color: var(--dim); font-size: 14.5px; font-style: normal; line-height: 1.78; }
+  p { margin: 0 0 16px; }
+  strong { color: var(--text); font-weight: 600; }
+  ul, ol.list { display: grid; gap: 10px; margin: 16px 0 18px; padding-left: 1.15rem; }
+  li::marker { color: var(--orange); }
+  a { color: var(--text); overflow-wrap: anywhere; text-decoration: underline;
+    text-decoration-color: rgba(240, 160, 60, 0.55); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--orange); }
+  .notice { color: var(--text); font-weight: 600; }
+  address { margin: 18px 0; padding: 16px 18px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--panel); }
+  .cards { display: grid; margin-top: 46px; border-top: 1px solid var(--line); }
+  .card { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 20px;
+    align-items: center; padding: 26px 4px; border-bottom: 1px solid var(--line); text-decoration: none; }
+  .card:hover { background: rgba(255, 255, 255, 0.025); }
+  .card-num { color: var(--orange); font-size: 11.5px; letter-spacing: 0.1em; }
+  .card-copy { display: grid; gap: 5px; }
+  .card-copy strong { font-size: 16px; font-weight: 600; }
+  .card-copy span { color: var(--dim); font-size: 13.5px; line-height: 1.55; }
+  .card-arrow { color: var(--faint); font-size: 18px; }
+  .foot { margin-top: 64px; padding-top: 26px; border-top: 1px solid var(--line);
+    color: var(--faint); font-size: 12.5px; }
+  .foot a { color: var(--dim); }
+  @media (max-width: 860px) {
+    .page { width: calc(100% - 36px); padding: 36px 0 56px; }
+    .layout { display: block; }
+    .toc { position: static; margin-bottom: 44px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+    .rule { margin: 38px 0; }
+    .copy section + section { margin-top: 44px; padding-top: 44px; }
+    .card { grid-template-columns: 28px minmax(0, 1fr) auto; gap: 14px; padding: 22px 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a class="back" href="/legal">&#8592; All legal documents</a>
+
+  <header>
+    <p class="eyebrow">Infinitus / Legal</p>
+    <h1>Privacy Policy</h1>
+    <p class="lede">Infinitus runs on your own devices and talks to the coding agents you configure. This Policy describes the information involved, the few optional features that reach a server operated by the publisher, and the choices you have.</p>
+    <dl class="dates">
+      <div><dt>Effective</dt><dd>2026-09-17</dd></div>
+      <div><dt>Last updated</dt><dd>2026-09-17</dd></div>
+    </dl>
+  </header>
+
+  <div class="rule"></div>
+
+  <div class="layout">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <ol>
+        <li><a href="#local-first"><span>01</span>How Infinitus works</a></li>
+        <li><a href="#information"><span>02</span>Information Infinitus handles</a></li>
+        <li><a href="#optional-services"><span>03</span>Optional connected services</a></li>
+        <li><a href="#uses"><span>04</span>How information is used</a></li>
+        <li><a href="#sharing"><span>05</span>Who information reaches</a></li>
+        <li><a href="#choices"><span>06</span>Your choices</a></li>
+        <li><a href="#retention"><span>07</span>Retention and deletion</a></li>
+        <li><a href="#security"><span>08</span>Security</a></li>
+        <li><a href="#international"><span>09</span>International users</a></li>
+        <li><a href="#children"><span>10</span>Children</a></li>
+        <li><a href="#do-not-track"><span>11</span>Do Not Track</a></li>
+        <li><a href="#updates"><span>12</span>Updates to this Policy</a></li>
+        <li><a href="#contact"><span>13</span>Contact</a></li>
+      </ol>
+    </nav>
+
+    <article class="copy">
+
+      <section id="local-first">
+        <p class="num">01</p>
+        <h2>How Infinitus Works</h2>
+        <p>
+          Infinitus is a local-first application. The Mac menu bar app, the desktop app, the Linux tray
+          and the iOS app run on hardware you own. Your prompts, source files, agent responses, command
+          output, diffs and conversation history are stored on your own machine and sent to the
+          coding-agent providers you configure &mdash; not to the publisher.
+        </p>
+        <p>
+          There is no hosted Infinitus web application, and using Infinitus does not require an account.
+          A phone connects to a machine you run, over your own local network, your own Tailscale
+          network, or a tunnel you enable. In that default configuration the publisher receives nothing
+          about your work.
+        </p>
+        <p>
+          Some features cannot work purely on-device &mdash; push notifications to a phone that is
+          asleep, for example, must pass through Apple. Those features are optional, described in
+          <a href="#optional-services">Section 03</a>, and off until you turn them on.
+        </p>
+      </section>
+
+      <section id="information">
+        <p class="num">02</p>
+        <h2>Information Infinitus Handles</h2>
+
+        <h3>Stored on Your Device</h3>
+        <p>
+          Infinitus stores your projects and threads, agent transcripts, checkpoints, connection
+          settings, preferences, drafts and cached file, branch and server metadata locally. Credentials
+          and session tokens use platform-provided protected storage &mdash; the macOS and iOS Keychain
+          &mdash; where the platform supports it. Information stored only on your device is not collected
+          by the publisher unless a feature you enable transmits it.
+        </p>
+
+        <h3>Sent to Your Coding-Agent Providers</h3>
+        <p>
+          When you send a prompt, the prompt, the files and attachments you include, and the context the
+          agent requests are transmitted to the provider you selected &mdash; Anthropic for Claude Code,
+          or whichever other harness you configure. Those providers process that content under their own
+          terms and privacy policies. The publisher is not a party to that exchange and does not receive
+          a copy of it.
+        </p>
+
+        <h3>Device Permissions</h3>
+        <ul>
+          <li>
+            <strong>Camera.</strong> Requested only when you scan a pairing QR code. Frames are processed
+            on your device and are not transmitted or retained.
+          </li>
+          <li>
+            <strong>Photos and files.</strong> Items you pick are read only to preview them or attach
+            them to a request you initiate.
+          </li>
+          <li>
+            <strong>Notifications.</strong> Requested only if you enable agent-status notifications or
+            Live Activities.
+          </li>
+          <li>
+            <strong>Local network.</strong> Used to discover and connect to Infinitus environments
+            reachable from your device.
+          </li>
+        </ul>
+      </section>
+
+      <section id="optional-services">
+        <p class="num">03</p>
+        <h2>Optional Connected Services</h2>
+        <p>
+          The features below reach infrastructure the publisher operates at
+          <a href="https://infinitus.run">infinitus.run</a>. Each is optional. Declining them leaves
+          Infinitus fully usable over a direct connection.
+        </p>
+
+        <h3>The infinitus.run Site</h3>
+        <p>
+          The website and its download and pairing endpoints run on Cloudflare. As with any website, the
+          server and its provider log request information &mdash; IP address, user agent, path and
+          timestamp &mdash; to serve traffic and resist abuse. The team invite page carries its payload in
+          the URL fragment, which browsers never transmit to a server.
+        </p>
+
+        <h3>Sign-in and the Relay (Optional)</h3>
+        <p>
+          If you choose to sign in, an account is created through Clerk, which supplies an identifier,
+          your email address and any profile information from the sign-in method you select. Signing in
+          enables the relay at <code>relay.infinitus.run</code>, which exists to deliver push
+          notifications and to link devices to environments. With it enabled, the relay stores:
+        </p>
+        <ul>
+          <li>Your account identifier, and the device identifiers, platform and app version of devices you register;</li>
+          <li>Apple push tokens for the devices that are to receive notifications;</li>
+          <li>
+            Environment links &mdash; the label you assigned, the environment's public key, its connection
+            endpoints, and your per-environment notification preferences;
+          </li>
+          <li>
+            For each notification delivered: the thread and project titles, the model name, and a short
+            status headline, retained so a phone that reconnects can show current state. This is metadata
+            about a session, not its contents &mdash; your prompts, code and agent responses never pass
+            through the relay;
+          </li>
+          <li>Delivery records for troubleshooting, and short-lived proofs that secure the connection.</li>
+        </ul>
+        <p>
+          Without sign-in, none of the above exists. Notifications then either come from your own Mac
+          directly, or not at all.
+        </p>
+
+        <h3>Managed Tunnels (Optional)</h3>
+        <p>
+          If you enable a managed tunnel so a device can reach your machine from outside your network,
+          the connection is carried by Cloudflare. Traffic through the tunnel is encrypted between your
+          client and your own machine.
+        </p>
+
+        <h3>Diagnostics</h3>
+        <p>
+          Operational traces from the relay go to Axiom, and are used to keep it running and to
+          investigate faults. The mobile app can send traces too, but only when a dataset and token are
+          configured in the build; in the published app both are unset, so it sends none.
+        </p>
+
+        <h3>App Distribution and Updates</h3>
+        <p>
+          The desktop and Mac apps check GitHub for new releases. The iOS app is distributed through the
+          App Store and may receive updates through Expo. Those providers see the request information
+          that any download involves.
+        </p>
+      </section>
+
+      <section id="uses">
+        <p class="num">04</p>
+        <h2>How Information Is Used</h2>
+        <p>Information reaching publisher-operated infrastructure is used only to:</p>
+        <ul>
+          <li>Authenticate you and keep your account secure, if you created one;</li>
+          <li>Link your devices and environments, and deliver the notifications you asked for;</li>
+          <li>Operate, troubleshoot and secure the site and the relay;</li>
+          <li>Investigate abuse, and comply with applicable law.</li>
+        </ul>
+
+        <h3>No Advertising, No Profiling, No Sale</h3>
+        <p>
+          Your information is not sold, not shared for advertising, and not used to build a profile of
+          you. Infinitus carries no analytics SDK and no advertising identifier.
+        </p>
+
+        <h3>No Training of AI Models</h3>
+        <p>
+          The publisher does not use your information, source code, prompts or agent responses to train
+          artificial-intelligence models. What your chosen provider does with what you send it is
+          governed by that provider's terms &mdash; review them.
+        </p>
+      </section>
+
+      <section id="sharing">
+        <p class="num">05</p>
+        <h2>Who Information Reaches</h2>
+
+        <h3>Providers You Choose</h3>
+        <p>
+          At your direction, prompts, files and related content go to the coding agents and AI providers
+          configured in your environment. Because you bring your own harness and provider, which third
+          parties are involved is your choice. They process that content under their own terms.
+        </p>
+
+        <h3>Service Providers</h3>
+        <p>
+          Depending on which optional features you use, the following process information on the
+          publisher's behalf:
+        </p>
+        <ul>
+          <li>
+            <strong>Cloudflare, Inc.</strong> &mdash; the infinitus.run site, the relay, and managed
+            tunnels.
+            <a href="https://www.cloudflare.com/policies/privacy/">Privacy policy</a>.
+          </li>
+          <li>
+            <strong>Clerk, Inc.</strong> &mdash; account authentication, if you sign in.
+            <a href="https://clerk.com/legal/privacy">Privacy policy</a>.
+          </li>
+          <li>
+            <strong>Neon, Inc.</strong> &mdash; the database behind the relay.
+            <a href="https://neon.com/privacy-policy">Privacy policy</a>.
+          </li>
+          <li>
+            <strong>Axiom, Inc.</strong> &mdash; operational diagnostics for the relay.
+            <a href="https://axiom.co/docs/legal/privacy">Privacy policy</a>.
+          </li>
+          <li>
+            <strong>Apple Inc.</strong> &mdash; App Store distribution and push notification delivery.
+            <a href="https://www.apple.com/legal/privacy/">Privacy policy</a>.
+          </li>
+          <li>
+            <strong>650 Industries, Inc. (Expo)</strong> &mdash; mobile application updates.
+            <a href="https://expo.dev/privacy">Privacy policy</a>.
+          </li>
+          <li>
+            <strong>GitHub, Inc.</strong> &mdash; release downloads, issues and source code.
+            <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">Privacy statement</a>.
+          </li>
+        </ul>
+
+        <h3>Legal and Safety</h3>
+        <p>
+          Information may be disclosed where the publisher believes in good faith that it is necessary to
+          comply with law or legal process, to protect the rights, property or safety of the publisher or
+          others, or to investigate abuse. Information may also be shared at your direction or with your
+          consent.
+        </p>
+
+        <h3>Third-Party Sites</h3>
+        <p>
+          Infinitus and its site link to third-party sites and services. Following such a link means that
+          third party may collect information from you. The publisher does not control and is not
+          responsible for their practices.
+        </p>
+      </section>
+
+      <section id="choices">
+        <p class="num">06</p>
+        <h2>Your Choices</h2>
+
+        <h3>Use Infinitus Without an Account</h3>
+        <p>
+          Local and direct connections need no sign-in. This is the configuration in which nothing about
+          your use reaches the publisher.
+        </p>
+
+        <h3>Turn Features Off</h3>
+        <p>
+          You can sign out, disconnect environments, disable notifications and Live Activities, turn off
+          managed tunnels, and clear local caches from Settings. Camera, photo, local-network and
+          notification permissions are granted and revoked in your device settings. On the phone, cache
+          controls are under <strong>Settings &rarr; App &rarr; Client Storage</strong>.
+        </p>
+
+        <h3>Your Privacy Rights</h3>
+        <p>
+          Depending on where you live, you may have the right to access, correct, delete or obtain a
+          portable copy of your personal information, or to object to or restrict its processing. Write
+          to the address in <a href="#contact">Section 13</a> and those rights will be honored after your
+          identity is verified.
+        </p>
+      </section>
+
+      <section id="retention">
+        <p class="num">07</p>
+        <h2>Retention and Deletion</h2>
+        <p>
+          Account, device-registration, environment-link and notification records are kept while your
+          account and the relevant feature are active, and for as long as reasonably needed to operate
+          the service, resist abuse and comply with law. Diagnostic traces expire automatically.
+        </p>
+        <p>
+          To delete your account and the relay data associated with it, email
+          <a href="mailto:deathemperor@gmail.com">deathemperor@gmail.com</a> from the address on the
+          account. Deleting it does not touch anything held on your own devices or by a coding-agent
+          provider you use &mdash; remove that directly or contact those providers.
+        </p>
+      </section>
+
+      <section id="security">
+        <p class="num">08</p>
+        <h2>Security</h2>
+        <p>
+          Network connections use encrypted transport. Credentials and session tokens use
+          platform-provided protected storage where available. Connection flows use scoped, proof-bound
+          tokens designed to resist reuse, and authorization headers are redacted from diagnostics. The
+          <a href="/security-policy">Security Policy</a> describes this in more detail.
+        </p>
+        <p>
+          No method of transmission or storage is completely secure. Because most of Infinitus runs on
+          your hardware, securing your devices, environments, credentials and networks is largely in your
+          hands.
+        </p>
+      </section>
+
+      <section id="international">
+        <p class="num">09</p>
+        <h2>International Users</h2>
+        <p>
+          The publisher is located in Vietnam, and the service providers listed above operate in the
+          United States, the European Union and elsewhere. Using the optional connected features means
+          information may be transferred to and processed in those countries, whose data-protection laws
+          may differ from those where you live. Where required, lawful safeguards are used for such
+          transfers.
+        </p>
+      </section>
+
+      <section id="children">
+        <p class="num">10</p>
+        <h2>Children</h2>
+        <p>
+          Infinitus is not intended for children under 13, and you must be at least 13 to use it.
+          Personal information is not knowingly collected from children under 13. If you believe a child
+          under 13 has provided information, please make contact so it can be removed.
+        </p>
+      </section>
+
+      <section id="do-not-track">
+        <p class="num">11</p>
+        <h2>Do Not Track</h2>
+        <p>
+          Browser &ldquo;Do Not Track&rdquo; signals are not currently answered, because nothing here
+          tracks you across sites in the first place: Infinitus uses no personal information for
+          advertising or cross-context behavioral purposes.
+        </p>
+      </section>
+
+      <section id="updates">
+        <p class="num">12</p>
+        <h2>Updates to This Policy</h2>
+        <p>
+          This Policy may be updated as Infinitus changes. Revisions are posted at this URL with the
+          dates above updated. Where a change materially affects your rights, additional notice will be
+          given if practicable or where the law requires it. Changes take effect when posted unless
+          stated otherwise.
+        </p>
+      </section>
+
+      <section id="contact">
+        <p class="num">13</p>
+        <h2>Contact</h2>
+        <p>For privacy questions, deletion requests or anything else about this Policy:</p>
+        <address>
+          <strong>Loc Truong</strong> (&ldquo;deathemperor&rdquo;)<br />
+          31 Nguyen Van Dau, Binh Loi Trung<br />
+          Ho Chi Minh City, Vietnam
+        </address>
+        <p><a href="mailto:deathemperor@gmail.com">deathemperor@gmail.com</a></p>
+      </section>
+    </article>
+  </div>
+
+  <div class="foot">
+    <a href="/">infinitus.run</a> &middot;
+    <a href="/legal">Legal</a> &middot;
+    <a href="https://github.com/deathemperor/infinitus">GitHub</a>
+  </div>
+</div>
+</body>
+</html>

@@ -773,7 +773,8 @@ jobs:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [mac, desktop, linux, cli]
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     permissions:
       contents: write
     env:
@@ -807,8 +808,7 @@ jobs:
           done
           # `pinnedRuntime` verifies a downloaded archive against this file
           # (`CLI_RELEASE_CHECKSUMS_FILE`), and `parseChecksums` keys on the
-          # name as written — so hash from inside the directory, with bare
-          # names. `shasum -a 256`, not `sha256sum`: this is a macOS runner.
+          # name as written — so hash from inside the directory, with bare names.
           (
             cd release-assets
             shopt -s nullglob
@@ -833,9 +833,5 @@ jobs:
             echo "apps/mac/CHANGELOG.md has no '## $VERSION' section; a release ships with notes." >&2
             exit 1
           fi
-          args=(--title "Infinitus $VERSION" --notes-file notes.md --target "$GITHUB_SHA")
-          if [[ "$VERSION" == *-* ]]; then
-            args+=(--prerelease)
-          fi
-          gh release create "$GITHUB_REF_NAME" "${args[@]}" release-assets/*
+          bash scripts/publish-infinitus-release.sh release-assets notes.md
           echo "Published $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"

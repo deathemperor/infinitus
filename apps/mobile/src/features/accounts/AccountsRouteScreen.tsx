@@ -97,7 +97,7 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         // the desktop app's.
         <EmptyState
           title="Infinitus is running, but no engine reports accounts"
-          detail="swapd ships with Infinitus: turn it on in the desktop app on that Mac, under Settings › Infinitus › Engines, then add the first account from its Accounts page."
+          detail="swapd ships with Infinitus: turn it on in the desktop app on that Mac, under Settings › Engines, then add the first account from its Accounts page."
           actionLabel="Read the accounts setup guide"
           onAction={() =>
             void Linking.openURL(
@@ -107,7 +107,7 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         />
       ) : null}
       {model.sections.map((section) => (
-        <SettingsSection key={section.key} title={section.title} card>
+        <SettingsSection key={section.key} title={section.title}>
           {model.bands.has(section.key) ? (
             <ExhaustedBand band={model.bands.get(section.key)!} nowMs={now} />
           ) : null}

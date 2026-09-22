@@ -50,6 +50,7 @@ import {
   renderMacPasskeyEntitlements,
   resolveClerkPasskeyNativeArtifacts,
   resolveMacPasskeySigningConfiguration,
+  resolveMacWebAuthnKeychainAccessGroup,
   resolveDesktopRuntimeDependencies,
   resolveMergedStageDependencies,
   resolveFffNativeDependencies,
@@ -863,7 +864,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           "@ff-labs/fff-node": "0.9.4",
           "@opencode-ai/sdk": "^1.3.15",
           "@pierre/diffs": "1.3.0",
-          "msgpackr-extract": "3.0.4",
           "node-pty": "1.1.0",
         },
         desktopDependencies: {
@@ -875,7 +875,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       }),
       {
         "@ff-labs/fff-node": "0.9.4",
-        "msgpackr-extract": "3.0.4",
         "node-pty": "1.1.0",
         "@napi-rs/keyring": "1.3.0",
         "playwright-core": "1.60.0",
@@ -1601,6 +1600,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
     return Effect.scoped(
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const fixture = yield* makeWindowsPayloadFixture({ copyUnpackedNatives: true });
         yield* validateWindowsPackagedPayload({
           stageDistDir: fixture.stageDistDir,
@@ -1609,9 +1609,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
         });
 
-        assert.isFalse(
-          commands.some((command) => command.options.env?.ELECTRON_RUN_AS_NODE === "1"),
-        );
+        // The probe runs the packaged executable; the bundle self-check inherits
+        // the host's env, so an Electron-hosted runner would leak
+        // ELECTRON_RUN_AS_NODE into it.
+        const probeExecutable = path.join(fixture.packagedAppDir, fixture.appExecutableName);
+        assert.isFalse(commands.some((command) => command.command === probeExecutable));
         assert.isTrue(
           commands.some(
             (command) =>
@@ -1962,6 +1964,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.include(entitlements, "<string>webcredentials:clerk.example.com</string>");
     assert.include(entitlements, "<string>webcredentials:example.clerk.accounts.dev</string>");
     assert.include(entitlements, "<key>com.apple.security.cs.allow-jit</key>");
+    // Electron's Touch ID authenticator stores WebAuthn credentials under this
+    // group, and refuses unless the signed entitlement carries the same value.
+    assert.equal(
+      resolveMacWebAuthnKeychainAccessGroup(configuration),
+      "ABC1234567.run.infinitus.desktop.webauthn",
+    );
+    assert.include(entitlements, "<key>keychain-access-groups</key>");
+    assert.include(entitlements, "<string>ABC1234567.run.infinitus.desktop.webauthn</string>");
   });
 
   it("rejects incomplete macOS passkey signing configuration", () => {

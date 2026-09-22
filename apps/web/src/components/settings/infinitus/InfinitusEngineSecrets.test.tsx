@@ -50,6 +50,7 @@ vi.mock("../settingsLayout", async (importOriginal) => ({
   SettingsPageContainer: ({ children }: { children: ReactNode }) => children,
 }));
 
+import type { InfinitusEngineProcesses } from "./InfinitusEngineControls";
 import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 
 const command = (name: string, stdin?: string) => ({
@@ -102,11 +103,11 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-async function renderSection() {
+async function renderSection(processes: InfinitusEngineProcesses | null = null) {
   await act(async () => {
     renderer = create(
       <StrictMode>
-        <InfinitusEngineSecrets />
+        <InfinitusEngineSecrets processes={processes} />
       </StrictMode>,
     );
   });
@@ -130,7 +131,61 @@ async function type(label: string, value: string) {
   });
 }
 
+function processes(): InfinitusEngineProcesses {
+  const engines = {
+    engines: [
+      {
+        key: "9router",
+        mode: "child",
+        state: "running",
+        pid: 42,
+        managed: true,
+        command: null,
+        detectedCommand: "/usr/local/bin/9router",
+        error: null,
+      },
+    ],
+  } as unknown as InfinitusEngineProcesses["engines"];
+  return {
+    bridge: {
+      getInfinitusEngines: vi.fn(),
+      setInfinitusEngineSettings: vi.fn(),
+      controlInfinitusEngine: vi.fn().mockResolvedValue(engines),
+    },
+    engines,
+    drafts: {},
+    setDrafts: vi.fn(),
+    locked: false,
+    error: null,
+    run: vi.fn(),
+  };
+}
+
 describe("InfinitusEngineSecrets", () => {
+  it("draws this computer's process rows inside the engine's own section", async () => {
+    const local = processes();
+    await renderSection(local);
+    expect(rendered()).toContain("Running (pid 42).");
+    await act(async () => {
+      byLabel("Stop 9Router").props.onClick();
+    });
+    expect(local.bridge.controlInfinitusEngine).toHaveBeenCalledWith({
+      key: "9router",
+      action: "stop",
+    });
+    // The shell reported no CLIProxyAPI, so that section has no process rows.
+    expect(
+      renderer!.root.findAll((node) => node.props["aria-label"] === "Stop CLIProxyAPI"),
+    ).toEqual([]);
+  });
+
+  it("keeps the process rows on a build without the engine secret commands", async () => {
+    fake.snapshot = snapshot([command("proxy")]);
+    await renderSection(processes());
+    expect(rendered()).toContain("no engine secret commands");
+    expect(rendered()).toContain("Running (pid 42).");
+  });
+
   it("reads both engines and draws url, secret state and the engine's own error", async () => {
     await renderSection();
     expect(fake.run).toHaveBeenCalledWith({

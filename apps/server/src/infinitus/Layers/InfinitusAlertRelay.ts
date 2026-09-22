@@ -29,6 +29,9 @@ import {
 /** Where a tapped alert lands on the phone: Settings › Accounts. The relay
     forwards the path; the phone validates it against its own routes. */
 export const INFINITUS_ALERT_DEEP_LINK = "/settings/accounts";
+/** The home screen, where the sign-in cards are (#1076): a lapsed sign-in's
+    alert says "sign in from this phone", so its tap lands on them. */
+export const INFINITUS_HOME_DEEP_LINK = "/";
 
 /**
  * The server half of an account alert (#1375): the Mac posts one line to
@@ -73,12 +76,7 @@ export const InfinitusAlertRelayLive = Layer.effect(
           Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "key_pair", cause })),
         );
         const environmentId = yield* serverEnvironment.getEnvironmentId;
-        // A thread's alert (a lapsed sign-in, #1076) lands on that thread; the
-        // path is the one the phone's notification handler already accepts.
-        const deepLink =
-          input.threadId === undefined
-            ? INFINITUS_ALERT_DEEP_LINK
-            : `/threads/${encodeURIComponent(environmentId)}/${encodeURIComponent(input.threadId)}`;
+        const deepLink = input.deepLink ?? INFINITUS_ALERT_DEEP_LINK;
         const alert = { title: input.title, body: input.body, deepLink };
         const now = yield* DateTime.now;
         const jti = yield* crypto.randomUUIDv4.pipe(

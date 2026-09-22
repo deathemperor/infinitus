@@ -108,9 +108,10 @@ import InfinitusCore
     }
 
     /// The same chooser for an engine that signs accounts in through a
-    /// browser (the proxy): its Management API hands us the login URL,
-    /// the OAuth redirect lands on the engine's own callback, and we
-    /// poll until it reports the credential — nothing to paste. Same
+    /// browser (swapd's `add-oauth`, the proxy): the engine hands us the
+    /// login URL, the OAuth redirect lands on the engine's own loopback
+    /// callback, and we wait until it holds the credential — nothing to
+    /// paste. The private sheet / incognito window is the same one. Same
     /// per-account cookie jar as the cswap flow (user 2026-09-02:
     /// "share cookiejar with cswap"): a re-login for an address that
     /// already has a jar opens signed in, whichever engine made it.
@@ -162,7 +163,12 @@ import InfinitusCore
                     self.phase = .idle
                     onFinish(nil)
                 } else {
-                    let msg = (error as? SignInFailure)?.sentence ?? EngineFailure.sentence(error)
+                    // swapd's own refusal is a sentence already ("the
+                    // sign-in was refused (access_denied)"); the generic
+                    // "engine refused that change" would hide it.
+                    let msg = (error as? SignInFailure)?.sentence
+                        ?? (error as? CLIError)?.message
+                        ?? EngineFailure.sentence(error)
                     self.phase = .failed(msg)
                     onFinish(msg)
                 }
@@ -484,21 +490,34 @@ import InfinitusCore
             capabilities: info[SignInSheetRoute.capabilitiesKey] as? [String: Any])
     }
 
-    /// `open -na <browser> --args <flag> <url>`: a running browser gets a
-    /// URL over Apple Events and ignores launch arguments, so the flag
-    /// only counts on a NEW instance, which hands its command line to the
-    /// running one (probed on Chrome 152, 2026-09-14). NSWorkspace's
+    /// `open -na <browser> --args <flag> --user-data-dir=<fresh> <url>`: a
+    /// browser instance of its own, on an empty profile. A running browser
+    /// gets a URL over Apple Events and ignores launch arguments, and a
+    /// second instance handing `--incognito` to the running one was seen
+    /// to open the page in the signed-in profile instead (user 2026-09-21,
+    /// Chrome 153: "I have to switch accounts") — so the private window
+    /// is not asked of the running browser at all. A different
+    /// `--user-data-dir` is what makes the Chromium family start a
+    /// separate process rather than hand off, and the profile is wiped
+    /// before every launch, so the page opens signed in to nothing;
+    /// passkeys live in the OS keychain and work there. NSWorkspace's
     /// `open(_:withApplicationAt:configuration:)` sends the URL the
-    /// Apple-Events way and drops the flag for the same reason.
+    /// Apple-Events way and drops every flag for the same reason.
     private func openInDefaultBrowser(_ url: URL, name: String, privateFlag: String?) {
         var placement = "in your profile \u{2014} if it is signed in to another Claude account, sign out there first"
         if let privateFlag, let app = NSWorkspace.shared.urlForApplication(toOpen: url) {
+            let profile = FileManager.default.temporaryDirectory
+                .appendingPathComponent("infinitus-signin-profile")
+            try? FileManager.default.removeItem(at: profile)
             let open = Process()
             open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            open.arguments = ["-na", app.path, "--args", privateFlag, url.absoluteString]
+            open.arguments = ["-na", app.path, "--args", privateFlag,
+                              "--user-data-dir=\(profile.path)",
+                              "--no-first-run", "--no-default-browser-check",
+                              url.absoluteString]
             do {
                 try open.run()
-                placement = "in a private window"
+                placement = "in a private window of its own, signed in to nothing"
             } catch {
                 NSWorkspace.shared.open(url)
             }

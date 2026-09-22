@@ -43,6 +43,7 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertNil(account.stale, "a plain ok row is not stale")
         XCTAssertEqual(account.disabled, false)
         XCTAssertEqual(account.preferred, false)
+        XCTAssertNil(account.autoIgnite, "a 0.2 list carries no keep-warm flag, so the control is hidden")
         XCTAssertEqual(account.usageFetchedAt, "2026-09-09T01:11:03Z")
         XCTAssertEqual(account.usageAgeSeconds, 7.6)
 
@@ -119,6 +120,19 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(fleets[1].accounts.map(\.email), ["g@example.com"])
         XCTAssertEqual(fleets[1].accounts[0].usage?.scoped?.map(\.name), ["gemini-2.5-pro", "gemini-2.5-flash"])
         XCTAssertEqual(fleets[1].accounts[0].usage?.scoped?.first?.pct, 75)
+    }
+
+    /// swapd 0.3's `autoIgnite` rides along per account; the control
+    /// server refuses the verb for a row that carries none.
+    func testAutoIgniteFlagIsCarriedWhenTheEngineReportsIt() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[
+          {"provider":"claude","installed":true,"activeSlot":1,"accounts":[
+            {"slot":1,"email":"a@example.com","organizationName":"","organizationUuid":"","active":true,
+             "disabled":false,"preferred":false,"autoIgnite":true,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let fleets = SwapdMapping.fleets(from: list, now: now)
+        XCTAssertEqual(fleets[0].accounts[0].autoIgnite, true)
     }
 
     /// The shape the engine ACTUALLY emits (`collect.rs account_view`:
@@ -357,7 +371,7 @@ final class SwapdEngineTests: XCTestCase {
         #!/bin/sh
         echo "$@" >> "\(argv)"
         case "$1" in
-          list|prefer|alias) echo '\(payload(nil))' ;;
+          list|prefer|auto-ignite|alias) echo '\(payload(nil))' ;;
           refresh|ignite) echo '\(payload("2026-09-09T05:59:59Z"))' ;;
           *) echo '{"schemaVersion":1,"error":{"code":"no-such-slot","message":"no slot 9 for claude"}}'; exit 1 ;;
         esac
@@ -373,11 +387,137 @@ final class SwapdEngineTests: XCTestCase {
         return text.split(separator: "\n").map(String.init)
     }
 
+    /// A stub `add-oauth`: the URL line at once, then — after the marker
+    /// file appears, standing in for the redirect — the add envelope, or
+    /// the error envelope + exit 1 when `FAIL` is set. `refused` answers
+    /// the error envelope before any URL, the way a held port does.
+    func makeOAuthEngine(refused: Bool = false, fail: Bool = false) throws -> SwapdEngine {
+        let argv = dir.appendingPathComponent("argv").path
+        let redirect = dir.appendingPathComponent("redirect").path
+        let after = fail
+            ? #"echo '{"schemaVersion":1,"error":{"code":"invalid-input","message":"the sign-in was refused (access_denied)"}}'; exit 1"#
+            : #"echo '{"schemaVersion":1,"slot":2,"email":"b@b.c","created":true}'"#
+        let script = refused ? """
+        #!/bin/sh
+        echo "$@" >> "\(argv)"
+        echo '{"schemaVersion":1,"error":{"code":"io","message":"port 54545 is already in use"}}'
+        exit 1
+        """ : """
+        #!/bin/sh
+        echo "$@" >> "\(argv)"
+        echo '{"schemaVersion":1,"url":"https://claude.ai/oauth/authorize?state=s-1","port":54545}'
+        while [ ! -e "\(redirect)" ]; do sleep 0.05; done
+        \(after)
+        """
+        let binary = dir.appendingPathComponent("swapd")
+        try script.write(to: binary, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+        return SwapdEngine(cli: SwapdCLI(binaryPath: binary.path))
+    }
+
+    func redirectLands() throws {
+        try Data().write(to: dir.appendingPathComponent("redirect"))
+    }
+
+    /// `add-oauth` answers in two lines: the URL comes back with the
+    /// engine still running, and `await` returns once the envelope does.
+    func testOAuthAddHandsBackTheURLBeforeTheRedirectLands() async throws {
+        let engine = try makeOAuthEngine()
+        let url = try await engine.beginOAuthAdd(fleet: .claude)
+        XCTAssertEqual(url.absoluteString, "https://claude.ai/oauth/authorize?state=s-1")
+        XCTAssertEqual(try argv(), ["add-oauth --provider claude --json"])
+        let waiting = Task { try await engine.awaitOAuthAdd() }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        try redirectLands()
+        try await waiting.value
+    }
+
+    /// The engine's own sentence when the sign-in fails after the URL,
+    /// not "exited 1".
+    func testOAuthAddReportsTheEnginesRefusalAfterTheURL() async throws {
+        let engine = try makeOAuthEngine(fail: true)
+        _ = try await engine.beginOAuthAdd(fleet: .claude)
+        try redirectLands()
+        do {
+            try await engine.awaitOAuthAdd()
+            XCTFail("expected the refusal")
+        } catch let error as CLIError {
+            XCTAssertEqual(error.message, "the sign-in was refused (access_denied)")
+        }
+    }
+
+    /// A refusal before any URL (the port held) surfaces from `begin`.
+    func testOAuthAddRefusedBeforeTheURLThrowsFromBegin() async throws {
+        let engine = try makeOAuthEngine(refused: true)
+        do {
+            _ = try await engine.beginOAuthAdd(fleet: .claude)
+            XCTFail("expected the refusal")
+        } catch let error as CLIError {
+            XCTAssertEqual(error.message, "port 54545 is already in use")
+        }
+    }
+
+    /// Cancelling the wait kills the engine, so the loopback port is free
+    /// for the next attempt rather than held by an orphan.
+    func testCancellingTheWaitTerminatesTheEngine() async throws {
+        let engine = try makeOAuthEngine()
+        _ = try await engine.beginOAuthAdd(fleet: .claude)
+        let waiting = Task { try await engine.awaitOAuthAdd() }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        waiting.cancel()
+        let started = Date()
+        do {
+            try await waiting.value
+            XCTFail("a terminated engine is a failed wait")
+        } catch {
+            // The stub loops until the redirect file exists; only a kill
+            // ends it this soon.
+            XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+        }
+    }
+
     func testSnapshotIsOneListCallStampedWithTheEngineID() async throws {
         let fleets = try await makeEngine().snapshot()
         XCTAssertEqual(try argv(), ["list --json"], "one subprocess, no per-account calls")
         XCTAssertEqual(fleets.map(\.key), ["swapd/claude"])
         XCTAssertEqual(fleets[0].accounts.map(\.number), [1])
+    }
+
+    /// #1481: an edit's reply is the engine's next snapshot, so the refresh
+    /// pass that follows costs no second `list`.
+    func testAnEditAnswersWithTheSnapshotOnceAListHasBeenRead() async throws {
+        let engine = try makeEngine()
+        let early = try await engine.setAutoIgnite(fleet: .claude, number: 1, true)
+        XCTAssertNil(early, "nothing to lay the reply over before the first list")
+        _ = try await engine.snapshot()
+        let fleets = try await engine.setAutoIgnite(fleet: .claude, number: 1, true)
+        XCTAssertEqual(fleets?.map(\.key), ["swapd/claude"])
+        XCTAssertEqual(try argv().filter { $0.hasPrefix("list") }, ["list --json"], "no second list")
+    }
+
+    /// A single-provider verb answers with that provider alone; the others
+    /// keep their last reading instead of vanishing from the snapshot.
+    func testAnEditsReplyIsLaidOverTheLastFullList() throws {
+        func list(_ providers: String) throws -> SwapdList {
+            try JSONDecoder().decode(SwapdList.self, from: Data(#"{"schemaVersion":1,"providers":[\#(providers)]}"#.utf8))
+        }
+        func view(_ provider: String, slot: Int) -> String {
+            #"{"provider":"\#(provider)","installed":true,"accounts":[\#(SwapdMappingTests.account(slot: slot))]}"#
+        }
+        let memory = SwapdActiveMemory()
+        XCTAssertNil(memory.merged(with: try list(view("claude", slot: 1))))
+        memory.keep(try list(view("claude", slot: 1) + "," + view("gemini", slot: 5)))
+        let merged = try XCTUnwrap(memory.merged(with: try list(view("claude", slot: 2))))
+        XCTAssertEqual(merged.providers.map(\.provider), ["claude", "gemini"])
+        XCTAssertEqual(merged.providers.map { $0.accounts.map(\.slot) }, [[2], [5]])
+    }
+
+    func testAutoIgniteIsTheEnginesOwnVerb() async throws {
+        let engine = try makeEngine()
+        try await engine.setAutoIgnite(fleet: .claude, number: 1, true)
+        try await engine.setAutoIgnite(fleet: .claude, number: 1, false)
+        XCTAssertEqual(try argv(), ["auto-ignite 1 on --provider claude --json",
+                                    "auto-ignite 1 off --provider claude --json"])
     }
 
     /// The ignite path's second half: the reset the popup announces comes
@@ -530,7 +670,8 @@ final class SwapdEngineTests: XCTestCase {
     func testCapabilitiesOmitWhatSwapdHasNoVerbFor() async throws {
         let engine = try makeEngine()
         XCTAssertTrue(engine.capabilities.contains(.refreshAccount))
-        for missing in [EngineCapabilities.costReport, .addOAuth, .notify] {
+        XCTAssertTrue(engine.capabilities.contains(.addOAuth), "`add-oauth` (swapd 0.2)")
+        for missing in [EngineCapabilities.costReport, .notify] {
             XCTAssertFalse(engine.capabilities.contains(missing))
         }
         do {

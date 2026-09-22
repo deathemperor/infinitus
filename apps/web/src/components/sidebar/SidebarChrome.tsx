@@ -1,10 +1,8 @@
 import {
-  ActivityIcon,
   ArrowLeftIcon,
   ChartLineIcon,
   ChartNoAxesColumnIcon,
   GaugeIcon,
-  GitPullRequestIcon,
   SettingsIcon,
   UsersIcon,
 } from "lucide-react";
@@ -18,10 +16,10 @@ import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import {
   resolveEnvironmentIdentificationPillLabel,
-  resolveSidebarStageBackdropVariant,
   resolveSidebarStageFocusRingOffsetClass,
   SidebarStageBackdrop,
   useEnvironmentStageLabel,
+  useSidebarStageBackdropVariant,
 } from "../SidebarStageBackdrop";
 import { Badge } from "../ui/badge";
 import {
@@ -37,6 +35,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
 export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   isElectron,
@@ -45,8 +44,8 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
-  const backdropVariant = resolveSidebarStageBackdropVariant(
-    stageLabel,
+  // Through the hook, not the resolver: the scene comes from the active theme.
+  const backdropVariant = useSidebarStageBackdropVariant(
     environmentIdentificationMode === "artwork",
   );
   const pillLabel =
@@ -143,11 +142,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
                 ? "accounts"
                 : location.pathname === "/stats"
                   ? "stats"
-                  : location.pathname === "/activity"
-                    ? "activity"
-                    : location.pathname === "/utilization"
-                      ? "utilization"
-                      : null,
+                  : location.pathname === "/utilization"
+                    ? "utilization"
+                    : null,
   });
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
@@ -185,11 +182,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleStatsClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/stats" });
-  }, [closeMobileSidebar, navigate]);
-
-  const handleActivityClick = useCallback(() => {
-    closeMobileSidebar();
-    void navigate({ to: "/activity" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUtilizationClick = useCallback(() => {
@@ -231,7 +223,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
           />
           {pullRequestsSupported ? (
             <SidebarUtilityItem
-              icon={<GitPullRequestIcon />}
+              icon={<PullRequestGlyph.pullRequest />}
               label="Pull Requests"
               onClick={handlePullRequestsClick}
             />
@@ -245,13 +237,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
           ) : null}
           {accountsSupported ? (
             <SidebarUtilityItem icon={<ChartLineIcon />} label="Stats" onClick={handleStatsClick} />
-          ) : null}
-          {accountsSupported ? (
-            <SidebarUtilityItem
-              icon={<ActivityIcon />}
-              label="Activity"
-              onClick={handleActivityClick}
-            />
           ) : null}
           {accountsSupported ? (
             <SidebarUtilityItem

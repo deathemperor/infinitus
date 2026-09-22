@@ -1,20 +1,24 @@
+import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Constants from "expo-constants";
-import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
-import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import {
+  StackActions,
+  useNavigation,
+  useRoute,
+  type StaticScreenProps,
+} from "@react-navigation/native";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, Platform, ScrollView, View } from "react-native";
+import { Alert, Linking, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
-
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import { SettingsScreen } from "../settings/components/SettingsScreen";
+import { AppText as Text } from "../../components/AppText";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { InfinitusAskToApprove } from "../infinitus/InfinitusAskToApprove";
 import { InfinitusNearbyServers } from "../infinitus/InfinitusNearbyServers";
-import { resolvePairingLink } from "./universalPairLink.logic";
 import { PICKED_HOST_HINT, pickedHostNeedsCode } from "../infinitus/lanDiscovery.logic";
+import { ConnectionFormField } from "./ConnectionFormField";
 import { ConnectionSheetButton } from "./ConnectionSheetButton";
 import {
   buildPairingUrl,
@@ -41,6 +45,7 @@ export function ConnectionsNewRouteScreen({
     pairingConnectionError,
   } = useRemoteConnections();
   const navigation = useNavigation();
+  const routeName = useRoute().name;
   const params = route.params ?? {};
   // Deep-link prefill: development, and the Infinitus variant's scanned QR
   // (#724); auto-connect stays development-only. See pairPrefill.logic.
@@ -153,9 +158,7 @@ export function ConnectionsNewRouteScreen({
       setScannerLocked(true);
 
       try {
-        // The Devices card's QR is the site's universal link (#724): read
-        // the Mac's origin out of its fragment before the usual parse.
-        const pairingUrl = resolvePairingLink(extractPairingUrlFromQrPayload(data));
+        const pairingUrl = extractPairingUrlFromQrPayload(data);
         const { host, code } = parsePairingUrl(pairingUrl);
         setHostInput(host);
         setCodeInput(code);
@@ -221,49 +224,24 @@ export function ConnectionsNewRouteScreen({
   }, [connectAndClose, routePairingUrl, shouldAutoConnect]);
 
   return (
-    <View collapsable={false} className="flex-1 bg-sheet">
-      <NativeStackScreenOptions
-        options={{
-          // Android renders its own in-screen header below instead of the native bar.
-          ...(Platform.OS === "android" ? { headerShown: false } : null),
-          title: showScanner ? "Scan QR Code" : "Add Environment",
-        }}
-      />
-      {Platform.OS === "android" ? (
-        <AndroidScreenHeader
-          title={showScanner ? "Scan QR Code" : "Add Environment"}
-          onBack={() => navigation.goBack()}
-          actions={[
-            {
-              accessibilityLabel: showScanner ? "Close scanner" : "Scan QR code",
-              icon: showScanner ? "xmark" : "camera",
-              onPress: () => {
-                if (showScanner) {
-                  closeScanner();
-                } else {
-                  void openScanner();
-                }
-              },
-            },
-          ]}
-        />
-      ) : (
-        <NativeHeaderToolbar placement="right">
-          <NativeHeaderToolbar.Button
-            icon={showScanner ? "xmark" : "qrcode.viewfinder"}
-            onPress={() => {
-              if (showScanner) {
-                closeScanner();
-              } else {
-                void openScanner();
-              }
-            }}
-            separateBackground
-            tintColor={headerIconColor}
-          />
-        </NativeHeaderToolbar>
-      )}
-
+    <SettingsScreen
+      formSheet={routeName === "ConnectionsNew"}
+      title={showScanner ? "Scan QR Code" : "Add Environment"}
+      actions={[
+        {
+          accessibilityLabel: showScanner ? "Close scanner" : "Scan QR code",
+          icon: showScanner ? "xmark" : Platform.OS === "ios" ? "qrcode.viewfinder" : "camera",
+          tintColor: headerIconColor,
+          onPress: () => {
+            if (showScanner) {
+              closeScanner();
+            } else {
+              void openScanner();
+            }
+          },
+        },
+      ]}
+    >
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -303,32 +281,24 @@ export function ConnectionsNewRouteScreen({
           ) : (
             <View collapsable={false} className="gap-4 rounded-[24px] bg-card p-4">
               <InfinitusNearbyServers onPick={handleNearbyPick} />
-              <View collapsable={false} className="gap-1.5">
-                <Text className="text-2xs font-infinitus-bold tracking-[0.8px] uppercase text-foreground-muted">
-                  Host
-                </Text>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  placeholder="192.168.1.100:8080"
-                  value={hostInput}
-                  onChangeText={handleHostChange}
-                  className="rounded-[14px] border border-input-border bg-input px-4 py-3.5 text-base text-foreground"
-                />
-              </View>
+              <ConnectionFormField
+                label="Host"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                placeholder="192.168.1.100:8080"
+                value={hostInput}
+                onChangeText={handleHostChange}
+              />
 
-              <View collapsable={false} className="gap-1.5">
-                <Text className="text-2xs font-infinitus-bold tracking-[0.8px] uppercase text-foreground-muted">
-                  Pairing code
-                </Text>
-                <TextInput
+              <View className="gap-1.5">
+                <ConnectionFormField
+                  label="Pairing code"
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholder="abc-123-xyz"
                   value={codeInput}
                   onChangeText={handleCodeChange}
-                  className="rounded-[14px] border border-input-border bg-input px-4 py-3.5 text-base text-foreground"
                 />
                 {needsCode ? (
                   <Text accessibilityLiveRegion="polite" className="text-xs text-foreground-muted">
@@ -348,19 +318,21 @@ export function ConnectionsNewRouteScreen({
                 <ErrorBanner message={pairingConnectionError} />
               ) : null}
 
-              <ConnectionSheetButton
-                icon="plus"
-                label={isSubmitting ? "Pairing..." : "Add environment"}
-                disabled={connectDisabled}
-                tone="primary"
-                onPress={() => {
-                  void handleSubmit();
-                }}
-              />
+              <View className={Platform.OS === "android" ? "flex-row justify-end" : undefined}>
+                <ConnectionSheetButton
+                  icon="plus"
+                  label={isSubmitting ? "Pairing..." : "Add environment"}
+                  disabled={connectDisabled}
+                  tone="primary"
+                  onPress={() => {
+                    void handleSubmit();
+                  }}
+                />
+              </View>
             </View>
           )}
         </View>
       </ScrollView>
-    </View>
+    </SettingsScreen>
   );
 }

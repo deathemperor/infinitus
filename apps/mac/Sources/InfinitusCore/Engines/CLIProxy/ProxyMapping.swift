@@ -170,7 +170,7 @@ public struct ProxyProfile: Sendable, Equatable {
 }
 
 /// `POST /api-call` → `https://api.anthropic.com/api/oauth/usage` — the raw
-/// body normalizer, port of `claude_swap.oauth.build_usage_result`.
+/// body normalizer, port of the engine's `build_usage_result`.
 public enum OAuthUsage {
     struct Wire: Decodable {
         struct Window: Decodable {

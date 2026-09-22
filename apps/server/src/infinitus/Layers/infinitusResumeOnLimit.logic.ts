@@ -1,5 +1,7 @@
 import type {
   ModelSelection,
+  OrchestrationThreadActivity,
+  OrchestrationThreadShell,
   ProviderInstanceConfigMap,
   ProviderRuntimeEvent,
   ThreadId,
@@ -7,6 +9,7 @@ import type {
 } from "@infinitus/contracts";
 import type { InfinitusFleet, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
+import * as DateTime from "effect/DateTime";
 
 /**
  * Resume-on-limit for the threads this server runs (#648): the pure half.
@@ -72,6 +75,71 @@ export interface LimitStop {
   readonly proxy: string | null;
 }
 
+const decodeLimitMarker = Schema.decodeUnknownOption(
+  Schema.Struct({
+    stop: Schema.Literals(["parked", "failed"]),
+    accounts: Schema.Array(Schema.String),
+    resetsAt: Schema.optionalKey(Schema.NullOr(Schema.DateTimeUtcFromString)),
+    limitType: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    proxy: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  }),
+);
+
+/** Recover only unresolved failures of the thread's current turn. A saved
+ * parked marker may describe a turn that subsequently failed before exit. */
+export function restoreLimitStops(
+  threads: ReadonlyArray<OrchestrationThreadShell>,
+  limits: ReadonlyArray<OrchestrationThreadActivity>,
+  resumes: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyArray<LimitStop> {
+  const resumed = new Set(resumes.map((activity) => activity.turnId));
+  const byTurn = new Map<TurnId, OrchestrationThreadActivity>();
+  for (const activity of limits) {
+    if (activity.turnId === null || activity.kind !== LIMIT_MARKER_KIND) continue;
+    const previous = byTurn.get(activity.turnId);
+    if (previous === undefined || activity.createdAt > previous.createdAt) {
+      byTurn.set(activity.turnId, activity);
+    }
+  }
+  const stops: LimitStop[] = [];
+  for (const thread of threads) {
+    const turn = thread.latestTurn;
+    if (
+      thread.archivedAt !== null ||
+      turn === null ||
+      turn.state !== "error" ||
+      // `stopped` is the same stop after the idle reaper took its session.
+      (thread.session?.status !== "error" && thread.session?.status !== "stopped") ||
+      thread.session.activeTurnId !== null ||
+      resumed.has(turn.turnId)
+    )
+      continue;
+    const marker = byTurn.get(turn.turnId);
+    if (marker === undefined) continue;
+    const stoppedAt = Date.parse(marker.createdAt);
+    if (thread.latestUserMessageAt !== null && Date.parse(thread.latestUserMessageAt) > stoppedAt)
+      continue;
+    const decoded = decodeLimitMarker(marker.payload);
+    if (decoded._tag !== "Some" || decoded.value.proxy != null) continue;
+    const payload = decoded.value;
+    // This feature has always tracked just the CLI credential fleet. Older
+    // markers saved its label as an array without the fleet key.
+    const account = payload.accounts[0];
+    if (account === undefined) continue;
+    stops.push({
+      threadId: thread.id,
+      turnId: turn.turnId,
+      kind: "failed",
+      stoppedAt,
+      activeAtStop: new Map([["swapd/claude", account]]),
+      resetsAt: payload.resetsAt == null ? null : DateTime.toEpochMillis(payload.resetsAt),
+      limitType: payload.limitType ?? null,
+      proxy: null,
+    });
+  }
+  return stops;
+}
+
 /**
  * The limit stop one runtime event reports, or null. Both arms read structured
  * evidence, never the adapter's prose: a parked turn arrives as the adapter's
@@ -106,6 +174,7 @@ export function limitStopFromEvent(
       const limitType = "rateLimitType" in detail ? detail.rateLimitType : undefined;
       return {
         ...base,
+        activeAtStop: refusedClaudeAccounts(detail, snapshot),
         kind: "parked",
         // Epoch seconds on the wire, as the adapter reads it.
         resetsAt:
@@ -148,6 +217,26 @@ export function proxyStop(stop: LimitStop, proxy: string): LimitStop {
 }
 
 /**
+ * Whether a turn of the thread's own is already under way, so the resume must
+ * not run: it would tear that turn's CLI down and send a second time into the
+ * session that replaces it, and only one of the two turns is ever answered
+ * (#1509). The mirror of the queue drain's `resuming` gate, for the ordering
+ * where the other send goes first — `eventCancelsStop` covers only a
+ * `turn.started` the worker has already reached, and a start dispatched
+ * moments earlier is a pending turn in the projection long before that.
+ * The stop's own turn is not such a turn: a parked one is still open here.
+ */
+export function turnOvertookStop(
+  thread: Pick<OrchestrationThreadShell, "latestTurn">,
+  stop: Pick<LimitStop, "turnId" | "stoppedAt">,
+): boolean {
+  const turn = thread.latestTurn ?? null;
+  if (turn === null || turn.completedAt !== null) return false;
+  if (stop.turnId !== null && turn.turnId === stop.turnId) return false;
+  return Date.parse(turn.requestedAt) > stop.stoppedAt;
+}
+
+/**
  * Whether one runtime event means the stop is no longer ours to resume: the
  * turn moved on (the user interrupted or re-sent, the CLI recovered) or the
  * session went away. Our own interrupt lands after the record is gone, so it
@@ -159,8 +248,12 @@ export function eventCancelsStop(event: ProviderRuntimeEvent, stop: LimitStop): 
     case "turn.started":
       return true;
     case "turn.aborted":
-    case "session.exited":
       return true;
+    case "session.exited":
+      // A parked turn goes with its session. A failed one already ended: the
+      // idle reaper stops its session long before the window resets, and the
+      // resume's send starts a new one from the resume cursor.
+      return stop.kind === "parked";
     case "turn.completed":
       // A parked turn that completes did so on its own; a failed stop's own
       // completion is the event that recorded it.
@@ -219,6 +312,23 @@ function stopWindowPct(
   return window?.pct ?? null;
 }
 
+/**
+ * Whether a reading shows the account with room in every window it carries;
+ * false for a reading with no windows, which is no evidence. The test a
+ * failed stop gets: the CLI ended the turn with its synthetic rate-limit
+ * error and no rate-limit event, so the stop names no window and no reset.
+ */
+function everyWindowUnderFull(account: InfinitusFleet["accounts"][number]): boolean {
+  if (account.usage === undefined) return false;
+  const decoded = decodeUsage(account.usage);
+  if (decoded._tag !== "Some") return false;
+  const usage = decoded.value;
+  const windows = [usage.fiveHour, usage.sevenDay, ...(usage.scoped ?? [])].filter(
+    (window) => window !== undefined,
+  );
+  return windows.length > 0 && windows.every((window) => window.pct < 100);
+}
+
 function accountLabel(account: InfinitusFleet["accounts"][number]): string {
   return account.alias ?? account.email;
 }
@@ -229,6 +339,73 @@ export function activeClaudeAccounts(snapshot: InfinitusSnapshot): ReadonlyMap<s
   for (const fleet of claudeFleets(snapshot)) {
     const active = fleet.accounts.find((account) => account.active);
     if (active !== undefined) out.set(fleet.key, accountLabel(active));
+  }
+  return out;
+}
+
+/** How far a refusal's window figure may sit from an account's reading and
+    still be that account's: readings trail the refusal by a poll or two. */
+const REFUSAL_MATCH_PCT = 10;
+
+/** The 0–1 utilization the SDK's refusal carries for one window, in percent. */
+function refusalWindowPct(detail: object, window: string): number | null {
+  const windows = "unifiedWindows" in detail ? detail.unifiedWindows : undefined;
+  if (typeof windows !== "object" || windows === null || !(window in windows)) return null;
+  const entry = (windows as Record<string, unknown>)[window];
+  if (typeof entry !== "object" || entry === null || !("utilization" in entry)) return null;
+  const utilization = entry.utilization;
+  return typeof utilization === "number" && Number.isFinite(utilization) ? utilization * 100 : null;
+}
+
+/** The widest gap between the refusal's figures and the account's reading over
+    the windows both carry; null when they share none. */
+function refusalDistance(
+  detail: object,
+  account: InfinitusFleet["accounts"][number],
+): number | null {
+  const decoded = account.usage === undefined ? undefined : decodeUsage(account.usage);
+  if (decoded === undefined || decoded._tag !== "Some") return null;
+  const pairs: ReadonlyArray<readonly [number | null, number | undefined]> = [
+    [refusalWindowPct(detail, "five_hour"), decoded.value.fiveHour?.pct],
+    [refusalWindowPct(detail, "seven_day"), decoded.value.sevenDay?.pct],
+  ];
+  let widest: number | null = null;
+  for (const [refused, read] of pairs) {
+    if (refused === null || read === undefined) continue;
+    widest = Math.max(widest ?? 0, Math.abs(refused - read));
+  }
+  return widest;
+}
+
+/**
+ * Whose limit a parked turn's refusal is, by fleet key. Normally the active
+ * account's. A CLI keeps the login it started on for a while after a swap, so
+ * a refusal seconds after one can still be the previous account's: blaming the
+ * live account reported a healthy one to the engine as spent until a weekly
+ * reset five days off, and the engine benched it 70 s after swapping to it.
+ * The refusal names its own window figures, so they decide: the active account
+ * when its reading agrees (or nothing can be compared), else the one other
+ * account whose reading does, else nobody — an unnamed stop reports nothing.
+ */
+function refusedClaudeAccounts(
+  detail: object,
+  snapshot: InfinitusSnapshot,
+): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const fleet of claudeFleets(snapshot)) {
+    const active = fleet.accounts.find((account) => account.active);
+    if (active === undefined) continue;
+    const ofActive = refusalDistance(detail, active);
+    if (ofActive === null || ofActive <= REFUSAL_MATCH_PCT) {
+      out.set(fleet.key, accountLabel(active));
+      continue;
+    }
+    const others = fleet.accounts.filter((account) => {
+      if (account === active) return false;
+      const distance = refusalDistance(detail, account);
+      return distance !== null && distance <= REFUSAL_MATCH_PCT;
+    });
+    if (others.length === 1) out.set(fleet.key, accountLabel(others[0]!));
   }
   return out;
 }
@@ -244,14 +421,22 @@ export interface ResumeTarget {
  * Native's ResumeGate, with headroom read where the engine reports it: an
  * active account of the CLI-credentials fleet whose credentials read `ok`
  * from a probe taken after the stop — a probe from before it would only
- * repeat the account that just ran out. `ok` alone is not headroom (the
+ * repeat the account that just ran out. A different account than the one at
+ * the stop needs no newer probe: its reading says nothing of the account that
+ * ran out, and the engine rations the usage endpoint, so an idle account the
+ * swap lands on is next read minutes later (a thread stopped a second after
+ * the engine's sweep sat six minutes beside four that resumed). `ok` alone is
+ * not headroom (the
  * account that hit the limit reads `ok` on the very next poll, which is how a
  * turn was resumed on it every cooldown until its window reset), so:
  * a reading that carries the stop's window decides — under 100 % counts,
  * full does not, whichever account it is; without one, a different account
- * counts, and the same account only once the stop's reset has passed. An
- * engine that reports no probe time gets the weaker test, a different account
- * than the one at the stop.
+ * counts, and the same account only once the stop's reset has passed. A
+ * failed stop names neither window nor reset, so the same account counts
+ * there once a probe after the stop reads every window under full (a thread
+ * sat two hours past its reset on an account reading 20 %). An engine that
+ * reports no probe time gets the weaker test, a different account than the
+ * one at the stop.
  */
 export function resumeTarget(
   stop: LimitStop,
@@ -266,7 +451,10 @@ export function resumeTarget(
     const from = stop.activeAtStop.get(fleet.key) ?? null;
     const label = accountLabel(active);
     const fetchedAt = active.usageFetchedAt === undefined ? NaN : Date.parse(active.usageFetchedAt);
-    const fresh = Number.isFinite(fetchedAt) ? fetchedAt > stop.stoppedAt : label !== from;
+    const swapped = from !== null && label !== from;
+    const fresh = Number.isFinite(fetchedAt)
+      ? swapped || fetchedAt > stop.stoppedAt
+      : label !== from;
     if (!fresh) continue;
     const target = { fleetKey: fleet.key, account: label, from };
     const pct = stopWindowPct(stop.limitType, active);
@@ -276,6 +464,7 @@ export function resumeTarget(
     }
     if (label !== from) return target;
     if (stop.resetsAt !== null && now >= stop.resetsAt) return target;
+    if (stop.limitType === null && everyWindowUnderFull(active)) return target;
   }
   return null;
 }

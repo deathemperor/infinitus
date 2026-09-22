@@ -53,7 +53,7 @@ export const NeonDatabase = Effect.gen(function* () {
   const migrations = { dir: schema.out, table: "relay_migrations" };
   // Through Config like the zone names: the deploy script's `.env` provider
   // never reaches `process.env`, and `orgId` cannot be changed after creation.
-  const orgId = yield* Config.nonEmptyString("NEON_ORG_ID").pipe(Config.option);
+  const orgId = yield* Config.NonEmptyString("NEON_ORG_ID").pipe(Config.option);
   const project =
     mode === "shared-database"
       ? yield* Neon.Project("RelayNeonProject", {

@@ -32,8 +32,8 @@ const CATALOG = NodeURL.fileURLToPath(
     built from bespoke cards rather than the catalog — Slack, Lock, the Dock
     badge, Engines' status list — are not grounded by this rule. */
 const CATALOG_PAGES: Readonly<Record<string, ReadonlyArray<string>>> = {
-  "infinitus-preferences": ["display", "about"],
-  "infinitus-themes": ["themes"],
+  "infinitus-preferences": ["display", "themes", "about"],
+  "infinitus-themes": ["display", "themes", "about"],
   "infinitus-animations": ["animations"],
   "infinitus-sessions": ["priority", "sessions"],
   "infinitus-push": ["push"],

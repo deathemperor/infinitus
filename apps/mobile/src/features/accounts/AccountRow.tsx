@@ -2,10 +2,13 @@ import {
   type AccountAction,
   type AccountRowModel,
   accountCommandArgs,
+  type RowFlip,
+  rowFlip,
   type UsageWindowBar,
+  withFlip,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import type { EnvironmentId } from "@infinitus/contracts";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
 
 import { SymbolView } from "../../components/AppSymbol";
@@ -27,6 +30,9 @@ import {
 
 const CAN_PROMPT = Platform.OS === "ios";
 
+/** How long a flipped flag stays drawn when no snapshot confirms it. */
+const FLIP_SETTLE_TIMEOUT_MS = 10_000;
+
 const BADGE_TONE = {
   active: {
     label: "Active",
@@ -36,6 +42,7 @@ const BADGE_TONE = {
   next: { label: "Next", pillClassName: "bg-subtle-strong", textClassName: "text-foreground" },
   held: { label: "Held", pillClassName: "bg-warning", textClassName: "text-warning-foreground" },
   starred: { label: "★ First", pillClassName: "bg-subtle", textClassName: "text-foreground-muted" },
+  warm: { label: "Warm", pillClassName: "bg-subtle", textClassName: "text-foreground-muted" },
 } as const;
 
 const TONE_CLASS = {
@@ -53,22 +60,44 @@ export function AccountRow(props: {
   readonly row: AccountRowModel;
   readonly last: boolean;
 }) {
-  const { environmentId, fleetKey, fleetTitle, row } = props;
+  const { environmentId, fleetKey, fleetTitle } = props;
   const run = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const [busy, setBusy] = useState<AccountAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A toggle is drawn the moment it is pressed (#1481). It draws nothing
+  // once a snapshot agrees, and retires when the command fails or after the
+  // settle timeout.
+  const [flip, setFlip] = useState<RowFlip | null>(null);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const row = withFlip(props.row, flip);
+  useEffect(
+    () => () => {
+      if (settle.current !== null) clearTimeout(settle.current);
+    },
+    [],
+  );
 
   const perform = useCallback(
     async (action: AccountAction, alias?: string) => {
       const { command, args, options } = accountCommandArgs(fleetKey, row, action, alias);
+      const next = rowFlip(row, action);
       setBusy(action);
       setError(null);
+      if (next !== null) {
+        setFlip(next);
+        if (settle.current !== null) clearTimeout(settle.current);
+        settle.current = setTimeout(() => setFlip(null), FLIP_SETTLE_TIMEOUT_MS);
+      }
       const result = await run({
         environmentId,
         input: { command, args: [...args], options: options ?? {} },
       });
       setBusy(null);
-      if (result._tag !== "Success") setError(commandFailureMessage(result.cause));
+      if (result._tag !== "Success") {
+        // Only this press's flip: a later press may have drawn its own.
+        if (next !== null) setFlip((current) => (current === next ? null : current));
+        setError(commandFailureMessage(result.cause));
+      }
     },
     [environmentId, fleetKey, row, run],
   );

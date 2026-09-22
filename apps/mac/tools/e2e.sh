@@ -261,14 +261,6 @@ echo "aws: orphan login wrapper swept at launch"
 # --- functional ---------------------------------------------------------
 "$CTL" manifest | json "len(d['commands'])" | grep -qE '^[1-9][0-9]*$' || fail "manifest empty"
 "$CTL" manifest | expect "next(c for c in d['commands'] if c['name']=='signin-code')['stdin']=='secret' and 'stdin' not in next(c for c in d['commands'] if c['name']=='status')" || fail "manifest: stdin flag (#747)"
-"$CTL" lock-status | expect "d['enabled'] is False and d['locked'] is False and d['relock']=='1 h'" || fail "biometric lock must default to off, unlocked, re-lock 1 h"
-# #747: the fork's Lock pane drives the setting through `lock`; `on` and
-# `unlock` need the biometric prompt (a human), so only the rest runs here.
-"$CTL" lock relock 5m | expect "d['relock']=='5 min'" || fail "lock relock 5m"
-"$CTL" lock relock 1h | expect "d['relock']=='1 h'" || fail "lock relock 1h"
-"$CTL" lock now | expect "d['locked'] is False" || fail "lock now must stay unlocked while the lock is off"
-"$CTL" lock relock never >/dev/null 2>&1 && fail "lock relock must refuse an unknown choice"
-"$CTL" unlock 2>&1 | grep -q "the lock is off" || fail "unlock must say the lock is off"
 "$CTL" status | json "d['engines']['swapd']['registered']" | grep -q True || fail "swapd not registered"
 # #1177: the swapd pane's read-only lines ride `status` (binary path, daemon word).
 "$CTL" status | expect "d['engines']['swapd']['binaryPath'].endswith('demo-swapd') and d['engines']['swapd']['daemon'] in ('stopped','running','backingOff','refused','schemaMismatch')" || fail "status swapd binary/daemon"
@@ -290,6 +282,16 @@ echo "functional: ok ($N demo accounts, pop-out visible)"
 "$CTL" rename swapd/claude 3 "" | expect "$(acct 3).get('alias')!='E2E Alias'" || fail "rename clear didn't take"   # demo accounts carry default aliases
 "$CTL" prefer swapd/claude 2 on | expect "$(acct 2).get('preferred')==True" || fail "prefer 2 didn't take"
 "$CTL" prefer swapd/claude 2 off | expect "$(acct 2).get('preferred')==False" || fail "unprefer 2 didn't take"
+# #1481: two writes at once queue in arrival order; the second used to be
+# refused with "busy: another control command is running".
+"$CTL" prefer swapd/claude 2 on >/dev/null & first=$!
+"$CTL" hold swapd/claude 3 >/dev/null & second=$!
+wait "$first" || fail "a write racing another was refused (prefer)"
+wait "$second" || fail "a write racing another was refused (hold)"
+"$CTL" fleets | expect "(lambda by: by[2].get('preferred')==True and by[3].get('disabled')==True)({a['number']: a for a in d[0]['accounts']})" \
+    || fail "racing writes didn't both land"
+"$CTL" prefer swapd/claude 2 off >/dev/null || fail "unprefer 2 after the race"
+"$CTL" unhold swapd/claude 3 >/dev/null || fail "unhold 3 after the race"
 NEXT="$("$CTL" fleets | json "d[0]['nextCandidate']")"
 "$CTL" rotate swapd/claude | expect "d['fleet']['activeNumber']==$NEXT" || fail "rotate didn't land on the next candidate ($NEXT)"
 "$CTL" history swapd/claude --limit 5 | expect "d['fleet']=='swapd/claude' and d['history']['schemaVersion']==1 and d['history']['switches'][0]['to']['slot']==2 and d['history']['switches'][0]['trigger']=='at-limit'" || fail "history hands the engine's switch log on"
@@ -339,9 +341,6 @@ pgrep -f "${INFINITUS_SWAPD_CLI#/private} auto" >/dev/null || fail "swapd auto m
 "$CTL" prefs set menu_bar_enabled false | expect "d['value'] is False" || fail "prefs set menu_bar_enabled false"
 "$CTL" status | expect "d['badge']" || fail "the socket must keep answering with the menu bar off (#828)"
 "$CTL" prefs set menu_bar_enabled true | expect "d['value'] is True" || fail "prefs set menu_bar_enabled true"
-# The Dock icon is a pref too, default off: Settings takes one only when it is on.
-"$CTL" prefs set dock_icon_enabled true | expect "d['value'] is True" || fail "prefs set dock_icon_enabled true"
-"$CTL" prefs set dock_icon_enabled false | expect "d['value'] is False" || fail "prefs set dock_icon_enabled false"
 "$CTL" fleets | expect "all('headroom' not in f for f in d)" || fail "headroom must drop once priority_mode is off"
 echo "headroom: absent off, 5h binds, low/abundant follow the thresholds (#616)"
 # #743: the interrupt mode says critical where hold says low, same line.
@@ -359,27 +358,8 @@ echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 "$CTL" utilization --days 400 >/dev/null 2>&1 && fail "utilization must refuse an out-of-range day count"
 "$CTL" stats --period week | expect "d['period']=='week' and 'total' in d and 'commits' in d['total'] and 'humanMessages' in d['total']" || fail "stats verb"
 
-# --- windows: Settings open idles too ------------------------------------
-# The Settings-open case sat at 18% for a week (#346: transcript reads
-# and the machine sampler all ran on behind it)
-# while the pop-out gate read 0.5%; this is the gate
-# that would have caught it. Settle first: the window builds its tabs on
-# the first open.
-settings_visible() { "$CTL" windows | expect "any(w['visible'] and w.get('title')=='Settings' for w in d)"; }
-"$CTL" show settings | expect "d['shown']=='settings'" || fail "show settings"
-sleep 3
-settings_visible || fail "Settings window not visible after show settings"
-sleep 9
-SA="$("$CTL" perf | json "d['cpuSeconds']")"
-sleep 15
-SB="$("$CTL" perf | json "d['cpuSeconds']")"
-SPCT="$(python3 -c "print(round(($SB-$SA)/15*100,1))")"
-echo "idle CPU with Settings open: ${SPCT}%"
-idle_cpu_ok "Settings idle CPU" "$SPCT" 15
-"$CTL" hide settings | expect "d['hidden']=='settings'" || fail "hide settings"
-sleep 1
-settings_visible && fail "Settings still visible after hide"
-echo "windows: ok (Settings open idle ${SPCT}%, hidden)"
+# `show settings` / `hide settings` refuse since the Settings window retired.
+"$CTL" show settings >/dev/null 2>&1 && fail "show settings must refuse (retired)"
 
 # The preference catalog (#558): the table with values, and `get` narrowed.
 "$CTL" prefs | expect "any(s['slug']=='display' and s['name']=='Display' for s in d['sections']) and any(p['key']=='popup_layout' and p['section']=='display' and p['effect']=='live' for p in d['prefs'])" || fail "prefs"

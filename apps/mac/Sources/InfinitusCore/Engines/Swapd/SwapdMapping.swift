@@ -69,6 +69,9 @@ public struct SwapdAccountView: Decodable, Sendable {
     public let active: Bool
     public let disabled: Bool
     public let preferred: Bool
+    /// The daemon keeps this account's 5h window running (swapd 0.3,
+    /// `auto-ignite`); absent from an older build.
+    public let autoIgnite: Bool?
     public let usageStatus: String
     public let fetchedAt: String?
     public let ageSeconds: Double?
@@ -237,6 +240,7 @@ public enum SwapdMapping {
                            : shown.map { window($0, now: now, fallbackName: $0.kind) },
                        alias: view.alias, icon: view.icon, plan: view.plan,
                        disabled: view.disabled, preferred: view.preferred,
+                       autoIgnite: view.autoIgnite,
                        // A served measurement carries the age of the fetch
                        // it came from, not of the pass that served it.
                        usageFetchedAt: view.fetchedAt ?? view.lastGood?.fetchedAt,

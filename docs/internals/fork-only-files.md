@@ -7,6 +7,7 @@ file or directory. Upstream files the fork edits are in
 per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
+- `apps/server/src/provider/Drivers/OmpDriver.ts`, `Layers/OmpProvider.ts`, `Layers/OmpAdapter.ts`, `Services/OmpAdapter.ts`, `acp/OmpAcpSupport.ts`, `Layers/ompUsage.logic.ts` and `textGeneration/OmpTextGeneration.ts` (each with its test) — the Oh My Pi driver, one more tenant of the ACP runtime, templated on Cursor. Text generation rides `omp -p` (no schema flag, so OpenCode's decode path), quota comes from `omp usage --json --redact`'s `capacity` fold (no email, hence no `resetsAt`), and session import reads `~/.omp/agent/sessions`. Upstream has its own unmerged omp driver claiming these exact paths, so a sync collides here rather than adding a provider. Rules and traps: `docs/internals/omp-driver.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlack.ts` (+ `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts` — the `SlackClient` seam, tests) — the Slack bridge's reactor (#574, PR 2 of 4); state in `<stateDir>/infinitus-slack/threads.json`. Rules and traps: `docs/internals/slack-bridge.md`.
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
@@ -17,7 +18,7 @@ these bullets.
   nothing of its input and the request observer sees the method only).
 - `apps/web/src/hooks/useInfinitusPairingToasts.ts` — a toast per phone
   asking to pair (#710): title with the device name, one Open action to
-  `/settings/infinitus/devices`. Never an Approve in the toast (a spoofed
+  `/settings/devices`. Never an Approve in the toast (a spoofed
   device name must not be let in by reflex) and never the match code; every
   unseen id is toasted once, including those already pending at load. Mounted
   from `InfinitusEventToasts` beside the events hook. Silent when the stream
@@ -36,18 +37,6 @@ these bullets.
   once from `apps/web/src/routes/__root.tsx`
   (an upstream file: that line and `CaptureGestureCoordinator`'s are the
   fork's only edits there).
-- `apps/web/src/components/settings/infinitus/InfinitusLockPanel.tsx` (+
-  `lock.logic.ts`, route `settings.infinitus.lock.tsx`) — Settings › Infinitus
-  › Lock (#747 step 3): the Mac's biometric lock over `infinitus.command`'s
-  `lock-status` / `lock on|off|now|relock <arg>` / `unlock` (native #788),
-  each answering `{enabled, locked, relock}`. The switch turns the lock on
-  (the Mac's own prompt runs there; the row says "Confirm on the Mac" while
-  it waits) or off (the team refusal and its `--yes` left with Team, #1061).
-  Re-lock is a select over the four native labels
-  (`RELOCK_CHOICES` maps "5 min" ↔ `5m` and so on); the status row offers
-  Lock now or Unlock (the unlock prompt runs on the Mac too). Every error is
-  the app's text verbatim; the pane holds no secret. Gated on the manifest
-  carrying all three verbs, else "no lock commands (needs ≥ 5bc33fa5c0)".
 - `apps/web/src/components/captures/`, `apps/web/src/state/captures.ts` — the composer's Captures popover (#433, PR B): `ComposerCapturesBadge`, `ComposerCapturesMenu`, `captures.logic`, `capturesUiStore`, `useCaptures`, and `CaptureGestureCoordinator` (+ `captureGesture.logic`), the desktop gesture's landing. Rules and traps: `docs/internals/captures.md`.
 - `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G): `promptSnippets.logic`, `promptsUiStore`, `ComposerPromptsBadge`, `ComposerPromptsMenu`, `useProjectPromptSnippets`, `ProjectPromptSnippetsSection`, `promptSnippetSlashItems`; the phone's half is `apps/mobile/src/features/threads/promptSnippetItems.ts`. Rules and traps: `docs/internals/prompt-snippets.md`.
 - `apps/web/src/components/sidebar/nextAttentionBus.ts` — the window
@@ -71,10 +60,11 @@ these bullets.
   project (`deepLink.logic` `resolveDeepLinkProject`: id, then title, then
   workspace-root basename, case-insensitive) and opens the composer through
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
-  unknown project toasts.
+  unknown project toasts; `settings` navigates to a listed Settings section
+  (`isSettingsDeepLinkPath`) and ignores any other path.
   `join` (#1313, the Team rebuild) parks the whole link — it is the team
   code, a secret — in `pendingTeamJoin.ts` (memory only, taken once) and
-  opens Settings › Infinitus; the Team page's Join field takes it when that
+  opens Settings › Team; the Team page's Join field takes it when that
   page lands, and nothing joins on its own. Only the link's kind is ever
   logged; `pair` stays the native app's.
 - `packages/contracts/src/captures.ts`, `apps/server/src/captures/CaptureStore.ts`, `packages/client-runtime/src/state/captures.ts` (exported as `@infinitus/client-runtime/state/captures`) — captures (#433): one list per project, kept as `<stateDir>/captures/<projectId>.json`, streamed by `subscribeCaptures`, written by `captures.apply`. Rules and traps: `docs/internals/captures.md`.
@@ -87,11 +77,15 @@ these bullets.
   `AccountVitals.isDead` / `RecoveryMath.revival`. Drawn by
   `apps/web/src/components/accounts/ExhaustedBand.tsx` inside each fleet
   section ("All accounts exhausted · next revival HH:MM (account)", the
-  time in the user's timestamp format), replacing the pop-out's reviver band.
+  time in the user's timestamp format; "All accounts out of Fable" when one
+  per-model window alone blocks every account and the plan windows still
+  have room), replacing the pop-out's reviver band.
 - `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
-- `apps/web/src/routes/activity.tsx`, `apps/web/src/components/activity/` — the
-  `/activity` page (#659): the pop-out's Activity pane in the fork — the
-  app's event log newest first, sectioned by local day (`activity.logic.ts`),
+- `apps/web/src/routes/settings.engines_.activity.tsx`,
+  `apps/web/src/components/activity/` — Settings › Engines ›
+  Activity (#659; `/settings/engines/activity`, the `engines_`
+  keeping it out of the Engines panel's tree): the pop-out's Activity pane in
+  the fork — the app's event log newest first, sectioned by local day (`activity.logic.ts`),
   a kind chip per line. Reads `events --limit 100` once through
   `infinitusEnvironment.events` (a query atom with no refresh, dropped a
   minute after the page leaves) and then folds in `snapshot.events` deltas
@@ -100,14 +94,15 @@ these bullets.
   `@infinitus/client-runtime/state/infinitusActivity`) — no polling of its own.
   The engine poller's per-minute `poll` / `no switch — …` lines (kind `other`
   on native; `isPollRow` reads the text) stay in the store but are hidden until
-  the header's "Show polls" toggle, persisted like the Stats period (#696).
-  Sidebar "Activity" beside Stats.
+  the section header's "Show polls" toggle, persisted like the Stats period
+  (#696). Reached from swapd's row on the Engines page (primary environment
+  only) and the palette's "Open activity"; it left the sidebar 2026-09-18.
 - `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Rules and traps: `docs/internals/utilization.md`.
 - Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table on `/usage` (#779): `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads the app's `history <fleet>` verb once per scan, `infinitusUsageAttribution.logic.ts` gives `accountAt(ms)`, `UsageAggregator`'s `attribute` hook sums the optional `UsageSummary.accounts`. Rules and traps: `docs/internals/usage-attribution.md`.
 - `apps/web/src/routes/accounts.tsx`, `apps/web/src/components/accounts/` — the Accounts page and its Sign-ins section (`SignInsSection.tsx`, `signIns.logic.ts`; models in `packages/client-runtime/src/state/infinitusAccounts.ts`, `infinitusPageState` #693); Add account / Sign in again (`addAccount.logic.ts`, #671, #1213), the desktop's in-app sign-in (`apps/desktop/src/infinitus/InfinitusSignIn.ts`, `signIn.logic.ts`, #677) and the paste-code path over `infinitus.secret` (#747 step 2). Rules and traps: `docs/internals/accounts-page.md`.
-- `apps/web/src/routes/settings.infinitus.{index,notifications,devices,engines}.tsx`
-  — the four Settings › Infinitus routes, thin shells over the panes above.
+- `apps/web/src/routes/settings.{menu-bar,notifications,devices,engines}.tsx`
+  — four of the Settings routes, thin shells over the panes above.
   Profiles (#165, the Mac's "named way to start a session") left with the
   #1041 sessions sweep, its `profiles` contract with it, and the fixture's
   canned reply with the Mac's own verb (#1091).
@@ -118,24 +113,14 @@ these bullets.
 - `packages/contracts/src/productName.ts` — `PRODUCT_NAME`, the one constant
   every user-facing string routes through (#601 phase 2); contracts holds it
   because shared depends on contracts, and `packages/shared/src/productName.ts`
-  re-exports it so `@infinitus/shared/productName` imports keep working.
-- `apps/server` — rule: any string the user reads (CLI help and command
-  descriptions, log lines, errors, HTTP/HTML pages, pairing and service copy,
-  MCP tool descriptions, the git author name, the prompts and runtime
-  instructions the assistant echoes) says `${PRODUCT_NAME}`, never a literal
-  "T3 Code"; identifiers stay (`t3` binary and package, `T3CODE_*` env vars,
-  the `t3code/<version>` UA token, upstream URLs) until #1368's later
-  slices rename them (the MCP server id is `infinitus` since slice E); "T3 Connect" is `CONNECT_NAME`
-  (`productName.ts`, "Infinitus Connect", #1368 slice A) on every surface —
-  web, mobile, server, `packages/*`, `docs/user` — and the web and desktop
-  guard tests, `scripts/connect-name.guard.test.ts` (server, phone, packages,
-  relay) and the visual pass fail on a new literal. The same three guards
-  fail on a bare "T3" used as the product noun ("T3 Account", "Open T3",
-  "a T3 thread"; #1368 follow-up) — identifiers never match — with an
-  allowlist for the wordmark glyph, the relay's live column default and the
-  triage playbook that must stay byte-identical to upstream's file. The
-  lock-screen widgets say a literal "Infinitus": a widget body serializes
-  into the extension and cannot reach an imported constant.
+  re-exports it so `@infinitus/shared/productName` imports keep working. It
+  also carries the upstream attribution constants (`UPSTREAM_PRODUCT_NAME`,
+  `UPSTREAM_PUBLISHER_NAME`, `UPSTREAM_REPOSITORY_URL`) the
+  licenses screens' "Built on T3 Code" section reads: the guard test treats a
+  bare "T3 Tools" as a stray literal, so the credit routes through them like
+  every other upstream reference. `productNamePlugin` rewrites only
+  `index.html` and `bootError.ts`, so these constants survive the build.
+- `apps/server`, `apps/web`, `apps/mobile`, `packages/*`, `docs/user` — rule: every string a user reads says `${PRODUCT_NAME}` / `${CONNECT_NAME}` (`productName.ts`), guarded by the web and desktop guard tests, `scripts/connect-name.guard.test.ts` and the visual pass (#1368 A); `docs` by the rename table's prose entries and CI's `--check`. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `apps/mobile` — rule: screen copy, alerts, brand text, a11y labels,
   the auth device label and the `infinitus` variant's
   permission strings read `PRODUCT_NAME`; the `development`/`preview`/
@@ -175,73 +160,9 @@ these bullets.
 - `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus` group in `packages/contracts/src/environmentHttp.ts` — the server half of `infinitusctl`'s desktop verbs (#822): the `infinitusctl` session and its 60 s heartbeat (#1137), `GET /api/infinitus/holds`, `POST /api/infinitus/release-thread`, `GET /api/infinitus/thread-defaults` (#1315). Rules and traps: `docs/internals/infinitusctl-desktop-verbs.md`.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control client, the `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command` (`events --after`, #346), the fork-port publisher (`prefs set fork_server_port`, withheld from dev and worktree servers, #640), the verb-only spans (#676). Rules and traps: `docs/internals/server-adapter.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlackSocket.ts` (+ `infinitusSlackSocket.logic.ts` — `parseSocketFrame`, `reconnectDelaySeconds`; test) — the Socket Mode client, `SlackClientLive` (#574, PR 4). Rules and traps: `docs/internals/slack-bridge.md`.
-- `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+ `slack.logic.ts` — `parseAllowedUserIds`, `slackStatusLine`; test) — Settings › Infinitus › Slack (#574, PR 3), mounted from `settings.infinitus.index.tsx`'s footer, search item `infinitus-slack`. Rules and traps: `docs/internals/slack-bridge.md`.
-  `Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`) is
-  resume-on-limit for the threads this server runs (#648), and since the
-  sessions sweep (#1041) the only one left — the Mac's terminal nudge went
-  with the sessions it typed into: the Claude adapter's parked-turn
-  warning (`rate_limit_info.status: "rejected"`) or a limit-failed
-  `turn.completed` records a stop (a parked turn's failed completion is the
-  same stop ending, one row, the window kept); while any thread is stopped
-  the layer subscribes to the snapshot and waits for the swapd fleet's
-  active account — the one the plain CLI spends; the proxy fleets never
-  count — to read `ok` from a probe taken after the stop (native's
-  ResumeGate). swapd's `ok` is a credential status, not headroom (the
-  account that just ran out reads `ok` on the next poll, which resumed a
-  turn onto it every cooldown), so `resumeTarget` also reads the account's
-  usage for the stop's window (`rateLimitType` on the stop): under 100 %
-  counts, full does not; a reading without that window lets a different
-  account through and the same one only once the stop's `resetsAt` passed.
-  Then the parked turn is interrupted, a `infinitus.turn.resumed` work-log row
-  names the account, and the thread continues with upstream's continuation
-  prompt from its resume cursor. The stop itself leaves an
-  `infinitus.thread.limited` row ("Limit hit on <account>") and joins the
-  layer's `InfinitusLimitStops.stopped` list (#270 I), which `ws.ts` merges
-  into `subscribeInfinitusHolds` beside the held starts so the sidebar reads
-  "Limit" with the account in the tooltip; the banner reads "Stopped on a
-  usage limit" with no button; the resumed row or a new turn closes it. A
-  parked stop's row and stream entry carry `resetsAt` (ISO) from the SDK's
-  `rate_limit_info`; the SDK re-announces a parked turn as its reset moves,
-  and the stream entry follows while the row stays as written; the tooltip
-  and the banner add "resets <time>" in the user's timestamp format while
-  the instant is still ahead (`infinitusHoldBanner.logic.ts` `limitedLine`
-  / `resetLabelFor`, `sidebar/HeldTooltipText.tsx`). A failed stop names no
-  reset. A thread on an instance whose environment carries
-  `ANTHROPIC_BASE_URL` (a proxy, #1088) spends no swapd account: its stop
-  reads "Limit hit on the proxy instance <display name>", names no account,
-  starts no snapshot watch and is never resumed — the banner stays until the
-  user sends again. Once per stop, 2-min cooldown per thread,
-  a user turn cancels; off by the `infinitusResumeOnLimit` server setting
-  (`apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx` on
-  Settings › Infinitus).
-  `Layers/InfinitusCompanion.ts` is the one-app companion (#654 step 1): on a
-  Mac whose socket is still quiet 3 s after the server starts it runs `open
--g -b run.infinitus` once (LaunchServices, no path, no retry, one log line;
-  withheld from dev/worktree servers and from any instance running with an
-  `INFINITUS_CONTROL_SOCKET` override — an isolated instance by definition,
-  which must never `open` the installed app — exactly like the port
-  publish; a socket FILE that exists but refuses — the app never unlinks
-  its socket, so that is an Infinitus mid-relaunch whose own reopen shell
-  will `open` it, #637/#756 — is re-probed every 2 s for 20 s and only a
-  file still refusing after that counts as a crash's stale leftover and is
-  opened over, `infinitus.companion.stale-socket`), and the
-  same body answers `infinitus.launch` (operate scope) for the web's "Launch
-  Infinitus" button — `{launched}` or `{launched: false, reason}`, never an
-  error; the app coming up is the snapshot flipping. With the menu-bar app
-  nested in the desktop bundle (#777): the packaged macOS desktop sets
-  `INFINITUS_DESKTOP_BUNDLE` for its backend, the companion resolves the
-  helper at `Contents/Library/LoginItems/Infinitus Menu Bar.app` and its
-  version (PlistBuddy on its Info.plist), opens it by path first (`open -g
--a`; a fresh DMG install is not in LaunchServices yet, and a brew-cask
-  copy may still carry the bundle id, #7) with the bundle id as the
-  fallback, and reconciles at startup: an answering helper whose
-  `status.bundlePath` is that nested path and whose `version` is not the
-  shipped one (the updater installs by moving bundles, so the old helper
-  keeps running) is sent `quit`, re-probed every 2 s until the socket stops
-  answering (never an `open` on top of a shutdown, #637), then reopened by
-  path. A standalone helper is left alone whatever its version; one that
-  reports no `bundlePath` only has its skew logged
-  (`infinitus.companion.skew-unarmed`).
+- `apps/web/src/components/settings/infinitus/InfinitusSlackCard.tsx` (+ `slack.logic.ts` — `parseAllowedUserIds`, `slackStatusLine`; test) — Settings › Menu bar › Slack (#574, PR 3), mounted from `settings.menu-bar.tsx`'s footer, search item `infinitus-slack`. Rules and traps: `docs/internals/slack-bridge.md`.
+- `apps/server/src/infinitus/Layers/InfinitusResumeOnLimit.ts` (+ `infinitusResumeOnLimit.logic.ts`; `apps/web/src/components/settings/infinitus/InfinitusResumeCard.tsx`) — resume-on-limit for the threads this server runs (#648, #270 I, #1088). Rules and traps: `docs/internals/resume-on-limit.md`.
+- `apps/server/src/infinitus/Layers/InfinitusCompanion.ts` — the one-app companion: opens the menu-bar app behind a quiet socket and answers `infinitus.launch` (#654 step 1, #777). Rules and traps: `docs/internals/companion.md`.
 - `apps/server/src/infinitus/serverLogFile.ts` (+ test) — the backend's own
   log file (#1182). Upstream keeps a server's log lines only through whoever
   started it: a boot service redirects stdout into `server.log`
@@ -256,8 +177,15 @@ these bullets.
   service redirects stdout there, and writing both would put every line in
   that file twice, in two formats. A sink that cannot write swallows it: a
   log file is never worth failing a turn over.
-- `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+ `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins read off the Claude driver's tool results (#1076): one `infinitus.signin.needed` row per hit and the Mac's `aws-login` / `gcloud-login` flow through `InfinitusService.command`. Rules and traps: `docs/internals/sign-in-lapse.md`.
-- `apps/server/src/infinitus/Layers/InfinitusAlertRelay.ts` (+ `Services/InfinitusAlertRelay.ts`, test; `packages/contracts/src/infinitusAlert.ts`) — the server half of an account alert (#1375): `POST /api/infinitus/alert` on the desktop credential's operate scope, signed with the environment's relay link key for the relay's `infinitusAlert` route (`relayInfinitusAlert.ts`), deep link `/settings/accounts`. Unlinked answers 503 `InfinitusAlertRelayUnlinked` (the Mac keeps the notice local); a relay refusal is logged with its cause and answers 500. The link is read per call, as `AgentAwarenessRelay` reads it. It replaced the Mac-key thread-card fold (`InfinitusAgentActivity.ts`, #1047 part 3): the relay draws the card now.
+- `apps/server/src/infinitus/Layers/InfinitusSignInLapse.ts` (+ `infinitusSignInLapse.logic.ts`, tests) — lapsed AWS / gcloud sign-ins read off the Claude driver's tool results, and a login a Bash command runs itself (#1076): one `infinitus.signin.needed` row per hit and the Mac's `aws-login` / `gcloud-login` flow through `InfinitusService.command`. Rules and traps: `docs/internals/sign-in-lapse.md`.
+- `apps/server/src/infinitus/Layers/InfinitusAlertRelay.ts` (+ `Services/InfinitusAlertRelay.ts`, test; `packages/contracts/src/infinitusAlert.ts`) — the server half of an account alert (#1375): `POST /api/infinitus/alert` on the desktop credential's operate scope, signed with the environment's relay link key for the relay's `infinitusAlert` route (`relayInfinitusAlert.ts`), deep link `/settings/accounts` unless the caller names one (a lapsed sign-in's alert lands on the home screen's sign-in cards, `/`). Unlinked answers 503 `InfinitusAlertRelayUnlinked` (the Mac keeps the notice local); a relay refusal is logged with its cause and answers 500. The link is read per call, as `AgentAwarenessRelay` reads it. It replaced the Mac-key thread-card fold (`InfinitusAgentActivity.ts`, #1047 part 3): the relay draws the card now.
+- `apps/desktop/resources/dmg/dmg-background-infinitus.svg` — the DMG window's
+  artwork for the `infinitus` channel (#732), rasterized by sips at build time
+  (`stageDesktopDmgBackground`), so gradients, shapes and text only: no filters,
+  masks or CSS. Palette and the twin-loop geometry follow `apps/mac/make-icon.swift`
+  and `MenuBarGlyph.swift`; the icon positions and the empty bottom 32px follow
+  the `dmg` block in `scripts/build-desktop-artifact.ts`. Light base on
+  purpose: Finder draws the icon labels black and the builder cannot recolor them.
 - `apps/desktop/src/infinitus/` — the shell's Infinitus side (#654 step 1):
   `InfinitusDesktopPrefs.ts` keeps `<stateDir>/infinitus-desktop.json`
   (`quitInfinitusWithApp`, default off; upstream's desktop-settings.json is
@@ -267,7 +195,7 @@ these bullets.
   per process, skipped for an updater-driven quit. Reached from the web over
   the bridge's optional `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp`
   (`ipc/methods/infinitus.ts`); the switch is the "This window" card on
-  Settings › Infinitus (`InfinitusDesktopCard.tsx`, hidden in a browser or
+  Settings › Menu bar (`InfinitusDesktopCard.tsx`, hidden in a browser or
   under an older shell). `InfinitusLaunchButton.tsx` is the launch button on
   the Accounts offline card and every Infinitus pane's unavailable notice,
   drawn only when the server's host is a Mac.
@@ -275,7 +203,7 @@ these bullets.
 - `apps/desktop/src/infinitus/InfinitusOAuthSignIn.ts` (+ `InfinitusSwapdProcess.ts`, `infinitusSwapd.logic.ts`, test) — the sign-in the shell runs itself by spawning `swapd add-oauth` (#1213); methods `beginInfinitusOAuthSignIn` / `cancelInfinitusOAuthSignIn`, contracts `InfinitusOAuthSignInInput` / `-Result`. Rules and traps: `docs/internals/accounts-page.md`.
 - `apps/desktop/src/infinitus/InfinitusKeepAwake.ts` — sleep held off while a turn runs (#1075): `apps/web/src/lib/desktopKeepAwake.logic.ts` `keepAwakeWanted`, the `setKeepAwake` bridge method, `DesktopKeepAwakeCoordinator`, `DesktopKeepAwakeSettings`. Rules and traps: `docs/internals/desktop-keep-awake.md`.
 - `apps/desktop/src/infinitus/InfinitusHistoryGesture.ts` — the mouse's back and forward buttons arriving as the system page-swipe gesture (#1250): `INFINITUS_HISTORY_GESTURE_CHANNEL`, `onHistoryGesture`, `swipeHistoryIntent` in `lib/backNavigation.ts`. Rules and traps: `docs/internals/desktop-history-gesture.md`.
-- `apps/desktop/src/infinitus/InfinitusEngineSupervisor.ts` (+ `infinitusEngines.logic.ts`, tests) — the proxy engines this shell runs, so a thread on a proxied instance stops failing with `ConnectionRefused` because nobody started 9Router. Detection decides the mode: an engine Homebrew already runs under launchd is left to it (`service`), one we can find is spawned and respawned with the Mac supervisor's backoff (`child`), and a typed command is always ours to run. Children die with the app; no launch agent is written. Web half: `apps/web/src/components/settings/infinitus/InfinitusEngineControls.tsx` + `engineControls.logic.ts`, mounted by `InfinitusEnginesPanel` for the local environment only; bridge methods `getInfinitusEngines` / `setInfinitusEngineSettings` / `controlInfinitusEngine`; settings in `InfinitusDesktopPrefs`' `engines`.
+- `apps/desktop/src/infinitus/InfinitusEngineSupervisor.ts` (+ `infinitusEngines.logic.ts`, tests) — the proxy engines this shell runs, so a thread on a proxied instance stops failing with `ConnectionRefused` because nobody started 9Router. Detection decides the mode: an engine Homebrew already runs under launchd is left to it (`service`), one we can find is spawned and respawned with the Mac supervisor's backoff (`child`), and a typed command is always ours to run. Children die with the app; no launch agent is written. Web half: `apps/web/src/components/settings/infinitus/InfinitusEngineControls.tsx` + `engineControls.logic.ts`, a hook `InfinitusEnginesPanel` calls for the local environment only, its rows drawn at the foot of each engine's section in `InfinitusEngineSecrets`; bridge methods `getInfinitusEngines` / `setInfinitusEngineSettings` / `controlInfinitusEngine`; settings in `InfinitusDesktopPrefs`' `engines`.
 - `apps/desktop/src/shell/InfinitusPosixCliDirs.ts` (+ test) — the POSIX
   sibling of upstream's `knownWindowsCliDirs` (#1078): `~/.claude/local`,
   `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
@@ -285,9 +213,15 @@ these bullets.
   `claude` (`resolvePosixCliDirFallback`, pure over `exists` /
   `listDirectory`); one info line names the dirs added and the one holding
   `claude`. darwin only; a probe that answers in time still wins.
-- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new` and `join` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
+- `apps/desktop/src/infinitus/InfinitusDeepLinks.ts` — deep links `thread`, `new`, `join` and `settings` on the `infinitus` / `infinitus-dev` scheme (#270 D, #1313): `deepLinkIntake`, `consumeInfinitusDeepLink` in `ipc/methods/infinitus.ts`. Rules and traps: `docs/internals/desktop-deep-links.md`.
 - `apps/mobile/assets/infinitus-ios-1024.png` — the Infinitus phone icon
   (copied from the native phone's asset catalog).
+- `apps/mobile/assets/infinitus-splash-1024.png`,
+  `apps/mobile/assets/android-splash-icon-infinitus.png` and
+  `scripts/export-infinitus-splash.ts` — the phone's splash artwork: the icon
+  under iOS's rounded silhouette, and for Android 12+'s circle mask the icon's
+  gradient with the widget's twin-loop mark kept inside it. Rerun the script
+  when the icon or mark changes.
 - `apps/mobile/assets/widget/InfinitusMark.svg` — the twin loop for the
   lock-screen card's header (#941), monochrome so the widget's foreground
   tint applies: the same geometry `apps/mac/make-icon.swift` draws (rings at
@@ -343,6 +277,7 @@ these bullets.
   unchanged.
 - `apps/mobile/modules/infinitus-loopback-catch/` (fork-owned local Expo module, iOS; `apps/mobile/src/features/infinitus/loopbackCatch.ts` binds it) — the phone catches a relay sign-in's loopback redirect itself and hands the URL to the Mac as `infinitus.secret {command: "aws-login-callback"}`; the flow, and the card's default code-paste flow with the AWS account rows to copy, is in `InfinitusSignIns.tsx`. Rules and traps: `docs/internals/loopback-catch.md`.
 - `apps/mobile/src/state/threadOutboxQueue.logic.ts` (+ `threadOutboxHolds.ts`) — the phone outbox's queue rule (#807, #812, #1325): `queueBehindRunningTurn`, `outboxQueueMode` (`infinitusComposerSendMode`), `resolveThreadOutboxDelivery`, `queueTurnCommandInput`, `queuedTurnSendAt`, `readHeldThreads`. Rules and traps: `docs/internals/phone-outbox-drain.md`.
+- `apps/mobile/src/features/infinitus/previewUrlReuse.logic.ts` — when a full-screen preview may open on the signed URL its thumbnail already holds (attachments only, with a margin before expiry). Why: `docs/internals/mobile-navigation.md`.
 - `apps/mobile/src/features/infinitus/lanDiscovery.logic.ts` (+ `lanDiscovery.ts`, `InfinitusNearbyServers.tsx`) — "Find Macs on this network" on the add-connection form (#651, #661, #669, #787): a /24 sweep for `/.well-known/t3/environment` on port 3773, `sweepSummary`, `shouldRetrySweep`; `missingPairingInput` in `pairing.ts`. Rules and traps: `docs/internals/lan-discovery.md`.
 - `apps/mobile/src/features/infinitus/pairingApproval.logic.ts` (+ `pairingApproval.ts`,
   `InfinitusAskToApprove.tsx`) — "Ask this Mac to approve" under the code
@@ -375,6 +310,12 @@ these bullets.
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure (the held banner still offers Pin).
+- `apps/mobile/src/features/sharing/ShareToThreadRouteScreen.tsx` (+
+  `share-to-thread.ts`, `.test.ts`) — "Add to an existing thread" on the
+  share sheet's project picker: the thread list (unarchived, newest first,
+  searchable), and the pick merges the share into that thread's composer
+  draft (`mergeComposerDraftContent` with the share id as receipt, then
+  `consumeShare`) and replaces the sheet with the thread.
 
 - `apps/mobile/src/features/review/shikiReviewHighlighter.coldEngine.test.ts`
   — the #610 regression: a mocked regex engine whose first scan outlives
@@ -383,14 +324,15 @@ these bullets.
 - `scripts/infinitus-md-size.test.ts` — the INFINITUS.md byte cap (16 KB, #1339):
   every session loads that file whole, so a feature's narrative goes in a
   `docs/internals/<feature>.md` page and one ledger line here.
+- `scripts/phone.sh` (+ `.agents/skills/drive-phone/SKILL.md`) — drives the developer's paired physical iPhone from a session with the server's pinned `agent-device` (launch, deep links, screenshots, console; snapshots and taps once the Mac's `DevToolsSecurity` is on). The CLI installs under the worktree's `.t3/tools`, never on the Mac. Usage and traps: the skill.
 - `.github/workflows/upstream-sync.yml` — the daily upstream merge as a PR (INFINITUS.md); once `scripts/infinitus-rename.ts --check` passes on `main` it renames upstream's tip on its own branch before merging (#1368 C).
-- `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
+- `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components, and the product name in `docs/user` prose) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`, `fork-visual-fixture.guard.test.ts`) — the canned Infinitus control socket the pass runs against in CI, kept honest against `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift` (#1091, #1139). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-routes.ts` (+ `.test.ts`), `scripts/fork-visual-check.ts` — the route table the pass asserts (one marker per populated page, `ALWAYS_ABSENT` phrases) and the checker that applies it. Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `.github/workflows/fork-visual-pass.yml` — "Fork visual pass", on every PR to `main` and by hand: fixture, server from source, `fork-visual-pass.mjs`, `fork-visual-check.ts`; artifact `fork-visual-pass` (#825, #831). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `.github/workflows/infinitus-nightly.yml` — the nightly (#1042, "One
-  release" above): a `version` job dates the root `VERSION`, `build` is
+  release" in `INFINITUS.md`): a `version` job dates the root `VERSION`, `build` is
   `infinitus-release.yml` through `workflow_call` with that version
   (`secrets: inherit`, so the Mac job signs and notarizes as for a release),
   `publish` — `main` only, on the schedule or a dispatch with `publish` —
@@ -399,10 +341,22 @@ these bullets.
 - `.github/workflows/infinitus-release.yml` — the one release (INFINITUS.md "One release"): the `desktop` job nests the `mac` job's `Infinitus-Menu-Bar-<version>.zip` as a login item (#777, `--native-helper`), the `cli` job builds the Linux CLI archives and `SHA256SUMS` (#1192, upstream's `cli_archive` steps copied). Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/contracts/src/providerProxy.ts`, `apps/server/src/provider/proxyModels.ts`,
   `apps/web/src/components/settings/proxyProvider.ts`,
-  `apps/web/src/components/settings/ProxyProviderFields.tsx` — "Route through a
-  proxy" for a Claude instance: 9Router / CLIProxyAPI / custom presets, model
-  slots picked from the proxy's `GET <baseUrl>/models`, everything stored on
-  the ordinary instance (env vars + CLAUDE_CONFIG_DIR), no settings file written.
+  `apps/web/src/components/settings/ProxyProviderFields.tsx`,
+  `apps/server/src/provider/Layers/piProxyHome.ts` — "Route through a
+  proxy" for a Claude or Pi instance: 9Router / CLIProxyAPI / custom presets,
+  models picked from the proxy's `GET <baseUrl>/models`, everything stored on
+  the ordinary instance (env vars + its own config dir). Claude reads its env
+  vars itself; Pi reads only `<home>/models.json`, which `piProxyHome.ts`
+  derives from the `PI_PROXY_*` vars and the `proxy/<id>` custom models on
+  every driver build, with the key as `$PI_PROXY_API_KEY` so it stays off disk.
+- `apps/server/src/provider/Drivers/PiDriver.ts`,
+  `provider/Services/PiAdapter.ts`, `provider/Layers/{PiAdapter,PiProvider,PiSessionRuntime,piRpcProtocol,piHomeEnvironment,piModels.logic}.ts`
+  (+ tests), `apps/server/src/textGeneration/PiTextGeneration.ts`,
+  `apps/server/scripts/pi-rpc-mock-agent.ts` — the Pi provider: the one
+  shipped driver speaking neither ACP nor an app-server protocol, but Pi's
+  own JSONL RPC (`pi --mode rpc`). Upstream's own Pi PRs claim these same
+  paths and are all closed. Rules and traps:
+  `docs/internals/pi-driver.md`.
 - `apps/server/src/vcs/checkpointDiffPathspec.ts` (+ its test) — restricts a
   checkpoint-to-checkpoint diff (turn cards, the panel's turn and full-thread
   views) to the paths whose `to` content still differs from the base branch's

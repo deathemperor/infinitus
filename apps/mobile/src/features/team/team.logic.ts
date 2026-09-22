@@ -9,7 +9,6 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { commandFailureMessage } from "../accounts/accountsRoute.logic";
-import { UNIVERSAL_PAIR_HOST } from "../connection/universalPairLink.logic";
 
 /**
  * Settings › Team (#1313), the phone's half of the web pane's
@@ -77,13 +76,14 @@ export function teamJoinSecretArgs(name: string): Omit<InfinitusSecretInput, "se
   return { command: "team-join", args: { "your name": name } };
 }
 
+/** The site's host: a universal link only fires for a host with an AASA. */
+export const UNIVERSAL_LINK_HOST = "infinitus.run";
 const JOIN_PATH = "/join";
 
 /**
- * The code a team invite link carries (#1313): `https://infinitus.run/join#<code>`,
- * the same host as the pairing link and the same reason (a universal link only
- * fires for a host with an AASA). The fragment is the whole code, never a
- * query string; null for any other URL or an empty fragment.
+ * The code a team invite link carries (#1313): `https://infinitus.run/join#<code>`.
+ * The fragment is the whole code, never a query string; null for any other
+ * URL or an empty fragment.
  */
 export function teamJoinLinkCode(raw: string): string | null {
   let url: URL;
@@ -94,7 +94,7 @@ export function teamJoinLinkCode(raw: string): string | null {
   }
   if (
     url.protocol !== "https:" ||
-    url.hostname !== UNIVERSAL_PAIR_HOST ||
+    url.hostname !== UNIVERSAL_LINK_HOST ||
     url.pathname.replace(/\/$/, "") !== JOIN_PATH
   ) {
     return null;

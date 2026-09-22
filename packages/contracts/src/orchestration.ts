@@ -93,7 +93,7 @@ const ModelSelectionSource = Schema.Struct({
 export const ModelSelection = ModelSelectionSource.pipe(
   Schema.decodeTo(
     ModelSelectionWire,
-    SchemaTransformation.transformOrFail({
+    SchemaTransformation.transformEffect({
       decode: (raw) => {
         // Resolve the routing key: prefer an explicit `instanceId`; fall
         // back to promoting the legacy `provider` slug (the canonical
@@ -142,6 +142,7 @@ export const ProviderRequestKind = Schema.Literals([
   "file-read",
   "file-change",
   "mcp-elicitation",
+  "permission",
 ]);
 export type ProviderRequestKind = typeof ProviderRequestKind.Type;
 export const ProviderApprovalDecision = Schema.Literals([
@@ -163,8 +164,9 @@ export const ProviderUserInputAnswers = Schema.Record(Schema.String, Schema.Unkn
 export type ProviderUserInputAnswers = typeof ProviderUserInputAnswers.Type;
 
 export const PROVIDER_SEND_TURN_MAX_INPUT_CHARS = 120_000;
-export const PROVIDER_SEND_TURN_MAX_ATTACHMENTS = 8;
+export const PROVIDER_SEND_TURN_MAX_ATTACHMENTS = 100;
 export const PROVIDER_SEND_TURN_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const PROVIDER_SEND_TURN_MAX_TOTAL_IMAGE_BYTES = 80 * 1024 * 1024;
 export const PROVIDER_SEND_TURN_MAX_FILE_BYTES = 50 * 1024 * 1024;
 export const PROVIDER_SEND_TURN_SUPPORTED_IMAGE_MIME_TYPES = [
   "image/gif",
@@ -371,6 +373,25 @@ export const ChatAttachment = Schema.Union([
 ]);
 export type ChatAttachment = typeof ChatAttachment.Type;
 
+export function getProviderAttachmentLimitError(
+  attachments: ReadonlyArray<Pick<ChatAttachment, "type" | "mimeType" | "sizeBytes">>,
+): string | undefined {
+  if (attachments.length > PROVIDER_SEND_TURN_MAX_ATTACHMENTS) {
+    return `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} files per message or question response.`;
+  }
+  const imageBytes = attachments.reduce(
+    (total, attachment) =>
+      total +
+      (attachment.type === "image" || isProviderSendTurnSupportedImageMimeType(attachment.mimeType)
+        ? attachment.sizeBytes
+        : 0),
+    0,
+  );
+  if (imageBytes > PROVIDER_SEND_TURN_MAX_TOTAL_IMAGE_BYTES) {
+    return "Images can total up to 80 MiB per message or question response. Use smaller images or send fewer at once.";
+  }
+}
+
 export const UserInputAttachments = Schema.Record(
   Schema.String,
   Schema.Array(Schema.Union([ChatImageAttachment, ChatFileAttachment])).pipe(
@@ -540,7 +561,15 @@ export const OrchestrationProject = Schema.Struct({
 });
 export type OrchestrationProject = typeof OrchestrationProject.Type;
 
-export const OrchestrationMessageRole = Schema.Literals(["user", "assistant", "system"]);
+/** `reasoning` carries a provider's thinking trace: a reasoning summary, or
+ *  the raw chain of thought when the model exposes one. It is a sibling of the
+ *  assistant text it precedes, not a replacement for it. */
+export const OrchestrationMessageRole = Schema.Literals([
+  "user",
+  "assistant",
+  "system",
+  "reasoning",
+]);
 export type OrchestrationMessageRole = typeof OrchestrationMessageRole.Type;
 
 export const OrchestrationMessage = Schema.Struct({
@@ -1133,6 +1162,8 @@ export type OrchestrationSubscribeShellInput = typeof OrchestrationSubscribeShel
 
 export const OrchestrationSubscribeThreadInput = Schema.Struct({
   threadId: ThreadId,
+  /** Opt in to reasoning roles; older clients receive system messages instead. */
+  reasoningMessages: Schema.optionalKey(Schema.Boolean),
   /**
    * When provided, the server skips the initial snapshot frame and instead
    * replays events after this sequence before streaming live events. Clients
@@ -1434,6 +1465,7 @@ const ThreadTurnStartBootstrapPrepareWorktree = Schema.Struct({
   baseBranch: TrimmedNonEmptyString,
   branch: Schema.optional(TrimmedNonEmptyString),
   startFromOrigin: Schema.optional(Schema.Boolean),
+  requireWorktree: Schema.optional(Schema.Boolean),
 });
 
 const ThreadTurnStartBootstrap = Schema.Struct({
@@ -1761,6 +1793,25 @@ const ThreadMessageAssistantCompleteCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+const ThreadMessageReasoningDeltaCommand = Schema.Struct({
+  type: Schema.Literal("thread.message.reasoning.delta"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  messageId: MessageId,
+  delta: Schema.String,
+  turnId: Schema.optional(TurnId),
+  createdAt: IsoDateTime,
+});
+
+const ThreadMessageReasoningCompleteCommand = Schema.Struct({
+  type: Schema.Literal("thread.message.reasoning.complete"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  messageId: MessageId,
+  turnId: Schema.optional(TurnId),
+  createdAt: IsoDateTime,
+});
+
 const ThreadHistoryImportCommand = Schema.Struct({
   type: Schema.Literal("thread.history.import"),
   commandId: CommandId,
@@ -1891,6 +1942,8 @@ const InternalOrchestrationCommand = Schema.Union([
   ThreadUsageBackfillCommand,
   ThreadMessageAssistantDeltaCommand,
   ThreadMessageAssistantCompleteCommand,
+  ThreadMessageReasoningDeltaCommand,
+  ThreadMessageReasoningCompleteCommand,
   ThreadHistoryImportCommand,
   ThreadMessageUserAppendCommand,
   ThreadProposedPlanUpsertCommand,
@@ -2549,26 +2602,6 @@ export const ProviderSessionRuntimeStatus = Schema.Literals([
 ]);
 export type ProviderSessionRuntimeStatus = typeof ProviderSessionRuntimeStatus.Type;
 
-const ProjectionThreadTurnStatus = Schema.Literals([
-  "running",
-  "completed",
-  "interrupted",
-  "error",
-]);
-export type ProjectionThreadTurnStatus = typeof ProjectionThreadTurnStatus.Type;
-
-const ProjectionCheckpointRow = Schema.Struct({
-  threadId: ThreadId,
-  turnId: TurnId,
-  checkpointTurnCount: NonNegativeInt,
-  checkpointRef: CheckpointRef,
-  status: OrchestrationCheckpointStatus,
-  files: Schema.Array(OrchestrationCheckpointFile),
-  assistantMessageId: Schema.NullOr(MessageId),
-  completedAt: IsoDateTime,
-});
-export type ProjectionCheckpointRow = typeof ProjectionCheckpointRow.Type;
-
 export const ProjectionPendingApprovalStatus = Schema.Literals(["pending", "resolved"]);
 export type ProjectionPendingApprovalStatus = typeof ProjectionPendingApprovalStatus.Type;
 
@@ -2723,7 +2756,7 @@ export class OrchestrationDispatchCommandError extends Schema.TaggedError<Orches
   {
     message: TrimmedNonEmptyString,
     cause: Schema.optional(Schema.Defect()),
-    bootstrapThreadDisposition: Schema.optional(Schema.Literal("deleted")),
+    bootstrapThreadDisposition: Schema.optional(Schema.Literals(["deleted", "not-created"])),
   },
 ) {}
 

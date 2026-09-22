@@ -1,5 +1,5 @@
 /**
- * Settings › Infinitus › Engines (#1177): the two proxy engines' base URL and
+ * Settings › Engines (#1177): the two proxy engines' base URL and
  * secret, the form the Mac's engine panes drew. The secret is a password
  * field, autocomplete off, cleared the moment it is submitted and gone with
  * the component; it travels once, as a `Redacted` value over
@@ -42,6 +42,10 @@ import {
   type ProxyEngineKey,
   type ProxyEngineState,
 } from "./engines.logic";
+import {
+  InfinitusEngineProcessRows,
+  type InfinitusEngineProcesses,
+} from "./InfinitusEngineControls";
 import { InfinitusPanelNotice, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
 import { infinitusCommandFailure } from "./panel.logic";
 import { isAuthorizationFailure } from "./pairingAccess.logic";
@@ -55,8 +59,12 @@ type PerEngine<T> = Partial<Record<ProxyEngineKey, T>>;
 
 export function InfinitusEngineSecrets({
   environment,
+  processes = null,
 }: {
   readonly environment?: EnvironmentPresentation | null;
+  /** This computer's engine processes, drawn at the foot of each engine's
+      section; `null` for a remote environment or outside the desktop shell. */
+  readonly processes?: InfinitusEngineProcesses | null;
 }) {
   const { environmentId, capability, snapshot } = useInfinitusEnvironment(environment);
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
@@ -195,12 +203,33 @@ export function InfinitusEngineSecrets({
     [environmentId, read, runCommand],
   );
 
-  if (capability !== true || snapshot === null || !snapshot.available) return null;
-  if (!supported) {
+  const answering = capability === true && snapshot !== null && snapshot.available;
+  // The shell runs the engines whether or not the app answers, so their rows
+  // stay when the connection rows cannot be drawn.
+  if (!answering || !supported) {
     return (
-      <SettingsSection id="infinitus-engine-secrets" title="Proxy engines">
-        <InfinitusPanelNotice message={UNSUPPORTED} />
-      </SettingsSection>
+      <>
+        {answering ? (
+          <SettingsSection id="infinitus-engine-secrets" title="Proxy engines">
+            <InfinitusPanelNotice message={UNSUPPORTED} />
+          </SettingsSection>
+        ) : null}
+        {processes === null
+          ? null
+          : PROXY_ENGINES.map((engine) => (
+              <SettingsSection
+                key={engine.key}
+                id={`infinitus-engine-${engine.key}`}
+                title={engine.label}
+              >
+                <InfinitusEngineProcessRows
+                  processes={processes}
+                  engineKey={engine.key}
+                  label={engine.label}
+                />
+              </SettingsSection>
+            ))}
+      </>
     );
   }
 
@@ -323,6 +352,13 @@ export function InfinitusEngineSecrets({
                 }
               />
             ) : null}
+            {processes === null ? null : (
+              <InfinitusEngineProcessRows
+                processes={processes}
+                engineKey={engine.key}
+                label={engine.label}
+              />
+            )}
             {probes[engine.key] === undefined ? null : (
               <p role="status" className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">
                 {probes[engine.key]}

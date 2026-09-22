@@ -1,11 +1,11 @@
 # Source control
 
-T3 Code integrates with GitHub, GitLab, Forgejo, Gitea, Bitbucket, and Azure DevOps to clone and publish
+Infinitus integrates with GitHub, GitLab, Forgejo, Gitea, Bitbucket, and Azure DevOps to clone and publish
 repositories, create pull requests, and review changes.
 
 ## Connect an account
 
-Install Git and configure authentication on the machine running your T3 Code server. For a remote
+Install Git and configure authentication on the machine running your Infinitus server. For a remote
 environment, do this on the remote machine. After signing in, open **Settings → Source Control**
 and choose **Rescan**.
 
@@ -20,11 +20,11 @@ gh auth login
 ### Forgejo and Gitea
 
 Install [Forgejo CLI (`fj`)](https://codeberg.org/forgejo-contrib/forgejo-cli) or
-[Gitea CLI (`tea`)](https://gitea.com/gitea/tea) 0.16 or later on your T3 Code server.
+[Gitea CLI (`tea`)](https://gitea.com/gitea/tea) 0.16 or later on your Infinitus server.
 Sign in with `fj --host https://your-server auth add-token` or `tea login add`.
 Repeat for each server you use, including Codeberg.
 
-T3 Code prefers a matching `fj` login and falls back to `tea` when `fj` is unavailable
+Infinitus prefers a matching `fj` login and falls back to `tea` when `fj` is unavailable
 or has no login for that server. Once an account is selected, failed actions stay on that
 account. Settings shows the detected CLI. Forgejo and Gitea share one integration entry.
 Servers hosted under a URL subpath, such as `https://example.com/forgejo`, use `tea` because
@@ -87,7 +87,7 @@ make your first commit before pushing.
 
 ## Create a pull request
 
-Use a thread's Git actions to commit, push, and create a pull request. T3 Code can generate commit
+Use a thread's Git actions to commit, push, and create a pull request. Infinitus can generate commit
 messages, review titles, and descriptions from your changes.
 
 Choose the writing style and model in **Settings → Source Control**. **Repository conventions**
@@ -118,8 +118,22 @@ for ten minutes during a GitHub outage; new credentials must be verified first. 
 an uncertain result is never automatically retried elsewhere. Listings, diffs, and checkout or
 PR creation from Git actions continue to use the project's environment.
 
-For Azure DevOps, use the host website to view diffs or change comments. Bitbucket does not support
-reopening a declined pull request.
+For Azure DevOps, use the host website to change comments. Bitbucket does not support reopening a
+declined pull request.
+
+### Mark files as viewed
+
+Tick a file off in the **Code** tab once you have read it and it collapses; the toolbar keeps a
+running count. A tick belongs to the pull request rather than to a commit, so scoping the tab to a
+single commit keeps them. A file pushed to after you cleared it comes back marked **Changed**.
+
+On GitHub these are GitHub's own viewed marks, so a review carries between Infinitus and github.com
+in either direction. Forgejo, GitLab, Bitbucket, and Azure DevOps expose no record Infinitus can read, so the
+server you are connected to keeps them instead: they follow you across the apps connected to that
+server, but the host's own site will not show them, and the count reads **viewed in Infinitus**.
+
+The **Code** tab is a web and desktop surface. The mobile app reports a pull request's status but
+does not show its diff, so marks are made and read on web and desktop.
 
 ## Troubleshooting
 

@@ -1,8 +1,8 @@
 # Phone app links and bridges
 
-## The universal pair link
+## The team invite link
 
-`apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal link `https://infinitus.run/pair#token=…&for=phone&to=<origin>` into the `environment-new?pairingUrl=<origin>/pair#…` route (`getInitialURL` / `subscribe`, `features/connection/universalPairLink.logic.ts`, #724): the Mac's origin travels in the fragment the site never sees, `to` is taken as a bare http(s) origin only, and the sheet fills Host and code like a scanned QR (#746) — the same rewrite runs on the in-app scanner's payload and on the route's `pairingUrl`.
+`apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal link `https://infinitus.run/join#<code>` into the `team?code=` route (`getInitialURL` / `subscribe`, `features/team/team.logic.ts`, #1313). The site's `/pair` universal link (#724, #746) left with #1407: a pairing link is upstream's plain `<origin>/pair#token=…` from Settings › Connections, read by the in-app scanner and the route's `pairingUrl`.
 
 ## The bridges
 

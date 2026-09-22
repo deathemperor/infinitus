@@ -7,11 +7,14 @@
  *
  * @module InfinitusEnginesPanel
  */
+import { Link } from "@tanstack/react-router";
+
 import type { EnvironmentPresentation } from "~/state/environments";
 import { Badge } from "../../ui/badge";
+import { Button } from "../../ui/button";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 
-import { InfinitusEngineControls } from "./InfinitusEngineControls";
+import { useInfinitusEngineProcesses } from "./InfinitusEngineControls";
 import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 import { InfinitusPrefsPanel, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
 import { buildEngineStatusRows, menuBarAppVersionLine } from "./panel.logic";
@@ -29,6 +32,13 @@ function InfinitusEngineStatusList({
   const { snapshot } = useInfinitusEnvironment(environment);
   const rows = buildEngineStatusRows(snapshot?.status);
   if (rows.length === 0) return null;
+  // The Activity sub screen reads the primary environment's log, so the way
+  // in is drawn only when this page manages that environment.
+  const activityLink = environment ? null : (
+    <Button render={<Link to="/settings/engines/activity" />} size="sm" variant="outline">
+      View activity
+    </Button>
+  );
 
   return (
     <SettingsSection id="infinitus-engine-status" title="Engine status">
@@ -37,6 +47,7 @@ function InfinitusEngineStatusList({
           key={row.key}
           title={row.label}
           description={row.detail ?? undefined}
+          control={row.key === "swapd" ? activityLink : undefined}
           status={
             <span className="flex flex-wrap items-center gap-1.5">
               <Badge variant={row.enabled ? "default" : "outline"}>
@@ -99,6 +110,10 @@ export function InfinitusEnginesPanel({
   readonly environment?: EnvironmentPresentation | null;
 }) {
   const target = environment === undefined ? {} : { environment };
+  // This computer's own engine processes, so never for a named remote
+  // environment: the shell can only start one on the machine it runs on.
+  const localProcesses = useInfinitusEngineProcesses();
+  const processes = environment ? null : localProcesses;
   return (
     <InfinitusPrefsPanel {...target} sectionSlugs={["engines"]} title="Engines">
       {environment ? (
@@ -116,10 +131,7 @@ export function InfinitusEnginesPanel({
         </a>
       </p>
       <InfinitusEngineStatusList {...target} />
-      <InfinitusEngineSecrets {...target} />
-      {/* This computer's own engine processes, so never for a named remote
-          environment: the shell can only start one on the machine it runs on. */}
-      {environment ? null : <InfinitusEngineControls />}
+      <InfinitusEngineSecrets {...target} processes={processes} />
       <InfinitusAboutSection {...target} />
     </InfinitusPrefsPanel>
   );

@@ -14,6 +14,7 @@ import {
   PROXY_PRESETS,
   withProxyPreset,
   type ProxyDraft,
+  type ProxyDriver,
   type ProxyPresetId,
 } from "./proxyProvider";
 
@@ -28,6 +29,8 @@ function splitTypedModels(value: string): ReadonlyArray<string> {
 }
 
 interface ProxyProviderFieldsProps {
+  /** Claude gets the ANTHROPIC_DEFAULT_*_MODEL slots; Pi has no such mapping. */
+  readonly driver: ProxyDriver;
   readonly environmentId: EnvironmentId;
   readonly draft: ProxyDraft;
   /** Shown under the fields once the user has tried to save. */
@@ -46,11 +49,13 @@ function proxyErrorDetail(cause: Cause.Cause<unknown>): string {
 }
 
 /**
- * Fork: "Route through a proxy" for a Claude instance — 9Router, CLIProxyAPI or
- * any Anthropic-compatible endpoint. Loads the proxy's model list so the
- * ANTHROPIC_DEFAULT_*_MODEL slots and the picker models are chosen, not typed.
+ * Fork: "Route through a proxy" for a Claude or Pi instance — 9Router,
+ * CLIProxyAPI or any compatible endpoint. Loads the proxy's model list so the
+ * ANTHROPIC_DEFAULT_*_MODEL slots (Claude) and the picker models are chosen,
+ * not typed.
  */
 export function ProxyProviderFields({
+  driver,
   environmentId,
   draft,
   error,
@@ -143,7 +148,9 @@ export function ProxyProviderFields({
         <span className="grid gap-0.5">
           <span className="text-xs font-medium text-foreground">Route through a proxy</span>
           <span className="text-[11px] text-muted-foreground">
-            9Router, CLIProxyAPI or any Anthropic-compatible endpoint, with its own config dir.
+            {driver === "pi"
+              ? "9Router, CLIProxyAPI or any OpenAI-compatible endpoint, with its own config dir."
+              : "9Router, CLIProxyAPI or any Anthropic-compatible endpoint, with its own config dir."}
           </span>
         </span>
         <Switch
@@ -220,16 +227,18 @@ export function ProxyProviderFields({
             </span>
           </label>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            {PROXY_MODEL_SLOTS.map((slot) =>
-              modelField(
-                `${slot.label} slot`,
-                draft.slots[slot.key],
-                `e.g. kr/claude-${slot.key}`,
-                (next) => onChange({ ...draft, slots: { ...draft.slots, [slot.key]: next } }),
-              ),
-            )}
-          </div>
+          {driver === "claude" ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PROXY_MODEL_SLOTS.map((slot) =>
+                modelField(
+                  `${slot.label} slot`,
+                  draft.slots[slot.key],
+                  `e.g. kr/claude-${slot.key}`,
+                  (next) => onChange({ ...draft, slots: { ...draft.slots, [slot.key]: next } }),
+                ),
+              )}
+            </div>
+          ) : null}
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-foreground">
@@ -281,8 +290,9 @@ export function ProxyProviderFields({
             )}
           </div>
           <span className="text-[11px] text-muted-foreground">
-            The slots map Claude's model names onto the proxy's. Picked models are added to this
-            instance's custom models so you can choose them directly.
+            {driver === "claude"
+              ? "The slots map Claude's model names onto the proxy's. Picked models are added to this instance's custom models so you can choose them directly."
+              : "Picked models are added to this instance's custom models as proxy/<model>; pick at least one, since Pi lists only declared models."}
           </span>
           {error ? <span className="text-[11px] text-destructive">{error}</span> : null}
         </>

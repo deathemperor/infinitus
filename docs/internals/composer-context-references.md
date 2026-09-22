@@ -1,6 +1,6 @@
 # Composer context references
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Using Infinitus? See [docs/user](../user/).
 
 Inline context references let a user message point at a typed payload from an exact position in
 its prose: an image, a file, a terminal excerpt, a picked page element, a preview annotation, a

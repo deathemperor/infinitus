@@ -18,7 +18,14 @@ import { infinitusAccountLabel } from "./infinitus.ts";
  */
 
 /** What a row's buttons can ask the control socket to do. */
-export type AccountAction = "switch" | "hold" | "unhold" | "prefer" | "rename" | "remove";
+export type AccountAction =
+  | "switch"
+  | "hold"
+  | "unhold"
+  | "prefer"
+  | "autoIgnite"
+  | "rename"
+  | "remove";
 
 /** One usage window drawn as a bar. `countdown` is the engine's own
     human string ("2h 14m"), absent on a window that has not started. */
@@ -42,6 +49,9 @@ export interface AccountRowModel {
   readonly active: boolean;
   readonly next: boolean;
   readonly preferred: boolean;
+  /** Kept warm: the engine restarts this account's 5h window whenever it
+      has gone cold, so a switch onto it lands on a running clock. */
+  readonly autoIgnite: boolean;
   readonly held: boolean;
   readonly windows: ReadonlyArray<UsageWindowBar>;
   readonly scoped: ReadonlyArray<UsageWindowBar>;
@@ -201,6 +211,9 @@ function rowActions(
   if (capabilities.has("switch") && !active) actions.push("switch");
   if (capabilities.has("hold")) actions.push(account.disabled === true ? "unhold" : "hold");
   if (capabilities.has("prefer") && account.preferred !== undefined) actions.push("prefer");
+  if (capabilities.has("autoIgnite") && account.autoIgnite !== undefined) {
+    actions.push("autoIgnite");
+  }
   if (capabilities.has("rename")) actions.push("rename");
   if (capabilities.has("remove")) actions.push("remove");
   return actions;
@@ -231,6 +244,7 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
     active: account.active || fleet.activeNumber === account.number,
     next: fleet.nextCandidate === account.number,
     preferred: account.preferred === true,
+    autoIgnite: account.autoIgnite === true,
     held: account.disabled === true,
     windows,
     scoped,
@@ -432,11 +446,61 @@ export function accountCommandArgs(
   if (action === "prefer") {
     return { command: "prefer", args: [...target, row.preferred ? "off" : "on"] };
   }
+  if (action === "autoIgnite") {
+    return { command: "auto-ignite", args: [...target, row.autoIgnite ? "off" : "on"] };
+  }
   if (action === "remove") {
     return { command: "remove", args: target, options: { yes: "true" } };
   }
   return { command: action, args: target };
 }
+
+/**
+ * The side a toggle press lands on, drawn on the row before the engine
+ * confirms it (#1481: the flame did not move for the seconds the engine took,
+ * then a timeout said the app was gone). `field` is the row flag the press
+ * sets and `to` its new value. A flip the snapshot has caught up with draws
+ * nothing, so the caller retires it on a timer or when the command fails.
+ */
+export interface RowFlip {
+  readonly number: number;
+  readonly field: "preferred" | "autoIgnite" | "held";
+  readonly to: boolean;
+}
+
+/** What `action` will make of `row`, or null for a press that flips no flag. */
+export function rowFlip(row: AccountRowModel, action: AccountAction): RowFlip | null {
+  switch (action) {
+    case "prefer":
+      return { number: row.number, field: "preferred", to: !row.preferred };
+    case "autoIgnite":
+      return { number: row.number, field: "autoIgnite", to: !row.autoIgnite };
+    case "hold":
+      return { number: row.number, field: "held", to: true };
+    case "unhold":
+      return { number: row.number, field: "held", to: false };
+    default:
+      return null;
+  }
+}
+
+/** `row` as it will read once `flip` lands: the flag, and the hold/unhold
+    action that follows it. Another row's flip leaves it alone. */
+export function withFlip(row: AccountRowModel, flip: RowFlip | null | undefined): AccountRowModel {
+  if (!flip || flip.number !== row.number || row[flip.field] === flip.to) return row;
+  const actions =
+    flip.field === "held"
+      ? row.actions.map((action) =>
+          action === "hold" || action === "unhold" ? (flip.to ? "unhold" : "hold") : action,
+        )
+      : row.actions;
+  return { ...row, [flip.field]: flip.to, actions };
+}
+
+/** A write's reply outlived the socket's budget: the app may still be at it,
+    which is not the same as the app being gone. */
+export const INFINITUS_COMMAND_TIMEOUT_MESSAGE =
+  "The Mac took too long to answer; the change may still land in a moment.";
 
 /*
  * Add account / re-login: the native `add <fleet>` verb opens the app's own

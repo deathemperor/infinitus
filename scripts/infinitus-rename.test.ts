@@ -59,6 +59,53 @@ describe("infinitus-rename", () => {
     }
   });
 
+  it("rewrites the product name in the docs, and nowhere else", () => {
+    const guide = [
+      "Press the shortcut and T3 Code attaches the image. Import a T3 Code theme.",
+      "T3 checks the SDK; only T3-managed worktrees qualify. Sign in to T3 Connect.",
+      "There is no npm package: `npx t3` installs upstream's T3 Code, not Infinitus.",
+      "Set `T3CODE_TELEMETRY_ENABLED=false`; state lives in `~/.t3/userdata`. © T3 Tools, Inc.",
+      "Agents drive the device through the command line. T3",
+      "Code installs it on demand, and a",
+      "T3 Code theme follows.",
+    ].join("\n");
+    const out = applyRenames(guide, "docs/user/telemetry.md");
+    expect(out).toBe(
+      [
+        "Press the shortcut and Infinitus attaches the image. Import an Infinitus theme.",
+        "Infinitus checks the SDK; only Infinitus-managed worktrees qualify. Sign in to Infinitus Connect.",
+        "There is no npm package: `npx t3` installs upstream's T3 Code, not Infinitus.",
+        "Set `T3CODE_TELEMETRY_ENABLED=false`; state lives in `~/.t3/userdata`. © T3 Tools, Inc.",
+        "Agents drive the device through the command line. Infinitus",
+        "installs it on demand, and an",
+        "Infinitus theme follows.",
+      ].join("\n"),
+    );
+    expect(applyRenames(out, "docs/user/telemetry.md")).toBe(out);
+    expect(remainingRenames(out, "docs/user/telemetry.md")).toEqual([]);
+    expect(applyRenames(guide, "apps/web/README.md")).toBe(guide);
+    expect(remainingRenames(guide, "apps/web/README.md")).toEqual([]);
+  });
+
+  it("keeps a maintainer page's literals: the other product, quoted and code-formatted names", () => {
+    const page = [
+      "Terms whose meaning matters across T3 Code; a T3 Code theme; T3 home; the T3 glyph.",
+      'the installed app\'s real `T3 Code (Alpha)`, "Built on T3 Code", named "T3 Code" here',
+      '"/Applications/T3 Code.app/Contents/MacOS/T3 Code"',
+      "which would hand it the real T3 Code; upstream's T3 Code stays too",
+    ].join("\n");
+    const out = applyRenames(page, "docs/internals/glossary.md");
+    expect(out).toBe(
+      [
+        "Terms whose meaning matters across Infinitus; an Infinitus theme; T3 home; the T3 glyph.",
+        'the installed app\'s real `T3 Code (Alpha)`, "Built on T3 Code", named "T3 Code" here',
+        '"/Applications/T3 Code.app/Contents/MacOS/T3 Code"',
+        "which would hand it the real T3 Code; upstream's T3 Code stays too",
+      ].join("\n"),
+    );
+    expect(remainingRenames(out, "docs/internals/glossary.md")).toEqual([]);
+  });
+
   it("leaves the compat-read identifiers alone", () => {
     // The names a user's disk, a shipped build or an external service holds
     // (#1368's checklist) are not the table's to rewrite.

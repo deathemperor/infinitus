@@ -5,7 +5,7 @@ Infinitus is one product on three screens: the macOS menu bar app that runs your
 What the desktop, web and phone apps add to the agent client:
 
 - **Accounts page** — every engine's fleet with per-account usage bars, the switch / hold / star / rename actions, the forecast of the next reset, and lapsed AWS and gcloud sign-ins with their device codes.
-- **Settings › Infinitus** — the menu bar app's preferences, notification routes, paired devices (the phone QR code), engines and lock, edited from the browser.
+- **Settings › Menu bar, Notifications, Devices, Engines, Lock** — the menu bar app's preferences, notification routes, paired devices, engines and lock, edited from the browser.
 - **Sidebar** — an Accounts pill with the active account and its fullest window.
 - **Command palette** — "Open accounts".
 - **Event toasts** — the engine's events (a swap, a reset, every account exhausted) surface as toasts in the app shell.
@@ -22,7 +22,7 @@ For contributors: this tree builds on [T3 Code](https://github.com/pingdotgg/t3c
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, and Google Antigravity. If they're set up on your computer, T3 Code can control them.
+Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Oh My Pi, Google Antigravity, and Pi. If they're set up on your computer, T3 Code can control them.
 
 ## "Wait, what are you selling me?"
 
@@ -35,14 +35,16 @@ We wanted something performant, remote-ready, and truly open. If we ever go the 
 Every Infinitus build comes from one [GitHub release](https://github.com/deathemperor/infinitus/releases) of this repository. There is no npm package, Homebrew cask, winget or AUR package for the desktop app; `npx t3` installs upstream's T3 Code, not Infinitus.
 
 > [!WARNING]
-> Infinitus drives Codex, Claude, Cursor, Grok Build, OpenCode and Antigravity. Install and sign in to at least one before starting a thread:
+> Infinitus drives Codex, Claude, Cursor, Grok Build, OpenCode, Oh My Pi, Antigravity and Pi. Install and sign in to at least one before starting a thread:
 >
 > - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
 > - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
 > - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
 > - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
 > - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
+> - Oh My Pi: install [Oh My Pi](https://github.com/oh-my-pi/oh-my-pi) and run `omp` once to sign in
 > - Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**. No CLI is required.
+> - Pi: install [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) and run `pi` once to sign in to a model provider
 
 ### Desktop app (macOS, Apple Silicon)
 

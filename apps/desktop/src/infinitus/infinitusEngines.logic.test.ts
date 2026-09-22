@@ -50,7 +50,7 @@ describe("engine detection", () => {
     assert.strictEqual(found.mode, "child");
     // Never `-t`: tray mode backgrounds itself, which reads to the supervisor
     // as a process that exited the instant it started.
-    assert.strictEqual(found.command, `${binary} -n -H 127.0.0.1`);
+    assert.strictEqual(found.command, `${binary} -t -n -H 127.0.0.1`);
   });
 
   it("leaves an engine Homebrew already supervises to launchd", () => {
@@ -77,9 +77,9 @@ describe("engine detection", () => {
     const home = "/Users/Ada Lovelace";
     const binary = `${home}/.local/bin/9router`;
     const found = detect(NINE_ROUTER, { homeDirectory: home, executables: [binary] });
-    assert.strictEqual(found.command, `"${binary}" -n -H 127.0.0.1`);
+    assert.strictEqual(found.command, `"${binary}" -t -n -H 127.0.0.1`);
     const parsed = parseCommandLine(found.command!);
-    assert.deepStrictEqual(parsed, { ok: true, binary, args: ["-n", "-H", "127.0.0.1"] });
+    assert.deepStrictEqual(parsed, { ok: true, binary, args: ["-t", "-n", "-H", "127.0.0.1"] });
   });
 });
 
@@ -109,7 +109,7 @@ describe("engine resolution", () => {
   it("falls back to detection when the typed command is blanked", () => {
     const binary = "/opt/homebrew/bin/9router";
     const resolved = resolveEngine(NINE_ROUTER, input({ executables: [binary] }), "   ");
-    assert.strictEqual(resolved.command, `${binary} -n -H 127.0.0.1`);
+    assert.strictEqual(resolved.command, `${binary} -t -n -H 127.0.0.1`);
   });
 });
 

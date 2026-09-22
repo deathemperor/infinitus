@@ -141,3 +141,5 @@ export const CONTROL_INFINITUS_ENGINE_CHANNEL = "desktop:infinitus-control-engin
 export const MAC_PERMISSION_HELPER_CHANNEL = "desktop:mac-permission-helper";
 
 export const CHECK_SYSTEM_PERMISSION_CHANNEL = "desktop:check-system-permission";
+
+export const PREVIEW_RECORDING_INPUT_CHANNEL = "desktop:preview-recording-input";

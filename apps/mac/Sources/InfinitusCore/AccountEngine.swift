@@ -49,22 +49,23 @@ public struct EngineCapabilities: OptionSet, Sendable, Codable, Hashable {
     /// has no "one request as credential X" verb yet — its cloaking
     /// lives in its executor, so nothing app-side can imitate it safely.
     public static let ignite      = EngineCapabilities(rawValue: 1 << 15)
-    /// Write every managed account to one file and read it back — cswap
-    /// `export` / `import`. Gated separately from `.remove` because an
-    /// export is a CREDENTIAL file and an import overwrites slots: an
-    /// engine may manage accounts without being able to hand them over
-    /// (the proxy holds keys it never reveals).
-    public static let backup      = EngineCapabilities(rawValue: 1 << 16)
+    // 1 << 16 was `.backup` (swapd `export` / `import` behind a file
+    // panel); it retired with the Mac's Settings window.
     /// Force ONE account's usage fetch now, past whatever serve floor the
     /// engine polls on, and answer with the fleet that follows — swapd
     /// `refresh --slot n`. cswap has no per-account force (its list serves
     /// what its policy last fetched), which is why this is not in `.all`.
     public static let refreshAccount = EngineCapabilities(rawValue: 1 << 17)
+    /// Keep an account's 5h window running: the engine's own daemon
+    /// ignites it whenever the window has gone cold — swapd `auto-ignite
+    /// <slot> on|off`, reported back per account as `Account.autoIgnite`.
+    /// Not in `.all`: cswap and the proxies have no such flag.
+    public static let autoIgnite = EngineCapabilities(rawValue: 1 << 18)
 
     public static let all: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
         .addToken, .addOAuth, .autoSwitch, .costReport, .history,
-        .settings, .notify, .prefer, .ignite, .backup,
+        .settings, .notify, .prefer, .ignite,
     ]
 }
 
@@ -164,16 +165,30 @@ public protocol AccountEngine: Sendable {
     func refresh(fleet: Provider, number: Int) async throws -> EngineFleet
     func switchTo(fleet: Provider, number: Int) async throws
     func rotate(fleet: Provider) async throws
-    func reorder(fleet: Provider, _ numbers: [Int]) async throws
-    func setHold(fleet: Provider, number: Int, held: Bool) async throws
+    /// The flag edits (`reorder`, hold, star, keep-warm, rename) answer
+    /// with the engine's snapshot as it reads afterwards when the engine
+    /// already has it — swapd returns the board with every edit — so the
+    /// caller's refresh pass takes that instead of asking the engine
+    /// again (#1481: one keep-warm press ran two engine passes). `nil`
+    /// means the pass asks as usual.
+    @discardableResult
+    func reorder(fleet: Provider, _ numbers: [Int]) async throws -> [EngineFleet]?
+    @discardableResult
+    func setHold(fleet: Provider, number: Int, held: Bool) async throws -> [EngineFleet]?
     /// Star/unstar: the engine lands on starred accounts first when it
     /// switches. Reported back per account as `Account.preferred`.
-    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws
+    @discardableResult
+    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]?
+    /// Keep-warm on/off: the engine's daemon ignites the account whenever
+    /// its 5h window has gone cold. Only with `.autoIgnite`.
+    @discardableResult
+    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]?
     /// One tiny request as account n so its 5h window starts now; the
     /// fleet's active account is untouched. Returns when the request is
     /// done (seconds).
     func ignite(fleet: Provider, number: Int) async throws
-    func rename(fleet: Provider, number: Int, _ name: String) async throws
+    @discardableResult
+    func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]?
     func remove(fleet: Provider, number: Int) async throws
     func addCurrent() async throws
     func addToken(_ token: String) async throws
@@ -181,15 +196,6 @@ public protocol AccountEngine: Sendable {
     func beginOAuthAdd(fleet: Provider) async throws -> URL
     func awaitOAuthAdd() async throws
     func usageReport(days: Int) async throws -> UsageReport
-    /// Write every managed account to `path`. The result is a CREDENTIAL
-    /// file — treat it like a private key. `full` includes the whole
-    /// `~/.claude.json` rather than just the OAuth account.
-    func exportAccounts(to path: URL, account: Int?, full: Bool) async throws
-    /// Read accounts back from `path`. `force` overwrites accounts that
-    /// already exist — destructive, so a caller must confirm it. Without
-    /// it the engine may still replace slots whose token is dead (cswap
-    /// does), which is the repair case, not a clobber.
-    func importAccounts(from path: URL, force: Bool) async throws
 }
 
 /// Every action is opt-in: the defaults throw so a UI that ignored
@@ -235,21 +241,16 @@ public extension AccountEngine {
     }
     func switchTo(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("switch") }
     func rotate(fleet: Provider) async throws { throw EngineError.unsupported("rotate") }
-    func reorder(fleet: Provider, _ numbers: [Int]) async throws { throw EngineError.unsupported("reorder") }
-    func setHold(fleet: Provider, number: Int, held: Bool) async throws { throw EngineError.unsupported("hold") }
-    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws { throw EngineError.unsupported("prefer") }
+    func reorder(fleet: Provider, _ numbers: [Int]) async throws -> [EngineFleet]? { throw EngineError.unsupported("reorder") }
+    func setHold(fleet: Provider, number: Int, held: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("hold") }
+    func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("prefer") }
+    func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("auto-ignite") }
     func ignite(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("ignite") }
-    func rename(fleet: Provider, number: Int, _ name: String) async throws { throw EngineError.unsupported("rename") }
+    func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]? { throw EngineError.unsupported("rename") }
     func remove(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("remove") }
     func addCurrent() async throws { throw EngineError.unsupported("addCurrent") }
     func addToken(_ token: String) async throws { throw EngineError.unsupported("addToken") }
     func beginOAuthAdd(fleet: Provider) async throws -> URL { throw EngineError.unsupported("addOAuth") }
     func awaitOAuthAdd() async throws { throw EngineError.unsupported("addOAuth") }
     func usageReport(days: Int) async throws -> UsageReport { throw EngineError.unsupported("costReport") }
-    func exportAccounts(to path: URL, account: Int?, full: Bool) async throws {
-        throw EngineError.unsupported("backup")
-    }
-    func importAccounts(from path: URL, force: Bool) async throws {
-        throw EngineError.unsupported("backup")
-    }
 }

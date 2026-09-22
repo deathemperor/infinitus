@@ -1,6 +1,6 @@
 # Mobile app-store screenshot harness
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Using Infinitus? See [docs/user](../user/).
 
 The screenshot harness runs the real mobile application against three disposable local T3
 environments. It creates an isolated base directory and server for each environment, real Git
@@ -23,8 +23,8 @@ The command:
 
 1. Creates three temporary T3 base directories and starts a local server for each on an available
    port.
-2. Creates T3 Code, React, and Linux Git repositories with recognizable favicons, feature branches,
-   and a deterministic T3 Code review diff.
+2. Creates Infinitus, React, and Linux Git repositories with recognizable favicons, feature branches,
+   and a deterministic Infinitus review diff.
 3. Seeds each server's migrated SQLite database with playful threads, messages, activities, and
    terminal history, then adds two persisted mobile-outbox tasks waiting to send.
 4. Starts an isolated Metro server, builds the selected native apps, and boots each device.

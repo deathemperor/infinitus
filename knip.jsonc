@@ -26,20 +26,25 @@
         "fold-changelog.mjs",
         "fold-changelog.d.mts",
         "infinitus-rename.ts",
+        "export-infinitus-splash.ts",
       ],
     },
     "apps/server": {
       // Vite+ pack entries and the launcher used by installed background services.
+      // `pi-rpc-mock-agent.ts` stands in for the `pi` binary: its test spawns it
+      // by path rather than importing it, so nothing here reaches it statically.
       "entry": [
         "src/bin.ts!",
         "src/claude-history-worker.ts!",
         "scripts/cli.ts",
         "scripts/evaluate-thread-titles.ts",
+        "scripts/pi-rpc-mock-agent.ts",
+        "scripts/measure-pr-preview.ts",
         "src/provider/testFixtures/*.mjs",
       ],
       // Keep the transitive Effect runtime pinned for standalone npm installs.
-      // Native msgpack acceleration and the Vite+ web build prerequisite.
-      "ignoreDependencies": ["@effect/platform-node-shared", "msgpackr-extract", "@infinitus/web"],
+      // The Vite+ web build prerequisite.
+      "ignoreDependencies": ["@effect/platform-node-shared", "@infinitus/web"],
     },
     "apps/desktop": {
       // Electron loads these bundles by filename rather than importing them.
@@ -69,8 +74,13 @@
       "ignoreIssues": { "src/components/ui/*.tsx": ["exports", "nsExports", "duplicates"] },
     },
     "apps/mobile": {
-      // Expo loads local config plugins by string; Metro handles platform variants.
-      "entry": ["index.ts!", "plugins/*.cjs"],
+      // Expo loads plugins by string; Metro embeds the browser entry in the native WebView.
+      "entry": [
+        "index.ts!",
+        "plugins/*.cjs",
+        "scripts/generate-device-stream.mts",
+        "src/features/devices/device-stream.browser.ts!",
+      ],
       // Fonts are configured as asset paths; Expo autolinks the native packages.
       "ignoreDependencies": [
         "@expo-google-fonts/dm-sans",

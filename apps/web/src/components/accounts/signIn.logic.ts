@@ -112,11 +112,6 @@ export function oauthSignInBridge(
   return { begin: bridge.beginInfinitusOAuthSignIn, cancel: bridge.cancelInfinitusOAuthSignIn };
 }
 
-/** The child window's title for a sign-in the shell runs. */
-export function shellOAuthWindowLabel(fleetKey: string, target: string | null): string {
-  return target === null ? `Sign in to ${fleetKey}` : `Sign in as ${target}`;
-}
-
 /** Which sign-in a fleet's section draws. `inApp` is a flow this client runs —
     the shell's own `add-oauth` (#1213) or the app's in-app sign-in (#677) —
     and `canAdd` the older hand-off to the Mac (#672). The shell's path asks the
@@ -231,7 +226,15 @@ export function signInBusy(flow: SignInFlow | null): boolean {
 /** The line under the fleet's title while a flow runs or just ended. */
 export function signInStatusText(flow: SignInFlow): string {
   const who = flow.target === null ? "" : ` as ${flow.target}`;
-  const where = flow.url === null ? "in the window" : "on the sign-in page";
+  // A shell flow (#1213) runs in a private window of the browser, or of the
+  // shell's own where the browser has none; the app's own (#677) is the
+  // desktop's child window or a link on this page.
+  const where =
+    flow.kind === "shell"
+      ? "in the private window that opened"
+      : flow.url === null
+        ? "in the window"
+        : "on the sign-in page";
   switch (flow.phase) {
     case "starting":
       return "Starting the sign-in…";

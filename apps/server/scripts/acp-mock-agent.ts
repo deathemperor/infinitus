@@ -15,6 +15,7 @@ import type * as AcpSchema from "effect-acp/schema";
 const requestLogPath = process.env.T3_ACP_REQUEST_LOG_PATH;
 const exitLogPath = process.env.T3_ACP_EXIT_LOG_PATH;
 const antigravityProfile = process.env.T3_ACP_ANTIGRAVITY === "1";
+const ompProfile = process.env.T3_ACP_OMP === "1";
 const emitToolCalls = process.env.T3_ACP_EMIT_TOOL_CALLS === "1";
 const emitInterleavedAssistantToolCalls =
   process.env.T3_ACP_EMIT_INTERLEAVED_ASSISTANT_TOOL_CALLS === "1";
@@ -58,9 +59,12 @@ const initialGrokReasoningEffort =
   process.env.T3_ACP_INITIAL_GROK_REASONING_EFFORT?.trim() || undefined;
 const promptDelayMs = Number(process.env.T3_ACP_PROMPT_DELAY_MS ?? "0");
 const permissionOptionIds = {
-  allowOnce: process.env.T3_ACP_ALLOW_ONCE_OPTION_ID ?? "allow-once",
-  allowAlways: process.env.T3_ACP_ALLOW_ALWAYS_OPTION_ID ?? "allow-always",
-  rejectOnce: process.env.T3_ACP_REJECT_ONCE_OPTION_ID ?? "reject-once",
+  allowOnce: process.env.T3_ACP_ALLOW_ONCE_OPTION_ID ?? (ompProfile ? "allow_once" : "allow-once"),
+  allowAlways:
+    process.env.T3_ACP_ALLOW_ALWAYS_OPTION_ID ?? (ompProfile ? "allow_always" : "allow-always"),
+  rejectOnce:
+    process.env.T3_ACP_REJECT_ONCE_OPTION_ID ?? (ompProfile ? "reject_once" : "reject-once"),
+  rejectAlways: process.env.T3_ACP_REJECT_ALWAYS_OPTION_ID ?? "reject_always",
 };
 const omitAllowAlways = process.env.T3_ACP_OMIT_ALLOW_ALWAYS === "1";
 const permissionRequestCount = Math.max(
@@ -69,8 +73,13 @@ const permissionRequestCount = Math.max(
 );
 const sessionId = "mock-session-1";
 
-let currentModeId = antigravityProfile ? "default" : "ask";
-let currentModelId = antigravityProfile ? "gemini-test-low" : "default";
+let currentModeId = antigravityProfile || ompProfile ? "default" : "ask";
+let currentModelId = antigravityProfile
+  ? "gemini-test-low"
+  : ompProfile
+    ? "google-antigravity/gemini-3.1-pro"
+    : "default";
+let currentThinking = "medium";
 let parameterizedModelPicker = false;
 let currentReasoning = "medium";
 let currentContext = "272k";
@@ -115,7 +124,51 @@ process.once("exit", (code) => {
   logExit(`exit:${code}`);
 });
 
+const ompModels = [
+  { value: "google-antigravity/gemini-3.1-pro", name: "Gemini 3.1 Pro" },
+  { value: "google-antigravity/claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+];
+
 function configOptions(): ReadonlyArray<AcpSchema.SessionConfigOption> {
+  if (ompProfile) {
+    return [
+      {
+        id: "mode",
+        name: "Mode",
+        category: "mode",
+        type: "select",
+        currentValue: currentModeId,
+        options: [
+          { value: "default", name: "Default" },
+          { value: "plan", name: "Plan" },
+        ],
+      },
+      {
+        id: "model",
+        name: "Model",
+        category: "model",
+        type: "select",
+        currentValue: currentModelId,
+        options: ompModels.map((model) => ({ value: model.value, name: model.name })),
+      },
+      {
+        id: "thinking",
+        name: "Thinking",
+        category: "thought_level",
+        type: "select",
+        currentValue: currentThinking,
+        options: [
+          { value: "off", name: "Off" },
+          { value: "minimal", name: "Minimal" },
+          { value: "low", name: "Low" },
+          { value: "medium", name: "Medium" },
+          { value: "high", name: "High" },
+          { value: "xhigh", name: "Extra High" },
+          { value: "max", name: "Max" },
+        ],
+      },
+    ];
+  }
   if (antigravityProfile) {
     return [
       {
@@ -300,29 +353,34 @@ const antigravityModels = [
   { modelId: "gemini-test-high", name: "Gemini Test High" },
 ] satisfies ReadonlyArray<AcpSchema.ModelInfo>;
 
-const availableModes: ReadonlyArray<AcpSchema.SessionMode> = antigravityProfile
+const availableModes: ReadonlyArray<AcpSchema.SessionMode> = ompProfile
   ? [
       { id: "default", name: "Default" },
-      { id: "auto_edit", name: "Auto edit" },
-      { id: "yolo", name: "YOLO" },
+      { id: "plan", name: "Plan" },
     ]
-  : [
-      {
-        id: "ask",
-        name: "Ask",
-        description: "Request permission before making any changes",
-      },
-      {
-        id: "architect",
-        name: "Architect",
-        description: "Design and plan software systems without implementation",
-      },
-      {
-        id: "code",
-        name: "Code",
-        description: "Write and modify code with full tool access",
-      },
-    ];
+  : antigravityProfile
+    ? [
+        { id: "default", name: "Default" },
+        { id: "auto_edit", name: "Auto edit" },
+        { id: "yolo", name: "YOLO" },
+      ]
+    : [
+        {
+          id: "ask",
+          name: "Ask",
+          description: "Request permission before making any changes",
+        },
+        {
+          id: "architect",
+          name: "Architect",
+          description: "Design and plan software systems without implementation",
+        },
+        {
+          id: "code",
+          name: "Code",
+          description: "Write and modify code with full tool access",
+        },
+      ];
 
 function modeState(): AcpSchema.SessionModeState {
   return {
@@ -380,6 +438,14 @@ const program = Effect.gen(function* () {
         ],
       },
     });
+  const publishOmpCommands = (targetSessionId: string) =>
+    agent.client.sessionUpdate({
+      sessionId: targetSessionId,
+      update: {
+        sessionUpdate: "available_commands_update",
+        availableCommands: [{ name: "compact", description: "Compact the conversation" }],
+      },
+    });
 
   yield* agent.handleInitialize((request) =>
     Effect.gen(function* () {
@@ -393,6 +459,19 @@ const program = Effect.gen(function* () {
       }
       parameterizedModelPicker =
         request.clientCapabilities?._meta?.parameterizedModelPicker === true;
+      if (ompProfile) {
+        return {
+          protocolVersion: 1,
+          agentInfo: { name: "omp-acp", version: "mock" },
+          agentCapabilities: {
+            loadSession: true,
+            mcpCapabilities: { http: true, sse: true },
+            promptCapabilities: { embeddedContext: true, image: true },
+            sessionCapabilities: { list: {}, fork: {}, resume: {}, close: {} },
+          },
+          authMethods: [{ id: "agent", name: "Agent" }],
+        };
+      }
       if (antigravityProfile) {
         return {
           protocolVersion: 1,
@@ -419,15 +498,23 @@ const program = Effect.gen(function* () {
   // Mirrors the real agent: the API key method reads GEMINI_API_KEY from the
   // process environment and rejects when it is missing.
   yield* agent.handleAuthenticate((request) =>
-    !antigravityProfile || request.methodId === "oauth-personal"
-      ? Effect.succeed({})
-      : request.methodId === "gemini-api-key" && process.env.GEMINI_API_KEY
+    ompProfile
+      ? request.methodId === "agent"
         ? Effect.succeed({})
         : Effect.fail(
             AcpError.AcpRequestError.invalidParams(
-              `Mock Antigravity rejected auth method ${request.methodId}.`,
+              `Mock Oh My Pi rejected auth method ${request.methodId}.`,
             ),
-          ),
+          )
+      : !antigravityProfile || request.methodId === "oauth-personal"
+        ? Effect.succeed({})
+        : request.methodId === "gemini-api-key" && process.env.GEMINI_API_KEY
+          ? Effect.succeed({})
+          : Effect.fail(
+              AcpError.AcpRequestError.invalidParams(
+                `Mock Antigravity rejected auth method ${request.methodId}.`,
+              ),
+            ),
   );
   if (antigravityProfile) {
     yield* agent.handleLogout(() => Effect.succeed({}));
@@ -435,6 +522,9 @@ const program = Effect.gen(function* () {
 
   yield* agent.handleCreateSession(() =>
     Effect.gen(function* () {
+      if (ompProfile) {
+        yield* publishOmpCommands(sessionId);
+      }
       if (antigravityProfile) {
         yield* publishAntigravityCommands(sessionId);
       }
@@ -579,6 +669,9 @@ const program = Effect.gen(function* () {
       }
       if (request.configId === "fast") {
         currentFast = request.value === true || request.value === "true";
+      }
+      if (request.configId === "thinking" && typeof request.value === "string") {
+        currentThinking = request.value;
       }
       return {
         configOptions: configOptions(),
@@ -784,7 +877,7 @@ const program = Effect.gen(function* () {
           sessionId: requestedSessionId,
           update: {
             sessionUpdate: "agent_message_chunk",
-            content: { type: "text", text: "hello from " },
+            content: { type: "text", text: "hello from" },
           },
         });
 
@@ -826,13 +919,15 @@ const program = Effect.gen(function* () {
           });
         }
 
-        writeJsonRpcNotification("session/update", {
-          sessionId: requestedSessionId,
-          update: {
-            sessionUpdate: "agent_message_chunk",
-            content: { type: "text", text: "mock" },
-          },
-        });
+        for (const text of [" ", "mo", "ck"]) {
+          writeJsonRpcNotification("session/update", {
+            sessionId: requestedSessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: { type: "text", text },
+            },
+          });
+        }
 
         return yield* Effect.never;
       }
@@ -1027,6 +1122,15 @@ const program = Effect.gen(function* () {
                 },
               ]),
           { optionId: permissionOptionIds.rejectOnce, name: "Reject", kind: "reject_once" },
+          ...(ompProfile
+            ? [
+                {
+                  optionId: permissionOptionIds.rejectAlways,
+                  name: "Reject always",
+                  kind: "reject_always" as const,
+                },
+              ]
+            : []),
         ];
 
         let cancelled = cancelledSessions.delete(requestedSessionId);

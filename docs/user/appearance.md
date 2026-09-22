@@ -1,16 +1,24 @@
 # Appearance and themes
 
-Open **Settings → Appearance** to choose a theme and follow the system appearance or stay in light
-or dark mode. To use different themes for light and dark mode, select the corresponding preview
-within each theme. Appearance preferences are saved separately on each device or browser.
+On web and desktop, open **Settings → Appearance** to choose a theme and follow the system
+appearance or stay in light or dark mode. To use different themes for light and dark mode, select
+the corresponding preview within each theme. Appearance preferences are saved separately on each
+device or browser.
 
-Mobile has its own themes and text, code, and terminal preferences. It does not follow environment
-themes or defaults.
+On web and desktop, use **Change theme** in the command palette to select a theme without leaving chat.
+Press **Cmd+Option+A** on macOS or **Ctrl+Alt+A** on Windows/Linux to open the theme picker directly.
+Use **Change appearance** in the command palette to choose System, Light, or Dark independently of
+the theme. **Cmd+Option+Shift+A** on macOS or **Ctrl+Alt+Shift+A** on Windows/Linux cycles through
+those modes. Customize these shortcuts under **Settings → Keybindings**.
+
+On mobile, open **Settings → Appearance**. Mobile has its own themes and text,
+code, and terminal preferences. It does not follow environment themes or defaults.
 
 On Android 12 or newer, choose the **Material You** theme in Appearance to use colors from
 your wallpaper. Selecting another theme replaces those colors. Like other themes, Material You
 can be selected separately for light and dark appearances.
-Android also offers **Material You Layout**, which changes shapes and spacing independently
+Android uses **Material You Layout** by default unless you have turned it off in Appearance.
+It changes shapes, spacing, and controls independently
 of the selected theme.
 
 ## Motion
@@ -22,7 +30,7 @@ without replaying its transitions.
 
 ## Custom themes
 
-On web and desktop, choose **Create theme** to adjust a palette, or import a T3 Code or VS Code
+On web and desktop, choose **Create theme** to adjust a palette, or import an Infinitus or VS Code
 theme. The theme editor's color picker lets you select an area of the app to find the color to
 change. Export your theme as JSON to share it.
 
@@ -33,7 +41,7 @@ main local environment. app.t3.codes and additional connections do not use them.
 
 Select a published theme in **Settings → Appearance** to follow its palette as the server updates
 it. **Duplicate** makes an independent copy you can edit. A saved custom theme with the same ID
-takes precedence. If the server stops publishing the selected theme, T3 Code falls back to its
+takes precedence. If the server stops publishing the selected theme, Infinitus falls back to its
 standard theme.
 
 Run this on the server to set a default and switch connected clients to it:
@@ -51,7 +59,7 @@ the default and published themes.
 
 ### Publish a theme
 
-Save a theme exported from T3 Code into `~/.t3/userdata/themes/` on the server, or the `themes`
+Save a theme exported from Infinitus into `~/.t3/userdata/themes/` on the server, or the `themes`
 directory under your custom state directory. The filename supplies the theme ID: `nightfall.json`
 can be selected with `infinitus theme set nightfall`. Keep the filename stable when updating its colors.
 Do not use `system`, `light`, `dark`, or a built-in theme's ID.
@@ -71,7 +79,7 @@ For an integration that generates a palette, this shorter format also works:
 }
 ```
 
-Set `appearance` to `light` or `dark` and supply hex colors for `canvas` and `accent`. T3 Code
+Set `appearance` to `light` or `dark` and supply hex colors for `canvas` and `accent`. Infinitus
 generates the rest. The optional `colors` overrides use the names in the theme editor's advanced
 view.
 

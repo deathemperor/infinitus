@@ -59,6 +59,31 @@ describe("workspace connection status", () => {
     });
   });
 
+  it("keeps the retry spinner when the last attempt recorded a failure", () => {
+    const state = workspaceState({
+      hasConnectingEnvironment: true,
+      hasReadyEnvironment: false,
+      connectionError: "Could not reach HyperNovae",
+      connectingEnvironments: [
+        {
+          environmentId: "environment-1" as never,
+          environmentLabel: "HyperNovae",
+          displayUrl: "",
+          isRelayManaged: false,
+          isEnabled: true,
+          connectionState: "reconnecting",
+          connectionError: "Could not reach HyperNovae",
+          connectionErrorTraceId: null,
+        },
+      ],
+    });
+
+    expect(workspaceConnectionStatusPresentation(state)).toEqual({
+      label: "Reconnecting to HyperNovae",
+      showsProgress: true,
+    });
+  });
+
   it("surfaces connection errors before the generic disconnected fallback", () => {
     const state = workspaceState({
       connectionError: "Could not reach Julius’s Mac mini",

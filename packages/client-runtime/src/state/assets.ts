@@ -72,6 +72,8 @@ export type AssetUrlState =
   | {
       readonly _tag: "Success";
       readonly url: string;
+      /** When the signed URL stops working, on the server's clock. */
+      readonly expiresAt: number;
       /** The host path the server chose to serve, when it differs from what was asked for. */
       readonly sourcePath?: string;
       /** Pixel size from the image header, when the server could read one. */
@@ -89,6 +91,7 @@ export function assetUrlStateFromResult(
   return {
     _tag: "Success",
     url,
+    expiresAt: result.value.expiresAt,
     ...(result.value.sourcePath !== undefined ? { sourcePath: result.value.sourcePath } : {}),
     ...(result.value.imageDimensions !== undefined
       ? { imageDimensions: result.value.imageDimensions }

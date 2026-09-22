@@ -242,26 +242,31 @@ final class FleetState: ObservableObject, Identifiable {
 
     // MARK: actions — engine first, then a fresh snapshot
 
+    /// `op` answers with the engine's snapshot when its verb already
+    /// returned one (a flag edit, #1481): the refresh pass takes it instead
+    /// of asking the engine again. Nil asks as usual.
     private func perform(after settle: @escaping @MainActor () -> Void = {},
-                         _ op: @escaping @Sendable () async throws -> Void) {
+                         _ op: @escaping @Sendable () async throws -> [EngineFleet]?) {
+        let engineID = engineID
         Task {
+            var seeded: [String: [EngineFleet]] = [:]
             do {
-                try await op()
+                if let fleets = try await op() { seeded[engineID] = fleets }
                 host.lastError = nil
             } catch { host.lastError = EngineFailure.sentence(error) }
-            await host.refreshSnapshot()
+            await host.refreshSnapshot(seeded: seeded)
             settle()
         }
     }
 
     func switchTo(_ number: Int) {
         let engine = engine, provider = provider
-        perform { try await engine.switchTo(fleet: provider, number: number) }
+        perform { try await engine.switchTo(fleet: provider, number: number); return nil }
     }
 
     func rotate() {
         let engine = engine, provider = provider
-        perform { try await engine.rotate(fleet: provider) }
+        perform { try await engine.rotate(fleet: provider); return nil }
     }
 
     /// Hold an account out of rotation / return it (engine-side flag; a
@@ -269,6 +274,15 @@ final class FleetState: ObservableObject, Identifiable {
     func setRotation(_ number: Int, enabled: Bool) {
         let engine = engine, provider = provider
         perform { try await engine.setHold(fleet: provider, number: number, held: !enabled) }
+    }
+
+    /// Keep-warm on/off: the engine's daemon restarts this account's 5h
+    /// window whenever it has gone cold. The verb answers with the edited
+    /// fleet, so `perform` seeds it and the row flips without waiting for
+    /// the next poll.
+    func setAutoIgnite(_ number: Int, _ on: Bool) {
+        let engine = engine, provider = provider
+        perform { try await engine.setAutoIgnite(fleet: provider, number: number, on) }
     }
 
     /// Stars flipped but not yet confirmed by the engine (the subprocess
@@ -287,14 +301,17 @@ final class FleetState: ObservableObject, Identifiable {
             && !(accounts.first { $0.number == number }?.active ?? true)
         pendingPreferred[number] = on
         perform(after: { [weak self] in self?.pendingPreferred[number] = nil }) {
-            try await engine.setPreferred(fleet: provider, number: number, on)
-            if land { try await engine.switchTo(fleet: provider, number: number) }
+            let edited = try await engine.setPreferred(fleet: provider, number: number, on)
+            guard land else { return edited }
+            // The switch moves the active account after the edit's reply.
+            try await engine.switchTo(fleet: provider, number: number)
+            return nil
         }
     }
 
     func remove(_ number: Int) {
         let engine = engine, provider = provider
-        perform { try await engine.remove(fleet: provider, number: number) }
+        perform { try await engine.remove(fleet: provider, number: number); return nil }
     }
 
     /// The in-flight rename pass from `randomizeNames`/`restoreNames`, so
@@ -360,39 +377,6 @@ final class FleetState: ObservableObject, Identifiable {
         rename(number, to: name)
     }
 
-    /// Write every managed account to `path`. The file holds CREDENTIALS,
-    /// so the caller warns before offering it and this reports where it
-    /// landed rather than a bare success.
-    func exportAccounts(to path: URL, full: Bool, done: @escaping (String?) -> Void) {
-        let engine = engine
-        Task {
-            do {
-                try await engine.exportAccounts(to: path, account: nil, full: full)
-                done(nil)
-            } catch let error as CLIError {
-                // The engine's own words ("no accounts to export …"),
-                // which is what the user has to act on.
-                done(error.message)
-            } catch { done("\(error)") }
-        }
-    }
-
-    /// Read accounts back. `force` REPLACES existing slots — the caller
-    /// must have confirmed it. A successful import changes the fleet, so
-    /// the snapshot is refreshed before the completion runs.
-    func importAccounts(from path: URL, force: Bool, done: @escaping (String?) -> Void) {
-        let engine = engine
-        Task {
-            do {
-                try await engine.importAccounts(from: path, force: force)
-                await host.refreshSnapshot()
-                done(nil)
-            } catch let error as CLIError {
-                done(error.message)
-            } catch { done("\(error)") }
-        }
-    }
-
     /// Rename = set/clear the account's alias, so every frontend
     /// (TUI, CLI, popup) shows the same name.
     func rename(_ number: Int, to name: String) {
@@ -451,6 +435,13 @@ extension FleetState: FleetModel {
                    caveat: host.fleetCaveats[engineID])
     }
     var appUpdatePending: Bool { host.appUpdatePending }
+    /// The ignite trio, per fleet: the rows render with a FleetState, so
+    /// without these a row's ignite affordance sees the protocol's
+    /// `false`/no-op defaults and quietly never appears. `igniting` is the
+    /// host's single in-flight marker — one ignition at a time, fleet-wide.
+    var canIgnite: Bool { capabilities.contains(.ignite) }
+    var igniting: Int? { host.igniting }
+    func ignite(_ number: Int) { host.ignite(number, on: self) }
     var engineMissing: Bool { host.engineMissing }
     var introTick: Int { host.introTick }
     var introStyle: String { host.introStyle }
@@ -458,27 +449,26 @@ extension FleetState: FleetModel {
     var introTitle: String { host.introTitle }
     var introBarDelay: Double { host.introBarDelay }
 
-    /// A credential-swap engine's re-logins run the app's token flow
-    /// (`.addCurrent`); an OAuth engine (the proxy) signs in through the
-    /// browser instead.
+    /// An engine that takes the OAuth redirect itself (swapd's `add-oauth`,
+    /// the proxy) signs in through the browser with nothing to paste; only
+    /// a credential-swap engine without that runs the app's own token
+    /// flow (`claude auth login` on a PTY, the code pasted back).
     func startRelogin(_ account: Account) {
-        if capabilities.contains(.addCurrent) { host.startRelogin(account) }
-        else if capabilities.contains(.addOAuth) {
+        if capabilities.contains(.addOAuth) {
             host.addOAuthAccount(engineID: engineID, provider: provider, relogin: account)
-        }
+        } else if capabilities.contains(.addCurrent) { host.startRelogin(account) }
     }
     func toggleEngine() { host.toggleEngine() }
     func relaunchApp() { host.relaunchApp() }
     func openSettings() { host.openSettings() }
-    /// A second account: a credential-swap engine through the in-app
-    /// token flow (a fresh login, not a bare `swapd add` — that would
-    /// re-adopt the same account), an OAuth engine through its browser
-    /// sign-in.
+    /// A second account: an OAuth engine through its browser sign-in, a
+    /// credential-swap engine without one through the in-app token flow
+    /// (a fresh login, not a bare `swapd add` — that would re-adopt the
+    /// same account).
     func addAccount() {
-        if capabilities.contains(.addCurrent) { host.addAccount() }
-        else if capabilities.contains(.addOAuth) {
+        if capabilities.contains(.addOAuth) {
             host.addOAuthAccount(engineID: engineID, provider: provider)
-        }
+        } else if capabilities.contains(.addCurrent) { host.addAccount() }
     }
     var canAddAccount: Bool {
         capabilities.contains(.addCurrent) || capabilities.contains(.addOAuth)

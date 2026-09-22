@@ -13,6 +13,7 @@ import {
 } from "@infinitus/contracts";
 import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
+import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -28,6 +29,7 @@ import { describe, expect } from "vite-plus/test";
 import { OrchestrationCommandInvariantError } from "../../orchestration/Errors.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
 import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
 import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 import { InfinitusTurnQueueLive } from "./InfinitusTurnQueue.ts";
@@ -160,7 +162,10 @@ const makeHarness = (initial: ReadonlyArray<OrchestrationThreadShell>) =>
         ),
       ),
     );
-    yield* Layer.build(layer);
+    const built = yield* Layer.build(layer);
+    // The layer merges the real service out, the one the resume layer claims
+    // a thread on in the server (#1509).
+    const limitStops = Context.get(built, InfinitusLimitStops);
     // The forked streams subscribe on their first step; an event published
     // before that reaches nobody.
     for (let i = 0; i < 20; i += 1) yield* Effect.yieldNow;
@@ -174,6 +179,8 @@ const makeHarness = (initial: ReadonlyArray<OrchestrationThreadShell>) =>
         ).pipe(Effect.asVoid),
       setPaused: (threadIds: ReadonlyArray<ThreadId>) =>
         Queue.offer(paused, threadIds).pipe(Effect.asVoid),
+      setResuming: (threadId: ThreadId, resuming: boolean) =>
+        limitStops.setResuming(threadId, resuming),
       setShell: (shell: OrchestrationThreadShell) =>
         Ref.update(shells, (map) => new Map([...map, [shell.id, shell]])),
       refuseStarts: (error: OrchestrationCommandInvariantError | null) =>
@@ -330,6 +337,24 @@ describe("InfinitusTurnQueueLive (#806)", () => {
         yield* h.setPaused([]);
         yield* settle(h.starts, (list) => list.length === 2);
         expect((yield* h.starts)[1]?.threadId).toBe(two);
+      }),
+    ),
+  );
+
+  // #1509: a row drained into the resume's replace-then-send window is a
+  // second send into one session. The release is its own wake — no session
+  // event need follow it — so the row goes on the claim being let go alone.
+  effectIt.effect("waits while a limit resume is sending, and the release wakes it", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness([idle(one)]);
+        yield* h.setResuming(one, true);
+        yield* h.emit(domainEvent("thread.turn-queued", one));
+        yield* nothingYet(h.starts);
+
+        yield* h.setResuming(one, false);
+        yield* settle(h.starts, (list) => list.length === 1);
+        expect((yield* h.starts)[0]?.threadId).toBe(one);
       }),
     ),
   );

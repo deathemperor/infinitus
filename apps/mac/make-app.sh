@@ -45,9 +45,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
          login-item grants key on the id — re-grant both after this;
          keychain items under the old id are not readable (re-enter).
          Prefs migrate in-app from com.huuloc.infinitus (2026-09-03 id)
-         ← com.huuloc.limitless (2026-08-30) ← io.github.claude-swap.CswapBar.g2,
-         a rename away from a persistent macOS 26 ControlCenter per-id
-         ban acquired in the 2026-08-29 MenuBarExtra insert/evict war.
+         ← com.huuloc.limitless (2026-08-30), itself a rename away from a
+         persistent macOS 26 ControlCenter per-id ban acquired in the
+         2026-08-29 MenuBarExtra insert/evict war.
          Never change casually. -->
     <key>CFBundleIdentifier</key><string>run.infinitus</string>
     <!-- INFINITUS_BUNDLE_NAME (#777): the desktop nests this app as its

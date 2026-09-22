@@ -273,6 +273,19 @@ export const GrokIcon: Icon = ({ className, ...props }) => (
   </svg>
 );
 
+export const OmpIcon: Icon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+    <path
+      d="M4.5 18.5c2.4-6.2 5.1-10.4 7.5-12.6 2.4 2.2 5.1 6.4 7.5 12.6"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      fill="none"
+    />
+    <path d="M8.2 14.8h7.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+);
+
 export const TraeIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 24 24" fill="currentColor">
     {/* Back rectangle: left strip + bottom strip drawn separately — empty bottom-left corner is the gap between them */}
@@ -706,6 +719,25 @@ const ANTIGRAVITY_ICON_DATA_URL =
 export const AntigravityIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 128 128" fill="none">
     <image href={ANTIGRAVITY_ICON_DATA_URL} width="128" height="128" />
+  </svg>
+);
+
+/**
+ * Pi's mark. Drawn rather than embedded: the project ships no icon asset we
+ * are licensed to redistribute, and the letterform is unambiguous at the
+ * sizes the provider list uses.
+ */
+export const PiIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 7h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M9 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path
+      d="M16 7v7a3 3 0 0 0 3 3"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 

@@ -101,11 +101,9 @@ vi.mock("expo-widgets", () => ({
   addPushToStartTokenListener: vi.fn(() => ({ remove: vi.fn() })),
 }));
 
-vi.mock("../../widgets/AgentActivity", () => ({
-  default: {
-    getInstances: widgetMocks.getInstances,
-    start: widgetMocks.start,
-  },
+vi.mock("./agentLiveActivity", () => ({
+  getAgentLiveActivities: widgetMocks.getInstances,
+  startAgentLiveActivity: widgetMocks.start,
 }));
 
 // The state modules pull the whole connection stack (and native expo modules)
@@ -336,6 +334,9 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     expect(resolveApsEnvironment("preview")).toBe("production");
     expect(resolveApsEnvironment("production")).toBe("production");
     expect(resolveApsEnvironment(undefined)).toBe("production");
+    expect(resolveApsEnvironment("infinitus", "sandbox")).toBe("sandbox");
+    expect(resolveApsEnvironment("development", "production")).toBe("production");
+    expect(resolveApsEnvironment("infinitus", "staging")).toBe("production");
   });
 
   it("disables push features in Personal Team relay registrations", () => {

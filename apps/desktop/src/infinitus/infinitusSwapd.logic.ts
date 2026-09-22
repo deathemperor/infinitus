@@ -10,7 +10,10 @@
  */
 
 /** Where `swapd` lives, checked in order; first hit wins. The list mirrors the
-    Mac app's `SwapdLocator`, so both find the same binary on one machine. */
+    Mac app's `SwapdLocator`, so both find the same binary on one machine: the
+    bundle's own copy first — the engine the release was pinned to, which a
+    stale `cargo install` on PATH used to shadow (#1530) — then the PATH dirs
+    a source build relies on. */
 export interface SwapdBinaryInput {
   readonly env: Record<string, string | undefined>;
   readonly homeDirectory: string;
@@ -27,13 +30,13 @@ const NESTED_SWAPD_RELATIVE_PATH =
 const swapdBinaryCandidates = (
   input: Pick<SwapdBinaryInput, "homeDirectory" | "desktopBundlePath">,
 ): ReadonlyArray<string> => [
+  ...(input.desktopBundlePath === null
+    ? []
+    : [`${input.desktopBundlePath}/${NESTED_SWAPD_RELATIVE_PATH}`]),
   "/opt/homebrew/bin/swapd",
   "/usr/local/bin/swapd",
   `${input.homeDirectory}/.cargo/bin/swapd`,
   `${input.homeDirectory}/.local/bin/swapd`,
-  ...(input.desktopBundlePath === null
-    ? []
-    : [`${input.desktopBundlePath}/${NESTED_SWAPD_RELATIVE_PATH}`]),
 ];
 
 /**
@@ -48,6 +51,28 @@ export const resolveSwapdBinary = (input: SwapdBinaryInput): string | null => {
   }
   return swapdBinaryCandidates(input).find((path) => input.exists(path)) ?? null;
 };
+
+/** The command-line switch a browser takes for a private window, by bundle
+    identifier — the Mac app's `SignInSheetRoute.privateFlags`, the Chromium
+    family's only (Safari has none), which is also the family that takes the
+    empty `--user-data-dir` beside it. `null` leaves the page to the profile. */
+const PRIVATE_WINDOW_FLAGS: Readonly<Record<string, string>> = {
+  "com.google.Chrome": "--incognito",
+  "com.google.Chrome.beta": "--incognito",
+  "com.google.Chrome.canary": "--incognito",
+  "com.google.Chrome.dev": "--incognito",
+  "org.chromium.Chromium": "--incognito",
+  "com.brave.Browser": "--incognito",
+  "com.vivaldi.Vivaldi": "--incognito",
+  "company.thebrowser.Browser": "--incognito",
+  "com.microsoft.edgemac": "--inprivate",
+  "com.microsoft.edgemac.Beta": "--inprivate",
+  "com.microsoft.edgemac.Dev": "--inprivate",
+  "com.microsoft.edgemac.Canary": "--inprivate",
+};
+
+export const privateWindowFlag = (bundleId: string): string | null =>
+  PRIVATE_WINDOW_FLAGS[bundleId] ?? null;
 
 /** One line of `add-oauth --json`: the URL to open, the account it stored, or
     the engine's refusal. An unreadable line is `null` — swapd writes nothing

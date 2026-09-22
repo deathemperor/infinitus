@@ -57,6 +57,16 @@
       "channel": "production",
       "environment": "production",
       "autoIncrement": true
+    },
+    "infinitus": {
+      "corepack": true,
+      "env": {
+        "APP_VARIANT": "infinitus",
+        "NODE_OPTIONS": "--max-old-space-size=4096"
+      },
+      "channel": "infinitus",
+      "distribution": "internal",
+      "autoIncrement": true
     }
   },
   "submit": {

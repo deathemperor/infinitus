@@ -1,7 +1,10 @@
 import { isElectron } from "~/env";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
+import { STATIC_KEYBINDING_COMMANDS, type KeybindingCommand } from "@infinitus/contracts";
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { EnvironmentConnectionPhase } from "@infinitus/client-runtime/connection";
+import { DEFAULT_KEYBINDINGS } from "@infinitus/shared/keybindings";
+import { commandLabel } from "./KeybindingsSettings.logic";
 import {
   validateSettingsScopeSearch,
   type ResolvedSettingsScope,
@@ -18,16 +21,15 @@ export type SettingsPath =
   | "/settings/providers"
   | "/settings/integrations"
   | "/settings/source-control"
+  | "/settings/storage"
   | "/settings/connections"
-  | "/settings/infinitus"
-  | "/settings/infinitus/themes"
-  | "/settings/infinitus/animations"
-  | "/settings/infinitus/sessions"
-  | "/settings/infinitus/lock"
-  | "/settings/infinitus/team"
-  | "/settings/infinitus/notifications"
-  | "/settings/infinitus/devices"
-  | "/settings/infinitus/engines"
+  | "/settings/menu-bar"
+  | "/settings/animations"
+  | "/settings/priority"
+  | "/settings/team"
+  | "/settings/notifications"
+  | "/settings/devices"
+  | "/settings/engines"
   | "/settings/archived";
 
 /**
@@ -64,6 +66,11 @@ export interface SettingsSearchItem {
   readonly localBackendManagementOnly?: boolean;
   readonly localEnvironmentOnly?: boolean;
   readonly wslAvailableOnly?: boolean;
+  /**
+   * Sorts after every other match. Keybinding commands mirror rows on other
+   * surfaces, so "model" must still lead with Default model, not Model Picker.
+   */
+  readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
   // Its section only exists where a connected server drives an Infinitus app.
   readonly infinitusOnly?: boolean;
@@ -93,20 +100,46 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/providers": "Providers",
   "/settings/integrations": "Integrations",
   "/settings/source-control": "Source Control",
+  "/settings/storage": "Storage",
   "/settings/connections": "Connections",
   // The app is Infinitus, so its pages carry no prefix (user 2026-09-11); the
   // catalog page is named for what it holds, the menu bar and popup prefs.
-  "/settings/infinitus": "Menu bar",
-  "/settings/infinitus/themes": "Themes",
-  "/settings/infinitus/animations": "Animations",
-  "/settings/infinitus/sessions": "Priority",
-  "/settings/infinitus/lock": "Lock",
-  "/settings/infinitus/team": "Team",
-  "/settings/infinitus/notifications": "Notifications",
-  "/settings/infinitus/devices": "Devices",
-  "/settings/infinitus/engines": "Engines",
+  "/settings/menu-bar": "Menu bar",
+  "/settings/animations": "Animations",
+  "/settings/priority": "Priority",
+  "/settings/team": "Team",
+  "/settings/notifications": "Notifications",
+  "/settings/devices": "Devices",
+  "/settings/engines": "Engines",
   "/settings/archived": "Archive",
 };
+
+/** Anchor id of the first row bound to `command` on the Keybindings page. */
+export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
+  return `keybinding-${command}` as const;
+}
+
+/**
+ * One result per built-in command, alphabetical by label. The anchor is
+ * the command's first row; default keys are searchable so "mod+b" lands on
+ * Sidebar: Toggle. A command with no default binding may have no row, so it
+ * points at the section instead.
+ */
+const KEYBINDING_SEARCH_ITEMS = STATIC_KEYBINDING_COMMANDS.toSorted((left, right) =>
+  commandLabel(left).localeCompare(commandLabel(right)),
+).map((command) => {
+  const defaultKeys = DEFAULT_KEYBINDINGS.filter((binding) => binding.command === command).map(
+    (binding) => binding.key,
+  );
+  return {
+    id: keybindingSearchAnchorId(command),
+    title: commandLabel(command),
+    to: "/settings/keybindings" as const,
+    searchTerms: [command, ...defaultKeys],
+    secondary: true,
+    ...(defaultKeys.length === 0 ? { targetId: "keybindings" } : {}),
+  };
+});
 
 /**
  * Searchable settings and stable destinations, in result order. Rows with a
@@ -114,6 +147,22 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
  * that may not be mounted point at their nearest stable section instead.
  */
 export const SETTINGS_SEARCH_ITEMS = [
+  {
+    id: "storage-worktrees",
+    title: "Worktree cleanup",
+    to: "/settings/storage",
+    scope: "project-defaults",
+    searchTerms: [
+      "disk storage delete deleted archived threads old inactive merged unchanged worktrees retention days project inherit off custom",
+    ],
+  },
+  {
+    id: "storage-artifacts",
+    title: "Artifacts and logs",
+    to: "/settings/storage",
+    scope: "environment-defaults",
+    searchTerms: ["disk storage browser screenshots captures rotated logs cleanup retention"],
+  },
   {
     id: "project-defaults",
     title: "Project defaults and overrides",
@@ -189,7 +238,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "environment-identification",
     title: "Environment identification",
     to: "/settings/appearance",
-    searchTerms: ["dev nightly artwork pill label hide none"],
+    searchTerms: ["dev nightly alpha artwork background pill label hide none"],
     // The setting is stage-dependent, so its parent section is the stable destination.
     targetId: "appearance-interface",
   },
@@ -317,10 +366,22 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["command menu dollar $ slash /"],
   },
   {
+    id: "composer-rich-text",
+    title: "Rich text composer",
+    to: "/settings/general",
+    searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
+  },
+  {
     id: "composer-collapse",
     title: "Collapse composer on scroll",
     to: "/settings/general",
     searchTerms: ["composer rest resting scroll wheel conversation timeline shrink minimize"],
+  },
+  {
+    id: "send-shortcut",
+    title: "Send shortcut",
+    to: "/settings/general",
+    searchTerms: ["enter return command ctrl multiline prompt new line composer"],
   },
   {
     id: "composer-send-mode",
@@ -332,7 +393,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "provider-update-checks",
     title: "Provider update checks",
     to: "/settings/general",
-    searchTerms: ["installed cli versions newer available codex claude cursor grok opencode"],
+    searchTerms: [
+      "installed cli versions newer available codex claude cursor grok omp oh-my-pi opencode",
+    ],
     scope: "environment-defaults",
   },
   {
@@ -455,6 +518,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/keybindings",
     searchTerms: ["keyboard shortcuts hotkeys commands bindings json"],
   },
+  ...KEYBINDING_SEARCH_ITEMS,
   {
     id: "snap-shot-enabled",
     title: "SnapShots",
@@ -499,7 +563,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Providers",
     to: "/settings/providers",
     searchTerms: [
-      "agents cli codex claude cursor grok opencode antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory endpoint arguments environment variables display name accent color custom favorite hidden auto compact",
+      "agents cli codex claude cursor grok omp oh-my-pi opencode antigravity pi google sign in sign out install subscription instances authentication api key models configuration binary path config directory endpoint arguments environment variables display name accent color custom favorite hidden auto compact",
     ],
   },
   {
@@ -586,6 +650,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "browser-recording-frame-rate",
     title: "Browser recording frame rate",
     to: "/settings/integrations",
+  },
+  {
+    id: "browser-recording-key-presses",
+    title: "Show key presses in recordings",
+    to: "/settings/integrations",
+    searchTerms: ["browser preview keyboard shortcuts keystrokes overlay capture"],
+  },
+  {
+    id: "browser-recording-mouse-presses",
+    title: "Show mouse presses in recordings",
+    to: "/settings/integrations",
+    searchTerms: ["browser preview clicks buttons drag overlay capture"],
   },
   {
     id: "browser-link-target",
@@ -758,7 +834,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     // row by row; `targetId` is the first section the page renders.
     id: "infinitus-preferences",
     title: "Infinitus preferences",
-    to: "/settings/infinitus",
+    to: "/settings/menu-bar",
     targetId: "infinitus-display",
     infinitusOnly: true,
     searchTerms: ["menu bar popup startup about threads hide icon"],
@@ -767,15 +843,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     // Fork (#574): the Slack bridge sits on the Menu bar page under Threads.
     id: "infinitus-slack",
     title: "Start threads from Slack",
-    to: "/settings/infinitus",
+    to: "/settings/menu-bar",
     targetId: "infinitus-slack",
     searchTerms: ["slack bot mention token socket mode bridge channel"],
     infinitusOnly: true,
   },
   {
+    // The theme picker sits on the Menu bar page, under its own section.
     id: "infinitus-themes",
     title: "Infinitus themes",
-    to: "/settings/infinitus/themes",
+    to: "/settings/menu-bar",
     targetId: "infinitus-themes",
     infinitusOnly: true,
     searchTerms: ["theme gamification style rpg movie hades picker look"],
@@ -783,7 +860,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-animations",
     title: "Infinitus animations",
-    to: "/settings/infinitus/animations",
+    to: "/settings/animations",
     targetId: "infinitus-animations",
     infinitusOnly: true,
     searchTerms: ["animation intro slide fade zoom burn ember flame speed motion"],
@@ -791,7 +868,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-sessions",
     title: "Infinitus priority",
-    to: "/settings/infinitus/sessions",
+    to: "/settings/priority",
     // The Mac files these keys under `priority` since #1069; a build older than
     // that still answers `sessions`, and the anchor then only loses its scroll.
     targetId: "infinitus-priority",
@@ -806,23 +883,15 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "desktop-badge",
     title: "Dock badge",
-    to: "/settings/infinitus/notifications",
+    to: "/settings/notifications",
     targetId: "desktop-notifications",
     infinitusOnly: true,
     searchTerms: ["dock icon badge count unread attention"],
   },
   {
-    id: "infinitus-lock",
-    title: "Infinitus lock",
-    to: "/settings/infinitus/lock",
-    targetId: "infinitus-lock",
-    infinitusOnly: true,
-    searchTerms: ["biometric touch id face id password unlock relock privacy lock now"],
-  },
-  {
     id: "infinitus-team",
     title: "Infinitus team",
-    to: "/settings/infinitus/team",
+    to: "/settings/team",
     targetId: "infinitus-team",
     infinitusOnly: true,
     searchTerms: ["team members invite code join create share transcripts leader roster"],
@@ -830,7 +899,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-push",
     title: "Infinitus notifications",
-    to: "/settings/infinitus/notifications",
+    to: "/settings/notifications",
     targetId: "infinitus-push",
     infinitusOnly: true,
     // The four rows left are account events (#1041 took `push_waiting` and
@@ -841,7 +910,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-devices",
     title: "Infinitus devices",
-    to: "/settings/infinitus/devices",
+    to: "/settings/devices",
     targetId: "infinitus-devices",
     infinitusOnly: true,
     // "live activity" went with the Mac's cards and the phone mirror with its
@@ -854,7 +923,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-engines",
     title: "Infinitus engines",
-    to: "/settings/infinitus/engines",
+    to: "/settings/engines",
     targetId: "infinitus-engines",
     infinitusOnly: true,
     searchTerms: [
@@ -862,6 +931,7 @@ export const SETTINGS_SEARCH_ITEMS = [
       "management key dashboard password base url test connection",
       "routing strategy session affinity daemon",
       "about version build release",
+      "activity events switches log",
     ],
   },
   {
@@ -893,19 +963,18 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/providers": null,
   "/settings/integrations": null,
   "/settings/source-control": "environment-defaults",
+  "/settings/storage": "project-defaults",
   "/settings/connections": "connections",
   "/settings/archived": "project-defaults",
-  // Fork: the Infinitus pages read the primary environment's menu bar app and
-  // need no selection scope to render.
-  "/settings/infinitus": null,
-  "/settings/infinitus/themes": null,
-  "/settings/infinitus/animations": null,
-  "/settings/infinitus/sessions": null,
-  "/settings/infinitus/lock": null,
-  "/settings/infinitus/team": null,
-  "/settings/infinitus/notifications": null,
-  "/settings/infinitus/devices": null,
-  "/settings/infinitus/engines": null,
+  // Fork: the menu bar app's pages read the primary environment and need no
+  // selection scope to render.
+  "/settings/menu-bar": null,
+  "/settings/animations": null,
+  "/settings/priority": null,
+  "/settings/team": null,
+  "/settings/notifications": null,
+  "/settings/devices": null,
+  "/settings/engines": null,
 };
 
 /** Search keeps the selected target. A missing row can explain its owning scope instead. */
@@ -1032,14 +1101,21 @@ const SETTINGS_SECTION_PATHS = new Set<string>(Object.keys(SETTINGS_SECTION_LABE
 
 /**
  * Whether a nav item is the one the current path belongs to. A section that
- * nests under another (Infinitus and its pages) would otherwise light both up,
- * so a prefix match only counts while the deeper path owns no nav item itself.
+ * nests under another would otherwise light both up, so a prefix match only
+ * counts for the deepest nav item above the path: a sub screen of Engines
+ * lights Engines alone.
  */
 export function isSettingsSectionActive(pathname: string, to: SettingsPath): boolean {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   if (normalized === to) return true;
   if (!normalized.startsWith(`${to}/`)) return false;
-  return !SETTINGS_SECTION_PATHS.has(normalized);
+  for (const section of SETTINGS_SECTION_PATHS) {
+    if (section.length > to.length && normalized.startsWith(section)) {
+      const rest = normalized.slice(section.length);
+      if (rest === "" || rest.startsWith("/")) return false;
+    }
+  }
+  return true;
 }
 
 export function searchSettings(
@@ -1080,6 +1156,11 @@ export function searchSettings(
                   : 0;
       return [{ item, index, rank }];
     })
-    .toSorted((left, right) => right.rank - left.rank || left.index - right.index)
+    .toSorted(
+      (left, right) =>
+        Number(left.item.secondary ?? false) - Number(right.item.secondary ?? false) ||
+        right.rank - left.rank ||
+        left.index - right.index,
+    )
     .map(({ item }) => item);
 }

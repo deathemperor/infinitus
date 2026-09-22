@@ -61,6 +61,10 @@ jobs:
             echo "branch $branch already exists; a sync for this upstream sha is pending"
             echo "state=uptodate" >> "$GITHUB_OUTPUT"; exit 0
           fi
+          # Every commit here is --no-verify: `vp config` (the root package's
+          # `prepare`) installs a pre-commit hook that lints the staged files,
+          # and a conflicted merge stages files full of conflict markers, so
+          # the hook can only fail. It killed the 2026-09-17 syncs.
           git checkout -b "$branch"
           # The identifier rename (#1368 C, docs/internals/infinitus-rename.md):
           # once main carries no old identifier, upstream's tip is renamed on
@@ -73,23 +77,23 @@ jobs:
             # The scope is in the lockfile's peer-set hashes too, and fmt wants node_modules.
             vp i --no-frozen-lockfile
             git diff --name-only | xargs vp fmt
-            git add -A && git commit -qm "chore: upstream renamed by scripts/infinitus-rename.ts"
+            git add -A && git commit -qm "chore: upstream renamed by scripts/infinitus-rename.ts" --no-verify
             git checkout -q "$branch"
             merge_from="$branch-upstream-renamed"
           else
             merge_from=upstream/main
           fi
-          if git merge --no-edit "$merge_from"; then
+          if git merge --no-edit --no-verify "$merge_from"; then
             echo "state=clean" >> "$GITHUB_OUTPUT"
           else
             git diff --name-only --diff-filter=U > /tmp/conflicts.txt
-            git add -A && git -c core.editor=true commit --no-edit
+            git add -A && git -c core.editor=true commit --no-edit --no-verify
             echo "state=conflict" >> "$GITHUB_OUTPUT"
           fi
           # Fork rule: GitHub-hosted runners, never Blacksmith (INFINITUS.md).
           if grep -rl "runs-on: blacksmith-" .github/workflows >/dev/null 2>&1; then
             sed -i -E 's/runs-on: blacksmith-[0-9]+vcpu-ubuntu-2404/runs-on: ubuntu-24.04/; s/runs-on: blacksmith-[0-9]+vcpu-macos-26/runs-on: macos-latest/; s/runs-on: blacksmith-[0-9]+vcpu-windows-2025/runs-on: windows-2025/' .github/workflows/*.yml
-            git commit -am "ci: GitHub-hosted runners after the upstream merge" || true
+            git commit -am "ci: GitHub-hosted runners after the upstream merge" --no-verify || true
           fi
           git push -u origin "$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"

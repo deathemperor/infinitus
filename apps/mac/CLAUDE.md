@@ -14,7 +14,7 @@ Native macOS menu bar app, `apps/mac` of the Infinitus repo (#823). The
   subcommand.
 - **Everything is Swift; the engine is fully isolated.** Every engine
   touchpoint is a `swapd … --json` subprocess (InfinitusCore/Engines/Swapd/SwapdCLI.swift).
-  Never read engine internals (`~/.claude-swap-backup/*`). Reading
+  Never read engine internals (the engine's own backup dir). Reading
   Claude Code's own files is fine: `~/.claude/settings.json`,
   `~/.claude/sessions/*.json` (+ `.key`), `~/.claude/projects/*/*.jsonl`.
 - **Bundle id is `run.infinitus`**, the phone's `run.infinitus.mobile`

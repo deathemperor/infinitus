@@ -61,6 +61,71 @@ export const signInWindowOptions = (
   },
 });
 
+/** The products a stock Chromium user agent names. Electron's default adds the
+    app's own (`Infinitus/0.5.0`) and `Electron/44.1.0`, and Google's sign-in
+    reads those as an embedded browser: it answers a request carrying them with
+    `flowName=GeneralOAuthLite` and its legacy consent page, which cannot finish
+    a federated login here. Everything kept is Chromium's own — which is what
+    the page is really running. */
+const CHROMIUM_USER_AGENT_PRODUCTS = new Set(["Mozilla", "AppleWebKit", "Chrome", "Safari"]);
+
+/** The sign-in window's user agent: the default with every non-Chromium product
+    dropped. Tokens that name no product (the platform, `(KHTML,`, `like`,
+    `Gecko)`) are part of the string's shape and stay. */
+export const signInUserAgent = (defaultUserAgent: string): string =>
+  defaultUserAgent
+    .split(" ")
+    .filter((token) => {
+      const slash = token.indexOf("/");
+      return slash === -1 || CHROMIUM_USER_AGENT_PRODUCTS.has(token.slice(0, slash));
+    })
+    .join(" ");
+
+/** What a provider's page may open from a sign-in window.
+ *
+ * A federated sign-in (Google, Apple) runs in a `window.open` child that
+ * `postMessage`s its result back to the opener, and a denied open returns
+ * `null` — which the page reports as "There was an error logging you in". The
+ * child keeps the opener and the flow's partition, so it stays in this flow's
+ * jar. A URL that is not a page is never a sign-in, and stays denied. */
+export const signInWindowOpenAction = (details: { readonly url: string }): "popup" | "deny" =>
+  /^https?:\/\//i.test(details.url) ? "popup" : "deny";
+
+/** A pop-up is not this window, so it inherits none of its preferences: spell
+    out the same hardening the flow's own window has. */
+const SIGN_IN_POPUP_WINDOW_OPTIONS = {
+  webPreferences: {
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    webviewTag: false,
+  },
+} satisfies Electron.BrowserWindowConstructorOptions;
+
+/** The browser a sign-in window and everything it opens present to the
+    provider.
+ *
+ * The agent goes on the flow's session as well as this window: a pop-up is
+ * navigating by the time `did-create-window` could reach it, and the request
+ * that decides which flow Google serves is its first one. `parent` makes the
+ * pop-up this window's child, so it cannot outlive the flow holding the jar it
+ * was opened in. */
+const prepareSignInWindow = (window: Electron.BrowserWindow): void => {
+  const userAgent = signInUserAgent(window.webContents.getUserAgent());
+  // Session-wide covers what is opened next; this window's contents already
+  // exist and keep their own.
+  window.webContents.session.setUserAgent(userAgent);
+  window.webContents.setUserAgent(userAgent);
+  window.webContents.setWindowOpenHandler((details) =>
+    signInWindowOpenAction(details) === "popup"
+      ? {
+          action: "allow",
+          overrideBrowserWindowOptions: { ...SIGN_IN_POPUP_WINDOW_OPTIONS, parent: window },
+        }
+      : { action: "deny" },
+  );
+};
+
 const decodeCodeResult = Schema.decodeUnknownEffect(InfinitusSignInCodeResult);
 
 /**
@@ -130,7 +195,7 @@ const make = Effect.gen(function* () {
       if (window === null) return;
       windows.set(input.flowId, window);
       // The provider's page may open pop-ups; they stay in the same jar.
-      window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      prepareSignInWindow(window);
       window.once("closed", () => {
         windows.delete(input.flowId);
       });

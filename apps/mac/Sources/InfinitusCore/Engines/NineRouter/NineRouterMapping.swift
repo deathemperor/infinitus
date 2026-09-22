@@ -149,14 +149,22 @@ public enum NineRouterUsage {
         }
         guard let quotas = wire.quotas else { return .ok(nil, plan: wire.plan) }
 
-        func window(_ q: Wire.Quota, name: String? = nil) -> UsageWindow? {
+        func window(_ q: Wire.Quota, name: String? = nil, session: Bool = false) -> UsageWindow? {
             guard let used = q.used, q.unlimited != true else { return nil }
+            var resetsAt = q.resetAt
+            // 9Router can retain the previous session's reset after usage
+            // reaches zero. That session is over; keeping its timer makes
+            // a full gauge pulse "resetting…" indefinitely. Weekly windows
+            // retain their fixed reset schedule even when unused.
+            if session, used == 0, let reset = WeeklyRoll.parse(resetsAt), reset <= now {
+                resetsAt = nil
+            }
             var countdown: String?, clock: String?
-            if let resetAt = q.resetAt, let date = WeeklyRoll.parse(resetAt) {
+            if let date = WeeklyRoll.parse(resetsAt) {
                 countdown = ResetFormat.countdown(until: date, now: now)
                 clock = ResetFormat.clock(date, now: now)
             }
-            return UsageWindow(pct: used, resetsAt: q.resetAt, countdown: countdown,
+            return UsageWindow(pct: used, resetsAt: resetsAt, countdown: countdown,
                                clock: clock, name: name)
         }
 
@@ -179,7 +187,7 @@ public enum NineRouterUsage {
                               currency: "credits", resetsAt: quota.resetAt,
                               countdown: countdown, clock: clock)
             } else if lower.hasPrefix("session") {
-                fiveHour = window(quota)
+                fiveHour = window(quota, session: true)
             } else if lower == "weekly (7d)" || lower == "weekly" {
                 // 9Router reports a bare percentage, so the ahead/behind
                 // signal is derived here (`Pace`) rather than forwarded.

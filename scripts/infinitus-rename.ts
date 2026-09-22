@@ -37,6 +37,10 @@ export interface Rename {
   readonly what: string;
   readonly pattern: RegExp;
   readonly replacement: string;
+  /** Repository-relative path prefix the entry is confined to; everywhere when absent. */
+  readonly within?: string;
+  /** Prose: a match opening or inside quotes or backticks, or after "real"/"upstream's", is a literal and stays. */
+  readonly prose?: true;
 }
 
 /**
@@ -77,6 +81,45 @@ export const RENAMES: ReadonlyArray<Rename> = [
     what: "Expo autolinking's gradle project names, derived from the package scope (':t3tools-* → ':infinitus-*)",
     pattern: /':t3tools-/g,
     replacement: "':infinitus-",
+  },
+  {
+    what: "the product name's article in the docs (a T3 Code theme → an Infinitus theme)",
+    // Upstream hard-wraps its prose, so the name can straddle a line
+    // ("T3\nCode installs"): the break survives, the orphaned "Code " goes.
+    // A wrap straight before punctuation ("T3\nCode.") is not handled and
+    // leaves a "Code" `--check` cannot see; read the sync's docs diff.
+    pattern: /\b([Aa])(\s+)T3(?:[ \t]+Code\b|(\n)Code[ \t])/g,
+    replacement: "$1n$2Infinitus$3",
+    within: "docs/",
+    prose: true,
+  },
+  {
+    what: "the product name in the docs (T3 Code)",
+    // Prose, so confined to docs: upstream owns most of those pages and
+    // every sync brings its wording back. The literals stay (`prose`): the
+    // installed app's `T3 Code (Alpha)`, "Built on T3 Code", "the real T3
+    // Code", "upstream's T3 Code" — sentences about the other product.
+    pattern: /\bT3(?:[ \t]+Code\b|(\n)Code[ \t])/g,
+    replacement: "Infinitus$1",
+    within: "docs/",
+    prose: true,
+  },
+  {
+    what: "a bare T3's article in the user guides (a T3 theme → an Infinitus theme)",
+    pattern: /\b([Aa])(\s+)T3(?! Tools\b)(?![_A-Za-z0-9])/g,
+    replacement: "$1n$2Infinitus",
+    within: "docs/user/",
+    prose: true,
+  },
+  {
+    what: "a bare T3 as the product noun in the user guides",
+    // Only the user guides: in docs/internals a bare T3 is as often
+    // upstream's (its glyph, mark, Clerk instance) as the product, and the
+    // publisher, T3 Tools, Inc., stays everywhere.
+    pattern: /\bT3(?! Tools\b)(?![_A-Za-z0-9])/g,
+    replacement: "Infinitus",
+    within: "docs/user/",
+    prose: true,
   },
 ];
 
@@ -157,21 +200,44 @@ export function isCandidate(path: string): boolean {
   return TEXT_EXTENSIONS.has(NodePath.extname(base));
 }
 
-/** One pass of the whole table over one file's text. */
-export function applyRenames(text: string): string {
+function appliesTo(rename: Rename, path: string | undefined): boolean {
+  return rename.within === undefined || (path?.startsWith(rename.within) ?? false);
+}
+
+/** A prose entry's match that is quoted, code-formatted, or named as the other product. */
+function isLiteralMention(text: string, offset: number): boolean {
+  const before = text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
+  const odd = (mark: string) => before.split(mark).length % 2 === 0;
+  return odd('"') || odd("`") || /["`]$|\b(?:real|upstream's)\s$/.test(before);
+}
+
+function skips(rename: Rename, text: string, offset: number): boolean {
+  return rename.prose === true && isLiteralMention(text, offset);
+}
+
+/** One pass of the table over one file's text; `path` admits the entries confined to it. */
+export function applyRenames(text: string, path?: string): string {
   let out = text;
   for (const rename of RENAMES) {
-    out = out.replace(rename.pattern, rename.replacement);
+    if (!appliesTo(rename, path)) continue;
+    out = out.replace(rename.pattern, (...args: Array<unknown>) => {
+      const match = args[0] as string;
+      const offset = args.at(-2) as number;
+      const groups = args.slice(1, -2) as Array<string | undefined>;
+      if (skips(rename, out, offset)) return match;
+      return rename.replacement.replace(/\$(\d)/g, (_, n: string) => groups[Number(n) - 1] ?? "");
+    });
   }
   return out;
 }
 
 /** Which entries still match, for `--check`'s report. */
-export function remainingRenames(text: string): ReadonlyArray<Rename> {
-  return RENAMES.filter((rename) => {
-    rename.pattern.lastIndex = 0;
-    return rename.pattern.test(text);
-  });
+export function remainingRenames(text: string, path?: string): ReadonlyArray<Rename> {
+  return RENAMES.filter(
+    (rename) =>
+      appliesTo(rename, path) &&
+      [...text.matchAll(rename.pattern)].some((m) => !skips(rename, text, m.index)),
+  );
 }
 
 function trackedFiles(root: string): ReadonlyArray<string> {
@@ -196,13 +262,13 @@ export function run(input: {
     if (!NodeFS.existsSync(absolute)) continue;
     const before = NodeFS.readFileSync(absolute, "utf8");
     if (input.mode === "check") {
-      const remaining = remainingRenames(before);
+      const remaining = remainingRenames(before, path);
       if (remaining.length > 0) {
         changed.push(`${path}: ${remaining.map((rename) => rename.what).join("; ")}`);
       }
       continue;
     }
-    const after = applyRenames(before);
+    const after = applyRenames(before, path);
     if (after === before) continue;
     changed.push(path);
     if (input.mode === "apply") NodeFS.writeFileSync(absolute, after);

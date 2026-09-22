@@ -32,7 +32,17 @@ const thread = (input: Partial<QueueDrainThread> = {}): QueueDrainThread => ({
   queuedTurns: [row("q1", "m")],
   ...input,
 });
-const open = { held: false, paused: false, inFlight: false, pendingStart: false };
+const session = (status: string, activeTurnId: string | null = null) => ({
+  status,
+  activeTurnId,
+});
+const open = {
+  held: false,
+  paused: false,
+  resuming: false,
+  inFlight: false,
+  pendingStart: false,
+};
 
 describe("queueDrainVerdict (#806)", () => {
   it("sends the first row of an idle thread, by key then by age", () => {
@@ -51,10 +61,6 @@ describe("queueDrainVerdict (#806)", () => {
   });
 
   it("waits while the thread is busy, starting, pending a start, or in error", () => {
-    const session = (status: string, activeTurnId: string | null = null) => ({
-      status,
-      activeTurnId,
-    });
     expect(queueDrainVerdict(thread({ session: session("running", "turn-1") }), open)).toEqual({
       kind: "wait",
       reason: "busy",
@@ -88,6 +94,29 @@ describe("queueDrainVerdict (#806)", () => {
       kind: "wait",
       reason: "paused",
     });
+  });
+
+  // #1509: the resume replaces the CLI and then sends, and the session it
+  // leaves in between reads idle. A row sent into that gap becomes a second
+  // turn in one session, and the one the CLI does not answer never completes.
+  it("waits while a limit resume is sending, even for a session that reads idle", () => {
+    expect(
+      queueDrainVerdict(thread({ session: session("ready") }), { ...open, resuming: true }),
+    ).toEqual({ kind: "wait", reason: "resuming" });
+  });
+
+  // No turn is running to steer during that window, so the boundary escape
+  // below must not let a steer row through it either.
+  it("holds a tool-boundary row back while a limit resume is sending", () => {
+    expect(
+      queueDrainVerdict(
+        thread({
+          session: session("running", "turn-1"),
+          queuedTurns: [{ ...row("q1", "m"), sendAt: "tool-boundary" }],
+        }),
+        { ...open, resuming: true, toolBoundary: true },
+      ),
+    ).toEqual({ kind: "wait", reason: "resuming" });
   });
 
   it("never sends into an archived thread or an empty queue", () => {

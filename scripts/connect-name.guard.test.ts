@@ -20,6 +20,12 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // Byte-identical to upstream's `.github/triage/PLAYBOOK.md` (its test), which
   // upstream's own triage workflow reads; it names upstream's issue tracker.
   ["apps/server/src/cli/triagePrompt.ts", "T3 Code"],
+  // The upstream attribution constants themselves: the licenses screens credit
+  // the project this fork is built on, so these two must hold the real upstream
+  // names. Every surface reads them instead of writing the literal, which is
+  // what this guard is enforcing.
+  ["packages/contracts/src/productName.ts", 'UPSTREAM_PRODUCT_NAME = "T3 Code"'],
+  ["packages/contracts/src/productName.ts", 'UPSTREAM_PUBLISHER_NAME = "T3 Tools, Inc."'],
 ];
 
 const ROOTS = [

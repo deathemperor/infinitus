@@ -4,17 +4,22 @@ import { isLegalDocumentUrl } from "./legal-document-url";
 
 describe("isLegalDocumentUrl", () => {
   it.each([
-    "https://t3.codes/legal",
-    "https://t3.codes/legal/",
-    "https://t3.codes/privacy-policy?source=app",
-    "https://t3.codes/terms-of-service#updates",
-    "https://t3.codes/security-policy",
+    "https://infinitus.run/legal",
+    "https://infinitus.run/legal/",
+    "https://infinitus.run/privacy-policy?source=app",
+    "https://infinitus.run/terms-of-service#updates",
+    "https://infinitus.run/security-policy",
   ])("allows a configured legal document: %s", (url) => {
     expect(isLegalDocumentUrl(url)).toBe(true);
   });
 
   it.each([
-    "https://t3.codes/download",
+    // Upstream's documents bind T3 Tools, Inc. and describe services the fork
+    // does not run; the Legal screen must never navigate back to them.
+    "https://t3.codes/legal",
+    "https://t3.codes/privacy-policy",
+    "https://t3.codes/terms-of-service",
+    "https://infinitus.run/download",
     "https://example.com/legal",
     "javascript:alert(1)",
     "not-a-url",

@@ -285,7 +285,9 @@ const PersistedOptionalProviderSettings = Schema.Struct({
     Schema.Struct({
       cursor: Schema.optionalKey(Schema.Struct({ enabled: Schema.optionalKey(Schema.Boolean) })),
       grok: Schema.optionalKey(Schema.Struct({ enabled: Schema.optionalKey(Schema.Boolean) })),
+      omp: Schema.optionalKey(Schema.Struct({ enabled: Schema.optionalKey(Schema.Boolean) })),
       opencode: Schema.optionalKey(Schema.Struct({ enabled: Schema.optionalKey(Schema.Boolean) })),
+      pi: Schema.optionalKey(Schema.Struct({ enabled: Schema.optionalKey(Schema.Boolean) })),
     }),
   ),
 });
@@ -313,7 +315,9 @@ function restoreUsedProviders(
       instance.enabled === undefined &&
       (instance.driver === "cursor" ||
         instance.driver === "grok" ||
-        instance.driver === "opencode") &&
+        instance.driver === "omp" ||
+        instance.driver === "opencode" ||
+        instance.driver === "pi") &&
       usedProviderInstances.has(instanceId)
         ? { ...instance, enabled: true }
         : instance,
@@ -332,9 +336,17 @@ function restoreUsedProviders(
         ...settings.providers.grok,
         enabled: persisted.providers?.grok?.enabled ?? usedProviders.has("grok"),
       },
+      omp: {
+        ...settings.providers.omp,
+        enabled: persisted.providers?.omp?.enabled ?? usedProviders.has("omp"),
+      },
       opencode: {
         ...settings.providers.opencode,
         enabled: persisted.providers?.opencode?.enabled ?? usedProviders.has("opencode"),
+      },
+      pi: {
+        ...settings.providers.pi,
+        enabled: persisted.providers?.pi?.enabled ?? usedProviders.has("pi"),
       },
     },
     providerInstances,
@@ -389,7 +401,9 @@ const PERSISTED_SERVER_SETTINGS_DEFAULTS = {
     ...DEFAULT_SERVER_SETTINGS.providers,
     cursor: { ...DEFAULT_SERVER_SETTINGS.providers.cursor, enabled: undefined },
     grok: { ...DEFAULT_SERVER_SETTINGS.providers.grok, enabled: undefined },
+    omp: { ...DEFAULT_SERVER_SETTINGS.providers.omp, enabled: undefined },
     opencode: { ...DEFAULT_SERVER_SETTINGS.providers.opencode, enabled: undefined },
+    pi: { ...DEFAULT_SERVER_SETTINGS.providers.pi, enabled: undefined },
   },
 };
 
@@ -614,13 +628,13 @@ const make = Effect.gen(function* () {
         provider_name AS "providerName",
         provider_instance_id AS "providerInstanceId"
       FROM projection_thread_sessions
-      WHERE provider_name IN ('cursor', 'grok', 'opencode')
+      WHERE provider_name IN ('cursor', 'grok', 'omp', 'opencode', 'pi')
       UNION
       SELECT DISTINCT
         provider_name AS "providerName",
         provider_instance_id AS "providerInstanceId"
       FROM provider_session_runtime
-      WHERE provider_name IN ('cursor', 'grok', 'opencode')
+      WHERE provider_name IN ('cursor', 'grok', 'omp', 'opencode', 'pi')
     `.pipe(
       Effect.mapError(
         (cause) =>
@@ -687,29 +701,6 @@ const make = Effect.gen(function* () {
             (cause) => new ServerSettingsError({ settingsPath, operation: "read-secret", cause }),
           ),
         );
-
-  // The marker sent back means "keep what you have"; an empty string clears.
-  const persistInfinitusSlackToken = (
-    field: InfinitusSlackTokenField,
-    value: string,
-  ): Effect.Effect<string, ServerSettingsError> =>
-    value === USAGE_LIMIT_SOURCE_KEY_REDACTED
-      ? Effect.succeed(value)
-      : value.length === 0
-        ? secretStore.remove(INFINITUS_SLACK_SECRET_NAMES[field]).pipe(
-            Effect.mapError(
-              (cause) =>
-                new ServerSettingsError({ settingsPath, operation: "remove-secret", cause }),
-            ),
-            Effect.as(""),
-          )
-        : secretStore.set(INFINITUS_SLACK_SECRET_NAMES[field], textEncoder.encode(value)).pipe(
-            Effect.mapError(
-              (cause) =>
-                new ServerSettingsError({ settingsPath, operation: "write-secret", cause }),
-            ),
-            Effect.as(USAGE_LIMIT_SOURCE_KEY_REDACTED),
-          );
 
   const materializeProviderEnvironmentSecrets = (
     settings: ServerSettings,
@@ -798,14 +789,39 @@ const make = Effect.gen(function* () {
       Stream.map(resolveTextGenerationProvider),
     );
 
-  const persistProviderEnvironmentSecrets = (
-    current: ServerSettings,
-    next: ServerSettings,
-  ): Effect.Effect<ServerSettings, ServerSettingsError> =>
-    Effect.gen(function* () {
+  type SecretChange = {
+    readonly secretName: string;
+    readonly providerInstanceId?: string;
+    readonly environmentVariable?: string;
+  } & (
+    | { readonly kind: "write"; readonly value: Uint8Array }
+    | { readonly kind: "remove"; readonly operation: "remove-secret" | "remove-stale-secret" }
+  );
+
+  // Fork (#574): the marker sent back means "keep what you have"; an empty
+  // string clears. The token rides the same change list as the provider
+  // secrets, so it is written, and rolled back, with them.
+  const planInfinitusSlackToken = (
+    field: InfinitusSlackTokenField,
+    value: string,
+    changes: Array<SecretChange>,
+  ): string => {
+    if (value === USAGE_LIMIT_SOURCE_KEY_REDACTED) return value;
+    const secretName = INFINITUS_SLACK_SECRET_NAMES[field];
+    if (value.length === 0) {
+      changes.push({ kind: "remove", secretName, operation: "remove-secret" });
+      return "";
+    }
+    changes.push({ kind: "write", secretName, value: textEncoder.encode(value) });
+    return USAGE_LIMIT_SOURCE_KEY_REDACTED;
+  };
+
+  const persistProviderEnvironmentSecrets = (current: ServerSettings, next: ServerSettings) =>
+    Effect.sync(() => {
       const providerInstances: Record<string, ProviderInstanceConfig> = {
         ...next.providerInstances,
       };
+      const changes: SecretChange[] = [];
 
       const nextSecretKeys = new Set<string>();
       for (const [instanceId, instance] of Object.entries(next.providerInstances)) {
@@ -814,18 +830,13 @@ const make = Effect.gen(function* () {
         for (const variable of instance.environment) {
           const secretName = providerEnvironmentSecretName({ instanceId, name: variable.name });
           if (!variable.sensitive) {
-            yield* secretStore.remove(secretName).pipe(
-              Effect.mapError(
-                (cause) =>
-                  new ServerSettingsError({
-                    settingsPath,
-                    operation: "remove-secret",
-                    providerInstanceId: instanceId,
-                    environmentVariable: variable.name,
-                    cause,
-                  }),
-              ),
-            );
+            changes.push({
+              kind: "remove",
+              secretName,
+              operation: "remove-secret",
+              providerInstanceId: instanceId,
+              environmentVariable: variable.name,
+            });
             environment.push(redactProviderEnvironmentVariable(variable));
             continue;
           }
@@ -844,32 +855,22 @@ const make = Effect.gen(function* () {
           const value = inlineValue ?? variable.value;
           if (!variable.valueRedacted || inlineValue !== undefined) {
             if (value.length > 0) {
-              yield* secretStore.set(secretName, textEncoder.encode(value)).pipe(
-                Effect.mapError(
-                  (cause) =>
-                    new ServerSettingsError({
-                      settingsPath,
-                      operation: "write-secret",
-                      providerInstanceId: instanceId,
-                      environmentVariable: variable.name,
-                      cause,
-                    }),
-                ),
-              );
+              changes.push({
+                kind: "write",
+                secretName,
+                value: textEncoder.encode(value),
+                providerInstanceId: instanceId,
+                environmentVariable: variable.name,
+              });
               environment.push({ ...variable, value: "", valueRedacted: true });
             } else {
-              yield* secretStore.remove(secretName).pipe(
-                Effect.mapError(
-                  (cause) =>
-                    new ServerSettingsError({
-                      settingsPath,
-                      operation: "remove-secret",
-                      providerInstanceId: instanceId,
-                      environmentVariable: variable.name,
-                      cause,
-                    }),
-                ),
-              );
+              changes.push({
+                kind: "remove",
+                secretName,
+                operation: "remove-secret",
+                providerInstanceId: instanceId,
+                environmentVariable: variable.name,
+              });
               const { valueRedacted: _omit, ...rest } = variable;
               environment.push(rest);
             }
@@ -889,18 +890,13 @@ const make = Effect.gen(function* () {
           if (!variable.sensitive) continue;
           const secretName = providerEnvironmentSecretName({ instanceId, name: variable.name });
           if (nextSecretKeys.has(secretName)) continue;
-          yield* secretStore.remove(secretName).pipe(
-            Effect.mapError(
-              (cause) =>
-                new ServerSettingsError({
-                  settingsPath,
-                  operation: "remove-stale-secret",
-                  providerInstanceId: instanceId,
-                  environmentVariable: variable.name,
-                  cause,
-                }),
-            ),
-          );
+          changes.push({
+            kind: "remove",
+            secretName,
+            operation: "remove-stale-secret",
+            providerInstanceId: instanceId,
+            environmentVariable: variable.name,
+          });
         }
       }
 
@@ -908,56 +904,156 @@ const make = Effect.gen(function* () {
       for (const [sourceId, source] of Object.entries(next.usageLimitSources)) {
         const secretName = usageLimitSourceSecretName(sourceId);
         if (source.managementKey === USAGE_LIMIT_SOURCE_KEY_REDACTED) {
-          // Unchanged from the client's point of view; the store already has it.
           usageLimitSources[sourceId] = source;
           continue;
         }
         if (source.managementKey.length === 0) {
-          yield* secretStore
-            .remove(secretName)
-            .pipe(
-              Effect.mapError(
-                (cause) =>
-                  new ServerSettingsError({ settingsPath, operation: "remove-secret", cause }),
-              ),
-            );
+          changes.push({ kind: "remove", secretName, operation: "remove-secret" });
           usageLimitSources[sourceId] = source;
           continue;
         }
-        yield* secretStore
-          .set(secretName, textEncoder.encode(source.managementKey))
-          .pipe(
-            Effect.mapError(
-              (cause) =>
-                new ServerSettingsError({ settingsPath, operation: "write-secret", cause }),
-            ),
-          );
+        changes.push({
+          kind: "write",
+          secretName,
+          value: textEncoder.encode(source.managementKey),
+        });
         usageLimitSources[sourceId] = { ...source, managementKey: USAGE_LIMIT_SOURCE_KEY_REDACTED };
       }
       for (const sourceId of Object.keys(current.usageLimitSources)) {
         if (sourceId in next.usageLimitSources) continue;
-        yield* secretStore
-          .remove(usageLimitSourceSecretName(sourceId))
-          .pipe(
-            Effect.mapError(
-              (cause) =>
-                new ServerSettingsError({ settingsPath, operation: "remove-stale-secret", cause }),
-            ),
-          );
+        changes.push({
+          kind: "remove",
+          secretName: usageLimitSourceSecretName(sourceId),
+          operation: "remove-stale-secret",
+        });
       }
 
       const infinitusSlack = {
         ...next.infinitusSlack,
-        appToken: yield* persistInfinitusSlackToken("appToken", next.infinitusSlack.appToken),
-        botToken: yield* persistInfinitusSlackToken("botToken", next.infinitusSlack.botToken),
+        appToken: planInfinitusSlackToken("appToken", next.infinitusSlack.appToken, changes),
+        botToken: planInfinitusSlackToken("botToken", next.infinitusSlack.botToken, changes),
       };
       return {
-        ...next,
-        providerInstances: providerInstances as ServerSettings["providerInstances"],
-        usageLimitSources: usageLimitSources as ServerSettings["usageLimitSources"],
-        infinitusSlack,
+        settings: {
+          ...next,
+          providerInstances: providerInstances as ServerSettings["providerInstances"],
+          usageLimitSources: usageLimitSources as ServerSettings["usageLimitSources"],
+          infinitusSlack,
+        },
+        changes,
       };
     });
+
+  const rollbackProviderEnvironmentSecretWrites = (
+    writes: ReadonlyArray<{
+      readonly secretName: string;
+      readonly previousValue: Option.Option<Uint8Array>;
+      readonly providerInstanceId?: string;
+      readonly environmentVariable?: string;
+    }>,
+  ) =>
+    Effect.forEach(
+      writes.toReversed(),
+      (write) =>
+        (Option.isSome(write.previousValue)
+          ? secretStore.set(write.secretName, write.previousValue.value)
+          : secretStore.remove(write.secretName)
+        ).pipe(
+          Effect.catch((cause) =>
+            Effect.logWarning("failed to roll back provider environment secret", {
+              providerInstanceId: write.providerInstanceId,
+              environmentVariable: write.environmentVariable,
+              cause,
+            }),
+          ),
+        ),
+      { discard: true },
+    );
+
+  const applyProviderEnvironmentSecretChanges = (changes: ReadonlyArray<SecretChange>) => {
+    const applied: Array<{
+      readonly secretName: string;
+      readonly previousValue: Option.Option<Uint8Array>;
+      readonly providerInstanceId?: string;
+      readonly environmentVariable?: string;
+    }> = [];
+    const rollback = Effect.suspend(() => rollbackProviderEnvironmentSecretWrites(applied));
+    return Effect.forEach(
+      changes,
+      (change) =>
+        Effect.gen(function* () {
+          const previousValue = yield* secretStore.get(change.secretName).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({
+                  settingsPath,
+                  operation: "read-secret",
+                  providerInstanceId: change.providerInstanceId,
+                  environmentVariable: change.environmentVariable,
+                  cause,
+                }),
+            ),
+          );
+          // A store operation may mutate before reporting an error (for example chmod after rename).
+          applied.push({ ...change, previousValue });
+          yield* (
+            change.kind === "write"
+              ? secretStore.set(change.secretName, change.value)
+              : secretStore.remove(change.secretName)
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ServerSettingsError({
+                  settingsPath,
+                  operation: change.kind === "write" ? "write-secret" : change.operation,
+                  providerInstanceId: change.providerInstanceId,
+                  environmentVariable: change.environmentVariable,
+                  cause,
+                }),
+            ),
+          );
+        }),
+      { discard: true },
+    ).pipe(
+      Effect.tapError(() => rollback),
+      Effect.as(rollback),
+    );
+  };
+
+  const updateSettings = (
+    patch: ServerSettingsPatch,
+  ): Effect.Effect<ServerSettings, ServerSettingsError> =>
+    writeSemaphore.withPermits(1)(
+      Effect.gen(function* () {
+        const current = yield* getSettingsFromCache;
+        const updated = applyServerSettingsPatch(current, patch);
+        const persisted = yield* persistProviderEnvironmentSecrets(current, updated);
+        const next = yield* normalizeServerSettings(persisted.settings);
+        const materialized = yield* Effect.uninterruptibleMask(() =>
+          Effect.gen(function* () {
+            const rollbackSecretChanges = yield* applyProviderEnvironmentSecretChanges(
+              persisted.changes,
+            );
+            const materializedExit = yield* Effect.exit(
+              materializeProviderEnvironmentSecrets(next),
+            );
+            if (Exit.isFailure(materializedExit)) {
+              yield* rollbackSecretChanges;
+              return yield* Effect.failCause(materializedExit.cause);
+            }
+            const writeExit = yield* Effect.exit(writeSettingsAtomically(next));
+            if (Exit.isFailure(writeExit)) {
+              yield* rollbackSecretChanges;
+              return yield* Effect.failCause(writeExit.cause);
+            }
+            return materializedExit.value;
+          }),
+        );
+        yield* Cache.set(settingsCache, cacheKey, next);
+        yield* emitChange(next);
+        return resolveTextGenerationProvider(materialized);
+      }),
+    );
 
   const revalidateAndEmit = writeSemaphore.withPermits(1)(
     Effect.gen(function* () {
@@ -1034,22 +1130,7 @@ const make = Effect.gen(function* () {
       Effect.flatMap(materializeProviderEnvironmentSecrets),
       Effect.map(resolveTextGenerationProvider),
     ),
-    updateSettings: (patch) =>
-      writeSemaphore.withPermits(1)(
-        Effect.gen(function* () {
-          const current = yield* getSettingsFromCache;
-          const nextPersisted = yield* persistProviderEnvironmentSecrets(
-            current,
-            applyServerSettingsPatch(current, patch),
-          );
-          const next = yield* normalizeServerSettings(nextPersisted);
-          yield* writeSettingsAtomically(next);
-          yield* Cache.set(settingsCache, cacheKey, next);
-          yield* emitChange(next);
-          const materialized = yield* materializeProviderEnvironmentSecrets(next);
-          return resolveTextGenerationProvider(materialized);
-        }),
-      ),
+    updateSettings,
     get streamChanges() {
       return materializeChanges(Stream.fromPubSub(changesPubSub));
     },

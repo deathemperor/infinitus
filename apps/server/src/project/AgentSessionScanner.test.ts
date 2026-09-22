@@ -47,6 +47,7 @@ const makeProjectionSnapshotQueryLayer = (importedWorkspaceRoots: ReadonlyArray<
         threads: [],
         updatedAt: "2026-01-01T00:00:00.000Z",
       }),
+    getDeletedWorktreeThreads: () => Effect.die("unused"),
     getArchivedShellSnapshot: () => Effect.die("unused"),
     getSnapshotSequence: () => Effect.die("unused"),
     getCounts: () => Effect.die("unused"),
@@ -74,6 +75,14 @@ const makeProjectionSnapshotQueryLayer = (importedWorkspaceRoots: ReadonlyArray<
 interface ScannerTestInput {
   readonly claudeHomePath: string;
   readonly codexHomePath: string;
+  /**
+   * Pi is disabled by default, so most tests leave this unset and the source
+   * is skipped. Setting it enables Pi AND points it at an isolated home — both
+   * matter, because Pi's default home is the developer's real `~/.pi/agent`.
+   */
+  readonly piHomePath?: string;
+  /** Enables the omp instance and points it at this `PI_CODING_AGENT_DIR`. */
+  readonly ompHomePath?: string;
   readonly importedWorkspaceRoots?: ReadonlyArray<string>;
   /** Base dir for the test ServerConfig; worktreesDir derives from it. */
   readonly configBaseDir?: string;
@@ -88,9 +97,29 @@ const makeScannerTestLayer = (input: ScannerTestInput) =>
           providers: {
             claudeAgent: { homePath: input.claudeHomePath },
             codex: { homePath: input.codexHomePath },
+            ...(input.piHomePath === undefined
+              ? {}
+              : { pi: { enabled: true, homePath: input.piHomePath } }),
+            ...(input.ompHomePath === undefined ? {} : { omp: { enabled: true } }),
           },
           ...(input.providerInstances === undefined
-            ? {}
+            ? input.ompHomePath === undefined
+              ? {}
+              : {
+                  providerInstances: {
+                    [ProviderInstanceId.make("omp")]: {
+                      driver: ProviderDriverKind.make("omp"),
+                      environment: [
+                        {
+                          name: "PI_CODING_AGENT_DIR",
+                          value: input.ompHomePath,
+                          sensitive: false,
+                        },
+                      ],
+                      config: { enabled: true },
+                    },
+                  },
+                }
             : { providerInstances: input.providerInstances }),
         }),
         ServerConfig.layerTest(
@@ -151,6 +180,62 @@ const claudeSessionLine = (cwd: string) =>
 /** Codex rollout line: session metadata is nested under `payload`. */
 const codexRolloutLine = (cwd: string) =>
   `${JSON.stringify({ timestamp: "2026-01-01T00:00:00.000Z", type: "session_meta", payload: { id: "r1", cwd } })}\n`;
+
+/**
+ * Pi transcript: a `session` header carrying the cwd and the resumable id,
+ * then `message` records whose content blocks mirror the RPC's.
+ */
+const piTranscript = (input: {
+  readonly cwd: string;
+  readonly sessionId: string;
+  readonly userText?: string;
+  readonly assistantText?: string;
+  readonly thinkingText?: string;
+  readonly modelId?: string;
+}) =>
+  [
+    JSON.stringify({
+      type: "session",
+      version: 3,
+      id: input.sessionId,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      cwd: input.cwd,
+    }),
+    ...(input.modelId === undefined
+      ? []
+      : [
+          JSON.stringify({
+            type: "model_change",
+            timestamp: "2026-01-01T00:00:01.000Z",
+            provider: "zai",
+            modelId: input.modelId,
+          }),
+        ]),
+    JSON.stringify({
+      type: "message",
+      timestamp: "2026-01-01T00:00:02.000Z",
+      message: {
+        role: "user",
+        content: [{ type: "text", text: input.userText ?? "First prompt" }],
+      },
+    }),
+    JSON.stringify({
+      type: "message",
+      timestamp: "2026-01-01T00:00:03.000Z",
+      message: {
+        role: "assistant",
+        content: [
+          ...(input.thinkingText === undefined
+            ? []
+            : [{ type: "thinking", thinking: input.thinkingText }]),
+          { type: "text", text: input.assistantText ?? "First answer" },
+        ],
+      },
+    }),
+  ].join("\n") + "\n";
+const OMP_SESSION_ID = "01a09f4b-0797-707f-9201-691a923d8fa1";
+const ompTranscriptFilename = (sessionId = OMP_SESSION_ID) =>
+  `2026-09-14T09-41-29-623Z_${sessionId}.jsonl`;
 
 const encodeTranscriptRecord = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -280,6 +365,72 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
             git: null,
           },
         ]);
+      }),
+    );
+
+    it.effect("groups Oh My Pi transcripts by cwd from the session record", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+        const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+        const ompHomePath = yield* makeTempDir("t3code-omp-home-");
+        const workspace = yield* makeTempDir("t3code-workspace-omp-");
+
+        yield* writeTranscript({
+          filePath: path.join(
+            ompHomePath,
+            "sessions",
+            "--Volumes-work-git-test--",
+            ompTranscriptFilename(),
+          ),
+          contents: [
+            encodeTranscriptRecord({
+              type: "title",
+              v: 1,
+              title: "Setup Vaultwarden and TOTP Guide",
+            }),
+            encodeTranscriptRecord({
+              type: "session",
+              version: 3,
+              id: OMP_SESSION_ID,
+              timestamp: "2026-09-14T09:41:29.623Z",
+              cwd: workspace,
+              title: "Setup Vaultwarden and TOTP Guide",
+            }),
+          ].join("\n"),
+          mtimeMs: Date.parse("2026-09-14T09:41:29.000Z"),
+        });
+
+        const result = yield* runScan({ claudeHomePath, codexHomePath, ompHomePath });
+
+        expect(result.candidates).toEqual([
+          {
+            path: workspace,
+            title: path.basename(workspace),
+            sources: ["omp"],
+            threadCount: 1,
+            lastActiveAt: "2026-09-14T09:41:29.000Z",
+            alreadyImported: false,
+            git: null,
+          },
+        ]);
+      }),
+    );
+
+    it.effect("does not produce a candidate from an empty Oh My Pi bucket", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+        const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+        const ompHomePath = yield* makeTempDir("t3code-omp-empty-");
+        yield* fileSystem.makeDirectory(path.join(ompHomePath, "sessions", "--empty--"), {
+          recursive: true,
+        });
+
+        const result = yield* runScan({ claudeHomePath, codexHomePath, ompHomePath });
+
+        expect(result.candidates).toEqual([]);
       }),
     );
 
@@ -1144,7 +1295,7 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
               Effect.map((file) => ({
                 ...file,
                 stat: file.stat,
-                readAlloc: (size: FileSystem.SizeInput) => {
+                readAlloc: (size: number) => {
                   reservedBytes += Number(size);
                   requests.push(Number(size));
                   return file.readAlloc(size);
@@ -1374,6 +1525,102 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
   });
 
   describe("recentThreads", () => {
+    it.effect("imports Oh My Pi session id, later title, and visible messages only", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const nowMs = Date.parse("2026-09-14T12:00:00.000Z");
+        yield* TestClock.setTime(nowMs);
+        const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+        const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+        const ompHomePath = yield* makeTempDir("t3code-omp-home-");
+        const workspace = yield* makeTempDir("t3code-workspace-omp-");
+        yield* writeTranscript({
+          filePath: path.join(
+            ompHomePath,
+            "sessions",
+            "--Volumes-work-git-test--",
+            ompTranscriptFilename(),
+          ),
+          contents: [
+            encodeTranscriptRecord({
+              type: "title",
+              v: 1,
+              title: "Setup Vaultwarden and TOTP Guide",
+            }),
+            encodeTranscriptRecord({
+              type: "session",
+              version: 3,
+              timestamp: "2026-09-14T09:41:29.623Z",
+              cwd: workspace,
+              title: "Setup Vaultwarden and TOTP Guide",
+            }),
+            encodeTranscriptRecord({
+              type: "model_change",
+              model: "google-antigravity/gemini-3.1-pro",
+            }),
+            encodeTranscriptRecord({
+              type: "title_change",
+              title: "Install and test DonutBrowser sync",
+            }),
+            encodeTranscriptRecord({
+              type: "custom_message",
+              customType: "system",
+              display: false,
+              content: "Injected system reminder",
+            }),
+            encodeTranscriptRecord({
+              type: "message",
+              timestamp: "2026-09-14T09:42:00.000Z",
+              message: {
+                role: "user",
+                attribution: "user",
+                content: [{ type: "text", text: "Set up Vaultwarden" }],
+              },
+            }),
+            encodeTranscriptRecord({
+              type: "message",
+              timestamp: "2026-09-14T09:42:05.000Z",
+              message: { role: "toolResult", content: [{ type: "text", text: "tool output" }] },
+            }),
+            encodeTranscriptRecord({
+              type: "message",
+              timestamp: "2026-09-14T09:42:10.000Z",
+              message: {
+                role: "assistant",
+                model: "gemini-3.1-pro",
+                content: [{ type: "text", text: "Vaultwarden is ready" }],
+              },
+            }),
+          ].join("\n"),
+          mtimeMs: nowMs,
+        });
+
+        const threads = yield* runRecentThreads({
+          claudeHomePath,
+          codexHomePath,
+          ompHomePath,
+          workspaceRoot: workspace,
+        });
+
+        expect(threads).toMatchObject([
+          {
+            source: "omp",
+            providerSessionId: OMP_SESSION_ID,
+            title: "Install and test DonutBrowser sync",
+            model: "google-antigravity/gemini-3.1-pro",
+            messages: [
+              { role: "user", text: "Set up Vaultwarden" },
+              { role: "assistant", text: "Vaultwarden is ready" },
+            ],
+          },
+        ]);
+        expect(threads[0]?.messages.some((message) => message.text.includes("Injected"))).toBe(
+          false,
+        );
+        expect(threads[0]?.messages.some((message) => message.text === "tool output")).toBe(false);
+      }),
+    );
+
     it.effect.each([false, true])(
       "counts terminal newlines correctly with record overflow=%s",
       (overflow) =>
@@ -1712,7 +1959,7 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
                   : {
                       ...file,
                       stat: file.stat,
-                      readAlloc: (size: FileSystem.SizeInput) =>
+                      readAlloc: (size: number) =>
                         file.readAlloc(size).pipe(
                           Effect.tap((chunk) =>
                             Effect.sync(() => {
@@ -2160,7 +2407,10 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
               payload: { type: "user_message", message: "Future work" },
             }),
           ].join("\n"),
-          mtimeMs: nowMs + 1,
+          // Node's BigInt stat (which the Effect file system now uses) floors
+          // sub-millisecond precision, so a one-millisecond offset can round
+          // back to `nowMs`; use a full second to stay clear of the clock.
+          mtimeMs: nowMs + 1_000,
         });
 
         const outcomes = yield* runRecentThreadOutcomes({
@@ -2214,7 +2464,7 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
               Effect.map((file) => ({
                 ...file,
                 stat: file.stat,
-                readAlloc: (size: FileSystem.SizeInput) =>
+                readAlloc: (size: number) =>
                   file.readAlloc(size).pipe(
                     Effect.tap((chunk) =>
                       Effect.gen(function* () {
@@ -2687,6 +2937,71 @@ describe("parseAgentSessionTranscript", () => {
         { role: "user", text: "Fix authentication" },
         { role: "assistant", text: "Updated the login flow" },
         { role: "assistant", text: "The provider request failed" },
+      ],
+    });
+  });
+
+  it("keeps Oh My Pi user and assistant text while dropping custom_message and toolResult", () => {
+    const thread = AgentSessionScanner.parseAgentSessionTranscript({
+      contents: [
+        encodeTranscriptRecord({
+          type: "title",
+          title: "Setup Vaultwarden and TOTP Guide",
+        }),
+        encodeTranscriptRecord({
+          type: "session",
+          id: OMP_SESSION_ID,
+          cwd: "/Volumes/work/git/test",
+          title: "Setup Vaultwarden and TOTP Guide",
+        }),
+        encodeTranscriptRecord({
+          type: "model_change",
+          model: "google-antigravity/gemini-3.1-pro",
+        }),
+        encodeTranscriptRecord({
+          type: "title_change",
+          title: "Install and test DonutBrowser sync",
+        }),
+        encodeTranscriptRecord({
+          type: "custom_message",
+          customType: "system",
+          display: false,
+          content: "Injected system reminder",
+        }),
+        encodeTranscriptRecord({
+          type: "message",
+          timestamp: "2026-09-14T09:42:00.000Z",
+          message: {
+            role: "user",
+            content: [{ type: "text", text: "Set up Vaultwarden" }],
+          },
+        }),
+        encodeTranscriptRecord({
+          type: "message",
+          message: { role: "toolResult", content: [{ type: "text", text: "tool output" }] },
+        }),
+        encodeTranscriptRecord({
+          type: "message",
+          timestamp: "2026-09-14T09:42:10.000Z",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "Vaultwarden is ready" }],
+          },
+        }),
+      ].join("\n"),
+      source: "omp",
+      providerInstanceId: ProviderInstanceId.make("omp"),
+      fallbackSessionId: OMP_SESSION_ID,
+      lastActiveAtMs: Date.parse("2026-09-14T12:00:00.000Z"),
+    });
+
+    expect(thread).toMatchObject({
+      providerSessionId: OMP_SESSION_ID,
+      title: "Install and test DonutBrowser sync",
+      model: "google-antigravity/gemini-3.1-pro",
+      messages: [
+        { role: "user", text: "Set up Vaultwarden" },
+        { role: "assistant", text: "Vaultwarden is ready" },
       ],
     });
   });
@@ -3216,4 +3531,108 @@ describe("parseAgentSessionTranscript", () => {
     expect(thread?.messages[0]?.text).toBe("Keep this prompt");
     expect(thread?.messages.at(-1)?.text).toBe("Assistant update 249");
   });
+});
+
+it.layer(NodeServices.layer)("AgentSessionScanner — Pi", (it) => {
+  it.effect("discovers a project from a Pi session directory", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+      const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+      const piHomePath = yield* makeTempDir("t3code-pi-home-");
+      const cwd = yield* makeTempDir("t3code-pi-project-");
+
+      // Pi names the directory after a lossy slug of the cwd, so the real path
+      // has to come from the transcript's own `session` header.
+      yield* writeTranscript({
+        filePath: path.join(
+          piHomePath,
+          "sessions",
+          "--slugged-cwd--",
+          "2026-01-01T00-00-00-000Z_t3-session-1.jsonl",
+        ),
+        contents: piTranscript({ cwd, sessionId: "t3-session-1" }),
+        mtimeMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = yield* runScan({ claudeHomePath, codexHomePath, piHomePath });
+
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]?.path).toBe(cwd);
+      expect(result.candidates[0]?.sources).toEqual(["pi"]);
+      expect(result.candidates[0]?.threadCount).toBe(1);
+    }),
+  );
+
+  it.effect("leaves Pi alone when it is not enabled", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const claudeHomePath = yield* makeTempDir("t3code-claude-home-");
+      const codexHomePath = yield* makeTempDir("t3code-codex-home-");
+      const piHomePath = yield* makeTempDir("t3code-pi-home-");
+      const cwd = yield* makeTempDir("t3code-pi-project-");
+      yield* writeTranscript({
+        filePath: path.join(
+          piHomePath,
+          "sessions",
+          "--slug--",
+          "2026-01-01T00-00-00-000Z_t3-session-1.jsonl",
+        ),
+        contents: piTranscript({ cwd, sessionId: "t3-session-1" }),
+        mtimeMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      // Pi ships disabled, and its default home is the developer's real
+      // `~/.pi/agent` — a scan that read it regardless would import history
+      // from an agent the user never turned on.
+      const result = yield* runScan({ claudeHomePath, codexHomePath });
+
+      expect(result.candidates).toEqual([]);
+    }),
+  );
+
+  it.effect("takes the resumable session id from the header, not the filename", () =>
+    Effect.gen(function* () {
+      const thread = AgentSessionScanner.parseAgentSessionTranscript({
+        contents: piTranscript({
+          cwd: "/tmp/pi-project",
+          sessionId: "t3-real-session",
+          modelId: "glm-5.3",
+        }),
+        source: "pi",
+        providerInstanceId: ProviderInstanceId.make("pi"),
+        // Pi's filenames are `<timestamp>_<sessionId>`, so the basename the
+        // scanner passes as a fallback is not a resumable id.
+        fallbackSessionId: "2026-01-01T00-00-00-000Z_t3-real-session",
+        lastActiveAtMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      expect(thread?.providerSessionId).toBe("t3-real-session");
+      expect(thread?.model).toBe("glm-5.3");
+    }),
+  );
+
+  it.effect("keeps Pi's thinking blocks out of an imported thread", () =>
+    Effect.gen(function* () {
+      const thread = AgentSessionScanner.parseAgentSessionTranscript({
+        contents: piTranscript({
+          cwd: "/tmp/pi-project",
+          sessionId: "t3-thinking",
+          userText: "Ask something",
+          assistantText: "The answer",
+          thinkingText: "Private reasoning that must not be imported",
+        }),
+        source: "pi",
+        providerInstanceId: ProviderInstanceId.make("pi"),
+        fallbackSessionId: "unused",
+        lastActiveAtMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      });
+
+      const assistant = thread?.messages.find((message) => message.role === "assistant");
+      expect(assistant?.text).toBe("The answer");
+      expect(
+        thread?.messages.filter((message) => message.text.includes("Private reasoning")),
+      ).toEqual([]);
+    }),
+  );
 });

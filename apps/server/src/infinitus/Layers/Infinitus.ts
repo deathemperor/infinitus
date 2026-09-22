@@ -16,6 +16,7 @@ import {
   type InfinitusSubscribeInput,
   type InfinitusUnavailable,
 } from "@infinitus/contracts/infinitus";
+import { INFINITUS_CONTROL_WRITE_TIMEOUT_MS } from "@infinitus/shared/infinitusControlSocket";
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -526,11 +527,14 @@ const makeInfinitus = Effect.gen(function* () {
       });
     }
 
-    const result = yield* client.request({
-      command: input.command,
-      args: input.args,
-      options: input.options,
-    });
+    // A verb the manifest calls anything but a read gets the write budget:
+    // the app answers only after the engine's subprocess is done.
+    const result = yield* client.request(
+      { command: input.command, args: input.args, options: input.options },
+      known !== undefined && known.effect !== "read"
+        ? { timeoutMs: INFINITUS_CONTROL_WRITE_TIMEOUT_MS }
+        : undefined,
+    );
 
     // A write moved something the last cycle already read. Detached so the
     // caller's reply does not wait on it — a `restart` command leaves a socket
