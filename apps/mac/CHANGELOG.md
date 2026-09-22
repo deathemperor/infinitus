@@ -10,6 +10,14 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.31
+
+### Mac
+- The menu bar app runs the account engine shipped inside it, not an older copy left on your PATH, so a fixed sign-in is fixed after the update.
+
+### Desktop
+- The desktop app's own sign-in runs the account engine shipped inside the app, not an older copy left on your PATH.
+
 ## 0.5.0-alpha.30
 
 ### Mac
