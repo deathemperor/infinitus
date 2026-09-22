@@ -15,7 +15,10 @@ import {
   PortSchema,
 } from "@infinitus/contracts";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
+<<<<<<< HEAD
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 import {
   buildTailscaleHttpsBaseUrl,

@@ -78,7 +78,11 @@ export function ConfirmDialogHost() {
         if (!open) completeConfirmDialogClose();
       }}
     >
+<<<<<<< HEAD
       <AlertDialogPopup className="max-w-lg" initialFocus={confirmRef}>
+=======
+      <AlertDialogPopup>
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
         <AlertDialogHeader>
           <AlertDialogTitle className="wrap-anywhere">{copy.title}</AlertDialogTitle>
           {copy.description ? (

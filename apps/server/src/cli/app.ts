@@ -11,7 +11,10 @@ import {
   type DesktopAppActivationRequest,
 } from "@infinitus/contracts";
 import { resolveDesktopAppControlAddress } from "@infinitus/shared/desktopAppControl";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 import {
   HostProcessPlatform,
   HostProcessUserId,

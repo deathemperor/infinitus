@@ -20,7 +20,10 @@ import {
   hasProviderUsageLimits,
   isUsageLimitsCommand,
 } from "@infinitus/shared/usageLimits";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 import { StackActions, useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
 import {

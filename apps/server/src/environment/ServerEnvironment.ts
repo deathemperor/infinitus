@@ -6,6 +6,7 @@ import {
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   type ExecutionEnvironmentDescriptor,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import {
   HostProcessArchitecture,
   HostProcessEnvironment,
@@ -13,6 +14,9 @@ import {
 } from "@infinitus/shared/hostProcess";
 import { resolveInfinitusControlSocketPath } from "@infinitus/shared/infinitusControl";
 import { lanHttpBaseUrls } from "../infinitus/Layers/LanBaseUrls.ts";
+=======
+import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";

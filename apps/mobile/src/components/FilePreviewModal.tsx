@@ -1,7 +1,12 @@
 import { useIsFocused } from "@react-navigation/native";
 import type { AssetResource, EnvironmentId } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Alert, Keyboard, Platform } from "react-native";
+=======
+import { useEffect, useEffectEvent, useState } from "react";
+import { Alert, Keyboard } from "react-native";
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 import type { FileBackedComposerAttachment } from "../lib/composerImages";
 import { loadLocalAttachmentPreview } from "../lib/localAttachmentPreview";

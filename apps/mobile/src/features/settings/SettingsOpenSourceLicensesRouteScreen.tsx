@@ -8,12 +8,15 @@ import {
   thirdPartyLicenseEntryKey,
   type ThirdPartyLicenseEntry,
 } from "@infinitus/shared/thirdPartyLicenses";
+<<<<<<< HEAD
 import {
   PRODUCT_NAME,
   UPSTREAM_PRODUCT_NAME,
   UPSTREAM_PUBLISHER_NAME,
   UPSTREAM_REPOSITORY_URL,
 } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 import { useCallback, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

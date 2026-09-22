@@ -120,6 +120,7 @@ uses HTTP, so include `https://` when your server uses HTTPS.
 ## Desktop-managed SSH
 
 In the desktop app, open **Settings → Connections → Add environment**, choose
+<<<<<<< HEAD
 **SSH**, and enter a host or SSH alias such as `user@example.com`. Infinitus
 downloads the server of its own version onto the host (it needs `curl` or
 `wget` and `tar` there, and a way to reach the releases), starts or reuses it,
@@ -130,6 +131,22 @@ work stay on the remote machine, which needs the
 The remote host must be Linux: no macOS server build is published yet, so a
 Mac cannot be added this way. A nightly desktop build ships no server archive
 and cannot set up a remote either.
+=======
+**SSH**, and enter a host or SSH alias such as `user@example.com`. Infinitus starts
+or reuses a server there and opens the port forward for you. Projects, provider
+credentials, and agent work stay on the remote machine.
+
+The remote host must be Linux or an Apple Silicon Mac with `curl` or `wget`,
+`tar`, `sha256sum` or `shasum`, and [provider setup](./install.md#providers).
+The first launch downloads Infinitus's server to `~/.t3/runtime` on the host, so
+it takes longer than later ones.
+Provider CLIs must be on the `PATH` of a non-interactive login shell there;
+check with:
+
+```bash
+ssh user@example.com 'sh -lc "command -v claude codex"'
+```
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 If SSH reconnecting fails after an app update, retry the launch once. Removing
 the connection stops a server that Infinitus launched; a server that was already
@@ -167,6 +184,7 @@ configuration. It is not a live reachability check. If the environment appears
 offline, run `infinitus service status` and read the displayed log. If it disappears
 when SSH closes, see [background-service troubleshooting](./background-service.md#troubleshooting).
 
+<<<<<<< HEAD
 | Error                                                     | Recovery                                                                                                                                                         |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `environment_link_limit_exceeded` or managed tunnel limit | Deregister an unused environment, then restart the server on the host.                                                                                           |
@@ -174,6 +192,15 @@ when SSH closes, see [background-service troubleshooting](./background-service.m
 | Expired or invalid link proof                             | Check the host's date and time, update the server, then restart it.                                                                                              |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                                                    |
 | HTTP 408, 429, or 5xx                                     | Check network and relay availability. Startup retries temporary failures for up to ten minutes.                                                                  |
+=======
+| Error                                                     | Recovery                                                                                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environment_link_limit_exceeded` or managed tunnel limit | Deregister an unused environment, then restart Infinitus on the host.                                                                       |
+| `auth_invalid` or `invalid_bearer`                        | Run `t3 connect login`. If credentials were revoked, run `t3 connect logout`, then `t3 connect` again. Restart the server after signing in. |
+| Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                          |
+| HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                               |
+| HTTP 408, 429, or 5xx                                     | Check network and relay availability. Startup retries temporary failures for up to ten minutes.                                             |
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 After fixing a permanent rejection, restart the host's server. On Linux, use
 `systemctl --user restart t3code.service` for the background service. For a
@@ -181,7 +208,11 @@ foreground server, stop it and run `infinitus serve` again with your usual optio
 Include the diagnostic message and trace ID when reporting a persistent failure.
 
 For a connection that still fails after linking, check the date and time on both
+<<<<<<< HEAD
 devices. For server version warnings, follow [Updating](./updating.md).
+=======
+devices. For server version warnings, follow [Updating Infinitus](./updating.md).
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 ## Using the Desktop App as a Remote Only
 

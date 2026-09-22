@@ -12,7 +12,10 @@ import {
   toJsonSchemaObject,
 } from "./TextGenerationUtils.ts";
 import { TextGenerationError } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 describe("buildCommitMessagePrompt", () => {
   it("includes staged patch and summary in the prompt", () => {

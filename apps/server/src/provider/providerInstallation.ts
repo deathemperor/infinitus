@@ -6,7 +6,10 @@ import {
   ProviderSetupError,
   type ProviderSetupInput,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 import { resolveCommandPath } from "@infinitus/shared/shell";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

@@ -10,7 +10,10 @@ import { classifyMarkdownImageSource } from "@infinitus/client-runtime/markdown-
 import { resolveMediaSource } from "@infinitus/client-runtime/media-source";
 import { parseChangeRequestUrl } from "@infinitus/shared/changeRequestUrl";
 import { isWorkspaceImagePreviewPath } from "@infinitus/shared/filePreview";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 /**
  * Activities the worktree setup card already represents. The settled record

@@ -121,7 +121,11 @@ function CloudEnvironmentRowsContent(
       {showHeader ? (
         <View className="px-1">
           <Text className="text-sm font-infinitus-bold uppercase text-foreground-muted">
+<<<<<<< HEAD
             {CONNECT_NAME}
+=======
+            T3 Connect
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
           </Text>
         </View>
       ) : null}
@@ -175,7 +179,11 @@ function CloudEnvironmentRowsContent(
       !controller.relayDiscovery.isRefreshing ? (
         <View collapsable={false} className="gap-3 rounded-[24px] bg-card p-5">
           <Text className="text-base font-infinitus-bold text-foreground">
+<<<<<<< HEAD
             Could not load {CONNECT_NAME} environments
+=======
+            Could not load T3 Connect environments
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
           </Text>
           <Text className="text-sm text-foreground-muted">{controller.relayDiscovery.error}</Text>
           {controller.relayDiscovery.errorTraceId ? (

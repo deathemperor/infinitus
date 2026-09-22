@@ -12,7 +12,10 @@ import { describe, expect, it } from "vite-plus/test";
 import type * as EffectAcpSchema from "effect-acp/schema";
 import { ProviderDriverKind, ProviderInstanceId, type CursorSettings } from "@infinitus/contracts";
 import { createModelCapabilities } from "@infinitus/shared/model";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 import {
   buildCursorProviderSnapshot,

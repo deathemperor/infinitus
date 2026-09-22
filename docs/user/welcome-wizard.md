@@ -12,10 +12,17 @@ browser.
 
 You can add more computers before continuing:
 
+<<<<<<< HEAD
 - **Infinitus Connect** connects computers that are signed in to your account. On a
   Mac, sign in from the desktop app's **Settings → Connections** and keep the
   app running; on a Linux server, run the unpacked archive's `./t3 connect`
   and then `./t3 serve`, or install the [background service](./background-service.md).
+=======
+- **Infinitus Connect** connects computers that are signed in to your account.
+  [Install the CLI](./install.md#command-line) and run `t3 connect` on each
+  computer you want to add, then start Infinitus or run `t3 serve` so the
+  computer stays available.
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 - **Add a computer** connects directly to a server on your network or tailnet.
   From a desktop app, create the pairing link in **Settings → Connections**
   with **Network access** on. From a Linux server, start it with
@@ -49,12 +56,19 @@ terminal metadata while the terminal process can use them.
 
 ## Import your projects
 
+<<<<<<< HEAD
 Infinitus finds directories that Claude Code or Codex has used, along with
 those used by Oh My Pi or Pi once you enable them in Settings. Git
 repositories are listed first, newest activity on top. When the remote is on
 GitHub, the group shows the repository as `owner/name`. Clones with the same
 remote share one group. Directories that are not git repositories sit under
 "Other folders".
+=======
+Infinitus finds directories that Claude Code or Codex has used. Git repositories
+are listed first, newest activity on top. When the remote is on GitHub, the
+group shows the repository as `owner/name`. Clones with the same remote share
+one group. Directories that are not git repositories sit under "Other folders".
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 The default selection includes git repositories active within the last 30 days
 with at least three conversations. Use the checkboxes, or "Select all" and

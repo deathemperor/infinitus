@@ -11,7 +11,11 @@ import {
   ThreadId,
   TurnId,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import type { OrchestrationEvent, OrchestrationThread } from "@infinitus/contracts";
+=======
+import type { OrchestrationThread } from "@infinitus/contracts";
+>>>>>>> upstream-sync-aff9318bf-upstream-renamed
 
 import { applyThreadDetailEvent } from "./threadReducer.ts";
 
