@@ -30,6 +30,8 @@ import type {
   InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
+  InfinitusSignInRedirectListenInput,
+  InfinitusSignInRedirectResult,
   InfinitusSignInWindowInput,
 } from "./infinitus.ts";
 import { type ClientSettings, type QuitConfirmationMode, SnapShotShortcut } from "./settings.ts";
@@ -1290,6 +1292,16 @@ export interface DesktopBridge {
     input: InfinitusOAuthSignInInput,
   ) => Promise<InfinitusOAuthSignInResult>;
   cancelInfinitusOAuthSignIn?: (flowId: string) => Promise<void>;
+  /**
+   * Fork: the engine's loopback listener stood in for here, for a sign-in on
+   * another Mac's environment. Settles with the address the browser ended on,
+   * or `ok: false` when the port is held (the page falls back to a field) or
+   * the flow was stopped. Optional: without it the page asks for the address.
+   */
+  listenInfinitusSignInRedirect?: (
+    input: InfinitusSignInRedirectListenInput,
+  ) => Promise<InfinitusSignInRedirectResult>;
+  stopInfinitusSignInRedirect?: (flowId: string) => Promise<void>;
   /**
    * Fork: the proxy engines this shell runs. A thread on a proxied Claude
    * instance dies with `ConnectionRefused` when its engine is down, so the

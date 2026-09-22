@@ -4,6 +4,7 @@ import {
   fleetRunsShellOAuth,
   fleetSignInGate,
   oauthSignInBridge,
+  redirectSignInBridge,
   signInBeginCommandArgs,
   signInBeginReply,
   signInBridge,
@@ -27,6 +28,7 @@ const flow = (over: Partial<SignInFlow>): SignInFlow => ({
   url: null,
   pasteCode: true,
   redirectPort: null,
+  redirectListening: false,
   phase: "starting",
   error: null,
   account: null,
@@ -173,6 +175,26 @@ describe("signInPasteField", () => {
     expect(signInPasteField({ ...remote, redirectPort: null })).toBeNull();
     expect(signInPasteField({ ...remote, phase: "registering" })).toBeNull();
     expect(signInPasteField({ ...remote, phase: "done" })).toBeNull();
+    // The desktop shell stands in for the listener: nothing to paste, and
+    // the status reads as a plain sign-in.
+    const listening = { ...remote, redirectListening: true };
+    expect(signInPasteField(listening)).toBeNull();
+    expect(signInStatusText(listening)).toBe("Sign in on the sign-in page.");
+  });
+
+  it("finds the shell's stand-in only when both of its methods are there", () => {
+    expect(redirectSignInBridge(undefined)).toBeNull();
+    expect(
+      redirectSignInBridge({ listenInfinitusSignInRedirect: async () => ({ ok: true }) }),
+    ).toBeNull();
+    const listen = async () => ({ ok: true });
+    const stop = async () => {};
+    expect(
+      redirectSignInBridge({
+        listenInfinitusSignInRedirect: listen,
+        stopInfinitusSignInRedirect: stop,
+      }),
+    ).toEqual({ listen, stop });
   });
 });
 
@@ -222,6 +244,7 @@ describe("signInStatusText / signInBusy", () => {
       url: null,
       pasteCode: true,
       redirectPort: null,
+      redirectListening: false,
       phase: "waitingForCode" as const,
       error: null,
       account: null,

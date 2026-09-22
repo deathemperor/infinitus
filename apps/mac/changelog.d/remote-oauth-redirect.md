@@ -1,1 +1,1 @@
-Desktop: Add account and Sign in again work from another machine — paste the address the browser ended on and the Mac finishes the sign-in.
+Desktop: Add account and Sign in again work from another machine — the sign-in opens in your browser there and the owning Mac finishes it.

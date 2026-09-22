@@ -8,6 +8,8 @@ import {
   InfinitusOAuthSignInResult,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
+  InfinitusSignInRedirectListenInput,
+  InfinitusSignInRedirectResult,
   InfinitusSignInWindowInput,
 } from "@infinitus/contracts/infinitus";
 import * as Effect from "effect/Effect";
@@ -20,6 +22,7 @@ import { InfinitusEngineSupervisorService } from "../../infinitus/InfinitusEngin
 import { InfinitusKeepAwakeService } from "../../infinitus/InfinitusKeepAwake.ts";
 import { InfinitusOAuthSignInService } from "../../infinitus/InfinitusOAuthSignIn.ts";
 import { InfinitusSignInService } from "../../infinitus/InfinitusSignIn.ts";
+import { InfinitusSignInRedirectService } from "../../infinitus/InfinitusSignInRedirect.ts";
 import * as IpcChannels from "../channels.ts";
 import { makeIpcMethod } from "../DesktopIpc.ts";
 
@@ -100,6 +103,26 @@ export const cancelInfinitusOAuthSignIn = makeIpcMethod({
   handler: Effect.fn("desktop.ipc.infinitus.cancelOAuthSignIn")(function* (flowId) {
     const signIn = yield* InfinitusOAuthSignInService;
     yield* signIn.cancel(flowId);
+  }),
+});
+
+export const listenInfinitusSignInRedirect = makeIpcMethod({
+  channel: IpcChannels.LISTEN_INFINITUS_SIGN_IN_REDIRECT_CHANNEL,
+  payload: InfinitusSignInRedirectListenInput,
+  result: InfinitusSignInRedirectResult,
+  handler: Effect.fn("desktop.ipc.infinitus.listenSignInRedirect")(function* (input) {
+    const redirect = yield* InfinitusSignInRedirectService;
+    return yield* redirect.listen(input);
+  }),
+});
+
+export const stopInfinitusSignInRedirect = makeIpcMethod({
+  channel: IpcChannels.STOP_INFINITUS_SIGN_IN_REDIRECT_CHANNEL,
+  payload: Schema.String,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.infinitus.stopSignInRedirect")(function* (flowId) {
+    const redirect = yield* InfinitusSignInRedirectService;
+    yield* redirect.stop(flowId);
   }),
 });
 

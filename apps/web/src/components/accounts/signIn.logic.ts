@@ -6,6 +6,8 @@ import type {
   InfinitusSecretInput,
   InfinitusSignInCodeInput,
   InfinitusSignInCodeResult,
+  InfinitusSignInRedirectListenInput,
+  InfinitusSignInRedirectResult,
   InfinitusSignInWindowInput,
   InfinitusSnapshot,
 } from "@infinitus/contracts/infinitus";
@@ -63,6 +65,11 @@ export interface SignInFlow {
       replays it against the listener. Null for a paste-code flow, and for a
       build that never says. */
   readonly redirectPort: number | null;
+  /** The desktop shell stands in for that listener on this machine: it took
+      the port, opened the page, and will hand the address on itself — nothing
+      to paste. Off again when the port was held or the hand-off was refused,
+      and the field takes over. */
+  readonly redirectListening: boolean;
   readonly phase: SignInPhase;
   readonly error: string | null;
   readonly account: string | null;
@@ -81,10 +88,33 @@ export type SignInPasteField = "code" | "address";
 export function signInPasteField(flow: SignInFlow | null): SignInPasteField | null {
   if (flow === null) return null;
   if (flow.phase === "waitingForCode" && flow.pasteCode) return "code";
-  if (flow.phase === "waitingForToken" && flow.redirectPort !== null && flow.url !== null) {
+  if (
+    flow.phase === "waitingForToken" &&
+    flow.redirectPort !== null &&
+    flow.url !== null &&
+    !flow.redirectListening
+  ) {
     return "address";
   }
   return null;
+}
+
+/** The desktop shell's stand-in for the engine's loopback listener, when this
+    is the desktop and it is new enough to carry it; anything else asks for
+    the address. */
+export interface RedirectSignInBridge {
+  readonly listen: (
+    input: InfinitusSignInRedirectListenInput,
+  ) => Promise<InfinitusSignInRedirectResult>;
+  readonly stop: (flowId: string) => Promise<void>;
+}
+
+export function redirectSignInBridge(
+  bridge: Partial<DesktopBridge> | undefined,
+): RedirectSignInBridge | null {
+  if (bridge?.listenInfinitusSignInRedirect === undefined) return null;
+  if (bridge.stopInfinitusSignInRedirect === undefined) return null;
+  return { listen: bridge.listenInfinitusSignInRedirect, stop: bridge.stopInfinitusSignInRedirect };
 }
 
 /** The in-app path exists on a build whose manifest lists `signin-begin`. */
