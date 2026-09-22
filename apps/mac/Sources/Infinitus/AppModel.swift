@@ -1972,6 +1972,19 @@ extension AppModel: FleetModel {
     /// status item injects.
     func openSettings() { showSettings?() }
 
+    /// The Infinitus desktop app, wherever LaunchServices knows it. Its
+    /// Accounts page runs the first sign-in itself (`swapd add-oauth`,
+    /// #1213), so the popup's setup card hands off to it instead of
+    /// asking for a Claude Code login and a relaunch.
+    static var desktopAppURL: URL? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
+    }
+    var desktopAppInstalled: Bool { Self.desktopAppURL != nil }
+    func openDesktopApp() {
+        guard let url = Self.desktopAppURL else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
     /// The "at this pace" line's click. The Utilization pane is the
     /// desktop app's now (#654, #774); Settings is what the Mac still opens.
     func openForecast() {

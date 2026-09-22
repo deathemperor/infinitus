@@ -7,15 +7,19 @@ final class OnboardingBriefTests: XCTestCase {
                                    organization: "Me's Org")
         let text = OnboardingBrief.text(engineInstalled: true, claude: claude, proxy: nil, proxyLive: false)
         XCTAssertTrue(text.contains("- [x] 1. Install the engine"))
-        XCTAssertTrue(text.contains("- [x] 2. Sign Claude Code"))
+        XCTAssertTrue(text.contains("- [ ] 2. Add the first account"))
         XCTAssertTrue(text.contains("signed in as me@example.com (Me's Org)"))
-        XCTAssertTrue(text.contains("swapd add"))
+        // A held login is the shortcut, never a prerequisite (#1213).
+        XCTAssertTrue(text.contains("Shortcut: Claude Code on this Mac is already signed in"))
+        XCTAssertTrue(text.contains("swapd add-oauth"))
+        XCTAssertFalse(text.contains("/login"))
     }
 
     func testBriefLeavesMissingPiecesUnticked() {
         let text = OnboardingBrief.text(engineInstalled: false, claude: nil, proxy: nil, proxyLive: false)
         XCTAssertTrue(text.contains("- [ ] 1. Install the engine"))
-        XCTAssertTrue(text.contains("- [ ] 2. Sign Claude Code"))
+        XCTAssertTrue(text.contains("- [ ] 2. Add the first account"))
+        XCTAssertFalse(text.contains("Shortcut:"))
         XCTAssertTrue(text.contains("NOT installed"))
     }
 }
