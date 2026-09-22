@@ -2,11 +2,11 @@
 
 An **engine** manages provider logins, reads their usage, and handles account switching. Infinitus shows what the engine reports and lets you control it.
 
-A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them.
+A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them. Accounts lists every connected host that runs Infinitus, one group per host, so one page shows the status of the accounts on all your machines.
 
 ## Set up an engine
 
-Official Mac releases include swapd. In the desktop or web client, open **Settings → Infinitus → Engines** to see engine status and enable it. From Accounts, choose **Set up engines** to configure the selected host. Opening engine settings directly uses your primary environment. The page's **About** section shows the menu bar app's version; it is bundled with the desktop app and updates with it.
+Official Mac releases include swapd. In the desktop or web client, open **Settings → Infinitus → Engines** to see engine status and enable it. A host whose Accounts group reports no engine links to that host's engine settings. Opening engine settings directly uses your primary environment. The page's **About** section shows the menu bar app's version; it is bundled with the desktop app and updates with it.
 
 In the Mac app, the swapd pane shows the detected binary and daemon status. An installed copy takes precedence over the bundled copy. If swapd is missing, install a current Infinitus release and relaunch. Source builds can install swapd separately with `cargo install --git https://github.com/deathemperor/swapd swapd` (requires Rust).
 

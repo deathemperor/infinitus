@@ -108,7 +108,7 @@ export function FleetSection({
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-medium text-foreground text-sm">{section.title}</h2>
+        <h3 className="font-medium text-foreground text-sm">{section.title}</h3>
         {canAdd || inApp ? (
           <Button
             className="ms-auto"

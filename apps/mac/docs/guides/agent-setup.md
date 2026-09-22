@@ -2,9 +2,7 @@
 
 For a coding agent (Claude Code, Codex, an SSH'd assistant) asked to
 "set up Infinitus" on a Mac. Every step is idempotent; run them in
-order and skip the ones already done. The in-app equivalent is the
-first-run card's **Copy for an AI agent** button, which fills in what
-it already found on the machine.
+order and skip the ones already done.
 
 **Two rules.** A human signs into every account — you never type or
 paste credentials, and you never read `~/.swapd/` (the engine's own
