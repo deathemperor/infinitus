@@ -14,7 +14,7 @@ CLIProxyAPI and 9Router are optional alternatives, installed separately. In **Se
 
 ## Add accounts
 
-With swapd enabled, its fleet appears in Accounts even before it holds an account. Choose **Add account**: in the desktop app on the owning Mac, the sign-in opens in your browser and the account joins the fleet when it completes, with nothing to paste. Repeat once per login. If Claude Code on that Mac is already signed in, the menu bar popup's setup card offers to adopt that login in one click instead; its **Sign in…** button opens Accounts in the desktop app. From another client, **Add account** opens the provider's sign-in as a link; if it shows an authorization code, paste it into that sign-in flow. Cancel the flow if you no longer want to add the account.
+With swapd enabled, its fleet appears in Accounts even before it holds an account. Choose **Add account**: in the desktop app on the owning Mac, the sign-in opens in your browser and the account joins the fleet when it completes, with nothing to paste. Repeat once per login. If Claude Code on that Mac is already signed in, the menu bar popup's setup card offers to adopt that login in one click instead; its **Sign in…** button opens the desktop app, where Accounts has **Add account**. From another client, **Add account** opens the provider's sign-in as a link; if it shows an authorization code, paste it into that sign-in flow. Cancel the flow if you no longer want to add the account.
 
 CLIProxyAPI accounts can be added from its accounts controls. For 9Router, open its dashboard and use **Providers → Connect Claude Code**. The available actions depend on the engine and provider.
 

@@ -710,7 +710,7 @@ struct FirstAccountCard: View {
                      binary: String?) -> String {
         var parts: [String] = []
         parts.append(desktop
-            ? "Sign in opens Accounts in Infinitus, where the sign-in runs in your browser."
+            ? "Sign in opens the Infinitus app; in Accounts, choose Add account to sign in through your browser."
             : "Sign in from a terminal: \(binary ?? "swapd") add-oauth")
         if adoptable, let email {
             parts.append(signedInLine(email: email, organization: organization))
