@@ -20,17 +20,26 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   GitCommandError,
+  T3_PROJECT_FILE_NAME,
   type ReviewDiffFileContentsInput,
   type ReviewDiffPreviewInput,
   type ReviewDiffFileStat,
   type ReviewDiffPreviewSource,
   type VcsRef,
+<<<<<<< HEAD
   type VcsRemoveWorktreeInput,
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 } from "@infinitus/contracts";
 import { dedupeRemoteBranchesWithLocalMatches, normalizeGitRemoteUrl } from "@infinitus/shared/git";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { compactTraceAttributes } from "@infinitus/shared/observability";
 import { decodeJsonResult } from "@infinitus/shared/schemaJson";
+<<<<<<< HEAD
+=======
+import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
+import { resolveProjectFileBackedSetting } from "@infinitus/shared/projectSettings";
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import { gitCommandDuration, gitCommandsTotal, withMetrics } from "../observability/Metrics.ts";
 import * as GitVcsDriver from "./GitVcsDriver.ts";
 import {
@@ -3128,11 +3137,37 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     // skills, tooling or source in one gets a worktree that is quietly missing
     // them. Best-effort: the objects are usually already in the parent's
     // `.git/modules`, but a first-ever clone needs the network, and failing to
-    // populate a submodule must not roll back the caller's thread.
+    // populate a submodule must not roll back the caller's thread. Repos with
+    // hundreds of nested submodules opt out or stop at the top level; the
+    // caller resolves that from settings, or the checkout's t3.json decides.
     const hasSubmodules = yield* fileSystem
       .exists(path.join(worktreePath, ".gitmodules"))
       .pipe(Effect.orElseSucceed(() => false));
-    if (hasSubmodules) {
+    const submoduleMode = !hasSubmodules
+      ? { value: "none" as const, source: "environment" as const }
+      : resolveProjectFileBackedSetting(
+          "worktreeSubmodules",
+          options?.submodules ?? null,
+          options?.submodules != null
+            ? null
+            : yield* fileSystem.readFileString(path.join(worktreePath, T3_PROJECT_FILE_NAME)).pipe(
+                Effect.flatMap((contents) => {
+                  const file = parseT3ProjectFile(contents);
+                  return file === null
+                    ? Effect.logWarning("t3.json is invalid; initializing submodules recursively", {
+                        worktreePath,
+                      }).pipe(Effect.as(null))
+                    : Effect.succeed(file);
+                }),
+                Effect.orElseSucceed(() => null),
+              ),
+        );
+    if (hasSubmodules && submoduleMode.value === "none" && progress?.onSubmodulesDisabled) {
+      yield* progress.onSubmodulesDisabled({
+        source: submoduleMode.source === "t3.json" ? "t3.json" : "settings",
+      });
+    }
+    if (submoduleMode.value !== "none") {
       if (progress?.onSubmodulesStarted) {
         yield* progress.onSubmodulesStarted();
       }
@@ -3140,7 +3175,9 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       yield* runGit(
         "GitVcsDriver.createWorktree.updateSubmodules",
         worktreePath,
-        ["submodule", "update", "--init", "--recursive"],
+        submoduleMode.value === "recursive"
+          ? ["submodule", "update", "--init", "--recursive"]
+          : ["submodule", "update", "--init"],
         onSubmoduleLine
           ? {
               env: { LC_ALL: "C" },

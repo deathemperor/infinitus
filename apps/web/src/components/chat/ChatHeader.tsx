@@ -4,7 +4,10 @@ import {
   type ProjectScript,
   type ResolvedKeybindingsConfig,
   type ThreadId,
+<<<<<<< HEAD
   type ThreadUsageRollup,
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 } from "@infinitus/contracts";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";

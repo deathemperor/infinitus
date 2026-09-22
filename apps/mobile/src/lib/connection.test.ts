@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 
 import { isRelayManagedConnection, toStableSavedRemoteConnection } from "./connection";
 import { authClientMetadata } from "./authClientMetadata";

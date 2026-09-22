@@ -11,7 +11,10 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
 import { createModelCapabilities } from "@infinitus/shared/model";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import { compareSemverVersions } from "@infinitus/shared/semver";
 import {
   buildServerProvider,

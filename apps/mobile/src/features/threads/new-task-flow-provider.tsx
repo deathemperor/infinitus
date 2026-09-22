@@ -21,10 +21,13 @@ import {
 } from "@infinitus/contracts";
 import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
+<<<<<<< HEAD
 import {
   isDefaultThreadEnvModeSettled,
   resolveDefaultThreadEnvMode,
 } from "@infinitus/shared/threadEnvMode";
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
 
@@ -433,6 +436,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
         })
       : null,
   );
+<<<<<<< HEAD
   const legacyProjectFileQuery = useEnvironmentQuery(
     readsProjectFile
       ? projectEnvironment.readFile({
@@ -452,15 +456,30 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   }, [t3ProjectFileData]);
   // Environment settings with the project's overrides applied; the
   // aggregate's own legacy fields still count until the server folds them.
+=======
+  const t3ProjectFileData = t3ProjectFileQuery.data as ProjectReadFileResult | null;
+  const t3ProjectFile = useMemo(
+    () =>
+      t3ProjectFileData === null || t3ProjectFileData.truncated
+        ? null
+        : parseT3ProjectFile(t3ProjectFileData.contents),
+    [t3ProjectFileData],
+  );
+  // Environment settings with the project's overrides and its t3.json
+  // applied; the aggregate's own legacy fields still count until the server
+  // folds them.
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
   const projectSettings = useMemo(
     () =>
       resolveProjectSettings(
         selectedEnvironmentServerConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
         selectedProject?.id ?? null,
         selectedProject,
+        t3ProjectFile,
       ),
-    [selectedEnvironmentServerConfig?.settings, selectedProject],
+    [selectedEnvironmentServerConfig?.settings, selectedProject, t3ProjectFile],
   );
+<<<<<<< HEAD
   const projectThreadEnvMode =
     projectSettings.sources.defaultThreadEnvMode === "project"
       ? projectSettings.settings.defaultThreadEnvMode
@@ -478,6 +497,17 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     projectSetting: projectThreadEnvMode,
     projectFilePending: t3ProjectFileQuery.isPending || legacyProjectFileQuery.isPending,
   });
+=======
+  const defaultWorkspaceMode: WorkspaceMode = projectSettings.settings.defaultThreadEnvMode;
+  // While the file read is pending and nothing above it decided, the
+  // resolved default is provisional. Nothing may write it into the draft
+  // during that window (the auto-branch effect does), or the frozen interim
+  // value beats the t3.json default once it loads.
+  const defaultWorkspaceModeSettled =
+    selectedProjectDraft.workspaceSelection?.mode !== undefined ||
+    projectSettings.sources.defaultThreadEnvMode !== "environment" ||
+    !t3ProjectFileQuery.isPending;
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
   const workspaceMode = selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode;
   const selectedBranchName = selectedProjectDraft.workspaceSelection?.branch ?? null;
   const selectedWorktreePath = selectedProjectDraft.workspaceSelection?.worktreePath ?? null;

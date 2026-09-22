@@ -39,7 +39,10 @@ import { expandAssistantCitationsForProvider } from "@infinitus/shared/assistant
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { causeErrorTag } from "@infinitus/shared/observability";
 import { getModelSelectionStringOptionValue } from "@infinitus/shared/model";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";

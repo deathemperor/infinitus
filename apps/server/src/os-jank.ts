@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import {
   listLoginShellCandidates,

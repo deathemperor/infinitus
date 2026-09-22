@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Updating
+=======
+# Updating Infinitus
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 
 The app you use and the server running your agents can be on different machines.
 When a server is behind your web or desktop app, an update notice appears in the

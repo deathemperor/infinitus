@@ -15,11 +15,15 @@ import {
 } from "@infinitus/contracts";
 import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
 import { projectComposerContextForProvider } from "@infinitus/shared/composerContextReferences";
+<<<<<<< HEAD
 import {
   isTemporaryWorktreeBranch,
   LEGACY_WORKTREE_BRANCH_PREFIX,
   WORKTREE_BRANCH_PREFIX,
 } from "@infinitus/shared/git";
+=======
+import { isTemporaryWorktreeBranch, WORKTREE_BRANCH_PREFIX } from "@infinitus/shared/git";
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Crypto from "effect/Crypto";
@@ -510,8 +514,16 @@ const make = Effect.gen(function* () {
     });
     // A directory deleted without `git worktree remove` leaves an admin entry
     // that makes `git worktree add` refuse the path; prune clears it.
+    // Best effort like the rest of this recovery: a settings read failure
+    // falls back to the checkout's t3.json.
+    const submodules = yield* projectSettingsForThread(thread.id).pipe(
+      Effect.map((settings) => settings.worktreeSubmodules),
+      Effect.orElseSucceed(() => null),
+    );
     yield* gitWorkflow.pruneWorktrees({ cwd }).pipe(
-      Effect.andThen(gitWorkflow.createWorktree({ cwd, refName: branch, path: worktreePath })),
+      Effect.andThen(
+        gitWorkflow.createWorktree({ cwd, refName: branch, path: worktreePath }, { submodules }),
+      ),
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.failCause(cause)

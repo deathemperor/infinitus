@@ -15,7 +15,10 @@ import {
   type SnapShotModifier,
   type SnapShotShortcut,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 
 interface AccessibilityTreeNode {
   readonly name?: string;

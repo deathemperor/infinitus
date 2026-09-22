@@ -82,12 +82,17 @@ import {
   type WorktreeSetupSnapshot,
 } from "@infinitus/contracts";
 import { resolveServerBackgroundActivitySettings } from "@infinitus/shared/backgroundActivitySettings";
+<<<<<<< HEAD
 import {
   HttpClient,
   HttpRouter,
   HttpServerRequest,
   HttpServerRespondable,
 } from "effect/unstable/http";
+=======
+import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
+import { HttpRouter, HttpServerRequest, HttpServerRespondable } from "effect/unstable/http";
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
@@ -199,11 +204,14 @@ import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as SessionStore from "./auth/SessionStore.ts";
 import { failEnvironmentAuthInvalid, failEnvironmentInternal } from "./auth/http.ts";
 import * as RelayClient from "@infinitus/shared/relayClient";
+<<<<<<< HEAD
 
 // Fork (#269 H): worktree bootstraps that passed the limit check but whose
 // worktree the projection may not hold yet — one set per process, since
 // Best-of starts its members together and clients hold their own connections.
 const worktreesInFlight = new Set<string>();
+=======
+>>>>>>> upstream-sync-b5a0f8101-upstream-renamed
 const isOrchestrationDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
@@ -1093,6 +1101,35 @@ const makeWsRpcLayer = (
           return output;
         });
 
+      // Project setting > environment setting; null when neither is set so
+      // the driver reads the freshly created checkout's own t3.json (the
+      // branch being checked out may declare something the project root does
+      // not). Settings that fail to load fall through the same way.
+      const resolveBootstrapWorktreeSubmodules = Effect.fnUntraced(function* (input: {
+        readonly threadId: ThreadId;
+        readonly projectId: ProjectId | null;
+      }) {
+        const settings = yield* serverSettings.getSettings.pipe(Effect.orElseSucceed(() => null));
+        if (!settings) return null;
+        // A worktree can also be prepared for an existing thread, whose
+        // project is only known through its shell.
+        const resolvedProjectId =
+          input.projectId ??
+          (yield* projectionSnapshotQuery.getThreadShellById(input.threadId).pipe(
+            Effect.map((thread) => Option.getOrNull(thread)?.projectId ?? null),
+            Effect.orElseSucceed(() => null),
+          ));
+        const project =
+          resolvedProjectId === null
+            ? null
+            : yield* projectionSnapshotQuery.getProjectShellById(resolvedProjectId).pipe(
+                Effect.map(Option.getOrNull),
+                Effect.orElseSucceed(() => null),
+              );
+        return resolveProjectSettings(settings, resolvedProjectId, project).settings
+          .worktreeSubmodules;
+      });
+
       const dispatchBootstrapTurnStart = (
         command: Extract<OrchestrationCommand, { type: "thread.turn.start" }>,
       ): Effect.Effect<{ readonly sequence: number }, OrchestrationDispatchCommandError> =>
@@ -1547,6 +1584,10 @@ const makeWsRpcLayer = (
               }
               yield* worktreeSetupTracker.stageStatus(threadId, "checkout", "running");
               let checkoutTotal: number | null = null;
+              const submodules = yield* resolveBootstrapWorktreeSubmodules({
+                threadId,
+                projectId: targetProjectId ?? null,
+              });
               const worktree = yield* gitWorkflow.createWorktree(
                 {
                   cwd: prepareWorktree.projectCwd,
@@ -1556,6 +1597,7 @@ const makeWsRpcLayer = (
                   path: null,
                 },
                 {
+                  submodules,
                   progress: {
                     // Git has registered the directory at this point, so a
                     // cancel during the submodule step can still remove it.
@@ -1585,6 +1627,13 @@ const makeWsRpcLayer = (
                             worktreeSetupTracker.stageStatus(threadId, "submodules", "running"),
                           ),
                         ),
+                    onSubmodulesDisabled: ({ source }) =>
+                      worktreeSetupTracker.stageStatus(
+                        threadId,
+                        "submodules",
+                        "skipped",
+                        `disabled in ${source}`,
+                      ),
                     onSubmoduleLine: (line) => {
                       const submodulePath = /Submodule path '([^']+)'/.exec(line)?.[1];
                       return submodulePath === undefined
