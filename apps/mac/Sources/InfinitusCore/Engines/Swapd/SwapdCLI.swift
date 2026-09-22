@@ -2,20 +2,28 @@ import Foundation
 
 #if !os(iOS)
 /// Where the `swapd` binary lives. Checked in order; first hit wins.
+///
+/// The bundle's own copy comes first: it is the engine the release was pinned
+/// to and tested with, and a copy left on PATH by an earlier `cargo install`
+/// silently outranked it — a 0.5.0-alpha.30 install kept signing in through a
+/// Sep 20 build and failed on the page the release had fixed (#1530). The PATH
+/// dirs are for a source build with no engine beside it; `INFINITUS_SWAPD_CLI`
+/// still pins one for a dev run.
 public enum SwapdLocator {
     public static func defaultCandidates(
         home: String = NSHomeDirectory(),
         bundledExecutableDirectory: String? = Bundle.main.executableURL?.deletingLastPathComponent().path
     ) -> [String] {
-        var paths = [
+        var paths: [String] = []
+        if let bundledExecutableDirectory {
+            paths.append("\(bundledExecutableDirectory)/swapd")
+        }
+        paths += [
             "/opt/homebrew/bin/swapd",
             "/usr/local/bin/swapd",
             "\(home)/.cargo/bin/swapd",   // `cargo install --path .`
             "\(home)/.local/bin/swapd",
         ]
-        if let bundledExecutableDirectory {
-            paths.append("\(bundledExecutableDirectory)/swapd")
-        }
         return paths
     }
 

@@ -103,12 +103,14 @@ public protocol FleetModel: ObservableObject {
     /// card hides the button.
     func addAccount()
     var canAddAccount: Bool { get }
-    /// A row's context menu: star/unstar (the engine's pick-first knob)
-    /// and pause/resume (hold out of rotation) — the Settings › Accounts
-    /// buttons, reachable from the popup. Mac-only; a mirroring host
-    /// leaves them no-ops.
+    /// A row's context menu: star/unstar (the engine's pick-first knob),
+    /// pause/resume (hold out of rotation) and keep-warm (the daemon
+    /// restarts the 5h window whenever it goes cold) — the Settings ›
+    /// Accounts buttons, reachable from the popup. Mac-only; a mirroring
+    /// host leaves them no-ops.
     func setPreferred(_ number: Int, _ on: Bool)
     func setRotation(_ number: Int, enabled: Bool)
+    func setAutoIgnite(_ number: Int, _ on: Bool)
 }
 
 // `FleetLabel` moved to InfinitusCore (FleetPanel.swift) so the Windows
@@ -146,6 +148,7 @@ public extension FleetModel {
     var canAddAccount: Bool { false }
     func setPreferred(_ number: Int, _ on: Bool) {}
     func setRotation(_ number: Int, enabled: Bool) {}
+    func setAutoIgnite(_ number: Int, _ on: Bool) {}
 }
 
 /// The cash column's source — the estimated-spend report the mac app

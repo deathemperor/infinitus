@@ -604,6 +604,14 @@ struct AccountRowMenu<M: FleetModel>: View {
                 Label(paused ? "Resume" : "Pause", systemImage: paused ? "play.circle" : "pause.circle")
             }
         }
+        if model.capabilities.contains(.autoIgnite), let warm = account.autoIgnite {
+            Button {
+                model.setAutoIgnite(account.number, !warm)
+            } label: {
+                Label(warm ? "Stop keeping warm" : "Keep warm",
+                      systemImage: warm ? "flame.slash" : "flame")
+            }
+        }
     }
 }
 

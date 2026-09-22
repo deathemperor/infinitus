@@ -276,6 +276,15 @@ final class FleetState: ObservableObject, Identifiable {
         perform { try await engine.setHold(fleet: provider, number: number, held: !enabled) }
     }
 
+    /// Keep-warm on/off: the engine's daemon restarts this account's 5h
+    /// window whenever it has gone cold. The verb answers with the edited
+    /// fleet, so `perform` seeds it and the row flips without waiting for
+    /// the next poll.
+    func setAutoIgnite(_ number: Int, _ on: Bool) {
+        let engine = engine, provider = provider
+        perform { try await engine.setAutoIgnite(fleet: provider, number: number, on) }
+    }
+
     /// Stars flipped but not yet confirmed by the engine (the subprocess
     /// plus the snapshot refresh take a few seconds — user 2026-09-03
     /// "pressing star … is not responsive"): the row shows this at once.
@@ -426,6 +435,13 @@ extension FleetState: FleetModel {
                    caveat: host.fleetCaveats[engineID])
     }
     var appUpdatePending: Bool { host.appUpdatePending }
+    /// The ignite trio, per fleet: the rows render with a FleetState, so
+    /// without these a row's ignite affordance sees the protocol's
+    /// `false`/no-op defaults and quietly never appears. `igniting` is the
+    /// host's single in-flight marker — one ignition at a time, fleet-wide.
+    var canIgnite: Bool { capabilities.contains(.ignite) }
+    var igniting: Int? { host.igniting }
+    func ignite(_ number: Int) { host.ignite(number, on: self) }
     var engineMissing: Bool { host.engineMissing }
     var introTick: Int { host.introTick }
     var introStyle: String { host.introStyle }

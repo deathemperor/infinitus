@@ -16,6 +16,7 @@ import {
 } from "@infinitus/contracts";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 import {
   buildTailscaleHttpsBaseUrl,
   DEFAULT_TAILSCALE_SERVE_PORT,
@@ -321,10 +322,11 @@ const makePairServerConfig = Effect.fn(function* (input: {
     traceMaxFiles: 10,
     otlpTracesUrl: undefined,
     otlpMetricsUrl: undefined,
-    otlpExportIntervalMs: 10_000,
+    otlpLogsUrl: undefined,
+    otlpTracesExport: DEFAULT_SIGNAL_EXPORT,
+    otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
+    otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
     otlpServiceName: "t3-server",
-    otlpHeaders: undefined,
-    otlpProtocol: "http/json",
     mode: "web",
     port: state.port,
     host: state.host,
