@@ -1,3 +1,4 @@
+import type { EnvironmentPresentation } from "../../state/environments";
 import { InfinitusLaunchButton } from "../settings/infinitus/InfinitusLaunchButton";
 import { Button } from "../ui/button";
 
@@ -7,17 +8,21 @@ import { Button } from "../ui/button";
  * subscription rather than asking the socket again from here.
  */
 export function AccountsUnavailable({
+  environment,
   reason,
   socketPath,
   onRetry,
 }: {
+  /** The machine whose socket is quiet; its own app is the one to launch.
+      The primary-only pages leave it out and get the primary. */
+  readonly environment?: EnvironmentPresentation;
   readonly reason: string | null;
   readonly socketPath: string | null;
   readonly onRetry: () => void;
 }) {
   return (
     <section className="flex max-w-xl flex-col items-start gap-2 rounded-lg border p-4">
-      <h2 className="font-medium text-foreground text-sm">Infinitus is offline</h2>
+      <h3 className="font-medium text-foreground text-sm">Infinitus is offline</h3>
       <p className="text-muted-foreground text-sm">
         {reason ?? "The control socket did not answer."}
       </p>
@@ -25,7 +30,7 @@ export function AccountsUnavailable({
         <p className="break-all font-mono text-muted-foreground text-xs">{socketPath}</p>
       )}
       <div className="flex flex-wrap items-start gap-2">
-        <InfinitusLaunchButton />
+        <InfinitusLaunchButton {...(environment === undefined ? {} : { environment })} />
         <Button size="sm" variant="outline" onClick={onRetry}>
           Retry
         </Button>

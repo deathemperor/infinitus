@@ -25,7 +25,7 @@ export function SignInsSection({
 }) {
   return (
     <section className="flex flex-col gap-1">
-      <h2 className="font-medium text-foreground text-sm">Sign-ins</h2>
+      <h3 className="font-medium text-foreground text-sm">Sign-ins</h3>
       <p className="text-muted-foreground text-xs">
         Expired AWS and gcloud credentials. Signing in runs on the Mac.
       </p>

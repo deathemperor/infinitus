@@ -12,9 +12,24 @@ const environmentId = EnvironmentId.make("test-environment");
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
+  /** A second machine's snapshot, drawn only when `environments` lists it. */
+  remoteSnapshot: null as InfinitusSnapshot | null,
+  environments: [] as ReadonlyArray<ReturnType<typeof testEnvironment>>,
   command: vi.fn(),
   refresh: vi.fn(),
 }));
+
+const testEnvironment = (environmentId: string, label: string) => ({
+  environmentId,
+  label,
+  connection: { phase: "connected" as string },
+  serverConfig: {
+    environment: {
+      capabilities: { infinitus: true },
+      platform: { os: "darwin", arch: "arm64" },
+    },
+  },
+});
 
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("./signIn.logic", async (importOriginal) => ({
@@ -23,7 +38,12 @@ vi.mock("./signIn.logic", async (importOriginal) => ({
 }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () =>
-    new Map([["test-environment", { environment: { capabilities: { infinitus: true } } }]]),
+    new Map(
+      testState.environments.map((environment) => [
+        environment.environmentId,
+        { environment: { capabilities: { infinitus: true } } },
+      ]),
+    ),
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -42,36 +62,33 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 vi.mock("../../state/environments", () => ({
-  useEnvironments: () => ({
-    environments: [{ environmentId: "test-environment", label: "Test environment" }],
-  }),
+  useEnvironments: () => ({ environments: testState.environments }),
   usePrimaryEnvironmentId: () => "test-environment",
-  usePrimaryEnvironment: () => ({
-    environmentId: "test-environment",
-    serverConfig: {
-      environment: {
-        capabilities: { infinitus: true },
-        platform: { os: "darwin", arch: "arm64" },
-      },
-    },
-  }),
+  usePrimaryEnvironment: () => testState.environments[0] ?? null,
 }));
 vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
-    snapshot: () => ({ label: "snapshot-atom" }),
+    snapshot: ({ environmentId }: { environmentId: string }) => ({
+      label: "snapshot-atom",
+      environmentId,
+    }),
     command: { label: "command-atom" },
     launch: { label: "launch-atom" },
     secret: { label: "secret-atom" },
   },
 }));
 vi.mock("../../state/query", () => ({
-  useEnvironmentQuery: () => ({
-    data: testState.snapshot,
-    error: null,
-    isPending: testState.snapshot === null,
-    isSuccess: testState.snapshot !== null,
-    refresh: testState.refresh,
-  }),
+  useEnvironmentQuery: (atom: { environmentId: string }) => {
+    const snapshot =
+      atom.environmentId === "remote-environment" ? testState.remoteSnapshot : testState.snapshot;
+    return {
+      data: snapshot,
+      error: null,
+      isPending: snapshot === null,
+      isSuccess: snapshot !== null,
+      refresh: testState.refresh,
+    };
+  },
 }));
 vi.mock("../../state/server", () => ({ environmentServerConfigsAtom: { label: "configs-atom" } }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => testState.command }));
@@ -84,13 +101,6 @@ vi.mock("../../hooks/useSettings", () => ({
 vi.mock("../ui/badge", () => ({ Badge: "span" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
-vi.mock("../ui/menu", () => ({
-  Menu: "div",
-  MenuPopup: "div",
-  MenuRadioGroup: "div",
-  MenuRadioItem: "div",
-  MenuTrigger: "button",
-}));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
 vi.mock("../ui/sidebar", () => ({ SidebarInset: "div" }));
 vi.mock("../ui/skeleton", () => ({ Skeleton: "div" }));
@@ -189,11 +199,74 @@ const readySnapshot: InfinitusSnapshot = {
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   testState.snapshot = null;
+  testState.remoteSnapshot = null;
+  testState.environments = [testEnvironment("test-environment", "Test environment")];
   testState.command = vi.fn().mockResolvedValue({ _tag: "Success", value: {} });
   testState.refresh = vi.fn();
 });
 
 describe("AccountsPage", () => {
+  it("draws every machine that runs Infinitus, each with its own accounts", async () => {
+    testState.environments = [
+      testEnvironment("test-environment", "This Mac"),
+      testEnvironment("remote-environment", "Studio"),
+    ];
+    testState.snapshot = readySnapshot;
+    testState.remoteSnapshot = {
+      available: true,
+      fleets: [
+        {
+          key: "claude",
+          engineID: "swapd",
+          provider: "Claude",
+          capabilities: ["switch"],
+          activeNumber: 3,
+          accounts: [
+            account({ number: 3, email: "studio@example.com", active: true }),
+            account({ number: 4, email: "studio-spare@example.com", alias: "studio spare" }),
+          ],
+        },
+      ],
+      commands: [],
+    };
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+    expect(markup).toContain("This Mac");
+    expect(markup).toContain("Studio");
+    expect(markup).toContain("one@example.com");
+    expect(markup).toContain("studio@example.com");
+
+    // A button on the second machine's row goes to that machine's socket.
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Switch studio spare",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    expect(testState.command).toHaveBeenCalledWith({
+      environmentId: EnvironmentId.make("remote-environment"),
+      input: { command: "switch", args: ["claude", "4"], options: {} },
+    });
+    renderer.unmount();
+  });
+
+  it("says so when a listed machine is not connected", () => {
+    testState.environments = [
+      testEnvironment("test-environment", "This Mac"),
+      { ...testEnvironment("remote-environment", "Studio"), connection: { phase: "offline" } },
+    ];
+    testState.snapshot = readySnapshot;
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+
+    expect(markup).toContain("Studio");
+    expect(markup).toContain("Not connected.");
+  });
+
   it("names the socket and offers a retry when Infinitus is offline", () => {
     testState.snapshot = {
       available: false,
