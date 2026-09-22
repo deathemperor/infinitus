@@ -131,6 +131,36 @@ codesign --verify --deep --strict "/Applications/T3 Code (Alpha).app"
 codesign -d --entitlements :- "/Applications/T3 Code (Alpha).app"
 ```
 
+## Sign in with Apple (phone)
+
+The phone signs in through Clerk's native `AuthView`, which shows every social connection the
+instance enables. App Review (guideline 4.8) requires Sign in with Apple next to any other social
+login, so the production instance carries an Apple connection with custom credentials. The build
+already holds the entitlement: the `@clerk/expo` plugin in `apps/mobile/app.config.ts` adds
+`com.apple.developer.applesignin` to every non-personal-team build, and the App ID
+`run.infinitus.mobile` has the capability. Enabling or repairing the connection is configuration
+only, no new binary.
+
+In the Apple Developer portal (team `Q783W6B4FA`):
+
+1. A Services ID (`run.infinitus.mobile.web`) with Sign in with Apple enabled, primary App ID
+   `run.infinitus.mobile`, domain `clerk.infinitus.run`, return URL
+   `https://clerk.infinitus.run/v1/oauth_callback` (read the exact URL off Clerk's Apple
+   connection page before registering).
+2. A key with Sign in with Apple enabled for that primary App ID. Apple serves the `.p8` once;
+   keep it beside the notarization key and note its Key ID in `~/.config/infinitus/signing.env`
+   (`SIWA_KEY_ID`, `SIWA_KEY_PATH`, `SIWA_SERVICES_ID`).
+
+In the Clerk Dashboard, **SSO connections** › Apple: Services ID, Team ID, Key ID and the key's
+PEM, with "Enable for sign-up and sign-in" on. The iOS app must already be listed under
+**Native applications** with the App ID prefix and bundle ID. Verify with
+`https://clerk.infinitus.run/v1/environment`: `user_settings.social.oauth_apple.enabled` is the
+proof, not the dashboard.
+
+Users who hide their email get an Apple relay address. Register Clerk's sender (the "Email
+Source for Apple Private Email Relay" value) under Sign in with Apple › Email Communication in
+the portal, or those users never receive Clerk's codes.
+
 ## Restricting sign-ups
 
 Use Clerk's allowlist for permitted email addresses or domains, or Restricted mode for invitation-only
