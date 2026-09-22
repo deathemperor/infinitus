@@ -10,6 +10,27 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.32
+
+### Mac
+- A sign-in the AWS CLI ended without completing, such as a declined account rebind, is no longer recorded as signed in.
+- The setup cards' "Copy for an AI agent" button is gone; the first account is one Add account click in the desktop app.
+- The "Add Claude account" companion window is gone; the sign-in sheet stands alone, closing it cancels the sign-in, and a second click on Add or Re-login brings it back.
+- The popup's first-account card offers Sign in…, which opens the desktop app for its Accounts page, beside the one-click adopt of a Claude Code login; a login made since launch is detected on the next open, no relaunch.
+
+### Desktop
+- Accounts shows the accounts on every connected machine that runs Infinitus at once, one group per machine, instead of one machine picked from a menu.
+- Add account and Sign in again work from another machine — the sign-in opens in your browser there and the owning Mac finishes it.
+- A thread stopped by a usage limit resumes on the same account once that account has room again, instead of waiting for a swap that never comes.
+- An empty fleet says what Add account does, and the no-engine page says to turn swapd on rather than install it.
+
+### Phone
+- Settings groups draw as cards again on the Grove, Ocean, Ember and Iris themes, where the card colour had collapsed into the sheet.
+- The no-engine page says to turn swapd on in the desktop app rather than install it.
+
+### Linux
+- The tray's empty-fleet tooltip names swapd add-oauth for a first sign-in.
+
 ## 0.5.0-alpha.31
 
 ### Mac
