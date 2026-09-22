@@ -263,14 +263,7 @@ export function AccountRow({
 
       {row.windows.length > 0 ? <WindowGrid windows={row.windows} /> : null}
 
-      {row.scoped.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs">
-            {row.scoped.length} model {row.scoped.length === 1 ? "window" : "windows"}
-          </span>
-          <WindowGrid windows={row.scoped} />
-        </div>
-      ) : null}
+      {row.scoped.length > 0 ? <WindowGrid windows={row.scoped} /> : null}
 
       {failure === null ? null : <p className="text-destructive text-xs">{failure}</p>}
 
