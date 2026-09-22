@@ -299,7 +299,11 @@ actor AwsLoginRunner {
         live.remove(process)
         guard var run = runs[key], run.process === process else { return }
         let prompt = run.state.providerOrAws.parseOutput(run.output)
-        if status == 0 || prompt.succeeded {
+        // The success line, never the exit code: `aws login` returns 0
+        // without "Updated profile" when the rebind question is declined
+        // (login.py returns early), so status alone took the "n" this
+        // runner answers for a sign-in and overrode the refusal above.
+        if prompt.succeeded {
             run.state.phase = .done
             run.state.message = "signed in"
         } else if run.state.phase == .failed, run.state.message != nil {
