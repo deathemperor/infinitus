@@ -601,7 +601,7 @@ struct OnboardingCard: View {
             .foregroundStyle(.secondary)
             .frame(width: onboardingTextWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
-        Text("For source builds:  \(OnboardingBrief.swapdInstallCommand)")
+        Text("For source builds:  \(Self.swapdInstallCommand)")
             .font(.caption).monospaced()
             .foregroundStyle(.tertiary)
             .textSelection(.enabled)
@@ -611,34 +611,10 @@ struct OnboardingCard: View {
             .font(.caption)
             .foregroundStyle(.tertiary)
         DetectionLines(model: model, afterInstall: true)
-        OnboardingBriefButton(model: model, engineInstalled: false)
     }
-}
 
-/// "Copy for an AI agent" (user 2026-09-03): the whole first-run recipe,
-/// with what this Mac already has ticked, on the clipboard — paste it
-/// into Claude Code and let it do the typing.
-struct OnboardingBriefButton: View {
-    @ObservedObject var model: AppModel
-    let engineInstalled: Bool
-    @State private var copied = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Button(copied ? "Copied" : "Copy for an AI agent") {
-                let text = OnboardingBrief.text(engineInstalled: engineInstalled,
-                                                claude: model.claudeCLI, proxy: model.cliProxy,
-                                                proxyLive: model.cliProxyLive)
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-                copied = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
-            }
-            .font(PopupFont.caption)
-            Text("Paste it into Claude Code and it does the steps for you.")
-                .font(.caption).foregroundStyle(.secondary)
-        }
-    }
+    /// Source-build fallback; official Mac releases carry the engine in the bundle.
+    static let swapdInstallCommand = "cargo install --git https://github.com/deathemperor/swapd swapd"
 }
 
 /// Engine present, fleet empty (todo 2026-09-01, reworked 2026-09-22):
@@ -698,7 +674,6 @@ struct FirstAccountCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             DetectionLines(model: model, afterInstall: false)
-            OnboardingBriefButton(model: model, engineInstalled: true)
         }
         .padding(6)
     }
