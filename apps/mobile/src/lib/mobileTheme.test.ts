@@ -96,12 +96,7 @@ describe("mobile themes", () => {
       );
       expect(variables["--color-card"]).toBe(themeColorToNativeColor(colors.surface));
       expect(variables["--color-composer-surface"]).toBe(
-        themeColorWithAlpha(
-          themeId === DEFAULT_MOBILE_THEME_ID
-            ? variables["--color-grouped-card"]
-            : themeColorToNativeColor(colors.surface),
-          appearance === "dark" ? 0.9 : 0.94,
-        ),
+        themeColorWithAlpha(variables["--color-grouped-card"], appearance === "dark" ? 0.9 : 0.94),
       );
       expect(variables["--color-thread-selected"]).toBe(
         themeColorToNativeColor(colors.sidebarRowActive),
@@ -168,12 +163,15 @@ describe("mobile themes", () => {
   });
 
   it.each(["light", "dark"] as const)(
-    "separates default settings groups from their %s background",
+    "separates settings groups from their %s background in every theme",
     (appearance) => {
+      for (const themeId of MOBILE_THEME_IDS) {
+        const themed = getMobileThemeVariables(themeId, appearance);
+        expect(
+          contrastRatio(themed["--color-grouped-card"], themed["--color-sheet-solid"]),
+        ).toBeGreaterThanOrEqual(1.06);
+      }
       const variables = getMobileThemeVariables("t3-code", appearance);
-      expect(
-        contrastRatio(variables["--color-grouped-card"], variables["--color-sheet-solid"]),
-      ).toBeGreaterThanOrEqual(1.06);
       expect(variables["--color-grouped-card"]).not.toBe(variables["--color-card"]);
       for (const platform of ["ios", "android"]) {
         const runtime = getMobileThemeRuntimeVariables("t3-code", appearance, platform);

@@ -192,6 +192,17 @@ function contrastRatio(
   );
 }
 
+/** Whether a fill is visibly distinct from the surface it sits on. */
+function standsOff(fill: string, surface: string): boolean {
+  const fillChannels = rgbChannels(themeColorToNativeColor(fill));
+  const surfaceChannels = rgbChannels(themeColorToNativeColor(surface));
+  return (
+    fillChannels !== null &&
+    surfaceChannels !== null &&
+    contrastRatio(fillChannels, surfaceChannels) >= 1.06
+  );
+}
+
 /** Preserve the color's hue while giving text 4.5:1 contrast on every supplied surface. */
 function readableTextColor(accent: string, surface: string | ReadonlyArray<string>): string {
   const accentChannels = rgbChannels(accent);
@@ -369,13 +380,15 @@ export function getMobileThemeVariables(
 ): MobileThemeVariables {
   const colors = getMobileThemeColors(themeId, appearance);
   // Mobile settings groups and fallback materials use tonal fills where desktop
-  // uses outlined cards. Regular cards retain their shared desktop surface.
-  const groupedCard =
-    themeId === DEFAULT_MOBILE_THEME_ID
-      ? appearance === "light"
-        ? colors.toolbarControlHover
-        : colors.sidebarRowActive
-      : colors.surface;
+  // uses outlined cards. Regular cards retain their shared desktop surface. A
+  // theme whose surface already stands off its chrome keeps it for the groups;
+  // most palettes give both the same colour, and a group painted in it would
+  // vanish into the settings sheet.
+  const groupedCard = standsOff(colors.surface, colors.chrome)
+    ? colors.surface
+    : appearance === "light"
+      ? colors.toolbarControlHover
+      : colors.sidebarRowActive;
   const mobileColors =
     themeId === DEFAULT_MOBILE_THEME_ID
       ? {
