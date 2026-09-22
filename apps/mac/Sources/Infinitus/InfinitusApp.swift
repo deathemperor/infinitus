@@ -309,13 +309,12 @@ struct MenuContent: View {
                 get: { model.pendingSwitch != nil },
                 set: { if !$0 { model.pendingSwitch = nil } })
         ) {
-            Button("Switch") {
-                if let n = model.pendingSwitch { model.switchTo(n) }
-                model.pendingSwitch = nil
-            }
+            Button("Switch") { model.commitPendingSwitch() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every Claude Code session on this machine rides the "
+            // A peer row's switch lands on that machine (#1545).
+            let machine = (model.pendingSwitchFleet?.engine as? PeerEngine)?.machineLabel ?? "this machine"
+            Text("Every Claude Code session on \(machine) rides the "
                  + "active account. Switch to account "
                  + "\(model.pendingSwitch.map(String.init) ?? "?")?")
         }
@@ -326,7 +325,7 @@ struct MenuContent: View {
     /// `SwapdMapping.fleets`, so the add-first-account paths can resolve
     /// it), and here it would be a header with nothing under it.
     private var populatedFleets: [FleetState] {
-        model.fleets.filter { !$0.accounts.isEmpty }
+        (model.fleets + model.peerFleets).filter { !$0.accounts.isEmpty }
     }
 
     /// Ten-plus accounts scroll instead of growing an off-screen popup.

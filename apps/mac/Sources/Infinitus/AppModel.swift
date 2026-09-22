@@ -20,7 +20,12 @@ final class AppModel: ObservableObject {
     // title, resume nudges and push triggers keep reading `accounts`
     // exactly as before.
     private(set) lazy var registry = EngineRegistry(host: self)
-    var fleets: [FleetState] { registry.fleets }
+    /// This Mac's own fleets. Other machines' are `peerFleets`; only the
+    /// popup stacks both (#1545).
+    var fleets: [FleetState] { registry.localFleets }
+    var peerFleets: [FleetState] { registry.peerFleets }
+    /// Other machines' accounts, pushed by the desktop over `peer-sync`.
+    private(set) lazy var peers = PeerFleetsModel(host: self)
     var primary: FleetState? { registry.primary }
     /// Per-engine last error (the primary's also lands in lastError).
     @Published var engineErrors: [String: String] = [:]
@@ -77,9 +82,15 @@ final class AppModel: ObservableObject {
     }
     /// Click-to-switch staging: the row sets this, the popup's
     /// confirmation alert commits or clears it.
+    /// The fleet whose row staged a switch — any fleet, a peer's too, so
+    /// the one confirm alert serves every row the popup draws.
+    var pendingSwitchFleet: FleetState? { registry.fleets.first { $0.pendingSwitch != nil } }
     var pendingSwitch: Int? {
-        get { primary?.pendingSwitch }
-        set { primary?.pendingSwitch = newValue }
+        get { pendingSwitchFleet?.pendingSwitch }
+        set {
+            if let newValue { primary?.pendingSwitch = newValue }
+            else { for fleet in registry.fleets { fleet.pendingSwitch = nil } }
+        }
     }
     @Published var dataPulseTick = 0
 
@@ -1280,6 +1291,7 @@ final class AppModel: ObservableObject {
         guard !registry.engines.isEmpty else { return }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
+                await self?.peers.expireSilent()
                 await self?.refreshSnapshot()
                 // Read the pref each pass so an interval change applies on
                 // the next tick without restarting the task.
@@ -1745,7 +1757,9 @@ final class AppModel: ObservableObject {
         let stamp = Date()
         for engine in engines {
             var byEmail: [String: SharedUsage] = [:]
-            for r in results where r.id != engine.id {
+            // A peer's reading is as old as the desktop's last push and
+            // would only suppress the local engine's own poll.
+            for r in results where r.id != engine.id && !PeerFleets.isPeer(engineID: r.id) {
                 for fleet in r.fleets ?? [] where fleet.provider == .claude {
                     for a in fleet.accounts where a.usageStatus == "ok" {
                         guard let u = a.usage else { continue }
@@ -1905,6 +1919,12 @@ final class AppModel: ObservableObject {
     // Primary-fleet actions (the mac-only panes and the wall call these;
     // the shared rows act on their own FleetState).
     func switchTo(_ number: Int) { primary?.switchTo(number) }
+    /// The confirm alert's Switch: the fleet that staged it, a peer's too.
+    func commitPendingSwitch() {
+        guard let fleet = pendingSwitchFleet, let number = fleet.pendingSwitch else { return }
+        fleet.switchTo(number)
+        pendingSwitch = nil
+    }
     func rotate() { primary?.rotate() }
 
     @Published var reorderError: String?

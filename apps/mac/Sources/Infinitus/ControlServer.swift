@@ -239,7 +239,7 @@ final class ControlServer {
             ] as [String: JSONValue]))
 
         case "status":
-            return ControlReply(ok: true, result: try .of(status()))
+            return ControlReply(ok: true, result: try .of(await status()))
 
         case "fleets":
             return ControlReply(ok: true, result: try .of(fleetsPayload()))
@@ -712,6 +712,10 @@ final class ControlServer {
             let report = try ControlBody.decode(ClientActivity.Report.self, from: r)
             model.leases.report(report)
             return ControlReply(ok: true, result: .object(["clientId": .string(report.clientId)]))
+
+        case PeerFleets.command:
+            let body = try ControlBody.decode(PeerFleets.Body.self, from: r, cap: 4 * 1024 * 1024)
+            return ControlReply(ok: true, result: try .of(await model.peers.sync(body)))
 
         case "crash-report":
             let report = try ControlBody.decode(CrashReport.self, from: r, cap: 2 * CrashReport.rawCap)
@@ -1238,14 +1242,19 @@ final class ControlServer {
         let signInRunning: Bool
         let playground: Bool
         let socket: String
+        /// Row actions queued for other machines and not yet answered
+        /// (`peer-sync`, #1545): the desktop pushes at once when this is
+        /// above zero.
+        let peerCommandsPending: Int
         /// #777: where this process runs from, and whether that is inside
         /// the desktop bundle — the desktop's reconcile quits only its own.
         let bundlePath: String
         let nested: Bool
     }
 
-    private func status() -> Status {
+    private func status() async -> Status {
         let info = Bundle.main.infoDictionary ?? [:]
+        let peerCommandsPending = await model.peers.pendingCount()
         return Status(
             version: info["CFBundleShortVersionString"] as? String ?? "dev",
             sha: info["InfinitusGitSHA"] as? String ?? info["CFBundleVersion"] as? String ?? "dev",
@@ -1267,6 +1276,7 @@ final class ControlServer {
             signInRunning: TokenFlow.shared.running || model.addingFirstAccount,
             playground: model.isPlayground,
             socket: ControlProtocol.socketURL().path,
+            peerCommandsPending: peerCommandsPending,
             bundlePath: Nesting.bundlePath,
             nested: Nesting.isNested)
     }

@@ -102,6 +102,10 @@ export const InfinitusStatus = Schema.Struct({
       Absent from helpers that predate it; the struct drops unknown keys, so
       the two versions tolerate each other. */
   bundlePath: Schema.optionalKey(Schema.String),
+  /** Row actions the popup queued for other machines and nobody has answered
+      (`peer-sync`, #1545): the desktop pushes at once when this is above zero.
+      Absent from an older app. */
+  peerCommandsPending: Schema.optionalKey(Schema.Number),
 });
 export type InfinitusStatus = typeof InfinitusStatus.Type;
 
@@ -930,6 +934,50 @@ export type InfinitusSubscribeInput = typeof InfinitusSubscribeInput.Type;
 /** One command call a client asks the server to forward. The same triple the
     control request carries, minus `secret`: material read from stdin never
     crosses the RPC boundary. */
+/** One other machine as the desktop pushes it to the menu bar app over
+    `peer-sync` (#1545): its snapshot's fleets, or null before the first one
+    arrived, and whether the desktop can reach it right now. */
+export const InfinitusPeerSyncMachine = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+  connected: Schema.Boolean,
+  fleets: Schema.NullOr(Schema.Array(InfinitusFleet)),
+});
+export type InfinitusPeerSyncMachine = typeof InfinitusPeerSyncMachine.Type;
+
+/** What one forwarded peer command came to, in that machine's own words. */
+export const InfinitusPeerSyncResult = Schema.Struct({
+  id: Schema.String,
+  ok: Schema.Boolean,
+  error: Schema.optionalKey(Schema.String),
+});
+export type InfinitusPeerSyncResult = typeof InfinitusPeerSyncResult.Type;
+
+/** The `peer-sync` body: every other environment that runs Infinitus, and the
+    outcome of each command run since the last push. */
+export const InfinitusPeerSyncBody = Schema.Struct({
+  machines: Schema.Array(InfinitusPeerSyncMachine),
+  results: Schema.Array(InfinitusPeerSyncResult),
+});
+export type InfinitusPeerSyncBody = typeof InfinitusPeerSyncBody.Type;
+
+/** One row action the popup queued for another machine: a control command in
+    that machine's own words, which the desktop forwards verbatim. */
+export const InfinitusPeerSyncCommand = Schema.Struct({
+  id: Schema.String,
+  machine: Schema.String,
+  command: Schema.String,
+  args: Schema.Array(Schema.String),
+  options: Schema.Record(Schema.String, Schema.String),
+});
+export type InfinitusPeerSyncCommand = typeof InfinitusPeerSyncCommand.Type;
+
+/** The `peer-sync` reply, hand-written from the manifest's prose. */
+export const InfinitusPeerSyncReply = Schema.Struct({
+  commands: Schema.Array(InfinitusPeerSyncCommand),
+});
+export type InfinitusPeerSyncReply = typeof InfinitusPeerSyncReply.Type;
+
 export const InfinitusCommandInput = Schema.Struct({
   command: Schema.String,
   args: Schema.Array(Schema.String),

@@ -2,7 +2,7 @@
 
 An **engine** manages provider logins, reads their usage, and handles account switching. Infinitus shows what the engine reports and lets you control it.
 
-A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them. Accounts lists every connected host that runs Infinitus, one group per host, so one page shows the status of the accounts on all your machines.
+A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them. Accounts lists every connected host that runs Infinitus, one group per host, so one page shows the status of the accounts on all your machines. The menu bar popup shows them too while the desktop app is open on that Mac, each fleet headed by its machine's name, and a switch, hold, star, keep-warm, rename or remove on one of those rows runs on that machine. Adding an account and igniting stay on the machine's own Accounts page.
 
 ## Set up an engine
 

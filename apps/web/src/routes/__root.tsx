@@ -29,6 +29,8 @@ import { CaptureGestureCoordinator } from "../components/captures/CaptureGesture
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
 import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
+import { InfinitusPeerFleets } from "../components/InfinitusPeerFleets";
+import { isElectron } from "../env";
 import { DesktopBadgeCoordinator } from "../components/desktop/DesktopBadgeCoordinator";
 import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAwakeCoordinator";
 import { NotificationModeMigration } from "../components/desktop/NotificationModeMigration";
@@ -239,6 +241,7 @@ function RootRouteView() {
           <CustomSnoozeDialogHost />
           <SlowRpcRequestToastCoordinator />
           {primaryEnvironmentAuthenticated ? <InfinitusEventToasts /> : null}
+          {primaryEnvironmentAuthenticated && isElectron ? <InfinitusPeerFleets /> : null}
           <ProjectCloneToastCoordinator />
           <HostedStaticEnvironmentBootstrap />
           {primaryEnvironmentAuthenticated ? (

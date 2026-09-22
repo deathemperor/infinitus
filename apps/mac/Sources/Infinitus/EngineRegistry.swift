@@ -25,9 +25,31 @@ final class EngineRegistry: ObservableObject {
         engines.first { $0.id == id }
     }
 
+    /// Drop an engine and the fleet states it reported — a peer machine
+    /// the desktop stopped pushing (`PeerFleetsModel`). Local engines
+    /// live for the app's life and never come through here.
+    func remove(engineID: String) {
+        engines.removeAll { $0.id == engineID }
+        let gone = fleets.filter { $0.engineID == engineID }
+        guard !gone.isEmpty else { return }
+        for state in gone { sinks[state.id] = nil }
+        fleets.removeAll { $0.engineID == engineID }
+        host.forwardFleetChange()
+    }
+
+    /// This Mac's own fleets: what the `fleets` verb, the launch cache
+    /// and the team publish every reason about. Never a peer's (#1545):
+    /// the desktop reads this list as this machine's accounts and pushes
+    /// the other machines' back, so a peer here would echo forever.
+    var localFleets: [FleetState] { fleets.filter { !PeerFleets.isPeer(engineID: $0.engineID) } }
+    /// Other machines' fleets, as the desktop last pushed them.
+    var peerFleets: [FleetState] { fleets.filter { PeerFleets.isPeer(engineID: $0.engineID) } }
+
     /// The Claude fleet the popup chrome, title, resume nudge and push
-    /// triggers reason about — swapd's when swapd is on.
-    var primary: FleetState? { fleets.first { $0.provider == .claude } }
+    /// triggers reason about — swapd's when swapd is on. Never a peer's:
+    /// another machine's accounts must not drive this one's title,
+    /// notifications or switch alert.
+    var primary: FleetState? { localFleets.first { $0.provider == .claude } }
 
     /// Find or create the state for a reported fleet.
     func state(for fleet: EngineFleet) -> FleetState {
@@ -50,8 +72,9 @@ final class EngineRegistry: ObservableObject {
         return state
     }
 
+    /// Local fleets before peers, Claude first within each.
     private static func rank(_ f: FleetState) -> Int {
-        f.provider == .claude ? 0 : 1
+        (PeerFleets.isPeer(engineID: f.engineID) ? 2 : 0) + (f.provider == .claude ? 0 : 1)
     }
 
     private func engineIndex(_ id: String) -> Int {
