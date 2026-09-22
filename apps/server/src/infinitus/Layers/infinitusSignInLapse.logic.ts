@@ -129,6 +129,11 @@ const ENV_PREFIX = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*/;
 const AWS_LOGIN_RUN = /^aws\s+(?:sso\s+)?login\b/;
 const GCLOUD_LOGIN_RUN = /^gcloud\s+auth\s+(application-default\s+)?login\b/;
 const GCLOUD_LOGIN_ACCOUNT = /\blogin\s+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)/;
+/** banyan's `bun scripts/agent-login.ts <aws|gcp>` wraps the same two CLIs
+    (its same-device mode is plain `aws login` / `gcloud auth login`), and
+    a login it opens is otherwise invisible (2026-09-22: a browser tab and
+    no card). Its AWS default is the `banyan` profile. */
+const AGENT_LOGIN_RUN = /\bagent-login\.ts\s+(aws|gcp)\b/;
 
 /**
  * The sign-in a Bash command is itself running, or null: an agent that types
@@ -154,6 +159,12 @@ export function signInRun(command: string): SignInLapse | null {
     if (/\s(?:--help|-h|help)(?:\s|$)/.test(run)) continue;
     if (AWS_LOGIN_RUN.test(run)) {
       return { provider: "aws", profile: AWS_COMMAND_PROFILE.exec(segment)?.[1] ?? "default" };
+    }
+    const wrapped = AGENT_LOGIN_RUN.exec(run);
+    if (wrapped !== null) {
+      return wrapped[1] === "aws"
+        ? { provider: "aws", profile: AWS_COMMAND_PROFILE.exec(segment)?.[1] ?? "banyan" }
+        : { provider: "gcloud", profile: "default" };
     }
     const gcloud = GCLOUD_LOGIN_RUN.exec(run);
     if (gcloud === null) continue;

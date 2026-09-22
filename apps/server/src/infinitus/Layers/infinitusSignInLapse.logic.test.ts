@@ -155,6 +155,20 @@ describe("signInRun", () => {
       provider: "gcloud",
       profile: "me@example.com",
     });
+    // banyan's wrapper around the same CLIs.
+    expect(
+      signInRun(
+        "cd /Users/x/banyan && timeout 300 bun scripts/agent-login.ts gcp 2>&1 | tail -5; gcloud auth print-access-token >/dev/null && echo gcp=ok",
+      ),
+    ).toEqual({ provider: "gcloud", profile: "default" });
+    expect(signInRun("bun scripts/agent-login.ts aws --profile papaya")).toEqual({
+      provider: "aws",
+      profile: "papaya",
+    });
+    expect(signInRun("bun scripts/agent-login.ts aws")).toEqual({
+      provider: "aws",
+      profile: "banyan",
+    });
   });
 
   it("ignores the words searched for, echoed or passed as a message", () => {
@@ -164,6 +178,8 @@ describe("signInRun", () => {
     expect(signInRun("grep -rn aws login src")).toBeNull();
     expect(signInRun("aws login --help")).toBeNull();
     expect(signInRun("gcloud auth login --help | head -40")).toBeNull();
+    expect(signInRun("bun scripts/agent-login.ts --help")).toBeNull();
+    expect(signInRun("sed -n 1,40p scripts/agent-login.ts")).toBeNull();
     expect(signInRun("AWS_PROFILE=papaya aws sts get-caller-identity")).toBeNull();
   });
 
