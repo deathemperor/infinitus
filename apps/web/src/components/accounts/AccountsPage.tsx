@@ -162,16 +162,25 @@ export function AccountsPage() {
       keeps listening until something ends it, and once the page is gone
       nothing here can (#1213). Leaving it retires the flow. */
   const shellFlowIdRef = useRef<string | null>(null);
+  /** The shell's stand-in listener outlives this page the same way: it holds
+      the port until stopped, and an address it caught after the page is gone
+      has nobody to send it. Leaving frees the port. */
+  const redirectFlowIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       addRunRef.current += 1;
       signInRunRef.current += 1;
+      const listening = redirectFlowIdRef.current;
+      if (listening !== null) {
+        redirectFlowIdRef.current = null;
+        void redirectBridge?.stop(listening).catch(() => {});
+      }
       const flowId = shellFlowIdRef.current;
       if (flowId === null) return;
       shellFlowIdRef.current = null;
       void oauthBridge?.cancel(flowId).catch(() => {});
     },
-    [oauthBridge],
+    [oauthBridge, redirectBridge],
   );
 
   const infinitusEnvironments = useMemo(
@@ -404,9 +413,11 @@ export function AccountsPage() {
             ? current
             : { ...current, redirectListening: false, codeError: error },
         );
+      redirectFlowIdRef.current = flowId;
       void redirectSignIn
         .listen({ flowId, port, url: reply.url, label: reply.label })
         .then(async (caught) => {
+          if (redirectFlowIdRef.current === flowId) redirectFlowIdRef.current = null;
           if (!live()) return;
           if (!caught.ok || caught.redirect === undefined) {
             if (caught.error !== undefined) fallBack(caught.error);
