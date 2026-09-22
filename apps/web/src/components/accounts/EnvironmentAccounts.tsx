@@ -630,8 +630,9 @@ function AccountsBody({
     return (
       <div className="flex flex-col gap-6">
         <p className="text-muted-foreground text-sm">
-          Infinitus is running, but no engine reports accounts — install and configure an engine
-          (swapd) for Infinitus to manage them.
+          Infinitus is running, but no engine reports accounts. swapd ships with Infinitus: turn it
+          on under Settings › Engines, then come back here and choose Add account to sign in through
+          your browser.
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <Link

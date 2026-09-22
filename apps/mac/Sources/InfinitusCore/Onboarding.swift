@@ -106,18 +106,27 @@ public enum OnboardingBrief {
                    ? "- [x] 1. Install the engine: already available (official Mac releases bundle swapd)."
                    : "- [ ] 1. Install the engine: install a current Infinitus release and relaunch. "
                      + "For source builds: `\(swapdInstallCommand)` (requires Rust).")
+        // The first account comes from a browser sign-in the engine runs
+        // itself (`add-oauth`, #1213): nothing to sign into beforehand and
+        // no code to paste. A login Claude Code already holds is the
+        // shortcut, not a prerequisite.
         let signedIn = claude?.email != nil
-        out.append("- [\(signedIn ? "x" : " ")] 2. Sign Claude Code into the first account: run `claude`, use "
-                   + "`/login`, the human completes the browser sign-in.")
-        out.append("- [ ] 3. Register it: relaunch Infinitus and choose Add beside the detected login. "
-                   + "For command-line setup, run `swapd add` using the full Binary path shown in "
-                   + "Settings → Engines. The bundled engine is not installed on PATH. "
-                   + "Use Accounts to add more logins once the fleet appears.")
-        out.append("- [ ] 4. Start auto-rotation: Infinitus installs a background account service once the "
-                   + "fleet has accounts (Settings → Engines shows it; `infinitusctl status` from "
+        out.append("- [ ] 2. Add the first account: open the Infinitus desktop app, Accounts, "
+                   + "Add account — the sign-in opens in the browser and the account lands in the "
+                   + "fleet by itself; a human completes the sign-in."
+                   + (signedIn
+                      ? " Shortcut: Claude Code on this Mac is already signed in, so the menu bar "
+                        + "popup's Add button adopts that login in one click (`swapd add`)."
+                      : "")
+                   + " For command-line setup, run `swapd add-oauth` (or `swapd add` to adopt "
+                   + "Claude Code's current login) using the full Binary path shown under "
+                   + "the desktop app's Settings → Engines; the bundled engine is not installed on PATH.")
+        out.append("- [ ] 3. Start auto-rotation: Infinitus installs a background account service once the "
+                   + "fleet has accounts (the desktop app's Settings → Engines shows it; `infinitusctl status` from "
                    + "Infinitus.app/Contents/MacOS confirms). It keeps switching accounts when the menu bar is closed.")
+        out.append("- [ ] 4. Add more accounts the same way: Accounts → Add account, once per login.")
         out.append("- [ ] 5. Optional, CLIProxyAPI as a second engine: `brew install cliproxyapi` "
-                   + "(or the release binary), start it, then in Infinitus Settings → Engines → "
+                   + "(or the release binary), start it, then in the desktop app's Settings → Engines → "
                    + "CLIProxyAPI paste the management key (the human pastes secrets) and add "
                    + "accounts from the same tab.")
         out.append("- [ ] 6. Optional, the phone: Infinitus Settings → Devices has its own "

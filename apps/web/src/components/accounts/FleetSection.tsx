@@ -200,6 +200,15 @@ export function FleetSection({
           )}
         </form>
       )}
+      {section.rows.length === 0 ? (
+        // A fleet the engine manages but holds nothing in: the day swapd is
+        // installed (#1319). The header alone reads as broken, so say what
+        // Add account does here — the shell's browser sign-in, the app's
+        // flow, or adopting the login the Mac's Claude Code holds.
+        <p className="text-muted-foreground text-xs">
+          {emptyFleetHint(inApp, canAdd, signIn.shellOAuth)}
+        </p>
+      ) : null}
       {band === null ? null : <ExhaustedBand band={band} />}
       <div className="flex flex-col">
         {section.rows.map((source) => {
@@ -231,4 +240,13 @@ export function FleetSection({
       </div>
     </section>
   );
+}
+
+/** What "Add account" does on a fleet with no accounts, so the empty header
+    is a first step and not a dead end. */
+function emptyFleetHint(inApp: boolean, canAdd: boolean, shellOAuth: boolean): string {
+  if (inApp && shellOAuth) return "No accounts yet. Add account signs one in through your browser.";
+  if (inApp) return "No accounts yet. Add account starts the provider's sign-in.";
+  if (canAdd) return "No accounts yet. Add account adopts the login Claude Code on the Mac holds.";
+  return "No accounts yet. Add one from the Infinitus desktop app on the owning Mac.";
 }
