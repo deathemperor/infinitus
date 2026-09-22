@@ -16,7 +16,7 @@ import {
   ProviderSessionRuntimeStatus,
   RuntimeMode,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   PersistenceDecodeError,

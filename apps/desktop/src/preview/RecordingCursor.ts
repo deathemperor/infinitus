@@ -1,7 +1,7 @@
 import type {
   DesktopPreviewAnnotationTheme,
   DesktopPreviewRecordingInput,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   DEFAULT_RECORDING_INPUT_OPTIONS,

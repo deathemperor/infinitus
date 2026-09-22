@@ -4,7 +4,7 @@
  * trigger and mode toggle, and each pending card can be dropped from the diff, so neither is
  * repeated here. The popover around it belongs to PullRequestComposer.
  */
-import type { EnvironmentId, PullRequestRef, PullRequestReviewVerdict } from "@t3tools/contracts";
+import type { EnvironmentId, PullRequestRef, PullRequestReviewVerdict } from "@infinitus/contracts";
 import { CheckIcon, MessageSquareIcon, XCircleIcon } from "lucide-react";
 import { useState, type ReactNode, type RefObject } from "react";
 

@@ -9,7 +9,7 @@ import {
   type WorktreeSubmodules,
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
   type ProjectScopedServerSettingKey,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { useRef, useState, type ComponentProps } from "react";
 import { Alert, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -529,7 +529,7 @@ function FanoutSwitchRow(props: {
         className="rounded-full bg-subtle px-3 py-2 active:opacity-70"
         onPress={() => props.onValueChange(true)}
       >
-        <Text className="text-sm font-t3-medium text-foreground">Mixed · Set on</Text>
+        <Text className="text-sm font-infinitus-medium text-foreground">Mixed · Set on</Text>
       </Pressable>
     </SettingsControlRow>
   );

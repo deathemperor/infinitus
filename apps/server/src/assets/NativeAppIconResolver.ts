@@ -1,5 +1,5 @@
 import * as NodeCrypto from "node:crypto";
-import type { ToolActivityNativeAppReference } from "@t3tools/contracts";
+import type { ToolActivityNativeAppReference } from "@infinitus/contracts";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -14,7 +14,7 @@ import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Semaphore from "effect/Semaphore";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 
 import * as ServerConfig from "../config.ts";
 

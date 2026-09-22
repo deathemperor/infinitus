@@ -1,4 +1,4 @@
-import { ThreadId, type DeviceServiceState } from "@t3tools/contracts";
+import { ThreadId, type DeviceServiceState } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { selectedThreadDevicePreview, threadDevicePreviews } from "./threadDevicePreviews";

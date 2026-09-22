@@ -8,7 +8,7 @@ import {
   type RepositoryIdentity,
   type ThreadPullRequestLink,
   type ThreadPullRequestSnapshot,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 

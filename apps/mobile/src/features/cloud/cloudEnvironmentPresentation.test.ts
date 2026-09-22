@@ -1,5 +1,5 @@
-import { EnvironmentId, ORCHESTRATION_PROTOCOL_VERSION } from "@t3tools/contracts";
-import type { RelayEnvironmentStatusResponse } from "@t3tools/contracts/relay";
+import { EnvironmentId, ORCHESTRATION_PROTOCOL_VERSION } from "@infinitus/contracts";
+import type { RelayEnvironmentStatusResponse } from "@infinitus/contracts/relay";
 import { describe, expect, it } from "vite-plus/test";
 
 import { availableCloudEnvironmentPresentation } from "./cloudEnvironmentPresentation";

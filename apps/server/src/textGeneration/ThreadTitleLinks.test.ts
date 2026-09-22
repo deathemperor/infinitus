@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as TestClock from "effect/testing/TestClock";
 import * as Fiber from "effect/Fiber";
 import * as Deferred from "effect/Deferred";
-import { SourceControlProviderError } from "@t3tools/contracts";
+import { SourceControlProviderError } from "@infinitus/contracts";
 import { resolveThreadTitleLinks } from "./ThreadTitleLinks.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 

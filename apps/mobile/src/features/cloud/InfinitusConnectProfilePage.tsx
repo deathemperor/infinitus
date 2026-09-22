@@ -1,11 +1,11 @@
-import { findErrorTraceId } from "@t3tools/client-runtime/errors";
+import { findErrorTraceId } from "@infinitus/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@infinitus/client-runtime/state/runtime";
 import type { MenuAction } from "@react-native-menu/menu";
-import type { EnvironmentId } from "@t3tools/contracts";
-import type { RelayClientEnvironmentRecord } from "@t3tools/contracts/relay";
+import type { EnvironmentId } from "@infinitus/contracts";
+import type { RelayClientEnvironmentRecord } from "@infinitus/contracts/relay";
 import { type ReactNode, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -61,7 +61,7 @@ function confirmDeregister(environment: RelayClientEnvironmentRecord, onConfirm:
  * deregistration. Mirrors the web UserButton page; connections on this device
  * are managed in Settings instead.
  */
-export function T3ConnectProfilePage() {
+export function InfinitusConnectProfilePage() {
   const environmentsState = useManagedRelayEnvironments();
   const deregisterEnvironment = useAtomCommand(deregisterManagedRelayEnvironmentCommand, {
     reportFailure: false,

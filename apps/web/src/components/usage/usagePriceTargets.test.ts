@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@infinitus/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {

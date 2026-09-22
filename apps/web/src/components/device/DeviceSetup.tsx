@@ -1,5 +1,5 @@
 import { DeviceHostUpdates } from "./DeviceHostUpdates";
-import type { DevicePlatform, DeviceServiceState, EnvironmentId } from "@t3tools/contracts";
+import type { DevicePlatform, DeviceServiceState, EnvironmentId } from "@infinitus/contracts";
 import { Check, CircleAlert } from "lucide-react";
 import { useState } from "react";
 

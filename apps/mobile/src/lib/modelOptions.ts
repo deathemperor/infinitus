@@ -2,11 +2,11 @@ import type {
   ModelCapabilities,
   ModelSelection,
   ServerConfig as T3ServerConfig,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import {
   buildExplicitProviderOptionSelectionsFromDescriptors,
   getProviderOptionDescriptors,
-} from "@t3tools/shared/model";
+} from "@infinitus/shared/model";
 
 export type ModelOption = {
   readonly key: string;

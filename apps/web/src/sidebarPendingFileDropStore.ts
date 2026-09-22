@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import type { ScopedThreadRef } from "@infinitus/contracts";
 
 /**
  * Field-wise ref equality. `scopedThreadKey` joins with `:`, so two distinct

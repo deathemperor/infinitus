@@ -21,8 +21,8 @@ import {
   EnvironmentThemeFile,
   EnvironmentThemeId,
   environmentThemeFileHasColors,
-} from "@t3tools/contracts";
-import { UNPUBLISHABLE_THEME_IDS } from "@t3tools/shared/themePalettes";
+} from "@infinitus/contracts";
+import { UNPUBLISHABLE_THEME_IDS } from "@infinitus/shared/themePalettes";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";

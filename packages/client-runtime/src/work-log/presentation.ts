@@ -5,11 +5,11 @@ import {
   type ThreadId,
   type ToolActivitySource,
   type ToolLifecycleItemType,
-} from "@t3tools/contracts";
-import { classifyMarkdownImageSource } from "@t3tools/client-runtime/markdown-images";
-import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
-import { parseChangeRequestUrl } from "@t3tools/shared/changeRequestUrl";
-import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
+} from "@infinitus/contracts";
+import { classifyMarkdownImageSource } from "@infinitus/client-runtime/markdown-images";
+import { resolveMediaSource } from "@infinitus/client-runtime/media-source";
+import { parseChangeRequestUrl } from "@infinitus/shared/changeRequestUrl";
+import { isWorkspaceImagePreviewPath } from "@infinitus/shared/filePreview";
 
 /**
  * Activities the worktree setup card already represents. The settled record

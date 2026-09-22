@@ -7,7 +7,7 @@
  * both themes) and the single `animate-skeleton` pulse, applied once on the container so any
  * number of bars costs one opacity animation.
  */
-import type { PullRequestListEntry, PullRequestSummary } from "@t3tools/contracts";
+import type { PullRequestListEntry, PullRequestSummary } from "@infinitus/contracts";
 import {
   ArrowLeftIcon,
   ChevronRightIcon,

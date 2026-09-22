@@ -3,7 +3,7 @@ import type {
   ApprovalRequestId,
   ProviderApprovalDecision,
   ProviderApprovalOption,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
@@ -32,10 +32,10 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
   // behind this card, so a translucent surface bleeds messages through it.
   return (
     <View className="gap-2.5 rounded-[20px] border border-border bg-card-alt p-4">
-      <Text className="font-t3-bold text-2xs uppercase tracking-[1.1px] text-foreground-secondary">
+      <Text className="font-infinitus-bold text-2xs uppercase tracking-[1.1px] text-foreground-secondary">
         Approval needed
       </Text>
-      <Text className="font-t3-bold text-lg text-foreground">
+      <Text className="font-infinitus-bold text-lg text-foreground">
         {props.approval.appName ?? props.approval.requestKind}
       </Text>
       {props.approval.detail ? (

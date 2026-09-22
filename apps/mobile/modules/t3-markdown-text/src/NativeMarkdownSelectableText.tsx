@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo } from "react";
-import { decodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
+import { decodeComposerContextFragment } from "@infinitus/shared/composerContextClipboard";
 import {
   findNodeHandle,
   Image,
@@ -26,7 +26,7 @@ import {
   installMarkdownCopySanitizer,
   renderAndroidContextChip,
 } from "./T3MarkdownTextSelectionModule";
-import { parseComposerContextHref } from "@t3tools/shared/composerContextReferences";
+import { parseComposerContextHref } from "@infinitus/shared/composerContextReferences";
 import { contextChipPresentation } from "./nativeMarkdownText";
 
 export const MarkdownContextClipboardContext = createContext("");

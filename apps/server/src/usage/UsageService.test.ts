@@ -6,15 +6,15 @@ import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
-import { mergeUsage } from "@t3tools/shared/usageMerge";
+import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
+import { mergeUsage } from "@infinitus/shared/usageMerge";
 import {
   EnvironmentId,
   ProviderDriverKind,
   ProviderInstanceId,
   UsageDay,
   type UsageSummaryInput,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";

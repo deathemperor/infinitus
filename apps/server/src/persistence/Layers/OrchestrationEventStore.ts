@@ -11,7 +11,7 @@ import {
   ProjectId,
   ProjectIconOverride,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import * as SqlSchema from "effect/unstable/sql/SqlSchema";
 import * as Effect from "effect/Effect";

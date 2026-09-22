@@ -2,7 +2,7 @@ import {
   ProviderDriverKind,
   type ModelCapabilities,
   type ServerProviderModel,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { getProviderModelCapabilities } from "./providerModels";

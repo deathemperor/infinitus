@@ -1,9 +1,9 @@
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
-} from "@t3tools/client-runtime/state/shell";
-import { threadSearchMatchKey } from "@t3tools/client-runtime/state/thread-search";
-import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+} from "@infinitus/client-runtime/state/shell";
+import { threadSearchMatchKey } from "@infinitus/client-runtime/state/thread-search";
+import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

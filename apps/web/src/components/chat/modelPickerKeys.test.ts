@@ -1,4 +1,4 @@
-import { ProviderInstanceId } from "@t3tools/contracts";
+import { ProviderInstanceId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
   modelPickerLegacySectionKey,

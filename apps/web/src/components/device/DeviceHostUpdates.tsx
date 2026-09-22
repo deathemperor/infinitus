@@ -1,4 +1,4 @@
-import type { DeviceServiceState, EnvironmentId } from "@t3tools/contracts";
+import type { DeviceServiceState, EnvironmentId } from "@infinitus/contracts";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { deviceEnvironment } from "~/state/device";

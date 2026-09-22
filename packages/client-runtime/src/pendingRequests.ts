@@ -4,7 +4,7 @@ import {
   ProviderApprovalOption,
   ProviderRequestKind,
   UserInputQuestion,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";

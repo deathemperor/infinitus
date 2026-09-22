@@ -2,7 +2,7 @@ import {
   type DesktopPendingSnapShot,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
   type ScopedThreadRef,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 import { useCallback, useEffect, useRef } from "react";
 
 import {

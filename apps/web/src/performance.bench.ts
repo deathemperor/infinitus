@@ -1,11 +1,11 @@
-import { EventId, ProjectId, TurnId, type OrchestrationThreadActivity } from "@t3tools/contracts";
+import { EventId, ProjectId, TurnId, type OrchestrationThreadActivity } from "@infinitus/contracts";
 import {
   getLatestThreadForProject,
   sortActiveThreadsByOrderKey,
   sortPinnedThreadsByOrderKey,
   sortThreads,
-} from "@t3tools/client-runtime/state/thread-sort";
-import { formatHourShort, formatRelativeHourShort } from "@t3tools/shared/usageFormat";
+} from "@infinitus/client-runtime/state/thread-sort";
+import { formatHourShort, formatRelativeHourShort } from "@infinitus/shared/usageFormat";
 import { bench, describe } from "vite-plus/test";
 
 import { deriveActivePlanState } from "./session-logic";

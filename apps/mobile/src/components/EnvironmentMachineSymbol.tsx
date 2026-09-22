@@ -1,4 +1,4 @@
-import type { EnvironmentMachineKind } from "@t3tools/contracts";
+import type { EnvironmentMachineKind } from "@infinitus/contracts";
 import { SymbolView, type AppSymbolName } from "./AppSymbol";
 
 const SYMBOL_BY_KIND: Record<EnvironmentMachineKind, AppSymbolName> = {

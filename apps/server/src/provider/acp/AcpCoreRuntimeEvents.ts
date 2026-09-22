@@ -10,7 +10,7 @@ import {
   type RuntimeRequestId,
   type ThreadId,
   type TurnId,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import {
   type AcpPermissionRequest,

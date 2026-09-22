@@ -1,4 +1,4 @@
-import type { ComposerContextId, ComposerContextRecord } from "@t3tools/contracts";
+import type { ComposerContextId, ComposerContextRecord } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {

@@ -12,7 +12,7 @@ import type {
   PreviewAnnotationStrokeTarget,
   PreviewAnnotationStyleChange,
   PreviewAnnotationSubmission,
-} from "@t3tools/contracts";
+} from "@infinitus/contracts";
 
 import { resolveAnnotationSubmission } from "./AnnotationKeyboard.ts";
 import { previewAnnotationStyles } from "./AnnotationStyles.generated.ts";
@@ -34,8 +34,8 @@ import {
 } from "./GuestProtocol.ts";
 const OVERLAY_ATTRIBUTE = "data-t3code-annotation-ui";
 const Z_INDEX_OVERLAY = 2147483646;
-const PRIMARY = "var(--t3-primary)";
-const PRIMARY_FILL = "color-mix(in srgb, var(--t3-primary) 10%, transparent)";
+const PRIMARY = "var(--infinitus-primary)";
+const PRIMARY_FILL = "color-mix(in srgb, var(--infinitus-primary) 10%, transparent)";
 const MAX_MARQUEE_ELEMENTS = 20;
 /** Upper bound on one element's React context lookup during submit. */
 const ELEMENT_CONTEXT_TIMEOUT_MS = 5_000;
@@ -142,22 +142,22 @@ const applyAnnotationTheme = (
   if (!theme) return;
   host.style.colorScheme = theme.colorScheme;
   const variables = {
-    "--t3-radius": theme.radius,
-    "--t3-background": theme.background,
-    "--t3-foreground": theme.foreground,
-    "--t3-popover": theme.popover,
-    "--t3-popover-foreground": theme.popoverForeground,
-    "--t3-primary": theme.primary,
-    "--t3-primary-foreground": theme.primaryForeground,
-    "--t3-muted": theme.muted,
-    "--t3-muted-foreground": theme.mutedForeground,
-    "--t3-accent": theme.accent,
-    "--t3-accent-foreground": theme.accentForeground,
-    "--t3-border": theme.border,
-    "--t3-input": theme.input,
-    "--t3-ring": theme.ring,
-    "--t3-font-sans": theme.fontSans,
-    "--t3-font-mono": theme.fontMono,
+    "--infinitus-radius": theme.radius,
+    "--infinitus-background": theme.background,
+    "--infinitus-foreground": theme.foreground,
+    "--infinitus-popover": theme.popover,
+    "--infinitus-popover-foreground": theme.popoverForeground,
+    "--infinitus-primary": theme.primary,
+    "--infinitus-primary-foreground": theme.primaryForeground,
+    "--infinitus-muted": theme.muted,
+    "--infinitus-muted-foreground": theme.mutedForeground,
+    "--infinitus-accent": theme.accent,
+    "--infinitus-accent-foreground": theme.accentForeground,
+    "--infinitus-border": theme.border,
+    "--infinitus-input": theme.input,
+    "--infinitus-ring": theme.ring,
+    "--infinitus-font-sans": theme.fontSans,
+    "--infinitus-font-mono": theme.fontMono,
   };
   for (const [name, value] of Object.entries(variables)) {
     host.style.setProperty(name, value);
@@ -1258,7 +1258,7 @@ function startAnnotation(): void {
           regions.push(region);
           const regionBox = createBox(
             PRIMARY,
-            "color-mix(in srgb, var(--t3-primary) 6%, transparent)",
+            "color-mix(in srgb, var(--infinitus-primary) 6%, transparent)",
           );
           regionBox.setAttribute("data-region-id", region.id);
           positionBox(regionBox, rect);

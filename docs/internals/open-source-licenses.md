@@ -15,7 +15,7 @@ Neither path depends on the connected environment or an RPC.
 ## What the build collects
 
 The generator follows installed production and optional dependencies, including dependencies of
-workspace packages, and omits first-party `@t3tools/*` packages. The web manifest starts from the
+workspace packages, and omits first-party `@infinitus/*` packages. The web manifest starts from the
 web, server, and desktop package manifests. The mobile manifest starts from the mobile package
 manifest. During the web bundle, the generator also checks emitted module ids to catch a bundled
 npm import missing from a package manifest.
