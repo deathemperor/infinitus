@@ -340,6 +340,7 @@ export function AccountsPage() {
       flowId: null,
       url: null,
       pasteCode: false,
+      redirectPort: null,
       phase: "starting",
       error: null,
       account: null,
@@ -369,6 +370,7 @@ export function AccountsPage() {
       flowId: reply.flowId,
       url: shellSignIn === null ? reply.url : null,
       pasteCode: reply.pasteCode,
+      redirectPort: reply.redirectPort ?? null,
     };
     setSignInFlow(begunFlow);
     await shellSignIn
@@ -395,7 +397,13 @@ export function AccountsPage() {
                   ? commandErrorMessage(answer.cause)
                   : "Infinitus answered unexpectedly.",
             }
-          : { ...begunFlow, phase: status.phase, error: status.error, account: status.account };
+          : {
+              ...begunFlow,
+              phase: status.phase,
+              error: status.error,
+              account: status.account,
+              redirectPort: status.redirectPort ?? begunFlow.redirectPort,
+            };
       setSignInFlow((current) =>
         current === null
           ? current
@@ -433,6 +441,7 @@ export function AccountsPage() {
       flowId,
       url: null,
       pasteCode: false,
+      redirectPort: null,
       phase: "waitingForToken",
       error: null,
       account: null,

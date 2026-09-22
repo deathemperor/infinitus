@@ -56,12 +56,35 @@ export interface SignInFlow {
       it; null while the shell has it or before the app answered. */
   readonly url: string | null;
   readonly pasteCode: boolean;
+  /** The loopback port the engine on the Mac listens on for the OAuth
+      redirect, when the sign-in ends on one. A browser on this device is sent
+      to ITS localhost, where nothing listens: the page takes the address that
+      browser ended on and hands it to the Mac over `signin-code`, which
+      replays it against the listener. Null for a paste-code flow, and for a
+      build that never says. */
+  readonly redirectPort: number | null;
   readonly phase: SignInPhase;
   readonly error: string | null;
   readonly account: string | null;
   /** The last `signin-code` refusal, shown under the code field. */
   readonly codeError: string | null;
   readonly codeBusy: boolean;
+}
+
+/** What the fleet's field takes while a flow waits on this device: the code
+    from the success page (#747), the loopback address the browser ended on
+    (a redirect the Mac's engine takes, shown from a link here), or nothing.
+    A flow the shell's window shows (`url` null) reaches the listener itself,
+    so it never asks for the address. */
+export type SignInPasteField = "code" | "address";
+
+export function signInPasteField(flow: SignInFlow | null): SignInPasteField | null {
+  if (flow === null) return null;
+  if (flow.phase === "waitingForCode" && flow.pasteCode) return "code";
+  if (flow.phase === "waitingForToken" && flow.redirectPort !== null && flow.url !== null) {
+    return "address";
+  }
+  return null;
 }
 
 /** The in-app path exists on a build whose manifest lists `signin-begin`. */
@@ -182,6 +205,7 @@ const BeginReply = Schema.Struct({
   flowId: Schema.String,
   url: Schema.String,
   pasteCode: Schema.Boolean,
+  redirectPort: Schema.optionalKey(Schema.Number),
   label: Schema.String,
 });
 export type SignInBeginReply = typeof BeginReply.Type;
@@ -197,20 +221,25 @@ const StatusReply = Schema.Struct({
   phase: SignInPhase,
   error: Schema.optionalKey(Schema.String),
   account: Schema.optionalKey(Schema.String),
+  redirectPort: Schema.optionalKey(Schema.Number),
 });
 const decodeStatus = Schema.decodeUnknownOption(StatusReply);
 
 /** `signin-status`'s answer as the flow's next state, or null for anything
     else. */
-export function signInStatusReply(
-  result: unknown,
-): { phase: SignInPhase; error: string | null; account: string | null } | null {
+export function signInStatusReply(result: unknown): {
+  phase: SignInPhase;
+  error: string | null;
+  account: string | null;
+  redirectPort: number | null;
+} | null {
   const decoded = decodeStatus(result);
   if (decoded._tag === "None") return null;
   return {
     phase: decoded.value.phase,
     error: decoded.value.error ?? null,
     account: decoded.value.account ?? null,
+    redirectPort: decoded.value.redirectPort ?? null,
   };
 }
 
@@ -241,7 +270,14 @@ export function signInStatusText(flow: SignInFlow): string {
     case "waitingForCode":
       return `Sign in${who} ${where}, then paste the code from the success page here.`;
     case "waitingForToken":
-      return flow.pasteCode ? "Checking the code…" : `Sign in${who} ${where}.`;
+      if (flow.pasteCode) return "Checking the code…";
+      // The redirect goes to this device's localhost, where nothing listens:
+      // the browser ends on a page that will not load, and its address is
+      // what the Mac needs.
+      if (signInPasteField(flow) === "address") {
+        return `Sign in${who} ${where}. It ends on a page that will not load: copy that page's address and paste it here.`;
+      }
+      return `Sign in${who} ${where}.`;
     case "registering":
       return "Adding the account…";
     case "done":

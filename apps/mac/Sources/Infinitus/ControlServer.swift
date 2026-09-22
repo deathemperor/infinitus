@@ -496,17 +496,16 @@ final class ControlServer {
             // ephemeral system sheet, passkeys and all — for a caller on
             // the same machine whose browser has no private window to give
             // (the desktop app beside Safari). Headless, the caller shows
-            // the page on ITS machine, which may not be this one — an
-            // engine's loopback redirect would land there with nothing
-            // listening. So the window run takes the engine's redirect
-            // (`.addOAuth`, the Mac's own Add / Re-login rule) and the
-            // headless one keeps the paste-back flow of a credential-swap
-            // engine even when it also takes the redirect.
+            // the page on ITS machine, which may not be this one: an
+            // engine's loopback redirect lands there with nothing
+            // listening, so the reply names the port (`redirectPort`) and
+            // the caller hands the address its browser ended on back
+            // through `signin-code`, replayed here (`OAuthRedirectRelay`).
+            // Either way an engine that takes the redirect itself gets the
+            // sign-in (the Mac's own Add / Re-login rule); only one without
+            // that runs the CLI's paste-back flow.
             let headless = r.options["window"] == nil
-            let oauthFirst = !headless
-            let useOAuth = fleet.capabilities.contains(.addOAuth)
-                && (oauthFirst || !fleet.capabilities.contains(.addCurrent))
-            if useOAuth {
+            if fleet.capabilities.contains(.addOAuth) {
                 model.addOAuthAccount(engineID: fleet.engineID, provider: fleet.provider,
                                       relogin: relogin, headless: headless)
             } else if fleet.capabilities.contains(.addCurrent) {
@@ -528,13 +527,15 @@ final class ControlServer {
                 flow.cancel()
                 throw Fail("no sign-in URL within 30s")
             }
-            return ControlReply(ok: true, result: .object([
+            var begun: [String: JSONValue] = [
                 "flowId": .string(flowID),
                 "url": .string(url.absoluteString),
                 "pasteCode": .bool(flow.pasteCode),
                 "window": .bool(!headless),
                 "label": .string(flow.reloginTarget.map { "Sign in again \u{2014} \($0)" } ?? "Add account"),
-            ]))
+            ]
+            if let port = flow.redirectPort { begun["redirectPort"] = .number(Double(port)) }
+            return ControlReply(ok: true, result: .object(begun))
 
         case "signin-status":
             return ControlReply(ok: true, result: signinPayload(try signinFlow(r)))
@@ -544,9 +545,30 @@ final class ControlServer {
             guard let code = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty else {
                 throw Fail("signin-code: the code is expected on stdin")
             }
-            guard flow.pasteCode else { throw Fail("this sign-in takes no code — it finishes on its own") }
+            guard flow.pasteCode || flow.redirectPort != nil else {
+                throw Fail("this sign-in takes no code — it finishes on its own")
+            }
             guard case .awaitingLogin = flow.phase else {
                 throw Fail("not waiting for a code (\(signinPhase(flow).phase))")
+            }
+            if flow.redirectPort != nil {
+                // The address the caller's browser ended on, replayed against
+                // the engine's listener here. A refusal is immediate; an
+                // accepted one has the engine redeeming the code, and the
+                // phase leaves awaitingLogin once it stored the credential
+                // or gave up.
+                if let refusal = await flow.submitRedirect(code) {
+                    return ControlReply(ok: false, result: .object(["ok": .bool(false), "error": .string(refusal)]), error: refusal)
+                }
+                let deadline = Date().addingTimeInterval(15)
+                while Date() < deadline {
+                    guard case .awaitingLogin = flow.phase else { break }
+                    try await Task.sleep(nanoseconds: 200_000_000)
+                }
+                if case .failed(let why) = flow.phase {
+                    return ControlReply(ok: false, result: .object(["ok": .bool(false), "error": .string(why)]), error: why)
+                }
+                return ControlReply(ok: true, result: .object(["ok": .bool(true)]))
             }
             flow.code = code
             flow.submitCode()
@@ -1173,6 +1195,7 @@ final class ControlServer {
         ]
         if let error { d["error"] = .string(error) }
         if let url = flow.authURL { d["url"] = .string(url.absoluteString) }
+        if let port = flow.redirectPort { d["redirectPort"] = .number(Double(port)) }
         if let email = flow.completedEmail { d["account"] = .string(email) }
         return .object(d)
     }

@@ -69,6 +69,13 @@ import InfinitusCore
     private(set) var flowID: String?
     private(set) var headless = false
     private(set) var completedEmail: String?
+    /// A headless engine run whose redirect lands on this Mac's loopback:
+    /// the port the engine listens on. The caller's browser may be on
+    /// another machine, where that redirect goes nowhere — it hands the
+    /// address back through `signin-code` and `submitRedirect` replays it
+    /// here (`OAuthRedirectRelay`). Nil for the paste-code flow and for a
+    /// window run, whose sheet is on this Mac and reaches the listener itself.
+    private(set) var redirectPort: Int?
 
     var running: Bool {
         switch phase {
@@ -89,6 +96,7 @@ import InfinitusCore
         code = ""
         buffer = ""
         authURL = nil
+        redirectPort = nil
         sheetError = nil
         browserRoute = nil
         pasteCode = true
@@ -133,6 +141,7 @@ import InfinitusCore
         preEmails = fleetEmails(model)
         code = ""
         authURL = nil
+        redirectPort = nil
         sheetError = nil
         browserRoute = nil
         pasteCode = false
@@ -143,6 +152,7 @@ import InfinitusCore
             do {
                 let url = try await engine.beginOAuthAdd(fleet: provider)
                 self.authURL = url
+                self.redirectPort = headless ? OAuthRedirectRelay.loopbackPort(of: url) : nil
                 self.phase = .awaitingLogin
                 self.openAuthWindow(url)
                 try await engine.awaitOAuthAdd()
@@ -187,6 +197,31 @@ import InfinitusCore
         master?.write(Data((trimmed + "\r").utf8))
         phase = .waitingForToken
         closeAuthWindow()
+    }
+
+    /// The redirect a browser on another machine ended on, replayed against
+    /// the engine's listener here (`OAuthRedirectRelay`): one GET, which is
+    /// what the browser would have sent. The engine answers 200 and goes on
+    /// to redeem the code — `awaitOAuthAdd` then moves the phase — or 400
+    /// for an address that is not this sign-in's. Returns the refusal, or
+    /// nil when the listener took it; the pasted value reaches no message.
+    func submitRedirect(_ pasted: String) async -> String? {
+        guard let port = redirectPort else { return "this sign-in takes no address" }
+        guard let url = OAuthRedirectRelay.replayURL(pasted: pasted, port: port) else {
+            return "That is not this sign-in's address: paste the whole address the browser ended on (http://localhost:\(port)/…)."
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(status) else {
+                return "The sign-in did not accept that address (HTTP \(status)); start the sign-in again."
+            }
+            return nil
+        } catch {
+            return "The sign-in is no longer waiting for its redirect; start it again."
+        }
     }
 
     // MARK: plumbing

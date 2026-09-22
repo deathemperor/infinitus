@@ -736,6 +736,97 @@ describe("AccountsPage", () => {
     restore();
   });
 
+  it("from another machine, takes the address a loopback sign-in ended on and hands it over infinitus.secret", async () => {
+    const restore = installBridge(undefined);
+    testState.snapshot = signInSnapshot;
+    // The engine on the Mac takes the redirect itself and listens there; this
+    // device's browser is sent to its own localhost, so the page asks for the
+    // address it ended on instead of a code.
+    const begun = {
+      flowId: "f1",
+      url: "https://claude.ai/oauth",
+      pasteCode: false,
+      redirectPort: 54545,
+      label: "Add account",
+    };
+    let addressSubmitted = false;
+    testState.command = vi.fn().mockImplementation(async (call: { input: { command: string } }) => {
+      switch (call.input.command) {
+        case "signin-begin":
+          return { _tag: "Success", value: { result: begun } };
+        case "signin-status":
+          if (!addressSubmitted) await new Promise((resolve) => setTimeout(resolve, 20));
+          return {
+            _tag: "Success",
+            value: {
+              result: addressSubmitted
+                ? { flowId: "f1", phase: "done", pasteCode: false, account: "two@example.com" }
+                : { flowId: "f1", phase: "waitingForToken", pasteCode: false, redirectPort: 54545 },
+            },
+          };
+        case "signin-code":
+          addressSubmitted = true;
+          return { _tag: "Success", value: { result: { ok: true } } };
+        default:
+          return { _tag: "Success", value: {} };
+      }
+    });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Add account: Claude (swapd)",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    const byLabel = (label: string) =>
+      renderer.root.findAll((node) => node.props["aria-label"] === label)[0];
+    const statusText = () =>
+      renderer.root.findAll((node) => node.props.role === "status")[0]?.children.join("") ?? "";
+    const settle = async (ready: () => boolean) => {
+      for (let tick = 0; tick < 100 && !ready(); tick += 1) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+      }
+    };
+    await settle(() => byLabel("Sign-in address: Claude (swapd)") !== undefined);
+
+    expect(byLabel("Open the sign-in page: Claude (swapd)")!.props.href).toBe(
+      "https://claude.ai/oauth",
+    );
+    expect(statusText()).toBe(
+      "Sign in on the sign-in page. It ends on a page that will not load: copy that page's address and paste it here.",
+    );
+    const field = byLabel("Sign-in address: Claude (swapd)")!;
+    expect(field.props.type).toBe("password");
+    expect(field.props.placeholder).toBe("Paste the address the browser ended on");
+
+    const form = renderer.root.findAll((node) => node.type === "form")[0]!;
+    const address = { value: "http://localhost:54545/callback?code=the-code&state=st" };
+    await act(async () => {
+      form.props.onSubmit({
+        preventDefault: () => {},
+        currentTarget: { elements: { namedItem: () => address } },
+      });
+    });
+    expect(address.value).toBe("");
+    await settle(() => statusText() === "Signed in as two@example.com.");
+    const codeCall = testState.command.mock.calls.find(
+      (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
+    )![0] as { input: { args: unknown; secret: Redacted.Redacted<string> } };
+    expect(codeCall.input.args).toEqual({ flowId: "f1" });
+    expect(Redacted.value(codeCall.input.secret)).toBe(
+      "http://localhost:54545/callback?code=the-code&state=st",
+    );
+    // The address carries the code: it never lands in the rendered page.
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("the-code");
+    renderer.unmount();
+    restore();
+  });
+
   it("runs the sign-in inside the app: begin, the shell's window, the pasted code, done", async () => {
     const bridge = bridgeStub();
     const restore = installBridge(bridge);
