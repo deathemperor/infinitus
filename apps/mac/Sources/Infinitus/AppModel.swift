@@ -1704,6 +1704,10 @@ final class AppModel: ObservableObject {
             // observer's body, once per refresh, even for an identical value (#18).
             if engineErrors[r.id] != nil { engineErrors[r.id] = nil }
             engineLastGood[r.id] = Date()
+            // A peer the desktop dropped while this pass awaited its
+            // engines is gone from the registry; its fleets would trip
+            // `state(for:)`. Local engines are never removed.
+            guard registry.engine(id: r.id) != nil else { continue }
             for reported in fleets {
                 let state = registry.state(for: reported)
                 let fleet = reported

@@ -205,6 +205,14 @@ public enum PeerFleets {
         return caps
     }
 
+    /// Each pushed fleet's key on its own machine, by provider — what a
+    /// command for that machine names. A provider this build maps to
+    /// `.other` keeps the key its machine printed, so the command still
+    /// lands.
+    public static func remoteKeys(_ docs: [FleetDoc]) -> [Provider: String] {
+        Dictionary(docs.map { (provider($0.provider), $0.key) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// The doc as the fleet the popup stacks, under the peer engine's id.
     public static func engineFleet(_ doc: FleetDoc, engineID: String) -> EngineFleet {
         EngineFleet(engineID: engineID, provider: provider(doc.provider),
@@ -264,7 +272,7 @@ public actor PeerCommandQueue {
     private func expire(_ id: String) {
         guard let continuation = continuations.removeValue(forKey: id) else { return }
         waiting.removeAll { $0.id == id }
-        continuation.resume(throwing: EngineError.unreachable(
-            "the desktop app did not answer within \(Int(timeout)) s"))
+        continuation.resume(throwing: PeerFleets.Failure(
+            "The desktop app did not answer within \(Int(timeout)) s. Check it is open, then try again."))
     }
 }

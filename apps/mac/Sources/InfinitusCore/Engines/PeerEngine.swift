@@ -14,27 +14,32 @@ public actor PeerEngine: AccountEngine {
     public nonisolated let capabilities: EngineCapabilities
     private let queue: PeerCommandQueue
     private var fleets: [EngineFleet]
+    /// Each fleet's key on the machine that owns it (`swapd/claude`), as
+    /// its push named it — what a command for that machine names.
+    private var remoteKeys: [Provider: String]
     private var connected: Bool
 
     /// Named after the machine, so a fleet header reads "Claude · HyperNovae swapd".
     public nonisolated var displayName: String { "\(machineLabel) \(remoteEngine)" }
 
     public init(machine: String, machineLabel: String, remoteEngine: String,
-                capabilities: EngineCapabilities, fleets: [EngineFleet], connected: Bool,
-                queue: PeerCommandQueue) {
+                capabilities: EngineCapabilities, fleets: [EngineFleet],
+                remoteKeys: [Provider: String], connected: Bool, queue: PeerCommandQueue) {
         self.id = PeerFleets.engineID(machine: machine, remoteEngine: remoteEngine)
         self.machine = machine
         self.machineLabel = machineLabel
         self.remoteEngine = remoteEngine
         self.capabilities = capabilities
         self.fleets = fleets
+        self.remoteKeys = remoteKeys
         self.connected = connected
         self.queue = queue
     }
 
     /// The desktop pushed again: what the popup's next refresh will show.
-    public func update(fleets: [EngineFleet], connected: Bool) {
+    public func update(fleets: [EngineFleet], remoteKeys: [Provider: String], connected: Bool) {
         self.fleets = fleets
+        self.remoteKeys = remoteKeys
         self.connected = connected
     }
 
@@ -45,7 +50,9 @@ public actor PeerEngine: AccountEngine {
 
     private func send(_ command: String, fleet: Provider, _ rest: [String],
                       options: [String: String] = [:]) async throws {
-        let key = fleets.first { $0.provider == fleet }?.remoteKey ?? ""
+        guard let key = remoteKeys[fleet] else {
+            throw EngineError.unsupported("\(fleet.displayName) on \(machineLabel)")
+        }
         try await queue.run(PeerFleets.Command(machine: machine, command: command,
                                                args: [key] + rest, options: options))
     }
@@ -80,15 +87,5 @@ public actor PeerEngine: AccountEngine {
 
     public func remove(fleet: Provider, number: Int) async throws {
         try await send("remove", fleet: fleet, [String(number)], options: ["yes": "true"])
-    }
-}
-
-extension EngineFleet {
-    /// The fleet's key on the machine that owns it (`swapd/claude`), which
-    /// a command for that machine names. A peer engine's id carries the
-    /// remote engine's id after its last colon.
-    var remoteKey: String {
-        let remoteEngine = engineID.split(separator: ":").last.map(String.init) ?? engineID
-        return "\(remoteEngine)/\(provider.rawValue)"
     }
 }

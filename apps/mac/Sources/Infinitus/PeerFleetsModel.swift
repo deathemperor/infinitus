@@ -26,6 +26,9 @@ final class PeerFleetsModel {
     /// One push: results first (a row waiting on one stops), then the
     /// fleets, then the queue for the desktop to run.
     func sync(_ body: PeerFleets.Body, now: Date = Date()) async -> PeerFleets.Reply {
+        // Stamped first: `expireSilent` on the tick must not drop an
+        // engine this push is about to apply to, across the awaits below.
+        lastPush = now
         for result in body.results { await queue.resolve(result) }
         var seen = Set<String>()
         for machine in body.machines {
@@ -34,32 +37,29 @@ final class PeerFleetsModel {
                 let engineID = PeerFleets.engineID(machine: machine.id, remoteEngine: remoteEngine)
                 seen.insert(engineID)
                 let fleets = docs.map { PeerFleets.engineFleet($0, engineID: engineID) }
+                let keys = PeerFleets.remoteKeys(docs)
                 let caps = PeerFleets.capabilities(named: docs.first?.capabilities ?? [])
                 if let engine = engines[engineID], engine.capabilities == caps, engine.machineLabel == machine.label {
-                    await engine.update(fleets: fleets, connected: machine.connected)
+                    await engine.update(fleets: fleets, remoteKeys: keys, connected: machine.connected)
                 } else {
                     if engines[engineID] != nil { host.registry.remove(engineID: engineID) }
                     let engine = PeerEngine(machine: machine.id, machineLabel: machine.label,
                                             remoteEngine: remoteEngine, capabilities: caps,
-                                            fleets: fleets, connected: machine.connected, queue: queue)
+                                            fleets: fleets, remoteKeys: keys,
+                                            connected: machine.connected, queue: queue)
                     engines[engineID] = engine
                     host.registry.register(engine)
                 }
-                for fleet in fleets {
-                    let state = host.registry.state(for: fleet)
-                    if machine.connected {
-                        _ = state.apply(fleet)
-                    } else {
-                        state.markStale(reason: "\(machine.label) is not connected", lastGood: lastPush, now: now)
-                    }
-                }
+                // The desktop sends no fleets for a machine it cannot reach
+                // or whose app is offline, so such a machine's rows leave
+                // the popup with its engine below rather than dim here.
+                for fleet in fleets { _ = host.registry.state(for: fleet).apply(fleet) }
             }
         }
         for engineID in engines.keys where !seen.contains(engineID) {
             engines[engineID] = nil
             host.registry.remove(engineID: engineID)
         }
-        lastPush = now
         host.forwardFleetChange()
         return PeerFleets.Reply(commands: await queue.drain())
     }
@@ -75,7 +75,7 @@ final class PeerFleetsModel {
             engines = [:]
             self.lastPush = nil
         } else if quiet > Self.silence {
-            for engine in engines.values { await engine.update(fleets: [], connected: false) }
+            for engine in engines.values { await engine.update(fleets: [], remoteKeys: [:], connected: false) }
         }
     }
 }

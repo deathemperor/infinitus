@@ -36,7 +36,7 @@ final class PeerFleetsTests: XCTestCase {
 
         let fleet = PeerFleets.engineFleet(body.machines[0].fleets![0], engineID: engineID)
         XCTAssertEqual(fleet.key, "peer:env-1:swapd/claude")
-        XCTAssertEqual(fleet.remoteKey, "swapd/claude")
+        XCTAssertEqual(PeerFleets.remoteKeys(body.machines[0].fleets!), [.claude: "swapd/claude", .kiro: "9router/kiro"])
         XCTAssertEqual(fleet.provider, .claude)
         XCTAssertEqual(fleet.activeNumber, 2)
         XCTAssertEqual(fleet.accounts.map(\.number), [1, 2])
@@ -52,11 +52,13 @@ final class PeerFleetsTests: XCTestCase {
         let kiro = PeerFleets.engineFleet(body.machines[0].fleets![1],
                                           engineID: PeerFleets.engineID(machine: "env-1", remoteEngine: "9router"))
         XCTAssertEqual(kiro.provider, .kiro)
-        XCTAssertEqual(kiro.remoteKey, "9router/kiro")
     }
 
-    func testAnUnknownProviderDrawsAsOther() {
+    func testAnUnknownProviderDrawsAsOtherAndKeepsItsKey() {
         XCTAssertEqual(PeerFleets.provider("mystery"), .other)
+        let doc = PeerFleets.FleetDoc(key: "swapd/mystery", engineID: "swapd", provider: "mystery",
+                                      capabilities: [], accounts: [])
+        XCTAssertEqual(PeerFleets.remoteKeys([doc]), [.other: "swapd/mystery"])
         XCTAssertEqual(PeerFleets.capabilities(named: ["switch", "teleport"]), [.switch])
     }
 
@@ -100,7 +102,7 @@ final class PeerFleetsTests: XCTestCase {
             try await run.value
             XCTFail("should have timed out")
         } catch {
-            guard case .unreachable = error as? EngineError else { return XCTFail("\(error)") }
+            XCTAssertEqual((error as? PeerFleets.Failure)?.message.hasPrefix("The desktop app did not answer"), true)
         }
         let pending = await queue.pendingCount
         XCTAssertEqual(pending, 0)

@@ -171,7 +171,9 @@ final class ControlServer {
         guard let command = ControlCommand.named(request.command) else {
             return .failure("unknown command \(request.command); run `infinitusctl manifest`")
         }
-        if command.effect != .read, !(request.command == "prefs" && request.args.first == "get") {
+        // `peer-sync` is the desktop's heartbeat (#1545), not a request worth a line each.
+        if command.effect != .read, !(request.command == "prefs" && request.args.first == "get"),
+           request.command != PeerFleets.command {
             // The verb and its target, never a value (`prefs set <key>`
             // shows the key; secrets ride `secret`, not argv): a relaunch
             // or a wedge can then be traced to its request from our side

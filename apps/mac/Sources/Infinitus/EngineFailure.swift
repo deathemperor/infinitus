@@ -22,6 +22,9 @@ enum EngineFailure {
                 return "The engine answered with an error (\(status)). Check the engine, then try again."
             }
         }
+        // A peer row's outcome arrives in the other machine's own words
+        // (#1545); they are the sentence.
+        if let peer = error as? PeerFleets.Failure { return peer.message }
         if error is CLIError {
             return "The engine refused that change. Check it is running, then try again."
         }
