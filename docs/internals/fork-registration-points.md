@@ -229,7 +229,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   optional `DesktopBridge` methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
   `openInfinitusSignIn` / `closeInfinitusSignIn` /
   `submitInfinitusSignInCode` (#677), `beginInfinitusOAuthSignIn` /
-  `cancelInfinitusOAuthSignIn` (#1213), and `setInfinitusCaptureGestureEnabled`
+  `cancelInfinitusOAuthSignIn` (#1213), `listenInfinitusSignInRedirect` /
+  `stopInfinitusSignInRedirect` (the stand-in for the engine's loopback
+  listener, `docs/internals/accounts-page.md`), and `setInfinitusCaptureGestureEnabled`
   / `consumePendingCaptureGestures` / `onCaptureGesturePending` with the
   `DesktopCaptureGestureEvent` schema
   beside `DesktopSnapShotEvent` (#433 slices 2–3), and `consumePendingDeepLink`

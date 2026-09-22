@@ -21,6 +21,7 @@ import {
   fleetSignInGate,
   signInBusy,
   signInEnded,
+  signInPasteField,
   signInStatusText,
   type SignInFlow,
 } from "./signIn.logic";
@@ -99,17 +100,15 @@ export function FleetSection({
       : null;
   const failed = inApp ? signIn.flow?.phase === "failed" : addFlow?.phase.kind === "failed";
   const onStart = inApp ? signIn.onStart : onAdd;
-  const codeField =
-    inApp && signIn.flow !== null && signIn.flow.phase === "waitingForCode" && signIn.flow.pasteCode
-      ? signIn.flow
-      : null;
+  const pasteField = inApp ? signInPasteField(signIn.flow) : null;
+  const codeField = pasteField === null ? null : signIn.flow;
   const cancellable = inApp && signIn.flow !== null && !signInEnded(signIn.flow.phase);
   /** The provider's page to open from this device, while the flow waits for it. */
   const signInUrl = cancellable && signIn.flow?.url != null ? signIn.flow.url : null;
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-medium text-foreground text-sm">{section.title}</h2>
+        <h3 className="font-medium text-foreground text-sm">{section.title}</h3>
         {canAdd || inApp ? (
           <Button
             className="ms-auto"
@@ -159,7 +158,7 @@ export function FleetSection({
           {status}
         </p>
       )}
-      {codeField === null ? null : (
+      {codeField === null || pasteField === null ? null : (
         <form
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
@@ -173,14 +172,18 @@ export function FleetSection({
             }
           }}
         >
-          {/* A secret (#747): masked, never remembered, cleared on submit. */}
+          {/* A secret (#747): masked, never remembered, cleared on submit. The
+              address the browser ended on carries the code in its query, so
+              it is one too. */}
           <input
             name="code"
             type="password"
             autoComplete="off"
             spellCheck={false}
-            aria-label={`Sign-in code: ${section.title}`}
-            placeholder="Paste the code"
+            aria-label={`Sign-in ${pasteField}: ${section.title}`}
+            placeholder={
+              pasteField === "code" ? "Paste the code" : "Paste the address the browser ended on"
+            }
             disabled={codeField.codeBusy}
             className="h-7 min-w-0 flex-1 rounded-md border bg-background px-2 font-mono text-xs"
           />
@@ -191,7 +194,7 @@ export function FleetSection({
             aria-busy={codeField.codeBusy}
           >
             {codeField.codeBusy ? <Spinner className="size-3" /> : null}
-            Submit code
+            {pasteField === "code" ? "Submit code" : "Submit address"}
           </Button>
           {codeField.codeError === null ? null : (
             <p role="alert" className="basis-full text-destructive text-xs">

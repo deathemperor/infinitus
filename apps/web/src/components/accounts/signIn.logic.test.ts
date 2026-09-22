@@ -4,6 +4,7 @@ import {
   fleetRunsShellOAuth,
   fleetSignInGate,
   oauthSignInBridge,
+  redirectSignInBridge,
   signInBeginCommandArgs,
   signInBeginReply,
   signInBridge,
@@ -11,6 +12,7 @@ import {
   signInCancelCommandArgs,
   signInCodeReply,
   signInCodeSecretArgs,
+  signInPasteField,
   signInStatusCommandArgs,
   signInStatusReply,
   signInStatusText,
@@ -25,6 +27,8 @@ const flow = (over: Partial<SignInFlow>): SignInFlow => ({
   flowId: "f1",
   url: null,
   pasteCode: true,
+  redirectPort: null,
+  redirectListening: false,
   phase: "starting",
   error: null,
   account: null,
@@ -124,13 +128,73 @@ describe("command args and replies", () => {
       phase: "waitingForCode",
       error: null,
       account: null,
+      redirectPort: null,
     });
     expect(
       signInStatusReply({ phase: "done", account: "two@example.com", pasteCode: true }),
-    ).toEqual({ phase: "done", error: null, account: "two@example.com" });
+    ).toEqual({ phase: "done", error: null, account: "two@example.com", redirectPort: null });
     expect(signInStatusReply({ phase: "failed", error: "cancelled" })?.error).toBe("cancelled");
     expect(signInStatusReply({ phase: "sideways" })).toBeNull();
     expect(signInStatusReply("nope")).toBeNull();
+  });
+
+  it("carries the loopback port of an engine that takes the redirect itself", () => {
+    expect(
+      signInBeginReply({
+        flowId: "f1",
+        url: "https://x",
+        pasteCode: false,
+        redirectPort: 54545,
+        label: "Add account",
+      })?.redirectPort,
+    ).toBe(54545);
+    expect(
+      signInStatusReply({ phase: "waitingForToken", pasteCode: false, redirectPort: 54545 }),
+    ).toEqual({ phase: "waitingForToken", error: null, account: null, redirectPort: 54545 });
+  });
+});
+
+describe("signInPasteField", () => {
+  it("asks for the code while the CLI waits for one (#747)", () => {
+    expect(signInPasteField(null)).toBeNull();
+    expect(signInPasteField(flow({ phase: "waitingForCode", pasteCode: true }))).toBe("code");
+    expect(signInPasteField(flow({ phase: "waitingForToken", pasteCode: true }))).toBeNull();
+  });
+
+  it("asks for the address only when this device opened the page of a loopback sign-in", () => {
+    const remote = flow({
+      phase: "waitingForToken",
+      pasteCode: false,
+      redirectPort: 54545,
+      url: "https://claude.ai/oauth",
+    });
+    expect(signInPasteField(remote)).toBe("address");
+    // The shell's window is on the Mac itself: the redirect reaches the listener.
+    expect(signInPasteField({ ...remote, url: null })).toBeNull();
+    // An older build never says, and a paste-code flow has no port.
+    expect(signInPasteField({ ...remote, redirectPort: null })).toBeNull();
+    expect(signInPasteField({ ...remote, phase: "registering" })).toBeNull();
+    expect(signInPasteField({ ...remote, phase: "done" })).toBeNull();
+    // The desktop shell stands in for the listener: nothing to paste, and
+    // the status reads as a plain sign-in.
+    const listening = { ...remote, redirectListening: true };
+    expect(signInPasteField(listening)).toBeNull();
+    expect(signInStatusText(listening)).toBe("Sign in on the sign-in page.");
+  });
+
+  it("finds the shell's stand-in only when both of its methods are there", () => {
+    expect(redirectSignInBridge(undefined)).toBeNull();
+    expect(
+      redirectSignInBridge({ listenInfinitusSignInRedirect: async () => ({ ok: true }) }),
+    ).toBeNull();
+    const listen = async () => ({ ok: true });
+    const stop = async () => {};
+    expect(
+      redirectSignInBridge({
+        listenInfinitusSignInRedirect: listen,
+        stopInfinitusSignInRedirect: stop,
+      }),
+    ).toEqual({ listen, stop });
   });
 });
 
@@ -179,6 +243,8 @@ describe("signInStatusText / signInBusy", () => {
       flowId: "f1",
       url: null,
       pasteCode: true,
+      redirectPort: null,
+      redirectListening: false,
       phase: "waitingForCode" as const,
       error: null,
       account: null,
@@ -199,5 +265,18 @@ describe("signInStatusText / signInBusy", () => {
         phase: "waitingForToken",
       }),
     ).toBe("Sign in on the sign-in page.");
+    // A loopback sign-in shown from a link on this device: the redirect goes
+    // to this device's localhost, and its address is what the Mac needs.
+    expect(
+      signInStatusText({
+        ...flow,
+        url: "https://claude.ai/oauth",
+        pasteCode: false,
+        redirectPort: 54545,
+        phase: "waitingForToken",
+      }),
+    ).toBe(
+      "Sign in on the sign-in page. It ends on a page that will not load: copy that page's address and paste it here.",
+    );
   });
 });

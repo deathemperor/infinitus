@@ -12,9 +12,24 @@ const environmentId = EnvironmentId.make("test-environment");
 
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
+  /** A second machine's snapshot, drawn only when `environments` lists it. */
+  remoteSnapshot: null as InfinitusSnapshot | null,
+  environments: [] as ReadonlyArray<ReturnType<typeof testEnvironment>>,
   command: vi.fn(),
   refresh: vi.fn(),
 }));
+
+const testEnvironment = (environmentId: string, label: string) => ({
+  environmentId,
+  label,
+  connection: { phase: "connected" as string },
+  serverConfig: {
+    environment: {
+      capabilities: { infinitus: true },
+      platform: { os: "darwin", arch: "arm64" },
+    },
+  },
+});
 
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("./signIn.logic", async (importOriginal) => ({
@@ -23,7 +38,12 @@ vi.mock("./signIn.logic", async (importOriginal) => ({
 }));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () =>
-    new Map([["test-environment", { environment: { capabilities: { infinitus: true } } }]]),
+    new Map(
+      testState.environments.map((environment) => [
+        environment.environmentId,
+        { environment: { capabilities: { infinitus: true } } },
+      ]),
+    ),
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -42,36 +62,38 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 vi.mock("../../state/environments", () => ({
-  useEnvironments: () => ({
-    environments: [{ environmentId: "test-environment", label: "Test environment" }],
-  }),
+  useEnvironments: () => ({ environments: testState.environments }),
   usePrimaryEnvironmentId: () => "test-environment",
-  usePrimaryEnvironment: () => ({
-    environmentId: "test-environment",
-    serverConfig: {
-      environment: {
-        capabilities: { infinitus: true },
-        platform: { os: "darwin", arch: "arm64" },
-      },
-    },
-  }),
+  usePrimaryEnvironment: () => testState.environments[0] ?? null,
 }));
 vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
-    snapshot: () => ({ label: "snapshot-atom" }),
+    snapshot: ({ environmentId }: { environmentId: string }) => ({
+      label: "snapshot-atom",
+      environmentId,
+    }),
     command: { label: "command-atom" },
     launch: { label: "launch-atom" },
     secret: { label: "secret-atom" },
   },
 }));
 vi.mock("../../state/query", () => ({
-  useEnvironmentQuery: () => ({
-    data: testState.snapshot,
-    error: null,
-    isPending: testState.snapshot === null,
-    isSuccess: testState.snapshot !== null,
-    refresh: testState.refresh,
-  }),
+  useEnvironmentQuery: (atom: { environmentId: string } | null) => {
+    // A disconnected machine subscribes to nothing and reads as pending.
+    const snapshot =
+      atom === null
+        ? null
+        : atom.environmentId === "remote-environment"
+          ? testState.remoteSnapshot
+          : testState.snapshot;
+    return {
+      data: snapshot,
+      error: null,
+      isPending: atom !== null && snapshot === null,
+      isSuccess: snapshot !== null,
+      refresh: testState.refresh,
+    };
+  },
 }));
 vi.mock("../../state/server", () => ({ environmentServerConfigsAtom: { label: "configs-atom" } }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => testState.command }));
@@ -84,13 +106,6 @@ vi.mock("../../hooks/useSettings", () => ({
 vi.mock("../ui/badge", () => ({ Badge: "span" }));
 vi.mock("../ui/button", () => ({ Button: "button" }));
 vi.mock("../ui/input", () => ({ Input: "input" }));
-vi.mock("../ui/menu", () => ({
-  Menu: "div",
-  MenuPopup: "div",
-  MenuRadioGroup: "div",
-  MenuRadioItem: "div",
-  MenuTrigger: "button",
-}));
 vi.mock("../ui/scroll-area", () => ({ ScrollArea: "div" }));
 vi.mock("../ui/sidebar", () => ({ SidebarInset: "div" }));
 vi.mock("../ui/skeleton", () => ({ Skeleton: "div" }));
@@ -189,11 +204,74 @@ const readySnapshot: InfinitusSnapshot = {
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   testState.snapshot = null;
+  testState.remoteSnapshot = null;
+  testState.environments = [testEnvironment("test-environment", "Test environment")];
   testState.command = vi.fn().mockResolvedValue({ _tag: "Success", value: {} });
   testState.refresh = vi.fn();
 });
 
 describe("AccountsPage", () => {
+  it("draws every machine that runs Infinitus, each with its own accounts", async () => {
+    testState.environments = [
+      testEnvironment("test-environment", "This Mac"),
+      testEnvironment("remote-environment", "Studio"),
+    ];
+    testState.snapshot = readySnapshot;
+    testState.remoteSnapshot = {
+      available: true,
+      fleets: [
+        {
+          key: "claude",
+          engineID: "swapd",
+          provider: "Claude",
+          capabilities: ["switch"],
+          activeNumber: 3,
+          accounts: [
+            account({ number: 3, email: "studio@example.com", active: true }),
+            account({ number: 4, email: "studio-spare@example.com", alias: "studio spare" }),
+          ],
+        },
+      ],
+      commands: [],
+    };
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+    expect(markup).toContain("This Mac");
+    expect(markup).toContain("Studio");
+    expect(markup).toContain("one@example.com");
+    expect(markup).toContain("studio@example.com");
+
+    // A button on the second machine's row goes to that machine's socket.
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Switch studio spare",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    expect(testState.command).toHaveBeenCalledWith({
+      environmentId: EnvironmentId.make("remote-environment"),
+      input: { command: "switch", args: ["claude", "4"], options: {} },
+    });
+    renderer.unmount();
+  });
+
+  it("says so when a listed machine is not connected", () => {
+    testState.environments = [
+      testEnvironment("test-environment", "This Mac"),
+      { ...testEnvironment("remote-environment", "Studio"), connection: { phase: "offline" } },
+    ];
+    testState.snapshot = readySnapshot;
+
+    const markup = renderToStaticMarkup(<AccountsPage />);
+
+    expect(markup).toContain("Studio");
+    expect(markup).toContain("Not connected.");
+  });
+
   it("names the socket and offers a retry when Infinitus is offline", () => {
     testState.snapshot = {
       available: false,
@@ -732,6 +810,97 @@ describe("AccountsPage", () => {
     // The value never lands in the rendered page.
     expect(JSON.stringify(renderer.toJSON())).not.toContain("the-code");
     expect(statusText()).toBe("Signed in as two@example.com.");
+    renderer.unmount();
+    restore();
+  });
+
+  it("from another machine, takes the address a loopback sign-in ended on and hands it over infinitus.secret", async () => {
+    const restore = installBridge(undefined);
+    testState.snapshot = signInSnapshot;
+    // The engine on the Mac takes the redirect itself and listens there; this
+    // device's browser is sent to its own localhost, so the page asks for the
+    // address it ended on instead of a code.
+    const begun = {
+      flowId: "f1",
+      url: "https://claude.ai/oauth",
+      pasteCode: false,
+      redirectPort: 54545,
+      label: "Add account",
+    };
+    let addressSubmitted = false;
+    testState.command = vi.fn().mockImplementation(async (call: { input: { command: string } }) => {
+      switch (call.input.command) {
+        case "signin-begin":
+          return { _tag: "Success", value: { result: begun } };
+        case "signin-status":
+          if (!addressSubmitted) await new Promise((resolve) => setTimeout(resolve, 20));
+          return {
+            _tag: "Success",
+            value: {
+              result: addressSubmitted
+                ? { flowId: "f1", phase: "done", pasteCode: false, account: "two@example.com" }
+                : { flowId: "f1", phase: "waitingForToken", pasteCode: false, redirectPort: 54545 },
+            },
+          };
+        case "signin-code":
+          addressSubmitted = true;
+          return { _tag: "Success", value: { result: { ok: true } } };
+        default:
+          return { _tag: "Success", value: {} };
+      }
+    });
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<AccountsPage />);
+    });
+    const button = renderer.root.findAll(
+      (node) => node.props["aria-label"] === "Add account: Claude (swapd)",
+    )[0]!;
+    await act(async () => {
+      button.props.onClick();
+    });
+    const byLabel = (label: string) =>
+      renderer.root.findAll((node) => node.props["aria-label"] === label)[0];
+    const statusText = () =>
+      renderer.root.findAll((node) => node.props.role === "status")[0]?.children.join("") ?? "";
+    const settle = async (ready: () => boolean) => {
+      for (let tick = 0; tick < 100 && !ready(); tick += 1) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+      }
+    };
+    await settle(() => byLabel("Sign-in address: Claude (swapd)") !== undefined);
+
+    expect(byLabel("Open the sign-in page: Claude (swapd)")!.props.href).toBe(
+      "https://claude.ai/oauth",
+    );
+    expect(statusText()).toBe(
+      "Sign in on the sign-in page. It ends on a page that will not load: copy that page's address and paste it here.",
+    );
+    const field = byLabel("Sign-in address: Claude (swapd)")!;
+    expect(field.props.type).toBe("password");
+    expect(field.props.placeholder).toBe("Paste the address the browser ended on");
+
+    const form = renderer.root.findAll((node) => node.type === "form")[0]!;
+    const address = { value: "http://localhost:54545/callback?code=the-code&state=st" };
+    await act(async () => {
+      form.props.onSubmit({
+        preventDefault: () => {},
+        currentTarget: { elements: { namedItem: () => address } },
+      });
+    });
+    expect(address.value).toBe("");
+    await settle(() => statusText() === "Signed in as two@example.com.");
+    const codeCall = testState.command.mock.calls.find(
+      (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
+    )![0] as { input: { args: unknown; secret: Redacted.Redacted<string> } };
+    expect(codeCall.input.args).toEqual({ flowId: "f1" });
+    expect(Redacted.value(codeCall.input.secret)).toBe(
+      "http://localhost:54545/callback?code=the-code&state=st",
+    );
+    // The address carries the code: it never lands in the rendered page.
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("the-code");
     renderer.unmount();
     restore();
   });

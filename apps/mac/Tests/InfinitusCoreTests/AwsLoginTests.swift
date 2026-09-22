@@ -115,6 +115,8 @@ final class AwsLoginTests: XCTestCase {
         XCTAssertFalse(device.wantsCode)
 
         XCTAssertTrue(AwsLogin.parseOutput("Updated profile papaya-login to use arn:aws:sts::1:assumed-role/x credentials.").succeeded)
+        // The CLI exits 0 after this too; only the line above counts as signed in.
+        XCTAssertFalse(AwsLogin.parseOutput("https://x.signin.aws.amazon.com/v1/authorize?a=b\r\n\r\naws: [ERROR]: The pending authorization to retrieve an SSO token has expired. The login flow to retrieve an SSO token must be restarted.\r\n").succeeded)
         // The rebind question (browser signed into another account).
         let rebind = AwsLogin.parseOutput("https://x.signin.aws.amazon.com/v1/authorize?a=b\r\n\r\nProfile papaya-login is already configured to use session arn:aws:iam::089192911254:user/a@b.c. Do you want to overwrite it to use arn:aws:iam::812652266901:user/a@b.c instead? (y/n): ")
         XCTAssertEqual(rebind.rebindRefusal, "papaya-login is bound to account 089192911254 but you signed in to 812652266901 — not rebound; sign in to the right account and retry")

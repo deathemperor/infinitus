@@ -712,6 +712,29 @@ export const InfinitusSignInCodeResult = Schema.Struct({
 });
 export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
 
+/** Fork: the engine's loopback listener stood in for on this machine. A
+    sign-in the Mac's engine finishes itself ends on `http://localhost:<port>/
+    callback`, and when this desktop looks at another Mac's environment the
+    page opens in this machine's browser — so the shell binds `port` here,
+    opens `url`, answers the browser, and hands the address back for the page
+    to send over `signin-code`. */
+export const InfinitusSignInRedirectListenInput = Schema.Struct({
+  flowId: Schema.String,
+  port: Schema.Number,
+  url: Schema.String,
+});
+export type InfinitusSignInRedirectListenInput = typeof InfinitusSignInRedirectListenInput.Type;
+
+/** The address the browser ended on (it carries the code: a secret from here
+    on), or why none will come — the port is held, or the flow was stopped
+    (no `error`). */
+export const InfinitusSignInRedirectResult = Schema.Struct({
+  ok: Schema.Boolean,
+  redirect: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+});
+export type InfinitusSignInRedirectResult = typeof InfinitusSignInRedirectResult.Type;
+
 /** Fork (#1213): a sign-in the desktop shell runs itself, through the engine's
     own `add-oauth` verb — swapd is the OAuth client, so its loopback listener
     catches the redirect and there is no code to paste. `provider` is the

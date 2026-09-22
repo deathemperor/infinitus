@@ -9,6 +9,7 @@ import * as InfinitusKeepAwake from "./InfinitusKeepAwake.ts";
 import * as InfinitusOAuthSignIn from "./InfinitusOAuthSignIn.ts";
 import * as InfinitusQuitWithApp from "./InfinitusQuitWithApp.ts";
 import * as InfinitusSignIn from "./InfinitusSignIn.ts";
+import * as InfinitusSignInRedirect from "./InfinitusSignInRedirect.ts";
 
 /** Everything the fork adds to the desktop shell for the menu-bar app: the
     prefs file, the quit-with-app hook that reads it, the in-app sign-in
@@ -21,6 +22,7 @@ export const layer = Layer.mergeAll(
   // The same layer value, so the sign-in the shell runs itself borrows the
   // one window service (Effect memoises a layer by identity).
   InfinitusOAuthSignIn.layer.pipe(Layer.provide(InfinitusSignIn.layer)),
+  InfinitusSignInRedirect.layer,
   InfinitusCaptureGesture.layer,
   InfinitusDeepLinks.layer,
   InfinitusKeepAwake.layer,

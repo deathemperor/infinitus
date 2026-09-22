@@ -2,11 +2,11 @@
 
 An **engine** manages provider logins, reads their usage, and handles account switching. Infinitus shows what the engine reports and lets you control it.
 
-A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them.
+A **fleet** is the set of accounts an engine manages for one provider, such as Claude accounts managed by swapd. A host can have several fleets. Accounts and engine configuration belong to that host; connecting from another device does not move them. Accounts lists every connected host that runs Infinitus, one group per host, so one page shows the status of the accounts on all your machines.
 
 ## Set up an engine
 
-Official Mac releases include swapd. In the desktop or web client, open **Settings → Infinitus → Engines** to see engine status and enable it. From Accounts, choose **Set up engines** to configure the selected host. Opening engine settings directly uses your primary environment. The page's **About** section shows the menu bar app's version; it is bundled with the desktop app and updates with it.
+Official Mac releases include swapd. In the desktop or web client, open **Settings → Infinitus → Engines** to see engine status and enable it. A host whose Accounts group reports no engine links to that host's engine settings. Opening engine settings directly uses your primary environment. The page's **About** section shows the menu bar app's version; it is bundled with the desktop app and updates with it.
 
 In the Mac app, the swapd pane shows the detected binary and daemon status. An installed copy takes precedence over the bundled copy. If swapd is missing, install a current Infinitus release and relaunch. Source builds can install swapd separately with `cargo install --git https://github.com/deathemperor/swapd swapd` (requires Rust).
 
@@ -14,7 +14,7 @@ CLIProxyAPI and 9Router are optional alternatives, installed separately. In **Se
 
 ## Add accounts
 
-With swapd enabled, its fleet appears in Accounts even before it holds an account. Choose **Add account**: in the desktop app on the owning Mac, the sign-in opens in your browser and the account joins the fleet when it completes, with nothing to paste. Repeat once per login. If Claude Code on that Mac is already signed in, the menu bar popup's setup card offers to adopt that login in one click instead; its **Sign in…** button opens the desktop app, where Accounts has **Add account**. From another client, **Add account** opens the provider's sign-in as a link; if it shows an authorization code, paste it into that sign-in flow. Cancel the flow if you no longer want to add the account.
+With swapd enabled, its fleet appears in Accounts even before it holds an account. Choose **Add account**: in the desktop app on the owning Mac, the sign-in opens in your browser and the account joins the fleet when it completes, with nothing to paste. Repeat once per login. If Claude Code on that Mac is already signed in, the menu bar popup's setup card offers to adopt that login in one click instead; its **Sign in…** button opens the desktop app, where Accounts has **Add account**. From the desktop app on another machine, **Add account** opens the sign-in in that machine's browser and the owning Mac finishes it when you approve. From a web browser, **Add account** opens the provider's sign-in as a link; if it shows an authorization code, paste it into that sign-in flow, and if it ends on a page that does not load, copy that page's address from the browser and paste it into the flow. Cancel the flow if you no longer want to add the account.
 
 CLIProxyAPI accounts can be added from its accounts controls. For 9Router, open its dashboard and use **Providers → Connect Claude Code**. The available actions depend on the engine and provider.
 

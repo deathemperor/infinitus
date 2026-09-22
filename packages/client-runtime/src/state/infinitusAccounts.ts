@@ -220,10 +220,11 @@ function rowActions(
 }
 
 /** The capabilities the native `add <fleet>` and `signin-begin` verbs act on
-    (#1213): `addOAuth` is the engine-driven OAuth sign-in (the proxy),
-    `addCurrent` the claude CLI's own flow whose code is pasted back (swapd —
-    every subscription account; it does not declare `addOAuth`). Either way
-    the Mac runs it and the page only watches. A fleet with only `addToken`
+    (#1213): `addOAuth` is the engine-driven OAuth sign-in (swapd's `add-oauth`
+    and the proxy; a headless run relays the redirect from another machine),
+    `addCurrent` the claude CLI's own flow whose code is pasted back (an
+    engine without `addOAuth`). Either way the Mac runs it and the page only
+    watches. A fleet with only `addToken`
     pastes a token in the Mac app and is not offered here. */
 const ADD_CAPABILITIES: ReadonlySet<string> = new Set(["addOAuth", "addCurrent"]);
 

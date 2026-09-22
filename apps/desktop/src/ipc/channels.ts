@@ -128,6 +128,11 @@ export const SUBMIT_INFINITUS_SIGN_IN_CODE_CHANNEL = "desktop:infinitus-submit-s
 // Fork: a sign-in the shell runs through the account engine itself (#1213).
 export const BEGIN_INFINITUS_OAUTH_SIGN_IN_CHANNEL = "desktop:infinitus-begin-oauth-sign-in";
 export const CANCEL_INFINITUS_OAUTH_SIGN_IN_CHANNEL = "desktop:infinitus-cancel-oauth-sign-in";
+// Fork: the engine's loopback listener stood in for here, for a sign-in on
+// another Mac's environment.
+export const LISTEN_INFINITUS_SIGN_IN_REDIRECT_CHANNEL =
+  "desktop:infinitus-listen-sign-in-redirect";
+export const STOP_INFINITUS_SIGN_IN_REDIRECT_CHANNEL = "desktop:infinitus-stop-sign-in-redirect";
 // Fork: deep links (#270 D).
 export const CONSUME_INFINITUS_DEEP_LINK_CHANNEL = "desktop:infinitus-consume-deep-link";
 export const INFINITUS_DEEP_LINK_PENDING_CHANNEL = "desktop:infinitus-deep-link-pending";
