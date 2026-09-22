@@ -31,8 +31,14 @@ describe("resolveSwapdBinary (#1213)", () => {
     assert.equal(resolve({ present: [`${HOME}/.cargo/bin/swapd`] }), `${HOME}/.cargo/bin/swapd`);
   });
 
-  it("falls back to the menu-bar helper nested in the packaged bundle", () => {
+  it("takes the menu-bar helper nested in the packaged bundle ahead of a PATH copy (#1530)", () => {
     assert.equal(resolve({ desktopBundlePath: BUNDLE, present: [NESTED] }), NESTED);
+    assert.equal(
+      resolve({ desktopBundlePath: BUNDLE, present: [`${HOME}/.cargo/bin/swapd`, NESTED] }),
+      NESTED,
+    );
+    // No bundle (a dev run), so the PATH copy is all there is.
+    assert.equal(resolve({ present: [`${HOME}/.cargo/bin/swapd`] }), `${HOME}/.cargo/bin/swapd`);
   });
 
   it("is null when the engine is nowhere", () => {

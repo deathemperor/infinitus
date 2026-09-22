@@ -10,7 +10,10 @@
  */
 
 /** Where `swapd` lives, checked in order; first hit wins. The list mirrors the
-    Mac app's `SwapdLocator`, so both find the same binary on one machine. */
+    Mac app's `SwapdLocator`, so both find the same binary on one machine: the
+    bundle's own copy first — the engine the release was pinned to, which a
+    stale `cargo install` on PATH used to shadow (#1530) — then the PATH dirs
+    a source build relies on. */
 export interface SwapdBinaryInput {
   readonly env: Record<string, string | undefined>;
   readonly homeDirectory: string;
@@ -27,13 +30,13 @@ const NESTED_SWAPD_RELATIVE_PATH =
 const swapdBinaryCandidates = (
   input: Pick<SwapdBinaryInput, "homeDirectory" | "desktopBundlePath">,
 ): ReadonlyArray<string> => [
+  ...(input.desktopBundlePath === null
+    ? []
+    : [`${input.desktopBundlePath}/${NESTED_SWAPD_RELATIVE_PATH}`]),
   "/opt/homebrew/bin/swapd",
   "/usr/local/bin/swapd",
   `${input.homeDirectory}/.cargo/bin/swapd`,
   `${input.homeDirectory}/.local/bin/swapd`,
-  ...(input.desktopBundlePath === null
-    ? []
-    : [`${input.desktopBundlePath}/${NESTED_SWAPD_RELATIVE_PATH}`]),
 ];
 
 /**
