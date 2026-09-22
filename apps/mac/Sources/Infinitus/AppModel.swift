@@ -1987,6 +1987,15 @@ extension AppModel: FleetModel {
     /// Infinitus › Engines is the desktop app's (#1177).
     func openSettings() { openDesktop?("engines") }
 
+    /// The Infinitus desktop app, wherever LaunchServices knows it. Its
+    /// Accounts page runs the first sign-in itself (`swapd add-oauth`,
+    /// #1213), so the popup's setup card hands off to it instead of
+    /// asking for a Claude Code login and a relaunch.
+    static var desktopAppURL: URL? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
+    }
+    var desktopAppInstalled: Bool { Self.desktopAppURL != nil }
+
     /// The "at this pace" line's click. The Utilization page is the
     /// desktop app's (#654, #774).
     func openForecast() { openDesktop?(nil) }

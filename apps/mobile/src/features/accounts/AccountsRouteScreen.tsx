@@ -97,7 +97,7 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         // the desktop app's.
         <EmptyState
           title="Infinitus is running, but no engine reports accounts"
-          detail="Install and configure an engine (swapd) for Infinitus to manage them. Engines are set up on the Mac, under Settings › Engines in the desktop app."
+          detail="swapd ships with Infinitus: turn it on in the desktop app on that Mac, under Settings › Engines, then add the first account from its Accounts page."
           actionLabel="Read the accounts setup guide"
           onAction={() =>
             void Linking.openURL(

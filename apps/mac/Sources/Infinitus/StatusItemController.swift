@@ -149,6 +149,10 @@ final class StatusItemController {
     }
 
     private func showAnchored() {
+        // A setup card names what this Mac has right now: a `claude /login`
+        // done since launch shows up on the next open, no relaunch. Off
+        // once a fleet has accounts, so the probe does not run per click.
+        if model.setupStepShown { model.detectOnboarding() }
         if anchored == nil {
             let host = NSHostingController(rootView: AnchoredRoot(
                 model: model,
@@ -333,7 +337,7 @@ final class StatusItemController {
 
         // The fork desktop app is the daily client (#654): one entry to
         // reach it, shown only when LaunchServices knows the bundle.
-        if Self.forkDesktopURL != nil {
+        if model.desktopAppInstalled {
             menu.addItem(menuItem("Open Infinitus", #selector(menuOpenFork)))
             menu.addItem(menuItem("Settings…", #selector(menuSettings)))
             menu.addItem(.separator())
@@ -383,9 +387,7 @@ final class StatusItemController {
         model.gamification = id
     }
     /// The T3 Code fork's desktop bundle, wherever it is installed.
-    static var forkDesktopURL: URL? {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "run.infinitus.desktop")
-    }
+    static var forkDesktopURL: URL? { AppModel.desktopAppURL }
     @objc private func menuOpenFork() { openFork() }
     @objc private func menuSettings() { openFork(settingsPage: "menu-bar") }
     /// Opens the desktop app; with a Settings page, at that section over
