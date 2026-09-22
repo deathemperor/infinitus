@@ -244,7 +244,7 @@ export function FleetSection({
 
 /** What "Add account" does on a fleet with no accounts, so the empty header
     is a first step and not a dead end. */
-export function emptyFleetHint(inApp: boolean, canAdd: boolean, shellOAuth: boolean): string {
+function emptyFleetHint(inApp: boolean, canAdd: boolean, shellOAuth: boolean): string {
   if (inApp && shellOAuth) return "No accounts yet. Add account signs one in through your browser.";
   if (inApp) return "No accounts yet. Add account starts the provider's sign-in.";
   if (canAdd) return "No accounts yet. Add account adopts the login Claude Code on the Mac holds.";
