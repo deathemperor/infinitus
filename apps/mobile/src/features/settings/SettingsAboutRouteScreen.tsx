@@ -42,10 +42,17 @@ function AppSettingsSection() {
 
   // The product version (root VERSION, #823) when the build carries it; the
   // store's marketing version otherwise.
-  const version =
-    (Constants.expoConfig?.extra?.productVersion as string | undefined) ??
-    Constants.expoConfig?.version ??
-    "0.0.0";
+  const productVersion = Constants.expoConfig?.extra?.productVersion as string | undefined;
+  const storeVersion = Constants.expoConfig?.version;
+  const version = productVersion ?? storeVersion ?? "0.0.0";
+  // The version and build number App Store Connect and TestFlight show for
+  // this binary, so a tester can match the two; only when they differ.
+  const storeVersionLabel =
+    productVersion && storeVersion
+      ? Constants.nativeBuildVersion
+        ? `${storeVersion} (${Constants.nativeBuildVersion})`
+        : storeVersion
+      : null;
   // Fall back to "production" to match resolveAppVariant in app.config.ts, so a
   // missing variant never mislabels a production build as development.
   const variant = (Constants.expoConfig?.extra?.appVariant as string | undefined) ?? "production";
@@ -117,6 +124,9 @@ function AppSettingsSection() {
       <Text className="flex-1 text-lg text-foreground">Version</Text>
       <View className="items-end">
         <Text className="text-lg text-foreground-muted">{versionLabel}</Text>
+        {storeVersionLabel ? (
+          <Text className="text-xs text-foreground-muted/70">{storeVersionLabel}</Text>
+        ) : null}
         {statusLabel ? (
           <Text className="text-xs text-foreground-muted/70">{statusLabel}</Text>
         ) : null}
@@ -136,7 +146,7 @@ function AppSettingsSection() {
       <SettingsRow icon="doc.text" label="Legal" fullScreenTarget="SettingsLegal" />
       {updateCheckAvailable ? (
         <Pressable
-          accessibilityLabel={`Version ${versionLabel}`}
+          accessibilityLabel={`Version ${versionLabel}${storeVersionLabel ? `, ${storeVersionLabel}` : ""}`}
           accessibilityRole="text"
           disabled={busy}
           onPress={handleVersionPress}
