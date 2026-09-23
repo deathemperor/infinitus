@@ -223,6 +223,12 @@ public struct SwapdCLI: Sendable {
             provider: provider)
     }
 
+    /// Spend one of the slot's banked limit resets as that slot; the live
+    /// login is untouched. The reply is a forced-fetch list.
+    public func reset(provider: Provider, slot: Int) async throws -> SwapdList {
+        try await listVerb(["reset", String(slot)], provider: provider)
+    }
+
     /// One cheapest request under the slot's own login so its window starts
     /// now; the live login is untouched. The reply is a forced-fetch list.
     public func ignite(provider: Provider, slot: Int) async throws -> SwapdList {

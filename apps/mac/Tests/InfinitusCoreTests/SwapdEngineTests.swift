@@ -135,6 +135,29 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(fleets[0].accounts[0].autoIgnite, true)
     }
 
+    /// swapd's `resets` (#1554) rides along per account, verbatim; a row
+    /// without it carries nil, so every host hides the control.
+    func testBankedResetsAreCarriedWhenTheEngineReportsThem() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[
+          {"provider":"claude","installed":true,"activeSlot":1,"accounts":[
+            {"slot":1,"email":"a@example.com","organizationName":"","organizationUuid":"","active":true,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[],
+             "resets":{"available":1,"total":1,"nextGrantId":"launch","label":"Launch: one reset",
+                       "endsAt":"2026-10-22T16:00:00Z","hold":{"reason":"notAtLimit"}}},
+            {"slot":2,"email":"b@example.com","organizationName":"","organizationUuid":"","active":false,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let fleets = SwapdMapping.fleets(from: list, now: now)
+        let resets = try XCTUnwrap(fleets[0].accounts[0].resets)
+        XCTAssertEqual(resets.available, 1)
+        XCTAssertEqual(resets.nextGrantId, "launch")
+        XCTAssertEqual(resets.label, "Launch: one reset")
+        XCTAssertEqual(resets.hold, AccountResets.Hold(reason: "notAtLimit"))
+        XCTAssertNil(fleets[0].accounts[1].resets)
+    }
+
+
     /// The shape the engine ACTUALLY emits (`collect.rs account_view`:
     /// every non-`ok` status empties `windows` and moves the measurement
     /// into `lastGood`) — not the shape spec §4's prose describes. A
@@ -371,7 +394,7 @@ final class SwapdEngineTests: XCTestCase {
         #!/bin/sh
         echo "$@" >> "\(argv)"
         case "$1" in
-          list|prefer|auto-ignite|alias) echo '\(payload(nil))' ;;
+          list|prefer|auto-ignite|alias|reset) echo '\(payload(nil))' ;;
           refresh|ignite) echo '\(payload("2026-09-09T05:59:59Z"))' ;;
           *) echo '{"schemaVersion":1,"error":{"code":"no-such-slot","message":"no slot 9 for claude"}}'; exit 1 ;;
         esac
@@ -510,6 +533,12 @@ final class SwapdEngineTests: XCTestCase {
         let merged = try XCTUnwrap(memory.merged(with: try list(view("claude", slot: 2))))
         XCTAssertEqual(merged.providers.map(\.provider), ["claude", "gemini"])
         XCTAssertEqual(merged.providers.map { $0.accounts.map(\.slot) }, [[2], [5]])
+    }
+
+    func testResetIsTheEnginesOwnVerb() async throws {
+        let engine = try makeEngine()
+        try await engine.reset(fleet: .claude, number: 1)
+        XCTAssertEqual(try argv(), ["reset 1 --provider claude --json"])
     }
 
     func testAutoIgniteIsTheEnginesOwnVerb() async throws {

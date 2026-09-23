@@ -21,6 +21,8 @@ import { infinitusEnvironment } from "../../state/infinitus";
 import { useAtomCommand } from "../../state/use-atom-command";
 import {
   commandFailureMessage,
+  resetConfirmation,
+  resetsLine,
   rowBadges,
   rowMenuActions,
   removeConfirmation,
@@ -121,6 +123,23 @@ export function AccountRow(props: {
         ]);
         return;
       }
+      if (action === "reset") {
+        const copy = resetConfirmation(row);
+        if (Platform.OS === "android") {
+          showConfirmDialog({
+            title: copy.title,
+            message: copy.message,
+            confirmText: "Use reset",
+            onConfirm: () => void perform("reset"),
+          });
+          return;
+        }
+        Alert.alert(copy.title, copy.message, [
+          { text: "Cancel", style: "cancel" },
+          { text: "Use reset", onPress: () => void perform("reset") },
+        ]);
+        return;
+      }
       if (action === "remove") {
         const copy = removeConfirmation(row, fleetTitle);
         if (Platform.OS === "android") {
@@ -180,6 +199,11 @@ export function AccountRow(props: {
         ) : null}
       </View>
       {row.plan ? <Text className="text-xs text-foreground-muted">{row.plan}</Text> : null}
+      {row.resets ? (
+        <Text className="text-xs text-foreground-muted" numberOfLines={2}>
+          {resetsLine(row.resets)}
+        </Text>
+      ) : null}
       {row.windows.map((window) => (
         <WindowBar key={window.name} window={window} />
       ))}

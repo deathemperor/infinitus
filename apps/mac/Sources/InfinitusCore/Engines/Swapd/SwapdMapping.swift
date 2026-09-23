@@ -72,6 +72,9 @@ public struct SwapdAccountView: Decodable, Sendable {
     /// The daemon keeps this account's 5h window running (swapd 0.3,
     /// `auto-ignite`); absent from an older build.
     public let autoIgnite: Bool?
+    /// The banked limit resets (a swapd with `reset`, #1554); absent from
+    /// an older build and from an account with no live grant.
+    public let resets: AccountResets?
     public let usageStatus: String
     public let fetchedAt: String?
     public let ageSeconds: Double?
@@ -248,7 +251,8 @@ public enum SwapdMapping {
                        lastGoodUsage: view.lastGood.map { usage($0.windows, now: now) } ?? nil,
                        lastGoodFetchedAt: view.lastGood?.fetchedAt,
                        lastGoodAgeSeconds: view.lastGood?.ageSeconds,
-                       stale: failed == nil ? nil : true, staleReason: failed)
+                       stale: failed == nil ? nil : true, staleReason: failed,
+                       resets: view.resets)
     }
 
     /// The contract's window list as today's UI (and the phone's decoder)
