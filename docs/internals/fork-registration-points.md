@@ -165,6 +165,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   before it (#743), a consumer of that gate. `InfinitusForkAnchorGate` just above
   the hold layers (#1013): wraps the gate with the fork-anchor re-check. `CaptureStore.layer` (#433) in the
   state-dir file services' `Layer.mergeAll` beside `Keybindings.layer`.
+- `apps/server/src/project/RepositoryIdentityResolver.ts` (+ its test) — a
+  remote `gh repo set-default` marked (`remote.<name>.gh-resolved`) wins over
+  upstream's `upstream`-then-`origin` rule, read only when a checkout has more
+  than one remote. The fork's sync loop keeps `upstream = pingdotgg/t3code`,
+  so without it every infinitus checkout that syncs was read as T3 Code and
+  the pull requests page listed upstream's PRs.
 - `apps/server/src/vcs/GitVcsDriver.ts` (+ its test) — upstream's open PR
   pingdotgg/t3code#10792 carried ahead of upstream (2026-09-12, upstream
   #3646): checkpoint capture seeds its private index from the workspace
