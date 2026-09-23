@@ -3714,6 +3714,7 @@ describe("ClaudeAdapterLive", () => {
           input_tokens: 400,
           cache_read_input_tokens: 90,
           cache_creation_input_tokens: 10,
+          cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 10 },
           output_tokens: 50,
           output_tokens_details: { thinking_tokens: 30 },
         },
@@ -3748,6 +3749,7 @@ describe("ClaudeAdapterLive", () => {
           inputTokens: 500,
           cachedInputTokens: 90,
           cacheCreationTokens: 10,
+          cacheTtlSeconds: 3600,
           reasoningTokens: 30,
           outputTokens: 50,
           hasSubagents: false,
@@ -3899,6 +3901,7 @@ describe("ClaudeAdapterLive", () => {
           input_tokens: 30,
           cache_read_input_tokens: 2,
           cache_creation_input_tokens: 3,
+          cache_creation: { ephemeral_5m_input_tokens: 3, ephemeral_1h_input_tokens: 0 },
           output_tokens: 7,
         },
         modelUsage: {
@@ -3934,6 +3937,7 @@ describe("ClaudeAdapterLive", () => {
           inputTokens: 35,
           cachedInputTokens: 2,
           cacheCreationTokens: 3,
+          cacheTtlSeconds: 300,
           outputTokens: 7,
           hasSubagents: false,
         });

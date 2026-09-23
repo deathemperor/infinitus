@@ -964,6 +964,20 @@ function normalizeClaudeActiveTokenUsage(
   });
 }
 
+/**
+ * The prompt-cache lifetime a turn's writes bought: Claude Code writes the
+ * main conversation with a 1-hour TTL on some sessions and 5 minutes on
+ * others, and says which in `cache_creation`. 1 hour wins a mixed turn (the
+ * main thread's writes); undefined when the turn wrote nothing.
+ */
+function claudeCacheTtlSeconds(value: unknown): number | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const creation = value as Record<string, unknown>;
+  if ((finiteNonNegativeInteger(creation.ephemeral_1h_input_tokens) ?? 0) > 0) return 3600;
+  if ((finiteNonNegativeInteger(creation.ephemeral_5m_input_tokens) ?? 0) > 0) return 300;
+  return undefined;
+}
+
 function normalizeClaudeTurnTokenUsage(
   result: SDKResultMessage | undefined,
   hasSubagents: boolean,
@@ -1013,10 +1027,12 @@ function normalizeClaudeTurnTokenUsage(
     };
   }
 
+  const cacheTtlSeconds = claudeCacheTtlSeconds(usage.cache_creation);
   const commonUsage = {
     usageScope: "main_agent",
     ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
     ...(cacheCreationTokens !== undefined ? { cacheCreationTokens } : {}),
+    ...(cacheTtlSeconds !== undefined ? { cacheTtlSeconds } : {}),
     ...(thinkingTokens !== undefined && rawOutputTokens !== undefined
       ? { reasoningTokens: Math.min(rawOutputTokens, thinkingTokens) }
       : {}),

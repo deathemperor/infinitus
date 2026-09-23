@@ -53,6 +53,18 @@ messages while disconnected. Uploads resume when you reconnect. Drafts and queue
 messages survive app restarts. Signing out of Infinitus Connect keeps that work on your
 device until you sign back into the same account.
 
+## Prompt cache timer
+
+On Claude threads, the composer shows how long the prompt cache stays warm after the last turn. A
+green border and a timer by the send button mean your next message reads the conversation from
+cache; amber means it expires within a few minutes. Once it expires, the border returns to normal
+and the timer reads "expired": the next message sends the whole context again at full cost, so a new
+thread may be cheaper if you do not need the history. It also reads "cold" once the agent's session
+has stopped (you pressed Stop, it sat idle for 30 minutes, or the app restarted): resuming usually
+sends the whole context again even before the cache would expire. Claude Code keeps some sessions'
+cache for an hour and others for five minutes; the timer follows what each turn reported. On mobile,
+the same timer is in the thread menu's **Thread usage**.
+
 ## Custom models
 
 On web and desktop, use Settings → Providers → **Models** to add an unlisted model with a custom

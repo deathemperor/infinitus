@@ -45,6 +45,7 @@ export function turnUsageFromCompletedTurn(
       ? { toolCalls: telemetry.toolCalls, durationMs: telemetry.durationMs }
       : {}),
     ...(unavailable ? { usageUnavailable: true as const } : {}),
+    ...(tokens?.cacheTtlSeconds !== undefined ? { cacheTtlSeconds: tokens.cacheTtlSeconds } : {}),
   };
 }
 

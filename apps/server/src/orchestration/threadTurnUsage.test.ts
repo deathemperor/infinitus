@@ -20,6 +20,7 @@ describe("turnUsageFromCompletedTurn (#834)", () => {
             outputTokens: 100,
             cachedInputTokens: 700,
             cacheCreationTokens: 50,
+            cacheTtlSeconds: 3600,
             reasoningTokens: 20,
             hasSubagents: true,
           },
@@ -41,6 +42,7 @@ describe("turnUsageFromCompletedTurn (#834)", () => {
       hasSubagents: true,
       costUsd: 0.12,
       completedAt: at,
+      cacheTtlSeconds: 3600,
     });
   });
 

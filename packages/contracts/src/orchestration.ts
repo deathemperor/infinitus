@@ -885,6 +885,9 @@ export const ThreadTurnUsage = Schema.Struct({
       for "not reported", and the row exists so the tool calls and wall
       time survive. Absent on every turn that reported. */
   usageUnavailable: Schema.optional(Schema.Literal(true)),
+  /** The prompt-cache TTL the turn's writes bought (`TurnTokenUsage`);
+      absent when the provider does not say. */
+  cacheTtlSeconds: Schema.optional(PositiveInt),
 });
 export type ThreadTurnUsage = typeof ThreadTurnUsage.Type;
 
@@ -919,6 +922,9 @@ export const ThreadUsageRollup = Schema.Struct({
       absent while none did. Tokens and cost mean something only while
       `turns` exceeds it (`threadUsageReported`). */
   unreportedTurns: Schema.optional(NonNegativeInt),
+  /** When the last turn's prompt cache goes cold: its completion plus its
+      `cacheTtlSeconds`. Absent when the last turn carried no TTL. */
+  cacheExpiresAt: Schema.optional(IsoDateTime),
 });
 export type ThreadUsageRollup = typeof ThreadUsageRollup.Type;
 

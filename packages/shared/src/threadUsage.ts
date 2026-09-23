@@ -1,4 +1,9 @@
-import type { ThreadTurnUsage, ThreadUsageRollup } from "@infinitus/contracts";
+import type {
+  OrchestrationSession,
+  ThreadTurnUsage,
+  ThreadUsageRollup,
+} from "@infinitus/contracts";
+import * as DateTime from "effect/DateTime";
 
 /**
  * Fork (#834): a thread's usage rollup, folded one completed turn at a time.
@@ -25,6 +30,7 @@ export function addTurnUsage(
     models: [],
     lastTurnAt: turn.completedAt,
   };
+  const isLatest = turn.completedAt >= base.lastTurnAt;
   return {
     source: base.source,
     turns: base.turns + 1,
@@ -39,7 +45,7 @@ export function addTurnUsage(
       turn.model !== null && !base.models.includes(turn.model)
         ? [...base.models, turn.model]
         : base.models,
-    lastTurnAt: turn.completedAt > base.lastTurnAt ? turn.completedAt : base.lastTurnAt,
+    lastTurnAt: isLatest ? turn.completedAt : base.lastTurnAt,
     ...optionalSum("toolCalls", base.toolCalls, turn.toolCalls),
     ...optionalSum("durationMs", base.durationMs, turn.durationMs),
     ...optionalSum(
@@ -47,7 +53,23 @@ export function addTurnUsage(
       base.unreportedTurns,
       turn.usageUnavailable === true ? 1 : undefined,
     ),
+    ...cacheExpiry(isLatest ? turn : undefined, base.cacheExpiresAt),
   };
+}
+
+/** The latest turn's cache expiry, or the rollup's when an older turn is
+    folded in; a latest turn without a TTL clears it, since its provider
+    (or a turn that wrote nothing) says nothing about the cache. */
+function cacheExpiry(
+  latest: ThreadTurnUsage | undefined,
+  current: string | undefined,
+): { cacheExpiresAt?: string } {
+  if (latest === undefined) return current === undefined ? {} : { cacheExpiresAt: current };
+  if (latest.cacheTtlSeconds === undefined) return {};
+  const expiresAtMs = Date.parse(latest.completedAt) + latest.cacheTtlSeconds * 1000;
+  return Number.isFinite(expiresAtMs)
+    ? { cacheExpiresAt: DateTime.formatIso(DateTime.makeUnsafe(expiresAtMs)) }
+    : {};
 }
 
 /**
@@ -84,4 +106,74 @@ export function foldTurnUsage(
     rollup = addTurnUsage(rollup, turn);
   }
   return rollup;
+}
+
+/**
+ * Whether the thread's prompt cache is still warm, from the rollup's
+ * `cacheExpiresAt` (the last turn's completion plus the TTL its writes
+ * bought). `expiring` covers the last fifth of the TTL, at most five
+ * minutes. Null when the last turn said nothing about the cache.
+ *
+ * `sessionAlive` (`promptCacheWriterAlive`) is whether the provider process
+ * that wrote the cache is still up. A Stop, the idle reaper, an error, a
+ * server restart or a runtime-mode change ends or replaces it, and the next
+ * message runs on a resumed CLI whose prompt prefix usually differs (git
+ * status, tool and MCP deltas), so the whole context is written again inside
+ * the TTL (pingdotgg/t3code#10955, #10600): that reads `cold` with reason
+ * `restart`, never warm.
+ */
+export type PromptCacheState =
+  | { readonly kind: "warm" | "expiring"; readonly remainingMs: number; readonly ttlMs: number }
+  | { readonly kind: "cold"; readonly reason: "expired" | "restart" };
+
+export function promptCacheState(
+  usage: Pick<ThreadUsageRollup, "cacheExpiresAt" | "lastTurnAt">,
+  nowMs: number,
+  sessionAlive: boolean,
+): PromptCacheState | null {
+  if (usage.cacheExpiresAt === undefined) return null;
+  const expiresAtMs = Date.parse(usage.cacheExpiresAt);
+  const ttlMs = expiresAtMs - Date.parse(usage.lastTurnAt);
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) return null;
+  const remainingMs = expiresAtMs - nowMs;
+  if (remainingMs <= 0) return { kind: "cold", reason: "expired" };
+  if (!sessionAlive) return { kind: "cold", reason: "restart" };
+  const expiringMs = Math.min(5 * 60_000, ttlMs / 5);
+  return { kind: remainingMs <= expiringMs ? "expiring" : "warm", remainingMs, ttlMs };
+}
+
+/**
+ * Whether the process that wrote the last turn's cache still runs: the
+ * session is `ready` and has not changed since that turn (the turn's
+ * completion sets `ready` at the same instant; any later stop, reap, error
+ * or restart moves `updatedAt` past it). A second of grace for ordering.
+ */
+export function promptCacheWriterAlive(
+  session: Pick<OrchestrationSession, "status" | "updatedAt"> | null | undefined,
+  lastTurnAt: string,
+): boolean {
+  if (session?.status !== "ready") return false;
+  return Date.parse(session.updatedAt) <= Date.parse(lastTurnAt) + 1000;
+}
+
+/** Whole minutes left, rounded down so the label never promises more
+    than the cache has: "42m", "<1m", "1h" right after a 1-hour write. */
+export function promptCacheRemainingLabel(remainingMs: number): string {
+  const minutes = Math.floor(remainingMs / 60_000);
+  if (minutes >= 60) return "1h";
+  return minutes < 1 ? "<1m" : `${minutes}m`;
+}
+
+/** "1-hour" or "5-minute", for the cache a TTL names. */
+export function promptCacheTtlLabel(ttlMs: number): string {
+  return ttlMs >= 60 * 60_000 ? "1-hour" : `${Math.round(ttlMs / 60_000)}-minute`;
+}
+
+/** Milliseconds until the label or the kind can next change: just past the
+    next whole minute before expiry (the label rounds down, so on the
+    boundary itself it has not changed yet). Null once cold. */
+export function promptCacheNextChangeMs(expiresAt: string, nowMs: number): number | null {
+  const remainingMs = Date.parse(expiresAt) - nowMs;
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null;
+  return (remainingMs % 60_000) + 1;
 }
