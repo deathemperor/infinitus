@@ -102,7 +102,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
   `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way;
   `thread.nextAttention` (`mod+alt+n`, `!terminalFocus`; it was `mod+shift+l` until upstream's #11615 took that chord for `composer.previousWorktree` — the fork yields on a default-chord collision) in
-  `THREAD_KEYBINDING_COMMANDS` (#270 C).
+  `THREAD_KEYBINDING_COMMANDS` (#270 C). The fork yielded again at upstream's #13212: its plain `mod+[`/`mod+]` for `thread.previous`/`thread.next` (#840) went, so those keys are upstream's `navigation.back`/`navigation.forward`. A config that the startup sync had already backfilled with the fork's bracket rules keeps them as user rules.
 - `apps/web/src/components/Sidebar.tsx` — `resolveNextAttentionThreadKey`
   (ranks the rendered list: approval, input, failed, held, unseen
   completion; holds read from the rows' atoms via `appAtomRegistry`), the
@@ -532,7 +532,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them), and
   `export-infinitus-splash.ts` (run by hand).
-- `patches/uniwind@1.11.0.patch` — upstream's patch (#9355) plus the fork's media-block hunk (2026-09-18): every rule inside a `@media` block keeps the block's media queries. Stock uniwind (1.12.0 too) resets its per-rule config after each child, so of the one `@media android` block Tailwind emits only the first `android:` utility keeps its platform and the rest apply on iOS as well — `android:bg-transparent` on the Settings section card erased every card on the phone. Pinned by `apps/mobile/src/lib/uniwind-platform-variants.test.ts`, which drives uniwind's own processor source; re-apply the hunk at the next uniwind bump until upstream fixes it.
 - `patches/expo-widgets@57.0.15.patch` — upstream's patch (#11604) plus the fork's `onExpoWidgetsActivityUpdate` hunk (#1277), consumer gone with #1375: drop the hunk at the next expo-widgets bump, never re-apply it. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/src/lib/mobileTheme.ts` — settings groups (`--color-grouped-card`) take the tonal fill in every theme whose surface matches its chrome, not only the default one (2026-09-22). Upstream's palette alignment (#12534) gave grove, ocean, ember and iris the same colour for both, so their Settings cards painted invisibly on the phone. Pinned by `mobileTheme.test.ts` ("separates settings groups … in every theme"); drop the bullet once upstream fixes the derivation.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
@@ -640,17 +639,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   babysat idle row reads "Babysitting r/10" ahead of that (`babysitLabel`,
   #269 A).
 - `apps/mobile/src/features/threads/threadListV2.ts`,
-  `thread-list-v2-items.tsx`, `threadPresentation.ts` — the `Monitoring`
+  `thread-list-v2-items.tsx` — the `Monitoring`
   status the phone was dropping: the server ships `backgroundLiveness` on
   every thread shell and upstream's web sidebar reads it
-  (`resolveSidebarThreadStatus`, `resolveThreadStatusPill`), but both mobile
-  resolvers stopped at the session row, so a thread whose turn settled while
-  watch loops ran read as a plain timestamp. Both now end in the web's two
+  (`resolveSidebarThreadStatus`, `resolveThreadStatusPill`), but the mobile
+  resolver stopped at the session row, so a thread whose turn settled while
+  watch loops ran read as a plain timestamp. It now ends in the web's two
   branches (working fleets, then monitoring watch loops) after the failed
-  check, each taking its own web counterpart's treatment: the v2 list label
-  is full-strength and hueless like `Sidebar.tsx`'s, the v1 row's pill keeps
-  Working's hue like `resolveThreadStatusPill`'s, and neither pulses —
-  monitoring is background presence, not progress. A babysat row still
+  check; the label is full-strength and hueless like `Sidebar.tsx`'s and
+  does not pulse — monitoring is background presence, not progress. A babysat row still
   labels ahead of it, since `babysitLabel` says the same thing with the
   round count.
 - `apps/mobile/src/state/entities.ts` — `useThreadShells` drops side
@@ -752,6 +749,5 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   branch that touches `.github/workflows` (#658); without it such a sync
   is done by hand.
 - `apps/mobile/src/dependency-graph.test.ts` — the upward-import ceilings (`state`/`components` → `features`) are the fork's counts: `features/infinitus` (side questions, pin-at-creation) is reached from `state/`, so upstream's numbers fail here. On a sync keep the fork's ceilings, and when the test prints a higher count set it to that.
-- `scripts/lint-restyle-ceiling.ts` — `RESTYLE_CEILING` is the fork's count of `shadcn(no-restyle)` findings under `apps/web/src`, not upstream's: the fork's own web surfaces carry className overrides of their own, so upstream's number fails CI here. On a sync take upstream's other changes to the file and keep the fork's ceiling; re-run `vp run lint:restyle-ceiling` and set it to the printed count when the sync or a fork change moves it.
 - **Oh My Pi as a provider driver.** `omp` speaks ACP natively (`omp acp`), so the driver is one more tenant of the existing ACP runtime; its own files are in `fork-only-files.md`. The registration points are the ones every driver has: `packages/contracts/src/settings.ts` (`OmpSettings` / `OmpSettingsPatch`, the `omp` key of `providers` and its patch, `enabled` false by default), `packages/contracts/src/model.ts` (`DEFAULT_MODEL_BY_PROVIDER.omp`, `PROVIDER_DISPLAY_NAMES.omp`), `apps/server/src/provider/builtInDrivers.ts`, `providerStatusCache.ts`, `apps/server/src/serverSettings.ts`, `textGeneration/TextGeneration.ts`, `apps/server/scripts/acp-mock-agent.ts` (`T3_ACP_OMP=1`), `packages/contracts/src/agentSessions.ts` (`"omp"` on `AgentSessionSource`) `apps/server/src/project/AgentSessionScanner.ts` and `AgentSessionImporter.ts` (the omp resume cursor, plus its test); web `Icons.tsx`, `chat/providerIconUtils.ts`, `settings/providerDriverMeta.ts`, `settings/customModelEditor.logic.ts`, `settings/settingsSearch.ts` and `onboarding/WelcomeWizard.tsx`; mobile `ProviderIcon.tsx`; docs `README.md`, `docs/user/install.md`, `docs/user/permission-modes.md`. Upstream's own unmerged omp PRs add an `omp` arm at every one of these points; on the sync that brings one, ours stays and theirs goes — a second `omp` key or `case` is a type error at best. Rules and traps: `docs/internals/omp-driver.md`.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
