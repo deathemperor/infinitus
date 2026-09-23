@@ -7,7 +7,9 @@ set -eu
 # + #48: an account the daemon benched for a dead refresh token reports `relogin-required` instead of listing healthy, so the re-login it needs is offered on the row.
 # + #50, #51: `add-oauth` asks for the seven scopes Claude Code itself sends; claude.ai refuses the old five-scope subset with "Invalid request format", which failed every browser sign-in and re-login on its first page. A grant that names no scope is stored as the claude.ai set.
 # + #52: `add-oauth` sends a 32-byte `state`, as Claude Code does; claude.ai refuses the 16-byte one with "Invalid request format" — the actual cause of the failed sign-ins, bisected in the browser.
+# + #54 (0.3.1): a profile credential without a refresh token is not read back as a rotation.
+# + #56: `list` reports each account's banked Claude limit resets as `resets`, and `reset <slot>` spends one as that slot (#1554).
 cargo install --locked --git https://github.com/deathemperor/swapd \
-    --rev d5e48b3e4cf0e338e7c586c4d742749518eba537 \
+    --rev 480749d9a0669fc597261287b4e2192ca6464d77 \
     --root "$INFINITUS_ENGINE_BUILD_ROOT" swapd
 "$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" --version
