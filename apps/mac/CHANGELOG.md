@@ -10,6 +10,25 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.34
+
+### Mac
+- Each account's banked Claude limit resets ride on the fleet, and `infinitusctl reset <fleet> <n>` spends one as that account.
+- A row's ticket mark in the popup shows the account's banked Claude resets and spends one after a confirm; the row's menu offers the same.
+
+### Desktop
+- Accounts rows show an account's banked Claude resets, with what stops the next one, and redeem one after a confirm.
+- Usage → Limits shows the limit resets a Claude subscription has banked and redeems one from the account's details, the way Codex reset credits already work; a reset that only works at a limit waits until you are at one and says so.
+- An agent waiting on its own AWS or gcloud login now carries on as soon as you sign in from the card or your phone.
+- A chat that grows below the composer (a queued message, a banner, a burst of output) keeps following the end, or shows "Scroll to end" when it cannot, instead of hiding the newest messages.
+- Claude threads show how long the prompt cache stays warm — a green composer border and a countdown by the send button, amber near the end — so you can tell whether the next message reuses the cache or sends the whole context again.
+
+### Phone
+- Accounts rows show banked Claude resets and redeem one from the row's menu.
+- The lock-screen card keeps counting an agent that has been working for hours; it used to drop out after two quiet hours.
+- The same Claude reset credits and the held state appear under Usage → Limits and the composer's limits card.
+- Thread usage shows the same prompt cache countdown.
+
 ## 0.5.0-alpha.33
 
 ### Mac
