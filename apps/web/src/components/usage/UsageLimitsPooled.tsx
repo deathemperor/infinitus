@@ -27,6 +27,7 @@ import {
   ResetCreditDialog,
   barColor,
   resetCreditsSummary,
+  resetHoldText,
   useResetCredit,
 } from "./UsageLimits";
 
@@ -155,6 +156,7 @@ function SegmentPopover({
       : account.sourceLabel;
   const credits =
     redeem && account.limits.resetCredits?.availableCount ? account.limits.resetCredits : null;
+  const hold = credits ? resetHoldText(credits, now) : null;
   return (
     <div className="flex w-72 max-w-[calc(100vw-3rem)] flex-col gap-2.5 text-xs">
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -193,19 +195,21 @@ function SegmentPopover({
         ) : null}
       </div>
       {credits && redeem ? (
-        <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
+        <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">
             <span className="tabular-nums">{resetCreditsSummary(credits, now, true)}</span>
             <Button
               size="xs"
               variant="outline"
-              disabled={redeem.busy}
+              disabled={redeem.busy || hold !== null}
               className="ms-auto"
               onClick={onRedeem}
             >
               {redeem.busy ? "Using…" : "Use reset"}
             </Button>
           </span>
+          {credits.label ? <span className="truncate">{credits.label}</span> : null}
+          {hold ? <span>{hold}</span> : null}
         </div>
       ) : null}
     </div>

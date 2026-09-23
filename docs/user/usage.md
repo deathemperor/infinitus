@@ -53,8 +53,11 @@ first, or by the first available window when no account reports a 5-hour limit. 
 account does not report that window. When the provider reports reset times, the card also says
 when the next reset lands and how much it hands back. The hatched
 part of a segment is what that reset restores. Tap a segment or account row for the account's plan,
-where it is signed in, and its reset time. On web, you can hover too. Codex accounts with banked
-reset credits show a ticket count and the **Use reset** action in the account details. On narrow screens, numbered rows below
+where it is signed in, and its reset time. On web, you can hover too. Accounts with banked
+reset credits show a ticket count and the **Use reset** action in the account details: Codex
+grants them when it has rate-limited you unfairly, and Claude subscription plans get the same
+limit resets Claude.ai offers under **Settings → Usage**. A Claude reset can only be used while
+you are at a limit, so the action waits until then and says so. On narrow screens, numbered rows below
 the bar show each account's quota, countdown, and credits. Tap a row to open its details.
 
 The same account signed in on more than one environment, or reported by a hub as well, counts once.
@@ -90,7 +93,8 @@ To see pooled accounts, open **Settings → Providers → Usage providers → Ad
 environment that will connect to the hub and enter its URL and management key.
 
 The accounts appear under **Usage → Limits**. Codex accounts show banked reset credits; select an
-account and choose **Use reset** to redeem one. No hub plugin is required.
+account and choose **Use reset** to redeem one. No hub plugin is required. Claude accounts report
+their resets only through a Claude connection on an environment, not through a hub.
 
 This connection supplies usage information; configure
 the provider separately to send agent requests through the hub. Remove the hub from the same

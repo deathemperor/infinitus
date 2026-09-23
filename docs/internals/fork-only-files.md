@@ -7,6 +7,17 @@ file or directory. Upstream files the fork edits are in
 per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
+- `apps/server/src/provider/Layers/claudeResetCredits.ts` (+ test) — Claude's
+  banked limit resets (the CLI's `cedar_ember` program, #1553): the grants read
+  from `GET /api/oauth/usage?cedar_ember=1&skip_spend=1` and the claim posted
+  to `/api/organizations/<org>/reset_rate_limits`, both with the login the
+  CLI keeps — the macOS keychain item (`Claude Code-credentials`, hashed
+  suffix for a `CLAUDE_CONFIG_DIR`) or `.credentials.json` — and its own
+  user agent; the organization comes from the token's profile, never from
+  `.claude.json`, so a swapped login claims against the right account. Never
+  refreshes a token: the probe's `get_usage` runs first and leaves a fresh
+  one. Upstream's unmerged pingdotgg/t3code#13118 claims this same path with a
+  file-only login and no macOS; on the sync that brings it, ours stays.
 - `apps/server/src/provider/Drivers/OmpDriver.ts`, `Layers/OmpProvider.ts`, `Layers/OmpAdapter.ts`, `Services/OmpAdapter.ts`, `acp/OmpAcpSupport.ts`, `Layers/ompUsage.logic.ts` and `textGeneration/OmpTextGeneration.ts` (each with its test) — the Oh My Pi driver, one more tenant of the ACP runtime, templated on Cursor. Text generation rides `omp -p` (no schema flag, so OpenCode's decode path), quota comes from `omp usage --json --redact`'s `capacity` fold (no email, hence no `resetsAt`), and session import reads `~/.omp/agent/sessions`. Upstream has its own unmerged omp driver claiming these exact paths, so a sync collides here rather than adding a provider. Rules and traps: `docs/internals/omp-driver.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlack.ts` (+ `infinitusSlack.logic.ts`, `Services/InfinitusSlackClient.ts` — the `SlackClient` seam, tests) — the Slack bridge's reactor (#574, PR 2 of 4); state in `<stateDir>/infinitus-slack/threads.json`. Rules and traps: `docs/internals/slack-bridge.md`.
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.

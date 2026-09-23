@@ -10,6 +10,17 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- Claude banked resets (#1553): `apps/server/src/provider/Drivers/ClaudeDriver.ts`
+  (the instance's `login` location, `consumeResetCredit` through
+  `CodexResetCreditCoordinator`, the probe's `resolveResetCredits`),
+  `Layers/ClaudeProvider.ts` (`checkClaudeProviderStatus`'s last parameter,
+  attached only for a subscription login), `Layers/ProviderRegistry.test.ts`
+  (one test), `packages/contracts/src/providerUsageLimits.ts`
+  (`ServerProviderResetCredits.label` / `nextHold`, additive), and the reset
+  control's held state on `apps/web/src/components/usage/UsageLimits.tsx`
+  (`resetHoldText`), `UsageLimitsPooled.tsx` and
+  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`. The module itself
+  is in `fork-only-files.md`.
 - Pi provider (#1409 follow-on). Registration points only:
   `packages/contracts/src/settings.ts` (`PiSettings`, the `pi` arm of the
   provider-config union) and `src/model.ts` (`PI_DEFAULT_MODEL`);

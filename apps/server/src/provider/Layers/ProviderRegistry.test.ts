@@ -2661,6 +2661,45 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
     // ── checkClaudeProviderStatus tests ──────────────────────────
 
     describe("checkClaudeProviderStatus", () => {
+      it.effect("reads banked resets only for a subscription login with usage", () =>
+        Effect.gen(function* () {
+          const check = (overrides: Partial<TestClaudeCapabilities>) =>
+            checkClaudeProviderStatus(
+              defaultClaudeSettings,
+              () =>
+                Effect.succeed({
+                  email: undefined,
+                  subscriptionType: undefined,
+                  tokenSource: undefined,
+                  apiProvider: undefined,
+                  slashCommands: [],
+                  usage: { rate_limits_available: true, rate_limits: {} },
+                  ...overrides,
+                }),
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              (version) => Effect.succeed({ availableCount: 2, label: `v${version}` }),
+            );
+          const subscription = yield* check({ subscriptionType: "max" });
+          const bedrock = yield* check({ apiProvider: "bedrock" });
+          assert.deepStrictEqual(subscription.usageLimits?.resetCredits, {
+            availableCount: 2,
+            label: "v1.0.0",
+          });
+          assert.strictEqual(bedrock.usageLimits?.resetCredits, undefined);
+        }).pipe(
+          Effect.provide(
+            mockSpawnerLayer((args) => {
+              const joined = args.join(" ");
+              if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };
+              throw new Error(`Unexpected args: ${joined}`);
+            }),
+          ),
+        ),
+      );
+
       it.effect("returns ready when claude is installed and authenticated", () =>
         Effect.gen(function* () {
           const status = yield* checkClaudeProviderStatus(

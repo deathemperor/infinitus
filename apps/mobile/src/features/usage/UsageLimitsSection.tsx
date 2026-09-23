@@ -183,6 +183,22 @@ const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
   alreadyRedeemed: "That credit was already redeemed.",
 };
 
+/** Same words as the web control: why the next credit waits, or null when it can be used now. */
+function resetHoldText(credits: ServerProviderResetCredits, now: number): string | null {
+  const hold = credits.nextHold;
+  if (!hold || credits.availableCount === 0) return null;
+  switch (hold.reason) {
+    case "notAtLimit":
+      return "Usable once you hit a limit";
+    case "cooldown": {
+      const left = hold.until ? formatDuration(Date.parse(hold.until) - now) : null;
+      return left ? `Cooling down · ${left}` : "Cooling down";
+    }
+    case "blocked":
+      return "Not usable right now";
+  }
+}
+
 /**
  * Banked reset credits with a confirmed redeem action. Redeeming spends a
  * credit the provider granted the user, so it goes through the native
@@ -213,6 +229,9 @@ export function ResetCredits(props: {
       : `${credits.availableCount} ${credits.availableCount === 1 ? "reset credit" : "reset credits"} banked${
           expiresIn ? ` · next expires in ${expiresIn}` : ""
         }`;
+  // Why the next credit waits: Claude's resets work only at a limit and cool
+  // down between claims. The button holds rather than spending a tap on "no".
+  const hold = resetHoldText(credits, now);
 
   const redeem = async () => {
     setBusy(true);
@@ -247,8 +266,8 @@ export function ResetCredits(props: {
       {credits.availableCount > 0 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: busy }}
-          disabled={busy}
+          accessibilityState={{ disabled: busy || hold !== null }}
+          disabled={busy || hold !== null}
           onPress={confirm}
           className={
             dense
@@ -262,12 +281,19 @@ export function ResetCredits(props: {
                 ? "text-xs font-infinitus-medium text-foreground"
                 : "text-sm font-infinitus-medium text-foreground"
             }
+            style={hold === null ? undefined : { opacity: 0.5 }}
           >
             {busy ? "Using…" : "Use reset"}
           </Text>
         </Pressable>
       ) : null}
+      {hold ? <Text className="text-xs text-foreground-tertiary">{hold}</Text> : null}
       {status ? <Text className="text-sm text-foreground">{status}</Text> : null}
+      {credits.label && credits.availableCount > 0 ? (
+        <Text className="basis-full text-xs text-foreground-tertiary" numberOfLines={1}>
+          {credits.label}
+        </Text>
+      ) : null}
     </View>
   );
 }
