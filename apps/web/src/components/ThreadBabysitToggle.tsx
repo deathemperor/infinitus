@@ -1,8 +1,7 @@
 import { BABYSIT_MAX_ROUNDS, type ThreadBabysit } from "@infinitus/contracts";
 import { BabyIcon } from "lucide-react";
 
-import { Button } from "./ui/button";
-import { cn } from "../lib/utils";
+import { ComposerControl } from "./chat/ComposerControl";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 /**
@@ -34,16 +33,12 @@ export function ThreadBabysitToggle({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button
-            variant="ghost"
+          <ComposerControl
             size="xs"
             aria-pressed={on}
             aria-label={tooltip}
             data-testid="composer-babysit-toggle"
-            className={cn(
-              "font-normal text-xs! active:scale-100",
-              on ? "text-foreground/80" : "text-muted-foreground/70 hover:text-foreground/80",
-            )}
+            className="active:scale-100"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.preventDefault();

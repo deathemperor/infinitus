@@ -27,7 +27,7 @@ export const ThreadReconnectingNotice = memo(function ThreadReconnectingNotice({
   if (!notice) return null;
   return (
     <div className="pointer-events-auto mx-auto w-fit max-w-[min(48rem,calc(100%-2rem))] pt-3">
-      <Alert variant="warning" className="alert-glass" data-variant="warning" role="status">
+      <Alert variant="warning" surface="glass" role="status">
         <WifiOffIcon />
         <AlertDescription>{notice}</AlertDescription>
       </Alert>

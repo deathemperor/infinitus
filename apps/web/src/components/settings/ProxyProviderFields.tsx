@@ -133,7 +133,6 @@ export function ProxyProviderFields({
         </Select>
       ) : (
         <Input
-          className="bg-background"
           placeholder={placeholder}
           value={value}
           onChange={(event) => onValue(event.target.value)}
@@ -189,7 +188,6 @@ export function ProxyProviderFields({
             <label className="grid gap-1.5">
               <span className="text-xs font-medium text-foreground">Base URL</span>
               <Input
-                className="bg-background"
                 placeholder="http://127.0.0.1:20128"
                 value={draft.baseUrl}
                 onChange={(event) => changeProxy({ ...draft, baseUrl: event.target.value })}
@@ -203,7 +201,6 @@ export function ProxyProviderFields({
               <Input
                 type="password"
                 autoComplete="off"
-                className="bg-background"
                 value={draft.apiKey}
                 onChange={(event) => onChange({ ...draft, apiKey: event.target.value })}
               />
@@ -280,7 +277,6 @@ export function ProxyProviderFields({
               </ul>
             ) : (
               <Input
-                className="bg-background"
                 placeholder="e.g. kr/gpt-5.6-sol, kr/claude-opus-5"
                 value={draft.pickerModels.join(", ")}
                 onChange={(event) =>
