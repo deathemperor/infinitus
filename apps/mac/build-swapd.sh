@@ -9,7 +9,8 @@ set -eu
 # + #52: `add-oauth` sends a 32-byte `state`, as Claude Code does; claude.ai refuses the 16-byte one with "Invalid request format" — the actual cause of the failed sign-ins, bisected in the browser.
 # + #54 (0.3.1): a profile credential without a refresh token is not read back as a rotation.
 # + #56: `list` reports each account's banked Claude limit resets as `resets`, and `reset <slot>` spends one as that slot (#1554).
+# 0.3.2: #56 released, with #57 (a test).
 cargo install --locked --git https://github.com/deathemperor/swapd \
-    --rev 480749d9a0669fc597261287b4e2192ca6464d77 \
+    --rev ce599ab705a84ab0c33ab70e21229beccdc74fc0 \
     --root "$INFINITUS_ENGINE_BUILD_ROOT" swapd
 "$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" --version
