@@ -87,18 +87,11 @@ or endpoint configurations do not report subscription limits.
 API-key accounts may not report subscription limits. This also applies to Claude connections
 using a proxy through `ANTHROPIC_AUTH_TOKEN`.
 
-## Connect a CLIProxyAPI hub
+## Hubs and fleets
 
-To see pooled accounts, open **Settings → Providers → Usage providers → Add hub**. Choose the
-environment that will connect to the hub and enter its URL and management key.
-
-The accounts appear under **Usage → Limits**. Codex accounts show banked reset credits; select an
-account and choose **Use reset** to redeem one. No hub plugin is required. Claude accounts report
-their resets only through a Claude connection on an environment, not through a hub.
-
-This connection supplies usage information; configure
-the provider separately to send agent requests through the hub. Remove the hub from the same
-settings section when you no longer need it.
+Accounts pooled behind a hub or an engine (CLIProxyAPI, 9Router, swapd) are read by the Infinitus
+app on their Mac and shown on the **Accounts** page, one group per machine, with each account's
+windows, banked resets and actions. There is no separate hub list under Settings → Providers.
 
 ## Subscription usage widget
 

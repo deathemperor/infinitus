@@ -24,8 +24,24 @@ export type AccountAction =
   | "unhold"
   | "prefer"
   | "autoIgnite"
+  | "reset"
   | "rename"
   | "remove";
+
+/** One account's banked limit resets as a row shows them (#1554). `hold` is
+    why the next one cannot be spent, null when it can; the engine judged it
+    when it listed, so nothing here reads a clock. */
+export interface AccountResetsModel {
+  readonly available: number;
+  readonly total: number;
+  /** The provider's own wording for the next grant. */
+  readonly label: string | null;
+  /** When the next grant lapses, ISO 8601. */
+  readonly endsAt: string | null;
+  readonly hold: "notAtLimit" | "cooldown" | "blocked" | null;
+  /** When a cooldown lifts, ISO 8601. */
+  readonly holdUntil: string | null;
+}
 
 /** One usage window drawn as a bar. `countdown` is the engine's own
     human string ("2h 14m"), absent on a window that has not started. */
@@ -56,6 +72,8 @@ export interface AccountRowModel {
   readonly windows: ReadonlyArray<UsageWindowBar>;
   readonly scoped: ReadonlyArray<UsageWindowBar>;
   readonly freshness: string | null;
+  /** The banked limit resets; null when the engine reports none for it. */
+  readonly resets: AccountResetsModel | null;
   readonly actions: ReadonlyArray<AccountAction>;
   /** The engine says the stored sign-in expired (native's "Sign-In Needed"
       chip). Whether a new one can be *run* is the page's to decide: the app's
@@ -214,6 +232,10 @@ function rowActions(
   if (capabilities.has("autoIgnite") && account.autoIgnite !== undefined) {
     actions.push("autoIgnite");
   }
+  // Only a bank with something left: the row says what stops the next one.
+  if (capabilities.has("reset") && account.resets !== undefined && account.resets.available > 0) {
+    actions.push("reset");
+  }
   if (capabilities.has("rename")) actions.push("rename");
   if (capabilities.has("remove")) actions.push("remove");
   return actions;
@@ -235,6 +257,52 @@ function fleetCanAdd(fleet: InfinitusFleet): boolean {
   return fleet.capabilities.some((capability) => ADD_CAPABILITIES.has(capability));
 }
 
+function accountResets(account: InfinitusAccount): AccountResetsModel | null {
+  const resets = account.resets;
+  if (resets === undefined) return null;
+  return {
+    available: resets.available,
+    total: resets.total,
+    label: resets.label ?? null,
+    endsAt: resets.endsAt ?? null,
+    hold: resets.hold?.reason ?? null,
+    holdUntil: resets.hold?.until ?? null,
+  };
+}
+
+/** Why the next reset waits, for the held button; null when it can be spent. */
+export function resetHoldText(resets: AccountResetsModel): string | null {
+  switch (resets.hold) {
+    case null:
+      return null;
+    case "notAtLimit":
+      return "Usable once the account hits a limit";
+    case "cooldown":
+      return resets.holdUntil === null
+        ? "Cooling down"
+        : `Cooling down until ${formatResetInstant(resets.holdUntil)}`;
+    case "blocked":
+      return "Not usable right now";
+  }
+}
+
+/** "1 of 1 resets banked · until 22 Oct" — the row's one-line summary. */
+export function resetsSummary(resets: AccountResetsModel): string {
+  const count = `${resets.available} of ${resets.total} ${resets.total === 1 ? "reset" : "resets"} banked`;
+  return resets.endsAt === null ? count : `${count} · until ${formatResetInstant(resets.endsAt)}`;
+}
+
+/** A short day for an instant the engine sent; the raw string when it is
+    not one this reader understands. */
+function formatResetInstant(iso: string): string {
+  const parsed = DateTime.make(iso);
+  if (parsed._tag === "None") return iso;
+  return DateTime.formatIntl(
+    parsed.value,
+    new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }),
+  );
+}
+
 function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowModel {
   const { windows, scoped } = usageBars(account);
   return {
@@ -250,6 +318,7 @@ function buildRow(fleet: InfinitusFleet, account: InfinitusAccount): AccountRowM
     windows,
     scoped,
     freshness: freshnessLabel(account),
+    resets: accountResets(account),
     actions: rowActions(fleet, account),
     reloginNeeded: account.usageStatus === RELOGIN_USAGE_STATUS,
   };

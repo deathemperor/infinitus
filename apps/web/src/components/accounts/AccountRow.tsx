@@ -1,7 +1,10 @@
-import type {
-  AccountAction,
-  AccountRowModel,
-  UsageWindowBar,
+import {
+  type AccountAction,
+  type AccountResetsModel,
+  type AccountRowModel,
+  resetHoldText,
+  resetsSummary,
+  type UsageWindowBar,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   ArrowLeftRightIcon,
@@ -10,6 +13,7 @@ import {
   PencilIcon,
   PlayIcon,
   StarIcon,
+  TicketIcon,
   Trash2Icon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -28,6 +32,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -89,6 +94,7 @@ const ACTION_ICON: Record<AccountAction, typeof StarIcon> = {
   unhold: PlayIcon,
   prefer: StarIcon,
   autoIgnite: FlameIcon,
+  reset: TicketIcon,
   rename: PencilIcon,
   remove: Trash2Icon,
 };
@@ -106,11 +112,75 @@ function actionLabel(row: AccountRowModel, action: AccountAction): string {
       return row.preferred ? "Stop preferring" : "Prefer";
     case "autoIgnite":
       return row.autoIgnite ? "Stop keeping warm" : "Keep warm (restart its 5h window when cold)";
+    case "reset":
+      return "Use a banked reset";
     case "rename":
       return "Rename";
     case "remove":
       return "Remove";
   }
+}
+
+/**
+ * The account's banked limit resets (#1554): a ticket count that opens what
+ * the bank holds, what stops the next one, and the redeem button. Spending
+ * one is the engine's `reset`, so it asks first like `remove` does.
+ */
+function ResetsPopover({
+  row,
+  resets,
+  canRedeem,
+  busy,
+  onRedeem,
+}: {
+  readonly row: AccountRowModel;
+  readonly resets: AccountResetsModel;
+  /** The fleet offers `reset` on this row (capability and a bank with something left). */
+  readonly canRedeem: boolean;
+  readonly busy: boolean;
+  readonly onRedeem: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hold = resetHoldText(resets);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            size="xs"
+            variant="ghost-muted"
+            aria-label={`${row.label}: ${resetsSummary(resets)}`}
+          />
+        }
+      >
+        <TicketIcon className="size-3" aria-hidden />
+        <span className="tabular-nums">{resets.available}</span>
+      </PopoverTrigger>
+      <PopoverPopup side="bottom" align="start" className="w-72">
+        <div className="flex flex-col gap-2 text-xs">
+          <span className="font-medium text-foreground tabular-nums">{resetsSummary(resets)}</span>
+          {resets.label === null ? null : (
+            <span className="text-muted-foreground">{resets.label}</span>
+          )}
+          {hold === null ? null : <span className="text-muted-foreground">{hold}</span>}
+          {canRedeem ? (
+            <Button
+              size="xs"
+              variant="outline"
+              className="self-start"
+              disabled={busy || hold !== null}
+              onClick={() => {
+                setOpen(false);
+                onRedeem();
+              }}
+            >
+              {busy ? "Using…" : "Use reset"}
+            </Button>
+          ) : null}
+        </div>
+      </PopoverPopup>
+    </Popover>
+  );
 }
 
 /**
@@ -140,6 +210,8 @@ export function AccountRow({
   const [alias, setAlias] = useState(row.label);
   /** `remove` deletes the credential from the engine, so it asks first. */
   const [confirmRemove, setConfirmRemove] = useState(false);
+  /** `reset` spends a banked reset the provider will not give back. */
+  const [confirmReset, setConfirmReset] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = pendingAction !== null;
 
@@ -207,6 +279,15 @@ export function AccountRow({
         {row.plan === null ? null : (
           <span className="text-muted-foreground text-xs">{row.plan}</span>
         )}
+        {row.resets === null ? null : (
+          <ResetsPopover
+            row={row}
+            resets={row.resets}
+            canRedeem={row.actions.includes("reset")}
+            busy={busy}
+            onRedeem={() => setConfirmReset(true)}
+          />
+        )}
         <span className="ms-auto flex items-center gap-2">
           {freshness === null ? null : (
             <span className="text-muted-foreground text-xs">{freshness}</span>
@@ -223,6 +304,8 @@ export function AccountRow({
             </Button>
           )}
           {row.actions.map((action) => {
+            // The ticket beside the plan is its button; no second one here.
+            if (action === "reset") return null;
             const Icon = ACTION_ICON[action];
             const label = actionLabel(row, action);
             return (
@@ -286,6 +369,28 @@ export function AccountRow({
               }}
             >
               Remove
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Use a reset on {row.label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This spends one of the account&apos;s banked limit resets. The provider does not give
+              it back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <Button
+              onClick={() => {
+                setConfirmReset(false);
+                onAction("reset");
+              }}
+            >
+              Use reset
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

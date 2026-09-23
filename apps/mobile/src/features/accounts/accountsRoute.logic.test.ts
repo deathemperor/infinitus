@@ -13,6 +13,8 @@ import {
   exhaustedCopy,
   macAccountsModel,
   rowBadges,
+  resetConfirmation,
+  resetsLine,
   rowMenuActions,
   removeConfirmation,
   switchConfirmation,
@@ -60,6 +62,7 @@ const row: AccountRowModel = {
   held: false,
   windows: [],
   scoped: [],
+  resets: null,
   freshness: "updated just now",
   actions: ["switch", "hold", "prefer", "rename"],
   reloginNeeded: false,
@@ -185,6 +188,24 @@ describe("row presentation", () => {
       rowMenuActions({ ...row, autoIgnite: true, actions: ["autoIgnite"] }, { canPrompt: true })[0]
         ?.title,
     ).toBe("Stop keeping warm");
+  });
+
+  it("offers a reset only while nothing holds it, and words the row's line (#1554)", () => {
+    const free = { available: 1, total: 1, label: null, endsAt: null, hold: null, holdUntil: null };
+    expect(
+      rowMenuActions({ ...row, resets: free, actions: ["reset"] }, { canPrompt: true }).map(
+        (action) => action.id,
+      ),
+    ).toEqual(["reset"]);
+    const cooling = { ...free, hold: "cooldown" as const };
+    expect(
+      rowMenuActions({ ...row, resets: cooling, actions: ["reset"] }, { canPrompt: true }),
+    ).toEqual([]);
+    expect(resetsLine(free)).toBe("1 of 1 reset banked");
+    expect(resetsLine({ ...free, total: 2, hold: "notAtLimit" })).toBe(
+      "1 of 2 resets banked · Usable once the account hits a limit",
+    );
+    expect(resetConfirmation(row).title).toBe("Use a reset on death4?");
   });
 
   it("orders badges active, next, held, starred, warm", () => {

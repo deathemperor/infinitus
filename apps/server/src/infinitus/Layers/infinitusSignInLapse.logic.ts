@@ -185,14 +185,11 @@ function toolResultText(value: unknown): string {
   return typeof record.text === "string" ? record.text : toolResultText(record.content);
 }
 
-/**
- * The lapse an `item.updated` event carries, or null: the Claude driver
- * relays each tool result as one, with the raw `tool_result` block under
- * `payload.data.result` and the tool's input beside it, and a tool's start
- * as one with the input alone — read for a login the command runs itself
- * (`signInRun`). Every other event is null.
- */
-export function signInLapseFromEvent(event: ProviderRuntimeEvent): SignInLapse | null {
+/** The Bash command and tool result an `item.updated` event carries, or null
+    for any other event. */
+function toolEvent(
+  event: ProviderRuntimeEvent,
+): { readonly result: unknown; readonly command: string | undefined } | null {
   if (event.type !== "item.updated") return null;
   const data = event.payload.data;
   if (data === null || typeof data !== "object") return null;
@@ -201,13 +198,35 @@ export function signInLapseFromEvent(event: ProviderRuntimeEvent): SignInLapse |
     input !== null && typeof input === "object" && "command" in input
       ? (input as { readonly command?: unknown }).command
       : undefined;
-  if (result === undefined) return typeof command === "string" ? signInRun(command) : null;
-  if (result === null || typeof result !== "object") return null;
-  const block = result as { readonly type?: unknown; readonly content?: unknown };
+  return { result, command: typeof command === "string" ? command : undefined };
+}
+
+/** The sign-in a Bash command runs itself (`signInRun`), read off the tool's
+    start: the event with an input and no result yet. That command blocks on
+    its own browser tab until the Mac's login ends it (`agentLoginPids`). */
+export function signInRunFromEvent(event: ProviderRuntimeEvent): SignInLapse | null {
+  const read = toolEvent(event);
+  if (read === null || read.result !== undefined || read.command === undefined) return null;
+  return signInRun(read.command);
+}
+
+/**
+ * The lapse an `item.updated` event carries, or null: the Claude driver
+ * relays each tool result as one, with the raw `tool_result` block under
+ * `payload.data.result` and the tool's input beside it, and a tool's start
+ * as one with the input alone — read for a login the command runs itself
+ * (`signInRun`). Every other event is null.
+ */
+export function signInLapseFromEvent(event: ProviderRuntimeEvent): SignInLapse | null {
+  const read = toolEvent(event);
+  if (read === null) return null;
+  if (read.result === undefined) return signInRunFromEvent(event);
+  if (read.result === null || typeof read.result !== "object") return null;
+  const block = read.result as { readonly type?: unknown; readonly content?: unknown };
   if (block.type !== "tool_result") return null;
   const text = toolResultText(block.content);
   if (text.length === 0) return null;
-  return signInLapse(text, typeof command === "string" ? command : undefined);
+  return signInLapse(text, read.command);
 }
 
 export function signInVerb(provider: SignInProvider): "aws-login" | "gcloud-login" {
@@ -243,4 +262,91 @@ export function hasLoginInFlight(
 /** "AWS sign-in needed on papaya" / "gcloud sign-in needed on application-default". */
 export function signInMarkerSummary(lapse: SignInLapse): string {
   return `${lapse.provider === "aws" ? "AWS" : "gcloud"} sign-in needed on ${lapse.profile}`;
+}
+
+/** The Mac's login as an `aws-login` / `gcloud-login` reply (`{state}`) or an
+    `aws-logins` item words it: the profile it runs under — the Mac resolves
+    a `credential_process` profile to the login profile it names — and its
+    phase. Null for anything else. */
+export function macLoginState(
+  value: unknown,
+): { readonly profile: string; readonly phase: string } | null {
+  if (value === null || typeof value !== "object") return null;
+  const state = (value as { readonly state?: unknown }).state;
+  if (state === null || typeof state !== "object") return null;
+  const { profile, phase } = state as { readonly profile?: unknown; readonly phase?: unknown };
+  return typeof profile === "string" && typeof phase === "string" ? { profile, phase } : null;
+}
+
+const basename = (path: string): string => path.slice(path.lastIndexOf("/") + 1);
+
+/** The sign-in a process's argv (as `ps -o args=` prints it) is running:
+    the CLI itself or its Python interpreter running it — `python aws login
+    --profile p`, `python -S …/gcloud.py auth login` — never a shell whose
+    `-c` string carries the words. */
+function loginProcess(command: string): SignInLapse | null {
+  const words = command.trim().split(/\s+/);
+  let at = 0;
+  if (/^python[0-9.]*$/i.test(basename(words[0] ?? ""))) {
+    at = 1;
+    while (words[at]?.startsWith("-")) at += 1;
+  }
+  const cli = basename(words[at] ?? "");
+  const rest = words.slice(at + 1);
+  // Reading the manual opens no browser.
+  if (rest.some((word) => word === "--help" || word === "-h" || word === "help")) return null;
+  if (cli === "aws") {
+    if (rest[0] !== "login" && !(rest[0] === "sso" && rest[1] === "login")) return null;
+    const flag = rest.findIndex((word) => word === "--profile" || word.startsWith("--profile="));
+    const profile = flag === -1 ? undefined : (rest[flag]!.split("=")[1] ?? rest[flag + 1]);
+    return { provider: "aws", profile: profile || "default" };
+  }
+  if (cli !== "gcloud" && cli !== "gcloud.py") return null;
+  if (rest[0] !== "auth") return null;
+  if (rest[1] === "application-default" && rest[2] === "login") {
+    return { provider: "gcloud", profile: "application-default" };
+  }
+  if (rest[1] !== "login") return null;
+  const account = rest[2]?.includes("@") === true ? rest[2] : undefined;
+  return { provider: "gcloud", profile: account ?? "default" };
+}
+
+/**
+ * The logins an agent is still blocked on once the Mac's login for the same
+ * credential lands: descendants of `rootPid` (this server — every provider
+ * CLI and the shells its tools open run under it) whose argv is that CLI's
+ * login for one of `profiles`, read off `ps -eo pid=,ppid=,args=`.
+ * Never a process outside this server's tree, so the Mac's own login (the
+ * app's child) and another server's agents are out of reach.
+ */
+export function agentLoginPids(
+  ps: string,
+  rootPid: number,
+  provider: SignInProvider,
+  profiles: ReadonlySet<string>,
+): ReadonlyArray<number> {
+  const rows = ps.split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+    return match === null
+      ? []
+      : [{ pid: Number(match[1]), ppid: Number(match[2]), command: match[3]! }];
+  });
+  const inTree = new Set([rootPid]);
+  // ps lists parents before children only by accident; grow until stable.
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const row of rows) {
+      if (!inTree.has(row.pid) && inTree.has(row.ppid)) {
+        inTree.add(row.pid);
+        grew = true;
+      }
+    }
+  }
+  return rows.flatMap((row) => {
+    if (row.pid === rootPid || !inTree.has(row.pid)) return [];
+    const login = loginProcess(row.command);
+    return login !== null && login.provider === provider && profiles.has(login.profile)
+      ? [row.pid]
+      : [];
+  });
 }
