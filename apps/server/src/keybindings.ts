@@ -96,6 +96,17 @@ export const ResolvedKeybindingFromConfig = KeybindingRule.pipe(
   ),
 );
 
+/**
+ * Defaults the fork once shipped and the startup sync wrote into user configs.
+ * The fork's `mod+[` / `mod+]` for thread traversal (#840) yielded to
+ * upstream's history navigation (#13212); a persisted copy would keep
+ * shadowing it, so the sync drops exact copies once.
+ */
+const RETIRED_DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
+  { key: "mod+[", command: "thread.previous" },
+  { key: "mod+]", command: "thread.next" },
+];
+
 function isSameKeybindingRule(left: KeybindingRule, right: KeybindingRule): boolean {
   return (
     left.command === right.command &&
@@ -469,7 +480,11 @@ const make = Effect.gen(function* () {
         yield* Cache.invalidate(resolvedConfigCache, resolvedConfigCacheKey);
         return;
       }
-      const customConfig = runtimeConfig.keybindings;
+      const customConfig = runtimeConfig.keybindings.filter(
+        (entry) =>
+          !RETIRED_DEFAULT_KEYBINDINGS.some((retired) => isSameKeybindingRule(entry, retired)),
+      );
+      const retiredRemoved = customConfig.length !== runtimeConfig.keybindings.length;
       // A persisted rule identical to a shipped default is a snapshot of that
       // default, not a customization of the command. Treating it as one means
       // a config written before a command gained a second default -- `mod+shift+o`
@@ -518,6 +533,7 @@ const make = Effect.gen(function* () {
         });
       }
       if (missingDefaults.length === 0) {
+        if (retiredRemoved) yield* writeConfigAtomically(customConfig);
         yield* Cache.invalidate(resolvedConfigCache, resolvedConfigCacheKey);
         return;
       }
@@ -547,6 +563,7 @@ const make = Effect.gen(function* () {
         });
       }
       if (defaultsToAppend.length === 0) {
+        if (retiredRemoved) yield* writeConfigAtomically(customConfig);
         yield* Cache.invalidate(resolvedConfigCache, resolvedConfigCacheKey);
         return;
       }

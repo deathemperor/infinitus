@@ -102,7 +102,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   both `!terminalFocus`, in `STATIC_KEYBINDING_COMMANDS` and
   `DEFAULT_KEYBINDINGS` (#433); `accounts.open` the same way;
   `thread.nextAttention` (`mod+alt+n`, `!terminalFocus`; it was `mod+shift+l` until upstream's #11615 took that chord for `composer.previousWorktree` — the fork yields on a default-chord collision) in
-  `THREAD_KEYBINDING_COMMANDS` (#270 C). The fork yielded again at upstream's #13212: its plain `mod+[`/`mod+]` for `thread.previous`/`thread.next` (#840) went, so those keys are upstream's `navigation.back`/`navigation.forward`. A config that the startup sync had already backfilled with the fork's bracket rules keeps them as user rules.
+  `THREAD_KEYBINDING_COMMANDS` (#270 C). The fork yielded again at upstream's #13212: its plain `mod+[`/`mod+]` for `thread.previous`/`thread.next` (#840) went, so those keys are upstream's `navigation.back`/`navigation.forward`. The startup sync had written those rules into user configs, so `apps/server/src/keybindings.ts` drops exact copies (`RETIRED_DEFAULT_KEYBINDINGS`) and upstream's keys backfill in their place.
 - `apps/web/src/components/Sidebar.tsx` — `resolveNextAttentionThreadKey`
   (ranks the rendered list: approval, input, failed, held, unseen
   completion; holds read from the rows' atoms via `appAtomRegistry`), the
