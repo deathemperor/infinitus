@@ -245,7 +245,7 @@ function describeThreadShellForAwareness(
 // Every live thread is republished on this cadence, stamped with the publish
 // time; a terminal row keeps the thread's own timestamp, which the relay reads
 // as when the work finished.
-export const AGENT_AWARENESS_HEARTBEAT_INTERVAL = "30 minutes";
+const AGENT_AWARENESS_HEARTBEAT_INTERVAL = "30 minutes";
 
 export function resolveAgentAwarenessHeartbeatThreadIds(
   publishedStateByThread: ReadonlyMap<ThreadId, string>,
