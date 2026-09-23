@@ -282,6 +282,25 @@ export function resetCreditsSummary(
   }`;
 }
 
+/**
+ * Why the next credit waits, for the held button: Claude's resets work only
+ * at a limit and cool down between claims. Null when it can be used now.
+ */
+export function resetHoldText(credits: ServerProviderResetCredits, now: number): string | null {
+  const hold = credits.nextHold;
+  if (!hold || credits.availableCount === 0) return null;
+  switch (hold.reason) {
+    case "notAtLimit":
+      return "Usable once you hit a limit";
+    case "cooldown": {
+      const left = hold.until ? formatDuration(Date.parse(hold.until) - now) : null;
+      return left ? `Cooling down · ${left}` : "Cooling down";
+    }
+    case "blocked":
+      return "Not usable right now";
+  }
+}
+
 /** Banked reset credits with the redeem button and its confirm, self-contained. */
 export function ResetCredits({
   environmentId,
@@ -296,15 +315,26 @@ export function ResetCredits({
 }) {
   const { confirming, setConfirming, busy, status, redeem } = useResetCredit(environmentId, input);
   if (credits.availableCount === 0 && status === null) return null;
+  const hold = resetHoldText(credits, now);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="tabular-nums">{resetCreditsSummary(credits, now)}</span>
       {credits.availableCount > 0 ? (
-        <Button size="xs" variant="outline" disabled={busy} onClick={() => setConfirming(true)}>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={busy || hold !== null}
+          onClick={() => setConfirming(true)}
+        >
           {busy ? "Using…" : "Use reset"}
         </Button>
       ) : null}
+      {hold ? <span>{hold}</span> : null}
       {status ? <span className="text-foreground">{status}</span> : null}
+      {/* The provider's own name for the offer is a sentence; it gets its own line. */}
+      {credits.label && credits.availableCount > 0 ? (
+        <span className="basis-full truncate">{credits.label}</span>
+      ) : null}
       <ResetCreditDialog
         open={confirming}
         onOpenChange={setConfirming}

@@ -37,6 +37,19 @@ export const ServerProviderResetCredits = Schema.Struct({
   nextExpiresAt: Schema.optional(IsoDateTime),
   /** Pins hub redemption to the displayed credit, including retries from another client. */
   nextCreditId: Schema.optional(TrimmedNonEmptyString),
+  /** The provider's own name for the offer, when it has one (Claude's "Opus 5.5 launch"). */
+  label: Schema.optional(TrimmedNonEmptyString),
+  /**
+   * The next credit is banked but cannot be used at this moment: Claude's
+   * resets work only while a limit is hit and cool down between claims. Codex
+   * never sets this. Clients keep the balance visible and hold the button.
+   */
+  nextHold: Schema.optional(
+    Schema.Struct({
+      reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
+      until: Schema.optional(IsoDateTime),
+    }),
+  ),
 });
 export type ServerProviderResetCredits = typeof ServerProviderResetCredits.Type;
 
