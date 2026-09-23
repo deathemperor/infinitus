@@ -10,6 +10,18 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.33
+
+### Mac
+- The popup shows every other machine's accounts under its name while the desktop app is open, and its rows switch, hold, star, keep warm, rename and remove on that machine.
+
+### Desktop
+- Accounts shows each account's per-model usage windows outright, with no toggle to open them.
+- Feeds the menu bar popup the accounts of every paired machine and runs the row actions it queues for them.
+
+### Phone
+- Settings › About › Version shows the App Store version and build number under the product version, so the two match up.
+
 ## 0.5.0-alpha.32
 
 ### Mac
