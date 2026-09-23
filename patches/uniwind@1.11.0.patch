@@ -1,5 +1,9 @@
 diff --git a/dist/common/bundler/css-processor/processor.js b/dist/common/bundler/css-processor/processor.js
+<<<<<<< HEAD
 index 7dd369fa3197dbd622832c89ac3854c401e55c3e..351953147770b8e94c70c09f66c6e212e4930659 100644
+=======
+index 7dd369f..48321d1 100644
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
 --- a/dist/common/bundler/css-processor/processor.js
 +++ b/dist/common/bundler/css-processor/processor.js
 @@ -105,6 +105,64 @@ class ProcessorBuilder {
@@ -154,11 +158,16 @@ index 7dd369fa3197dbd622832c89ac3854c401e55c3e..351953147770b8e94c70c09f66c6e212
            return;
          }
          selector.forEach(selectorToken => {
+<<<<<<< HEAD
 @@ -199,11 +223,19 @@ class ProcessorBuilder {
+=======
+@@ -199,11 +223,16 @@ class ProcessorBuilder {
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
        const {
          mediaQueries
        } = rule.value.query;
 -      this.declarationConfig.mediaQueries.push(...mediaQueries);
+<<<<<<< HEAD
 +      // Every rule inside the block starts from the config the block was entered
 +      // with, media queries included: resetting to an empty config after each
 +      // child dropped them from the second rule on, and a platform variant
@@ -173,11 +182,28 @@ index 7dd369fa3197dbd622832c89ac3854c401e55c3e..351953147770b8e94c70c09f66c6e212
 -        this.declarationConfig = this.getDeclarationConfig();
        });
 +      this.declarationConfig = this.getDeclarationConfig();
+=======
++      const outerConfig = this.declarationConfig;
++      const blockMediaQueries = [...outerConfig.mediaQueries, ...mediaQueries];
+       rule.value.rules.forEach(rule2 => {
++        this.declarationConfig = {
++          ...outerConfig,
++          mediaQueries: blockMediaQueries
++        };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = outerConfig;
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
        return;
      }
      if (rule.type === "layer-block") {
 diff --git a/dist/metro/transformer.cjs b/dist/metro/transformer.cjs
+<<<<<<< HEAD
 index d57ca8161f411f0dc7df827132586e428cafdf1b..6494582092a73a8f6776a2c69bc1b87c4e0fd9f6 100644
+=======
+index d57ca81..83b58d1 100644
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
 --- a/dist/metro/transformer.cjs
 +++ b/dist/metro/transformer.cjs
 @@ -7,6 +7,7 @@ const culori = require('culori');
@@ -340,11 +366,16 @@ index d57ca8161f411f0dc7df827132586e428cafdf1b..6494582092a73a8f6776a2c69bc1b87c
            return;
          }
          selector.forEach((selectorToken) => {
+<<<<<<< HEAD
 @@ -1629,11 +1654,19 @@ class ProcessorBuilder {
+=======
+@@ -1629,11 +1654,13 @@ class ProcessorBuilder {
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
      }
      if (rule.type === "media") {
        const { mediaQueries } = rule.value.query;
 -      this.declarationConfig.mediaQueries.push(...mediaQueries);
+<<<<<<< HEAD
 +      // Every rule inside the block starts from the config the block was entered
 +      // with, media queries included: resetting to an empty config after each
 +      // child dropped them from the second rule on, and a platform variant
@@ -363,6 +394,20 @@ index d57ca8161f411f0dc7df827132586e428cafdf1b..6494582092a73a8f6776a2c69bc1b87c
      }
      if (rule.type === "layer-block") {
 @@ -1753,10 +1786,11 @@ const transform = async (config$1, projectRoot, filePath, data, options) => {
+=======
++      const outerConfig = this.declarationConfig;
++      const blockMediaQueries = [...outerConfig.mediaQueries, ...mediaQueries];
+       rule.value.rules.forEach((rule2) => {
++        this.declarationConfig = { ...outerConfig, mediaQueries: blockMediaQueries };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = outerConfig;
+       return;
+     }
+     if (rule.type === "layer-block") {
+@@ -1753,10 +1780,11 @@ const transform = async (config$1, projectRoot, filePath, data, options) => {
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
    await bundlerConfig.generateArtifacts(cssArtifactPath);
    const virtualCode = await compileCSS(bundlerConfig);
    const isWeb = bundlerConfig.platform === config.Platform.Web;
@@ -376,7 +421,11 @@ index d57ca8161f411f0dc7df827132586e428cafdf1b..6494582092a73a8f6776a2c69bc1b87c
      "utf-8"
    );
 diff --git a/dist/metro/transformer.mjs b/dist/metro/transformer.mjs
+<<<<<<< HEAD
 index d3e7475f8f0aaba510b318657dc8374e6c6097cb..58d16488fac331cb9d553285427da04a93941343 100644
+=======
+index d3e7475..f92b73b 100644
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
 --- a/dist/metro/transformer.mjs
 +++ b/dist/metro/transformer.mjs
 @@ -5,6 +5,7 @@ import { converter, parse, formatHex, formatHex8 } from 'culori';
@@ -539,11 +588,16 @@ index d3e7475f8f0aaba510b318657dc8374e6c6097cb..58d16488fac331cb9d553285427da04a
            return;
          }
          selector.forEach((selectorToken) => {
+<<<<<<< HEAD
 @@ -1622,11 +1647,19 @@ class ProcessorBuilder {
+=======
+@@ -1622,11 +1647,13 @@ class ProcessorBuilder {
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
      }
      if (rule.type === "media") {
        const { mediaQueries } = rule.value.query;
 -      this.declarationConfig.mediaQueries.push(...mediaQueries);
+<<<<<<< HEAD
 +      // Every rule inside the block starts from the config the block was entered
 +      // with, media queries included: resetting to an empty config after each
 +      // child dropped them from the second rule on, and a platform variant
@@ -562,6 +616,20 @@ index d3e7475f8f0aaba510b318657dc8374e6c6097cb..58d16488fac331cb9d553285427da04a
      }
      if (rule.type === "layer-block") {
 @@ -1746,10 +1779,11 @@ const transform = async (config, projectRoot, filePath, data, options) => {
+=======
++      const outerConfig = this.declarationConfig;
++      const blockMediaQueries = [...outerConfig.mediaQueries, ...mediaQueries];
+       rule.value.rules.forEach((rule2) => {
++        this.declarationConfig = { ...outerConfig, mediaQueries: blockMediaQueries };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = outerConfig;
+       return;
+     }
+     if (rule.type === "layer-block") {
+@@ -1746,10 +1773,11 @@ const transform = async (config, projectRoot, filePath, data, options) => {
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
    await bundlerConfig.generateArtifacts(cssArtifactPath);
    const virtualCode = await compileCSS(bundlerConfig);
    const isWeb = bundlerConfig.platform === Platform.Web;
@@ -575,7 +643,11 @@ index d3e7475f8f0aaba510b318657dc8374e6c6097cb..58d16488fac331cb9d553285427da04a
      "utf-8"
    );
 diff --git a/dist/module/bundler/css-processor/processor.js b/dist/module/bundler/css-processor/processor.js
+<<<<<<< HEAD
 index 58c96b6ab642c2b724d1868d0d48b77bad33be6f..744d60335d1683f85c8f3c84d2e81101420342a7 100644
+=======
+index 58c96b6..6849ca7 100644
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
 --- a/dist/module/bundler/css-processor/processor.js
 +++ b/dist/module/bundler/css-processor/processor.js
 @@ -99,6 +99,64 @@ export class ProcessorBuilder {
@@ -730,11 +802,16 @@ index 58c96b6ab642c2b724d1868d0d48b77bad33be6f..744d60335d1683f85c8f3c84d2e81101
            return;
          }
          selector.forEach((selectorToken) => {
+<<<<<<< HEAD
 @@ -191,11 +215,19 @@ export class ProcessorBuilder {
+=======
+@@ -191,11 +215,13 @@ export class ProcessorBuilder {
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
      }
      if (rule.type === "media") {
        const { mediaQueries } = rule.value.query;
 -      this.declarationConfig.mediaQueries.push(...mediaQueries);
+<<<<<<< HEAD
 +      // Every rule inside the block starts from the config the block was entered
 +      // with, media queries included: resetting to an empty config after each
 +      // child dropped them from the second rule on, and a platform variant
@@ -749,11 +826,21 @@ index 58c96b6ab642c2b724d1868d0d48b77bad33be6f..744d60335d1683f85c8f3c84d2e81101
 -        this.declarationConfig = this.getDeclarationConfig();
        });
 +      this.declarationConfig = this.getDeclarationConfig();
+=======
++      const outerConfig = this.declarationConfig;
++      const blockMediaQueries = [...outerConfig.mediaQueries, ...mediaQueries];
+       rule.value.rules.forEach((rule2) => {
++        this.declarationConfig = { ...outerConfig, mediaQueries: blockMediaQueries };
+         this.parseRuleRec(rule2);
+-        this.declarationConfig = this.getDeclarationConfig();
+       });
++      this.declarationConfig = outerConfig;
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
        return;
      }
      if (rule.type === "layer-block") {
 diff --git a/src/bundler/adapters/metro/transformer.ts b/src/bundler/adapters/metro/transformer.ts
-index 08059b0fb2394effd2553086216d8933a53fad84..05c051595bfffd313f1d731fcedc1e991af720e1 100644
+index 08059b0..05c0515 100644
 --- a/src/bundler/adapters/metro/transformer.ts
 +++ b/src/bundler/adapters/metro/transformer.ts
 @@ -5,6 +5,7 @@ import { Platform } from '@/common/consts'
@@ -787,7 +874,11 @@ index 08059b0fb2394effd2553086216d8933a53fad84..05c051595bfffd313f1d731fcedc1e99
          'utf-8',
      )
 diff --git a/src/bundler/css-processor/processor.ts b/src/bundler/css-processor/processor.ts
+<<<<<<< HEAD
 index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..c42c1c035462a2436fd968f24378c3ce9b0c5ff4 100644
+=======
+index c8b3bb8..4af4199 100644
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
 --- a/src/bundler/css-processor/processor.ts
 +++ b/src/bundler/css-processor/processor.ts
 @@ -123,6 +123,77 @@ export class ProcessorBuilder {
@@ -973,6 +1064,7 @@ index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..c42c1c035462a2436fd968f24378c3ce
  
                      return
                  }
+<<<<<<< HEAD
 @@ -242,11 +276,19 @@ export class ProcessorBuilder {
          if (rule.type === 'media') {
              const { mediaQueries } = rule.value.query
@@ -995,8 +1087,34 @@ index c8b3bb86e2a50c16ebc3f0404f4d9ac050aba61d..c42c1c035462a2436fd968f24378c3ce
  
              return
          }
+=======
+@@ -241,13 +275,21 @@ export class ProcessorBuilder {
+ 
+         if (rule.type === 'media') {
+             const { mediaQueries } = rule.value.query
++            // Media queries have to outlive the reset between the block's sibling
++            // rules: resetting only after each parse left every rule past the first
++            // without the block's queries, shipping ios:/android: variants and later
++            // utilities of a width breakpoint unguarded to every platform. Reset to
++            // the outer config instead of a fresh one so media nested inside a class
++            // rule keeps writing into that class.
++            const outerConfig = this.declarationConfig
++            const blockMediaQueries = [...outerConfig.mediaQueries, ...mediaQueries]
+ 
+-            this.declarationConfig.mediaQueries.push(...mediaQueries)
+             rule.value.rules.forEach(rule => {
++                this.declarationConfig = { ...outerConfig, mediaQueries: blockMediaQueries }
+                 this.parseRuleRec(rule)
+-                this.declarationConfig = this.getDeclarationConfig()
+             })
+ 
++            this.declarationConfig = outerConfig
+             return
+         }
+ 
+>>>>>>> upstream-sync-829af7b73-upstream-renamed
 diff --git a/src/core/config/config.native.ts b/src/core/config/config.native.ts
-index 5e0832b5913df6f02604020d7ff5caf3b6a8d912..01aed1be25ca928f3a802996f41cb6b841aaed86 100644
+index 5e0832b..01aed1b 100644
 --- a/src/core/config/config.native.ts
 +++ b/src/core/config/config.native.ts
 @@ -8,6 +8,8 @@ import type { CSSVariables, GenerateStyleSheetsCallback, ThemeName } from '../ty
