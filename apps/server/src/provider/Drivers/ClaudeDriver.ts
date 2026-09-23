@@ -204,6 +204,24 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         cwd,
         processEnv,
       );
+      // The grants ride the same TTL as the capabilities they attach to: the
+      // usage endpoint budgets requests per identity, and an account engine
+      // polling the same login must not be throttled by every status check.
+      const resetCreditsCache = yield* Cache.make({
+        capacity: 1,
+        timeToLive: CAPABILITIES_PROBE_TTL,
+        lookup: (version: string) =>
+          readClaudeResetCredits(login, version).pipe(
+            Effect.provideService(HttpClient.HttpClient, httpClient),
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Path.Path, path),
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          ),
+      });
+      const invalidateCaches = Effect.all(
+        [Cache.invalidateAll(capabilitiesProbeCache), Cache.invalidateAll(resetCreditsCache)],
+        { discard: true },
+      );
 
       // Start the TTL-gated refresh without delaying provider readiness. The
       // next check observes a remote manifest after the background fetch lands.
@@ -218,13 +236,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
                 cwd,
                 resolveClaudeModelCatalog(manifest),
                 scopedLimitNames,
-                (version) =>
-                  readClaudeResetCredits(login, version).pipe(
-                    Effect.provideService(HttpClient.HttpClient, httpClient),
-                    Effect.provideService(FileSystem.FileSystem, fileSystem),
-                    Effect.provideService(Path.Path, path),
-                    Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-                  ),
+                (version) => Cache.get(resetCreditsCache, version),
               ),
             ),
             Effect.map(stampIdentity),
@@ -284,7 +296,9 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
 
       // Same rules as Codex: serialised on the config directory that holds
       // the login, one request id kept until Claude answers, then a re-probe
-      // so the snapshot says what the reset did.
+      // so the snapshot says what the reset did. The windows live in the
+      // capabilities cache, so it is dropped first or the re-probe would
+      // republish the pre-reset bars for the rest of the TTL.
       const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = () =>
         Effect.gen(function* () {
           const current = yield* snapshot.getSnapshot;
@@ -314,6 +328,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
           Effect.tap(() =>
             Effect.gen(function* () {
               const before = (yield* snapshot.getSnapshot).usageLimits?.checkedAt;
+              yield* invalidateCaches;
               const refreshed = yield* snapshot.refresh;
               const after = refreshed.usageLimits?.checkedAt;
               if (
@@ -343,7 +358,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         accentColor,
         enabled,
         snapshot,
-        invalidateCaches: Cache.invalidateAll(capabilitiesProbeCache),
+        invalidateCaches,
         snapshotForCwd,
         consumeResetCredit,
         adapter,

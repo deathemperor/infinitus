@@ -140,6 +140,17 @@ describe("claudeResetCreditsToContract", () => {
       nextCreditId: "grant_a",
       nextHold: { reason: "cooldown", until: "2026-09-22T12:30:00.000Z" },
     });
+    // The named grant is gone but others remain: nothing to claim, so held.
+    expect(
+      claudeResetCreditsToContract(
+        {
+          eligible: true,
+          next_grant_id: "grant_a",
+          grants: [grant({ paused: true }), grant({ id: "grant_b", usable_now: false })],
+        },
+        NOW,
+      ),
+    ).toEqual({ availableCount: 1, nextHold: { reason: "blocked" } });
     // A cooldown already over is no hold.
     expect(status({ cooldown_until: "2026-09-22T11:30:00Z" }, {})).toEqual({
       availableCount: 1,

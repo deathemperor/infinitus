@@ -173,8 +173,12 @@ export function claudeResetCreditsToContract(
   const cooldownUntil = isoFuture(status.cooldown_until, nowMs);
   const nextExpiresAt = next ? isoFuture(next.ends_at, nowMs) : undefined;
   const label = next?.label?.trim();
+  const availableCount = live.reduce((sum, grant) => sum + grant.resets_left, 0);
+  // Credits with no claimable grant (the named one paused or ended) hold too.
   const hold: ServerProviderResetCredits["nextHold"] = !next
-    ? undefined
+    ? availableCount > 0
+      ? { reason: "blocked" }
+      : undefined
     : cooldownUntil
       ? { reason: "cooldown", until: cooldownUntil }
       : next.usable_now
@@ -183,7 +187,7 @@ export function claudeResetCreditsToContract(
           ? { reason: "notAtLimit" }
           : { reason: "blocked" };
   return {
-    availableCount: live.reduce((sum, grant) => sum + grant.resets_left, 0),
+    availableCount,
     ...(nextExpiresAt ? { nextExpiresAt } : {}),
     ...(next ? { nextCreditId: next.id } : {}),
     ...(label ? { label } : {}),
