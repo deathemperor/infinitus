@@ -913,6 +913,25 @@ describe("resolveShortcutCommand", () => {
     );
   });
 
+  it("navigates history with mod+[ and mod+] outside the terminal", () => {
+    const back = event({ key: "[", code: "BracketLeft", metaKey: true });
+    const forward = event({ key: "]", code: "BracketRight", ctrlKey: true });
+    assert.strictEqual(
+      resolveShortcutCommand(back, DEFAULT_RESOLVED_KEYBINDINGS, { platform: "MacIntel" }),
+      "navigation.back",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(forward, DEFAULT_RESOLVED_KEYBINDINGS, { platform: "Linux" }),
+      "navigation.forward",
+    );
+    assert.isNull(
+      resolveShortcutCommand(back, DEFAULT_RESOLVED_KEYBINDINGS, {
+        platform: "MacIntel",
+        context: { terminalFocus: true },
+      }),
+    );
+  });
+
   it("matches bracket shortcuts using the physical key code", () => {
     assert.strictEqual(
       resolveShortcutCommand(
@@ -1167,45 +1186,45 @@ describe("plus key parsing", () => {
   });
 });
 
-describe("thread traversal shortcuts", () => {
+describe("second default keys", () => {
   it("adds a newly shipped default key to a config that snapshotted the old one", () => {
-    // A config written before #840 added `mod+[` already names
-    // thread.previous under `mod+shift+[`. Keying the override on the command
-    // alone dropped the new default, so `mod+[` silently never existed.
+    // A config snapshotted when chat.new had only `mod+n` already names the
+    // command. Keying the override on the command alone dropped the new
+    // default, so `mod+shift+o` silently never existed.
     const bindings = mergeWithDefaultKeybindings(
       compileResolvedKeybindingsConfig([
-        { key: "mod+shift+[", command: "thread.previous" },
-        { key: "mod+shift+]", command: "thread.next" },
+        { key: "mod+n", command: "chat.new", when: "!terminalFocus" },
       ]),
     );
-    for (const [key, shiftKey, command] of [
-      ["[", false, "thread.previous"],
-      ["]", false, "thread.next"],
-      ["[", true, "thread.previous"],
-      ["]", true, "thread.next"],
+    for (const [key, shiftKey] of [
+      ["n", false],
+      ["o", true],
     ] as const) {
       assert.strictEqual(
         resolveShortcutCommand(event({ key, metaKey: true, shiftKey }), bindings, {
           platform: "MacIntel",
         }),
-        command,
+        "chat.new",
       );
     }
   });
 
   it("still lets a real remap of the command suppress the shipped defaults", () => {
     const bindings = mergeWithDefaultKeybindings(
-      compileResolvedKeybindingsConfig([{ key: "mod+alt+p", command: "thread.previous" }]),
+      compileResolvedKeybindingsConfig([{ key: "mod+alt+x", command: "chat.new" }]),
     );
     assert.strictEqual(
-      resolveShortcutCommand(event({ key: "p", metaKey: true, altKey: true }), bindings, {
+      resolveShortcutCommand(event({ key: "x", metaKey: true, altKey: true }), bindings, {
         platform: "MacIntel",
       }),
-      "thread.previous",
+      "chat.new",
     );
-    for (const shiftKey of [false, true]) {
+    for (const [key, shiftKey] of [
+      ["n", false],
+      ["o", true],
+    ] as const) {
       assert.isNull(
-        resolveShortcutCommand(event({ key: "[", metaKey: true, shiftKey }), bindings, {
+        resolveShortcutCommand(event({ key, metaKey: true, shiftKey }), bindings, {
           platform: "MacIntel",
         }),
       );

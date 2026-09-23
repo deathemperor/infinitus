@@ -175,7 +175,7 @@ export function SideQuestionPanel({
       >
         {forking.error === null ? (
           <>
-            <Spinner className="size-4 text-muted-foreground" />
+            <Spinner size="md" tone="muted" />
             <p className="text-muted-foreground text-xs">
               Forking the thread at its latest completed turn…
             </p>
@@ -213,7 +213,7 @@ export function SideQuestionPanel({
   if (!thread) {
     return (
       <div className="flex h-full items-center justify-center p-6">
-        <Spinner className="size-4 text-muted-foreground" />
+        <Spinner size="md" tone="muted" />
       </div>
     );
   }
@@ -253,7 +253,7 @@ export function SideQuestionPanel({
               )}
             </div>
           ))}
-          {running ? <Spinner className="size-3.5 text-muted-foreground" /> : null}
+          {running ? <Spinner size="sm" tone="muted" /> : null}
           {failure !== null ? (
             <div
               className="flex items-start justify-between gap-2 rounded-md border border-destructive/40 px-3 py-2"

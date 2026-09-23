@@ -73,7 +73,13 @@ export function BestOfPicker({
           then keep the result you like
         </TooltipPopup>
       </Tooltip>
-      <PopoverPopup {...composerFloatingLayerProps} side="top" align="start" className="w-64 p-2">
+      <PopoverPopup
+        {...composerFloatingLayerProps}
+        side="top"
+        align="start"
+        width="sm"
+        padding="compact"
+      >
         <div className="text-muted-foreground px-1 pb-1.5 text-xs">
           Pick {BEST_OF_MIN}–{BEST_OF_MAX} models. Each gets its own worktree; the prompt is sent as
           typed, text only.

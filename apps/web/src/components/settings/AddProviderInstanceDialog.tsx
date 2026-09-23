@@ -276,7 +276,7 @@ export function AddProviderInstanceDialog({
               value={driver}
               onValueChange={(value) => setDriver(ProviderDriverKind.make(value))}
               aria-labelledby="add-instance-driver-label"
-              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+              className="grid grid-cols-1 sm:grid-cols-2"
             >
               {DRIVER_OPTIONS.map((option) => {
                 const IconComponent = option.icon;
@@ -331,7 +331,6 @@ export function AddProviderInstanceDialog({
           <label className={cn("grid gap-2", wizardStep !== 1 && "hidden")}>
             <span className="text-xs font-medium text-foreground">Label</span>
             <Input
-              className="bg-background"
               placeholder="e.g. Work"
               value={label}
               onChange={(event) => setLabel(event.target.value)}
@@ -344,7 +343,6 @@ export function AddProviderInstanceDialog({
           <label className={cn("grid gap-2", wizardStep !== 1 && "hidden")}>
             <span className="text-xs font-medium text-foreground">Instance ID</span>
             <Input
-              className="bg-background"
               placeholder={`${driver}_work`}
               value={instanceId}
               onChange={(event) => {
