@@ -44,6 +44,9 @@ jobs:
         id: merge
         env:
           GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+          # Pinned: with an `upstream` remote in the checkout, gh can resolve
+          # to pingdotgg/t3code, and the fork never acts there (INFINITUS.md).
+          GH_REPO: ${{ github.repository }}
           HAS_PAT: ${{ secrets.UPSTREAM_SYNC_TOKEN != '' }}
         run: |
           set -e
@@ -96,9 +99,21 @@ jobs:
           if git merge --no-edit --no-verify "$merge_from"; then
             echo "state=clean" >> "$GITHUB_OUTPUT"
           else
+            # The lockfile is generated, never hand-merged: take upstream's and
+            # let the install fold the fork's dependencies back in. It
+            # conflicted on most syncs that moved a dependency.
+            if git diff --name-only --diff-filter=U | grep -qx pnpm-lock.yaml; then
+              git checkout --theirs pnpm-lock.yaml
+              vp i --no-frozen-lockfile
+              git add pnpm-lock.yaml
+            fi
             git diff --name-only --diff-filter=U > /tmp/conflicts.txt
             git add -A && git -c core.editor=true commit --no-edit --no-verify
-            echo "state=conflict" >> "$GITHUB_OUTPUT"
+            if [ -s /tmp/conflicts.txt ]; then
+              echo "state=conflict" >> "$GITHUB_OUTPUT"
+            else
+              echo "state=clean" >> "$GITHUB_OUTPUT"
+            fi
           fi
           # Fork rule: GitHub-hosted runners, never Blacksmith (INFINITUS.md).
           if grep -rl "runs-on: blacksmith-" .github/workflows >/dev/null 2>&1; then
@@ -119,6 +134,19 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           sha=$(git rev-parse --short upstream/main)
+          # This merge contains every older sync's upstream commits, so an
+          # older sync PR still open is dead work: resolving it only to meet
+          # the same conflicts here again is how #1556 and #1562 piled up.
+          # Close it for this one, which is the only sync PR left to finish —
+          # unless someone already pushed to it: a resolution in progress stays.
+          gh pr list --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("upstream-sync-")) | select(.headRefName != "${{ steps.merge.outputs.branch }}") | .number' |
+            while read -r stale; do
+              last=$(gh pr view "$stale" --json commits --jq '.commits[-1].authors[0].email')
+              [ "$last" = "noreply@infinitus.run" ] || continue
+              gh pr close "$stale" --delete-branch \
+                --comment "Superseded by the sync of upstream $sha, which contains these commits."
+            done
           if [ "${{ steps.merge.outputs.state }}" = "clean" ]; then
             gh pr create --base main --head "${{ steps.merge.outputs.branch }}" \
               --title "chore: merge upstream T3 Code ($sha)" \
