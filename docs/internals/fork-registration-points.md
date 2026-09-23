@@ -140,7 +140,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `infinitusPairingHttpApiLayer` and `infinitusTeamControlHttpApiLayer` in
   `makeRoutesLayer`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
-  client (#1076; the thread-card layer it was merged with left with #1375).
+  client and `ProcessRunner.layer` (#1076; the thread-card layer it was merged with left with #1375).
   `infinitusHttpApiLayer` is provided `InfinitusAlertRelayLive` over the
   secret store and `FetchHttpClient.layer` (#1375). `InfinitusSlackLive` (provided `SlackClientLive` over
   `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
