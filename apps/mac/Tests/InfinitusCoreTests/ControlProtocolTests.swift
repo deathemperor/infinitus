@@ -52,6 +52,8 @@ final class ControlProtocolTests: XCTestCase {
         XCTAssertFalse(ControlCommand.named("status")?.replyShape.contains("forkTunnel") ?? true)
         XCTAssertEqual(ControlCommand.named("prefer")?.requires, "prefer")
         XCTAssertEqual(ControlCommand.named("auto-ignite")?.requires, "autoIgnite")
+        XCTAssertEqual(ControlCommand.named("reset")?.requires, "reset")
+        XCTAssertEqual(ControlCommand.named("reset")?.args, ["<fleet>", "<n>"])
         XCTAssertEqual(ControlCommand.named("signin-begin")?.effect, .human)
         XCTAssertEqual(ControlCommand.named("signin-begin")?.options, ["--relogin <email>", "--window"])
         XCTAssertEqual(ControlCommand.named("signin-status")?.effect, .read)

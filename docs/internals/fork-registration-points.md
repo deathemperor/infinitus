@@ -10,6 +10,17 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- Fleet-wide Claude resets (#1554): `packages/contracts/src/infinitus.ts`
+  (`InfinitusAccount.resets`, `InfinitusAccountResets`, additive) is
+  fork-owned; the upstream edits are the hub section left unmounted —
+  `apps/web/src/components/settings/ProviderSettingsPanel.tsx` (no
+  `UsageProviderSettings` mount, no `usage-providers` search target),
+  `UsageProviderSettings.tsx` (a plain title in place of the search id, so
+  the unmounted file still compiles), `knip.jsonc` (that file and
+  `AddUsageLimitSourceDialog.tsx` ignored as unused files) and
+  `settingsSearch.ts` (+ test, the `usage-providers` entry dropped) — since
+  the Accounts page reads every hub through the Mac app. The rest is
+  fork-owned (`fork-only-files.md`); rules: `docs/internals/accounts-page.md`.
 - Claude banked resets (#1553): `apps/server/src/provider/Drivers/ClaudeDriver.ts`
   (the instance's `login` location, `consumeResetCredit` through
   `CodexResetCreditCoordinator`, the probe's `resolveResetCredits`),

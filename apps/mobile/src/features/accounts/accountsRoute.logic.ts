@@ -1,6 +1,7 @@
 import type { MenuAction } from "@react-native-menu/menu";
 import {
   type AccountAction,
+  type AccountResetsModel,
   type AccountRowModel,
   type AccountsPageState,
   accountsPageState,
@@ -9,6 +10,8 @@ import {
   type FleetSectionModel,
   type ForecastModel,
   INFINITUS_COMMAND_TIMEOUT_MESSAGE,
+  resetHoldText,
+  resetsSummary,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   exhaustedBand,
@@ -126,13 +129,17 @@ export function rowMenuActions(
   row: AccountRowModel,
   options: { readonly canPrompt: boolean },
 ): ReadonlyArray<MenuAction> {
-  return row.actions
-    .filter((action) => action !== "rename" || options.canPrompt)
-    .map((action) => ({
-      id: action,
-      title: actionTitle(action, row),
-      image: ACTION_SYMBOL[action],
-    }));
+  return (
+    row.actions
+      .filter((action) => action !== "rename" || options.canPrompt)
+      // A held reset is not offered; the row's resets line says why.
+      .filter((action) => action !== "reset" || row.resets?.hold === null)
+      .map((action) => ({
+        id: action,
+        title: actionTitle(action, row),
+        image: ACTION_SYMBOL[action],
+      }))
+  );
 }
 
 const ACTION_SYMBOL: Record<AccountAction, string> = {
@@ -141,6 +148,7 @@ const ACTION_SYMBOL: Record<AccountAction, string> = {
   unhold: "play.circle",
   prefer: "star",
   autoIgnite: "flame",
+  reset: "ticket",
   rename: "pencil",
   remove: "trash",
 };
@@ -157,6 +165,8 @@ function actionTitle(action: AccountAction, row: AccountRowModel): string {
       return row.preferred ? "Unstar" : "Star (pick first)";
     case "autoIgnite":
       return row.autoIgnite ? "Stop keeping warm" : "Keep warm (restart 5h window)";
+    case "reset":
+      return "Use a banked reset";
     case "rename":
       return "Rename…";
     case "remove":
@@ -185,6 +195,24 @@ export function switchConfirmation(
     title: `Switch ${fleetTitle} to ${row.label}?`,
     message: "Every live session on the Mac continues on this account.",
   };
+}
+
+/** The confirm before a banked reset is spent: the provider gives none back. */
+export function resetConfirmation(row: AccountRowModel): {
+  readonly title: string;
+  readonly message: string;
+} {
+  return {
+    title: `Use a reset on ${row.label}?`,
+    message:
+      "This spends one of the account's banked limit resets. The provider does not give it back.",
+  };
+}
+
+/** The row's resets line: the count, and what stops the next one. */
+export function resetsLine(resets: AccountResetsModel): string {
+  const hold = resetHoldText(resets);
+  return hold === null ? resetsSummary(resets) : `${resetsSummary(resets)} · ${hold}`;
 }
 
 /** Pills after the label, in a fixed order so rows stay comparable. */

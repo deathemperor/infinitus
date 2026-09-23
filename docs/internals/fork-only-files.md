@@ -108,6 +108,17 @@ these bullets.
   the section header's "Show polls" toggle, persisted like the Stats period
   (#696). Reached from swapd's row on the Engines page (primary environment
   only) and the palette's "Open activity"; it left the sidebar 2026-09-18.
+- Fleet-wide Claude resets (#1554): swapd's `reset <ident>` verb and the
+  `resets` block on its `list` rows (the engine repo, pinned in
+  `apps/mac/build-swapd.sh`); on the Mac `EngineCapabilities.reset`,
+  `Account.resets` / `AccountResets` (`Models.swift`), `SwapdCLI.reset`,
+  `SwapdEngine.reset` and the `reset <fleet> <n>` control route; on the
+  clients `AccountRowModel.resets` / `resetHoldText` / `resetsSummary` in
+  `packages/client-runtime/src/state/infinitusAccounts.ts`, the ticket
+  popover and confirm in `apps/web/src/components/accounts/AccountRow.tsx`,
+  the row line, menu action and confirm in
+  `apps/mobile/src/features/accounts/AccountRow.tsx` + `accountsRoute.logic.ts`.
+  Rules and traps: `docs/internals/accounts-page.md`.
 - `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Rules and traps: `docs/internals/utilization.md`.
 - Live token rate (#1127): `packages/contracts/src/infinitus.ts` (`InfinitusLiveTokenRate`), `rpc.ts` (`infinitus.liveTokenRate`, `AuthOrchestrationReadScope` in `RpcAuthorization.ts`), `apps/server/src/persistence/ProjectionTurnUsage.ts` (`listCompletedSince`), `apps/server/src/infinitus/liveTokenRate.logic.ts` (+ test; `EMPTY_LIVE_TOKEN_RATE`), `ws.ts`; client `infinitus.ts` (`liveTokenRate`), `infinitusUtilization.ts` (`liveRateText`), `LiveRateLine` on the Utilization page. Rules and traps: `docs/internals/live-token-rate.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table on `/usage` (#779): `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads the app's `history <fleet>` verb once per scan, `infinitusUsageAttribution.logic.ts` gives `accountAt(ms)`, `UsageAggregator`'s `attribute` hook sums the optional `UsageSummary.accounts`. Rules and traps: `docs/internals/usage-attribution.md`.

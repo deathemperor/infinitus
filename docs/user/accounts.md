@@ -26,6 +26,8 @@ Use **Switch** to choose an account manually. Automatic switching follows the en
 
 A 5-hour window only starts when the account is used, so a switch onto an idle account starts its clock from zero. **Keep warm** (the flame on an account row, swapd only) makes swapd's daemon restart that account's 5-hour window whenever it has gone cold, so a later switch lands on a window that is already running. Each restart is one small request as that account and costs it a little weekly quota; an account whose weekly quota is nearly spent, held, or currently active is not restarted.
 
+An account with banked limit resets (the resets Claude offers under **Settings → Usage**) shows a ticket count next to its plan. Open it for how many are left, when the offer ends, and what stops the next one: a Claude reset is only usable while the account is at a limit, and one cannot follow another straight away. **Use reset** spends one as that account, after a confirmation; the provider does not give it back. On a phone the row's menu offers the same action while nothing holds it.
+
 When accounts run out of headroom, the fleet shows its exhausted state and reported reset timing. Whether a thread can resume automatically depends on its provider and your resume settings; adding another usable account or waiting for a reset restores capacity. A login that expires needs sign-in again rather than a quota reset. Use the account's re-login action, or the separate **Sign-ins** section for pending service logins.
 
 On a phone, Accounts displays each paired Mac's fleets. Configure engines and add accounts on the owning Mac. If Accounts has no fleets, check that an engine is enabled and reachable, then add its first account.

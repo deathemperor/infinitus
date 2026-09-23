@@ -381,6 +381,19 @@ final class ControlServer {
             await settle(try await fleet.engine.setAutoIgnite(fleet: fleet.provider, number: n, r.args[2] == "on"), fleet)
             return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
 
+        case "reset":
+            let (fleet, n) = try target(r)
+            guard fleet.capabilities.contains(.reset) else { throw Fail("\(fleet.id) banks no limit resets") }
+            guard let account = fleet.accounts.first(where: { $0.number == n }) else { throw Fail("no account #\(n) in \(fleet.id)") }
+            guard let resets = account.resets, resets.available > 0 else {
+                throw Fail("no banked reset on account #\(n)")
+            }
+            if let hold = resets.hold {
+                throw Fail("account #\(n)'s reset cannot be spent now (\(hold.reason))")
+            }
+            await settle(try await fleet.engine.reset(fleet: fleet.provider, number: n), fleet)
+            return ControlReply(ok: true, result: try .of(["fleet": fleetPayload(fleet)]))
+
         case "crashes":
             // `--id` is the desktop's Copy: one report with the transcript a
             // session gets, raw diagnostic and all. The list stays without it —
@@ -1291,6 +1304,7 @@ final class ControlServer {
             (.costReport, "costReport"), (.history, "history"), (.settings, "settings"),
             (.prefer, "prefer"), (.ignite, "ignite"),
             (.refreshAccount, "refreshAccount"), (.autoIgnite, "autoIgnite"),
+            (.reset, "reset"),
         ]
         return table.filter { caps.contains($0.0) }.map(\.1)
     }
