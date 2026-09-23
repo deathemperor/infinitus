@@ -1,6 +1,11 @@
 import type { ThreadUsageRollup } from "@infinitus/contracts";
 import { formatDuration } from "@infinitus/shared/orchestrationTiming";
-import { threadUsageReported } from "@infinitus/shared/threadUsage";
+import {
+  promptCacheRemainingLabel,
+  promptCacheState,
+  promptCacheTtlLabel,
+  threadUsageReported,
+} from "@infinitus/shared/threadUsage";
 import { formatDateTimeShort, formatTokens, formatUsd } from "@infinitus/shared/usageFormat";
 
 /** One card of the thread usage sheet. */
@@ -54,6 +59,31 @@ export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadU
       : []),
     { label: "Last turn", value: formatDateTimeShort(usage.lastTurnAt) },
   ];
+}
+
+/**
+ * The "Prompt cache" row: how long the last turn's prompt cache stays warm,
+ * so the user can tell whether the next message reads the context from
+ * cache or re-writes it. Null when the last turn reported no TTL (every
+ * provider but Claude).
+ */
+export function threadPromptCacheRow(
+  usage: ThreadUsageRollup,
+  nowMs: number,
+): ThreadUsageRow | null {
+  const state = promptCacheState(usage, nowMs);
+  if (state === null) return null;
+  if (state.kind === "cold") {
+    return { label: "Prompt cache", value: "Expired — the next message re-writes the context" };
+  }
+  const left = `${promptCacheRemainingLabel(state.remainingMs)} left`;
+  return {
+    label: "Prompt cache",
+    value:
+      state.kind === "expiring"
+        ? `Expiring · ${left}`
+        : `Warm · ${left} (${promptCacheTtlLabel(state.ttlMs)} cache)`,
+  };
 }
 
 function turnsValue(usage: ThreadUsageRollup): string {

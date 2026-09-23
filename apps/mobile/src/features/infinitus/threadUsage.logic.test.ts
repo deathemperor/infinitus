@@ -1,7 +1,7 @@
 import type { ThreadUsageRollup } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { threadUsageNotes, threadUsageRows } from "./threadUsage.logic";
+import { threadPromptCacheRow, threadUsageNotes, threadUsageRows } from "./threadUsage.logic";
 
 const ROLLUP: ThreadUsageRollup = {
   source: "runtime",
@@ -103,5 +103,26 @@ describe("thread usage sheet (#834)", () => {
       "Estimated from the transcript.",
       "Subagent tokens are not counted.",
     ]);
+  });
+});
+
+describe("thread usage sheet's prompt cache row", () => {
+  const warm = { ...ROLLUP, cacheExpiresAt: "2026-09-12T15:37:00.000Z" };
+  const at = (iso: string) => Date.parse(iso);
+
+  it("counts down the cache the last turn wrote, then says it expired", () => {
+    expect(threadPromptCacheRow(warm, at("2026-09-12T14:50:30.000Z"))?.value).toBe(
+      "Warm · 46m left (1-hour cache)",
+    );
+    expect(threadPromptCacheRow(warm, at("2026-09-12T15:34:00.000Z"))?.value).toBe(
+      "Expiring · 3m left",
+    );
+    expect(threadPromptCacheRow(warm, at("2026-09-12T15:37:00.000Z"))?.value).toBe(
+      "Expired — the next message re-writes the context",
+    );
+  });
+
+  it("has no row when the last turn reported no TTL", () => {
+    expect(threadPromptCacheRow(ROLLUP, at("2026-09-12T14:50:00.000Z"))).toBeNull();
   });
 });

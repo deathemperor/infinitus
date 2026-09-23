@@ -1,7 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { TurnId, type ThreadTurnUsage } from "@infinitus/contracts";
 
-import { addTurnUsage, foldTurnUsage, threadUsageReported } from "./threadUsage.ts";
+import {
+  addTurnUsage,
+  foldTurnUsage,
+  promptCacheNextChangeMs,
+  promptCacheRemainingLabel,
+  promptCacheState,
+  threadUsageReported,
+} from "./threadUsage.ts";
 
 const turn = (id: string, overrides: Partial<ThreadTurnUsage> = {}): ThreadTurnUsage => ({
   turnId: TurnId.make(id),
@@ -67,6 +74,25 @@ describe("thread usage rollup (#834)", () => {
     const next = addTurnUsage(transcript, turn("t1", { completedAt: "2026-09-11T00:00:00.000Z" }));
     expect(next.source).toBe("transcript");
     expect(next.lastTurnAt).toBe("2026-09-12T00:00:00.000Z");
+  });
+
+  it("dates the cache expiry from the latest turn's TTL, and drops it when that turn has none", () => {
+    const warm = addTurnUsage(undefined, turn("t1", { cacheTtlSeconds: 3600 }));
+    expect(warm.cacheExpiresAt).toBe("2026-09-12T01:00:00.000Z");
+    const later = addTurnUsage(
+      warm,
+      turn("t2", { cacheTtlSeconds: 300, completedAt: "2026-09-12T00:30:00.000Z" }),
+    );
+    expect(later.cacheExpiresAt).toBe("2026-09-12T00:35:00.000Z");
+    // A refold that meets an older turn after the latest keeps the latest's expiry.
+    const older = addTurnUsage(
+      later,
+      turn("t0", { cacheTtlSeconds: 3600, completedAt: "2026-09-11T00:00:00.000Z" }),
+    );
+    expect(older.cacheExpiresAt).toBe("2026-09-12T00:35:00.000Z");
+    // A latest turn that says nothing about the cache (a Codex turn) clears it.
+    const silent = addTurnUsage(later, turn("t3", { completedAt: "2026-09-12T00:31:00.000Z" }));
+    expect(silent).not.toHaveProperty("cacheExpiresAt");
   });
 
   it("sums tool calls and time only from the turns that carried them", () => {
@@ -141,5 +167,40 @@ describe("thread usage rollup (#834)", () => {
     expect(folded?.turns).toBe(3);
     expect(folded?.inputTokens).toBe(3000);
     expect(folded?.costUsd).toBe(1.25);
+  });
+});
+
+describe("prompt cache state", () => {
+  const lastTurnAt = "2026-09-23T10:00:00.000Z";
+  const hour = { lastTurnAt, cacheExpiresAt: "2026-09-23T11:00:00.000Z" };
+  const fiveMinutes = { lastTurnAt, cacheExpiresAt: "2026-09-23T10:05:00.000Z" };
+  const at = (iso: string) => Date.parse(iso);
+
+  it("is warm, then expiring in the last fifth of the TTL (at most 5 minutes), then cold", () => {
+    expect(promptCacheState(hour, at("2026-09-23T10:30:00.000Z"))?.kind).toBe("warm");
+    expect(promptCacheState(hour, at("2026-09-23T10:55:00.000Z"))?.kind).toBe("expiring");
+    expect(promptCacheState(hour, at("2026-09-23T11:00:00.000Z"))?.kind).toBe("cold");
+    expect(promptCacheState(fiveMinutes, at("2026-09-23T10:03:59.000Z"))?.kind).toBe("warm");
+    expect(promptCacheState(fiveMinutes, at("2026-09-23T10:04:00.000Z"))?.kind).toBe("expiring");
+  });
+
+  it("says nothing for a thread whose last turn reported no TTL", () => {
+    expect(promptCacheState({ lastTurnAt }, at(lastTurnAt))).toBeNull();
+  });
+
+  it("rounds the minutes left down, so the label never overstates", () => {
+    expect(promptCacheRemainingLabel(60 * 60_000)).toBe("1h");
+    expect(promptCacheRemainingLabel(42 * 60_000 + 59_000)).toBe("42m");
+    expect(promptCacheRemainingLabel(59_000)).toBe("<1m");
+  });
+
+  it("wakes on the expiry's minute grid and stops once cold", () => {
+    expect(promptCacheNextChangeMs(hour.cacheExpiresAt, at("2026-09-23T10:30:20.000Z"))).toBe(
+      40_000,
+    );
+    expect(promptCacheNextChangeMs(hour.cacheExpiresAt, at("2026-09-23T10:30:00.000Z"))).toBe(
+      60_000,
+    );
+    expect(promptCacheNextChangeMs(hour.cacheExpiresAt, at("2026-09-23T11:00:00.000Z"))).toBeNull();
   });
 });

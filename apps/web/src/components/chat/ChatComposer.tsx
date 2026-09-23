@@ -35,6 +35,7 @@ import type {
   ScopedThreadRef,
   ServerProvider,
   ThreadId,
+  ThreadUsageRollup,
   SnapShotSource,
 } from "@infinitus/contracts";
 import {
@@ -297,6 +298,7 @@ import {
   renderProviderTraitsPicker,
 } from "./composerProviderState";
 import { ContextWindowMeter, ContextWindowMeterPlaceholder } from "./ContextWindowMeter";
+import { ComposerPromptCache, PROMPT_CACHE_FRAME_CLASS_NAME } from "./ComposerPromptCache";
 import {
   providerSupportsManualCompaction,
   resolveContextWindowModelDisplayName,
@@ -1264,6 +1266,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   compact: boolean;
   activeContextWindow: ContextWindowSnapshot | null;
   reserveContextWindowMeter: boolean;
+  threadUsage: ThreadUsageRollup | undefined;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
   pendingAction: {
@@ -1292,6 +1295,13 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
 }) {
   return (
     <>
+      {props.isRunning ? null : (
+        <ComposerPromptCache
+          usage={props.threadUsage}
+          compact={props.compact}
+          contextTokens={props.activeContextWindow?.usedTokens ?? null}
+        />
+      )}
       {props.activeContextWindow ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}
@@ -6690,7 +6700,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       <div className="relative">
         <ComposerSurface.Main
           ref={composerMainSurfaceRef}
-          className={composerProviderState.composerFrameClassName}
+          className={cn(
+            composerProviderState.composerFrameClassName,
+            PROMPT_CACHE_FRAME_CLASS_NAME,
+          )}
         >
           <div
             ref={composerSurfaceRef}
@@ -7395,6 +7408,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       settings.contextWindowMeterEnabled ? activeContextWindow : null
                     }
                     reserveContextWindowMeter={reserveContextWindowMeter}
+                    threadUsage={props.activeThreadShell?.usage}
                     activeThreadModelDisplayName={activeThreadModelDisplayName}
                     pendingAction={pendingPrimaryAction}
                     isRunning={phase === "running"}

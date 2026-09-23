@@ -326,6 +326,9 @@ const TurnTokenUsageCommonFields = {
   usageScope: Schema.Literal("main_agent"),
   cachedInputTokens: Schema.optional(NonNegativeInt),
   cacheCreationTokens: Schema.optional(NonNegativeInt),
+  /** How long the prompt cache the turn wrote stays warm without another
+      call, when the provider says (Claude: 300 or 3600). */
+  cacheTtlSeconds: Schema.optional(PositiveInt),
   reasoningTokens: Schema.optional(NonNegativeInt),
   hasSubagents: Schema.Boolean,
 };

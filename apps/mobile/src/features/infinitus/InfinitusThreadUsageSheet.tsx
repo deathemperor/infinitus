@@ -1,6 +1,7 @@
-import { EnvironmentId, ThreadId } from "@infinitus/contracts";
+import { EnvironmentId, ThreadId, type ThreadUsageRollup } from "@infinitus/contracts";
+import { promptCacheNextChangeMs } from "@infinitus/shared/threadUsage";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -8,7 +9,7 @@ import { AndroidSheetHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
 import { useThreadShell } from "../../state/entities";
 import { MetaCard } from "../threads/git/gitSheetComponents";
-import { threadUsageNotes, threadUsageRows } from "./threadUsage.logic";
+import { threadPromptCacheRow, threadUsageNotes, threadUsageRows } from "./threadUsage.logic";
 
 type ThreadUsageSheetProps = StaticScreenProps<{
   readonly environmentId: string;
@@ -32,7 +33,8 @@ export function InfinitusThreadUsageSheet(props: ThreadUsageSheetProps) {
     }),
     [props.route.params.environmentId, props.route.params.threadId],
   );
-  const usage = useThreadShell(ref)?.usage;
+  const shell = useThreadShell(ref);
+  const usage = shell?.usage;
 
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
@@ -55,6 +57,10 @@ export function InfinitusThreadUsageSheet(props: ThreadUsageSheetProps) {
               {threadUsageRows(usage).map((row) => (
                 <MetaCard key={row.label} label={row.label} value={row.value} />
               ))}
+              {/* Hidden while a turn runs: its every call restarts the clock. */}
+              {usage.cacheExpiresAt !== undefined && shell?.latestTurn?.state !== "running" ? (
+                <PromptCacheCard key={usage.cacheExpiresAt} usage={usage} />
+              ) : null}
             </View>
             <View className="gap-1 px-1">
               {threadUsageNotes(usage).map((note) => (
@@ -68,4 +74,28 @@ export function InfinitusThreadUsageSheet(props: ThreadUsageSheetProps) {
       </ScrollView>
     </View>
   );
+}
+
+/** The prompt cache row with its own clock, re-read on the expiry's minute
+    grid so the minutes and the turn to "Expired" land on time; nothing
+    ticks once cold. Keyed by the expiry, so a new turn starts a fresh one. */
+function PromptCacheCard({ usage }: { usage: ThreadUsageRollup }) {
+  const [nowMs, setNowMs] = useState(Date.now);
+  const { cacheExpiresAt } = usage;
+  useEffect(() => {
+    if (cacheExpiresAt === undefined) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      const delayMs = promptCacheNextChangeMs(cacheExpiresAt, Date.now());
+      if (delayMs === null) return;
+      timer = setTimeout(() => {
+        setNowMs(Date.now());
+        arm();
+      }, delayMs);
+    };
+    arm();
+    return () => clearTimeout(timer);
+  }, [cacheExpiresAt]);
+  const row = threadPromptCacheRow(usage, nowMs);
+  return row === null ? null : <MetaCard label={row.label} value={row.value} />;
 }

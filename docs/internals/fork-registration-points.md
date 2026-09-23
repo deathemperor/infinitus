@@ -121,7 +121,11 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   is read just above the "Derived: composer trigger / menu" block so the
   slash-menu `useMemo` appends `promptSnippetSlashItems(...)` after
   `searchSlashCommandItems`, and `onSelectComposerItem` has a
-  `prompt-snippet` branch before the skill one.
+  `prompt-snippet` branch before the skill one. The prompt cache timer:
+  `ComposerPromptCache` first in `ComposerFooterPrimaryActions` (its
+  `threadUsage` prop, fed `props.activeThreadShell?.usage`) and
+  `PROMPT_CACHE_FRAME_CLASS_NAME` added to `ComposerSurface.Main`'s
+  className (`docs/internals/turn-usage.md`).
 - `apps/web/src/components/chat/ComposerCommandMenu.tsx` — the
   `prompt-snippet` variant of `ComposerCommandItem` (label + description
   render through the default row) (#270 G).
