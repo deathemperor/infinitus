@@ -286,11 +286,10 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
   it.effect("backfills a newly shipped default key alongside a snapshotted older one", () =>
     Effect.gen(function* () {
       const { keybindingsConfigPath } = yield* ServerConfig.ServerConfig;
-      // Mirrors a config written before #840 added `mod+[`: it already names
-      // thread.previous, under the default key that shipped at the time.
+      // Mirrors a config snapshotted when chat.new shipped one default key: it
+      // already names chat.new, so keying on the command dropped the second.
       yield* writeKeybindingsConfig(keybindingsConfigPath, [
-        { key: "mod+shift+[", command: "thread.previous" },
-        { key: "mod+shift+]", command: "thread.next" },
+        { key: "mod+n", command: "chat.new", when: "!terminalFocus" },
       ]);
 
       yield* Effect.gen(function* () {
@@ -301,10 +300,8 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
       const persisted = yield* readKeybindingsConfig(keybindingsConfigPath);
       const hasRule = (key: string, command: KeybindingCommand) =>
         persisted.some((entry) => entry.key === key && entry.command === command);
-      assert.isTrue(hasRule("mod+shift+[", "thread.previous"));
-      assert.isTrue(hasRule("mod+[", "thread.previous"));
-      assert.isTrue(hasRule("mod+shift+]", "thread.next"));
-      assert.isTrue(hasRule("mod+]", "thread.next"));
+      assert.isTrue(hasRule("mod+n", "chat.new"));
+      assert.isTrue(hasRule("mod+shift+o", "chat.new"));
     }).pipe(Effect.provide(makeKeybindingsLayer())),
   );
 

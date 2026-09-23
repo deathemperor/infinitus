@@ -63,9 +63,6 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+o", command: "editor.openFavorite" },
   { key: "mod+shift+[", command: "thread.previous" },
   { key: "mod+shift+]", command: "thread.next" },
-  // Fork (#840): the plain brackets too, the way browsers walk history.
-  { key: "mod+[", command: "thread.previous" },
-  { key: "mod+]", command: "thread.next" },
   { key: "mod+alt+n", command: "thread.nextAttention", when: "!terminalFocus" },
   { key: "mod+shift+c", command: "thread.copyReference", when: "!terminalFocus" },
   { key: "mod+shift+s", command: "thread.settle", when: "!terminalFocus" },
@@ -345,8 +342,8 @@ export function mergeWithDefaultKeybindings(
 
   // A user rule identical to a shipped default is a snapshot, not a
   // customization. Keying the override on the command alone means a config
-  // written before a command gained a second default -- `mod+[` next to
-  // `mod+shift+[` (#840) -- suppresses that new default forever.
+  // written before a command gained a second default -- `mod+shift+o` next to
+  // `mod+n` for chat.new -- suppresses that new default forever.
   const defaultSignatures = new Set(DEFAULT_RESOLVED_KEYBINDINGS.map(resolvedKeybindingSignature));
   const customSignatures = new Set(custom.map(resolvedKeybindingSignature));
   const overriddenCommands = new Set(

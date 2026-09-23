@@ -472,8 +472,8 @@ const make = Effect.gen(function* () {
       const customConfig = runtimeConfig.keybindings;
       // A persisted rule identical to a shipped default is a snapshot of that
       // default, not a customization of the command. Treating it as one means
-      // a config written before a command gained a second default -- `mod+[`
-      // alongside `mod+shift+[` (#840) -- never backfills the new key.
+      // a config written before a command gained a second default -- `mod+shift+o`
+      // alongside `mod+n` for chat.new -- never backfills the new key.
       const isDefaultRule = (entry: KeybindingRule) =>
         DEFAULT_KEYBINDINGS.some((defaultRule) => isSameKeybindingRule(entry, defaultRule));
       const existingCommands = new Set(
