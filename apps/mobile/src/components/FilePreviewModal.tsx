@@ -1,36 +1,14 @@
 import { useIsFocused } from "@react-navigation/native";
-import type { AssetResource, EnvironmentId } from "@infinitus/contracts";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Alert, Keyboard, Platform } from "react-native";
 
-import type { FileBackedComposerAttachment } from "../lib/composerImages";
 import { loadLocalAttachmentPreview } from "../lib/localAttachmentPreview";
-import type { MediaActionsSource } from "../lib/mediaActions";
 import { reusablePreviewUrl } from "../features/infinitus/previewUrlReuse.logic";
 import { useRefreshAssetUrl } from "../state/assets";
 import { FilePreview } from "./FilePreview";
+import type { FilePreviewSource } from "./FilePreviewModal.types";
 
-export interface ResolvedFilePreviewSource {
-  readonly kind: "image" | "pdf" | "document";
-  readonly mimeType?: string;
-  readonly uri: string;
-  readonly name?: string;
-  readonly sourceIdentifier?: string;
-  readonly srcFragment?: string;
-  readonly actionsSource?: MediaActionsSource;
-}
-
-export type FilePreviewSource = Omit<ResolvedFilePreviewSource, "uri"> &
-  (
-    | { readonly uri: string }
-    | { readonly attachment: FileBackedComposerAttachment }
-    | {
-        readonly environmentId: EnvironmentId;
-        readonly resource: AssetResource;
-        /** The URL the thumbnail is showing, so an attachment opens without a round trip. */
-        readonly cachedUrl?: { readonly url: string; readonly expiresAt: number };
-      }
-  );
+export type { FilePreviewSource, ResolvedFilePreviewSource } from "./FilePreviewModal.types";
 
 function ResolvedFilePreview(props: {
   readonly source: FilePreviewSource;

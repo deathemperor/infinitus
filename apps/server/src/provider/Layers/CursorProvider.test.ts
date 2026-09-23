@@ -743,7 +743,7 @@ describe("discoverCursorModelsViaAcp", () => {
           apiEndpoint: "",
           customModels: [],
         };
-        const discover = yield* makeCursorModelDiscovery(settings, {
+        const { discover, invalidate } = yield* makeCursorModelDiscovery(settings, {
           ...process.env,
           T3_ACP_REQUEST_LOG_PATH: requestLogPath,
         });
@@ -756,6 +756,10 @@ describe("discoverCursorModelsViaAcp", () => {
         yield* fileSystem.writeFileString(requestLogPath, "");
         expect(yield* discover(about)).toEqual(first);
         expect(yield* fileSystem.readFileString(requestLogPath)).toBe("");
+        yield* invalidate;
+        expect(yield* discover(about)).toEqual(first);
+        expect(yield* fileSystem.readFileString(requestLogPath)).toContain("initialize");
+        yield* fileSystem.writeFileString(requestLogPath, "");
         yield* discover({ ...about, version: "2026.08.12" });
         expect(yield* fileSystem.readFileString(requestLogPath)).toContain("initialize");
         yield* fileSystem.writeFileString(requestLogPath, "");

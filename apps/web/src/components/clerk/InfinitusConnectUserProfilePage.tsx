@@ -61,12 +61,7 @@ export function InfinitusConnectEnvironmentRow(props: {
           </div>
           <CollapsibleTrigger
             render={
-              <Button
-                size="sm"
-                variant="destructive-outline"
-                className="text-[0.8125rem]"
-                disabled={props.mutationPending}
-              >
+              <Button size="sm" variant="destructive-outline" disabled={props.mutationPending}>
                 Deregister
               </Button>
             }
@@ -94,7 +89,6 @@ export function InfinitusConnectEnvironmentRow(props: {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-[0.8125rem]"
                   disabled={props.mutationPending}
                   onClick={() => props.onConfirmationChange(false)}
                 >
@@ -103,7 +97,6 @@ export function InfinitusConnectEnvironmentRow(props: {
                 <Button
                   size="sm"
                   variant="destructive"
-                  className="text-[0.8125rem]"
                   disabled={props.mutationPending}
                   onClick={() => props.onDeregister(environment)}
                 >
@@ -241,20 +234,20 @@ export function InfinitusConnectUserProfilePage() {
             ))}
           </ul>
         ) : environmentsState.error ? null : (
-          <Empty className="min-h-64 gap-4 border-t px-6 py-10 md:p-10">
-            <EmptyMedia className="mb-0" variant="icon">
-              <ServerIcon />
-            </EmptyMedia>
-            <EmptyHeader>
-              <EmptyTitle className="text-[1.0625rem] leading-6">
-                No {CONNECT_NAME} environments
-              </EmptyTitle>
-              <EmptyDescription className="text-[0.8125rem] leading-[1.125rem]">
-                Link an environment from its local Settings to make it available through{" "}
-                {CONNECT_NAME}.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <div className="border-t">
+            <Empty size="compact">
+              <EmptyMedia variant="icon">
+                <ServerIcon />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No {CONNECT_NAME} environments</EmptyTitle>
+                <EmptyDescription>
+                  Link an environment from its local Settings to make it available through{" "}
+                  {CONNECT_NAME}.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </div>
         )}
       </div>
     </ClerkUserProfilePage>

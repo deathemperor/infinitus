@@ -750,14 +750,6 @@ describe("ClientSettings pull request merge methods", () => {
 });
 
 describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
-  it("defaults text generation to Luna at low reasoning effort", () => {
-    expect(DEFAULT_SERVER_SETTINGS.textGenerationModelSelection).toEqual({
-      instanceId: ProviderInstanceId.make("codex"),
-      model: "gpt-5.6-luna",
-      options: [{ id: "reasoningEffort", value: "low" }],
-    });
-  });
-
   it("defaults to an empty record so legacy configs without the key still decode", () => {
     expect(DEFAULT_SERVER_SETTINGS.providerInstances).toEqual({});
   });
@@ -876,6 +868,27 @@ describe("provider enabled defaults", () => {
 });
 
 describe("ServerSettings worktree defaults", () => {
+  it("defaults the thread env mode to inherit and keeps stored values", () => {
+    expect(decodeServerSettings({}).defaultThreadEnvMode).toBeNull();
+    expect(decodeServerSettings({ defaultThreadEnvMode: "worktree" }).defaultThreadEnvMode).toBe(
+      "worktree",
+    );
+    expect(
+      decodeServerSettings({ defaultThreadEnvMode: "remote" }).defaultThreadEnvMode,
+    ).toBeNull();
+    expect(
+      decodeServerSettingsPatch({ defaultThreadEnvMode: null }).defaultThreadEnvMode,
+    ).toBeNull();
+  });
+
+  it("keeps an inherited thread env mode off the wire for older clients", () => {
+    const encode = Schema.encodeSync(ServerSettings);
+    expect("defaultThreadEnvMode" in encode(decodeServerSettings({}))).toBe(false);
+    expect(
+      encode(decodeServerSettings({ defaultThreadEnvMode: "worktree" })).defaultThreadEnvMode,
+    ).toBe("worktree");
+  });
+
   it("defaults start-from-origin on for legacy configs", () => {
     expect(decodeServerSettings({}).newWorktreesStartFromOrigin).toBe(true);
   });
@@ -891,6 +904,15 @@ describe("ServerSettings worktree defaults", () => {
     expect(decodeServerSettingsPatch({ worktreeMaxCount: 0 }).worktreeMaxCount).toBe(0);
     expect(() => decodeServerSettingsPatch({ worktreeMaxCount: -1 })).toThrow();
     expect(() => decodeServerSettingsPatch({ worktreeMaxCount: 2.5 })).toThrow();
+  });
+
+  it("defaults worktree submodules to inherit and tolerates unknown modes", () => {
+    expect(decodeServerSettings({}).worktreeSubmodules).toBeNull();
+    expect(decodeServerSettings({ worktreeSubmodules: "top-level" }).worktreeSubmodules).toBe(
+      "top-level",
+    );
+    expect(decodeServerSettings({ worktreeSubmodules: "shallow" }).worktreeSubmodules).toBeNull();
+    expect(decodeServerSettingsPatch({ worktreeSubmodules: null }).worktreeSubmodules).toBeNull();
   });
 });
 

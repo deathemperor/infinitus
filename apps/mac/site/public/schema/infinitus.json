@@ -21,6 +21,15 @@
       ],
       "description": "Where new threads start for this repository: \"worktree\" for a fresh git worktree, \"local\" for the current checkout. A per-project setting in Infinitus overrides this; when neither is set, the global default applies."
     },
+    "worktreeSubmodules": {
+      "type": "string",
+      "enum": [
+        "recursive",
+        "top-level",
+        "none"
+      ],
+      "description": "How new worktrees populate git submodules: \"recursive\" (the default) initializes nested submodules too, \"top-level\" initializes only those declared by this repository, and \"none\" leaves every submodule empty for a setup script to handle. A project or environment setting in Infinitus overrides this."
+    },
     "scripts": {
       "type": "array",
       "items": {

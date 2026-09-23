@@ -56,6 +56,8 @@ jobs:
       # The fork's identifier rename (#1368 C): fails while an old T3 name is in the tree.
       - name: Check identifier rename
         run: node scripts/infinitus-rename.ts --check
+      - name: Check className overrides on components/ui do not grow
+        run: vp run lint:restyle-ceiling
 
       - name: Typecheck
         run: vpr typecheck

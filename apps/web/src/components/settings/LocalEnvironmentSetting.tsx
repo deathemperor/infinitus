@@ -87,7 +87,7 @@ export function LocalEnvironmentSetting() {
             >
               {isUpdating ? (
                 <>
-                  <Spinner className="size-3.5" />
+                  <Spinner size="sm" />
                   Restarting…
                 </>
               ) : enabled ? (

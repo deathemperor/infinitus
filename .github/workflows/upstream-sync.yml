@@ -77,7 +77,17 @@ jobs:
             # The scope is in the lockfile's peer-set hashes too, and fmt wants node_modules.
             vp i --no-frozen-lockfile
             git diff --name-only | xargs vp fmt
-            git add -A && git commit -qm "chore: upstream renamed by scripts/infinitus-rename.ts" --no-verify
+            git add -A
+            # The renamed commit's first parent is the previous renamed commit
+            # already in main, not upstream's tip alone: the merge base of the
+            # sync is then a renamed tree, so a fork edit next to a renamed line
+            # is no longer a conflict. Parented on upstream/main alone, the base
+            # was the unrenamed upstream commit and every such line conflicted,
+            # ~130 files a day (#1538, #1543; #1548 was the hand-made proof).
+            prev=$(git log main --format=%H --grep='^chore: upstream renamed by scripts/infinitus-rename.ts' -1)
+            renamed=$(git commit-tree "$(git write-tree)" ${prev:+-p "$prev"} -p upstream/main \
+              -m "chore: upstream renamed by scripts/infinitus-rename.ts")
+            git reset -q --hard "$renamed"
             git checkout -q "$branch"
             merge_from="$branch-upstream-renamed"
           else

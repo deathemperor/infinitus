@@ -1,22 +1,86 @@
+import {
+  LEGACY_T3_PROJECT_FILE_NAME,
+  T3_PROJECT_FILE_NAME,
+  type ProjectReadFileResult,
+  type T3ProjectFile,
+} from "@infinitus/contracts";
+import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
+import { useAtomValue } from "@effect/atom-react";
+import * as Option from "effect/Option";
+import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
+import { getProjectFileQueryAtom, optimisticFileAtom } from "../files/projectFilesQueryState";
 import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
 import { resolveScopedSettingsTargets, selectScopedSettingsEnvironments } from "./scopedSettings";
 import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
+
+/**
+ * Each member's decoded t3.json, so file-backed settings show the file as a
+ * layer in the inheritance chain. A member is only present once its read has
+ * settled; the query atom caches per (environment, cwd).
+ */
+function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
+  const members = scope.kind === "project" || scope.kind === "checkout" ? scope.members : [];
+  return useAtomValue(
+    useMemo(
+      () =>
+        Atom.make((get) => {
+          const files = new Map<string, T3ProjectFile | null>();
+          // A pending in-app save overlays the query, like useProjectFileQuery.
+          const read = (
+            member: (typeof members)[number],
+            fileName: string,
+          ): ProjectReadFileResult | null | "waiting" => {
+            const result = get(
+              getProjectFileQueryAtom(member.environmentId, member.workspaceRoot, fileName),
+            );
+            if (result.waiting) return "waiting";
+            return (
+              get(optimisticFileAtom(member.environmentId, member.workspaceRoot, fileName))?.data ??
+              Option.getOrNull(AsyncResult.value(result))
+            );
+          };
+          for (const member of members) {
+            // `infinitus.json` decides when it exists; a checkout carrying only
+            // upstream's `t3.json` is read from that, the server's own order.
+            const preferred = read(member, T3_PROJECT_FILE_NAME);
+            if (preferred === "waiting") continue;
+            const data = preferred ?? read(member, LEGACY_T3_PROJECT_FILE_NAME);
+            if (data === "waiting") continue;
+            files.set(
+              member.physicalProjectKey,
+              data === null || data.truncated ? null : parseT3ProjectFile(data.contents),
+            );
+          }
+          return files;
+        }),
+      [members],
+    ),
+  );
+}
 
 function useResolvedSettingsScope(search: SettingsScopeSearch) {
   const groups = useSettingsProjectGroups();
   const { environments: availableEnvironments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const scope = useMemo(
+    () => resolveSettingsScope(search, groups, availableEnvironments),
+    [availableEnvironments, groups, search],
+  );
+  const projectFiles = useMemberProjectFiles(scope);
   return useMemo(() => {
-    const scope = resolveSettingsScope(search, groups, availableEnvironments);
     const selected = selectScopedSettingsEnvironments(
       scope,
       availableEnvironments,
       primaryEnvironmentId,
     );
-    const targets = resolveScopedSettingsTargets(scope, selected.connectedEnvironments);
+    const targets = resolveScopedSettingsTargets(
+      scope,
+      selected.connectedEnvironments,
+      projectFiles,
+    );
     // The representative target supplies display values; project scopes
     // prefer the member on the primary environment, like environments do.
     const target =
@@ -26,7 +90,7 @@ function useResolvedSettingsScope(search: SettingsScopeSearch) {
       targets[0] ??
       null;
     return { scope, groups, ...selected, targets, target };
-  }, [availableEnvironments, groups, primaryEnvironmentId, search]);
+  }, [availableEnvironments, groups, primaryEnvironmentId, projectFiles, scope]);
 }
 
 const SettingsScopeContext = createContext<

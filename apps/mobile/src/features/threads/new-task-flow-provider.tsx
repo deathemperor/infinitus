@@ -21,10 +21,6 @@ import {
 } from "@infinitus/contracts";
 import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
-import {
-  isDefaultThreadEnvModeSettled,
-  resolveDefaultThreadEnvMode,
-} from "@infinitus/shared/threadEnvMode";
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
 
@@ -94,7 +90,7 @@ import { useMobileProjectGroupingSettings } from "../../state/project-grouping";
 import {
   resolvePendingTaskInteractionMode,
   resolveProviderInteractionMode,
-} from "./legacy-plan-mode";
+} from "../../state/legacy-plan-mode";
 import { useLegacyPlanModeState } from "./use-legacy-plan-mode-enabled";
 import {
   resolveNewTaskBranchWorktreePath,
@@ -446,38 +442,35 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   );
   const t3ProjectFileData = (t3ProjectFileQuery.data ??
     legacyProjectFileQuery.data) as ProjectReadFileResult | null;
-  const t3ProjectFileDefaultMode = useMemo(() => {
-    if (t3ProjectFileData === null || t3ProjectFileData.truncated) return null;
-    return parseT3ProjectFile(t3ProjectFileData.contents)?.defaultThreadEnvMode ?? null;
-  }, [t3ProjectFileData]);
-  // Environment settings with the project's overrides applied; the
-  // aggregate's own legacy fields still count until the server folds them.
+  const t3ProjectFile = useMemo(
+    () =>
+      t3ProjectFileData === null || t3ProjectFileData.truncated
+        ? null
+        : parseT3ProjectFile(t3ProjectFileData.contents),
+    [t3ProjectFileData],
+  );
+  // Environment settings with the project's overrides and its t3.json
+  // applied; the aggregate's own legacy fields still count until the server
+  // folds them.
   const projectSettings = useMemo(
     () =>
       resolveProjectSettings(
         selectedEnvironmentServerConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
         selectedProject?.id ?? null,
         selectedProject,
+        t3ProjectFile,
       ),
-    [selectedEnvironmentServerConfig?.settings, selectedProject],
+    [selectedEnvironmentServerConfig?.settings, selectedProject, t3ProjectFile],
   );
-  const projectThreadEnvMode =
-    projectSettings.sources.defaultThreadEnvMode === "project"
-      ? projectSettings.settings.defaultThreadEnvMode
-      : undefined;
-  const defaultWorkspaceMode: WorkspaceMode = resolveDefaultThreadEnvMode({
-    projectSetting: projectThreadEnvMode,
-    projectFile: t3ProjectFileDefaultMode,
-    globalDefault: projectSettings.settings.defaultThreadEnvMode,
-  });
-  // While unsettled the resolved default is provisional. Nothing may write
-  // it into the draft during that window (the auto-branch effect does), or
-  // the frozen interim value beats the project file's default once it loads.
-  const defaultWorkspaceModeSettled = isDefaultThreadEnvModeSettled({
-    explicitMode: selectedProjectDraft.workspaceSelection?.mode,
-    projectSetting: projectThreadEnvMode,
-    projectFilePending: t3ProjectFileQuery.isPending || legacyProjectFileQuery.isPending,
-  });
+  const defaultWorkspaceMode: WorkspaceMode = projectSettings.settings.defaultThreadEnvMode;
+  // While the file read is pending and nothing above it decided, the
+  // resolved default is provisional. Nothing may write it into the draft
+  // during that window (the auto-branch effect does), or the frozen interim
+  // value beats the t3.json default once it loads.
+  const defaultWorkspaceModeSettled =
+    selectedProjectDraft.workspaceSelection?.mode !== undefined ||
+    projectSettings.sources.defaultThreadEnvMode !== "environment" ||
+    !(t3ProjectFileQuery.isPending || legacyProjectFileQuery.isPending);
   const workspaceMode = selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode;
   const selectedBranchName = selectedProjectDraft.workspaceSelection?.branch ?? null;
   const selectedWorktreePath = selectedProjectDraft.workspaceSelection?.worktreePath ?? null;
