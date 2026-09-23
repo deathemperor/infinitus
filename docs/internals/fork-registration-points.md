@@ -175,6 +175,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   diff to the pathspec from `checkpointDiffPathspec.ts` (#1403): one call
   before the command and the `--literal-pathspecs` / `-- <paths>` arguments;
   this edit stays after that sync.
+- `apps/web/src/components/chat/MessagesTimeline.tsx`,
+  `MessagesTimeline.logic.ts` (+ the timeline test) — upstream's open PRs
+  pingdotgg/t3code#10773 and #12376 carried ahead of upstream (2026-09-23,
+  upstream #12372): end-follow also follows footer growth (the composer
+  reservation: queued messages, banners), and a settle check after size
+  changes, turn end, restore end and anchor/disclosure release shows the
+  scroll-to-end pill when the viewport stranded above the end with no scroll
+  event. Drops on the upstream sync that brings them in; until then a sync
+  conflict here is resolved toward upstream.
 - `apps/server/src/orchestration/Layers/OrchestrationEngine.ts` (the
   `thread.auto-settle` invariant) and `apps/server/src/orchestration/ThreadSettlementReactor.ts`
   (the candidate filter) — read `InfinitusLimitStops.isStopped` and
