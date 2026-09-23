@@ -92,6 +92,16 @@ final class AppModel: ObservableObject {
             else { for fleet in registry.fleets { fleet.pendingSwitch = nil } }
         }
     }
+    /// The same staging for a banked limit reset (#1554): the ticket mark
+    /// or menu item on any fleet's row sets it, the one alert commits it.
+    var pendingResetFleet: FleetState? { registry.fleets.first { $0.pendingReset != nil } }
+    var pendingReset: Int? {
+        get { pendingResetFleet?.pendingReset }
+        set {
+            if let newValue { primary?.pendingReset = newValue }
+            else { for fleet in registry.fleets { fleet.pendingReset = nil } }
+        }
+    }
     @Published var dataPulseTick = 0
 
     /// A fleet's rows changed: whoever observes the host (title, popup
@@ -1928,6 +1938,12 @@ final class AppModel: ObservableObject {
         guard let fleet = pendingSwitchFleet, let number = fleet.pendingSwitch else { return }
         fleet.switchTo(number)
         pendingSwitch = nil
+    }
+    /// The confirm alert's Use reset (#1554): the fleet that staged it.
+    func commitPendingReset() {
+        guard let fleet = pendingResetFleet, let number = fleet.pendingReset else { return }
+        fleet.redeemReset(number)
+        pendingReset = nil
     }
     func rotate() { primary?.rotate() }
 

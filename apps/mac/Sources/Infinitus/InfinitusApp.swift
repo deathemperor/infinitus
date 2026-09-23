@@ -318,6 +318,21 @@ struct MenuContent: View {
                  + "active account. Switch to account "
                  + "\(model.pendingSwitch.map(String.init) ?? "?")?")
         }
+        // A banked reset is spent, never given back (#1554): the ticket
+        // mark only STAGES it; this alert commits it.
+        .alert(
+            "Use a banked reset?",
+            isPresented: Binding(
+                get: { model.pendingReset != nil },
+                set: { if !$0 { model.pendingReset = nil } })
+        ) {
+            Button("Use reset") { model.commitPendingReset() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This spends one of account "
+                 + "\(model.pendingReset.map(String.init) ?? "?")'s banked limit resets "
+                 + "and clears its windows now. The provider does not give it back.")
+        }
     }
 
     /// The fleets the stack draws. An engine that reports a provider it

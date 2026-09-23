@@ -68,6 +68,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                         // tail, so a trailing marker vanished on real
                         // fleets (user 2026-09-01).
                         AccountPauseButton(model: model, account: account)
+                        AccountResetMark(model: model, account: account)
                         Button(action: {
                             // disabled rows stay clickable, like rumps; the
                             // popup-level alert asks before committing
@@ -295,6 +296,7 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                 .foregroundStyle(account.active ? Color.accentColor : Color.secondary)
                 .instantTip(cells.slotTip)
             AccountPauseButton(model: model, account: account)
+            AccountResetMark(model: model, account: account)
             Button(action: {
                 if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
             }, label: { cells.nameLabel })
@@ -385,6 +387,7 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                             .foregroundStyle(account.active ? Color.accentColor : Color.secondary)
                             .instantTip(cells.slotTip)
                         AccountPauseButton(model: model, account: account)
+                        AccountResetMark(model: model, account: account)
                         Button(action: {
                             if !account.active, model.capabilities.contains(.switch) { model.pendingSwitch = account.number }
                         }, label: { cells.nameLabel })
@@ -611,6 +614,55 @@ struct AccountRowMenu<M: FleetModel>: View {
                 Label(warm ? "Stop keeping warm" : "Keep warm",
                       systemImage: warm ? "flame.slash" : "flame")
             }
+        }
+        if let resets = account.resets, resets.available > 0, model.capabilities.contains(.reset) {
+            Button {
+                model.pendingReset = account.number
+            } label: {
+                Label(resetMenuTitle(resets), systemImage: "ticket")
+            }
+            .disabled(resets.hold != nil)
+        }
+    }
+}
+
+func resetMenuTitle(_ resets: AccountResets) -> String {
+    "Use banked reset (\(resets.available) of \(resets.total) left)"
+}
+
+/// The account's banked limit resets (#1554): a ticket and the count,
+/// beside the pause mark, on a row whose engine reads the bank. A press
+/// stages the reset like a row click stages a switch, and the popup-level
+/// alert asks first — the provider gives none back. Held (not at a limit,
+/// cooling down) it only tells why.
+struct AccountResetMark<M: FleetModel>: View {
+    let model: M
+    let account: Account
+
+    var body: some View {
+        if let resets = account.resets, resets.available > 0, model.capabilities.contains(.reset) {
+            Button {
+                if resets.hold == nil { model.pendingReset = account.number }
+            } label: {
+                HStack(spacing: 1) {
+                    Image(systemName: "ticket")
+                    Text(String(resets.available))
+                }
+                .font(PopupFont.caption2)
+                .foregroundStyle(resets.hold == nil ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .instantTip(Self.tip(resets))
+        }
+    }
+
+    static func tip(_ resets: AccountResets) -> String {
+        let count = "\(resets.available) of \(resets.total) \(resets.total == 1 ? "reset" : "resets") banked"
+        switch resets.hold?.reason {
+        case nil: return count + " — press to use one"
+        case "notAtLimit": return count + " — usable once the account hits a limit"
+        case "cooldown": return count + " — cooling down"
+        default: return count + " — not usable right now"
         }
     }
 }
