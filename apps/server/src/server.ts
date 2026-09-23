@@ -319,6 +319,8 @@ const ReactorLayerLive = ReactorCoreLayerLive.pipe(
       Layer.provide(
         InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive)),
       ),
+      // `ps` / `kill` for the agent's own login once the Mac's lands.
+      Layer.provide(ProcessRunner.layer),
       // The phones are told through the relay (#1375's alert route).
       Layer.provide(
         InfinitusAlertRelayLive.pipe(
