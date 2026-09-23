@@ -194,13 +194,17 @@ describe("prompt cache state", () => {
     expect(promptCacheRemainingLabel(59_000)).toBe("<1m");
   });
 
-  it("wakes on the expiry's minute grid and stops once cold", () => {
-    expect(promptCacheNextChangeMs(hour.cacheExpiresAt, at("2026-09-23T10:30:20.000Z"))).toBe(
-      40_000,
-    );
-    expect(promptCacheNextChangeMs(hour.cacheExpiresAt, at("2026-09-23T10:30:00.000Z"))).toBe(
-      60_000,
-    );
+  it("wakes just past each minute of the expiry's grid, where the label drops, and stops once cold", () => {
+    const labelAfterWake = (nowIso: string) => {
+      const nowMs = at(nowIso);
+      const wakeMs = nowMs + (promptCacheNextChangeMs(fiveMinutes.cacheExpiresAt, nowMs) ?? 0);
+      const state = promptCacheState(fiveMinutes, wakeMs);
+      return state?.kind === "cold" ? "cold" : promptCacheRemainingLabel(state?.remainingMs ?? 0);
+    };
+    expect(labelAfterWake("2026-09-23T10:00:20.000Z")).toBe("3m");
+    expect(labelAfterWake("2026-09-23T10:01:00.000Z")).toBe("3m");
+    expect(labelAfterWake("2026-09-23T10:03:30.000Z")).toBe("<1m");
+    expect(labelAfterWake("2026-09-23T10:04:30.000Z")).toBe("cold");
     expect(promptCacheNextChangeMs(hour.cacheExpiresAt, at("2026-09-23T11:00:00.000Z"))).toBeNull();
   });
 });

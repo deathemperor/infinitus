@@ -141,11 +141,11 @@ export function promptCacheTtlLabel(ttlMs: number): string {
   return ttlMs >= 60 * 60_000 ? "1-hour" : `${Math.round(ttlMs / 60_000)}-minute`;
 }
 
-/** Milliseconds until the label or the kind can next change: the next
-    whole minute before expiry, so a clock need not tick faster. Null once
-    cold. */
+/** Milliseconds until the label or the kind can next change: just past the
+    next whole minute before expiry (the label rounds down, so on the
+    boundary itself it has not changed yet). Null once cold. */
 export function promptCacheNextChangeMs(expiresAt: string, nowMs: number): number | null {
   const remainingMs = Date.parse(expiresAt) - nowMs;
   if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null;
-  return remainingMs % 60_000 || 60_000;
+  return (remainingMs % 60_000) + 1;
 }
