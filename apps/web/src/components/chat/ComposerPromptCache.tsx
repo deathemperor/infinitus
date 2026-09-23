@@ -1,9 +1,10 @@
-import type { ThreadUsageRollup } from "@infinitus/contracts";
+import type { OrchestrationSession, ThreadUsageRollup } from "@infinitus/contracts";
 import { TimerIcon } from "lucide-react";
 import {
   promptCacheNextChangeMs,
   promptCacheRemainingLabel,
   promptCacheState,
+  promptCacheWriterAlive,
 } from "@infinitus/shared/threadUsage";
 import { useEffect, useState } from "react";
 
@@ -28,6 +29,7 @@ export const PROMPT_CACHE_FRAME_CLASS_NAME =
  */
 export function ComposerPromptCache(props: {
   usage: ThreadUsageRollup | undefined;
+  session: OrchestrationSession | null | undefined;
   compact: boolean;
   contextTokens: number | null;
 }) {
@@ -39,6 +41,7 @@ export function ComposerPromptCache(props: {
       key={cacheExpiresAt}
       cacheExpiresAt={cacheExpiresAt}
       lastTurnAt={props.usage.lastTurnAt}
+      sessionAlive={promptCacheWriterAlive(props.session, props.usage.lastTurnAt)}
       compact={props.compact}
       contextTokens={props.contextTokens}
     />
@@ -48,11 +51,14 @@ export function ComposerPromptCache(props: {
 function PromptCacheLabel(props: {
   cacheExpiresAt: string;
   lastTurnAt: string;
+  sessionAlive: boolean;
   compact: boolean;
   contextTokens: number | null;
 }) {
   const [nowMs, setNowMs] = useState(Date.now);
   useEffect(() => {
+    // A session that ended reads cold until expiry, so nothing to tick for.
+    if (!props.sessionAlive) return;
     let timer: number | undefined;
     const arm = () => {
       const delayMs = promptCacheNextChangeMs(props.cacheExpiresAt, Date.now());
@@ -64,11 +70,16 @@ function PromptCacheLabel(props: {
     };
     arm();
     return () => window.clearTimeout(timer);
-  }, [props.cacheExpiresAt]);
+  }, [props.cacheExpiresAt, props.sessionAlive]);
 
-  const state = promptCacheState(props, nowMs);
+  const state = promptCacheState(props, nowMs, props.sessionAlive);
   if (state === null) return null;
-  const label = state.kind === "cold" ? "expired" : promptCacheRemainingLabel(state.remainingMs);
+  const label =
+    state.kind === "cold"
+      ? state.reason === "expired"
+        ? "expired"
+        : "cold"
+      : promptCacheRemainingLabel(state.remainingMs);
   return (
     <Tooltip>
       <TooltipTrigger

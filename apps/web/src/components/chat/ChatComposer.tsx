@@ -36,6 +36,7 @@ import type {
   ServerProvider,
   ThreadId,
   ThreadUsageRollup,
+  OrchestrationSession,
   SnapShotSource,
 } from "@infinitus/contracts";
 import {
@@ -1267,6 +1268,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   activeContextWindow: ContextWindowSnapshot | null;
   reserveContextWindowMeter: boolean;
   threadUsage: ThreadUsageRollup | undefined;
+  threadSession: OrchestrationSession | null | undefined;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
   pendingAction: {
@@ -1298,6 +1300,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
       {props.isRunning ? null : (
         <ComposerPromptCache
           usage={props.threadUsage}
+          session={props.threadSession}
           compact={props.compact}
           contextTokens={props.activeContextWindow?.usedTokens ?? null}
         />
@@ -7409,6 +7412,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     }
                     reserveContextWindowMeter={reserveContextWindowMeter}
                     threadUsage={props.activeThreadShell?.usage}
+                    threadSession={props.activeThreadShell?.session}
                     activeThreadModelDisplayName={activeThreadModelDisplayName}
                     pendingAction={pendingPrimaryAction}
                     isRunning={phase === "running"}

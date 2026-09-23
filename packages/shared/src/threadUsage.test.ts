@@ -7,6 +7,7 @@ import {
   promptCacheNextChangeMs,
   promptCacheRemainingLabel,
   promptCacheState,
+  promptCacheWriterAlive,
   threadUsageReported,
 } from "./threadUsage.ts";
 
@@ -177,15 +178,44 @@ describe("prompt cache state", () => {
   const at = (iso: string) => Date.parse(iso);
 
   it("is warm, then expiring in the last fifth of the TTL (at most 5 minutes), then cold", () => {
-    expect(promptCacheState(hour, at("2026-09-23T10:30:00.000Z"))?.kind).toBe("warm");
-    expect(promptCacheState(hour, at("2026-09-23T10:55:00.000Z"))?.kind).toBe("expiring");
-    expect(promptCacheState(hour, at("2026-09-23T11:00:00.000Z"))?.kind).toBe("cold");
-    expect(promptCacheState(fiveMinutes, at("2026-09-23T10:03:59.000Z"))?.kind).toBe("warm");
-    expect(promptCacheState(fiveMinutes, at("2026-09-23T10:04:00.000Z"))?.kind).toBe("expiring");
+    expect(promptCacheState(hour, at("2026-09-23T10:30:00.000Z"), true)?.kind).toBe("warm");
+    expect(promptCacheState(hour, at("2026-09-23T10:55:00.000Z"), true)?.kind).toBe("expiring");
+    expect(promptCacheState(hour, at("2026-09-23T11:00:00.000Z"), true)?.kind).toBe("cold");
+    expect(promptCacheState(fiveMinutes, at("2026-09-23T10:03:59.000Z"), true)?.kind).toBe("warm");
+    expect(promptCacheState(fiveMinutes, at("2026-09-23T10:04:00.000Z"), true)?.kind).toBe(
+      "expiring",
+    );
+  });
+
+  it("reads cold inside the TTL once the session that wrote the cache has ended", () => {
+    // A Stop, the idle reaper or a restart: the next message resumes a new CLI.
+    expect(promptCacheState(hour, at("2026-09-23T10:30:00.000Z"), false)).toEqual({
+      kind: "cold",
+      reason: "restart",
+    });
+    expect(promptCacheState(hour, at("2026-09-23T11:00:00.000Z"), false)).toEqual({
+      kind: "cold",
+      reason: "expired",
+    });
+  });
+
+  it("trusts only a ready session untouched since the last turn to hold the cache", () => {
+    const session = (status: "ready" | "stopped" | "error", updatedAt: string) => ({
+      status,
+      updatedAt,
+    });
+    expect(promptCacheWriterAlive(session("ready", lastTurnAt), lastTurnAt)).toBe(true);
+    // Stopped, reaped, errored: the next message resumes a new CLI.
+    expect(promptCacheWriterAlive(session("stopped", lastTurnAt), lastTurnAt)).toBe(false);
+    // Ready again on a restarted process (a runtime-mode change, a recovery).
+    expect(promptCacheWriterAlive(session("ready", "2026-09-23T10:12:00.000Z"), lastTurnAt)).toBe(
+      false,
+    );
+    expect(promptCacheWriterAlive(null, lastTurnAt)).toBe(false);
   });
 
   it("says nothing for a thread whose last turn reported no TTL", () => {
-    expect(promptCacheState({ lastTurnAt }, at(lastTurnAt))).toBeNull();
+    expect(promptCacheState({ lastTurnAt }, at(lastTurnAt), true)).toBeNull();
   });
 
   it("rounds the minutes left down, so the label never overstates", () => {
@@ -198,7 +228,7 @@ describe("prompt cache state", () => {
     const labelAfterWake = (nowIso: string) => {
       const nowMs = at(nowIso);
       const wakeMs = nowMs + (promptCacheNextChangeMs(fiveMinutes.cacheExpiresAt, nowMs) ?? 0);
-      const state = promptCacheState(fiveMinutes, wakeMs);
+      const state = promptCacheState(fiveMinutes, wakeMs, true);
       return state?.kind === "cold" ? "cold" : promptCacheRemainingLabel(state?.remainingMs ?? 0);
     };
     expect(labelAfterWake("2026-09-23T10:00:20.000Z")).toBe("3m");

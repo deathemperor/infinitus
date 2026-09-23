@@ -65,16 +65,23 @@ export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadU
  * The "Prompt cache" row: how long the last turn's prompt cache stays warm,
  * so the user can tell whether the next message reads the context from
  * cache or re-writes it. Null when the last turn reported no TTL (every
- * provider but Claude).
+ * provider but Claude). `sessionAlive`: `promptCacheState`.
  */
 export function threadPromptCacheRow(
   usage: ThreadUsageRollup,
   nowMs: number,
+  sessionAlive: boolean,
 ): ThreadUsageRow | null {
-  const state = promptCacheState(usage, nowMs);
+  const state = promptCacheState(usage, nowMs, sessionAlive);
   if (state === null) return null;
   if (state.kind === "cold") {
-    return { label: "Prompt cache", value: "Expired — the next message re-writes the context" };
+    return {
+      label: "Prompt cache",
+      value:
+        state.reason === "expired"
+          ? "Expired — the next message re-writes the context"
+          : "Cold — the session stopped; resuming usually re-writes the context",
+    };
   }
   const left = `${promptCacheRemainingLabel(state.remainingMs)} left`;
   return {

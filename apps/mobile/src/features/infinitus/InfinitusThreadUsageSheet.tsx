@@ -1,5 +1,5 @@
 import { EnvironmentId, ThreadId, type ThreadUsageRollup } from "@infinitus/contracts";
-import { promptCacheNextChangeMs } from "@infinitus/shared/threadUsage";
+import { promptCacheNextChangeMs, promptCacheWriterAlive } from "@infinitus/shared/threadUsage";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
@@ -59,7 +59,11 @@ export function InfinitusThreadUsageSheet(props: ThreadUsageSheetProps) {
               ))}
               {/* Hidden while a turn runs: its every call restarts the clock. */}
               {usage.cacheExpiresAt !== undefined && shell?.latestTurn?.state !== "running" ? (
-                <PromptCacheCard key={usage.cacheExpiresAt} usage={usage} />
+                <PromptCacheCard
+                  key={usage.cacheExpiresAt}
+                  usage={usage}
+                  sessionAlive={promptCacheWriterAlive(shell?.session, usage.lastTurnAt)}
+                />
               ) : null}
             </View>
             <View className="gap-1 px-1">
@@ -79,11 +83,17 @@ export function InfinitusThreadUsageSheet(props: ThreadUsageSheetProps) {
 /** The prompt cache row with its own clock, re-read on the expiry's minute
     grid so the minutes and the turn to "Expired" land on time; nothing
     ticks once cold. Keyed by the expiry, so a new turn starts a fresh one. */
-function PromptCacheCard({ usage }: { usage: ThreadUsageRollup }) {
+function PromptCacheCard({
+  usage,
+  sessionAlive,
+}: {
+  usage: ThreadUsageRollup;
+  sessionAlive: boolean;
+}) {
   const [nowMs, setNowMs] = useState(Date.now);
   const { cacheExpiresAt } = usage;
   useEffect(() => {
-    if (cacheExpiresAt === undefined) return;
+    if (cacheExpiresAt === undefined || !sessionAlive) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const arm = () => {
       const delayMs = promptCacheNextChangeMs(cacheExpiresAt, Date.now());
@@ -95,7 +105,7 @@ function PromptCacheCard({ usage }: { usage: ThreadUsageRollup }) {
     };
     arm();
     return () => clearTimeout(timer);
-  }, [cacheExpiresAt]);
-  const row = threadPromptCacheRow(usage, nowMs);
+  }, [cacheExpiresAt, sessionAlive]);
+  const row = threadPromptCacheRow(usage, nowMs, sessionAlive);
   return row === null ? null : <MetaCard label={row.label} value={row.value} />;
 }

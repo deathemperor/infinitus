@@ -1,4 +1,8 @@
-import type { ThreadTurnUsage, ThreadUsageRollup } from "@infinitus/contracts";
+import type {
+  OrchestrationSession,
+  ThreadTurnUsage,
+  ThreadUsageRollup,
+} from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
 
 /**
@@ -109,23 +113,47 @@ export function foldTurnUsage(
  * `cacheExpiresAt` (the last turn's completion plus the TTL its writes
  * bought). `expiring` covers the last fifth of the TTL, at most five
  * minutes. Null when the last turn said nothing about the cache.
+ *
+ * `sessionAlive` (`promptCacheWriterAlive`) is whether the provider process
+ * that wrote the cache is still up. A Stop, the idle reaper, an error, a
+ * server restart or a runtime-mode change ends or replaces it, and the next
+ * message runs on a resumed CLI whose prompt prefix usually differs (git
+ * status, tool and MCP deltas), so the whole context is written again inside
+ * the TTL (pingdotgg/t3code#10955, #10600): that reads `cold` with reason
+ * `restart`, never warm.
  */
 export type PromptCacheState =
   | { readonly kind: "warm" | "expiring"; readonly remainingMs: number; readonly ttlMs: number }
-  | { readonly kind: "cold" };
+  | { readonly kind: "cold"; readonly reason: "expired" | "restart" };
 
 export function promptCacheState(
   usage: Pick<ThreadUsageRollup, "cacheExpiresAt" | "lastTurnAt">,
   nowMs: number,
+  sessionAlive: boolean,
 ): PromptCacheState | null {
   if (usage.cacheExpiresAt === undefined) return null;
   const expiresAtMs = Date.parse(usage.cacheExpiresAt);
   const ttlMs = expiresAtMs - Date.parse(usage.lastTurnAt);
   if (!Number.isFinite(ttlMs) || ttlMs <= 0) return null;
   const remainingMs = expiresAtMs - nowMs;
-  if (remainingMs <= 0) return { kind: "cold" };
+  if (remainingMs <= 0) return { kind: "cold", reason: "expired" };
+  if (!sessionAlive) return { kind: "cold", reason: "restart" };
   const expiringMs = Math.min(5 * 60_000, ttlMs / 5);
   return { kind: remainingMs <= expiringMs ? "expiring" : "warm", remainingMs, ttlMs };
+}
+
+/**
+ * Whether the process that wrote the last turn's cache still runs: the
+ * session is `ready` and has not changed since that turn (the turn's
+ * completion sets `ready` at the same instant; any later stop, reap, error
+ * or restart moves `updatedAt` past it). A second of grace for ordering.
+ */
+export function promptCacheWriterAlive(
+  session: Pick<OrchestrationSession, "status" | "updatedAt"> | null | undefined,
+  lastTurnAt: string,
+): boolean {
+  if (session?.status !== "ready") return false;
+  return Date.parse(session.updatedAt) <= Date.parse(lastTurnAt) + 1000;
 }
 
 /** Whole minutes left, rounded down so the label never promises more
