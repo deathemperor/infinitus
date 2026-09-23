@@ -26,6 +26,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
@@ -237,11 +238,38 @@ function describeThreadShellForAwareness(
   };
 }
 
+// The relay ages a live row out two hours after its `updatedAt` so a dead
+// environment cannot inflate the card's count forever. The identity check
+// below never republishes an unchanged thread, so a thread that stays Working
+// for hours (a background fleet, a long turn) would age out while still live.
+// Every live thread is republished on this cadence, stamped with the publish
+// time; a terminal row keeps the thread's own timestamp, which the relay reads
+// as when the work finished.
+const AGENT_AWARENESS_HEARTBEAT_INTERVAL = "30 minutes";
+
+export function resolveAgentAwarenessHeartbeatThreadIds(
+  publishedStateByThread: ReadonlyMap<ThreadId, string>,
+): ReadonlyArray<ThreadId> {
+  const threadIds: Array<ThreadId> = [];
+  for (const [threadId, identity] of publishedStateByThread) {
+    if (identity === "null") {
+      continue;
+    }
+    const phase = (JSON.parse(identity) as { readonly phase: RelayAgentActivityState["phase"] })
+      .phase;
+    if (phase !== "completed" && phase !== "failed") {
+      threadIds.push(threadId);
+    }
+  }
+  return threadIds;
+}
+
 export function resolveAgentAwarenessRelayPublishSnapshot(input: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly thread: Option.Option<OrchestrationThreadShell>;
   readonly project: Option.Option<OrchestrationProjectShell>;
+  readonly publishedAt: string;
 }): {
   readonly projectId: string | null;
   readonly state: RelayAgentActivityState | null;
@@ -261,15 +289,19 @@ export function resolveAgentAwarenessRelayPublishSnapshot(input: {
       reason: "project-not-found",
     };
   }
+  const state = sanitizeRelayAgentActivityState(
+    projectThreadAwareness({
+      environmentId: input.environmentId,
+      project: input.project.value,
+      thread: input.thread.value,
+    }),
+  );
   return {
     projectId: input.thread.value.projectId,
-    state: sanitizeRelayAgentActivityState(
-      projectThreadAwareness({
-        environmentId: input.environmentId,
-        project: input.project.value,
-        thread: input.thread.value,
-      }),
-    ),
+    state:
+      state !== null && state.phase !== "completed" && state.phase !== "failed"
+        ? { ...state, updatedAt: input.publishedAt }
+        : state,
     reason: "snapshot",
   };
 }
@@ -348,6 +380,9 @@ export const make = Effect.gen(function* () {
   // clears the deadline. Assigned after the worker exists.
   const publishConfirmDeadlines = new Map<ThreadId, number>();
   let schedulePublishConfirm: (threadId: ThreadId) => Effect.Effect<void> = () => Effect.void;
+  // Threads the heartbeat has queued: their next publish goes out even when
+  // the projected state is unchanged, so the relay sees them as still live.
+  const heartbeatDue = new Set<ThreadId>();
 
   const publishThreadUnsafe = Effect.fn("publishThreadUnsafe")(function* (threadId: ThreadId) {
     const publishAgentActivity = yield* readPublishAgentActivityEnabled.pipe(
@@ -421,10 +456,12 @@ export const make = Effect.gen(function* () {
       threadId,
       thread,
       project,
+      publishedAt: DateTime.formatIso(yield* DateTime.now),
     });
     const publishIdentity = agentAwarenessPublishIdentity(snapshot.state);
     const publishedStateByThread = yield* Ref.get(publishedStateByThreadRef);
-    if (publishedStateByThread.get(threadId) === publishIdentity) {
+    const heartbeat = heartbeatDue.delete(threadId) && snapshot.state !== null;
+    if (!heartbeat && publishedStateByThread.get(threadId) === publishIdentity) {
       // The projection is back at (or never left) the last published state, so
       // any pending deferred confirmation is moot. Leaving the deadline in
       // place would let a much later transient null find it already expired
@@ -614,6 +651,23 @@ export const make = Effect.gen(function* () {
         Effect.sleep("1 second").pipe(
           Effect.andThen(publishActiveThreadsOnceWhenConfigured(startupState !== "enabled")),
         ),
+      );
+      yield* forkParked(
+        Effect.gen(function* () {
+          const threadIds = resolveAgentAwarenessHeartbeatThreadIds(
+            yield* Ref.get(publishedStateByThreadRef),
+          );
+          if (threadIds.length === 0) {
+            return;
+          }
+          yield* Effect.logInfo("agent activity heartbeat republishing live threads", {
+            count: threadIds.length,
+          });
+          for (const threadId of threadIds) {
+            heartbeatDue.add(threadId);
+          }
+          yield* Effect.forEach(threadIds, worker.enqueue, { discard: true });
+        }).pipe(Effect.repeat(Schedule.spaced(AGENT_AWARENESS_HEARTBEAT_INTERVAL))),
       );
       yield* forkParked(
         Stream.runForEach(orchestrationEngine.streamDomainEvents, (event) => {

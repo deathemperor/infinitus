@@ -312,6 +312,7 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
         threadId,
         thread: Option.none(),
         project: Option.none(),
+        publishedAt: "2026-05-25T01:00:00.000Z",
       }),
     ).toEqual({
       projectId: null,
@@ -325,12 +326,69 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
         threadId,
         thread: Option.some(thread),
         project: Option.none(),
+        publishedAt: "2026-05-25T01:00:00.000Z",
       }),
     ).toEqual({
       projectId: "project-1",
       state: null,
       reason: "project-not-found",
     });
+  });
+
+  it("stamps a live publish with the publish time and a finished one with the thread's", () => {
+    const now = "2026-05-25T00:00:00.000Z";
+    const publishedAt = "2026-05-25T03:00:00.000Z";
+    const project = Option.some({
+      id: "project-1" as ProjectId,
+      title: "T3 Code",
+    } as OrchestrationProjectShell);
+    const thread = (latestTurnState: "running" | "completed") =>
+      Option.some({
+        id: "thread-1" as ThreadId,
+        projectId: "project-1" as ProjectId,
+        title: "Long fleet",
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        session: null,
+        latestTurn: {
+          turnId: "turn-1" as TurnId,
+          state: latestTurnState,
+          requestedAt: now,
+          startedAt: now,
+          completedAt: latestTurnState === "completed" ? now : null,
+          assistantMessageId: null,
+        },
+        updatedAt: now,
+        hasPendingApprovals: false,
+        hasPendingUserInput: false,
+      } as OrchestrationThreadShell);
+    const snapshot = (latestTurnState: "running" | "completed") =>
+      AgentAwarenessRelay.resolveAgentAwarenessRelayPublishSnapshot({
+        environmentId: "env-1" as EnvironmentId,
+        threadId: "thread-1" as ThreadId,
+        thread: thread(latestTurnState),
+        project,
+        publishedAt,
+      }).state;
+
+    expect(snapshot("running")).toMatchObject({ phase: "running", updatedAt: publishedAt });
+    expect(snapshot("completed")).toMatchObject({ phase: "completed", updatedAt: now });
+  });
+
+  it("heartbeats every published thread that is still live", () => {
+    const identity = (phase: RelayAgentActivityState["phase"]) =>
+      AgentAwarenessRelay.agentAwarenessPublishIdentity({ ...state, phase });
+    const published = new Map<ThreadId, string>([
+      ["running" as ThreadId, identity("running")],
+      ["waiting" as ThreadId, identity("waiting_for_input")],
+      ["done" as ThreadId, identity("completed")],
+      ["failed" as ThreadId, identity("failed")],
+      ["gone" as ThreadId, AgentAwarenessRelay.agentAwarenessPublishIdentity(null)],
+    ]);
+
+    expect(AgentAwarenessRelay.resolveAgentAwarenessHeartbeatThreadIds(published)).toEqual([
+      "running",
+      "waiting",
+    ]);
   });
 
   it("selects only active shell snapshot threads for startup catch-up", () => {
