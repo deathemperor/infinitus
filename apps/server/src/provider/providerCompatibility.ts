@@ -8,6 +8,7 @@ import {
 import { satisfiesSemverRange } from "@infinitus/shared/semver";
 import * as Schema from "effect/Schema";
 import packageJson from "../../package.json" with { type: "json" };
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 // Deliberately uses the shared CLI gate syntax: comparator groups joined by ||.
 // Release tags and prereleases remain unknown instead of matching stable ranges.
@@ -74,11 +75,11 @@ export function resolveProviderCompatibility(
       : "unknown";
   const message =
     status === "broken"
-      ? "This provider version is known to be incompatible with this T3 Code release."
+      ? `This provider version is known to be incompatible with this ${PRODUCT_NAME} release.`
       : status === "unsupported"
-        ? "This provider version is outside the supported range for this T3 Code release."
+        ? `This provider version is outside the supported range for this ${PRODUCT_NAME} release.`
         : status === "graceful"
-          ? "This provider version has limited compatibility with this T3 Code release."
+          ? `This provider version has limited compatibility with this ${PRODUCT_NAME} release.`
           : null;
   const recommendedVersion = policy.recommendedVersion ?? null;
   const recommendedRange = policy.recommendedRange ?? null;

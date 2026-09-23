@@ -417,7 +417,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
                   message:
                     targetVersion !== undefined
                       ? "This version is no longer recommended or this installer cannot install a specific version. Refresh provider settings."
-                      : "The latest provider version is incompatible with this T3 Code release. Review provider settings.",
+                      : `The latest provider version is incompatible with this ${PRODUCT_NAME} release. Review provider settings.`,
                 }),
               );
             }
