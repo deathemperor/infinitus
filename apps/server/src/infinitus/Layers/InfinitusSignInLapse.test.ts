@@ -21,10 +21,12 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { describe, expect } from "vite-plus/test";
 
+import { ProcessRunner, type ProcessRunInput } from "../../processRunner.ts";
 import { OrchestrationEngineService } from "../../orchestration/Services/OrchestrationEngine.ts";
 import { ProviderService } from "../../provider/Services/ProviderService.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
+import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
 import { InfinitusSignInLapseLive } from "./InfinitusSignInLapse.ts";
 import { SIGN_IN_MARKER_KIND } from "./infinitusSignInLapse.logic.ts";
 
@@ -71,6 +73,23 @@ const toolResult = (
     },
   }) as never;
 
+/** A Bash tool's start: the input, no result yet. */
+const toolStart = (threadId: ThreadId, command: string): ProviderRuntimeEvent =>
+  ({
+    type: "item.updated",
+    eventId: `evt-${(counter += 1)}`,
+    provider: "claude",
+    createdAt: "2026-09-13T00:00:00Z",
+    threadId,
+    turnId,
+    itemId: `item-${counter}`,
+    payload: {
+      itemType: "tool",
+      status: "inProgress",
+      data: { toolName: "Bash", input: { command } },
+    },
+  }) as never;
+
 const command = (name: string): InfinitusManifestCommand => ({
   name,
   args: ["<profile>"],
@@ -105,6 +124,10 @@ const makeHarness = (input: {
   readonly snapshot?: InfinitusSnapshot;
   readonly polled?: InfinitusSnapshot;
   readonly reply?: Effect.Effect<unknown, InfinitusCommandFailed>;
+  /** The Mac login's phases `--status` answers in turn, the last one repeating. */
+  readonly phases?: ReadonlyArray<string>;
+  /** What `ps` prints. */
+  readonly ps?: string;
 }) =>
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<ProviderRuntimeEvent>();
@@ -113,6 +136,9 @@ const makeHarness = (input: {
     const alerts = yield* Ref.make<
       ReadonlyArray<{ title: string; body: string; deepLink?: string }>
     >([]);
+    const statuses = yield* Ref.make<ReadonlyArray<string>>([]);
+    const phases = yield* Ref.make(input.phases ?? []);
+    const runs = yield* Ref.make<ReadonlyArray<ProcessRunInput>>([]);
     const current = yield* Ref.make(input.snapshot ?? manifest("aws-login", "gcloud-login"));
     const layer = InfinitusSignInLapseLive.pipe(
       Layer.provide(
@@ -132,6 +158,38 @@ const makeHarness = (input: {
           Layer.mock(InfinitusAlertRelay)({
             publish: (alert) =>
               Ref.update(alerts, (list) => [...list, alert]).pipe(Effect.as({ deliveries: 1 })),
+          }),
+          Layer.mock(InfinitusControlClient)({
+            socketPath: "/tmp/infinitus.sock",
+            request: (request) =>
+              Effect.gen(function* () {
+                yield* Ref.update(statuses, (list) => [...list, (request.args ?? []).join(" ")]);
+                const left = yield* Ref.get(phases);
+                const phase = left[0];
+                if (left.length > 1) yield* Ref.set(phases, left.slice(1));
+                return phase === undefined
+                  ? yield* new InfinitusCommandFailed({
+                      command: request.command,
+                      error: "no login in flight",
+                      restarting: false,
+                    })
+                  : { state: { profile: request.args?.[0], phase } };
+              }),
+          }),
+          Layer.mock(ProcessRunner)({
+            run: (run) =>
+              Ref.update(runs, (list) => [...list, run]).pipe(
+                Effect.as({
+                  stdout: run.command === "ps" ? (input.ps ?? "") : "",
+                  stderr: "",
+                  code: 0 as never,
+                  timedOut: false,
+                  stdoutTruncated: false,
+                  stderrTruncated: false,
+                  stdoutInvalidUtf8: false,
+                  stderrInvalidUtf8: false,
+                }),
+              ),
           }),
           Layer.mock(InfinitusService)({
             snapshot: Ref.get(current),
@@ -176,6 +234,10 @@ const makeHarness = (input: {
         Effect.map((list) => list.map((request) => [request.command, ...request.args])),
       ),
       alerts: Ref.get(alerts),
+      statuses: Ref.get(statuses),
+      kills: Ref.get(runs).pipe(
+        Effect.map((list) => list.filter((run) => run.command === "kill").map((run) => run.args)),
+      ),
     };
   });
 
@@ -307,6 +369,57 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
         ["aws-login", "default"],
         ["aws-login", "default"],
       ]);
+    }),
+  );
+
+  const agentGcloud = (pid: number) =>
+    [
+      `  ${pid - 1} ${process.pid} /bin/zsh -c bun scripts/agent-login.ts gcp`,
+      `  ${pid} ${pid - 1} /Library/Frameworks/Python -S /sdk/lib/gcloud.py auth login`,
+    ].join("\n");
+
+  effectIt.effect("the Mac's login landing ends the agent's own, under this server only", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({
+        phases: ["waitingForBrowser", "waitingForBrowser", "done"],
+        ps: `${agentGcloud(501)}\n  900 1 /Library/Frameworks/Python /sdk/lib/gcloud.py auth login`,
+      });
+      yield* h.emit(toolStart(one, "bun scripts/agent-login.ts gcp 2>&1 | tail -5"));
+      expect(yield* h.logins).toEqual([["gcloud-login", "default"]]);
+      expect(yield* h.kills).toEqual([]);
+      yield* TestClock.adjust(Duration.seconds(3));
+      expect(yield* h.kills).toEqual([]);
+      yield* TestClock.adjust(Duration.seconds(3));
+      expect(yield* h.kills).toEqual([["-TERM", "501"]]);
+      // Over: no more reads.
+      const reads = (yield* h.statuses).length;
+      yield* TestClock.adjust(Duration.seconds(30));
+      expect((yield* h.statuses).length).toBe(reads);
+    }),
+  );
+
+  effectIt.effect("a failed or unknown Mac login leaves the agent's to its timeout", () =>
+    Effect.gen(function* () {
+      const failed = yield* makeHarness({
+        phases: ["waitingForBrowser", "failed"],
+        ps: agentGcloud(501),
+      });
+      yield* failed.emit(toolStart(one, "gcloud auth login"));
+      yield* TestClock.adjust(Duration.seconds(30));
+      expect(yield* failed.kills).toEqual([]);
+      // Already done at the first read: an earlier outcome, not this login's.
+      const earlier = yield* makeHarness({ phases: ["done"], ps: agentGcloud(501) });
+      yield* earlier.emit(toolStart(one, "gcloud auth login"));
+      yield* TestClock.adjust(Duration.seconds(30));
+      expect(yield* earlier.kills).toEqual([]);
+    }),
+  );
+
+  effectIt.effect("a lapse in a tool result starts no watch", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({ phases: ["done"] });
+      yield* h.emit(toolResult(one, SSO_EXPIRED));
+      expect(yield* h.statuses).toEqual([]);
     }),
   );
 });

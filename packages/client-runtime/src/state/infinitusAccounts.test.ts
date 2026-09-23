@@ -234,6 +234,41 @@ describe("row actions", () => {
     expect(actionsFor({}, ["autoIgnite"])).not.toContain("autoIgnite");
   });
 
+  it("offers a reset only when the fleet can and the bank has something left (#1554)", () => {
+    const bank = { available: 1, total: 1 };
+    expect(actionsFor({ resets: bank })).not.toContain("reset");
+    expect(actionsFor({ resets: bank }, ["reset"])).toContain("reset");
+    expect(actionsFor({ resets: { available: 0, total: 1 } }, ["reset"])).not.toContain("reset");
+    expect(actionsFor({}, ["reset"])).not.toContain("reset");
+  });
+
+  it("carries the bank on the row, with the hold flattened", () => {
+    const held = rowAt(
+      fleet({
+        accounts: [
+          account({
+            resets: {
+              available: 1,
+              total: 2,
+              label: "Launch",
+              endsAt: "2026-10-22T16:00:00Z",
+              hold: { reason: "cooldown", until: "2026-09-24T00:00:00Z" },
+            },
+          }),
+        ],
+      }),
+    );
+    expect(held.resets).toEqual({
+      available: 1,
+      total: 2,
+      label: "Launch",
+      endsAt: "2026-10-22T16:00:00Z",
+      hold: "cooldown",
+      holdUntil: "2026-09-24T00:00:00Z",
+    });
+    expect(rowAt(fleet()).resets).toBeNull();
+  });
+
   it("reports the held flag on the row", () => {
     const row: AccountRowModel = rowAt(fleet({ accounts: [account({ disabled: true })] }));
     expect(row.held).toBe(true);
@@ -260,6 +295,13 @@ describe("command arguments", () => {
     });
     expect(accountCommandArgs("claude", row, "unhold")).toEqual({
       command: "unhold",
+      args: ["claude", "2"],
+    });
+  });
+
+  it("targets a reset like every other account verb", () => {
+    expect(accountCommandArgs("claude", row, "reset")).toEqual({
+      command: "reset",
       args: ["claude", "2"],
     });
   });

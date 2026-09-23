@@ -61,6 +61,10 @@ public struct EngineCapabilities: OptionSet, Sendable, Codable, Hashable {
     /// <slot> on|off`, reported back per account as `Account.autoIgnite`.
     /// Not in `.all`: cswap and the proxies have no such flag.
     public static let autoIgnite = EngineCapabilities(rawValue: 1 << 18)
+    /// Spend one of an account's banked limit resets (Claude's `/reset`,
+    /// swapd `reset <slot>`); the bank rides per account as
+    /// `Account.resets`. Not in `.all`: only swapd reads and spends it.
+    public static let reset = EngineCapabilities(rawValue: 1 << 19)
 
     public static let all: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
@@ -187,6 +191,12 @@ public protocol AccountEngine: Sendable {
     /// fleet's active account is untouched. Returns when the request is
     /// done (seconds).
     func ignite(fleet: Provider, number: Int) async throws
+    /// Spend one of account n's banked limit resets as that account; the
+    /// active account is untouched. Answers like the flag edits, with the
+    /// fleet as it reads after the forced fetch that follows the claim.
+    /// Only with `.reset`.
+    @discardableResult
+    func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]?
     @discardableResult
     func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]?
     func remove(fleet: Provider, number: Int) async throws
@@ -246,6 +256,7 @@ public extension AccountEngine {
     func setPreferred(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("prefer") }
     func setAutoIgnite(fleet: Provider, number: Int, _ on: Bool) async throws -> [EngineFleet]? { throw EngineError.unsupported("auto-ignite") }
     func ignite(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("ignite") }
+    func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]? { throw EngineError.unsupported("reset") }
     func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]? { throw EngineError.unsupported("rename") }
     func remove(fleet: Provider, number: Int) async throws { throw EngineError.unsupported("remove") }
     func addCurrent() async throws { throw EngineError.unsupported("addCurrent") }

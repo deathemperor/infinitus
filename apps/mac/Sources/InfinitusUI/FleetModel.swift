@@ -111,6 +111,11 @@ public protocol FleetModel: ObservableObject {
     func setPreferred(_ number: Int, _ on: Bool)
     func setRotation(_ number: Int, enabled: Bool)
     func setAutoIgnite(_ number: Int, _ on: Bool)
+    /// A row's ticket mark or menu item staged a banked limit reset
+    /// (#1554); like `pendingSwitch`, the host puts up the confirmation
+    /// and `redeemReset` spends it. The provider gives none back.
+    var pendingReset: Int? { get set }
+    func redeemReset(_ number: Int)
 }
 
 // `FleetLabel` moved to InfinitusCore (FleetPanel.swift) so the Windows
@@ -149,6 +154,11 @@ public extension FleetModel {
     func setPreferred(_ number: Int, _ on: Bool) {}
     func setRotation(_ number: Int, enabled: Bool) {}
     func setAutoIgnite(_ number: Int, _ on: Bool) {}
+    var pendingReset: Int? {
+        get { nil }
+        set {}
+    }
+    func redeemReset(_ number: Int) {}
 }
 
 /// The cash column's source — the estimated-spend report the mac app

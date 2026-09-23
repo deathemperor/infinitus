@@ -37,7 +37,7 @@ public struct SwapdEngine: AccountEngine {
     public static let engineCapabilities: EngineCapabilities = [
         .switch, .rotate, .reorder, .hold, .rename, .remove, .addCurrent,
         .addToken, .addOAuth, .autoSwitch, .history, .settings, .prefer, .ignite,
-        .refreshAccount, .autoIgnite,
+        .refreshAccount, .autoIgnite, .reset,
     ]
 
     public func snapshot() async throws -> [EngineFleet] {
@@ -110,6 +110,12 @@ public struct SwapdEngine: AccountEngine {
     }
     public func rename(fleet: Provider, number: Int, _ name: String) async throws -> [EngineFleet]? {
         edited(try await cli.setAlias(provider: fleet, slot: number, name))
+    }
+    /// `swapd reset <slot>`: the claim as that slot, then a forced fetch,
+    /// so the board laid over the last list already shows the cleared
+    /// windows.
+    public func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]? {
+        edited(try await cli.reset(provider: fleet, slot: number))
     }
     public func remove(fleet: Provider, number: Int) async throws {
         try await cli.removeAccount(provider: fleet, slot: number)

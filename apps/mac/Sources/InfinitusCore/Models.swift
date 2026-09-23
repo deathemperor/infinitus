@@ -93,6 +93,11 @@ public struct Account: Codable, Sendable {
     /// The engine's classified kind of that failed fetch (`http-429`,
     /// `timeout`, `locked`, …), swapd's `lastError`; nil unless `stale`.
     public let staleReason: String?
+    /// The limit resets the provider has banked for this account (Claude's
+    /// `/reset`), as the engine last read them; `reset <fleet> <n>` spends
+    /// one. Additive: nil from an engine without the bank, and for an
+    /// account with no live grant.
+    public let resets: AccountResets?
 
     /// Memberwise, for engines that build accounts directly instead of
     /// decoding `cswap list --json` (multi-engine seam, #8).
@@ -106,7 +111,7 @@ public struct Account: Codable, Sendable {
                 usageFetchedAt: String? = nil, usageAgeSeconds: Double? = nil,
                 lastGoodUsage: Usage? = nil, lastGoodFetchedAt: String? = nil,
                 lastGoodAgeSeconds: Double? = nil, stale: Bool? = nil,
-                staleReason: String? = nil) {
+                staleReason: String? = nil, resets: AccountResets? = nil) {
         self.number = number
         self.email = email
         self.organizationName = organizationName
@@ -129,6 +134,7 @@ public struct Account: Codable, Sendable {
         self.lastGoodAgeSeconds = lastGoodAgeSeconds
         self.stale = stale
         self.staleReason = staleReason
+        self.resets = resets
     }
 
     /// The same account with `preferred` stamped — cswap learns it from
@@ -141,7 +147,44 @@ public struct Account: Codable, Sendable {
                 autoIgnite: autoIgnite,
                 usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
                 lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
-                lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale, staleReason: staleReason)
+                lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale, staleReason: staleReason,
+                resets: resets)
+    }
+}
+
+/// One account's banked limit resets, swapd's `resets` verbatim: what is
+/// left across the live grants, the grant the provider spends next and why
+/// it cannot be spent right now. The engine judged it against its own clock
+/// when it listed, so nothing here ticks.
+public struct AccountResets: Codable, Sendable, Equatable {
+    public let available: Int
+    public let total: Int
+    public let nextGrantId: String?
+    /// The provider's own wording for the next grant.
+    public let label: String?
+    /// When that grant lapses, RFC 3339.
+    public let endsAt: String?
+    public let hold: Hold?
+
+    public struct Hold: Codable, Sendable, Equatable {
+        /// `notAtLimit` (spends only at a limit), `cooldown` (one was spent
+        /// recently; `until` says when the next may be) or `blocked`.
+        public let reason: String
+        public let until: String?
+        public init(reason: String, until: String? = nil) {
+            self.reason = reason
+            self.until = until
+        }
+    }
+
+    public init(available: Int, total: Int, nextGrantId: String? = nil, label: String? = nil,
+                endsAt: String? = nil, hold: Hold? = nil) {
+        self.available = available
+        self.total = total
+        self.nextGrantId = nextGrantId
+        self.label = label
+        self.endsAt = endsAt
+        self.hold = hold
     }
 }
 

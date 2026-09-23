@@ -109,6 +109,28 @@ export const InfinitusStatus = Schema.Struct({
 });
 export type InfinitusStatus = typeof InfinitusStatus.Type;
 
+/** One account's banked limit resets, the engine's `resets` verbatim: what is
+    left across the live grants, the grant the provider spends next and why it
+    cannot be spent right now. Judged against the engine's clock when it
+    listed, so nothing on a client ticks it. */
+export const InfinitusAccountResets = Schema.Struct({
+  available: Schema.Number,
+  total: Schema.Number,
+  nextGrantId: Schema.optionalKey(Schema.String),
+  /** The provider's own wording for the next grant. */
+  label: Schema.optionalKey(Schema.String),
+  /** When that grant lapses, ISO 8601. */
+  endsAt: Schema.optionalKey(Schema.String),
+  hold: Schema.optionalKey(
+    Schema.Struct({
+      reason: Schema.Literals(["notAtLimit", "cooldown", "blocked"]),
+      /** When a cooldown lifts, ISO 8601. */
+      until: Schema.optionalKey(Schema.String),
+    }),
+  ),
+});
+export type InfinitusAccountResets = typeof InfinitusAccountResets.Type;
+
 /** One account inside a fleet from the `fleets` / `refresh` reply. `usage` is
     the engine's own usage payload, left opaque at this layer. Everything the
     native `Account` models as optional is optional here too: an engine that
@@ -134,6 +156,11 @@ export const InfinitusAccount = Schema.Struct({
   usageStatus: Schema.String,
   usageAgeSeconds: Schema.optionalKey(Schema.Number),
   usageFetchedAt: Schema.optionalKey(Schema.String),
+  /** The limit resets the provider has banked for this account (Claude's
+      `/reset`), as the engine last read them; `reset <fleet> <n>` spends one
+      (#1554). Absent from engines without the bank, from a swapd without
+      `reset` and from an account with no live grant. */
+  resets: Schema.optionalKey(InfinitusAccountResets),
 });
 export type InfinitusAccount = typeof InfinitusAccount.Type;
 

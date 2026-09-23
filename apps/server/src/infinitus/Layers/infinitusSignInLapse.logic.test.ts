@@ -2,7 +2,9 @@ import type { ProviderRuntimeEvent } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  agentLoginPids,
   hasLoginInFlight,
+  macLoginState,
   manifestHasVerb,
   signInLapse,
   signInLapseFromEvent,
@@ -249,5 +251,53 @@ describe("hasLoginInFlight (#1076)", () => {
     expect(
       hasLoginInFlight([{ profile: "papaya", provider: null, state: state("starting") }], aws),
     ).toBe(true);
+  });
+});
+
+describe("agentLoginPids", () => {
+  const SERVER = 100;
+  // What `ps -eo pid=,ppid=,args=` prints: the CLIs run as their Python.
+  const PS = [
+    "    1     0 /sbin/launchd",
+    "  100     1 node server.js",
+    "  110   100 /usr/local/bin/claude --output-format stream-json",
+    "  120   110 /bin/zsh -c cd /x && bun scripts/agent-login.ts gcp | tail -5",
+    "  121   120 bun scripts/agent-login.ts gcp",
+    "  122   121 /Library/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python -S /sdk/lib/gcloud.py auth login",
+    "  130   110 /bin/zsh -c aws login --profile papaya",
+    "  131   130 /opt/homebrew/Cellar/python@3.14/Python /opt/homebrew/bin/aws login --profile papaya",
+    "  132   110 /opt/homebrew/Cellar/python@3.14/Python /opt/homebrew/bin/aws login --profile=banyan-login",
+    "  140   110 /Library/Frameworks/Python /sdk/lib/gcloud.py auth application-default login",
+    "  141   110 /Library/Frameworks/Python /sdk/lib/gcloud.py auth login me@example.com --force",
+    "  142   110 /Library/Frameworks/Python /sdk/lib/gcloud.py auth login --help",
+    // The Mac's own login: the app's child, outside this server's tree.
+    "  200     1 /Applications/Infinitus.app/Contents/MacOS/Infinitus",
+    "  201   200 script -q /dev/null /opt/homebrew/bin/gcloud auth login",
+    "  202   201 /Library/Frameworks/Python /sdk/lib/gcloud.py auth login",
+  ].join("\n");
+
+  it("finds the CLI's own process for the credential, under this server only", () => {
+    expect(agentLoginPids(PS, SERVER, "gcloud", new Set(["default"]))).toEqual([122]);
+    expect(agentLoginPids(PS, SERVER, "gcloud", new Set(["application-default"]))).toEqual([140]);
+    expect(agentLoginPids(PS, SERVER, "gcloud", new Set(["me@example.com"]))).toEqual([141]);
+    expect(agentLoginPids(PS, SERVER, "aws", new Set(["papaya"]))).toEqual([131]);
+    expect(agentLoginPids(PS, SERVER, "aws", new Set(["banyan", "banyan-login"]))).toEqual([132]);
+  });
+
+  it("never a shell carrying the words, another profile, or another tree", () => {
+    expect(agentLoginPids(PS, SERVER, "aws", new Set(["default"]))).toEqual([]);
+    expect(agentLoginPids(PS, 200, "gcloud", new Set(["default"]))).toEqual([202]);
+    expect(agentLoginPids(PS, 999, "gcloud", new Set(["default"]))).toEqual([]);
+  });
+});
+
+describe("macLoginState", () => {
+  it("reads the profile and phase of a login reply or item", () => {
+    expect(macLoginState({ state: { profile: "banyan-login", phase: "done" } })).toEqual({
+      profile: "banyan-login",
+      phase: "done",
+    });
+    expect(macLoginState({ state: null })).toBeNull();
+    expect(macLoginState(undefined)).toBeNull();
   });
 });

@@ -107,6 +107,33 @@ def fleet(active):
         account(10, "juliet", "Max 20x", [win("5h", 0.0), win("7d", 0.0)], active == 10),
     ]
 
+# Banked limit resets (#1554), one per condition: alpha's is spendable,
+# bravo's waits for a limit, charlie (dead) can spend one now. A spent
+# reset is remembered in the state until `reset` (no ident) forgets it.
+RESETS = {
+    1: {"available": 1, "total": 1, "nextGrantId": "launch",
+        "label": "Claude Opus 5.5 launch: one usage-limit reset for Pro and Max"},
+    2: {"available": 1, "total": 2, "nextGrantId": "launch",
+        "label": "Claude Opus 5.5 launch: one usage-limit reset for Pro and Max",
+        "hold": {"reason": "notAtLimit"}},
+    3: {"available": 1, "total": 1, "nextGrantId": "launch",
+        "label": "Claude Opus 5.5 launch: one usage-limit reset for Pro and Max"},
+}
+
+def resets_for(n, st):
+    bank = RESETS.get(n)
+    if bank is None:
+        return None
+    bank = dict(bank)
+    bank["endsAt"] = iso(24 * 29)
+    spent = st.get("resetsSpent", {}).get(str(n), 0)
+    left = max(0, bank["available"] - spent)
+    bank["available"] = left
+    if spent:
+        bank.pop("nextGrantId", None)
+        bank.pop("hold", None)
+    return bank
+
 def apply_overrides(accounts, st):
     disabled = set(st.get("disabled", [])); enabled = set(st.get("enabled", []))
     preferred = set(st.get("preferred", [])); aliases = st.get("aliases", {})
@@ -118,6 +145,9 @@ def apply_overrides(accounts, st):
         a["preferred"] = n in preferred
         a["autoIgnite"] = n in auto_ignite
         if str(n) in aliases: a["alias"] = aliases[str(n)]
+        bank = resets_for(n, st)
+        if bank is not None:
+            a["resets"] = bank
     return accounts
 
 def provider_view(st, refreshed_slot=None):
@@ -227,6 +257,22 @@ elif cmd == "history":
     print(json.dumps({"schemaVersion": 1, "switches": [
         {"ts": iso(-3), "from": {"slot": 1, "email": "alpha@example.com"},
          "to": {"slot": 2, "email": "bravo@example.com"}, "trigger": "at-limit"}]}))
+elif cmd == "reset" and slot_arg() is not None:
+    # swapd's `reset <ident>` (#1554): spend the slot's banked reset and
+    # answer with the fetch made after it — the 5h window cleared.
+    st = state()
+    n = slot_arg()
+    bank = resets_for(n, st)
+    if bank is None:
+        err("invalid-input", f"slot {n} has no banked reset")
+    if bank["available"] == 0:
+        err("invalid-input", f"slot {n} has no reset left")
+    if bank.get("hold"):
+        err("invalid-input", f"slot {n}'s reset cannot be spent now: it spends only once the account is at a limit")
+    spent = st.setdefault("resetsSpent", {})
+    spent[str(n)] = spent.get(str(n), 0) + 1
+    save(st)
+    print(json.dumps(list_payload(refreshed_slot=n)))
 elif cmd == "reset":
     # tools/e2e.sh: back to the pristine fleet (slot 1 active, nothing
     # held, aliased, preferred or reordered, no scenario).

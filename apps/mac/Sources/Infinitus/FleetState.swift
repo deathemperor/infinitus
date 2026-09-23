@@ -276,6 +276,22 @@ final class FleetState: ObservableObject, Identifiable {
         perform { try await engine.setHold(fleet: provider, number: number, held: !enabled) }
     }
 
+    /// A banked limit reset staged by a row's ticket mark or menu item
+    /// (#1554); the popup-level alert commits it through `redeemReset`.
+    @Published var pendingReset: Int?
+
+    /// Spend one of the account's banked limit resets as that account
+    /// (swapd `reset <slot>`). The verb answers with the fleet after its
+    /// forced fetch, so `perform` seeds it and the row shows the cleared
+    /// window at once.
+    func redeemReset(_ number: Int) {
+        let engine = engine, provider = provider
+        let name = accounts.first { $0.number == number }
+            .map { $0.alias ?? String($0.email.prefix(while: { $0 != "@" })) } ?? "account \(number)"
+        host.logEvent("other", icon: "ticket", "using a banked reset on \(name)")
+        perform { try await engine.reset(fleet: provider, number: number) }
+    }
+
     /// Keep-warm on/off: the engine's daemon restarts this account's 5h
     /// window whenever it has gone cold. The verb answers with the edited
     /// fleet, so `perform` seeds it and the row flips without waiting for
