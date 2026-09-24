@@ -117,7 +117,15 @@ struct WarmChip<M: FleetModel>: View {
                     .foregroundStyle(armed ? .white : .secondary)
             }
         } else {
-            Text(word).font(PopupFont.caption).foregroundStyle(.secondary).instantTip(why)
+            // A fleet this Mac cannot ignite (another machine's rows, #1545)
+            // wears the same chip, so "cold" reads the same on every row;
+            // only the press is missing, and the tooltip says why.
+            (Text(Image(systemName: "flame")) + Text(" " + word))
+                .font(PopupFont.caption)
+                .padding(.horizontal, 5).padding(.vertical, 1)
+                .background(Color.secondary.opacity(0.15), in: Capsule())
+                .foregroundStyle(.secondary)
+                .instantTip(why)
         }
     }
 }
