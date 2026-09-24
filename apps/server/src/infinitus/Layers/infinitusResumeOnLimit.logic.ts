@@ -106,6 +106,7 @@ export function restoreLimitStops(
     const turn = thread.latestTurn;
     if (
       thread.archivedAt !== null ||
+      thread.settledOverride === "settled" ||
       turn === null ||
       turn.state !== "error" ||
       // `stopped` is the same stop after the idle reaper took its session.
