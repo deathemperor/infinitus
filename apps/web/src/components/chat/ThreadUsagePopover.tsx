@@ -3,9 +3,9 @@ import { CoinsIcon } from "lucide-react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { formatDayAwareTimestamp } from "../../timestampFormat";
-import { Button } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ComposerControl } from "./ComposerControl";
 import {
   threadUsageBadgeAriaLabel,
   threadUsageBadgeLabel,
@@ -45,12 +45,11 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
     <Popover>
       <PopoverTrigger
         render={
-          <Button
-            variant="ghost"
+          <ComposerControl
             size="xs"
             aria-label={threadUsageBadgeAriaLabel(usage)}
             data-testid="thread-usage-badge"
-            className="font-normal text-xs! text-muted-foreground/70 hover:text-foreground/80 active:scale-100"
+            className="active:scale-100"
           />
         }
       >
@@ -60,7 +59,8 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
       <PopoverPopup
         side="bottom"
         align="end"
-        className="w-72 max-w-none p-[var(--floating-content-inset)] text-left whitespace-normal"
+        padding="compact"
+        className="w-72 max-w-none text-left whitespace-normal"
       >
         <div className="flex flex-col gap-2.5">
           <div className="flex items-start justify-between gap-3">
@@ -108,7 +108,7 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
               >
                 {sourceLine}
               </TooltipTrigger>
-              <TooltipPopup side="bottom" className="max-w-64 text-pretty">
+              <TooltipPopup side="bottom" className="max-w-64">
                 {sourceDetail}
               </TooltipPopup>
             </Tooltip>

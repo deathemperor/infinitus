@@ -51,10 +51,24 @@ function parseRemoteFetchUrls(stdout: string): Map<string, string> {
   return remotes;
 }
 
+/** Remotes `gh repo set-default` marked, read from `git config --get-regexp` output. */
+function parseGhDefaultRemotes(stdout: string): ReadonlyArray<string> {
+  return stdout.split("\n").flatMap((line) => {
+    const match = /^remote\.(.+)\.gh-resolved(?:\s|$)/.exec(line.trim());
+    return match?.[1] ? [match[1]] : [];
+  });
+}
+
+/**
+ * The remote that names the checkout's repository. A remote `gh repo set-default` chose wins,
+ * because a fork that merges `upstream` in rather than contributing to it would otherwise be
+ * read as the upstream repository; then `upstream`, `origin`, and the first by name.
+ */
 function pickPrimaryRemote(
   remotes: ReadonlyMap<string, string>,
+  ghDefaultRemotes: ReadonlyArray<string> = [],
 ): { readonly remoteName: string; readonly remoteUrl: string } | null {
-  for (const preferredRemoteName of ["upstream", "origin"] as const) {
+  for (const preferredRemoteName of [...ghDefaultRemotes, "upstream", "origin"]) {
     const remoteUrl = remotes.get(preferredRemoteName);
     if (remoteUrl) {
       return { remoteName: preferredRemoteName, remoteUrl };
@@ -132,7 +146,23 @@ const resolveRepositoryIdentityFromCacheKey = Effect.fn(
     return null;
   }
 
-  const remote = pickPrimaryRemote(parseRemoteFetchUrls(remoteResult.value.stdout));
+  const remotes = parseRemoteFetchUrls(remoteResult.value.stdout);
+  // Only a choice between remotes needs `gh`'s default; one remote answers alone.
+  const ghDefaultResult =
+    remotes.size > 1
+      ? yield* processRunner
+          .run({
+            command: "git",
+            args: ["-C", cacheKey, "config", "--get-regexp", "^remote\\..*\\.gh-resolved$"],
+            timeoutBehavior: "timedOutResult",
+          })
+          .pipe(Effect.option)
+      : null;
+  const ghDefaultRemotes =
+    ghDefaultResult?._tag === "Some" && ghDefaultResult.value.code === 0
+      ? parseGhDefaultRemotes(ghDefaultResult.value.stdout)
+      : [];
+  const remote = pickPrimaryRemote(remotes, ghDefaultRemotes);
   return remote ? buildRepositoryIdentity({ ...remote, rootPath: cacheKey }) : null;
 });
 
