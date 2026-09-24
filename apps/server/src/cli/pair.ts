@@ -16,6 +16,7 @@ import {
 } from "@infinitus/contracts";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
+import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
 import {
   buildTailscaleHttpsBaseUrl,
   DEFAULT_TAILSCALE_SERVE_PORT,
@@ -326,6 +327,7 @@ const makePairServerConfig = Effect.fn(function* (input: {
     otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
     otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
     otlpServiceName: "t3-server",
+    otelEnvironment: OtelEnvironment.none,
     mode: "web",
     port: state.port,
     host: state.host,
