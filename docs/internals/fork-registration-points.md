@@ -303,7 +303,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   PATH with no `claude`, still reaches the usual install dirs.
 - `apps/web/src/routes/__root.tsx` — `DeepLinkCoordinator` mounted beside
   `DesktopAppActivationCoordinator` (#270 D); `InfinitusPeerFleets` mounted
-  beside `InfinitusEventToasts`, Electron only (#1545).
+  beside `InfinitusEventToasts`, Electron only (#1545), and
+  `InfinitusSettingsSync` under it (`docs/internals/settings-sync.md`).
 - `apps/server/src/server.test.ts` — a `Layer.mock(InfinitusService)` in the
   harness's stub stack, since the routes layer now needs the service; a
   `Layer.mock(InfinitusPairing)` and a `Layer.mock(CaptureStore)` beside it.

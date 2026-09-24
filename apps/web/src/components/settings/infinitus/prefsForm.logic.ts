@@ -168,15 +168,20 @@ export const PREF_COPY: Readonly<
     label: "Server port",
     description: "The port this server listens on. Infinitus writes it at startup.",
   },
-  // Devices: this Mac's name and iCloud sync (#1178).
+  // Devices: this Mac's name (#1178) and the desktop's settings sync.
   machine_name: {
     label: "This Mac's name",
     description: "How the phone and this server name the Mac. Empty follows the computer name.",
   },
-  icloud_sync: {
-    label: "Sync settings via iCloud Drive",
+  sync_settings: {
+    label: "Sync settings across machines",
     description:
-      "Display preferences, custom themes and engine settings travel through one file in your iCloud Drive. Never credentials.",
+      "Display preferences follow you to every machine this desktop app is connected to; a change on any of them reaches the rest. Never credentials.",
+  },
+  sync_account_names: {
+    label: "Sync account names across machines",
+    description:
+      "Custom account names travel the same way, matched by email, so an account named on one machine wears that name everywhere.",
   },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },

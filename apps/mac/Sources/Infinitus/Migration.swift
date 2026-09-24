@@ -2,9 +2,10 @@ import Foundation
 import WebKit
 
 /// One-time copy-migration for the rename (Limitless → Infinitus,
-/// 2026-08-30): the App Support dir and the iCloud Drive folder move to
-/// the new name; the old ones are left in place for rollback, the same
-/// way the CswapBar → Limitless move was done. Per item, not per dir:
+/// 2026-08-30): the App Support dir moves to the new name; the old one is
+/// left in place for rollback, the same way the CswapBar → Limitless move
+/// was done (the iCloud Drive folder moved too, until the iCloud sync
+/// left). Per item, not per dir:
 /// run-unbundled.sh (and a cache write) can create the new dir before
 /// this runs, and a whole-dir check would then skip themes.json forever.
 enum RenameMigration {
@@ -12,9 +13,6 @@ enum RenameMigration {
         copyMissingItems(
             from: "\(home)/Library/Application Support/Limitless",
             to: "\(home)/Library/Application Support/Infinitus")
-        copyMissingItems(
-            from: "\(home)/Library/Mobile Documents/com~apple~CloudDocs/Limitless",
-            to: "\(home)/Library/Mobile Documents/com~apple~CloudDocs/Infinitus")
     }
 
     private static func copyMissingItems(from old: String, to new: String) {

@@ -540,7 +540,6 @@ final class AppModel: ObservableObject {
     /// How a fork-server publish is probed before it is followed (#1137);
     /// a stored property so a test can answer without a socket.
     var forkServerProbe: ForkServerProbe.Transport = ForkServerProbe.urlSession
-    let sync = SettingsSyncModel()
     let historyRecorder = UsageHistoryRecorder()
 
     /// The Mac's own popup / pop-out / chat window is a client too (#223
@@ -726,8 +725,6 @@ final class AppModel: ObservableObject {
     var rowTheme: RowTheme {
         availableThemes.first { $0.id == gamification } ?? .off
     }
-    func reloadCustomThemes() { customThemes = RowTheme.loadCustom() }
-
     /// Popup scale factor — applied as a measured scaleEffect (macOS has
     /// no Dynamic Type; see PopupScale).
     var popupScale: CGFloat {
@@ -847,7 +844,6 @@ final class AppModel: ObservableObject {
             swapd = nil
             if swapdEnabled { lastError = "Account engine missing — install a current Infinitus release to restore bundled swapd, then relaunch." }
         }
-        if !playground { sync.attach(model: self) }
         if let swapd, swapdEnabled || playground { registry.register(SwapdEngine(cli: swapd)) }
         if let swapd, !playground {
             Task { [weak self] in
@@ -958,9 +954,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Re-read the persisted display prefs after an iCloud sync pull — the
-    /// @Published values were initialized once at launch and would
-    /// otherwise never see the imported defaults.
     /// The preference catalog with this install's values (#558): what
     /// `infinitusctl prefs` and the mirror's `GET /prefs` answer.
     func prefsReply(keys: [String]? = nil) throws -> PrefCatalog.Reply {
@@ -1022,7 +1015,7 @@ final class AppModel: ObservableObject {
         return true
     }
 
-    /// Every pref re-read from defaults (an iCloud apply, `prefs set`).
+    /// Every pref re-read from defaults (`prefs set`).
     /// Each property is assigned only when its value moved: a `didSet`
     /// that re-applies its state — the LAN listener, the revival panel,
     /// the theme's layers — must not run for the thirty-odd keys a
@@ -1070,9 +1063,6 @@ final class AppModel: ObservableObject {
         set(\.menuBarIconShown, defaults.object(forKey: "menu_bar_enabled") as? Bool ?? true)
         set(\.menuBarEffects, defaults.object(forKey: "menubar_effects") as? Bool ?? true)
         set(\.forkServerPort, defaults.object(forKey: "fork_server_port") as? Int ?? ForkServerProbe.defaultPort)
-        // #1178: the Devices page's prefs land on their owners; each didSet
-        // writes the same key back.
-        set(\.sync.enabled, defaults.object(forKey: "icloud_sync") as? Bool ?? false)
     }
 
     // MARK: battle plan (#7)
@@ -1840,9 +1830,8 @@ final class AppModel: ObservableObject {
         // (four demo-cast files turned up in App Support, 2026-09-03).
         if !isPlayground, !mockMode {
             let accts = list.accounts
-            let syncOn = sync.enabled
             Task.detached(priority: .utility) { [historyRecorder] in
-                await historyRecorder.record(accounts: accts, syncEnabled: syncOn)
+                await historyRecorder.record(accounts: accts)
             }
             statsModel.refreshIfStale()
             team.refreshIfStale()
@@ -1914,7 +1903,6 @@ final class AppModel: ObservableObject {
         for msg in pushes where !isPlayground {
             announce(msg, icon: "exclamationmark.triangle", urgent: true)
         }
-        if !isPlayground { await sync.tick() }
     }
 
     /// The badge click: running -> stop, stopped -> start ("auto switch

@@ -38,17 +38,6 @@ final class ReadyLabelThemeTests: XCTestCase {
     }
 }
 
-final class SettingsSyncSnapshotTests: XCTestCase {
-    func testSnapshotRoundTrips() throws {
-        var snap = SyncSnapshot()
-        snap.app = ["compact_rows": .bool(true), "refresh_interval": .number(60),
-                    "popup_layout": .string("wide")]
-        snap.themes = [RowTheme(id: "x", name: "X", readyLabel: "GO")]
-        snap.engine = ["autoswitch.threshold": "98.0"]
-        XCTAssertEqual(SyncSnapshot.decode(try snap.encoded()), snap)
-    }
-}
-
 final class PushTriggersTests: XCTestCase {
     private func acct(_ n: Int, dead: Bool, pct: Double? = nil) -> PushTriggers.Account {
         PushTriggers.Account(number: n, name: "a\(n)", dead: dead, worstPct: pct)

@@ -2,22 +2,19 @@ import Foundation
 import InfinitusCore
 
 /// Feeds UsageHistory from the snapshot loop: appends new samples to the
-/// per-machine JSONL in App Support and, when iCloud settings sync is on,
-/// mirrors that file into the same iCloud Drive folder the settings
-/// snapshot uses. Off the main actor — it's all file IO.
+/// per-machine JSONL in App Support. Off the main actor — it's all file IO.
 actor UsageHistoryRecorder {
     static let retention: TimeInterval = 90 * 86400
-    private let mirrorInterval: TimeInterval = 300
 
     /// email -> engine poll instant last written (samples repeat between
     /// engine usage polls; only a fresh poll earns a line).
     private var appended: [String: Double] = [:]
-    private var lastMirror: Date = .distantPast
     private var prunedThisLaunch = false
     private var seededWeeklyResetMemory = false
 
-    /// Stable per-machine suffix so machines never write each other's
-    /// files (merge happens at read time instead).
+    /// Stable per-machine suffix, kept from when the file was mirrored
+    /// to iCloud Drive beside other machines' copies: the existing history
+    /// lives under it, so a rename would orphan a year of samples.
     static var machineID: String {
         let d = AppDefaults.standard
         if let id = d.string(forKey: "machine_id"), !id.isEmpty { return id }
@@ -30,27 +27,7 @@ actor UsageHistoryRecorder {
         AppSupport.root().appendingPathComponent("usage-history.\(machineID).jsonl")
     }
 
-    static func iCloudURL() -> URL? {
-        SettingsSyncModel.containerDir()?
-            .appendingPathComponent("usage-history.\(machineID).jsonl")
-    }
-
-    /// Every history file visible to this machine: its own plus any
-    /// machine's mirror in iCloud Drive. The dashboard reads through this.
-    static func readableURLs() -> [URL] {
-        var urls = [localURL]
-        if let dir = SettingsSyncModel.containerDir(),
-           let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
-            for n in names.sorted()
-            where n.hasPrefix("usage-history.") && n.hasSuffix(".jsonl")
-                && n != localURL.lastPathComponent {
-                urls.append(dir.appendingPathComponent(n))
-            }
-        }
-        return urls
-    }
-
-    func record(accounts: [Account], syncEnabled: Bool) {
+    func record(accounts: [Account]) {
         if !prunedThisLaunch {
             prunedThisLaunch = true
             try? UsageHistory.prune(url: Self.localURL,
@@ -75,19 +52,7 @@ actor UsageHistoryRecorder {
             try UsageHistory.append(fresh, to: Self.localURL)
             for s in fresh { appended[s.email] = s.t }
         } catch {
-            return   // full disk etc. — history is best-effort, never fatal
-        }
-        guard syncEnabled, Date().timeIntervalSince(lastMirror) > mirrorInterval,
-              let dest = Self.iCloudURL() else { return }
-        lastMirror = Date()
-        let fm = FileManager.default
-        try? fm.createDirectory(at: dest.deletingLastPathComponent(),
-                                withIntermediateDirectories: true)
-        let tmp = dest.deletingLastPathComponent()
-            .appendingPathComponent(dest.lastPathComponent + ".tmp")
-        try? fm.removeItem(at: tmp)
-        if (try? fm.copyItem(at: Self.localURL, to: tmp)) != nil {
-            _ = try? fm.replaceItemAt(dest, withItemAt: tmp)
+            // full disk etc. — history is best-effort, never fatal
         }
     }
 }
