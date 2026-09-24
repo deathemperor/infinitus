@@ -63,7 +63,8 @@ const WATCH_INTERVAL = Duration.seconds(3);
  * person at a browser, and starting a second one would take its place.
  * Once per thread per profile per hour: a
  * session that keeps retrying the same call is one need, while a second
- * profile that lapses in the same hour is its own. Everything runs
+ * profile that lapses in the same hour is its own, and so is every login
+ * the agent runs itself (once per tool call). Everything runs
  * on one sequential worker off the event stream, so the turn is never
  * waited on; an unreachable Mac or a refused verb is logged and the row
  * stays. A login the agent runs itself (`aws login`, `gcloud auth login`)
@@ -266,7 +267,12 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
         const lapse = signInLapseFromEvent(event);
         if (lapse === null) return;
         const threadId = event.threadId;
-        const key = `${threadId}\n${lapse.provider}\n${lapse.profile}`;
+        const run = signInRunFromEvent(event) !== null;
+        // A login the agent runs itself blocks on its browser tab now, however
+        // recently the profile lapsed: each tool call is its own need.
+        const key = run
+          ? `${threadId}\nrun\n${event.itemId ?? event.eventId}`
+          : `${threadId}\n${lapse.provider}\n${lapse.profile}`;
         const now = DateTime.toEpochMillis(yield* DateTime.now);
         const last = seen.get(key);
         if (last === undefined || now - last >= SIGN_IN_DEBOUNCE_MS) {
@@ -280,9 +286,7 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
           yield* login(threadId, lapse);
           yield* notify(threadId, lapse);
         }
-        // Past the debounce too: a second login run inside the hour waits
-        // on a browser tab just the same.
-        if (signInRunFromEvent(event) !== null) yield* watch(lapse);
+        if (run) yield* watch(lapse);
       });
 
     const worker = yield* makeDrainableWorker((event: ProviderRuntimeEvent) =>
