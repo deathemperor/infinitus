@@ -4905,11 +4905,13 @@ function AgentSpawnMemberRow({
       <div className="flex select-none items-center gap-1.5">
         <p className="flex min-w-0 flex-1 items-baseline gap-1.5 text-sm leading-relaxed">
           <span
-            ref={activeStatus ? observeVisibleAnimation : undefined}
+            ref={activeStatus && !open ? observeVisibleAnimation : undefined}
             className={cn(
               "min-w-0 truncate",
               agent.status === "failed" ? failedToolIconClassName : "text-foreground/80",
-              activeStatus && "live-tool-shine",
+              // Collapsed, the title is the only live signal; open, the
+              // running tool row carries it (one animated element per agent).
+              activeStatus && !open && "live-tool-shine",
             )}
           >
             {agent.title}
