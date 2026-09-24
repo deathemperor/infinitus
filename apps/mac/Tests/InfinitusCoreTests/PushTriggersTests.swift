@@ -45,7 +45,42 @@ final class SettingsSyncSnapshotTests: XCTestCase {
                     "popup_layout": .string("wide")]
         snap.themes = [RowTheme(id: "x", name: "X", readyLabel: "GO")]
         snap.engine = ["autoswitch.threshold": "98.0"]
+        snap.names = ["claude/a@x.io": "Dragon", "codex/a@x.io": ""]
         XCTAssertEqual(SyncSnapshot.decode(try snap.encoded()), snap)
+    }
+
+    /// A file an older Mac wrote has no `names`; it must still decode, or
+    /// the reader takes it for "no file" and pushes over it.
+    func testSnapshotWithoutNamesDecodes() {
+        let data = Data(#"{"app":{"compact_rows":true},"themes":[],"engine":{}}"#.utf8)
+        let snap = SyncSnapshot.decode(data)
+        XCTAssertEqual(snap?.app["compact_rows"], .bool(true))
+        XCTAssertEqual(snap?.names, [:])
+    }
+
+    func testNamesMergeKeepsAnotherMacsAccounts() {
+        let file = ["claude/a@x.io": "Dragon", "claude/only-there@x.io": "Owl"]
+        let mine = SyncNames.rows(provider: .claude, accounts: [
+            Account(number: 1, email: "a@x.io", alias: "Wyrm"),
+            Account(number: 2, email: "b@x.io"),
+            Account(number: 3, email: "", alias: "NoIdentity"),
+        ])
+        XCTAssertEqual(SyncNames.merge(file, local: mine),
+                       ["claude/a@x.io": "Wyrm", "claude/only-there@x.io": "Owl", "claude/b@x.io": ""])
+    }
+
+    func testPendingRenamesOnlyWhereTheFileDiffers() {
+        let names = ["claude/a@x.io": "Dragon", "claude/b@x.io": "", "claude/c@x.io": "Same",
+                     "codex/d@x.io": "OtherFleet", "claude/": "Nobody"]
+        let renames = SyncNames.pendingRenames(names: names, provider: .claude, accounts: [
+            Account(number: 1, email: "a@x.io"),                    // gains a name
+            Account(number: 2, email: "b@x.io", alias: "Old"),      // cleared
+            Account(number: 3, email: "c@x.io", alias: "Same"),     // already right
+            Account(number: 4, email: "d@x.io", alias: "Kept"),     // the file names a codex slot, not this one
+            Account(number: 5, email: "e@x.io", alias: "Kept"),     // unknown to the file
+            Account(number: 6, email: ""),                          // no identity, never renamed
+        ])
+        XCTAssertEqual(renames, [1: "Dragon", 2: ""])
     }
 }
 

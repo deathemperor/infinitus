@@ -21,6 +21,17 @@ final class SettingsSyncModel: ObservableObject {
     }
 
     private var lastSeen: SyncSnapshot?
+    /// Account names (`icloud_sync_names`): the file's names were applied
+    /// here since the option came on. Until then this Mac's own rows —
+    /// mostly blanks on a Mac that never named anything — must not reach
+    /// the file, or the first push after flipping it on would clear every
+    /// other Mac's names.
+    private var namesAdopted = false
+    /// Names an engine refused (`rename` threw), by key: this Mac reports
+    /// the file's value for them instead of its own, so a Mac that cannot
+    /// wear a name does not push its old one back and fight the file
+    /// every tick.
+    private var refusedNames: [String: String] = [:]
     private let defaults = AppDefaults.standard
     private weak var model: AppModel?
 
@@ -70,11 +81,22 @@ final class SettingsSyncModel: ObservableObject {
         guard enabled, !Self.isDevInstance else { return }
         guard let dir = Self.containerDir() else { return }
         let url = dir.appendingPathComponent("settings-sync.json")
-        let local = await localSnapshot()
+        let remote = (try? Data(contentsOf: url)).flatMap(SyncSnapshot.decode)
+        let namesOn = defaults.bool(forKey: "icloud_sync_names")
+        if !namesOn { namesAdopted = false; refusedNames = [:] }
+        if namesOn, !namesAdopted {
+            // The file's names are the truth when the option comes on.
+            // The rows still show the old aliases until the next refresh,
+            // so comparing now would push them back: let the next tick
+            // read the renamed fleet.
+            if let remote { await applyNames(remote.names) }
+            namesAdopted = true
+            return
+        }
+        let local = await localSnapshot(names: namesOn)
         // Re-check after the await: a stale in-flight tick must not push
         // under an off toggle (observed as "pushed 00:23", 2026-08-30).
         guard enabled else { return }
-        let remote = (try? Data(contentsOf: url)).flatMap(SyncSnapshot.decode)
         if let remote, remote != lastSeen, remote != local {
             // Remote moved (another Mac wrote, or first tick over an
             // existing file): adopt it. Remote wins a two-sided race — the
@@ -86,7 +108,7 @@ final class SettingsSyncModel: ObservableObject {
             await apply(remote, engine: !first)
             if first, remote.engine != local.engine {
                 // Push the merge (remote prefs + this engine) next tick.
-                lastSeen = SyncSnapshot(app: remote.app, themes: remote.themes, engine: local.engine)
+                lastSeen = SyncSnapshot(app: remote.app, themes: remote.themes, engine: local.engine, names: remote.names)
             } else {
                 lastSeen = remote
             }
@@ -105,7 +127,7 @@ final class SettingsSyncModel: ObservableObject {
         }
     }
 
-    private func localSnapshot() async -> SyncSnapshot {
+    private func localSnapshot(names namesOn: Bool) async -> SyncSnapshot {
         var app: [String: JSONValue] = [:]
         // Only explicitly-set keys travel; on the other side absent keys
         // are left alone, so factory defaults never overwrite a choice.
@@ -120,9 +142,41 @@ final class SettingsSyncModel: ObservableObject {
                 app[key] = .string(s)
             }
         }
+        // Names: the file's map with this Mac's rows over it; with the
+        // option off the map passes through untouched, so a Mac that does
+        // not sync names never erases the ones the others share.
+        var names = lastSeen?.names ?? [:]
+        if namesOn, let model {
+            for fleet in model.fleets where fleet.capabilities.contains(.rename) {
+                names = SyncNames.merge(names, local: SyncNames.rows(provider: fleet.provider, accounts: fleet.accounts))
+            }
+            names = SyncNames.merge(names, local: refusedNames)
+        }
         // Engine settings rode along as `cswap config` text; the Mac
         // stops filling the field until a `swapd config` port (#756).
-        return SyncSnapshot(app: app, themes: RowTheme.loadCustom(), engine: [:])
+        return SyncSnapshot(app: app, themes: RowTheme.loadCustom(), engine: [:], names: names)
+    }
+
+    /// Rename this Mac's accounts to the file's names, awaited, so the
+    /// engine holds them before the next refresh reads the fleet. A
+    /// refusal lands on the popup's error line like a hand rename's.
+    private func applyNames(_ names: [String: String]) async {
+        guard let model else { return }
+        for fleet in model.fleets where fleet.capabilities.contains(.rename) {
+            let renames = SyncNames.pendingRenames(names: names, provider: fleet.provider, accounts: fleet.accounts)
+            for (number, alias) in renames.sorted(by: { $0.key < $1.key }) {
+                guard let account = fleet.accounts.first(where: { $0.number == number }) else { continue }
+                let key = SyncNames.key(provider: fleet.provider, email: account.email)
+                do {
+                    _ = try await fleet.engine.rename(fleet: fleet.provider, number: number, alias)
+                    refusedNames[key] = nil
+                    model.reorderError = nil
+                } catch {
+                    refusedNames[key] = alias
+                    model.reorderError = EngineFailure.sentence(error)
+                }
+            }
+        }
     }
 
     private func apply(_ snap: SyncSnapshot, engine applyEngine: Bool = true) async {
@@ -137,6 +191,7 @@ final class SettingsSyncModel: ObservableObject {
             }
         }
         model?.reloadPrefs()
+        if defaults.bool(forKey: "icloud_sync_names") { await applyNames(snap.names) }
         if snap.themes != RowTheme.loadCustom() {
             try? RowTheme.saveCustom(snap.themes)
             model?.reloadCustomThemes()

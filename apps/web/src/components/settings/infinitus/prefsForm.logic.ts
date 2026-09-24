@@ -178,6 +178,11 @@ export const PREF_COPY: Readonly<
     description:
       "Display preferences, custom themes and engine settings travel through one file in your iCloud Drive. Never credentials.",
   },
+  icloud_sync_names: {
+    label: "Sync account names too",
+    description:
+      "Custom account names ride in the same file, matched by email, so an account named on one Mac wears that name on every Mac. The file's names win when this comes on.",
+  },
   // Engines.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },

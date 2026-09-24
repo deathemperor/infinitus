@@ -121,6 +121,7 @@ public enum PrefCatalog {
         // Devices: this Mac's name and iCloud sync (#1178).
         Entry("machine_name", .string, .string(""), devices),
         Entry("icloud_sync", .bool, .bool(false), devices),
+        Entry("icloud_sync_names", .bool, .bool(false), devices),
         // Engines: the `engine` command relaunches the app for these.
         Entry("engine_swapd_enabled", .bool, .bool(true), engines, effect: .restart),
         Entry("engine_cliproxy_enabled", .bool, .bool(false), engines, effect: .restart),
