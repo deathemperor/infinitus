@@ -8,13 +8,14 @@ final class PeerFleetsTests: XCTestCase {
     private let push = #"""
     {"machines":[{"id":"env-1","label":"HyperNovae","connected":true,"fleets":[
       {"key":"swapd/claude","engineID":"swapd","provider":"claude",
-       "capabilities":["switch","hold","prefer","autoIgnite","rename","remove","addOAuth","ignite"],
+       "capabilities":["switch","hold","prefer","autoIgnite","rename","remove","reset","addOAuth","ignite"],
        "activeNumber":2,"nextCandidate":1,
        "accounts":[
         {"number":1,"email":"one@example.com","active":false,"isOrganization":false,"usageStatus":"ok",
          "usage":{"fiveHour":{"pct":12.5,"countdown":"2h"},"sevenDay":{"pct":40}}},
         {"number":2,"alias":"bloody","email":"two@example.com","plan":"Max 20x","active":true,
-         "isOrganization":false,"usageStatus":"ok","disabled":false,"preferred":true,"autoIgnite":true}
+         "isOrganization":false,"usageStatus":"ok","disabled":false,"preferred":true,"autoIgnite":true,
+         "resets":{"available":1,"total":2,"label":"Reset 1 of 2","endsAt":"2026-10-22T00:00:00Z","hold":{"reason":"notAtLimit"}}}
        ]},
       {"key":"9router/kiro","engineID":"9router","provider":"kiro","capabilities":["switch"],
        "accounts":[{"number":7,"email":"k@example.com","active":true,"isOrganization":false,"usageStatus":"ok"}]}
@@ -46,8 +47,12 @@ final class PeerFleetsTests: XCTestCase {
         XCTAssertEqual(fleet.accounts[1].preferred, true)
         XCTAssertEqual(fleet.accounts[1].autoIgnite, true)
         XCTAssertEqual(fleet.accounts[1].plan, "Max 20x")
+        XCTAssertNil(fleet.accounts[0].resets)
+        XCTAssertEqual(fleet.accounts[1].resets,
+                       AccountResets(available: 1, total: 2, label: "Reset 1 of 2",
+                                     endsAt: "2026-10-22T00:00:00Z", hold: .init(reason: "notAtLimit")))
         // Row actions only: adding an account and igniting stay off a peer row.
-        XCTAssertEqual(fleet.capabilities, [.switch, .hold, .prefer, .autoIgnite, .rename, .remove])
+        XCTAssertEqual(fleet.capabilities, [.switch, .hold, .prefer, .autoIgnite, .rename, .remove, .reset])
 
         let kiro = PeerFleets.engineFleet(body.machines[0].fleets![1],
                                           engineID: PeerFleets.engineID(machine: "env-1", remoteEngine: "9router"))
@@ -60,6 +65,21 @@ final class PeerFleetsTests: XCTestCase {
                                       capabilities: [], accounts: [])
         XCTAssertEqual(PeerFleets.remoteKeys([doc]), [.other: "swapd/mystery"])
         XCTAssertEqual(PeerFleets.capabilities(named: ["switch", "teleport"]), [.switch])
+    }
+
+    func testAPeerRowsResetQueuesThatMachinesOwnVerb() async throws {
+        let queue = PeerCommandQueue(timeout: 5)
+        let engine = PeerEngine(machine: "env-1", machineLabel: "HyperNovae", remoteEngine: "swapd",
+                                capabilities: [.reset], fleets: [], remoteKeys: [.claude: "swapd/claude"],
+                                connected: true, queue: queue)
+        let run = Task { try await engine.reset(fleet: .claude, number: 2) }
+        var drained: [PeerFleets.Command] = []
+        while drained.isEmpty { drained = await queue.drain(); await Task.yield() }
+        XCTAssertEqual(drained.map { ($0.command, $0.args, $0.options) }.map { "\($0) \($1) \($2)" },
+                       ["reset [\"swapd/claude\", \"2\"] [:]"])
+        await queue.resolve(.init(id: drained[0].id, ok: true))
+        let refreshed = try await run.value
+        XCTAssertNil(refreshed)
     }
 
     func testAQueuedCommandWaitsForItsResult() async throws {

@@ -98,13 +98,16 @@ public enum PeerFleets {
         public let usageStatus: String?
         public let usageAgeSeconds: Double?
         public let usageFetchedAt: String?
+        /// The banked limit resets as that machine's engine read them (#1554).
+        public let resets: AccountResets?
 
         public init(number: Int, alias: String? = nil, email: String, plan: String? = nil,
                     active: Bool, disabled: Bool? = nil, preferred: Bool? = nil,
                     autoIgnite: Bool? = nil, isOrganization: Bool? = nil,
                     organizationName: String? = nil, organizationUuid: String? = nil,
                     usage: Usage? = nil, usageStatus: String? = nil,
-                    usageAgeSeconds: Double? = nil, usageFetchedAt: String? = nil) {
+                    usageAgeSeconds: Double? = nil, usageFetchedAt: String? = nil,
+                    resets: AccountResets? = nil) {
             self.number = number
             self.alias = alias
             self.email = email
@@ -120,6 +123,7 @@ public enum PeerFleets {
             self.usageStatus = usageStatus
             self.usageAgeSeconds = usageAgeSeconds
             self.usageFetchedAt = usageFetchedAt
+            self.resets = resets
         }
 
         public var account: Account {
@@ -130,7 +134,8 @@ public enum PeerFleets {
                     active: active, usageStatus: usageStatus ?? "ok",
                     usage: usage, alias: alias, plan: plan, disabled: disabled,
                     preferred: preferred, autoIgnite: autoIgnite,
-                    usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds)
+                    usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
+                    resets: resets)
         }
     }
 
@@ -198,7 +203,7 @@ public enum PeerFleets {
     public static func capabilities(named names: [String]) -> EngineCapabilities {
         let table: [String: EngineCapabilities] = [
             "switch": .switch, "rotate": .rotate, "hold": .hold, "rename": .rename,
-            "remove": .remove, "prefer": .prefer, "autoIgnite": .autoIgnite,
+            "remove": .remove, "prefer": .prefer, "autoIgnite": .autoIgnite, "reset": .reset,
         ]
         var caps: EngineCapabilities = []
         for name in names { if let cap = table[name] { caps.insert(cap) } }

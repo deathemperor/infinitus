@@ -68,6 +68,12 @@ describe("fleetFingerprint", () => {
     expect(
       fleetFingerprint([fleet({ usage: { fiveHour: { pct: 13.6 }, sevenDay: { pct: 40.2 } } })]),
     ).not.toBe(a);
+    expect(
+      fleetFingerprint([fleet({ resets: { available: 1, total: 1 } })]),
+    ).not.toBe(a);
+    expect(
+      fleetFingerprint([fleet({ resets: { available: 0, total: 1 } })]),
+    ).not.toBe(fleetFingerprint([fleet({ resets: { available: 1, total: 1 } })]));
     // A fraction of a percent the bar cannot show is not a change.
     expect(
       fleetFingerprint([fleet({ usage: { fiveHour: { pct: 12.2 }, sevenDay: { pct: 40.4 } } })]),
@@ -143,6 +149,7 @@ describe("forwardable", () => {
       "rename",
       "remove",
       "rotate",
+      "reset",
     ]) {
       expect(forwardable(command(name))).toBe(true);
     }
