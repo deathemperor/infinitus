@@ -136,72 +136,74 @@ export function ImageMarkupDialog(props: ImageMarkupDialogProps) {
         <DialogHeader>
           <DialogTitle>Draw on {props.imageName}</DialogTitle>
         </DialogHeader>
-        <DialogPanel className="flex min-h-0 flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <ToggleGroup
-              value={[tool]}
-              onValueChange={(value) => {
-                const next = value[0];
-                if (next === "pen" || next === "arrow" || next === "rect") setTool(next);
-              }}
-              aria-label="Drawing tool"
-            >
-              <Toggle value="pen" aria-label="Pen">
-                <PenLineIcon />
-              </Toggle>
-              <Toggle value="arrow" aria-label="Arrow">
-                <ArrowUpRightIcon />
-              </Toggle>
-              <Toggle value="rect" aria-label="Rectangle">
-                <SquareIcon />
-              </Toggle>
-            </ToggleGroup>
-            <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Colour">
-              {MARKUP_COLORS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={color === option.value}
-                  aria-label={option.name}
-                  onClick={() => setColor(option.value)}
-                  className={cn(
-                    "size-5 rounded-full border border-border shadow-xs",
-                    color === option.value &&
-                      "ring-2 ring-ring ring-offset-2 ring-offset-background",
-                  )}
-                  style={{ backgroundColor: option.value }}
-                />
-              ))}
+        <DialogPanel className="flex min-h-0 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <ToggleGroup
+                value={[tool]}
+                onValueChange={(value) => {
+                  const next = value[0];
+                  if (next === "pen" || next === "arrow" || next === "rect") setTool(next);
+                }}
+                aria-label="Drawing tool"
+              >
+                <Toggle value="pen" aria-label="Pen">
+                  <PenLineIcon />
+                </Toggle>
+                <Toggle value="arrow" aria-label="Arrow">
+                  <ArrowUpRightIcon />
+                </Toggle>
+                <Toggle value="rect" aria-label="Rectangle">
+                  <SquareIcon />
+                </Toggle>
+              </ToggleGroup>
+              <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Colour">
+                {MARKUP_COLORS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={color === option.value}
+                    aria-label={option.name}
+                    onClick={() => setColor(option.value)}
+                    className={cn(
+                      "size-5 rounded-full border border-border shadow-xs",
+                      color === option.value &&
+                        "ring-2 ring-ring ring-offset-2 ring-offset-background",
+                    )}
+                    style={{ backgroundColor: option.value }}
+                  />
+                ))}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={shapes.length === 0}
+                onClick={() => setShapes((previous) => previous.slice(0, -1))}
+                aria-label="Undo"
+              >
+                <Undo2Icon />
+                Undo
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={shapes.length === 0}
-              onClick={() => setShapes((previous) => previous.slice(0, -1))}
-              aria-label="Undo"
-            >
-              <Undo2Icon />
-              Undo
-            </Button>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md bg-muted/40">
-            {failed ? (
-              <p className="p-6 text-muted-foreground text-sm">This image could not be loaded.</p>
-            ) : (
-              <canvas
-                ref={canvasRef}
-                className={cn(
-                  "max-h-[70vh] max-w-full touch-none select-none",
-                  ready ? "cursor-crosshair" : "opacity-0",
-                )}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={finishStroke}
-                onPointerCancel={finishStroke}
-                aria-label={`Drawing surface for ${props.imageName}`}
-              />
-            )}
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md bg-muted/40">
+              {failed ? (
+                <p className="p-6 text-muted-foreground text-sm">This image could not be loaded.</p>
+              ) : (
+                <canvas
+                  ref={canvasRef}
+                  className={cn(
+                    "max-h-[70vh] max-w-full touch-none select-none",
+                    ready ? "cursor-crosshair" : "opacity-0",
+                  )}
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={finishStroke}
+                  onPointerCancel={finishStroke}
+                  aria-label={`Drawing surface for ${props.imageName}`}
+                />
+              )}
+            </div>
           </div>
         </DialogPanel>
         <DialogFooter>

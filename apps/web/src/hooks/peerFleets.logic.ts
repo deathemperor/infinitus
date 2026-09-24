@@ -30,6 +30,7 @@ const FORWARDABLE = new Set([
   "rename",
   "remove",
   "refresh",
+  "reset",
 ]);
 
 export function forwardable(command: InfinitusPeerSyncCommand): boolean {
@@ -87,6 +88,7 @@ export function fleetFingerprint(fleets: ReadonlyArray<InfinitusFleet> | null): 
           account.autoIgnite ? 1 : 0,
           account.usageStatus,
           usage,
+          resetsMark(account.resets),
         ].join("|");
       });
       return [
@@ -98,6 +100,12 @@ export function fleetFingerprint(fleets: ReadonlyArray<InfinitusFleet> | null): 
       ].join("#");
     })
     .join("\n");
+}
+
+/** The ticket mark's count and its hold (#1554); a spend changes both. */
+function resetsMark(resets: InfinitusFleet["accounts"][number]["resets"]): string {
+  if (resets === undefined) return "";
+  return `${resets.available}/${resets.total}/${resets.hold?.reason ?? ""}`;
 }
 
 /** The percentages of the windows the row draws, rounded to what the bars

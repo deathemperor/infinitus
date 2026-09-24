@@ -318,7 +318,7 @@ export function ConnectionsNewRouteScreen({
                 <ErrorBanner message={pairingConnectionError} />
               ) : null}
 
-              <View className={Platform.OS === "android" ? "flex-row justify-end" : undefined}>
+              <View className="android:flex-row android:justify-end">
                 <ConnectionSheetButton
                   icon="plus"
                   label={isSubmitting ? "Pairing..." : "Add environment"}
