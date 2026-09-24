@@ -306,8 +306,13 @@ export function resolveAgentAwarenessRelayPublishSnapshot(input: {
   };
 }
 
+function terminalWorkSinceStart(thread: OrchestrationThreadShell, startedAt: number): boolean {
+  return Date.parse(thread.latestTurn?.completedAt ?? "") > startedAt;
+}
+
 export function resolveAgentAwarenessRelayActiveThreadIds(input: {
   readonly environmentId: EnvironmentId;
+  readonly startedAt: number;
   readonly projects: ReadonlyArray<Pick<OrchestrationProjectShell, "id" | "title">>;
   readonly threads: ReadonlyArray<OrchestrationThreadShell>;
 }): ReadonlyArray<ThreadId> {
@@ -318,12 +323,16 @@ export function resolveAgentAwarenessRelayActiveThreadIds(input: {
       if (!project) {
         return false;
       }
+      const state = projectThreadAwareness({
+        environmentId: input.environmentId,
+        project,
+        thread,
+      });
       return (
-        projectThreadAwareness({
-          environmentId: input.environmentId,
-          project,
-          thread,
-        }) !== null
+        state !== null &&
+        (state.phase !== "completed" && state.phase !== "failed"
+          ? true
+          : terminalWorkSinceStart(thread, input.startedAt))
       );
     })
     .map((thread) => thread.id);
@@ -337,6 +346,7 @@ export const make = Effect.gen(function* () {
   const orchestrationEngine = yield* OrchestrationEngine.OrchestrationEngineService;
   const crypto = yield* Crypto.Crypto;
   const cloudLinkKeyPair = yield* getOrCreateEnvironmentKeyPairFromSecretStore(secrets);
+  const startedAt = (yield* DateTime.now).epochMilliseconds;
   const activeSnapshotPublishedRef = yield* Ref.make(false);
   const publishedStateByThreadRef = yield* Ref.make(new Map<ThreadId, string>());
 
@@ -460,8 +470,20 @@ export const make = Effect.gen(function* () {
     });
     const publishIdentity = agentAwarenessPublishIdentity(snapshot.state);
     const publishedStateByThread = yield* Ref.get(publishedStateByThreadRef);
+<<<<<<< HEAD
     const heartbeat = heartbeatDue.delete(threadId) && snapshot.state !== null;
     if (!heartbeat && publishedStateByThread.get(threadId) === publishIdentity) {
+=======
+    if (
+      (snapshot.state?.phase === "completed" || snapshot.state?.phase === "failed") &&
+      !publishedStateByThread.has(threadId)
+    ) {
+      // Startup has no publish history. Only work from this server process may
+      // produce an initial terminal alert; historical threads remain quiet.
+      if (Option.isNone(thread) || !terminalWorkSinceStart(thread.value, startedAt)) return;
+    }
+    if (publishedStateByThread.get(threadId) === publishIdentity) {
+>>>>>>> upstream-sync-e67abcf79-upstream-renamed
       // The projection is back at (or never left) the last published state, so
       // any pending deferred confirmation is moot. Leaving the deadline in
       // place would let a much later transient null find it already expired
@@ -539,7 +561,11 @@ export const make = Effect.gen(function* () {
     });
     yield* Ref.update(publishedStateByThreadRef, (publishedStates) => {
       const nextPublishedStates = new Map(publishedStates);
-      nextPublishedStates.set(threadId, publishIdentity);
+      if (snapshot.state === null) {
+        nextPublishedStates.delete(threadId);
+      } else {
+        nextPublishedStates.set(threadId, publishIdentity);
+      }
       return nextPublishedStates;
     });
   });
@@ -573,6 +599,7 @@ export const make = Effect.gen(function* () {
     const snapshot = yield* snapshotQuery.getShellSnapshot();
     const activeThreadIds = resolveAgentAwarenessRelayActiveThreadIds({
       environmentId,
+      startedAt,
       projects: snapshot.projects,
       threads: snapshot.threads,
     });

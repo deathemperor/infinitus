@@ -53,6 +53,26 @@ update can roll back to the previous version. If the update still fails:
 
 ## Mobile updates
 
+<<<<<<< HEAD
 The phone app is not on a store: it is installed from a build. Update it by
 installing a newer build the same way. It saves drafts and queued messages
 before it restarts.
+=======
+To update an environment from your phone, open **Settings → Environments** and
+select it. **Check for updates** finds the latest release on that environment's
+current release channel. Keep the app open while the environment updates and
+reconnects. Hosts that cannot update remotely show instructions for updating on
+the machine instead.
+
+The same page lets you refresh provider status and update supported providers.
+These controls require a connected environment and permission to operate it.
+Provider update checks and restart continuation preferences are in
+**Settings → Maintenance**. If provider update checks are disabled, enable them
+there before refreshing to find newer versions.
+
+Install App Store or Google Play releases as usual. The mobile app can also
+download updates in the background and apply them when you next leave the app.
+It saves drafts and queued messages before restarting. If you keep the app open
+for a long time, it may ask to install immediately; choosing **Later** leaves the
+update queued for the next suitable moment.
+>>>>>>> upstream-sync-e67abcf79-upstream-renamed

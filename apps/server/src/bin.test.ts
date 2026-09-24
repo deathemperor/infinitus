@@ -17,6 +17,7 @@ import * as NetService from "@infinitus/shared/Net";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
+import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
@@ -107,6 +108,7 @@ const makeCliTestServerConfig = (baseDir: string) =>
       otlpMetricsExport: DEFAULT_SIGNAL_EXPORT,
       otlpLogsExport: DEFAULT_SIGNAL_EXPORT,
       otlpServiceName: "t3-server",
+      otelEnvironment: OtelEnvironment.none,
       mode: "web",
       port: 0,
       host: "127.0.0.1",
