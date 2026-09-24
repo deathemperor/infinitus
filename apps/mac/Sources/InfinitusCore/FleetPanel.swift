@@ -300,7 +300,7 @@ public enum FleetPanel {
         let cause = AccountVitals.cause(account.usage)
         return Row(number: account.number, name: name, email: account.email,
                    active: isActive, disabled: account.disabled ?? false,
-                   dead: AccountVitals.isDead(account.usage),
+                   dead: AccountVitals.isPlanDead(account.usage),
                    deadNote: cause.map { deadNote($0) },
                    gauges: gauges(account.usage, now: now),
                    engineID: engineID, provider: provider)

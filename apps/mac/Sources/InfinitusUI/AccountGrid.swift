@@ -513,7 +513,7 @@ extension AccountGrid {
     /// Accounts alive but with a binding window at 90%+ — the dying set.
     var criticalNumbers: [Int] {
         model.displayAccounts.filter { a in
-            !AccountVitals.isDead(a.usage)
+            !AccountVitals.isPlanDead(a.usage)
                 && (PushTriggers.worstPlanPct(a.usage) ?? 0) >= 90
         }.map(\.number)
     }
