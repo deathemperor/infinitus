@@ -72,6 +72,8 @@ vi.mock("../../state/infinitus", () => ({
       label: "snapshot-atom",
       environmentId,
     }),
+    // The quota timeline's history read; no fixture lists the verb.
+    utilization: () => null,
     command: { label: "command-atom" },
     launch: { label: "launch-atom" },
     secret: { label: "secret-atom" },
@@ -98,6 +100,11 @@ vi.mock("../../state/query", () => ({
 vi.mock("../../state/server", () => ({ environmentServerConfigsAtom: { label: "configs-atom" } }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => testState.command }));
 const NOW_ISO = "2026-09-11T10:00:00.000Z";
+// The provider filter and the timeline's view persist in localStorage, which
+// the node suite has no window for.
+vi.mock("../../hooks/useLocalStorage", () => ({
+  useLocalStorage: <T,>(_key: string, initial: T) => [initial, () => {}],
+}));
 vi.mock("../../hooks/useNowMinute", () => ({ useNowMinute: () => NOW_ISO }));
 vi.mock("../../hooks/useSettings", () => ({
   usePrimarySettings: (selector: (settings: { timestampFormat: string }) => unknown) =>
