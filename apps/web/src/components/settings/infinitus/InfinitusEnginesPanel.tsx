@@ -8,17 +8,31 @@
  * @module InfinitusEnginesPanel
  */
 import { Link } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
 
 import type { EnvironmentPresentation } from "~/state/environments";
+import { infinitusEnvironment } from "~/state/infinitus";
+import { useAtomCommand } from "~/state/use-atom-command";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 
 import { useInfinitusEngineProcesses } from "./InfinitusEngineControls";
+import {
+  engineUpdateCheckInput,
+  engineUpdateInput,
+  engineUpdateLine,
+  engineUpdateSupported,
+  parseEngineUpdateCheck,
+} from "./engineUpdate.logic";
 import { InfinitusEnginePolicy } from "./InfinitusEnginePolicy";
 import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 import { InfinitusPrefsPanel, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
-import { buildEngineStatusRows, menuBarAppVersionLine } from "./panel.logic";
+import {
+  buildEngineStatusRows,
+  infinitusCommandFailure,
+  menuBarAppVersionLine,
+} from "./panel.logic";
 
 const KEY_STATUS: Readonly<Record<"present" | "missing", string>> = {
   present: "Key set",
@@ -32,6 +46,9 @@ function InfinitusEngineStatusList({
 }) {
   const { snapshot } = useInfinitusEnvironment(environment);
   const rows = buildEngineStatusRows(snapshot?.status);
+  const updateOn =
+    snapshot !== null && snapshot.available && engineUpdateSupported(snapshot.commands);
+  const swapdRegistered = rows.some((row) => row.key === "swapd" && row.registered);
   if (rows.length === 0) return null;
   // The Activity sub screen reads the primary environment's log, so the way
   // in is drawn only when this page manages that environment.
@@ -69,7 +86,92 @@ function InfinitusEngineStatusList({
             {row.label}: {row.error}
           </p>
         ))}
+      {updateOn && swapdRegistered ? (
+        <InfinitusEngineUpdateRow {...(environment === undefined ? {} : { environment })} />
+      ) : null}
     </SettingsSection>
+  );
+}
+
+const UPDATING = "Installing. Infinitus is relaunching — this page picks up again when it answers.";
+
+/** The engine's newest release against the one running (#1577): read once
+    the row mounts, installed on the owning Mac by a restart verb, so the row
+    goes quiet until the app answers again. */
+function InfinitusEngineUpdateRow({
+  environment,
+}: {
+  readonly environment?: EnvironmentPresentation | null;
+}) {
+  const { environmentId } = useInfinitusEnvironment(environment);
+  const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  const [line, setLine] = useState<string | null>(null);
+  const [updatable, setUpdatable] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [relaunching, setRelaunching] = useState(false);
+
+  const check = useCallback(async () => {
+    if (environmentId === null) return;
+    const result = await runCommand({ environmentId, input: engineUpdateCheckInput("swapd") });
+    if (result._tag === "Failure") {
+      setLine(infinitusCommandFailure(result.cause).message);
+      setUpdatable(false);
+      return;
+    }
+    const parsed = parseEngineUpdateCheck(result.value.result);
+    if (parsed === null) {
+      setLine("Infinitus answered engine-update-check with a shape this build cannot read.");
+      setUpdatable(false);
+      return;
+    }
+    setLine(engineUpdateLine(parsed));
+    setUpdatable(parsed.updatable);
+  }, [environmentId, runCommand]);
+
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- GitHub is asked once the row mounts; every set lands after the reply.
+    void check();
+  }, [check]);
+
+  const update = useCallback(async () => {
+    if (environmentId === null) return;
+    setBusy(true);
+    const result = await runCommand({ environmentId, input: engineUpdateInput("swapd") });
+    setBusy(false);
+    if (result._tag === "Failure") {
+      setLine(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    setRelaunching(true);
+  }, [environmentId, runCommand]);
+
+  return (
+    <SettingsRow
+      serverScoped
+      title="Engine update"
+      description={relaunching ? UPDATING : (line ?? "Checking the newest swapd release…")}
+      control={
+        <span className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            aria-label="Check for a newer swapd release"
+            disabled={busy || relaunching}
+            onClick={() => void check()}
+          >
+            Check
+          </Button>
+          <Button
+            size="sm"
+            aria-label="Install the newest swapd release"
+            disabled={!updatable || busy || relaunching}
+            onClick={() => void update()}
+          >
+            Update
+          </Button>
+        </span>
+      }
+    />
   );
 }
 
