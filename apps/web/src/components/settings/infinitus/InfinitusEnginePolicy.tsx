@@ -170,7 +170,13 @@ function PolicyRowView({
   };
   const label = `${fleet} ${row.label}`;
   const reset = row.isSet ? (
-    <Button size="sm" variant="ghost" aria-label={`Reset ${label}`} disabled={locked} onClick={onUnset}>
+    <Button
+      size="sm"
+      variant="ghost"
+      aria-label={`Reset ${label}`}
+      disabled={locked}
+      onClick={onUnset}
+    >
       Reset
     </Button>
   ) : null;

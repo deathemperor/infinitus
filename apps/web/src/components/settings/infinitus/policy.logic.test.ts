@@ -21,11 +21,23 @@ const command = (name: string) => ({
 });
 
 const SETTINGS = [
-  { key: "claude.enabled", value: true, isSet: false, default: true, help: "Auto-switching on/off" },
+  {
+    key: "claude.enabled",
+    value: true,
+    isSet: false,
+    default: true,
+    help: "Auto-switching on/off",
+  },
   { key: "claude.threshold", value: 99.9, isSet: true, default: 90, help: "Switch when…" },
   { key: "claude.strategy", value: "consume-first", isSet: true, default: "best", help: "How…" },
   { key: "claude.model", value: ["Fable", "Opus"], isSet: true, default: [], help: "Also…" },
-  { key: "claude.newKnob", value: "x", isSet: false, default: "x", help: "A knob this build never saw" },
+  {
+    key: "claude.newKnob",
+    value: "x",
+    isSet: false,
+    default: "x",
+    help: "A knob this build never saw",
+  },
 ];
 
 describe("policySupported", () => {
@@ -89,7 +101,13 @@ describe("policyRows", () => {
   const row = (key: string) => rows.find((r) => r.key === key)!;
 
   it("strips the provider prefix and keeps the engine's order and help", () => {
-    expect(rows.map((r) => r.key)).toEqual(["enabled", "threshold", "strategy", "model", "newKnob"]);
+    expect(rows.map((r) => r.key)).toEqual([
+      "enabled",
+      "threshold",
+      "strategy",
+      "model",
+      "newKnob",
+    ]);
     expect(row("threshold").help).toBe("Switch when…");
   });
 

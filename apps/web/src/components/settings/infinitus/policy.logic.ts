@@ -120,7 +120,9 @@ function controlFor(key: string, value: unknown): PolicyControl {
   return { kind: "text" };
 }
 
-export function policyRows(settings: ReadonlyArray<InfinitusPolicySetting>): ReadonlyArray<PolicyRow> {
+export function policyRows(
+  settings: ReadonlyArray<InfinitusPolicySetting>,
+): ReadonlyArray<PolicyRow> {
   return settings.map((setting) => {
     const key = bareKey(setting.key);
     return {

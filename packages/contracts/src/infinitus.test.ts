@@ -738,7 +738,12 @@ describe("InfinitusPolicy", () => {
         { key: "claude.model", value: ["Fable"], isSet: true, default: [], help: "models" },
       ],
     });
-    expect(decoded.settings.map((setting) => setting.value)).toEqual([true, 99.9, "best", ["Fable"]]);
+    expect(decoded.settings.map((setting) => setting.value)).toEqual([
+      true,
+      99.9,
+      "best",
+      ["Fable"],
+    ]);
     expect(() =>
       decodePolicy({ fleet: "swapd/claude", settings: [{ key: "claude.enabled", value: true }] }),
     ).toThrow();
