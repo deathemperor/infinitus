@@ -636,6 +636,12 @@ const TaskStartedPayload = Schema.Struct({
   description: Schema.optional(TrimmedNonEmptyStringSchema),
   /** Registered in the background from the start (a later move arrives on task.updated). */
   isBackgrounded: Schema.optional(Schema.Boolean),
+  /**
+   * The brief the agent was launched with (Claude's Agent tool `prompt`),
+   * bounded by the adapter. Only the start row carries it: the linkage
+   * bundle repeats on every progress tick and must stay small (#1567).
+   */
+  prompt: Schema.optional(TrimmedNonEmptyStringSchema),
   ...taskAgentLinkageFields,
 });
 export type TaskStartedPayload = typeof TaskStartedPayload.Type;

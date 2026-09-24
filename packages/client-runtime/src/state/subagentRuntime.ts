@@ -68,6 +68,8 @@ export interface RuntimeSubagent {
   readonly usage: SubagentUsage | null;
   readonly progress: string | null;
   readonly lastToolName: string | null;
+  /** The brief the agent was launched with, when the start row carried it (#1567). */
+  readonly prompt: string | null;
   readonly result: string | null;
   readonly error: string | null;
   readonly outputFile: string | null;
@@ -237,6 +239,7 @@ interface MutableAgent {
   usage: SubagentUsage | null;
   progress: string | null;
   lastToolName: string | null;
+  prompt: string | null;
   result: string | null;
   error: string | null;
   outputFile: string | null;
@@ -294,6 +297,7 @@ function getOrCreate(
     usage: null,
     progress: null,
     lastToolName: null,
+    prompt: null,
     result: null,
     error: null,
     outputFile: null,
@@ -499,6 +503,8 @@ export function foldSubagentActivities(
         }
         const detail = asString(payload.detail);
         if (detail && agent.title === agent.id) agent.title = detail;
+        const prompt = asString(payload.prompt);
+        if (prompt) agent.prompt = prompt;
         agent.updatedAt = at;
         break;
       }
