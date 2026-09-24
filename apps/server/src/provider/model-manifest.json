@@ -53,6 +53,24 @@
       "t3CodeRange": ">=0.0.42",
       "recommendedRange": "=1.1.1",
       "ranges": [{ "range": "=1.1.1", "status": "supported" }]
+    },
+    {
+      "driver": "omp",
+      "t3CodeRange": ">=0.0.42",
+      "recommendedRange": ">=18.1.21",
+      "ranges": [
+        { "range": ">=18.1.21", "status": "supported" },
+        { "range": "<18.1.21", "status": "unknown" }
+      ]
+    },
+    {
+      "driver": "pi",
+      "t3CodeRange": ">=0.0.42",
+      "recommendedRange": ">=0.85.1",
+      "ranges": [
+        { "range": ">=0.85.1", "status": "supported" },
+        { "range": "<0.85.1", "status": "unknown" }
+      ]
     }
   ],
   "currentModels": {
