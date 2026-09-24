@@ -2312,6 +2312,14 @@ describe("ClaudeAdapterLive", () => {
         assert.equal(toolStarted.payload.itemType, "collab_agent_tool_call");
         assert.equal(toolStarted.payload.title, "Subagent task");
       }
+      // The launch brief rides on task.started so clients can show what the
+      // agent was asked (#1567): the tool row's input never reaches them.
+      const taskStarted = runtimeEvents.find((event) => event.type === "task.started");
+      assert.equal(taskStarted?.type, "task.started");
+      if (taskStarted?.type === "task.started") {
+        assert.equal(taskStarted.payload.prompt, "Audit the SQL changes");
+        assert.equal(taskStarted.payload.toolUseId, "tool-task-1");
+      }
       const completed = runtimeEvents.find((event) => event.type === "turn.completed");
       assert.equal(completed?.type, "turn.completed");
       if (completed?.type === "turn.completed") {

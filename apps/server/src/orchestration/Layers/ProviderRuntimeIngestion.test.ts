@@ -4866,6 +4866,7 @@ describe("ProviderRuntimeIngestion", () => {
       payload: {
         taskId: "turn-task-1",
         taskType: "plan",
+        prompt: "Compare the rollout chunks",
       },
     });
 
@@ -4942,6 +4943,9 @@ describe("ProviderRuntimeIngestion", () => {
 
     expect(started?.kind).toBe("task.started");
     expect(started?.summary).toBe("Plan task started");
+    expect((started?.payload as Record<string, unknown> | undefined)?.prompt).toBe(
+      "Compare the rollout chunks",
+    );
     expect(progress?.kind).toBe("task.progress");
     expect(progressPayload?.detail).toBe("Code reviewer is validating the desktop rollout chunks.");
     expect(progressPayload?.summary).toBe(
