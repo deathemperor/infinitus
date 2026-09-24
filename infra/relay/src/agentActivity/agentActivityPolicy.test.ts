@@ -73,6 +73,20 @@ describe("shared agent activity policy", () => {
     );
   });
 
+  it("keeps a monitoring thread live and rings Done when the watch ends", () => {
+    const monitoring = aggregate([{ ...state, phase: "monitoring" }]);
+    expect(monitoring.activeCount).toBe(1);
+    expect(monitoring.activities).toMatchObject([{ phase: "monitoring", status: "Monitoring" }]);
+    expect(
+      terminalTransitionRows({
+        previousAggregate: monitoring,
+        nextAggregate: aggregate([{ ...state, phase: "completed" }]),
+        preferences,
+        nowMs: 0,
+      }),
+    ).toMatchObject([{ threadId: state.threadId }]);
+  });
+
   it("distinguishes equal thread IDs across environments", () => {
     const waiting = { ...state, phase: "waiting_for_input" as const };
     const other = { ...waiting, environmentId: EnvironmentId.make("other") };

@@ -33,7 +33,7 @@ export function agentActivityExpiresAt(
     return Number.NaN;
   }
   const ttlMs =
-    state.phase === "running" || state.phase === "starting"
+    state.phase === "running" || state.phase === "starting" || state.phase === "monitoring"
       ? RUNNING_AGENT_ACTIVITY_ROW_TTL_MS
       : WAITING_AGENT_ACTIVITY_ROW_TTL_MS;
   return updatedAtMs + ttlMs;
