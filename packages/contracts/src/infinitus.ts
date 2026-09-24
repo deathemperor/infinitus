@@ -199,6 +199,28 @@ export const InfinitusFleet = Schema.Struct({
 });
 export type InfinitusFleet = typeof InfinitusFleet.Type;
 
+/** One knob of an engine's switching policy as the `policy` verb answers it
+    (swapd `config list --json`, the engine's own JSON untouched): `value` and
+    `default` are the knob's JSON — a boolean, a number, a string or a list of
+    strings — and `help` the engine's own line for it. `key` carries the
+    provider prefix (`claude.strategy`); `policy-set` takes the bare key. */
+export const InfinitusPolicySetting = Schema.Struct({
+  key: Schema.String,
+  value: Schema.Unknown,
+  isSet: Schema.Boolean,
+  default: Schema.Unknown,
+  help: Schema.String,
+});
+export type InfinitusPolicySetting = typeof InfinitusPolicySetting.Type;
+
+/** The `policy`, `policy-set` and `policy-unset` replies: the fleet and its
+    knobs (all of them on a read, the one key on a write). */
+export const InfinitusPolicy = Schema.Struct({
+  fleet: Schema.String,
+  settings: Schema.Array(InfinitusPolicySetting),
+});
+export type InfinitusPolicy = typeof InfinitusPolicy.Type;
+
 /** The `forecast` command's reply: a run-rate projection, `null` when the app
     has nothing to project. The inner lines stay opaque for v1 — only the
     top-level keys are pinned, and all but `computedAt` and `basis` are absent

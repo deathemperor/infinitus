@@ -348,6 +348,34 @@ final class ControlServer {
                 from: try await swapd.cli.historyData(provider: fleet.provider, limit: limit))
             return ControlReply(ok: true, result: .object(["fleet": .string(fleet.id), "history": history]))
 
+        case "policy", "policy-set", "policy-unset":
+            // The engine's own knobs (swapd `config`), read and written in
+            // its words: the app sets policy, it never runs one of its own
+            // (CLAUDE.md, "Account policy lives in the engines").
+            let fleet = try fleet(r)
+            guard fleet.capabilities.contains(.settings), let swapd = fleet.engine as? SwapdEngine else {
+                throw Fail("\(fleet.id) has no policy knobs")
+            }
+            let data: Data
+            switch r.command {
+            case "policy":
+                data = try await swapd.cli.policyData(provider: fleet.provider)
+            case "policy-set":
+                guard r.args.count == 3, !r.args[1].isEmpty, !r.args[1].hasPrefix("-") else {
+                    throw Fail("usage: policy-set <fleet> <key> <value>")
+                }
+                data = try await swapd.cli.setPolicy(provider: fleet.provider, key: r.args[1], value: r.args[2])
+            default:
+                guard r.args.count == 2, !r.args[1].isEmpty, !r.args[1].hasPrefix("-") else {
+                    throw Fail("usage: policy-unset <fleet> <key>")
+                }
+                data = try await swapd.cli.unsetPolicy(provider: fleet.provider, key: r.args[1])
+            }
+            let reply = try JSONDecoder().decode(JSONValue.self, from: data)
+            return ControlReply(ok: true, result: .object([
+                "fleet": .string(fleet.id), "settings": reply["settings"] ?? .array([]),
+            ]))
+
         case "reorder":
             let fleet = try fleet(r)
             guard fleet.capabilities.contains(.reorder) else { throw Fail("\(fleet.id) has no rotation order") }

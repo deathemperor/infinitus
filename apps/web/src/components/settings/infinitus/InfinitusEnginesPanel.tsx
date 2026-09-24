@@ -15,6 +15,7 @@ import { Button } from "../../ui/button";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
 
 import { useInfinitusEngineProcesses } from "./InfinitusEngineControls";
+import { InfinitusEnginePolicy } from "./InfinitusEnginePolicy";
 import { InfinitusEngineSecrets } from "./InfinitusEngineSecrets";
 import { InfinitusPrefsPanel, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
 import { buildEngineStatusRows, menuBarAppVersionLine } from "./panel.logic";
@@ -131,6 +132,7 @@ export function InfinitusEnginesPanel({
         </a>
       </p>
       <InfinitusEngineStatusList {...target} />
+      <InfinitusEnginePolicy {...target} />
       <InfinitusEngineSecrets {...target} processes={processes} />
       <InfinitusAboutSection {...target} />
     </InfinitusPrefsPanel>

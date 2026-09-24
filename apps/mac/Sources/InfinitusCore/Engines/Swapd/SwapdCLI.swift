@@ -178,6 +178,26 @@ public struct SwapdCLI: Sendable {
                       + (limit.map { ["--limit", String($0)] } ?? []))
     }
 
+    /// The provider's switching-policy knobs (`config list`), the engine's
+    /// own JSON untouched — the `policy` control verb hands it on as-is, the
+    /// way `history` does: `{settings:[{key, value, isSet, default, help}]}`.
+    public func policyData(provider: Provider) async throws -> Data {
+        try await run(["config", "list", "--json", "--provider", Self.providerID(provider)])
+    }
+
+    /// Set one knob by its bare key (`strategy`); the engine names it
+    /// `<provider>.<key>`. A value off the knob's type or range is refused in
+    /// the engine's words, never clamped. The daemon re-reads its settings
+    /// every tick, so nothing restarts.
+    public func setPolicy(provider: Provider, key: String, value: String) async throws -> Data {
+        try await run(["config", "set", "\(try Self.providerID(provider)).\(key)", value, "--json"])
+    }
+
+    /// Drop one knob so its default applies again.
+    public func unsetPolicy(provider: Provider, key: String) async throws -> Data {
+        try await run(["config", "unset", "\(try Self.providerID(provider)).\(key)", "--json"])
+    }
+
     /// Force one usage fetch past the engine's serve floor (`--slot n`), or
     /// every stale slot without one, then answer with the fresh list.
     public func refresh(provider: Provider, slot: Int? = nil) async throws -> SwapdList {
