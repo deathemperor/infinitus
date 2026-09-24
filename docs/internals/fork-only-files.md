@@ -180,7 +180,7 @@ these bullets.
   (kept for later; the gate captures the caller's context and runs it under
   that later). The passthrough layer is the server's default; the hold layer
   replaces it.
-- `apps/server/src/infinitus/Layers/InfinitusSessionHold.ts` (+ `infinitusSessionHold.logic.ts`, `Services/InfinitusSessionHold.ts`) — session priority mode, hold (#616): the `TurnStartGate` that holds a background start while the fleet reads `low`/`critical`; `infinitus.releaseThread`, `subscribeInfinitusHolds` (#741), `packages/client-runtime/src/state/infinitusThreadHold.ts`, `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+ `infinitusHoldBanner.logic.ts`), `sidebar/useInfinitusHeldSummary.ts`, `chat/PinAtCreationToggle.tsx`. Rules and traps: `docs/internals/session-priority.md`.
+- `apps/server/src/infinitus/Layers/InfinitusSessionHold.ts` (+ `infinitusSessionHold.logic.ts`, `Services/InfinitusSessionHold.ts`) — session priority mode, hold (#616): the `TurnStartGate` that holds a background start while the fleet reads `low`/`critical`; `infinitus.releaseThread`, `subscribeInfinitusHolds` (#741), `packages/client-runtime/src/state/infinitusThreadHold.ts` (the marker-row fold and `heldEntryFor`, the stream's per-thread read shared by web and phone rows), `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+ `infinitusHoldBanner.logic.ts`), `sidebar/useInfinitusHeldSummary.ts`, `chat/PinAtCreationToggle.tsx`. Rules and traps: `docs/internals/session-priority.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSessionInterrupt.ts` (+ `infinitusSessionInterrupt.logic.ts`, `Services/InfinitusSessionInterrupt.ts`) — session priority mode, interrupt (#743): pauses running background turns while the fleet reads `critical` and resumes them with `CONTINUATION_PROMPT` through `TurnStartGate`. Rules and traps: `docs/internals/session-priority.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+ `Services/InfinitusSecret.ts`) — `infinitus.secret` (`orchestration:operate`; the sign-in and team-join verbs for any client, the rest `access:write`), the fork's one secret-carrying path (#747): the value rides the control request line's `secret` field for a verb whose manifest entry says `stdin: "secret"` (native #766). Rules and traps: `docs/internals/infinitus-secret.md`.
 - `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus` group in `packages/contracts/src/environmentHttp.ts` — the server half of `infinitusctl`'s desktop verbs (#822): the `infinitusctl` session and its 60 s heartbeat (#1137), `GET /api/infinitus/holds`, `POST /api/infinitus/release-thread`, `GET /api/infinitus/thread-defaults` (#1315). Rules and traps: `docs/internals/infinitusctl-desktop-verbs.md`.
@@ -329,7 +329,9 @@ these bullets.
   headroom" with **Resume now**; a limit stop (#270 I) has no button and
   adds "· resets 2:13 PM" from the row's `resetsAt` (`resetLabelFor`: the
   device's clock format — the phone has no timestamp setting — null once
-  the instant is past).
+  the instant is past). `useThreadHeldEntry.ts` is the list row's read of
+  the same Mac's holds stream (the web's `useInfinitusHeldSummary`), so a
+  held or limit-parked thread reads "Held" / "Limit" in the list too.
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
   `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown

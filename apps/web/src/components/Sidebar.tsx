@@ -144,7 +144,7 @@ import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
-import { heldEntryFor } from "./sidebar/infinitusHeld.logic";
+import { heldEntryFor } from "@infinitus/client-runtime/state/infinitusThreadHold";
 import { HeldTooltipText } from "./sidebar/HeldTooltipText";
 import { onNextAttentionThreadRequest } from "./sidebar/nextAttentionBus";
 import { SidebarNeedsAttention } from "./sidebar/SidebarNeedsAttention";

@@ -667,7 +667,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   check; the label is full-strength and hueless like `Sidebar.tsx`'s and
   does not pulse — monitoring is background presence, not progress. A babysat row still
   labels ahead of it, since `babysitLabel` says the same thing with the
-  round count.
+  round count. The same two files take the web's `held` / `limited` states
+  (#741, #270 I): the row reads the Mac's holds stream through
+  `features/infinitus/useThreadHeldEntry.ts` and passes the entry's kind to
+  the resolver ahead of the session row, so a turn parked on a usage limit
+  reads "Limit" with the held row's line where the branch sits, not "Failed"
+  with the adapter's error.
 - `apps/mobile/src/state/entities.ts` — `useThreadShells` drops side
   questions (`sideOf != null`, #269 C) and `useThreadShell` answers null for
   one, so a side question is in no phone list and never opens as a page;
