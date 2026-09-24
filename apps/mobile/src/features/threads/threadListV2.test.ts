@@ -143,6 +143,62 @@ describe("resolveThreadListV2Status", () => {
     expect(resolveThreadListV2Status(thread)).toBe("approval");
   });
 
+  it("reads a start held for headroom as held, ahead of the session row (#741)", () => {
+    const thread = makeThread({
+      id: ThreadId.make("t"),
+      title: "t",
+      session: {
+        threadId: ThreadId.make("t"),
+        status: "running",
+        providerName: "Claude",
+        providerInstanceId: ProviderInstanceId.make("claude"),
+        runtimeMode: "full-access",
+        activeTurnId: null,
+        lastError: null,
+        updatedAt: NOW,
+      },
+    });
+    expect(resolveThreadListV2Status(thread, { held: true })).toBe("held");
+    expect(resolveThreadListV2Status(thread, { held: false })).toBe("working");
+  });
+
+  it("reads a turn parked on a usage limit as limited, not failed or working (#270 I)", () => {
+    const session = {
+      threadId: ThreadId.make("t"),
+      providerName: "Claude",
+      providerInstanceId: ProviderInstanceId.make("claude"),
+      runtimeMode: "full-access" as const,
+      activeTurnId: null,
+      updatedAt: NOW,
+    };
+    // The adapter gave up on the turn: the session row says error, the row says Limit.
+    const errored = makeThread({
+      id: ThreadId.make("t"),
+      title: "t",
+      session: {
+        ...session,
+        status: "error",
+        lastError: "Claude usage limit reached. Send the message again once the limit resets.",
+      },
+    });
+    expect(resolveThreadListV2Status(errored, { limited: true })).toBe("limited");
+    expect(resolveThreadListV2Status(errored)).toBe("failed");
+    // The parked turn still counts as running until it is resumed.
+    const running = makeThread({
+      id: ThreadId.make("t"),
+      title: "t",
+      session: { ...session, status: "running", lastError: null },
+    });
+    expect(resolveThreadListV2Status(running, { limited: true })).toBe("limited");
+  });
+
+  it("keeps approval and input ahead of a hold: the user still has to answer", () => {
+    const approval = makeThread({ id: ThreadId.make("t"), title: "t", hasPendingApprovals: true });
+    expect(resolveThreadListV2Status(approval, { limited: true })).toBe("approval");
+    const input = makeThread({ id: ThreadId.make("t"), title: "t", hasPendingUserInput: true });
+    expect(resolveThreadListV2Status(input, { held: true })).toBe("input");
+  });
+
   it("resolves ready for quiescent threads", () => {
     expect(resolveThreadListV2Status(makeThread({ id: ThreadId.make("t"), title: "t" }))).toBe(
       "ready",
