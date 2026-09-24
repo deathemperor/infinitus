@@ -128,12 +128,13 @@ describe("restoreLimitStops", () => {
     expect(restoreLimitStops([reaped], [marker], [])).toHaveLength(1);
   });
 
-  it("does not revive a resumed, cancelled, archived, active or superseded turn", () => {
+  it("does not revive a resumed, cancelled, archived, settled, active or superseded turn", () => {
     expect(
       restoreLimitStops([thread], [marker], [{ ...marker, kind: RESUME_MARKER_KIND }]),
     ).toEqual([]);
     for (const candidate of [
       { ...thread, archivedAt: createdAt },
+      { ...thread, settledOverride: "settled" as const },
       { ...thread, latestTurn: null },
       ...(["interrupted", "completed", "running"] as const).map((state) => ({
         ...thread,

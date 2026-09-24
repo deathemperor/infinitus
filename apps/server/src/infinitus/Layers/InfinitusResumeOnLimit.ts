@@ -50,7 +50,8 @@ const RESUMED_LIMIT = 500;
 type Input =
   | { readonly source: "restore" }
   | { readonly source: "runtime"; readonly event: ProviderRuntimeEvent }
-  | { readonly source: "snapshot"; readonly snapshot: InfinitusSnapshot };
+  | { readonly source: "snapshot"; readonly snapshot: InfinitusSnapshot }
+  | { readonly source: "settled"; readonly threadId: ThreadId };
 
 /**
  * Resumes a thread's turn on a live account after a usage limit stopped it
@@ -67,7 +68,9 @@ type Input =
  * cooldown, and a turn the user moved on from is forgotten. Off by the
  * `infinitusResumeOnLimit` server setting. Each stop also leaves an
  * `infinitus.thread.limited` row and joins the `stopped` list the sidebar
- * reads (#270 I), until it resumes or is forgotten.
+ * reads (#270 I), until it resumes or is forgotten. Settling the thread
+ * forgets it: the user is done with that work, so it neither waits in the
+ * sidebar nor wakes on the next account.
  */
 const resetsAtIso = (stop: LimitStop): string | null =>
   stop.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(stop.resetsAt));
@@ -112,7 +115,12 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       target: ResumeTarget,
     ) {
       const shell = yield* projectionSnapshotQuery.getThreadShellById(stop.threadId);
-      if (Option.isNone(shell) || shell.value.archivedAt !== null) return;
+      if (
+        Option.isNone(shell) ||
+        shell.value.archivedAt !== null ||
+        shell.value.settledOverride === "settled"
+      )
+        return;
       if (turnOvertookStop(shell.value, stop)) {
         return yield* Effect.logInfo("infinitus.resume-on-limit.overtaken", {
           threadId: stop.threadId,
@@ -258,6 +266,13 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         return publish;
       });
 
+    const isSettled = (threadId: ThreadId) =>
+      projectionSnapshotQuery.getThreadShellById(threadId).pipe(
+        Effect.map((shell) => Option.isSome(shell) && shell.value.settledOverride === "settled"),
+        // An unreadable shell records the stop, as before settling existed.
+        Effect.orElseSucceed(() => false),
+      );
+
     /** The proxied instance the thread runs on (#1088), read only once an
         event is a stop; an unreadable shell or settings names none. */
     const proxyFor = (threadId: ThreadId) =>
@@ -288,6 +303,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           yield* forget(event.threadId);
         }
         if (plain === null || !recorded) return;
+        // A settled thread's parked turn can still refuse; nobody waits on it.
+        if (yield* isSettled(plain.threadId)) return;
         const proxy = yield* proxyFor(plain.threadId);
         const fresh =
           proxy === null
@@ -424,7 +441,11 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         ? restore
         : input.source === "runtime"
           ? onRuntimeEvent(input.event)
-          : onSnapshot(input.snapshot)
+          : input.source === "settled"
+            ? stops.has(input.threadId)
+              ? forget(input.threadId)
+              : Effect.void
+            : onSnapshot(input.snapshot)
       ).pipe(
         // One bad input must not end the worker for every later one.
         Effect.catchCause((cause) =>
@@ -450,6 +471,15 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               event.type === "session.exited",
           ),
           Stream.runForEach((event) => worker.enqueue({ source: "runtime", event })),
+        ),
+      ),
+    );
+    yield* forkParked(
+      orchestrationEngine.streamDomainEvents.pipe(
+        Stream.runForEach((event) =>
+          event.type === "thread.settled"
+            ? worker.enqueue({ source: "settled", threadId: event.payload.threadId })
+            : Effect.void,
         ),
       ),
     );
