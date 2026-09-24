@@ -10,6 +10,13 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- Closed popups stop blocking keys: `apps/web/src/components/ChatView.tsx`
+  (`TYPE_TO_FOCUS_FLOATING_LAYER_SELECTOR`) and `RightPanelTabs.tsx`
+  (`LAUNCHER_SHORTCUT_BLOCKING_LAYERS`) qualify every popup slot with
+  `:is([data-open],[data-ending-style])`, like upstream's dialog entries.
+  Upstream #12453 keeps the chat header's actions menu mounted while
+  closed, which killed type-to-focus and the launcher letters. Drop this
+  once upstream fixes it.
 - Fleet-wide Claude resets (#1554): `packages/contracts/src/infinitus.ts`
   (`InfinitusAccount.resets`, `InfinitusAccountResets`, additive) is
   fork-owned; the upstream edits are the hub section left unmounted —
