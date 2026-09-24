@@ -392,7 +392,8 @@ export function hasActionableProposedPlan(
  * at most one row per agent. Everything an agent does internally lives in the
  * Agents surface:
  * - timelineBypass rows (Codex children, workflow members) never render here;
- * - tool rows attributed to an owning agent (payload.agentId) are re-homed;
+ * - tool rows attributed to an owning agent (payload.agentId) are re-homed
+ *   (deriveAgentWorkLogEntries hands them to the spawn member row, #1567);
  * - task.progress ticks collapse into one row per taskId;
  * - task.updated is fold input only (status patches are not narrative).
  * Unattributed rows stay unless a linked agent row replaces their launch;
@@ -513,6 +514,57 @@ export function deriveWorkLogEntries(
     entries.push(entry);
   }
   return collapseDerivedWorkLogEntries(entries);
+}
+
+const EMPTY_AGENT_WORK_LOG_ENTRIES: ReadonlyMap<string, ReadonlyArray<WorkLogEntry>> = new Map();
+
+/**
+ * The tool rows the quiet-timeline filter re-homes (#1567): every attributed
+ * tool activity, grouped by its owning agent's taskId and collapsed per tool
+ * call the same way the parent's rows are, so a spawn member can render its
+ * agent's work with the chrome the main thread uses. Nothing in the chat
+ * timeline reads this map; only the expanded member row does.
+ */
+export function deriveAgentWorkLogEntries(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyMap<string, ReadonlyArray<WorkLogEntry>> {
+  // Attributed rows are a small minority of a thread; pick them out before
+  // sorting, and hand back one shared empty map so the timeline row context
+  // keeps its identity on threads without subagents.
+  const attributed: Array<[OrchestrationThreadActivity, string]> = [];
+  for (const activity of activities) {
+    if (activity.kind !== "tool.updated" && activity.kind !== "tool.completed") continue;
+    const agentId = asTrimmedString(asRecord(activity.payload)?.agentId);
+    if (!agentId || isPlanBoundaryToolActivity(activity)) continue;
+    attributed.push([activity, agentId]);
+  }
+  if (attributed.length === 0) return EMPTY_AGENT_WORK_LOG_ENTRIES;
+  attributed.sort(([left], [right]) => compareActivitiesByOrder(left, right));
+  const byAgent = new Map<string, DerivedWorkLogEntry[]>();
+  const rowIndexByToolCall = new Map<string, number>();
+  for (const [activity, agentId] of attributed) {
+    const entry = toDerivedWorkLogEntry(activity);
+    const entries = byAgent.get(agentId) ?? [];
+    if (entries.length === 0) byAgent.set(agentId, entries);
+    // One row per tool call across its lifecycle; a completed row is final
+    // (a duplicate completion starts a new row rather than rewriting it).
+    const key = entry.toolCallId ? `${agentId}:${entry.toolCallId}` : undefined;
+    const existingIndex = key === undefined ? undefined : rowIndexByToolCall.get(key);
+    const existing = existingIndex === undefined ? undefined : entries[existingIndex];
+    if (existing && existing.sourceActivityKind !== "tool.completed") {
+      // The row keeps its first identity so the member's list has stable keys
+      // across the call's lifecycle.
+      entries[existingIndex!] = {
+        ...mergeDerivedWorkLogEntries(existing, entry),
+        id: existing.id,
+        createdAt: existing.createdAt,
+      };
+      continue;
+    }
+    if (key !== undefined) rowIndexByToolCall.set(key, entries.length);
+    entries.push(entry);
+  }
+  return byAgent;
 }
 
 /** Adapters forward unknown wire-only SDK messages (background_tasks_changed,

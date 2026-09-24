@@ -101,6 +101,21 @@ describe("foldSubagentActivities", () => {
     expect(agents[0]).toMatchObject({ kind: "subagent_batch", status: "idle" });
   });
 
+  it("keeps the launch brief from the start row (#1567)", () => {
+    const agents = fold([
+      activity("task.started", {
+        taskId: "task-1",
+        title: "Audit auth flow",
+        prompt: "Find every caller of verifySession and list the unguarded ones.",
+      }),
+      activity("task.progress", { taskId: "task-1", summary: "Reading auth/" }),
+    ]);
+    expect(agents[0]).toMatchObject({
+      prompt: "Find every caller of verifySession and list the unguarded ones.",
+      progress: "Reading auth/",
+    });
+  });
+
   it("builds an agent from start → progress → completion", () => {
     const agents = fold([
       activity("task.started", {

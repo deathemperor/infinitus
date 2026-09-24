@@ -118,9 +118,19 @@ export interface WorkLogEntry {
       readonly detail: string | undefined;
       /** When this member last reported, so the card can show the newest activity. */
       readonly updatedAt: string;
+      /** The brief the agent was launched with, from its start row (#1567). */
+      readonly prompt?: string;
+      /** The agent's newest own tool call, re-homed from the hidden attributed rows (#1567). */
+      readonly lastTool?: AgentSpawnMemberTool;
     }>;
   };
   toolData?: unknown;
+}
+
+export interface AgentSpawnMemberTool {
+  readonly label: string;
+  readonly status: WorkLogToolLifecycleStatus | undefined;
+  readonly updatedAt: string;
 }
 
 interface DerivedWorkLogEntry extends WorkLogEntry {
@@ -128,6 +138,8 @@ interface DerivedWorkLogEntry extends WorkLogEntry {
   collapseKey?: string;
   /** Grouping key for subagent lifecycle rows (one row per agent). */
   taskId?: string;
+  /** The launch brief on an agent's start row (#1567). */
+  agentPrompt?: string;
   /** The tool call that launched this agent, when the provider reports one. */
   agentSpawnToolCallId?: string;
   isWorkflowCoordinator?: boolean;
@@ -225,6 +237,7 @@ export interface AgentSpawnSummary {
     readonly tone: "working" | "completed" | "failed" | "stopped";
     readonly detail: string | undefined;
     readonly updatedAt: string;
+    readonly prompt?: string;
   }>;
 }
 
@@ -449,7 +462,51 @@ function deriveWorkLogEntries(
     if (isAgentInternalActivity(activity)) continue;
     entries.push(toDerivedWorkLogEntry(activity));
   }
-  return collapseDerivedWorkLogEntries(entries);
+  return attachAgentTools(collapseDerivedWorkLogEntries(entries), latestAgentTools(ordered));
+}
+
+/**
+ * The newest attributed tool row per owning agent (#1567). The quiet
+ * timeline hides these rows; the spawn card shows each member's current
+ * call instead of a progress line that may be a minute stale.
+ */
+function latestAgentTools(
+  ordered: ReadonlyArray<OrchestrationThreadActivity>,
+): ReadonlyMap<string, AgentSpawnMemberTool> {
+  // Only the winner per agent is derived into an entry; the rest is a scan.
+  const newest = new Map<string, OrchestrationThreadActivity>();
+  for (const activity of ordered) {
+    if (activity.kind !== "tool.updated" && activity.kind !== "tool.completed") continue;
+    const agentId = asTrimmedString(asRecord(activity.payload)?.agentId);
+    if (!agentId || isPlanBoundaryToolActivity(activity)) continue;
+    newest.set(agentId, activity);
+  }
+  const latest = new Map<string, AgentSpawnMemberTool>();
+  for (const [agentId, activity] of newest) {
+    const entry = toDerivedWorkLogEntry(activity);
+    latest.set(agentId, {
+      label: workEntryHeading(entry),
+      status: entry.toolLifecycleStatus,
+      updatedAt: activity.createdAt,
+    });
+  }
+  return latest;
+}
+
+function attachAgentTools(
+  entries: DerivedWorkLogEntry[],
+  tools: ReadonlyMap<string, AgentSpawnMemberTool>,
+): DerivedWorkLogEntry[] {
+  if (tools.size === 0) return entries;
+  return entries.map((entry) => {
+    const spawn = entry.agentSpawn;
+    if (!spawn || !spawn.agentTaskIds.some((taskId) => tools.has(taskId))) return entry;
+    const agents = spawn.agents.map((agent, index) => {
+      const lastTool = tools.get(spawn.agentTaskIds[index] ?? "");
+      return lastTool ? { ...agent, lastTool } : agent;
+    });
+    return { ...entry, agentSpawn: { ...spawn, agents } };
+  });
 }
 
 /** Adapters forward unknown wire-only SDK messages (background_tasks_changed,
@@ -540,6 +597,10 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
     const spawnToolCallId = asTrimmedString(payload.toolUseId);
     if (spawnToolCallId) {
       entry.agentSpawnToolCallId = spawnToolCallId;
+    }
+    const agentPrompt = asTrimmedString(payload.prompt);
+    if (agentPrompt) {
+      entry.agentPrompt = agentPrompt;
     }
     if (
       payload.taskType === "local_workflow" ||
@@ -696,6 +757,9 @@ function agentSpawnMember(
     status: entry.toolLifecycleStatus ?? previous?.status,
     detail: entry.detail ?? previous?.detail,
     updatedAt: entry.createdAt,
+    ...((entry.agentPrompt ?? previous?.prompt)
+      ? { prompt: entry.agentPrompt ?? previous?.prompt }
+      : {}),
   };
 }
 
@@ -1142,12 +1206,18 @@ export function agentSpawnSummary(
 ): AgentSpawnSummary {
   const members = agentSpawnMembers(spawn).map((agent) => {
     const tone = agentSpawnTone(agent.status);
+    // While working, the newest signal wins: a tool call the agent made
+    // after its last progress report is what it is doing now.
+    const tool = agent.lastTool;
+    const toolIsNewer =
+      tone === "working" && tool !== undefined && tool.updatedAt > agent.updatedAt;
     return {
       title: agent.title,
       status: tone === "working" ? "working" : (agent.status ?? tone),
       tone,
-      detail: agent.detail,
-      updatedAt: agent.updatedAt,
+      detail: toolIsNewer ? tool.label : agent.detail,
+      updatedAt: toolIsNewer ? tool.updatedAt : agent.updatedAt,
+      ...(agent.prompt ? { prompt: agent.prompt } : {}),
     };
   });
   const tone = agentSpawnTone(batchStatus);

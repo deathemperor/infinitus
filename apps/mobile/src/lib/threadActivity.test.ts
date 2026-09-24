@@ -3310,6 +3310,74 @@ describe("quiet timeline: nested agents", () => {
     ).toEqual(["turn-fold", "agent-spawn"]);
   });
 
+  it("shows a member's brief and its newest own tool call (#1567)", () => {
+    const turnId = TurnId.make("turn-spawn-tools");
+    const at = (seconds: number) => `2026-04-01T00:00:${String(seconds).padStart(2, "0")}.000Z`;
+    const feed = buildThreadFeed(
+      makeThread({
+        id: ThreadId.make("thread-spawn-tools"),
+        projectId: ProjectId.make("project-1"),
+        title: "Spawn tools",
+        activities: [
+          makeActivity({
+            id: EventId.make("a-start"),
+            kind: "task.started",
+            summary: "Agent a",
+            createdAt: at(1),
+            turnId,
+            payload: {
+              taskId: "a",
+              agentKind: "agent",
+              taskType: "local_agent",
+              title: "Agent a",
+              prompt: "Find every caller of verifySession.",
+            },
+          }),
+          makeActivity({
+            id: EventId.make("a-progress"),
+            kind: "task.progress",
+            summary: "Agent a",
+            createdAt: at(2),
+            turnId,
+            payload: { taskId: "a", agentKind: "agent", title: "Agent a", detail: "Reading auth/" },
+          }),
+          makeActivity({
+            id: EventId.make("a-grep"),
+            kind: "tool.updated",
+            tone: "tool",
+            summary: "Grep",
+            createdAt: at(3),
+            turnId,
+            payload: {
+              itemType: "dynamic_tool_call",
+              toolCallId: "toolu_grep",
+              status: "inProgress",
+              title: "Grep",
+              agentId: "a",
+            },
+          }),
+        ],
+      }),
+    );
+    const card = deriveThreadFeedPresentation(feed, null, new Set([turnId])).find(
+      (row) => row.type === "agent-spawn",
+    );
+    expect(card).toMatchObject({
+      summary: {
+        status: "Grep",
+        members: [
+          { title: "Agent a", detail: "Grep", prompt: "Find every caller of verifySession." },
+        ],
+      },
+    });
+    // The attributed tool row itself stays out of the timeline.
+    expect(
+      feed.flatMap((entry) =>
+        entry.type === "activity-group" ? entry.activities.map((row) => row.id) : [],
+      ),
+    ).toEqual(["a-start"]);
+  });
+
   it("presents a spawn batch as one card whose status line follows the newest member activity", () => {
     const turnId = TurnId.make("turn-spawn-card");
     const latestTurn = {

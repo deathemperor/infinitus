@@ -49,6 +49,7 @@ import {
 } from "@infinitus/client-runtime/state/subagentRuntime";
 
 const EMPTY_AGENT_PANEL_MODEL = emptyAgentPanelModel();
+const EMPTY_AGENT_WORK_LOG_ENTRIES: ReadonlyMap<string, ReadonlyArray<WorkLogEntry>> = new Map();
 const NOOP_OPEN_AGENTS = () => {};
 const EMPTY_QUEUED_MESSAGES: ReadonlyArray<QueuedComposerMessage> = [];
 const NOOP_QUEUED_MESSAGE_ACTION = (_id: string) => {};
@@ -89,6 +90,7 @@ import {
   workEntryDisplayIndicatesToolFailure,
   workEntrySignalsSevereFailure,
   workLogEntryIsToolLike,
+  type WorkLogEntry,
 } from "../../session-logic";
 import {
   type ChatMessage,
@@ -306,6 +308,8 @@ interface TimelineRowSharedState {
   expandedReasoningMessageIds: ReadonlySet<string>;
   workGroupViewState: WorkGroupViewState;
   agentPanelModel: AgentPanelModel;
+  /** Each subagent's own tool rows, keyed by taskId (#1567). */
+  agentWorkLogEntries: ReadonlyMap<string, ReadonlyArray<WorkLogEntry>>;
   expandedSpawnEntryIds: ReadonlySet<string>;
   onOpenAgents: () => void;
   onCancelWorktreeSetup: (() => void) | null;
@@ -425,6 +429,7 @@ interface MessagesTimelineProps {
     sourceAnchor: AssistantCitationSourceAnchor,
   ) => boolean;
   agentPanelModel?: AgentPanelModel;
+  agentWorkLogEntries?: ReadonlyMap<string, ReadonlyArray<WorkLogEntry>>;
   onOpenAgents?: () => void;
   isWorking: boolean;
   isPreparingWorktree?: boolean;
@@ -515,6 +520,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   isCompacting = false,
   activeTurnStartedAt,
   agentPanelModel,
+  agentWorkLogEntries = EMPTY_AGENT_WORK_LOG_ENTRIES,
   onOpenAgents = NOOP_OPEN_AGENTS,
   listRef,
   timelineEntries,
@@ -1321,6 +1327,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       expandedReasoningMessageIds: paintedExpandedReasoningMessageIds,
       workGroupViewState,
       agentPanelModel: agentPanelModel ?? EMPTY_AGENT_PANEL_MODEL,
+      agentWorkLogEntries,
       expandedSpawnEntryIds: paintedExpandedSpawnEntryIds,
       onOpenAgents,
       onCancelWorktreeSetup: onCancelWorktreeSetup ?? null,
@@ -1356,6 +1363,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       paintedExpandedReasoningMessageIds,
       workGroupViewState,
       agentPanelModel,
+      agentWorkLogEntries,
       paintedExpandedSpawnEntryIds,
       onOpenAgents,
       onCancelWorktreeSetup,
@@ -4815,8 +4823,13 @@ const AgentSpawnRow = memo(function AgentSpawnRow(props: {
   onToggleEntry?: ((collapsed: boolean) => void) | undefined;
 }) {
   const { workEntry } = props;
-  const { agentPanelModel, expandedSpawnEntryIds, onToggleSpawnRow, onOpenAgents } =
-    use(TimelineRowCtx);
+  const {
+    agentPanelModel,
+    agentWorkLogEntries,
+    expandedSpawnEntryIds,
+    onToggleSpawnRow,
+    onOpenAgents,
+  } = use(TimelineRowCtx);
   const spawn = workEntry.agentSpawn;
   if (!spawn) {
     return null;
@@ -4866,7 +4879,12 @@ const AgentSpawnRow = memo(function AgentSpawnRow(props: {
       {expanded ? (
         <div className="ms-7 mt-0.5 flex flex-col">
           {agents.map((agent) => (
-            <AgentSpawnMemberRow key={agent.id} agent={agent} onToggleEntry={props.onToggleEntry} />
+            <AgentSpawnMemberRow
+              key={agent.id}
+              agent={agent}
+              toolEntries={agentWorkLogEntries.get(agent.id) ?? EMPTY_WORK_LOG_ENTRIES}
+              onToggleEntry={props.onToggleEntry}
+            />
           ))}
           <button
             type="button"
@@ -4892,17 +4910,35 @@ const AGENT_MEMBER_STATUS_LABEL: Record<RuntimeSubagent["status"], string> = {
   interrupted: "Stopped",
 };
 
+const EMPTY_WORK_LOG_ENTRIES: ReadonlyArray<WorkLogEntry> = [];
+
+/**
+ * One subagent under an expanded spawn row (#1567). Reads like a small copy
+ * of the main thread: the title shines while the agent works, the collapsed
+ * line is its newest tool call, and opening it shows the brief it was given
+ * and every tool row with the chrome the parent's rows use.
+ */
 function AgentSpawnMemberRow({
   agent,
+  toolEntries,
   onToggleEntry,
 }: {
   agent: RuntimeSubagent;
+  toolEntries: ReadonlyArray<WorkLogEntry>;
   onToggleEntry?: ((collapsed: boolean) => void) | undefined;
 }) {
+  const { workspaceRoot } = use(TimelineRowCtx);
   const [open, setOpen] = useState(false);
   const activeStatus = isActiveSubagentStatus(agent.status);
+  const latestTool = toolEntries.at(-1);
+  // A tool row only counts as running while its agent does: an agent that
+  // died mid-call leaves an inProgress row behind that must not shine.
+  const toolIsActive = (entry: WorkLogEntry) =>
+    activeStatus && entry.toolLifecycleStatus === "inProgress";
   const activity = activeStatus
-    ? (agent.progress ?? (agent.lastToolName ? `▸ ${agent.lastToolName}` : null))
+    ? latestTool
+      ? liveWorkEntryLabel(latestTool, workspaceRoot, toolIsActive(latestTool))
+      : (agent.progress ?? (agent.lastToolName ? `▸ ${agent.lastToolName}` : null))
     : (agent.error ?? agent.result ?? agent.progress ?? null);
   const durationMs =
     agent.startedAt && agent.completedAt
@@ -4929,10 +4965,11 @@ function AgentSpawnMemberRow({
       ? agent.role
       : null;
   const firstLine = activity?.split("\n").find((line) => line.trim().length > 0) ?? null;
-  const body = [activity?.trim() || null, formatSubagentModelLabel(agent.model, agent.effort)]
+  const outcome = activeStatus ? null : (agent.error ?? agent.result ?? agent.progress ?? null);
+  const body = [outcome?.trim() || null, formatSubagentModelLabel(agent.model, agent.effort)]
     .filter(Boolean)
     .join("\n\n");
-  const canExpand = body.length > 0;
+  const canExpand = body.length > 0 || agent.prompt !== null || toolEntries.length > 0;
   const toggleOpen = () => {
     onToggleEntry?.(open);
     setOpen((value) => !value);
@@ -4964,9 +5001,11 @@ function AgentSpawnMemberRow({
       <div className="flex select-none items-center gap-1.5">
         <p className="flex min-w-0 flex-1 items-baseline gap-1.5 text-sm leading-relaxed">
           <span
+            ref={activeStatus ? observeVisibleAnimation : undefined}
             className={cn(
               "min-w-0 truncate",
               agent.status === "failed" ? failedToolIconClassName : "text-foreground/80",
+              activeStatus && "live-tool-shine",
             )}
           >
             {agent.title}
@@ -4986,11 +5025,34 @@ function AgentSpawnMemberRow({
       ) : null}
       {open ? (
         <div
-          className="mt-1 cursor-default rounded-md bg-muted/40 px-3 py-2"
+          className="mt-1 flex cursor-default flex-col gap-1.5"
           onClick={stopRowToggle}
           onPointerDown={stopRowToggle}
         >
-          <pre className={toolCallExpandedBodyClassName}>{body}</pre>
+          {agent.prompt !== null ? (
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <pre className={toolCallExpandedBodyClassName}>{agent.prompt}</pre>
+            </div>
+          ) : null}
+          {toolEntries.length > 0 ? (
+            <div className="flex flex-col">
+              {toolEntries.map((entry) => (
+                <LiveActivityRow
+                  key={entry.id}
+                  label={liveWorkEntryLabel(entry, workspaceRoot, toolIsActive(entry))}
+                  iconName={workEntryIconName(entry)}
+                  toolIcon={entry.toolIcon ?? entry.toolSource?.icon}
+                  failed={workEntryDisplayIndicatesToolFailure(entry)}
+                  active={toolIsActive(entry)}
+                />
+              ))}
+            </div>
+          ) : null}
+          {body.length > 0 ? (
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <pre className={toolCallExpandedBodyClassName}>{body}</pre>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

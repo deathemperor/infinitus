@@ -1528,6 +1528,23 @@ const CLAUDE_TASK_PATCH_STATUS: Record<string, RuntimeTaskStatus> = {
  * subagent-forwarded block carries that id as its parent. Returns undefined
  * for parent-conversation traffic.
  */
+const SUBAGENT_PROMPT_CHAR_LIMIT = 4000;
+
+/**
+ * The Agent tool's prompt as carried on task.started (#1567). One row per
+ * agent, so a generous cap: enough to read the whole brief in the timeline,
+ * bounded so a pasted document cannot bloat the activity table.
+ */
+function boundedSubagentPrompt(value: unknown): string | undefined {
+  const trimmed = trimmedString(value);
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed.length > SUBAGENT_PROMPT_CHAR_LIMIT
+    ? `${trimmed.slice(0, SUBAGENT_PROMPT_CHAR_LIMIT - 1)}…`
+    : trimmed;
+}
+
 function agentIdForParentToolUse(
   agents: Map<string, ClaudeTaskAgentState>,
   parentToolUseId: string | null | undefined,
@@ -4304,6 +4321,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         // later ones refine the record in place. AgentInput.effort may be a
         // named level or an integer.
         const launchInput = launchingTool?.input;
+        const prompt = boundedSubagentPrompt(launchInput?.prompt);
         const toolUseId = message.tool_use_id;
         const bufferedModel = toolUseId ? context.pendingTaskModels.get(toolUseId) : undefined;
         if (toolUseId) {
@@ -4354,6 +4372,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
             ...(effort ? { effort } : {}),
             ...(message.tool_use_id ? { toolUseId: message.tool_use_id } : {}),
             ...(message.workflow_name ? { workflowName: message.workflow_name } : {}),
+            ...(prompt ? { prompt } : {}),
           },
         });
         return;

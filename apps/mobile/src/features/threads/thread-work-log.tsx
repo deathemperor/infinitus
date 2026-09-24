@@ -1124,6 +1124,15 @@ export const ThreadAgentSpawnCard = memo(function ThreadAgentSpawnCard(props: {
                     {member.detail}
                   </Text>
                 ) : null}
+                {member.prompt ? (
+                  <Text
+                    selectable
+                    className="pl-3 text-2xs italic leading-normal text-foreground-muted"
+                    numberOfLines={4}
+                  >
+                    {member.prompt}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </Animated.View>

@@ -188,6 +188,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   scroll-to-end pill when the viewport stranded above the end with no scroll
   event. Drops on the upstream sync that brings them in; until then a sync
   conflict here is resolved toward upstream.
+- Subagent turn visibility (#1567): `packages/contracts/src/providerRuntime.ts` (`TaskStartedPayload.prompt`), `apps/server/src/provider/Layers/ClaudeAdapter.ts` (`boundedSubagentPrompt` on `task_started`), `apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts` (`prompt` passed through on `task.started`), `packages/client-runtime/src/state/subagentRuntime.ts` (`RuntimeSubagent.prompt`), `apps/web/src/session-logic.ts` (`deriveAgentWorkLogEntries`), `apps/web/src/components/ChatView.tsx` and `chat/MessagesTimeline.tsx` (`agentWorkLogEntries` on the row context; `AgentSpawnMemberRow` shines while active and expands to the brief and the agent's tool rows), `apps/mobile/src/lib/threadActivity.ts` (`prompt` and `lastTool` on spawn members) and `features/threads/thread-work-log.tsx`.
 - `apps/server/src/orchestration/Layers/OrchestrationEngine.ts` (the
   `thread.auto-settle` invariant) and `apps/server/src/orchestration/ThreadSettlementReactor.ts`
   (the candidate filter) — read `InfinitusLimitStops.isStopped` and

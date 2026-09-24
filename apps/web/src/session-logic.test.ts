@@ -15,6 +15,7 @@ import {
   deriveActivePlanState,
   deriveTimelineEntries,
   deriveTimelineEntriesWithState,
+  deriveAgentWorkLogEntries,
   deriveWorkLogEntries,
   findLatestProposedPlan,
   hasActionableProposedPlan,
@@ -2547,5 +2548,82 @@ describe("session activity performance", () => {
       command: "git diff",
       toolLifecycleStatus: "completed",
     });
+  });
+});
+
+describe("deriveAgentWorkLogEntries (#1567)", () => {
+  it("groups attributed tool rows per agent and collapses each call's lifecycle", () => {
+    const entries = deriveAgentWorkLogEntries([
+      makeActivity({
+        id: "read-running",
+        kind: "tool.updated",
+        summary: "Read",
+        tone: "tool",
+        payload: {
+          itemType: "file_read",
+          toolCallId: "toolu_read",
+          status: "inProgress",
+          title: "Read",
+          agentId: "agent-1",
+        },
+        turnId: "turn-1",
+        sequence: 1,
+      }),
+      makeActivity({
+        id: "parent-bash",
+        kind: "tool.completed",
+        summary: "Bash",
+        tone: "tool",
+        payload: { itemType: "command_execution", toolCallId: "toolu_parent", status: "completed" },
+        turnId: "turn-1",
+        sequence: 2,
+      }),
+      makeActivity({
+        id: "grep-other",
+        kind: "tool.completed",
+        summary: "Grep",
+        tone: "tool",
+        payload: {
+          itemType: "dynamic_tool_call",
+          toolCallId: "toolu_grep",
+          status: "completed",
+          agentId: "agent-2",
+        },
+        turnId: "turn-1",
+        sequence: 3,
+      }),
+      makeActivity({
+        id: "read-done",
+        kind: "tool.completed",
+        summary: "Read",
+        tone: "tool",
+        payload: {
+          itemType: "file_read",
+          toolCallId: "toolu_read",
+          status: "completed",
+          title: "Read",
+          agentId: "agent-1",
+        },
+        turnId: "turn-1",
+        sequence: 4,
+      }),
+    ]);
+    expect([...entries.keys()]).toEqual(["agent-1", "agent-2"]);
+    expect(entries.get("agent-1")).toMatchObject([
+      { id: "read-running", toolCallId: "toolu_read", toolLifecycleStatus: "completed" },
+    ]);
+    expect(entries.get("agent-2")).toMatchObject([{ id: "grep-other", toolCallId: "toolu_grep" }]);
+  });
+
+  it("is empty when no tool row belongs to an agent", () => {
+    const entries = deriveAgentWorkLogEntries([
+      makeActivity({
+        kind: "tool.completed",
+        summary: "Bash",
+        tone: "tool",
+        payload: { itemType: "command_execution", toolCallId: "toolu_parent", status: "completed" },
+      }),
+    ]);
+    expect(entries.size).toBe(0);
   });
 });

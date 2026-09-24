@@ -675,6 +675,9 @@ export function runtimeEventToActivities(
             ...(event.payload.description
               ? { detail: truncateDetail(event.payload.description) }
               : {}),
+            // The launch brief, already bounded by the adapter; never through
+            // truncateDetail, which would leave 180 chars of it (#1567).
+            ...(event.payload.prompt ? { prompt: event.payload.prompt } : {}),
             ...taskLinkageActivityFields(event.payload as Record<string, unknown>),
           },
           turnId: toTurnId(event.turnId) ?? null,
