@@ -7,6 +7,7 @@ import {
   buildFleetSection,
   buildForecast,
   buildSignInRows,
+  providerAccountCounts,
   signInCommandArgs,
   signInDismissCommandArgs,
   signInDismissSupported,
@@ -23,10 +24,12 @@ import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { Link } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { randomUUID } from "../../lib/utils";
 import type { EnvironmentPresentation } from "../../state/environments";
@@ -39,6 +42,8 @@ import { AccountsUnavailable } from "./AccountsUnavailable";
 import { WAIT_ADD_STEP_SECONDS, waitAddStep, type AddAccountFlow } from "./addAccount.logic";
 import { FleetSection, type FleetSignIn } from "./FleetSection";
 import { ForecastStrip } from "./ForecastStrip";
+import { ALL_PROVIDERS, ProviderTabs, type ProviderFilter } from "./ProviderTabs";
+import { QuotaTimeline } from "./QuotaTimeline";
 import {
   fleetRunsShellOAuth,
   oauthSignInBridge,
@@ -62,6 +67,7 @@ import { SignInsSection } from "./SignInsSection";
     and how long a flipped flag is drawn on a row the snapshots never confirm
     (a write the app answered without changing anything). */
 const COMMAND_SETTLE_TIMEOUT_MS = 10_000;
+const PROVIDER_FILTER_KEY = "infinitus.accountsProvider";
 
 interface CommandTarget {
   readonly fleetKey: string;
@@ -127,6 +133,12 @@ export function EnvironmentAccounts({
   const [pendingSignIn, setPendingSignIn] = useState<PendingSignIn | null>(null);
   const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // One choice for every machine's group: a provider a machine lacks shows it all.
+  const [providerFilter, setProviderFilter] = useLocalStorage<ProviderFilter, string>(
+    PROVIDER_FILTER_KEY,
+    ALL_PROVIDERS,
+    Schema.String,
+  );
   const [addFlow, setAddFlow] = useState<AddAccountFlow | null>(null);
   const [signInFlow, setSignInFlow] = useState<SignInFlow | null>(null);
   /** Bumped on every start and on unmount: a poll from an earlier flow stops. */
@@ -587,6 +599,8 @@ export function EnvironmentAccounts({
           state={state}
           snapshot={snapshot}
           nowMs={Date.parse(minute)}
+          providerFilter={providerFilter}
+          onProviderFilter={setProviderFilter}
           pending={pending}
           flips={flips}
           failure={failure}
@@ -623,6 +637,8 @@ function AccountsBody({
   state,
   snapshot,
   nowMs,
+  providerFilter,
+  onProviderFilter,
   pending,
   flips,
   failure,
@@ -642,6 +658,8 @@ function AccountsBody({
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly nowMs: number;
+  readonly providerFilter: ProviderFilter;
+  readonly onProviderFilter: (provider: ProviderFilter) => void;
   readonly pending: ReadonlyArray<PendingCommand>;
   readonly flips: ReadonlyArray<PendingFlip>;
   readonly failure: (CommandTarget & { message: string }) | null;
@@ -728,11 +746,28 @@ function AccountsBody({
   const offersAdd = snapshotOffersAdd(snapshot);
   const offersSignIn = snapshotOffersSignIn(snapshot);
   const signInRunning = snapshotSignInRunning(snapshot);
+  const providers = providerAccountCounts(snapshot.fleets);
+  const shownProvider = providers.some((entry) => entry.provider === providerFilter)
+    ? providerFilter
+    : ALL_PROVIDERS;
+  const fleets =
+    shownProvider === ALL_PROVIDERS
+      ? snapshot.fleets
+      : snapshot.fleets.filter((fleet) => fleet.provider === shownProvider);
+  const shown = fleets.map((fleet) => ({ fleet, section: buildFleetSection(fleet) }));
   return (
     <div className="flex flex-col gap-6">
+      {providers.length > 1 ? (
+        <ProviderTabs providers={providers} selected={shownProvider} onSelect={onProviderFilter} />
+      ) : null}
       {forecast === null ? null : <ForecastStrip forecast={forecast} />}
-      {snapshot.fleets.map((fleet) => {
-        const section = buildFleetSection(fleet);
+      <QuotaTimeline
+        environmentId={environment.environmentId}
+        sections={shown.map((entry) => entry.section)}
+        hasHistory={snapshot.commands.some((command) => command.name === "utilization")}
+        nowMs={nowMs}
+      />
+      {shown.map(({ fleet, section }) => {
         // Only the engine whose sign-in is a loopback OAuth flow takes the
         // shell path; the others keep the app's.
         const shellOAuth = signIn.shellOAuth && fleetRunsShellOAuth(section.engineID);

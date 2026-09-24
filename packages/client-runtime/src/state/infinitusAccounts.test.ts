@@ -19,6 +19,7 @@ import {
   infinitusCapabilityAcross,
   infinitusCapabilityOf,
   infinitusPageState,
+  providerAccountCounts,
   buildSignInRows,
   signInCommandArgs,
   signInDismissCommandArgs,
@@ -838,5 +839,39 @@ describe("sign-in rows", () => {
       args: ["me@example.com"],
       options: { local: "true" },
     });
+  });
+});
+
+describe("providerAccountCounts", () => {
+  it("sums each provider's accounts across its fleets, in first-seen order", () => {
+    const one = {
+      number: 1,
+      email: "a@example.com",
+      active: false,
+      isOrganization: false,
+      usageStatus: "ok",
+    };
+    const two = { ...one, number: 2 };
+    const fleets: InfinitusFleet[] = [
+      {
+        key: "claude",
+        engineID: "swapd",
+        provider: "claude",
+        capabilities: [],
+        accounts: [one, two],
+      },
+      { key: "codex", engineID: "cliproxy", provider: "codex", capabilities: [], accounts: [] },
+      {
+        key: "claude-proxy",
+        engineID: "cliproxy",
+        provider: "claude",
+        capabilities: [],
+        accounts: [one],
+      },
+    ];
+    expect(providerAccountCounts(fleets)).toEqual([
+      { provider: "claude", accounts: 3 },
+      { provider: "codex", accounts: 0 },
+    ]);
   });
 });

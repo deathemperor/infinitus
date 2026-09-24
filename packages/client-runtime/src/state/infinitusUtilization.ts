@@ -136,6 +136,20 @@ function rows<A>(
   return out;
 }
 
+/** Every closed weekly generation the reply carries, decoded row by row. */
+export function utilizationGenerations(
+  u: InfinitusUtilization,
+): ReadonlyArray<InfinitusUtilizationGeneration> {
+  return rows(u.generations, decodeGeneration);
+}
+
+/** Every five-hour window the reply carries, decoded row by row. */
+export function utilizationFiveHourWindows(
+  u: InfinitusUtilization,
+): ReadonlyArray<InfinitusUtilizationFiveHourWindow> {
+  return rows(u.fiveHourWindows, decodeFiveHour);
+}
+
 export interface WasteRow {
   /** `email|window|resetAt`, unique across the reply. */
   readonly key: string;

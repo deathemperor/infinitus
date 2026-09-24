@@ -391,6 +391,19 @@ export function buildFleetSection(fleet: InfinitusFleet): FleetSectionModel {
   };
 }
 
+/** How many accounts each provider holds across a machine's fleets, in the
+    order the fleets first name them. Two fleets of one provider (swapd and a
+    proxy, say) count together. */
+export function providerAccountCounts(
+  fleets: ReadonlyArray<InfinitusFleet>,
+): ReadonlyArray<{ readonly provider: string; readonly accounts: number }> {
+  const counts = new Map<string, number>();
+  for (const fleet of fleets) {
+    counts.set(fleet.provider, (counts.get(fleet.provider) ?? 0) + fleet.accounts.length);
+  }
+  return [...counts].map(([provider, accounts]) => ({ provider, accounts }));
+}
+
 /** The native forecast dates its instants as epoch seconds
     (`UsageForecast.computedAt: Double`, from `Date().timeIntervalSince1970`),
     so they become ISO strings here. */

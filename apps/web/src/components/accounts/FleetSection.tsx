@@ -17,6 +17,7 @@ import {
   type AddAccountFlow,
 } from "./addAccount.logic";
 import { ExhaustedBand } from "./ExhaustedBand";
+import { fleetProvider } from "./providerMark";
 import {
   fleetSignInGate,
   signInBusy,
@@ -105,9 +106,11 @@ export function FleetSection({
   const cancellable = inApp && signIn.flow !== null && !signInEnded(signIn.flow.phase);
   /** The provider's page to open from this device, while the flow waits for it. */
   const signInUrl = cancellable && signIn.flow?.url != null ? signIn.flow.url : null;
+  const Mark = fleetProvider(section.provider).mark;
   return (
     <section className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
+        {Mark === null ? null : <Mark className="size-4 shrink-0" aria-hidden />}
         <h3 className="font-medium text-foreground text-sm">{section.title}</h3>
         {canAdd || inApp ? (
           <Button
