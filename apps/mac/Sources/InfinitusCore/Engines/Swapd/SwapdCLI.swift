@@ -10,11 +10,25 @@ import Foundation
 /// dirs are for a source build with no engine beside it; `INFINITUS_SWAPD_CLI`
 /// still pins one for a dev run.
 public enum SwapdLocator {
+    /// A release installed from the Engines page (#1577) comes before the
+    /// bundle only while it is the newer engine: `updateVersion` is its
+    /// sidecar, `bundledVersion` the one `make-app.sh` stamped; a source
+    /// build with no stamp has no bundled engine to outrank. Older or equal,
+    /// the copy is skipped — the bundle is the release's pinned engine.
+    public static func updatePreferred(updateVersion: String?, bundledVersion: String?) -> Bool {
+        EngineVersion.isNewer(updateVersion, than: bundledVersion)
+    }
+
     public static func defaultCandidates(
         home: String = NSHomeDirectory(),
-        bundledExecutableDirectory: String? = Bundle.main.executableURL?.deletingLastPathComponent().path
+        bundledExecutableDirectory: String? = Bundle.main.executableURL?.deletingLastPathComponent().path,
+        updateVersion: String? = SwapdUpdate.Location().installedVersion(),
+        bundledVersion: String? = SwapdUpdate.bundledVersion()
     ) -> [String] {
         var paths: [String] = []
+        if updatePreferred(updateVersion: updateVersion, bundledVersion: bundledVersion) {
+            paths.append(SwapdUpdate.Location(home: URL(fileURLWithPath: home)).binary.path)
+        }
         if let bundledExecutableDirectory {
             paths.append("\(bundledExecutableDirectory)/swapd")
         }
