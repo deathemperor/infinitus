@@ -925,7 +925,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-engines",
     infinitusOnly: true,
     searchTerms: [
-      "swapd cliproxy 9router proxy accounts registered key",
+      "swapd cliproxy 9router proxy accounts registered key policy strategy threshold model switching",
       "management key dashboard password base url test connection",
       "routing strategy session affinity daemon",
       "about version build release",
