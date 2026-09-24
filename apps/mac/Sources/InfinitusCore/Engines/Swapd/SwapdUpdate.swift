@@ -14,10 +14,14 @@ public enum SwapdUpdate {
         URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
     }
 
+    /// Under the app's own state directory (`AppSupport`, so a dev or
+    /// fixture instance keeps its copy beside its own state, #506), not the
+    /// launch agent's `engines/swapd`, which is a copy of whatever the
+    /// locator chose and is rewritten from it.
     public struct Location: Sendable {
         public let directory: URL
-        public init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
-            directory = home.appendingPathComponent("Library/Application Support/Infinitus/engines/swapd-update")
+        public init(appSupport: URL = AppSupport.root()) {
+            directory = appSupport.appendingPathComponent("engines/swapd-update", isDirectory: true)
         }
         public var binary: URL { directory.appendingPathComponent("swapd") }
         public var version: URL { directory.appendingPathComponent("VERSION") }

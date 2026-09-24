@@ -22,12 +22,13 @@ public enum SwapdLocator {
     public static func defaultCandidates(
         home: String = NSHomeDirectory(),
         bundledExecutableDirectory: String? = Bundle.main.executableURL?.deletingLastPathComponent().path,
+        updateBinary: String = SwapdUpdate.Location().binary.path,
         updateVersion: String? = SwapdUpdate.Location().installedVersion(),
         bundledVersion: String? = SwapdUpdate.bundledVersion()
     ) -> [String] {
         var paths: [String] = []
         if updatePreferred(updateVersion: updateVersion, bundledVersion: bundledVersion) {
-            paths.append(SwapdUpdate.Location(home: URL(fileURLWithPath: home)).binary.path)
+            paths.append(updateBinary)
         }
         if let bundledExecutableDirectory {
             paths.append("\(bundledExecutableDirectory)/swapd")

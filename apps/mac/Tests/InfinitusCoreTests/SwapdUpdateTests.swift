@@ -57,13 +57,13 @@ final class SwapdUpdateTests: XCTestCase {
         let update = "/fixture/Library/Application Support/Infinitus/engines/swapd-update/swapd"
         let bundled = "/fixture/Infinitus.app/Contents/MacOS/swapd"
         let newer = SwapdLocator.defaultCandidates(home: home, bundledExecutableDirectory: "/fixture/Infinitus.app/Contents/MacOS",
-                                                   updateVersion: "0.3.3", bundledVersion: "0.3.2")
+                                                   updateBinary: update, updateVersion: "0.3.3", bundledVersion: "0.3.2")
         XCTAssertEqual(Array(newer.prefix(2)), [update, bundled])
         let stale = SwapdLocator.defaultCandidates(home: home, bundledExecutableDirectory: "/fixture/Infinitus.app/Contents/MacOS",
-                                                   updateVersion: "0.3.2", bundledVersion: "0.3.2")
+                                                   updateBinary: update, updateVersion: "0.3.2", bundledVersion: "0.3.2")
         XCTAssertEqual(stale.first, bundled)
         XCTAssertFalse(stale.contains(update), "an update the bundle caught up with is skipped, as a PATH copy is (#1530)")
-        let none = SwapdLocator.defaultCandidates(home: home, bundledExecutableDirectory: nil, updateVersion: nil, bundledVersion: nil)
+        let none = SwapdLocator.defaultCandidates(home: home, bundledExecutableDirectory: nil, updateBinary: update, updateVersion: nil, bundledVersion: nil)
         XCTAssertFalse(none.contains(update))
         XCTAssertNil(SwapdUpdate.bundledVersion(info: [:]))
         XCTAssertEqual(SwapdUpdate.bundledVersion(info: ["InfinitusSwapdVersion": "0.3.2"]), "0.3.2")
@@ -75,7 +75,7 @@ final class SwapdUpdateTests: XCTestCase {
     /// with its sidecar. A wrong digest installs nothing.
     func testInstallVerifiesTheDigestAndTheBinaryBeforePuttingItInPlace() async throws {
         let archive = Data("pretend tarball".utf8)
-        let location = SwapdUpdate.Location(home: dir)
+        let location = SwapdUpdate.Location(appSupport: dir)
         let release = SwapdUpdate.Release(version: "0.3.3", asset: URL(string: "https://x/a.tgz")!,
                                           checksum: URL(string: "https://x/a.sha")!,
                                           assetName: "swapd-0.3.3-aarch64-apple-darwin.tar.gz")
