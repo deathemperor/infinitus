@@ -28,6 +28,8 @@ export function statusForPhase(phase: RelayAgentActivityState["phase"]): string 
       return "Connecting";
     case "running":
       return "Working";
+    case "monitoring":
+      return "Monitoring";
     case "stale":
       return "Waiting";
   }
@@ -135,6 +137,6 @@ export function makeAggregateState(input: {
 export function activityPhasePriority(phase: RelayAgentActivityState["phase"]): number {
   if (phase === "waiting_for_approval" || phase === "waiting_for_input") return 0;
   if (phase === "failed") return 1;
-  if (phase === "starting" || phase === "running") return 2;
+  if (phase === "starting" || phase === "running" || phase === "monitoring") return 2;
   return 3;
 }

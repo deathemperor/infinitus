@@ -176,14 +176,15 @@ describe("projectThreadAwareness", () => {
     });
     expect(working?.phase).toBe("running");
 
-    // A watch loop alone is not an active agent: the list shows Monitoring,
-    // never Working, so the card keeps Done.
+    // A watch loop alone reads Monitoring on the lists, so the card says so
+    // too rather than Done.
     const monitoring = projectThreadAwareness({
       environmentId: "env-1" as EnvironmentId,
       project,
       thread: thread({ ...settled, backgroundLiveness: "monitoring" }),
     });
-    expect(monitoring?.phase).toBe("completed");
+    expect(monitoring?.phase).toBe("monitoring");
+    expect(monitoring?.headline).toBe("Agent is monitoring");
   });
 
   it("projects failures with the session error detail", () => {

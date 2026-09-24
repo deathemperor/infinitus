@@ -24,6 +24,7 @@ export type RelayAgentAwarenessPlatform = typeof RelayAgentAwarenessPlatform.Typ
 export const RelayAgentAwarenessPhase = Schema.Literals([
   "starting",
   "running",
+  "monitoring",
   "waiting_for_approval",
   "waiting_for_input",
   "completed",

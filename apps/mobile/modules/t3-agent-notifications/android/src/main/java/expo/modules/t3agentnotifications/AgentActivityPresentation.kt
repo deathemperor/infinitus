@@ -25,6 +25,7 @@ internal enum class ActivityPhase(
 ) {
   STARTING("Connecting", "Starting", "Working", "Open", R.color.agent_activity_working),
   RUNNING("Working", "Working", "Working", "Open", R.color.agent_activity_working),
+  MONITORING("Monitoring", "Monitoring", "Monitor", "Open", R.color.agent_activity_working),
   APPROVAL(
     "Approval",
     "Approval needed",
@@ -83,6 +84,7 @@ internal fun activityPhase(data: Map<String, String>, rows: List<ActivityRow>): 
   when (data["activity_phase"]?.takeIf { it.isNotBlank() }) {
     "starting" -> ActivityPhase.STARTING
     "running" -> ActivityPhase.RUNNING
+    "monitoring" -> ActivityPhase.MONITORING
     "waiting_for_approval" -> ActivityPhase.APPROVAL
     "waiting_for_input" -> ActivityPhase.INPUT
     "stale" -> ActivityPhase.STALE
@@ -142,7 +144,7 @@ internal class ActivityPresentation(data: Map<String, String>, private val activ
     // Tint the summary only when it names an outcome or a request; a plain
     // "3 working" stays neutral so the accent keeps meaning something.
     val tintedSummary = tint != null && rows.size > 1 && phase != ActivityPhase.RUNNING &&
-      phase != ActivityPhase.STARTING
+      phase != ActivityPhase.STARTING && phase != ActivityPhase.MONITORING
     builder.setContentTitle(if (tintedSummary) tinted(summary, tint!!) else summary)
     if (rows.size > 1) {
       builder.setSubText(

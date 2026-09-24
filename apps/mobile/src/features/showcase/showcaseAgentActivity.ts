@@ -31,6 +31,7 @@ export const SHOWCASE_AGENT_ACTIVITY_ROWS = [
 const STATUS_BY_PHASE: Record<AgentActivityPhase, string> = {
   starting: "Connecting",
   running: "Working",
+  monitoring: "Monitoring",
   waiting_for_approval: "Approval",
   waiting_for_input: "Input",
   stale: "Waiting",
@@ -41,6 +42,7 @@ const STATUS_BY_PHASE: Record<AgentActivityPhase, string> = {
 const ACTIVE_PHASES: ReadonlySet<AgentActivityPhase> = new Set([
   "starting",
   "running",
+  "monitoring",
   "waiting_for_approval",
   "waiting_for_input",
 ]);
