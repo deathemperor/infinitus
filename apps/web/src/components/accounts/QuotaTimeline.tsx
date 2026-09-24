@@ -23,7 +23,7 @@ import { usePrimarySettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { useEnvironmentQuery } from "../../state/query";
-import { formatShortTimestamp, weekStartsOn } from "../../timestampFormat";
+import { formatShortTimestamp, timestampLocale, weekStartsOn } from "../../timestampFormat";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { fleetProvider } from "./providerMark";
@@ -33,8 +33,11 @@ const VIEWS = ["weekly", "fiveHour"] as const;
 const VIEW_SCHEMA = Schema.Literals(VIEWS);
 const VIEW_LABELS: Record<QuotaTimelineView, string> = { weekly: "Weekly", fiveHour: "5-hour" };
 
-const dayFormatter = new Intl.DateTimeFormat(undefined, { month: "2-digit", day: "2-digit" });
-const weekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+const dayFormatter = new Intl.DateTimeFormat(timestampLocale, {
+  month: "2-digit",
+  day: "2-digit",
+});
+const weekdayFormatter = new Intl.DateTimeFormat(timestampLocale, { weekday: "short" });
 
 /** "09/28 22:00" in the weekly view, "22:00" in the five-hour one. */
 function instantLabel(ms: number, view: QuotaTimelineView, format: TimestampFormat): string {

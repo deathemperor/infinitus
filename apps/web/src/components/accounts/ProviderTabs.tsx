@@ -1,10 +1,8 @@
+import { ALL_PROVIDERS } from "@infinitus/client-runtime/state/infinitusAccounts";
+
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { fleetProvider } from "./providerMark";
-
-/** "All" or one provider's name as the snapshot carries it. */
-export type ProviderFilter = string;
-export const ALL_PROVIDERS: ProviderFilter = "all";
 
 /**
  * One machine's accounts split by provider, each with its account count, so a
@@ -17,8 +15,9 @@ export function ProviderTabs({
   onSelect,
 }: {
   readonly providers: ReadonlyArray<{ readonly provider: string; readonly accounts: number }>;
-  readonly selected: ProviderFilter;
-  readonly onSelect: (provider: ProviderFilter) => void;
+  /** `all`, or one provider's name as the snapshot carries it. */
+  readonly selected: string;
+  readonly onSelect: (provider: string) => void;
 }) {
   const total = providers.reduce((sum, entry) => sum + entry.accounts, 0);
   const tabs = [

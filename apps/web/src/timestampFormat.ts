@@ -51,7 +51,7 @@ function readHostSystemLocale(): string | null {
   return window.desktopBridge?.getSystemLocale?.() ?? null;
 }
 
-const timestampLocale = resolveTimestampLocale(readHostSystemLocale());
+export const timestampLocale = resolveTimestampLocale(readHostSystemLocale());
 
 const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6] as const;
 type WeekdayIndex = (typeof WEEKDAY_INDEXES)[number];

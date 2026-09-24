@@ -7,7 +7,8 @@ import {
   buildFleetSection,
   buildForecast,
   buildSignInRows,
-  providerAccountCounts,
+  ALL_PROVIDERS,
+  fleetsForProvider,
   signInCommandArgs,
   signInDismissCommandArgs,
   signInDismissSupported,
@@ -42,7 +43,7 @@ import { AccountsUnavailable } from "./AccountsUnavailable";
 import { WAIT_ADD_STEP_SECONDS, waitAddStep, type AddAccountFlow } from "./addAccount.logic";
 import { FleetSection, type FleetSignIn } from "./FleetSection";
 import { ForecastStrip } from "./ForecastStrip";
-import { ALL_PROVIDERS, ProviderTabs, type ProviderFilter } from "./ProviderTabs";
+import { ProviderTabs } from "./ProviderTabs";
 import { QuotaTimeline } from "./QuotaTimeline";
 import {
   fleetRunsShellOAuth,
@@ -134,7 +135,7 @@ export function EnvironmentAccounts({
   const [signInFailure, setSignInFailure] = useState<{ key: string; message: string } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   // One choice for every machine's group: a provider a machine lacks shows it all.
-  const [providerFilter, setProviderFilter] = useLocalStorage<ProviderFilter, string>(
+  const [providerFilter, setProviderFilter] = useLocalStorage<string, string>(
     PROVIDER_FILTER_KEY,
     ALL_PROVIDERS,
     Schema.String,
@@ -658,8 +659,8 @@ function AccountsBody({
   readonly state: ReturnType<typeof accountsPageState>;
   readonly snapshot: InfinitusSnapshot | null;
   readonly nowMs: number;
-  readonly providerFilter: ProviderFilter;
-  readonly onProviderFilter: (provider: ProviderFilter) => void;
+  readonly providerFilter: string;
+  readonly onProviderFilter: (provider: string) => void;
   readonly pending: ReadonlyArray<PendingCommand>;
   readonly flips: ReadonlyArray<PendingFlip>;
   readonly failure: (CommandTarget & { message: string }) | null;
@@ -746,14 +747,11 @@ function AccountsBody({
   const offersAdd = snapshotOffersAdd(snapshot);
   const offersSignIn = snapshotOffersSignIn(snapshot);
   const signInRunning = snapshotSignInRunning(snapshot);
-  const providers = providerAccountCounts(snapshot.fleets);
-  const shownProvider = providers.some((entry) => entry.provider === providerFilter)
-    ? providerFilter
-    : ALL_PROVIDERS;
-  const fleets =
-    shownProvider === ALL_PROVIDERS
-      ? snapshot.fleets
-      : snapshot.fleets.filter((fleet) => fleet.provider === shownProvider);
+  const {
+    providers,
+    shown: shownProvider,
+    fleets,
+  } = fleetsForProvider(snapshot.fleets, providerFilter);
   const shown = fleets.map((fleet) => ({ fleet, section: buildFleetSection(fleet) }));
   return (
     <div className="flex flex-col gap-6">

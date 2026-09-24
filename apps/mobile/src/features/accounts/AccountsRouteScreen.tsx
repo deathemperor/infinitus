@@ -8,6 +8,7 @@ import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorBanner } from "../../components/ErrorBanner";
+import { ProviderIcon } from "../../components/ProviderIcon";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { infinitusEnvironment } from "../../state/infinitus";
 import { environmentPresentations } from "../../state/presentation";
@@ -21,6 +22,13 @@ import { ExhaustedBand } from "./ExhaustedBand";
 import { ForecastStrip } from "./ForecastStrip";
 import { useNowMinute } from "./useNowMinute";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+
+/** A fleet's provider as the driver `ProviderIcon` draws. Only the two it has
+    a mark for: it draws anything else with the Codex mark. */
+const FLEET_PROVIDER_DRIVER: Readonly<Record<string, string>> = {
+  claude: "claudeAgent",
+  codex: "codex",
+};
 
 /** Settings › Accounts (#572): every paired Mac that runs Infinitus, its fleets
     and their accounts, read and driven through the T3 server's adapter. */
@@ -107,7 +115,17 @@ function MacAccounts(props: { readonly mac: InfinitusMac; readonly titled: boole
         />
       ) : null}
       {model.sections.map((section) => (
-        <SettingsSection key={section.key} title={section.title}>
+        <SettingsSection
+          key={section.key}
+          title={section.title}
+          trailing={
+            FLEET_PROVIDER_DRIVER[section.provider] === undefined ? null : (
+              <View className="px-2">
+                <ProviderIcon provider={FLEET_PROVIDER_DRIVER[section.provider]} size={14} />
+              </View>
+            )
+          }
+        >
           {model.bands.has(section.key) ? (
             <ExhaustedBand band={model.bands.get(section.key)!} nowMs={now} />
           ) : null}
