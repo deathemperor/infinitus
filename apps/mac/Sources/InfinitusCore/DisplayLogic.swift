@@ -419,6 +419,12 @@ public enum AccountVitals {
         }
     }
 
+    /// Any window spent, a per-model one included: what the fleet-wide
+    /// reckonings read — the all-limited line and its revival, the death
+    /// and revival notifications, the candidates a proxy rotates onto.
+    /// Under a policy that switches on a model's window (swapd's `model`),
+    /// an account out of that model is one the rotation leaves, so it
+    /// counts as limited there. The ROW wears `isPlanDead` (below).
     public static func isDead(_ usage: Usage?) -> Bool {
         guard let usage else { return false }
         var pcts: [Double] = []
@@ -430,6 +436,25 @@ public enum AccountVitals {
         // windows it stays a footnote.
         if pcts.isEmpty, let spend = usage.spend { return spend.pct >= 100 }
         return pcts.contains { $0 >= 100 }
+    }
+
+    /// The row's death: a plan window (5h, 7d, or the credit pool of a
+    /// credit-only plan) spent. A spent per-model window is NOT one — the
+    /// account still serves every other model, so its row keeps its icon
+    /// and gauges and only that model's cell reads "down" (user
+    /// 2026-09-24: an account out of Fable "is not dead, still usable for
+    /// other models as the 7d limit is still up").
+    public static func isPlanDead(_ usage: Usage?) -> Bool {
+        guard let usage else { return false }
+        var plan: [Double] = []
+        if let p = usage.fiveHour?.pct { plan.append(p) }
+        if let p = usage.sevenDay?.pct { plan.append(p) }
+        // No 5h/7d at all is the Gemini shape — one bucket per model, and
+        // those buckets ARE the plan. A Claude account reports both beside
+        // its model windows, so only there is a model window a footnote.
+        if plan.isEmpty { plan = (usage.scoped ?? []).map(\.pct) }
+        if plan.isEmpty, let spend = usage.spend { return spend.pct >= 100 }
+        return plan.contains { $0 >= 100 }
     }
 
     /// The one per-model window that alone kills this account ("Fable"):

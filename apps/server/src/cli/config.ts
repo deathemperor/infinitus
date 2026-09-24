@@ -5,6 +5,7 @@ import {
   OtlpProtocol,
   type SignalExport,
 } from "@infinitus/shared/observability";
+import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
 import { parsePersistedServerObservabilitySettings } from "@infinitus/shared/serverSettings";
 import { DesktopBackendBootstrap, PortSchema } from "@infinitus/contracts";
 import * as Config from "effect/Config";
@@ -387,6 +388,8 @@ export const resolveServerConfig = (
     );
     const logLevel = Option.getOrElse(cliLogLevel, () => env.logLevel);
 
+    const otel = yield* OtelEnvironment.load;
+
     // T3 Code's own OTLP variables name no signal, so the one answer they give
     // is the answer for all three.
     const signalExport: SignalExport = {
@@ -402,20 +405,24 @@ export const resolveServerConfig = (
       traceBatchWindowMs: env.traceBatchWindowMs,
       traceMaxBytes: env.traceMaxBytes,
       traceMaxFiles: env.traceMaxFiles,
-      otlpTracesUrl:
-        env.otlpTracesUrl ??
-        bootstrap?.otlpTracesUrl ??
-        persistedObservabilitySettings.otlpTracesUrl,
-      otlpMetricsUrl:
-        env.otlpMetricsUrl ??
-        bootstrap?.otlpMetricsUrl ??
-        persistedObservabilitySettings.otlpMetricsUrl,
-      otlpLogsUrl:
-        env.otlpLogsUrl ?? bootstrap?.otlpLogsUrl ?? persistedObservabilitySettings.otlpLogsUrl,
+      otlpTracesUrl: otel.disabled
+        ? undefined
+        : (env.otlpTracesUrl ??
+          bootstrap?.otlpTracesUrl ??
+          persistedObservabilitySettings.otlpTracesUrl),
+      otlpMetricsUrl: otel.disabled
+        ? undefined
+        : (env.otlpMetricsUrl ??
+          bootstrap?.otlpMetricsUrl ??
+          persistedObservabilitySettings.otlpMetricsUrl),
+      otlpLogsUrl: otel.disabled
+        ? undefined
+        : (env.otlpLogsUrl ?? bootstrap?.otlpLogsUrl ?? persistedObservabilitySettings.otlpLogsUrl),
       otlpTracesExport: signalExport,
       otlpMetricsExport: signalExport,
       otlpLogsExport: signalExport,
       otlpServiceName: env.otlpServiceName,
+      otelEnvironment: otel,
       mode,
       port,
       cwd,

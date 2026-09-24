@@ -13,6 +13,7 @@ import {
   InfinitusForecast,
   InfinitusFleet,
   InfinitusManifest,
+  InfinitusPolicy,
   InfinitusPrefs,
   InfinitusSnapshot,
   InfinitusThreadForkRefused,
@@ -22,6 +23,7 @@ import {
 
 const decodeReply = Schema.decodeUnknownSync(InfinitusControlReply);
 const decodeStatus = Schema.decodeUnknownSync(InfinitusStatus);
+const decodePolicy = Schema.decodeUnknownSync(InfinitusPolicy);
 const decodeFleet = Schema.decodeUnknownSync(InfinitusFleet);
 const decodeForecast = Schema.decodeUnknownSync(InfinitusForecast);
 const decodeManifest = Schema.decodeUnknownSync(InfinitusManifest);
@@ -724,3 +726,26 @@ const TEAM_STATUS = {
   lastPublish: 1_757_950_000,
   lastError: null,
 };
+
+describe("InfinitusPolicy", () => {
+  it("decodes the engine's knobs with values of every JSON type it uses", () => {
+    const decoded = decodePolicy({
+      fleet: "swapd/claude",
+      settings: [
+        { key: "claude.enabled", value: true, isSet: false, default: true, help: "on/off" },
+        { key: "claude.threshold", value: 99.9, isSet: true, default: 90, help: "pct" },
+        { key: "claude.strategy", value: "best", isSet: false, default: "best", help: "how" },
+        { key: "claude.model", value: ["Fable"], isSet: true, default: [], help: "models" },
+      ],
+    });
+    expect(decoded.settings.map((setting) => setting.value)).toEqual([
+      true,
+      99.9,
+      "best",
+      ["Fable"],
+    ]);
+    expect(() =>
+      decodePolicy({ fleet: "swapd/claude", settings: [{ key: "claude.enabled", value: true }] }),
+    ).toThrow();
+  });
+});

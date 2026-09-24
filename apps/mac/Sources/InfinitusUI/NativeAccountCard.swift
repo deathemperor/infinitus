@@ -241,8 +241,10 @@ public struct AccountWindowDetails<M: FleetModel>: View {
 /// lucky-7s trigger is a module-internal extension, and dead/critical
 /// should read from one place with it.
 public enum AccountRowVitals {
+    /// The row's death (plan windows only): a card out of one model stays
+    /// a live card whose model gauge reads spent.
     public static func isDead(_ account: Account) -> Bool {
-        AccountVitals.isDead(account.usage)
+        AccountVitals.isPlanDead(account.usage)
     }
 
     /// The dying set: alive, but its binding window is in the 90s —

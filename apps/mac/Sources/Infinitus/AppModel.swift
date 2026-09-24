@@ -123,6 +123,9 @@ final class AppModel: ObservableObject {
     /// swapd's `auto` under the supervisor (#475: one daemon per enabled
     /// engine, each owning its account policy).
     @Published var swapdState: EngineSupervisor.State = .stopped
+    /// The engine's own version, read once at launch for `status`; nil
+    /// until it answers, and for an engine that has no `version` verb.
+    @Published var swapdVersion: String?
     struct EventEntry: Identifiable {
         let id = UUID()
         var at = Date()
@@ -846,6 +849,12 @@ final class AppModel: ObservableObject {
         }
         if !playground { sync.attach(model: self) }
         if let swapd, swapdEnabled || playground { registry.register(SwapdEngine(cli: swapd)) }
+        if let swapd, !playground {
+            Task { [weak self] in
+                let version = try? await swapd.version()
+                await MainActor.run { self?.swapdVersion = version }
+            }
+        }
         // The proxy is never part of the playground (isolation contract)
         // and needs its key before it can be an engine at all.
         if !playground, cliproxyEnabled,

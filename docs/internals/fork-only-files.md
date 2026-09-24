@@ -93,6 +93,7 @@ these bullets.
   per-model window alone blocks every account and the plan windows still
   have room), replacing the pop-out's reviver band.
 - `apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): `packages/client-runtime/src/state/infinitusStats.ts` folds `stats --period p`, read through `infinitusEnvironment.stats` and the snapshot's `needs: ["stats"]` lease scope (#587). Rules and traps: `docs/internals/stats-page.md`.
+- `apps/web/src/components/settings/infinitus/InfinitusEnginePolicy.tsx` + `policy.logic.ts` (+ test) — Settings › Engines › Switching policy: an engine's own policy knobs (swapd `config list|set|unset --json`, its JSON untouched) as rows on the Engines page, per environment; the Mac's `policy` / `policy-set` / `policy-unset` control verbs (`requires: settings`; `SwapdCLI.policyData` / `setPolicy` / `unsetPolicy`, `SwapdPolicyTests`) and the `InfinitusPolicy` contract. Rows are the engine's list in its order with its help lines, so a knob a newer engine adds draws without a build; only `strategy`'s choices are the fork's (swapd's `Kind::Choice`, its `settings.rs`), and the engine's refusal of a value off a knob's range is shown in its words, never clamped here.
 - `apps/web/src/routes/settings.engines_.activity.tsx`,
   `apps/web/src/components/activity/` — Settings › Engines ›
   Activity (#659; `/settings/engines/activity`, the `engines_`

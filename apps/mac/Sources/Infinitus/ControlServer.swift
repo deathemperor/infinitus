@@ -348,6 +348,34 @@ final class ControlServer {
                 from: try await swapd.cli.historyData(provider: fleet.provider, limit: limit))
             return ControlReply(ok: true, result: .object(["fleet": .string(fleet.id), "history": history]))
 
+        case "policy", "policy-set", "policy-unset":
+            // The engine's own knobs (swapd `config`), read and written in
+            // its words: the app sets policy, it never runs one of its own
+            // (CLAUDE.md, "Account policy lives in the engines").
+            let fleet = try fleet(r)
+            guard fleet.capabilities.contains(.settings), let swapd = fleet.engine as? SwapdEngine else {
+                throw Fail("\(fleet.id) has no policy knobs")
+            }
+            let data: Data
+            switch r.command {
+            case "policy":
+                data = try await swapd.cli.policyData(provider: fleet.provider)
+            case "policy-set":
+                guard r.args.count == 3, !r.args[1].isEmpty, !r.args[1].hasPrefix("-") else {
+                    throw Fail("usage: policy-set <fleet> <key> <value>")
+                }
+                data = try await swapd.cli.setPolicy(provider: fleet.provider, key: r.args[1], value: r.args[2])
+            default:
+                guard r.args.count == 2, !r.args[1].isEmpty, !r.args[1].hasPrefix("-") else {
+                    throw Fail("usage: policy-unset <fleet> <key>")
+                }
+                data = try await swapd.cli.unsetPolicy(provider: fleet.provider, key: r.args[1])
+            }
+            let reply = try JSONDecoder().decode(JSONValue.self, from: data)
+            return ControlReply(ok: true, result: .object([
+                "fleet": .string(fleet.id), "settings": reply["settings"] ?? .array([]),
+            ]))
+
         case "reorder":
             let fleet = try fleet(r)
             guard fleet.capabilities.contains(.reorder) else { throw Fail("\(fleet.id) has no rotation order") }
@@ -1238,6 +1266,10 @@ final class ControlServer {
         /// and each engine's last error, so the desktop's Engines page can
         /// draw them.
         let binaryPath: String?, daemon: String?, error: String?
+        /// The engine's own version (swapd `version`), so the Engines page
+        /// can say which copy runs; nil until read, or for an engine
+        /// without one.
+        let version: String?
     }
 
     /// `EngineSupervisor.State` as one stable word for `status`.
@@ -1277,15 +1309,16 @@ final class ControlServer {
                 "swapd": EngineStatus(enabled: model.swapdEnabled, registered: model.swapdRegistered,
                                       keyPresent: nil, binaryPath: model.swapd?.binaryPath,
                                       daemon: model.swapdEnabled ? Self.daemonWord(model.swapdState) : nil,
-                                      error: model.engineErrors[SwapdEngine.engineID]),
+                                      error: model.engineErrors[SwapdEngine.engineID],
+                                      version: model.swapdVersion),
                 "cliproxy": EngineStatus(enabled: model.cliproxyEnabled,
                                          registered: model.registry.engine(id: CLIProxyEngine.engineID) != nil,
                                          keyPresent: model.cliproxyKeyPresent, binaryPath: nil, daemon: nil,
-                                         error: model.engineErrors[CLIProxyEngine.engineID]),
+                                         error: model.engineErrors[CLIProxyEngine.engineID], version: nil),
                 "9router": EngineStatus(enabled: model.nineRouterEnabled,
                                         registered: model.registry.engine(id: NineRouterEngine.engineID) != nil,
                                         keyPresent: model.nineRouterPasswordPresent, binaryPath: nil, daemon: nil,
-                                        error: model.engineErrors[NineRouterEngine.engineID]),
+                                        error: model.engineErrors[NineRouterEngine.engineID], version: nil),
             ],
             badge: model.engineBadge.map { "\($0)" } ?? "none",
             signInRunning: TokenFlow.shared.running || model.addingFirstAccount,

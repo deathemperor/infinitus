@@ -370,6 +370,27 @@ final class AccountVitalsTests: XCTestCase {
             try usage(#"{"scoped":[{"pct":100,"name":"Fable"}]}"#)))
     }
 
+    func testARowDiesOnAPlanWindowOnlyNeverOnAModelAlone() throws {
+        // Out of Fable with the 7d window up: limited for the fleet-wide
+        // reckonings, alive as a row (user 2026-09-24).
+        let fableOnly = try usage(#"{"fiveHour":{"pct":7},"sevenDay":{"pct":70},"scoped":[{"pct":100,"name":"Fable"}]}"#)
+        XCTAssertTrue(AccountVitals.isDead(fableOnly))
+        XCTAssertFalse(AccountVitals.isPlanDead(fableOnly))
+        XCTAssertFalse(AccountVitals.isPlanDead(try usage(#"{"sevenDay":{"pct":50},"scoped":[{"pct":100,"name":"Fable"}]}"#)))
+        // The Gemini shape has no 5h/7d: its per-model buckets are the plan.
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"scoped":[{"pct":100,"name":"gemini-2.5-pro"}]}"#)))
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"scoped":[{"pct":100,"name":"gemini-2.5-pro"},{"pct":40,"name":"gemini-2.5-flash"}]}"#)),
+                      "any bucket spent, as before #1575: the buckets are the plan")
+        // A plan window spent kills the row whatever the model says.
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"fiveHour":{"pct":100},"scoped":[{"pct":0,"name":"Fable"}]}"#)))
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"sevenDay":{"pct":100.0}}"#)))
+        // Credit-only plans: spent credit is the row's death too, but not
+        // beside a per-model window, and never beside a plan window.
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"spend":{"used":10,"limit":10,"pct":100,"currency":"credits"}}"#)))
+        XCTAssertFalse(AccountVitals.isPlanDead(try usage(#"{"fiveHour":{"pct":10},"spend":{"used":10,"limit":10,"pct":100,"currency":"credits"}}"#)))
+        XCTAssertFalse(AccountVitals.isPlanDead(nil))
+    }
+
     func testSpentCreditAloneIsAlive() throws {
         // Spent usage credit = no overflow buffer; the subscription
         // windows still have headroom, so the account is NOT dead.

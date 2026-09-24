@@ -159,6 +159,14 @@ public struct SwapdCLI: Sendable {
         try decodeList(await run(try arguments(verb, provider: provider), stdin: stdin))
     }
 
+    /// The engine's own version (`version --json`, `{version}`), for the
+    /// `status` reply — which copy of the engine this app runs, bundled or
+    /// installed, so a fix that landed in a release is checked for by name.
+    public func version() async throws -> String {
+        struct Reply: Decodable { let version: String }
+        return try JSONDecoder().decode(Reply.self, from: await run(["version", "--json"])).version
+    }
+
     /// Every provider swapd holds, in one call. No `--provider`: the app
     /// renders one fleet per provider that has accounts.
     public func list() async throws -> SwapdList {
@@ -176,6 +184,26 @@ public struct SwapdCLI: Sendable {
     public func historyData(provider: Provider, limit: Int? = nil) async throws -> Data {
         try await run(["history", "--json", "--provider", Self.providerID(provider)]
                       + (limit.map { ["--limit", String($0)] } ?? []))
+    }
+
+    /// The provider's switching-policy knobs (`config list`), the engine's
+    /// own JSON untouched — the `policy` control verb hands it on as-is, the
+    /// way `history` does: `{settings:[{key, value, isSet, default, help}]}`.
+    public func policyData(provider: Provider) async throws -> Data {
+        try await run(["config", "list", "--json", "--provider", Self.providerID(provider)])
+    }
+
+    /// Set one knob by its bare key (`strategy`); the engine names it
+    /// `<provider>.<key>`. A value off the knob's type or range is refused in
+    /// the engine's words, never clamped. The daemon re-reads its settings
+    /// every tick, so nothing restarts.
+    public func setPolicy(provider: Provider, key: String, value: String) async throws -> Data {
+        try await run(["config", "set", "\(try Self.providerID(provider)).\(key)", value, "--json"])
+    }
+
+    /// Drop one knob so its default applies again.
+    public func unsetPolicy(provider: Provider, key: String) async throws -> Data {
+        try await run(["config", "unset", "\(try Self.providerID(provider)).\(key)", "--json"])
     }
 
     /// Force one usage fetch past the engine's serve floor (`--slot n`), or
