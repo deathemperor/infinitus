@@ -84,6 +84,9 @@ export const InfinitusEngineState = Schema.Struct({
   binaryPath: Schema.optionalKey(Schema.String),
   daemon: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** The engine's own version (swapd `version`), absent until the app has
+      read it and for an engine that has none. */
+  version: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusEngineState = typeof InfinitusEngineState.Type;
 

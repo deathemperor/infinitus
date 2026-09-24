@@ -170,7 +170,7 @@ public struct ControlCommand: Codable, Sendable, Equatable {
                        replyShape: "{schemaVersion, commands:[ControlCommand]}"),
         ControlCommand(name: "status", effect: .read,
                        summary: "App version, which engines are on, engine badge, whether a sign-in is running.",
-                       replyShape: "{version, sha, engines:{swapd:{enabled,registered,binaryPath?,daemon?:stopped|running|backingOff|refused|schemaMismatch,error?}, cliproxy:{enabled,registered,keyPresent,error?}, 9router:{enabled,registered,keyPresent,error?}}, badge, signInRunning, playground, bundlePath, nested}"),
+                       replyShape: "{version, sha, engines:{swapd:{enabled,registered,binaryPath?,daemon?:stopped|running|backingOff|refused|schemaMismatch,error?,version?}, cliproxy:{enabled,registered,keyPresent,error?}, 9router:{enabled,registered,keyPresent,error?}}, badge, signInRunning, playground, bundlePath, nested}"),
         ControlCommand(name: "fleets", effect: .read,
                        summary: "Every fleet with accounts, usage, active/next, the engine's capabilities and, while priority_mode is on, its headroom verdict (#616: absent = mode off or no usage seen yet; a transient usage gap keeps the last verdict; #743: the interrupt mode says critical where hold says low).",
                        replyShape: "[{key, engineID, provider, capabilities:[String], caveat?, activeNumber?, nextCandidate?, candidateOrder?, nextRecovery?, accounts:[Account], headroom?:{state:abundant|low|critical, window, pct, reason}}]"),
