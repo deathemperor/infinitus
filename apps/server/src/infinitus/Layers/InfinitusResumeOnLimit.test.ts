@@ -4,6 +4,7 @@ import {
   DEFAULT_SERVER_SETTINGS,
   EventId,
   type OrchestrationCommand,
+  type OrchestrationEvent,
   type OrchestrationThreadActivity,
   type OrchestrationThreadShell,
   ProviderDriverKind,
@@ -162,6 +163,7 @@ interface Harness {
   readonly nextReport: Effect.Effect<{ account: string; resetsAt: string | null }>;
   readonly setBackground: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly emit: (event: ProviderRuntimeEvent) => Effect.Effect<void>;
+  readonly emitDomain: (event: OrchestrationEvent) => Effect.Effect<void>;
   readonly poll: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly setCurrent: (snapshot: InfinitusSnapshot) => Effect.Effect<void>;
   readonly setEnabled: (enabled: boolean) => Effect.Effect<void>;
@@ -186,6 +188,7 @@ const makeHarnessWith = (
 ) =>
   Effect.gen(function* () {
     const events = yield* Queue.unbounded<ProviderRuntimeEvent>();
+    const domainEvents = yield* Queue.unbounded<OrchestrationEvent>();
     const snapshots = yield* Queue.unbounded<InfinitusSnapshot>();
     const current = yield* Ref.make<InfinitusSnapshot>(stale);
     const enabled = yield* Ref.make(true);
@@ -239,6 +242,9 @@ const makeHarnessWith = (
               ),
           }),
           Layer.mock(OrchestrationEngineService)({
+            get streamDomainEvents() {
+              return Stream.fromQueue(domainEvents);
+            },
             dispatch: (command) =>
               Ref.update(dispatched, (previous) => [...previous, command]).pipe(
                 Effect.as({ sequence: 1 }),
@@ -306,6 +312,7 @@ const makeHarnessWith = (
       reported: Ref.get(reported),
       nextReport: Queue.take(reports),
       emit: (event) => Queue.offer(events, event).pipe(Effect.asVoid),
+      emitDomain: (event) => Queue.offer(domainEvents, event).pipe(Effect.asVoid),
       poll: (snapshot) =>
         Ref.set(current, snapshot).pipe(
           Effect.andThen(Queue.offer(snapshots, snapshot)),
@@ -632,6 +639,29 @@ describe("InfinitusResumeOnLimitLive", () => {
         yield* kept[1]!;
         expect(yield* h.turns).toEqual([{ threadId, input: CONTINUATION_PROMPT }]);
         expect(yield* h.isStopped).toBe(false);
+      }),
+    ),
+  );
+
+  effectIt.effect("forgets a stop when the user settles its thread", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const h = yield* makeHarness;
+        const offline: InfinitusSnapshot = { available: false, fleets: [], commands: [] };
+        yield* h.setCurrent(offline);
+        yield* h.setBackground(stale);
+        yield* h.emit(parkedWarning());
+        yield* h.nextWatch;
+        expect(yield* h.isStopped).toBe(true);
+        yield* h.emitDomain({
+          type: "thread.settled",
+          aggregateKind: "thread",
+          aggregateId: threadId,
+          payload: { threadId, settledAt: at(200), updatedAt: at(200) },
+        } as never);
+        expect(yield* settle(h.isStopped, (stopped) => !stopped)).toBe(false);
+        expect(yield* Stream.runHead(h.stopped)).toEqual(Option.some([]));
+        expect(yield* h.watchers).toBe(0);
       }),
     ),
   );
