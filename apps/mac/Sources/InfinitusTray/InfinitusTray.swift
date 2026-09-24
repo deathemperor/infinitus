@@ -221,7 +221,7 @@ struct InfinitusTray {
             let rows = list.accounts.map { row($0, list: list, recovery: recovery, theme: theme, now: now) }
             let tooltip = rows.joined(separator: "\n")
             let cls: String
-            if let active, AccountVitals.isDead(active.usage) { cls = "dead" }
+            if let active, AccountVitals.isPlanDead(active.usage) { cls = "dead" }
             else if let active, active.usageStatus != "ok" { cls = "warning" }
             else { cls = "ok" }
             emit(WaybarPayload(

@@ -174,7 +174,9 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
     var banded = true
 
     var theme: RowTheme { model.rowTheme }
-    var dead: Bool { AccountVitals.isDead(account.usage) }
+    /// Plan-dead only: a row out of one model keeps its icon and gauges,
+    /// and that model's cell says "down" on its own (`ownCause`).
+    var dead: Bool { AccountVitals.isPlanDead(account.usage) }
 
     /// Narrow contexts: compact rows, and the stacked cards ("make width
     /// smaller even", user 2026-08-30) — both use the short vocabulary.
