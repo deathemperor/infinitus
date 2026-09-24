@@ -330,6 +330,15 @@ function Segment({
 }) {
   const left = position(segment.start, range);
   const width = position(segment.end, range) - left;
+  // The fill ends at the used share of the window's own time, not of the
+  // part on screen, so it lines up against the now line even when the bar
+  // opened before the range did.
+  const fillEnd =
+    segment.pct === null
+      ? null
+      : segment.start + (segment.pct / 100) * (segment.end - segment.start);
+  const fill =
+    fillEnd === null || width <= 0 ? 0 : ((position(fillEnd, range) - left) / width) * 100;
   const resets = instantLabel(segment.end, view, timestampFormat);
   const label = segment.pct === null ? resets : `${segment.pct}% · ${resets}`;
   const what =
@@ -355,10 +364,10 @@ function Segment({
             )}
             style={{ left: `${left}%`, width: `${width}%` }}
           >
-            {segment.kind === "current" && segment.pct !== null && segment.pct > 0 ? (
+            {segment.kind === "current" && fill > 0 ? (
               <span
                 className="absolute inset-y-0 left-0 bg-foreground/20"
-                style={{ width: `${segment.pct}%` }}
+                style={{ width: `${fill}%` }}
                 aria-hidden
               />
             ) : null}
