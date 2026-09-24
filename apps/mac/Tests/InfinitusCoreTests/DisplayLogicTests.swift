@@ -376,7 +376,11 @@ final class AccountVitalsTests: XCTestCase {
         let fableOnly = try usage(#"{"fiveHour":{"pct":7},"sevenDay":{"pct":70},"scoped":[{"pct":100,"name":"Fable"}]}"#)
         XCTAssertTrue(AccountVitals.isDead(fableOnly))
         XCTAssertFalse(AccountVitals.isPlanDead(fableOnly))
-        XCTAssertFalse(AccountVitals.isPlanDead(try usage(#"{"scoped":[{"pct":100,"name":"Fable"}]}"#)))
+        XCTAssertFalse(AccountVitals.isPlanDead(try usage(#"{"sevenDay":{"pct":50},"scoped":[{"pct":100,"name":"Fable"}]}"#)))
+        // The Gemini shape has no 5h/7d: its per-model buckets are the plan.
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"scoped":[{"pct":100,"name":"gemini-2.5-pro"}]}"#)))
+        XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"scoped":[{"pct":100,"name":"gemini-2.5-pro"},{"pct":40,"name":"gemini-2.5-flash"}]}"#)),
+                      "any bucket spent, as before #1575: the buckets are the plan")
         // A plan window spent kills the row whatever the model says.
         XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"fiveHour":{"pct":100},"scoped":[{"pct":0,"name":"Fable"}]}"#)))
         XCTAssertTrue(AccountVitals.isPlanDead(try usage(#"{"sevenDay":{"pct":100.0}}"#)))

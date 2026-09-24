@@ -446,11 +446,15 @@ public enum AccountVitals {
     /// other models as the 7d limit is still up").
     public static func isPlanDead(_ usage: Usage?) -> Bool {
         guard let usage else { return false }
-        var pcts: [Double] = []
-        if let p = usage.fiveHour?.pct { pcts.append(p) }
-        if let p = usage.sevenDay?.pct { pcts.append(p) }
-        if pcts.isEmpty, (usage.scoped ?? []).isEmpty, let spend = usage.spend { return spend.pct >= 100 }
-        return pcts.contains { $0 >= 100 }
+        var plan: [Double] = []
+        if let p = usage.fiveHour?.pct { plan.append(p) }
+        if let p = usage.sevenDay?.pct { plan.append(p) }
+        // No 5h/7d at all is the Gemini shape — one bucket per model, and
+        // those buckets ARE the plan. A Claude account reports both beside
+        // its model windows, so only there is a model window a footnote.
+        if plan.isEmpty { plan = (usage.scoped ?? []).map(\.pct) }
+        if plan.isEmpty, let spend = usage.spend { return spend.pct >= 100 }
+        return plan.contains { $0 >= 100 }
     }
 
     /// The one per-model window that alone kills this account ("Fable"):
