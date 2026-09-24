@@ -116,8 +116,8 @@ export interface EngineStatusRow {
   /** `none` for an engine that holds no key at all — only the proxies do
       (their form is `InfinitusEngineSecrets`, #1177). */
   readonly keyState: "present" | "missing" | "none";
-  /** swapd's daemon word and binary path ("Daemon running · /opt/…"), null
-      for an engine that reports neither (#1235). */
+  /** swapd's version, daemon word and binary path ("Version 0.3.2 · Daemon
+      running · /opt/…"), null for an engine that reports none (#1235). */
   readonly detail: string | null;
   /** The engine's own last error, verbatim, or null. */
   readonly error: string | null;
@@ -133,6 +133,7 @@ const DAEMON_WORDS: Readonly<Record<string, string>> = {
 
 function engineDetail(engine: InfinitusEngineState): string | null {
   const parts = [
+    engine.version === undefined || engine.version === null ? null : `Version ${engine.version}`,
     engine.daemon === undefined ? null : (DAEMON_WORDS[engine.daemon] ?? `Daemon ${engine.daemon}`),
     engine.binaryPath ?? null,
   ].filter((part) => part !== null);

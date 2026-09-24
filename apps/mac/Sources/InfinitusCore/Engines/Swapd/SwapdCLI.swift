@@ -159,6 +159,14 @@ public struct SwapdCLI: Sendable {
         try decodeList(await run(try arguments(verb, provider: provider), stdin: stdin))
     }
 
+    /// The engine's own version (`version --json`, `{version}`), for the
+    /// `status` reply — which copy of the engine this app runs, bundled or
+    /// installed, so a fix that landed in a release is checked for by name.
+    public func version() async throws -> String {
+        struct Reply: Decodable { let version: String }
+        return try JSONDecoder().decode(Reply.self, from: await run(["version", "--json"])).version
+    }
+
     /// Every provider swapd holds, in one call. No `--provider`: the app
     /// renders one fleet per provider that has accounts.
     public func list() async throws -> SwapdList {

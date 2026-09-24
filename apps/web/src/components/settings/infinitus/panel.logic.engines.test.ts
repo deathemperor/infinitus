@@ -15,6 +15,7 @@ const status = {
       registered: true,
       binaryPath: "/opt/homebrew/bin/swapd",
       daemon: "backingOff",
+      version: "0.3.2",
     },
     cliproxy: { enabled: true, registered: false, keyPresent: true, error: "401 from the proxy" },
     "9router": { enabled: false, registered: false, keyPresent: false },
@@ -24,8 +25,17 @@ const status = {
 describe("buildEngineStatusRows (#1235)", () => {
   it("words swapd's daemon state and binary path as the row's detail", () => {
     const swapd = buildEngineStatusRows(status).find((row) => row.key === "swapd")!;
-    expect(swapd.detail).toBe("Daemon backing off · /opt/homebrew/bin/swapd");
+    expect(swapd.detail).toBe("Version 0.3.2 · Daemon backing off · /opt/homebrew/bin/swapd");
     expect(swapd.error).toBeNull();
+  });
+
+  it("leaves the version out until the app has read it", () => {
+    const { version: _version, ...unread } = status.engines.swapd;
+    const swapd = buildEngineStatusRows({
+      ...status,
+      engines: { ...status.engines, swapd: unread },
+    }).find((row) => row.key === "swapd")!;
+    expect(swapd.detail).toBe("Daemon backing off · /opt/homebrew/bin/swapd");
   });
 
   it("carries an engine's own error verbatim and no detail for a proxy", () => {
