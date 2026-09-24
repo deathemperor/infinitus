@@ -57,7 +57,7 @@ export function parsePolicy(result: unknown): InfinitusPolicy | null {
   return Option.isSome(decoded) ? decoded.value : null;
 }
 
-export type PolicyControl =
+type PolicyControl =
   | { readonly kind: "switch" }
   | { readonly kind: "number" }
   | { readonly kind: "select"; readonly choices: ReadonlyArray<string> }
@@ -104,7 +104,7 @@ function bareKey(key: string): string {
   return dot === -1 ? key : key.slice(dot + 1);
 }
 
-export function policyValueText(value: unknown): string {
+function policyValueText(value: unknown): string {
   if (typeof value === "boolean") return value ? "on" : "off";
   if (typeof value === "number") return String(value);
   if (typeof value === "string") return value;
