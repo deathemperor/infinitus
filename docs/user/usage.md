@@ -98,3 +98,20 @@ windows, banked resets and actions. There is no separate hub list under Settings
 Add **Subscription usage** from your iOS or Android widget gallery to see remaining Codex and
 Claude quotas. Tap it to open **Usage → Limits**. On iOS, use **Edit Widget** to choose Session,
 Weekly, or both for each provider. Reopen Infinitus to refresh expired readings.
+
+## Compare activity across machines
+
+Open **Stats** on web or desktop to combine activity from your connected macOS, Linux,
+and Windows environments. Use the environment menu to select individual machines.
+Older servers need an update before they can report Stats; offline environments are
+excluded and the page marks the remaining totals as partial.
+
+Claude and Codex report transcript activity, tokens, and estimated API-equivalent cost.
+Grok contributes saved usage totals. Unknown model prices are marked as unpriced; set
+prices in **Usage → Model prices** or refresh pricing. Repository statistics use locally
+available Git history for the configured Git author; pull-request statistics require
+`gh` to be signed in on the environment. Shared sessions, commits, and pull requests
+count once across machines. The Data coverage note explains missing metrics.
+
+Stats uses your browser's timezone. Long streaks reaching the retained history boundary
+are shown with `≥`. The native Mac Stats view remains local to that Mac.

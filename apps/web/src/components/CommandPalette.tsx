@@ -2062,6 +2062,17 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
+  actionItems.push({
+    kind: "action",
+    value: "action:open-stats",
+    searchTerms: ["stats", "infinitus", "metrics", "commits", "streak", "cost"],
+    title: "Open stats",
+    icon: <ChartLineIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/stats" });
+    },
+  });
+
   if (accountsSupported) {
     actionItems.push({
       kind: "action",
@@ -2077,16 +2088,6 @@ function OpenCommandPaletteDialog(props: {
     // The Infinitus dashboards (#747): reachable from the palette like the
     // pages above, no shortcut of their own.
     actionItems.push(
-      {
-        kind: "action",
-        value: "action:open-stats",
-        searchTerms: ["stats", "infinitus", "metrics", "commits", "streak", "cost"],
-        title: "Open stats",
-        icon: <ChartLineIcon className={ITEM_ICON_CLASS} />,
-        run: async () => {
-          await navigate({ to: "/stats" });
-        },
-      },
       {
         kind: "action",
         value: "action:open-activity",

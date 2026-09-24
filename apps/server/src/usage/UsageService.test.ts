@@ -828,3 +828,96 @@ describe("UsageService", () => {
     }).pipe(Effect.scoped),
   );
 });
+
+describe("portable Stats service", () => {
+  it.live("backfills a Usage cache, resumes activity, and reprices historical Codex usage", () =>
+    Effect.gen(function* () {
+      const { home, settings } = yield* setup;
+      const dir = NodePath.join(home, "codex", "sessions");
+      yield* Effect.promise(() => NodeFSP.mkdir(dir, { recursive: true }));
+      const file = NodePath.join(dir, "rollout.jsonl");
+      const line = (type: string, payload: unknown, second = 0) =>
+        JSON.stringify({
+          type,
+          payload,
+          timestamp: `2026-08-01T10:00:${String(second).padStart(2, "0")}Z`,
+        }) + "\n";
+      const first =
+        line("session_meta", { id: "stats-codex" }) +
+        line("turn_context", { model: "gpt-test", effort: "high" }) +
+        line("event_msg", { type: "user_message", message: "hello" }) +
+        line(
+          "event_msg",
+          {
+            type: "token_count",
+            info: {
+              last_token_usage: {
+                input_tokens: 1000,
+                cached_input_tokens: 600,
+                output_tokens: 200,
+                reasoning_output_tokens: 100,
+              },
+            },
+          },
+          1,
+        ) +
+        line("event_msg", { type: "task_complete" }, 2);
+      yield* Effect.promise(() => NodeFSP.writeFile(file, first));
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        const request = {
+          period: "month" as const,
+          today: UsageDay.make("2026-08-01"),
+          timeZone: "UTC",
+        };
+        yield* service.readSummary(WINDOW);
+        const initial = yield* service.readStats(request);
+        assert.strictEqual(initial.sessions.length, 1);
+        assert.strictEqual(initial.sessions[0]!.days[0]!.day.unpricedRecords, 1);
+        const settingsService = yield* ServerSettings.ServerSettingsService;
+        yield* settingsService.updateSettings({
+          usagePriceOverrides: {
+            "gpt-test": {
+              inputCostPerMillionTokens: 2,
+              outputCostPerMillionTokens: 10,
+              cacheReadCostPerMillionTokens: 0.5,
+            },
+          },
+        });
+        const priced = yield* service.readStats(request);
+        assert.closeTo(priced.sessions[0]!.days[0]!.day.usd!, 0.0031, 1e-9);
+        assert.strictEqual(priced.sessions[0]!.days[0]!.day.humanMessages, 1);
+        yield* Effect.promise(() =>
+          NodeFSP.appendFile(
+            file,
+            line("event_msg", { type: "user_message", message: "again" }, 3) +
+              line(
+                "response_item",
+                {
+                  type: "function_call",
+                  name: "exec_command",
+                  call_id: "c1",
+                  arguments: '{"cmd":"pwd"}',
+                },
+                4,
+              ),
+          ),
+        );
+        const grown = yield* service.readStats(request);
+        assert.strictEqual(grown.sessions[0]!.days[0]!.day.humanMessages, 2);
+        assert.strictEqual(grown.sessions[0]!.days[0]!.day.toolCalls?.exec_command, 1);
+        assert.strictEqual(grown.sessions[0]!.days[0]!.day.outputTokens, 200);
+        const restarted = yield* UsageService.make;
+        assert.deepStrictEqual((yield* restarted.readStats(request)).sessions, grown.sessions);
+        yield* Effect.promise(() => NodeFSP.copyFile(file, NodePath.join(dir, "moved-copy.jsonl")));
+        const copied = yield* service.readStats(request);
+        assert.strictEqual(copied.sessions.length, 1);
+        assert.strictEqual(copied.sessions[0]!.days[0]!.day.outputTokens, 200);
+        yield* Effect.promise(() => NodeFSP.writeFile(file, first));
+        yield* Effect.promise(() => NodeFSP.unlink(NodePath.join(dir, "moved-copy.jsonl")));
+        // Retained copies are still deduplicated after cleanup.
+        assert.strictEqual((yield* service.readStats(request)).sessions.length, 1);
+      }).pipe(Effect.provide(serviceLayers({ prefix: "portable-stats", home, settings })));
+    }).pipe(Effect.scoped),
+  );
+});

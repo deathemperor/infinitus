@@ -330,6 +330,10 @@
     "./device/model": {
       "types": "./src/device/model.ts",
       "default": "./src/device/model.ts"
+    },
+    "./state/stats": {
+      "types": "./src/state/stats.ts",
+      "default": "./src/state/stats.ts"
     }
   },
   "scripts": {
