@@ -1,5 +1,8 @@
 import Crypto
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 #if !os(iOS)
 /// A swapd release installed from the Engines page (#1577), outside the
