@@ -88,4 +88,11 @@ public actor PeerEngine: AccountEngine {
     public func remove(fleet: Provider, number: Int) async throws {
         try await send("remove", fleet: fleet, [String(number)], options: ["yes": "true"])
     }
+
+    /// Spends one of that account's banked resets there (#1554); the other
+    /// machine's own `reset` verb re-checks the bank and its hold.
+    public func reset(fleet: Provider, number: Int) async throws -> [EngineFleet]? {
+        try await send("reset", fleet: fleet, [String(number)])
+        return nil
+    }
 }
