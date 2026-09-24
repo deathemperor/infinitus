@@ -1016,6 +1016,7 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
               threadId,
               thread: Option.some(currentThread),
               project: Option.some(project),
+              publishedAt: DateTime.formatIso(now),
             }).state?.phase,
           ).toBe("completed");
           yield* relay.publishThread(threadId);

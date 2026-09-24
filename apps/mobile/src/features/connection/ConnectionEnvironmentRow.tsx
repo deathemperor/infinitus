@@ -113,18 +113,14 @@ export function ConnectionEnvironmentRow(props: {
               {props.environment.environmentLabel}
             </Text>
           </View>
-<<<<<<< HEAD
-          <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-            {props.environment.displayUrl}
-          </Text>
-          {enabled && roamingLine ? (
-            <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-              {roamingLine}
-=======
           {!props.environment.isRelayManaged && props.environment.displayUrl.trim() ? (
             <Text className="text-xs text-foreground-muted" numberOfLines={1}>
               {props.environment.displayUrl}
->>>>>>> upstream-sync-e67abcf79-upstream-renamed
+            </Text>
+          ) : null}
+          {enabled && roamingLine ? (
+            <Text className="text-xs text-foreground-muted" numberOfLines={1}>
+              {roamingLine}
             </Text>
           ) : null}
           {statusLabel ? (

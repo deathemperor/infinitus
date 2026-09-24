@@ -470,10 +470,7 @@ export const make = Effect.gen(function* () {
     });
     const publishIdentity = agentAwarenessPublishIdentity(snapshot.state);
     const publishedStateByThread = yield* Ref.get(publishedStateByThreadRef);
-<<<<<<< HEAD
     const heartbeat = heartbeatDue.delete(threadId) && snapshot.state !== null;
-    if (!heartbeat && publishedStateByThread.get(threadId) === publishIdentity) {
-=======
     if (
       (snapshot.state?.phase === "completed" || snapshot.state?.phase === "failed") &&
       !publishedStateByThread.has(threadId)
@@ -482,8 +479,7 @@ export const make = Effect.gen(function* () {
       // produce an initial terminal alert; historical threads remain quiet.
       if (Option.isNone(thread) || !terminalWorkSinceStart(thread.value, startedAt)) return;
     }
-    if (publishedStateByThread.get(threadId) === publishIdentity) {
->>>>>>> upstream-sync-e67abcf79-upstream-renamed
+    if (!heartbeat && publishedStateByThread.get(threadId) === publishIdentity) {
       // The projection is back at (or never left) the last published state, so
       // any pending deferred confirmation is moot. Leaving the deadline in
       // place would let a much later transient null find it already expired
