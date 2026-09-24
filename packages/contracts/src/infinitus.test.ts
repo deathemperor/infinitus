@@ -12,6 +12,7 @@ import {
   InfinitusCrashReport,
   InfinitusForecast,
   InfinitusFleet,
+  InfinitusEngineUpdateCheck,
   InfinitusManifest,
   InfinitusPolicy,
   InfinitusPrefs,
@@ -24,6 +25,7 @@ import {
 const decodeReply = Schema.decodeUnknownSync(InfinitusControlReply);
 const decodeStatus = Schema.decodeUnknownSync(InfinitusStatus);
 const decodePolicy = Schema.decodeUnknownSync(InfinitusPolicy);
+const decodeEngineUpdateCheck = Schema.decodeUnknownSync(InfinitusEngineUpdateCheck);
 const decodeFleet = Schema.decodeUnknownSync(InfinitusFleet);
 const decodeForecast = Schema.decodeUnknownSync(InfinitusForecast);
 const decodeManifest = Schema.decodeUnknownSync(InfinitusManifest);
@@ -747,5 +749,26 @@ describe("InfinitusPolicy", () => {
     expect(() =>
       decodePolicy({ fleet: "swapd/claude", settings: [{ key: "claude.enabled", value: true }] }),
     ).toThrow();
+  });
+});
+
+describe("InfinitusEngineUpdateCheck", () => {
+  it("decodes a check with and without a release, and needs the updatable flag", () => {
+    expect(
+      decodeEngineUpdateCheck({
+        engine: "swapd",
+        current: "0.3.2",
+        latest: "0.3.3",
+        updatable: true,
+      }).updatable,
+    ).toBe(true);
+    const failed = decodeEngineUpdateCheck({
+      engine: "swapd",
+      current: "0.3.2",
+      updatable: false,
+      error: "api.github.com answered 403",
+    });
+    expect(failed.latest).toBeUndefined();
+    expect(() => decodeEngineUpdateCheck({ engine: "swapd", current: "0.3.2" })).toThrow();
   });
 });
