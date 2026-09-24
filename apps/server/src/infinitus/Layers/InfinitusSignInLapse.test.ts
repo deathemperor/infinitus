@@ -415,6 +415,27 @@ describe("InfinitusSignInLapseLive (#1076)", () => {
     }),
   );
 
+  effectIt.effect("a login the agent runs inside the hour raises the Mac's login again", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({});
+      yield* h.emit(toolResult(one, SSO_EXPIRED, "aws s3 ls --profile papaya-login"));
+      const run = toolStart(one, "printf 'y\\n' | aws login --profile papaya-login 2>&1 | tail -5");
+      yield* TestClock.adjust(Duration.minutes(20));
+      yield* h.emit(run);
+      // The same tool call relayed again is still one run.
+      yield* h.emit(run);
+      expect((yield* h.rows).map((row) => row.summary)).toEqual([
+        "AWS sign-in needed on papaya-login",
+        "AWS sign-in needed on papaya-login",
+      ]);
+      expect(yield* h.logins).toEqual([
+        ["aws-login", "papaya-login"],
+        ["aws-login", "papaya-login"],
+      ]);
+      expect((yield* h.alerts).length).toBe(2);
+    }),
+  );
+
   effectIt.effect("a lapse in a tool result starts no watch", () =>
     Effect.gen(function* () {
       const h = yield* makeHarness({ phases: ["done"] });
