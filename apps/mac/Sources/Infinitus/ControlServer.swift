@@ -850,6 +850,9 @@ final class ControlServer {
                 throw Fail("swapd \(model.swapdVersion ?? "?") is already the newest release")
             }
             try await updater.install(release)
+            // The reply's flag only tells the CLI to wait; the relaunch is
+            // the model's, as it is for `engine` and the secret verbs.
+            model.relaunchApp()
             return ControlReply(ok: true, result: .object(["restarting": .bool(true), "version": .string(release.version)]),
                                 restarting: true)
 
