@@ -1,1 +1,0 @@
-Desktop: Settings → Devices keeps display preferences and, as a second switch, account names the same on every machine through the desktop app; the iCloud Drive file sync and its usage-history mirror are gone.
