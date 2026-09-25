@@ -14,12 +14,13 @@
     },
     "scripts": {
       // Knip loads its preprocessor through a CLI option, not a source import;
-      // native verification runs directly; the fork's visual pass (harness,
-      // fixture, check) is run by hand and by
-      // .github/workflows/fork-visual-pass.yml (INFINITUS.md).
+      // native verification and worktree setup (from infinitus.json) run
+      // directly; the fork's visual pass (harness, fixture, check) is run by
+      // hand and by .github/workflows/fork-visual-pass.yml (INFINITUS.md).
       "entry": [
         "knip-schemas.ts",
         "mobile-native-client.ts",
+        "setup-worktree.ts",
         "fork-visual-pass.mjs",
         "fork-visual-fixture.mjs",
         "fork-visual-check.ts",
@@ -54,6 +55,8 @@
         "src/snapShot/GlobalShiftShortcutWorker.ts!",
         "src/snapShot/RegionSnapShotWorker.ts!",
         "src/snapShot/SnapShotAccessibilityWorker.ts!",
+        "src/boot.ts!",
+        "src/compileCache.ts!",
         "src/main.ts!",
         "src/preload.ts!",
         "src/preview-pick-preload.ts!",
@@ -66,7 +69,7 @@
       "ignoreDependencies": ["playwright-core", "electron-builder"],
     },
     "apps/web": {
-      // Worktree setup invokes this directly from infinitus.json.
+      // Worktree setup (scripts/setup-worktree.ts) runs this directly.
       "entry": ["scripts/warm-dep-cache.ts"],
       // Upstream's "Usage providers" hub section is not mounted in the fork
       // (#1554); the two files stay unedited so upstream merges stay small.

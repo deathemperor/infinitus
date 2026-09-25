@@ -360,17 +360,17 @@ export function InfinitusEngineSecrets({
               />
             )}
             {probes[engine.key] === undefined ? null : (
-              <p role="status" className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">
+              <p role="status" className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
                 {probes[engine.key]}
               </p>
             )}
             {state?.error ? (
-              <p className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">
+              <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
                 Last error from the engine: {state.error}
               </p>
             ) : null}
             {error === undefined ? null : (
-              <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+              <p role="alert" className="px-3 py-2 text-sm text-destructive sm:px-4">
                 {error}
               </p>
             )}
@@ -378,7 +378,7 @@ export function InfinitusEngineSecrets({
         );
       })}
       {relaunching ? (
-        <p className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">{RELAUNCHING}</p>
+        <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">{RELAUNCHING}</p>
       ) : null}
     </>
   );
@@ -458,13 +458,13 @@ function ProxyRoutingRows({
       ) : null}
       {notes.note === null ? null : (
         <p
-          className={`px-3 py-2 text-[13px] sm:px-4 ${notes.note.tone === "warn" ? "text-warning-foreground" : "text-muted-foreground"}`}
+          className={`px-3 py-2 text-sm sm:px-4 ${notes.note.tone === "warn" ? "text-warning-foreground" : "text-muted-foreground"}`}
         >
           {notes.note.text}
         </p>
       )}
       {state?.caveat ? (
-        <p className="px-3 py-2 text-[13px] text-muted-foreground sm:px-4">{state.caveat}</p>
+        <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">{state.caveat}</p>
       ) : null}
     </>
   );

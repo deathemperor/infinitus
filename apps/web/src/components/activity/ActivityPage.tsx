@@ -171,7 +171,7 @@ export function ActivityPage() {
                       {formatShortTimestamp(row.at, timestampFormat)}
                     </span>
                     {chip === undefined ? null : (
-                      <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
+                      <span className="shrink-0 rounded bg-muted px-1 text-3xs text-muted-foreground">
                         {chip}
                       </span>
                     )}

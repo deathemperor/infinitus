@@ -221,13 +221,7 @@ function foldSessionUsage(
     }
     any = true;
     totals = addTotals(totals, record.totals);
-    const priced = priceUsage(
-      rates,
-      record.model,
-      record.totals,
-      record.reportedCostUsd,
-      overrides,
-    );
+    const priced = priceUsage(rates, record, overrides);
     if (priced.costSource !== "unpriced") costUsd = (costUsd ?? 0) + priced.costUsd;
     if (record.model.length > 0 && !models.includes(record.model)) models.push(record.model);
     if (record.timestampMs > lastMs) lastMs = record.timestampMs;
@@ -333,7 +327,7 @@ export const make = Effect.gen(function* () {
 
     yield* encodeRatesCache({ fetchedAtMs: now, document: fetched }).pipe(
       Effect.flatMap((serialized) => fileSystem.writeFileString(ratesCachePath, serialized)),
-      Effect.catchCause(() => Effect.void),
+      Effect.ignoreCause,
     );
   });
 
@@ -480,7 +474,7 @@ export const make = Effect.gen(function* () {
         cacheDirty = false;
       }),
       // A cache we cannot write is a slower next start, not a failed read.
-      Effect.catchCause(() => Effect.void),
+      Effect.ignoreCause,
     );
   });
 

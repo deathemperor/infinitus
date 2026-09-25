@@ -12,6 +12,7 @@ const rates: RateTable = new Map([
       outputCostPerToken: 5e-5,
       cacheReadCostPerToken: 1e-6,
       cacheCreationCostPerToken: 1.25e-5,
+      fastMultiplier: 1,
     },
   ],
 ]);
@@ -31,6 +32,7 @@ function record(overrides: Partial<UsageRecord> = {}): UsageRecord {
       reasoningTokens: 0,
     },
     reportedCostUsd: null,
+    fast: false,
     dedupeKey: null,
     ...overrides,
   };
@@ -203,7 +205,7 @@ describe("UsageAggregator", () => {
   });
 
   it("attributes Claude records to the account the hook names, the rest to unattributed or notClaude", () => {
-    const oneRecordUsd = priceUsage(rates, record().model, record().totals, null).costUsd;
+    const oneRecordUsd = priceUsage(rates, record()).costUsd;
     const aggregator = new UsageAggregator({
       timeZone: "UTC",
       sinceDay: "2026-08-01",

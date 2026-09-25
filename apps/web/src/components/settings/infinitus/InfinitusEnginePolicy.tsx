@@ -118,7 +118,7 @@ export function InfinitusEnginePolicy({
             title={`Switching policy · ${fleet}`}
           >
             {policy === undefined || (policy.rows.length === 0 && policy.error === null) ? (
-              <p role="status" className="px-3 py-3 text-[13px] text-muted-foreground sm:px-4">
+              <p role="status" className="px-3 py-3 text-sm text-muted-foreground sm:px-4">
                 Reading the engine's settings…
               </p>
             ) : null}
@@ -133,7 +133,7 @@ export function InfinitusEnginePolicy({
               />
             ))}
             {policy?.error === null || policy?.error === undefined ? null : (
-              <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+              <p role="alert" className="px-3 py-2 text-sm text-destructive sm:px-4">
                 {policy.error}
               </p>
             )}

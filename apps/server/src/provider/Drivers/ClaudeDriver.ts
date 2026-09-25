@@ -31,13 +31,13 @@ import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeClaudeAdapter } from "../Layers/ClaudeAdapter.ts";
 import { makeClaudeScopedLimitNames } from "../Layers/claudeUsageLimits.ts";
+import * as ResetCreditCoordinator from "../Layers/resetCreditCoordinator.ts";
 import {
   type ClaudeLoginLocation,
   claudeKeychainService,
   consumeClaudeResetCredit,
   readClaudeResetCredits,
 } from "../Layers/claudeResetCredits.ts";
-import * as CodexResetCredit from "../Layers/codexResetCredit.ts";
 import {
   checkClaudeProviderStatus,
   makePendingClaudeProvider,
@@ -98,7 +98,7 @@ const UPDATE = makePackageManagedProviderMaintenanceResolver({
 export type ClaudeDriverEnv =
   | BackgroundPolicy.BackgroundPolicy
   | ChildProcessSpawner.ChildProcessSpawner
-  | CodexResetCredit.CodexResetCreditCoordinator
+  | ResetCreditCoordinator.ResetCreditCoordinator
   | Crypto.Crypto
   | FileSystem.FileSystem
   | HttpClient.HttpClient
@@ -123,7 +123,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
       const path = yield* Path.Path;
       const { cwd } = yield* ServerConfig;
       const httpClient = yield* HttpClient.HttpClient;
-      const resetCreditCoordinator = yield* CodexResetCredit.CodexResetCreditCoordinator;
+      const resetCreditCoordinator = yield* ResetCreditCoordinator.ResetCreditCoordinator;
       const serverSettings = yield* ServerSettingsService;
       const eventLoggers = yield* ProviderEventLoggers;
       const modelManifest = yield* ModelManifest.ModelManifest;
@@ -295,18 +295,21 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
             );
 
       // Same rules as Codex: serialised on the config directory that holds
-      // the login, one request id kept until Claude answers, then a re-probe
-      // so the snapshot says what the reset did. The windows live in the
-      // capabilities cache, so it is dropped first or the re-probe would
-      // republish the pre-reset bars for the rest of the TTL.
+      // the login, one request id kept until Claude answers (a cooldown or
+      // rate limit is an answer), then a re-probe so the snapshot says what
+      // the reset did. The windows live in the capabilities cache, so it is
+      // dropped first or the re-probe would republish the pre-reset bars for
+      // the rest of the TTL.
       const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = () =>
         Effect.gen(function* () {
           const current = yield* snapshot.getSnapshot;
           const grantId = current.usageLimits?.resetCredits?.nextCreditId;
           if (!grantId || !current.version) return "noCredit" as const;
           const version = current.version;
-          return yield* resetCreditCoordinator.redeem(login.configDir, (requestId) =>
-            consumeClaudeResetCredit({ login, version, grantId, requestId }),
+          return yield* resetCreditCoordinator.redeem(
+            login.configDir,
+            (requestId) => consumeClaudeResetCredit({ login, version, grantId, requestId }),
+            (error) => error._tag === "ClaudeResetCreditError" && error.reason !== "requestFailed",
           );
         }).pipe(
           Effect.provideService(HttpClient.HttpClient, httpClient),
@@ -325,16 +328,19 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
                 cause,
               }),
           ),
-          Effect.tap(() =>
+          // Re-probe after any answer, but only a reset claims the limits
+          // changed, so only a reset reports an unconfirmed refresh.
+          Effect.tap((outcome) =>
             Effect.gen(function* () {
               const before = (yield* snapshot.getSnapshot).usageLimits?.checkedAt;
               yield* invalidateCaches;
               const refreshed = yield* snapshot.refresh;
               const after = refreshed.usageLimits?.checkedAt;
               if (
-                after === undefined ||
-                after === before ||
-                refreshed.usageLimits?.unavailable?.reason === "probeFailed"
+                outcome === "reset" &&
+                (after === undefined ||
+                  after === before ||
+                  refreshed.usageLimits?.unavailable?.reason === "probeFailed")
               ) {
                 return yield* new ProviderDriverError({
                   driver: DRIVER_KIND,

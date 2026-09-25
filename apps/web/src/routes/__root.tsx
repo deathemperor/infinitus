@@ -31,10 +31,10 @@ import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
 import { InfinitusPeerFleets } from "../components/InfinitusPeerFleets";
 import { InfinitusSettingsSync } from "../components/InfinitusSettingsSync";
-import { isElectron } from "../env";
 import { DesktopBadgeCoordinator } from "../components/desktop/DesktopBadgeCoordinator";
 import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAwakeCoordinator";
 import { NotificationModeMigration } from "../components/desktop/NotificationModeMigration";
+import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
 import { ThreadNotificationCoordinator } from "../components/ThreadNotificationCoordinator";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
@@ -52,6 +52,7 @@ import {
   toastManager,
 } from "../components/ui/toast";
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
+import { isElectron } from "../env";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
 import { useClientSettings } from "../hooks/useSettings";
@@ -229,6 +230,7 @@ function RootRouteView() {
           {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
           {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
           {primaryEnvironmentAuthenticated ? <DeepLinkCoordinator /> : null}
+          {isElectron ? <RunningThreadKeepAlive /> : null}
           <RelayClientInstallDialog />
           <ConnectOnboardingDialog />
           <SshPasswordPromptDialog />
