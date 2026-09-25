@@ -137,7 +137,7 @@ export function InfinitusEngineProcessRows({
         }
       />
       {error !== null && error.key === engine.key ? (
-        <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+        <p role="alert" className="px-3 py-2 text-sm text-destructive sm:px-4">
           {error.message}
         </p>
       ) : null}

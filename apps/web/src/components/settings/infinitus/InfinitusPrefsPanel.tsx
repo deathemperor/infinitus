@@ -74,7 +74,7 @@ const NO_GROUPING: Intl.NumberFormatOptions = { useGrouping: false };
 /** Everything the panes say when there is nothing to edit yet. */
 export function InfinitusPanelNotice({ message }: { readonly message: string }) {
   return (
-    <p role="status" className="px-3 py-3 text-[13px] text-muted-foreground sm:px-4">
+    <p role="status" className="px-3 py-3 text-sm text-muted-foreground sm:px-4">
       {message}
     </p>
   );
@@ -327,7 +327,7 @@ export function InfinitusPrefsPanel({
       {lead}
       {children}
       {writeState.relaunching ? (
-        <p role="status" className="px-3 text-[13px] text-muted-foreground sm:px-4">
+        <p role="status" className="px-3 text-sm text-muted-foreground sm:px-4">
           Infinitus is relaunching — this page picks up again when it answers.
         </p>
       ) : null}

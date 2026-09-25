@@ -49,10 +49,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
   also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
   in the sidebar's utility row, so their Back returns to the main app (#1601).
-- `vite.config.ts` — one override turning `shadcn/no-arbitrary-values` and
-  `shadcn/no-raw-colors` off for the fork-only web pages written before
-  upstream added those rules (#1601); a file leaves the list once it uses
-  theme tokens.
 - `apps/desktop/src/updates/updatesTestHarness.ts` — the `resourcesPath`
   option (#1042); under upstream's no-op file system, reads below it go to
   the real disk so the feed-swap test's own `app-update.yml` is found.

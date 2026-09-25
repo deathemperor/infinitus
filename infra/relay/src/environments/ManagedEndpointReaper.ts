@@ -40,7 +40,7 @@ export class ManagedEndpointReaper extends Context.Service<
       | ManagedEndpointAllocations.ManagedEndpointAllocationPersistenceError
     >;
   }
->()("t3code-relay/environments/ManagedEndpointReaper") {}
+>()("infinitus-relay/environments/ManagedEndpointReaper") {}
 
 function isExpiredManagedTunnel(input: {
   readonly tunnel: ManagedEndpointProvider.ManagedEndpointTunnel;

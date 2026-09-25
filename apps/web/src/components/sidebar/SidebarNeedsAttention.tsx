@@ -38,7 +38,7 @@ const holdsByEnvironmentAtom = Atom.family((key: string) =>
 // Same words and hues as the rows' status pills, so a thread reads the same
 // here and in its place in the list.
 const STATUS_LABEL: Record<NeedsAttentionStatus, { label: string; className: string }> = {
-  approval: { label: "Approval", className: "text-amber-700 dark:text-amber-300" },
+  approval: { label: "Approval", className: "text-warning-foreground" },
   input: { label: "Input", className: "text-indigo-600 dark:text-indigo-300" },
   held: { label: "Held", className: "text-muted-foreground" },
   limited: { label: "Limit", className: "text-muted-foreground" },
@@ -84,12 +84,12 @@ export function SidebarNeedsAttention(props: {
         onClick={props.onToggle}
         aria-expanded={props.expanded}
         data-testid="sidebar-needs-attention-toggle"
-        className="flex h-8 w-full cursor-pointer items-center gap-2 px-2 text-left text-xs font-medium text-amber-700 dark:text-amber-300"
+        className="flex h-8 w-full cursor-pointer items-center gap-2 px-2 text-left text-xs font-medium text-warning-foreground"
       >
         <span className="shrink-0">
           {props.expanded ? "Needs attention" : `Needs attention (${entries.length})`}
         </span>
-        <span aria-hidden className="h-px min-w-2 flex-1 bg-amber-500/25 dark:bg-amber-400/20" />
+        <span aria-hidden className="h-px min-w-2 flex-1 bg-warning/25" />
         <ChevronDownIcon
           aria-hidden
           className={cn("size-3 shrink-0 transition-transform", props.expanded && "rotate-180")}

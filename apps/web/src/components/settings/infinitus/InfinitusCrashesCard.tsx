@@ -104,7 +104,7 @@ export function InfinitusCrashesCard() {
 
   return (
     <SettingsSection id="infinitus-crashes" title="Crash reports">
-      <div className="flex flex-col gap-3 px-3 py-3 text-[13px] sm:px-4">
+      <div className="flex flex-col gap-3 px-3 py-3 text-sm sm:px-4">
         {reports !== null && shown.length === 0 ? (
           <p role="status" className="text-muted-foreground">
             {EMPTY_NOTICE}

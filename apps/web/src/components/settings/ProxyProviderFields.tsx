@@ -146,7 +146,7 @@ export function ProxyProviderFields({
       <label className="flex items-center justify-between gap-3">
         <span className="grid gap-0.5">
           <span className="text-xs font-medium text-foreground">Route through a proxy</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-2xs text-muted-foreground">
             {driver === "pi"
               ? "9Router, CLIProxyAPI or any OpenAI-compatible endpoint, with its own config dir."
               : "9Router, CLIProxyAPI or any Anthropic-compatible endpoint, with its own config dir."}
@@ -216,7 +216,7 @@ export function ProxyProviderFields({
                 {loading ? "Loading…" : "Load models"}
               </Button>
             </div>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-2xs text-muted-foreground">
               {loadError ??
                 (models
                   ? `${models.length} models listed; pick them below.`
@@ -285,12 +285,12 @@ export function ProxyProviderFields({
               />
             )}
           </div>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-2xs text-muted-foreground">
             {driver === "claude"
               ? "The slots map Claude's model names onto the proxy's. Picked models are added to this instance's custom models so you can choose them directly."
               : "Picked models are added to this instance's custom models as proxy/<model>; pick at least one, since Pi lists only declared models."}
           </span>
-          {error ? <span className="text-[11px] text-destructive">{error}</span> : null}
+          {error ? <span className="text-2xs text-destructive">{error}</span> : null}
         </>
       ) : null}
     </div>

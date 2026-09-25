@@ -271,10 +271,10 @@ export function AccountRow({
           </Badge>
         ) : null}
         {row.preferred ? (
-          <StarIcon className="size-3 fill-current text-yellow-500" aria-label="Preferred" />
+          <StarIcon className="size-3 fill-current text-warning" aria-label="Preferred" />
         ) : null}
         {row.autoIgnite ? (
-          <FlameIcon className="size-3 fill-current text-orange-500" aria-label="Kept warm" />
+          <FlameIcon className="size-3 fill-current text-warning" aria-label="Kept warm" />
         ) : null}
         {row.plan === null ? null : (
           <span className="text-muted-foreground text-xs">{row.plan}</span>
@@ -332,7 +332,7 @@ export function AccountRow({
                       className={cn(
                         "size-3",
                         action === "prefer" && row.preferred && "fill-current",
-                        action === "autoIgnite" && row.autoIgnite && "fill-current text-orange-500",
+                        action === "autoIgnite" && row.autoIgnite && "fill-current text-warning",
                       )}
                     />
                   )}

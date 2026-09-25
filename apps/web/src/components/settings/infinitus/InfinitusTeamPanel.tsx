@@ -263,7 +263,7 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
         )}
         {notice === null ? null : <InfinitusPanelNotice message={notice} />}
         {error === null ? null : (
-          <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+          <p role="alert" className="px-3 py-2 text-sm text-destructive sm:px-4">
             {error}
           </p>
         )}
@@ -371,7 +371,7 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
                 }
               />
             ))}
-            <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+            <p className="px-3 pb-2 text-sm text-muted-foreground sm:px-4">
               What every machine of yours publishes to this team, once a minute for Now and every
               five for the rest. Transcripts are redacted before they leave, and kept 90 days.
             </p>
@@ -570,7 +570,7 @@ function MembersSection({
               }
             />
             {expanded !== member.userId ? null : (
-              <div className="flex flex-col gap-2 px-3 pb-3 text-[13px] sm:px-4">
+              <div className="flex flex-col gap-2 px-3 pb-3 text-sm sm:px-4">
                 {member.machines.map((machine) => {
                   const now = machineNow(machine);
                   return (
@@ -707,7 +707,7 @@ function InvitesSection({
               disabled={busy !== null}
               onChange={(event) => setDays(event.currentTarget.value)}
             />
-            <label className="flex items-center gap-2 text-[13px]">
+            <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 aria-label="One use"
                 checked={oneUse}
@@ -745,11 +745,11 @@ function InvitesSection({
             </Button>
           </div>
           {copyError === null ? null : (
-            <p role="alert" className="text-[13px] text-destructive">
+            <p role="alert" className="text-sm text-destructive">
               {copyError}
             </p>
           )}
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             The link opens Infinitus on a phone or a desktop; the token pastes into Settings › Team
             anywhere.
           </p>
@@ -925,7 +925,7 @@ function GrantsSection({
               />
             </div>
             {TEAM_CAPABILITIES.map(({ capability, label, asks }) => (
-              <div key={capability} className="flex items-center gap-4 text-[13px]">
+              <div key={capability} className="flex items-center gap-4 text-sm">
                 <label className="flex items-center gap-2">
                   <Checkbox
                     aria-label={`Allow ${capability}`}
@@ -959,7 +959,7 @@ function GrantsSection({
             </div>
           </form>
         )}
-        <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+        <p className="px-3 pb-2 text-sm text-muted-foreground sm:px-4">
           Interrupt and new ask you first unless ticked; view and send never ask. The desktop runs
           what it is asked within fifteen seconds.
         </p>
@@ -1147,7 +1147,7 @@ function JoinSection({
           </Button>
         </div>
         {error === null ? null : (
-          <p role="alert" className="text-[13px] text-destructive">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}
@@ -1218,7 +1218,7 @@ function CreateSection({
           disabled={busy !== null}
           onChange={(event) => setMemberName(event.currentTarget.value)}
         />
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           You become its founding leader. Nothing to host: the team lives on {CONNECT_NAME}.
         </p>
         <div className="flex items-center justify-end gap-2">
@@ -1227,7 +1227,7 @@ function CreateSection({
           </Button>
         </div>
         {error === null ? null : (
-          <p role="alert" className="text-[13px] text-destructive">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}
@@ -1325,12 +1325,12 @@ function PrivateProjectsSection() {
           Keep private
         </Button>
       </form>
-      <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+      <p className="px-3 pb-2 text-sm text-muted-foreground sm:px-4">
         Nothing from a private project leaves this Mac: no thread, no transcript, no stats. Local to
         the Mac, never sent.
       </p>
       {error === null ? null : (
-        <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+        <p role="alert" className="px-3 py-2 text-sm text-destructive sm:px-4">
           {error}
         </p>
       )}
