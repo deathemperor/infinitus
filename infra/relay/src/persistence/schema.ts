@@ -190,3 +190,7 @@ export const relayDpopProofs = pgTable(
     index("idx_relay_dpop_proofs_expires_at").on(table.expiresAt),
   ],
 );
+
+// Fork (#1592): the Infinitus Team tables live in their own file; `Drizzle.Schema`
+// reads this one path, so they are re-exported here for the migration generator.
+export * from "../infinitusTeam/schema.ts";

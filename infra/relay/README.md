@@ -83,7 +83,8 @@ in this directory):
 vp run --filter infinitus-relay deploy
 ```
 
-The stack provisions the Cloudflare Worker and queues, managed endpoint resources, database
+The stack provisions the Cloudflare Worker and queues, the team transcripts R2 bucket (the API
+token needs Workers R2 Storage Read and Write, #1592), managed endpoint resources, database
 connectivity, and relay tracing resources. Copy [`infra/relay/.env.example`](./.env.example) to
 `infra/relay/.env` and fill in the deployment-specific values before deploying. Alchemy loads that
 file from the relay directory. Runtime secrets include Clerk, APNs, and optional FCM credentials. Set
