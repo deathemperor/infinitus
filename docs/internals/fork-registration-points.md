@@ -76,12 +76,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
-  routes (#710), and `InfinitusTeamControlHttpApi`: a teammate's sealed team
-  command for the Mac (#1313), so the typed HTTP clients carry them; the
+  routes (#710), so the typed HTTP clients carry them (the git-store team's
+  `InfinitusTeamControlHttpApi` left with #1592); the
   `infinitus` group's `POST /api/infinitus/alert` (#1375) takes the Mac's
   account alert on the operate scope.
 - `packages/contracts/package.json` — the `./infinitus`,
-  `./infinitusPairing`, `./infinitusTeamControl`, `./captures`,
+  `./infinitusPairing`, `./captures`,
   `./infinitusAlert`, `./relayInfinitusAlert` (#1375) and
   `./relayInfinitusTeam` (#1592) subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
@@ -162,8 +162,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`.
-  `infinitusPairingHttpApiLayer` and `infinitusTeamControlHttpApiLayer` in
-  `makeRoutesLayer`
+  `infinitusPairingHttpApiLayer` in `makeRoutesLayer`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
   client and `ProcessRunner.layer` (#1076; the thread-card layer it was merged with left with #1375).
   `infinitusHttpApiLayer` is provided `InfinitusAlertRelayLive` over the
@@ -605,7 +604,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac) and the `SettingsTeam` route
-  (Settings › Team, #1313; `team?code=…` is where an invite link lands).
+  (Settings › Team, #1313, on the relay since #1592; `team?code=…` is where an invite link lands).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` and `SettingsTeam` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the rows of
@@ -644,7 +643,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fork's build fell through to upstream's T3 mark and drew the T3 logo
   beside the Infinitus wordmark on every loading screen. Any new
   variant-keyed asset needs an `infinitus` branch for the same reason.
-- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
+- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313, #1592: `infinitus.run/join#<token>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
   `infinitusComposerSendMode` (#807, `"queue" | "steer"`) keys (interface
