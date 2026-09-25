@@ -153,8 +153,19 @@ page, or **Settings → Infinitus Connect** on mobile, and choose **Deregister**
 revokes its cloud access and frees its host space even when the environment is
 offline or has been wiped.
 
+<<<<<<< HEAD
 On a command-line host, `infinitus connect unlink` disables exposure while retaining
 your login; `infinitus connect logout` also clears that login. Background-service
+=======
+When idle tunnel cleanup is enabled, Infinitus Connect removes a linked environment's
+tunnel after it stays offline for several minutes. The environment stays linked
+and keeps the same address. When the host starts again or wakes, Infinitus Connect
+creates a replacement tunnel on its own. You do not need to pair again. Cleanup
+usually runs five to ten minutes after the tunnel goes down.
+
+On a command-line host, `t3 connect unlink` disables exposure while retaining
+your login; `t3 connect logout` also clears that login. Background-service
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
 [removal](./background-service.md#manage-the-service) is separate.
 
 Treat pairing URLs and authorization codes as passwords. Do not include them in

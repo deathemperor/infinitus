@@ -674,6 +674,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
+          auto_settle_disabled_at AS "autoSettleDisabledAt",
           title_regeneration_request_id AS "titleRegenerationRequestId",
           title_regeneration_started_at AS "titleRegenerationStartedAt",
           latest_user_message_at AS "latestUserMessageAt",
@@ -719,6 +720,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
+          auto_settle_disabled_at AS "autoSettleDisabledAt",
           title_regeneration_request_id AS "titleRegenerationRequestId",
           title_regeneration_started_at AS "titleRegenerationStartedAt",
           latest_user_message_at AS "latestUserMessageAt",
@@ -796,6 +798,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
+          auto_settle_disabled_at AS "autoSettleDisabledAt",
           title_regeneration_request_id AS "titleRegenerationRequestId",
           title_regeneration_started_at AS "titleRegenerationStartedAt",
           latest_user_message_at AS "latestUserMessageAt",
@@ -1420,6 +1423,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           pinned_at AS "pinnedAt",
           pin_order_key AS "pinOrderKey",
           active_order_key AS "activeOrderKey",
+          auto_settle_disabled_at AS "autoSettleDisabledAt",
           title_regeneration_request_id AS "titleRegenerationRequestId",
           title_regeneration_started_at AS "titleRegenerationStartedAt",
           latest_user_message_at AS "latestUserMessageAt",
@@ -2523,7 +2527,11 @@ pending_approval_requests AS (
                 pinnedAt: row.pinnedAt,
                 pinOrderKey: row.pinOrderKey ?? null,
                 activeOrderKey: row.activeOrderKey ?? null,
+<<<<<<< HEAD
                 ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
+=======
+                autoSettleDisabledAt: row.autoSettleDisabledAt ?? null,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
                 titleRegeneration: mapTitleRegeneration(row),
                 titleState: row.titleState,
                 deletedAt: row.deletedAt,
@@ -2783,7 +2791,11 @@ pending_approval_requests AS (
                   pinnedAt: row.pinnedAt,
                   pinOrderKey: row.pinOrderKey ?? null,
                   activeOrderKey: row.activeOrderKey ?? null,
+<<<<<<< HEAD
                   ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
+=======
+                  autoSettleDisabledAt: row.autoSettleDisabledAt ?? null,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
                   titleRegeneration: mapTitleRegeneration(row),
                   titleState: row.titleState,
                   deletedAt: row.deletedAt,
@@ -2961,7 +2973,11 @@ pending_approval_requests AS (
                         pinnedAt: row.pinnedAt,
                         pinOrderKey: row.pinOrderKey ?? null,
                         activeOrderKey: row.activeOrderKey ?? null,
+<<<<<<< HEAD
                         ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
+=======
+                        autoSettleDisabledAt: row.autoSettleDisabledAt ?? null,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
                         titleRegeneration: mapTitleRegeneration(row),
                         titleState: row.titleState,
                         session: sessionByThread.get(row.threadId) ?? null,
@@ -3146,7 +3162,11 @@ pending_approval_requests AS (
                   pinnedAt: row.pinnedAt,
                   pinOrderKey: row.pinOrderKey ?? null,
                   activeOrderKey: row.activeOrderKey ?? null,
+<<<<<<< HEAD
                   ...queuedTurnsField(queuedTurnsByThread.get(row.threadId)),
+=======
+                  autoSettleDisabledAt: row.autoSettleDisabledAt ?? null,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
                   titleRegeneration: mapTitleRegeneration(row),
                   titleState: row.titleState,
                   session: sessionByThread.get(row.threadId) ?? null,
@@ -3538,7 +3558,11 @@ pending_approval_requests AS (
         pinnedAt: threadRow.value.pinnedAt,
         pinOrderKey: threadRow.value.pinOrderKey ?? null,
         activeOrderKey: threadRow.value.activeOrderKey ?? null,
+<<<<<<< HEAD
         ...queuedTurnsField(queuedTurnRows.map(mapQueuedTurnRow)),
+=======
+        autoSettleDisabledAt: threadRow.value.autoSettleDisabledAt ?? null,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
         titleRegeneration: mapTitleRegeneration(threadRow.value),
         titleState: threadRow.value.titleState,
         session: Option.isSome(sessionRow) ? mapSessionRow(sessionRow.value) : null,
@@ -3853,7 +3877,11 @@ pending_approval_requests AS (
         pinnedAt: threadRow.value.pinnedAt,
         pinOrderKey: threadRow.value.pinOrderKey ?? null,
         activeOrderKey: threadRow.value.activeOrderKey ?? null,
+<<<<<<< HEAD
         ...queuedTurnsField(queuedTurnRows.map(mapQueuedTurnRow)),
+=======
+        autoSettleDisabledAt: threadRow.value.autoSettleDisabledAt ?? null,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
         titleRegeneration: mapTitleRegeneration(threadRow.value),
         titleState: threadRow.value.titleState,
         deletedAt: null,

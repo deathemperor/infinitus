@@ -31,6 +31,8 @@ import { ServerSettingsService } from "../../serverSettings.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeClaudeAdapter } from "../Layers/ClaudeAdapter.ts";
 import { makeClaudeScopedLimitNames } from "../Layers/claudeUsageLimits.ts";
+import * as ClaudeResetCredits from "../Layers/claudeResetCredits.ts";
+import * as ResetCreditCoordinator from "../Layers/resetCreditCoordinator.ts";
 import {
   type ClaudeLoginLocation,
   claudeKeychainService,
@@ -98,7 +100,11 @@ const UPDATE = makePackageManagedProviderMaintenanceResolver({
 export type ClaudeDriverEnv =
   | BackgroundPolicy.BackgroundPolicy
   | ChildProcessSpawner.ChildProcessSpawner
+<<<<<<< HEAD
   | CodexResetCredit.CodexResetCreditCoordinator
+=======
+  | ResetCreditCoordinator.ResetCreditCoordinator
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   | Crypto.Crypto
   | FileSystem.FileSystem
   | HttpClient.HttpClient
@@ -123,7 +129,11 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
       const path = yield* Path.Path;
       const { cwd } = yield* ServerConfig;
       const httpClient = yield* HttpClient.HttpClient;
+<<<<<<< HEAD
       const resetCreditCoordinator = yield* CodexResetCredit.CodexResetCreditCoordinator;
+=======
+      const resetCreditCoordinator = yield* ResetCreditCoordinator.ResetCreditCoordinator;
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
       const serverSettings = yield* ServerSettingsService;
       const eventLoggers = yield* ProviderEventLoggers;
       const modelManifest = yield* ModelManifest.ModelManifest;
@@ -152,6 +162,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         effectiveConfig,
         processEnv,
       );
+<<<<<<< HEAD
       // The login the CLI uses for this instance (banked resets, #1553): its
       // config directory and, on macOS, the keychain item the CLI derives from
       // the exact `CLAUDE_CONFIG_DIR` it sees — the resolved path
@@ -164,6 +175,14 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
             : processEnv.CLAUDE_CONFIG_DIR?.trim() || undefined,
         ),
       };
+=======
+      const configDir = yield* resolveClaudeHomePath(effectiveConfig, processEnv);
+      const accountConfigPath = yield* ClaudeResetCredits.claudeAccountConfigPath(
+        effectiveConfig.homePath.trim() || processEnv.CLAUDE_CONFIG_DIR?.trim()
+          ? configDir
+          : undefined,
+      );
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
       const stampIdentity = withInstanceIdentity({
         instanceId,
         driverKind: DRIVER_KIND,
@@ -236,7 +255,16 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
                 cwd,
                 resolveClaudeModelCatalog(manifest),
                 scopedLimitNames,
+<<<<<<< HEAD
                 (version) => Cache.get(resetCreditsCache, version),
+=======
+                (version) =>
+                  ClaudeResetCredits.readClaudeResetCredits(configDir, version).pipe(
+                    Effect.provideService(HttpClient.HttpClient, httpClient),
+                    Effect.provideService(FileSystem.FileSystem, fileSystem),
+                    Effect.provideService(Path.Path, path),
+                  ),
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
               ),
             ),
             Effect.map(stampIdentity),
@@ -294,25 +322,48 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
               Effect.provideService(Path.Path, path),
             );
 
+<<<<<<< HEAD
       // Same rules as Codex: serialised on the config directory that holds
       // the login, one request id kept until Claude answers, then a re-probe
       // so the snapshot says what the reset did. The windows live in the
       // capabilities cache, so it is dropped first or the re-probe would
       // republish the pre-reset bars for the rest of the TTL.
+=======
+      // Same rules as Codex: serialised on the config directory that holds the
+      // login, one request id kept until Claude answers (a cooldown or rate
+      // limit is an answer), then a re-probe.
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
       const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = () =>
         Effect.gen(function* () {
           const current = yield* snapshot.getSnapshot;
           const grantId = current.usageLimits?.resetCredits?.nextCreditId;
           if (!grantId || !current.version) return "noCredit" as const;
           const version = current.version;
+<<<<<<< HEAD
           return yield* resetCreditCoordinator.redeem(login.configDir, (requestId) =>
             consumeClaudeResetCredit({ login, version, grantId, requestId }),
+=======
+          return yield* resetCreditCoordinator.redeem(
+            configDir,
+            (requestId) =>
+              ClaudeResetCredits.consumeClaudeResetCredit({
+                configDir,
+                accountConfigPath,
+                version,
+                grantId,
+                requestId,
+              }),
+            ClaudeResetCredits.isSettledClaudeResetCreditFailure,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
           );
         }).pipe(
           Effect.provideService(HttpClient.HttpClient, httpClient),
           Effect.provideService(FileSystem.FileSystem, fileSystem),
           Effect.provideService(Path.Path, path),
+<<<<<<< HEAD
           Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+=======
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
           Effect.mapError(
             (cause) =>
               new ProviderDriverError({
@@ -325,6 +376,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
                 cause,
               }),
           ),
+<<<<<<< HEAD
           Effect.tap(() =>
             Effect.gen(function* () {
               const before = (yield* snapshot.getSnapshot).usageLimits?.checkedAt;
@@ -335,6 +387,21 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
                 after === undefined ||
                 after === before ||
                 refreshed.usageLimits?.unavailable?.reason === "probeFailed"
+=======
+          // Re-probe after any answer, but only a reset claims the limits
+          // changed, so only a reset reports an unconfirmed refresh.
+          Effect.tap((outcome) =>
+            Effect.gen(function* () {
+              const before = (yield* snapshot.getSnapshot).usageLimits?.checkedAt;
+              yield* Cache.invalidateAll(capabilitiesProbeCache);
+              const refreshed = yield* snapshot.refresh;
+              const after = refreshed.usageLimits?.checkedAt;
+              if (
+                outcome === "reset" &&
+                (after === undefined ||
+                  after === before ||
+                  refreshed.usageLimits?.unavailable?.reason === "probeFailed")
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
               ) {
                 return yield* new ProviderDriverError({
                   driver: DRIVER_KIND,
@@ -363,6 +430,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         consumeResetCredit,
         adapter,
         textGeneration,
+        consumeResetCredit,
       } satisfies ProviderInstance;
     }),
 };

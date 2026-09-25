@@ -27,6 +27,7 @@ import { SshPasswordPromptDialog } from "../components/desktop/SshPasswordPrompt
 import { SnapShotCoordinator } from "../components/desktop/SnapShotCoordinator";
 import { CaptureGestureCoordinator } from "../components/captures/CaptureGestureCoordinator";
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
+<<<<<<< HEAD
 import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
 import { InfinitusPeerFleets } from "../components/InfinitusPeerFleets";
@@ -35,6 +36,9 @@ import { isElectron } from "../env";
 import { DesktopBadgeCoordinator } from "../components/desktop/DesktopBadgeCoordinator";
 import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAwakeCoordinator";
 import { NotificationModeMigration } from "../components/desktop/NotificationModeMigration";
+=======
+import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
 import { ThreadNotificationCoordinator } from "../components/ThreadNotificationCoordinator";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
@@ -52,6 +56,7 @@ import {
   toastManager,
 } from "../components/ui/toast";
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
+import { isElectron } from "../env";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
 import { useClientSettings } from "../hooks/useSettings";
@@ -228,7 +233,11 @@ function RootRouteView() {
         >
           {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
           {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
+<<<<<<< HEAD
           {primaryEnvironmentAuthenticated ? <DeepLinkCoordinator /> : null}
+=======
+          {isElectron ? <RunningThreadKeepAlive /> : null}
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
           <RelayClientInstallDialog />
           <ConnectOnboardingDialog />
           <SshPasswordPromptDialog />

@@ -266,8 +266,9 @@ export const make = Effect.gen(function* BrowserSessionMake() {
     getSession,
     clearCookies: Effect.fn("BrowserSession.clearCookies")(function* (partitions?) {
       const sessions = yield* SynchronizedRef.get(sessionsRef);
-      yield* Effect.all(
-        selectSessions(sessions, partitions).map(([partition, browserSession]) =>
+      yield* Effect.forEach(
+        selectSessions(sessions, partitions),
+        ([partition, browserSession]) =>
           Effect.tryPromise({
             try: () =>
               browserSession.clearStorageData({
@@ -279,14 +280,14 @@ export const make = Effect.gen(function* BrowserSessionMake() {
                 cause,
               }),
           }),
-        ),
         { concurrency: "unbounded", discard: true },
       );
     }),
     clearCache: Effect.fn("BrowserSession.clearCache")(function* (partitions?) {
       const sessions = yield* SynchronizedRef.get(sessionsRef);
-      yield* Effect.all(
-        selectSessions(sessions, partitions).map(([partition, browserSession]) =>
+      yield* Effect.forEach(
+        selectSessions(sessions, partitions),
+        ([partition, browserSession]) =>
           Effect.tryPromise({
             try: () => browserSession.clearCache(),
             catch: (cause) =>
@@ -295,7 +296,6 @@ export const make = Effect.gen(function* BrowserSessionMake() {
                 cause,
               }),
           }),
-        ),
         { concurrency: "unbounded", discard: true },
       );
     }),

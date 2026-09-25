@@ -16,10 +16,14 @@ import {
   ThreadPinnedPayload as ContractsThreadPinnedPayloadSchema,
   ThreadUnpinnedPayload as ContractsThreadUnpinnedPayloadSchema,
   ThreadPinReorderedPayload as ContractsThreadPinReorderedPayloadSchema,
+<<<<<<< HEAD
   ThreadTurnQueuedPayload as ContractsThreadTurnQueuedPayloadSchema,
   ThreadTurnQueueUpdatedPayload as ContractsThreadTurnQueueUpdatedPayloadSchema,
   ThreadTurnQueueRemovedPayload as ContractsThreadTurnQueueRemovedPayloadSchema,
   ThreadTurnQueueMovedPayload as ContractsThreadTurnQueueMovedPayloadSchema,
+=======
+  ThreadAutoSettleSetPayload as ContractsThreadAutoSettleSetPayloadSchema,
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   ThreadPullRequestLinkedPayload as ContractsThreadPullRequestLinkedPayloadSchema,
   ThreadPullRequestUnlinkedPayload as ContractsThreadPullRequestUnlinkedPayloadSchema,
   ThreadPullRequestSyncedPayload as ContractsThreadPullRequestSyncedPayloadSchema,
@@ -57,12 +61,16 @@ export const ThreadUnsnoozedPayload = ContractsThreadUnsnoozedPayloadSchema;
 export const ThreadPinnedPayload = ContractsThreadPinnedPayloadSchema;
 export const ThreadUnpinnedPayload = ContractsThreadUnpinnedPayloadSchema;
 export const ThreadPinReorderedPayload = ContractsThreadPinReorderedPayloadSchema;
+<<<<<<< HEAD
 export const ThreadTurnQueuedPayload = ContractsThreadTurnQueuedPayloadSchema;
 export const ThreadTurnQueueUpdatedPayload = ContractsThreadTurnQueueUpdatedPayloadSchema;
 export const ThreadTurnQueueRemovedPayload = ContractsThreadTurnQueueRemovedPayloadSchema;
 export const ThreadTurnQueueMovedPayload = ContractsThreadTurnQueueMovedPayloadSchema;
 export const ThreadTurnUsageRecordedPayload = ContractsThreadTurnUsageRecordedPayloadSchema;
 export const ThreadUsageBackfilledPayload = ContractsThreadUsageBackfilledPayloadSchema;
+=======
+export const ThreadAutoSettleSetPayload = ContractsThreadAutoSettleSetPayloadSchema;
+>>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
 export const ThreadPullRequestLinkedPayload = ContractsThreadPullRequestLinkedPayloadSchema;
 export const ThreadPullRequestUnlinkedPayload = ContractsThreadPullRequestUnlinkedPayloadSchema;
 export const ThreadPullRequestSyncedPayload = ContractsThreadPullRequestSyncedPayloadSchema;
