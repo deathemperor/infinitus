@@ -61,7 +61,13 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     absent: ["Intro style", "Intro title", "Intro speed", "Burn style"],
   },
   { route: "/settings/priority", label: "Priority", marker: "Thread priority" },
-  { route: "/settings/team", label: "Team", marker: "Whole team" },
+  {
+    route: "/settings/team",
+    label: "Team",
+    // The team itself lives on Infinitus Connect (#1592), which the pass has
+    // no sign-in for; the private projects are the Mac's and the fixture's.
+    marker: "secret-lab",
+  },
   {
     route: "/settings/notifications",
     label: "Notifications",

@@ -103,6 +103,14 @@
       "types": "./src/relay/index.ts",
       "default": "./src/relay/index.ts"
     },
+    "./relay/infinitusTeam": {
+      "types": "./src/relay/infinitusTeam.ts",
+      "default": "./src/relay/infinitusTeam.ts"
+    },
+    "./relay/infinitusTeamLogic": {
+      "types": "./src/relay/infinitusTeamLogic.ts",
+      "default": "./src/relay/infinitusTeamLogic.ts"
+    },
     "./state/auth": {
       "types": "./src/state/auth.ts",
       "default": "./src/state/auth.ts"
