@@ -377,6 +377,12 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "team-leave", options: ["--yes"], effect: .write, summary: "Delete my files on the store, tell the leaders, forget the team here; --yes confirms.", replyShape: "{left}"),
         ControlCommand(name: "team-share", args: ["<kind>", "off|leaders|team"], effect: .write, summary: "Audience for stats|now|threads|transcripts|fleet.", replyShape: "team-status"),
         ControlCommand(name: "team-exclude", args: ["add|remove", "<project slug>"], effect: .write, summary: "Keep a project private (local, never sent).", replyShape: "team-status"),
+        // Team on Infinitus Connect (#1592): what the desktop's publisher
+        // reads off this Mac; everything else Team leaves it.
+        ControlCommand(name: "team-days", options: ["--days <n>"], effect: .read,
+                       summary: "The stats days of the last n (30) days folded for the team, private projects left out, compacted.",
+                       replyShape: "{days: {<yyyy-mm-dd>: Day}, exclusions: [project], generation}"),
+        ControlCommand(name: "team-exclusions", effect: .read, summary: "The projects kept private (what team-exclude took).", replyShape: "{projects: [project]}"),
         ControlCommand(name: "team-policy", args: ["requests", "code|off"], effect: .write, summary: "Who may request to join (leaders): with a code, or nobody.", replyShape: "team-status"),
         ControlCommand(name: "team-insights", options: ["--period <day|week|month|year>"], effect: .read, summary: "Blockers, headroom, who is on, the team picture for the period (spend is an estimate).", replyShape: "{period, blockers: [{kid, name, kind, text}], headroom: [{kid, name, engine, active, headroom, spare, dead}], onNow: [name], cost: {total, byMember, byModel, byRepo}, repos: [{project, usd, turns, members}], hours: [n]}"),
         ControlCommand(name: "team-identity", options: ["--export"], effect: .read, stdin: "secret",

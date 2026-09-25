@@ -506,6 +506,23 @@ export const InfinitusAwsLogins = Schema.Struct({
 });
 export type InfinitusAwsLogins = typeof InfinitusAwsLogins.Type;
 
+/** The `team-days --days <n>` reply (#1592): the folded stats days the
+    desktop's Team publisher sends the relay, each a compacted `Stats.Day`
+    left opaque here, the private projects' slugs, and the scan generation
+    the fold came from — `0` with no days while the first scan is running. */
+export const InfinitusTeamDays = Schema.Struct({
+  days: Schema.Record(Schema.String, Schema.Unknown),
+  exclusions: Schema.Array(Schema.String),
+  generation: Schema.Number,
+});
+export type InfinitusTeamDays = typeof InfinitusTeamDays.Type;
+
+/** The `team-exclusions` reply (#1592). */
+export const InfinitusTeamExclusions = Schema.Struct({
+  projects: Schema.Array(Schema.String),
+});
+export type InfinitusTeamExclusions = typeof InfinitusTeamExclusions.Type;
+
 /** One member of the team as `team-status` lists it (#1313): the roster
     row plus what the member last published — absent for one that has not
     published yet. `fleet` is left opaque (the Mac's `fleet.json`). */

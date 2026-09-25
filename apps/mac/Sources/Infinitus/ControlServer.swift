@@ -1082,6 +1082,13 @@ final class ControlServer {
             if let failure = await model.team.setExclusion(slug: r.args[1], on: r.args[0] == "add") { throw Fail(failure) }
             return try teamReply()
 
+        case "team-days":
+            let days = min(max(r.options["days"].flatMap(Int.init) ?? 30, 1), 3650)
+            return ControlReply(ok: true, result: try JSONValue.of(model.teamDays.reply(days: days)))
+
+        case "team-exclusions":
+            return ControlReply(ok: true, result: .object(["projects": .array(TeamExclusions.load(paths: model.team.paths).projects.map { .string($0) })]))
+
         case "team-policy":
             guard r.args.count == 2, r.args[0] == "requests", ["code", "off"].contains(r.args[1]) else {
                 throw Fail("usage: team-policy requests code|off")

@@ -889,13 +889,23 @@ final class AppModel: ObservableObject {
         // Settings › Team (#1313): the loop rides the refresh tick; the
         // publisher works from StatsModel's scan (#251) and gives the
         // table back once folded (#499).
-        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true }
+        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true || self?.teamDays.scanWanted == true }
         team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(home: NSHomeDirectory(), machine: "Mac") }
         team.ownsScan = { [weak self] in self?.statsModel.enabled == true }
         team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
         team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
         team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
         team.scanRequested = { [weak self] in self?.statsModel.refresh() }
+        // Team on Infinitus Connect (#1592): `team-days` folds from the same
+        // scan. The table goes back through it only while the git team is
+        // off, else that team's own fold would miss and rescan.
+        teamDays.ownsScan = { [weak self] in self?.statsModel.enabled == true }
+        teamDays.scanEntries = { [weak self] in self?.statsModel.scanEntries }
+        teamDays.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
+        teamDays.scanConsumed = { [weak self] generation in
+            if self?.team.enabled != true { self?.statsModel.dropScanEntries(generation: generation) }
+        }
+        teamDays.scanRequested = { [weak self] in self?.statsModel.refresh() }
         team.desktopCredential = { [weak self] in
             guard let self, let origin = desktopCredential.origin, let url = URL(string: origin),
                   let token = desktopCredential.token() else { return nil }
@@ -904,6 +914,10 @@ final class AppModel: ObservableObject {
         team.onLog = { [weak self] text in self?.logEvent("team", icon: "person.2", text) }
         team.load()
     }
+
+    /// The stats days the desktop's Team publisher reads (#1592), over
+    /// the same team dir as the exclusions.
+    private(set) lazy var teamDays = TeamDays(paths: TeamPaths.standard())
 
     /// Settings › Team (spec §9). Secrets in the keychain, or files when
     /// INFINITUS_TEAM_DIR redirects the team dir (e2e, a second instance).
