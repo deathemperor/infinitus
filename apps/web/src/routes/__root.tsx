@@ -30,6 +30,7 @@ import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAp
 import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
 import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
 import { InfinitusPeerFleets } from "../components/InfinitusPeerFleets";
+import { InfinitusSettingsSync } from "../components/InfinitusSettingsSync";
 import { isElectron } from "../env";
 import { DesktopBadgeCoordinator } from "../components/desktop/DesktopBadgeCoordinator";
 import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAwakeCoordinator";
@@ -242,6 +243,7 @@ function RootRouteView() {
           <SlowRpcRequestToastCoordinator />
           {primaryEnvironmentAuthenticated ? <InfinitusEventToasts /> : null}
           {primaryEnvironmentAuthenticated && isElectron ? <InfinitusPeerFleets /> : null}
+          {primaryEnvironmentAuthenticated && isElectron ? <InfinitusSettingsSync /> : null}
           <ProjectCloneToastCoordinator />
           <HostedStaticEnvironmentBootstrap />
           {primaryEnvironmentAuthenticated ? (

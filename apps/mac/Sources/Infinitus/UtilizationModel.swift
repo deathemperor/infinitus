@@ -4,7 +4,7 @@ import InfinitusCore
 /// Utilization over time (todo 2026-09-01): the recorded 5h/7d/per-model
 /// percentages for the whole fleet or one account, plus waste — the
 /// headroom that expired unused at each weekly reset — and the token run
-/// rate. Reads the merged local + iCloud history; loading is file IO, so
+/// rate. Reads this machine's own history; loading is file IO, so
 /// it runs off-main on demand. The pane that charted it left with #654;
 /// `infinitusctl utilization --days N` (#747) hands the same figures to
 /// the desktop app, which renders them now.
@@ -74,7 +74,7 @@ final class UtilizationModel: ObservableObject {
     }
 
     nonisolated static func compute(days: Int, now: Double) -> Snapshot {
-        let urls = UsageHistoryRecorder.readableURLs()
+        let urls = [UsageHistoryRecorder.localURL]
         let merged = UsageHistory.merge(urls.map { UsageHistory.load(url: $0) })
         // Waste generations and 5h windows need the FULL history (a
         // reset may predate the chart range); the chart gets the

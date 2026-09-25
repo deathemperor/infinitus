@@ -1,1 +1,0 @@
-Mac: an account that is only out of one model (Fable) keeps its icon and gauges in the popup, with just that model's cell reading down, instead of wearing the skull as if the whole account were spent.

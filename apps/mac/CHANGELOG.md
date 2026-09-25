@@ -10,6 +10,34 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.35
+
+### Mac
+- The control socket gains policy, policy-set and policy-unset, the engine's own config knobs read and written in its words.
+- The control socket gains engine-update-check and engine-update; a release installed that way runs ahead of the bundled engine while it is the newer one.
+- An account that is only out of one model (Fable) keeps its icon and gauges in the popup, with just that model's cell reading down, instead of wearing the skull as if the whole account were spent.
+- Other machines' rows in the popup now show their banked Claude resets and can spend one, like this Mac's own rows.
+- An account on another machine that has gone cold wears the same flame chip as one on this Mac, instead of a bare word.
+- When every account is at its limit and one comes back, the switch lands about a minute later instead of five, so stopped sessions can continue sooner.
+
+### Desktop
+- Cmd+[ and Cmd+] now go back and forward through the pages you have visited, like a browser; Cmd+Shift+[ and Cmd+Shift+] still switch to the previous and next thread.
+- A subagent in the timeline now shows what it was asked, each tool it calls with the same rows the main thread uses, and a live shine while it works.
+- When an agent runs `aws login` or `gcloud auth login` itself, the sign-in card and phone alert now appear every time, even if the same profile asked for a sign-in earlier that hour.
+- Settings → Devices keeps display preferences and, as a second switch, account names the same on every machine through the desktop app; the iCloud Drive file sync and its usage-history mirror are gone.
+- Settings → Engines shows swapd's switching policy (on/off, strategy, threshold, the models whose weekly limits count) for each machine and lets you change it there.
+- Settings → Engines checks swapd against its newest release and installs it on that Mac with one click, without waiting for an Infinitus release.
+- Settings → Engines names the swapd version the app runs, beside its daemon state and path.
+- Accounts draws every account's 5-hour and weekly windows on one calendar, so you can see which accounts run out on the same days, and filters a machine's accounts by provider.
+- Settling a thread that stopped on a usage limit now clears it from Needs attention, and it no longer resumes on the next account.
+- The first key you type with the composer unfocused no longer ends up after the rest of what you type.
+- Typing while the composer is unfocused puts the text in the composer again, and the right panel's letter shortcuts work again.
+
+### Phone
+- A subagent card shows the agent's brief and its newest tool call instead of a stale progress line.
+- A thread whose agent only watches a PR or checks now reads Monitoring on the lock-screen card, as it does in the lists, instead of Done.
+- A thread that stopped on a usage limit reads "Limit" with the account and its reset in the thread list, like the desktop, instead of "Failed" with the error.
+
 ## 0.5.0-alpha.34
 
 ### Mac

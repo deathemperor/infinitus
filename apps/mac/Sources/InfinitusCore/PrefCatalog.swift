@@ -118,9 +118,13 @@ public enum PrefCatalog {
         // Devices: where the T3 Code fork server bound, which the server
         // publishes on startup.
         Entry("fork_server_port", .int, .number(Double(ForkServerProbe.defaultPort)), devices),
-        // Devices: this Mac's name and iCloud sync (#1178).
+        // Devices: this Mac's name (#1178) and the desktop app's sync of
+        // display prefs and account names across machines — the desktop
+        // reads these off its primary Mac and runs the sync itself; the
+        // Mac holds nothing else of it.
         Entry("machine_name", .string, .string(""), devices),
-        Entry("icloud_sync", .bool, .bool(false), devices),
+        Entry("sync_settings", .bool, .bool(false), devices),
+        Entry("sync_account_names", .bool, .bool(false), devices),
         // Engines: the `engine` command relaunches the app for these.
         Entry("engine_swapd_enabled", .bool, .bool(true), engines, effect: .restart),
         Entry("engine_cliproxy_enabled", .bool, .bool(false), engines, effect: .restart),
