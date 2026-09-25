@@ -6,8 +6,9 @@ import { useInfinitusPeerFleets } from "../hooks/useInfinitusPeerFleets";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 
-/** One remote machine's snapshot subscription, reported up to the loop. */
-function PeerSnapshotFeeder({
+/** One machine's snapshot subscription, reported up to a loop (the peer
+    fleets' and the settings sync's; the atom family shares the stream). */
+export function PeerSnapshotFeeder({
   environmentId,
   connected,
   report,

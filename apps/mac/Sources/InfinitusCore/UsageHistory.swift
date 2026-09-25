@@ -4,9 +4,8 @@ import Foundation
 //
 // Append-only JSONL of per-account window utilizations, sampled from the
 // same `cswap list --json` snapshots the popup renders — no new engine
-// surface. One file per machine (`usage-history.<machineID>.jsonl`), so
-// the iCloud copy never conflicts: every machine writes only its own
-// file and readers merge all of them.
+// surface. One file per machine (`usage-history.<machineID>.jsonl`), a
+// name kept from when the files were mirrored beside other machines'.
 //
 // Accounts are keyed by EMAIL, not slot number — `cswap swap`/`move`
 // renumber slots (`cswap reorder`, the Accounts pane drag). The slot rides

@@ -76,16 +76,16 @@ final class PrefCatalogTests: XCTestCase {
     }
 
     func testTheDevicesPagePrefsSitUnderDevices() throws {
-        // #1178: this Mac's name and the iCloud sync switch (the APNs ids
-        // left with #1375).
-        let keys = ["machine_name", "icloud_sync"]
+        // #1178: this Mac's name and the desktop's settings-sync switch (the
+        // APNs ids left with #1375).
+        let keys = ["machine_name", "sync_settings"]
         let reply = try PrefCatalog.reply(from: defaults, keys: keys)
         XCTAssertEqual(reply.prefs.map(\.section), Array(repeating: "devices", count: 2))
         XCTAssertEqual(reply.prefs.map(\.effect), Array(repeating: .live, count: 2))
         XCTAssertEqual(reply.prefs.map(\.value), [.string(""), .bool(false)])
         XCTAssertEqual(try PrefCatalog.write(.string("Studio"), key: "machine_name", to: defaults).value, .string("Studio"))
         XCTAssertEqual(defaults.string(forKey: "machine_name"), "Studio")
-        XCTAssertEqual(try PrefCatalog.write(.bool(true), key: "icloud_sync", to: defaults).value, .bool(true))
+        XCTAssertEqual(try PrefCatalog.write(.bool(true), key: "sync_settings", to: defaults).value, .bool(true))
         XCTAssertThrowsError(try PrefCatalog.write(.number(1), key: "machine_name", to: defaults))
     }
 
