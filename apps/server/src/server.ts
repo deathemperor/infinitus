@@ -84,6 +84,7 @@ import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
 import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts";
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
+import { InfinitusTeamRelayLive } from "./infinitus/Layers/InfinitusTeamRelay.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
@@ -333,6 +334,14 @@ const ReactorLayerLive = ReactorCoreLayerLive.pipe(
   // Fork (#574): the Slack bridge over Socket Mode.
   Layer.provideMerge(
     InfinitusSlackLive.pipe(Layer.provide(SlackClientLive), Layer.provide(FetchHttpClient.layer)),
+  ),
+  // Fork (#1592): the Team publisher and command runner on Infinitus Connect,
+  // started by the orchestration reactor beside the awareness relay.
+  Layer.provideMerge(
+    InfinitusTeamRelayLive.pipe(
+      Layer.provide(ServerSecretStore.layer),
+      Layer.provide(FetchHttpClient.layer),
+    ),
   ),
   // Fork (#806): sends queued messages when their thread is idle, not held
   // and not paused; needs both layers below.
