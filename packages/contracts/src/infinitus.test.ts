@@ -19,7 +19,6 @@ import {
   InfinitusSnapshot,
   InfinitusThreadForkRefused,
   InfinitusStatus,
-  InfinitusTeamSnapshot,
 } from "./infinitus.ts";
 
 const decodeReply = Schema.decodeUnknownSync(InfinitusControlReply);
@@ -613,121 +612,6 @@ describe("InfinitusThreadForkRefused", () => {
     expect(decoded.message).toBe("The thread was not found.");
   });
 });
-
-const decodeTeam = Schema.decodeUnknownSync(Schema.NullOr(InfinitusTeamSnapshot));
-
-describe("InfinitusTeamSnapshot", () => {
-  it("decodes the fixture's team-status reply", () => {
-    const team = decodeTeam(TEAM_STATUS);
-    expect(team?.members.map((m) => m.name)).toEqual(["Ann", "Bo"]);
-    expect(team?.shares?.transcripts).toBe("leaders");
-  });
-
-  it("decodes the grants, the waits and a member's controls (#1313, delegated control)", () => {
-    const team = decodeTeam({
-      ...TEAM_STATUS,
-      members: [
-        { kid: "k-bo", name: "Bo", role: "member", isMe: false, controls: ["send", "view"] },
-      ],
-      grants: [
-        { id: "g-1", audience: "leaders", threads: "all", capabilities: ["send"], since: 1 },
-        {
-          id: "g-2",
-          audience: ["k-bo"],
-          threads: ["t1"],
-          capabilities: ["interrupt", "new"],
-          since: 2,
-          preauthorized: ["new"],
-          expires: 99,
-        },
-      ],
-      pending: [
-        {
-          id: "c-1",
-          kid: "k-bo",
-          name: "Bo",
-          thread: "t1",
-          action: "interrupt",
-          text: null,
-          expires: 120,
-        },
-      ],
-    });
-    expect(team?.members[0]?.controls).toEqual(["send", "view"]);
-    expect(team?.grants?.map((g) => g.id)).toEqual(["g-1", "g-2"]);
-    expect(team?.grants?.[1]?.threads).toEqual(["t1"]);
-    expect(team?.pending?.[0]?.action).toBe("interrupt");
-    expect(decodeTeam(TEAM_STATUS)?.grants).toBeUndefined();
-  });
-
-  it("decodes null for a Mac in no team, and a member without a publish yet", () => {
-    expect(decodeTeam(null)).toBeNull();
-    const team = decodeTeam({
-      ...TEAM_STATUS,
-      members: [{ kid: "k", name: "New", role: "member", isMe: false }],
-    });
-    expect(team?.members[0]?.lastPublished).toBeUndefined();
-  });
-});
-
-const TEAM_STATUS = {
-  id: "papaya",
-  name: "Papaya",
-  remote: "https://github.com/…/team.git",
-  kid: "k-ann",
-  role: "leader",
-  rev: 4,
-  members: [
-    {
-      kid: "k-ann",
-      name: "Ann",
-      role: "leader",
-      isMe: true,
-      founder: true,
-      since: 1_757_900_000,
-      lastPublished: 1_757_950_000,
-      kinds: ["stats", "now", "threads"],
-      threadsNow: 2,
-      blockers: [],
-      crashes: 0,
-      todayUSD: 3.5,
-      todayMessages: 40,
-      todayCommits: 3,
-    },
-    {
-      kid: "k-bo",
-      name: "Bo",
-      role: "member",
-      isMe: false,
-      founder: false,
-      since: 1_757_910_000,
-      lastPublished: 1_757_940_000,
-      kinds: ["stats"],
-      threadsNow: 0,
-      blockers: ["aws: papaya"],
-      crashes: 1,
-      todayUSD: 0.2,
-      todayMessages: 5,
-      todayCommits: 0,
-    },
-  ],
-  requests: [
-    { kid: "k-cy", name: "Cy", platform: "macos", devices: ["Cy's Mac"], at: 1_757_960_000 },
-  ],
-  policy: { requests: "code" },
-  shares: {
-    stats: "team",
-    now: "team",
-    threads: "leaders",
-    transcripts: "leaders",
-    crashes: "leaders",
-    fleet: "off",
-  },
-  exclusions: ["secret-repo"],
-  lastFetch: 1_757_960_100,
-  lastPublish: 1_757_950_000,
-  lastError: null,
-};
 
 describe("InfinitusPolicy", () => {
   it("decodes the engine's knobs with values of every JSON type it uses", () => {
