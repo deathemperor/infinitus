@@ -215,23 +215,6 @@ final class ControlServer {
         init(_ m: String) { errorDescription = m }
     }
 
-    /// The team snapshot after an action, or the action's error.
-    private func teamReply() throws -> ControlReply {
-        if let err = model.team.lastError { throw Fail(err) }
-        return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
-    }
-
-    /// A teammate by kid or roster name (spec §8: `team-grant`, `team-drive`).
-    private func teammate(_ word: String) throws -> String {
-        let everyone = model.team.roster?.doc.everyone ?? []
-        if everyone.contains(where: { $0.keys.kid == word }) { return word }
-        let named = everyone.filter { $0.name == word }
-        guard named.count == 1, let one = named.first else {
-            throw Fail(named.isEmpty ? "no teammate \(word)" : "several teammates named \(word); pass the kid")
-        }
-        return one.keys.kid
-    }
-
     private func dispatch(_ r: ControlRequest) async throws -> ControlReply {
         switch r.command {
         case "manifest":
@@ -1003,211 +986,23 @@ final class ControlServer {
                 "stale": .bool(stale),
             ]))
 
-        // MARK: team (#1313)
-
-        case "team-status":
-            return ControlReply(ok: true, result: try model.team.snapshot.map { try JSONValue.of($0) } ?? .null)
-
-        case "team-create":
-            // infinitusctl's arg parser treats `--remote` as a bare flag (it
-            // has no way to know team-create wants a value), so the URL
-            // lands as the second positional instead of options["remote"].
-            let remote = r.options["remote"].flatMap { $0 == "true" ? nil : $0 } ?? r.args.dropFirst().first
-            guard let name = r.args.first, !name.isEmpty, let remote, !remote.isEmpty else {
-                throw Fail("usage: team-create <name> --remote <url> [--as <your name>]")
-            }
-            // The remote's write token rides stdin (#747, `stdin: "secret"`);
-            // empty stdin is the credential-less create it always was.
-            if let failure = await model.team.create(name: name, remote: remote, token: r.secret, leaderName: r.options["as"] ?? "Leader") {
-                throw Fail(failure)
-            }
-            return try teamReply()
-
-        case "team-join":
-            guard let name = r.args.first, !name.isEmpty else { throw Fail("usage: team-join <your name>  (the team code or invite link on stdin)") }
-            guard let code = r.secret?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty else {
-                throw Fail("team-join needs the team code or invite link on stdin")
-            }
-            if let failure = await model.team.join(code: code, name: name) { throw Fail(failure) }
-            return try teamReply()
-
-        case "team-code":
-            let days = min(max(r.options["days"].flatMap(Int.init) ?? 7, 1), 3650)
-            let minted = r.options["invite"] != nil ? await model.team.mintInvite(days: days) : await model.team.mintCode(days: days)
-            guard let minted else { throw Fail(model.team.lastError ?? "no code") }
-            return ControlReply(ok: true, result: .object([
-                "code": .string(minted),
-                "expires": .number(Double(Int(Date().timeIntervalSince1970) + days * 86_400)),
-            ]))
-
-        case "team-fetch":
-            await model.team.fetchNow()
-            return try teamReply()
-
-        case "team-publish":
-            let report = await model.team.publishNow()
-            if let err = model.team.lastError { throw Fail(err) }
-            return ControlReply(ok: true, result: try JSONValue.of(report ?? TeamPublisher.Report()))
-
-        case "team-approve", "team-decline", "team-remove", "team-promote":
-            guard let kid = r.args.first, !kid.isEmpty else { throw Fail("usage: \(r.command) <kid>") }
-            let failure: String?
-            switch r.command {
-            case "team-approve": failure = await model.team.approve(kid: kid)
-            case "team-decline": failure = await model.team.decline(kid: kid)
-            case "team-remove": failure = await model.team.remove(kid: kid)
-            default: failure = await model.team.promote(kid: kid)
-            }
-            if let failure { throw Fail(failure) }
-            return try teamReply()
-
-        case "team-leave":
-            guard r.options["yes"] != nil else { throw Fail("team-leave deletes this Mac's files on the store and forgets the team: pass --yes") }
-            guard model.team.inTeam else { throw Fail("not in a team") }
-            if let failure = await model.team.leave() { throw Fail(failure) }
-            return ControlReply(ok: true, result: .object(["left": .bool(true)]))
-
-        case "team-share":
-            let targets: [String: TeamRoster.ShareTarget] = ["off": .off, "leaders": .leaders, "team": .team]
-            guard r.args.count == 2, TeamKinds.memberKinds.contains(r.args[0]), let target = targets[r.args[1]] else {
-                throw Fail("usage: team-share \(TeamKinds.memberKinds.joined(separator: "|")) off|leaders|team")
-            }
-            if let failure = await model.team.setShare(kind: r.args[0], target: target) { throw Fail(failure) }
-            return try teamReply()
+        // MARK: team on Infinitus Connect (#1592)
 
         case "team-exclude":
             guard r.args.count == 2, ["add", "remove"].contains(r.args[0]), !r.args[1].isEmpty else {
                 throw Fail("usage: team-exclude add|remove <project slug>")
             }
-            if let failure = await model.team.setExclusion(slug: r.args[1], on: r.args[0] == "add") { throw Fail(failure) }
-            return try teamReply()
+            var exclusions = TeamExclusions.load(paths: model.teamDays.paths)
+            exclusions.set(r.args[1], excluded: r.args[0] == "add")
+            try exclusions.save(paths: model.teamDays.paths)
+            return ControlReply(ok: true, result: .object(["projects": .array(exclusions.projects.map { .string($0) })]))
 
         case "team-days":
             let days = min(max(r.options["days"].flatMap(Int.init) ?? 30, 1), 3650)
             return ControlReply(ok: true, result: try JSONValue.of(model.teamDays.reply(days: days)))
 
         case "team-exclusions":
-            return ControlReply(ok: true, result: .object(["projects": .array(TeamExclusions.load(paths: model.team.paths).projects.map { .string($0) })]))
-
-        case "team-policy":
-            guard r.args.count == 2, r.args[0] == "requests", ["code", "off"].contains(r.args[1]) else {
-                throw Fail("usage: team-policy requests code|off")
-            }
-            if let failure = await model.team.setPolicy(requests: r.args[1]) { throw Fail(failure) }
-            return try teamReply()
-
-        case "team-insights":
-            guard let period = Stats.Period(rawValue: r.options["period"] ?? "week") else { throw Fail("--period is day, week, month or year") }
-            guard model.team.inTeam else { throw Fail("not in a team") }
-            guard let insights = model.team.insights(period: period) else { throw Fail("insights are the leaders' view") }
-            struct Blocker: Encodable { var kid, name, kind, text: String }
-            struct Headroom: Encodable { var kid, name, engine: String; var active: String?; var headroom: Int?; var spare, dead: Int }
-            struct Repo: Encodable { var project: String; var usd: Double; var turns: Int; var members: [String] }
-            struct Money: Encodable { var kid, name: String; var usd: Double }
-            struct Costs: Encodable { var total: Double; var byMember: [Money]; var byModel: [String: Double]; var byRepo: [String: Double] }
-            struct Reply: Encodable {
-                var period: String; var blockers: [Blocker]; var headroom: [Headroom]; var onNow: [String]
-                var cost: Costs; var repos: [Repo]; var hours: [Int]
-            }
-            let reply = Reply(period: period.rawValue,
-                              blockers: insights.blockers.map { Blocker(kid: $0.kid, name: $0.name, kind: $0.kind, text: $0.text) },
-                              headroom: insights.headroom.map { Headroom(kid: $0.kid, name: $0.name, engine: $0.engine, active: $0.active,
-                                                                          headroom: $0.headroom, spare: $0.spare, dead: $0.dead) },
-                              onNow: insights.onNow,
-                              cost: Costs(total: insights.cost.total,
-                                          byMember: insights.cost.byMember.map { Money(kid: $0.kid, name: $0.name, usd: $0.usd) },
-                                          byModel: insights.cost.byModel, byRepo: insights.cost.byRepo),
-                              repos: insights.repos.map { Repo(project: $0.project, usd: $0.usd, turns: $0.turns, members: $0.members.map(\.name)) },
-                              hours: insights.hours)
-            return ControlReply(ok: true, result: try JSONValue.of(reply))
-
-        case "team-identity":
-            var out: [String: JSONValue] = ["kid": model.team.kid.map(JSONValue.string) ?? .null]
-            if r.options["export"] != nil {
-                guard let passphrase = r.secret, !passphrase.isEmpty else { throw Fail("team-identity --export needs the passphrase on stdin") }
-                guard let sealed = await model.team.exportIdentity(passphrase: passphrase) else { throw Fail(model.team.lastError ?? "export failed") }
-                out["exported"] = .string(sealed.base64EncodedString())
-            }
-            return ControlReply(ok: true, result: .object(out))
-
-        // MARK: delegated control (#1313, spec §8)
-
-        case "team-inbox":
-            // Never `Fail`: an unverifiable envelope answers `{ack: null}` so
-            // the desktop's unauthenticated route tells a stranger nothing.
-            guard let file = r.secret.flatMap({ Data(base64Encoded: $0) }), !file.isEmpty else {
-                return ControlReply(ok: true, result: .object(["ack": .null]))
-            }
-            let ack = await model.team.inbox(file)
-            return ControlReply(ok: true, result: .object(["ack": ack.map { .string($0.base64EncodedString()) } ?? .null]))
-
-        case "team-grants":
-            guard model.team.inTeam else { throw Fail("not in a team") }
-            return ControlReply(ok: true, result: try JSONValue.of(model.team.grants))
-
-        case "team-grant":
-            let usage = "usage: team-grant <leaders|team|kid,…> --cap <view,send,interrupt,new> [--threads <id,id>] [--pre <interrupt,new>] [--expires <seconds>]"
-            guard let first = r.args.first, let target = TeamShares.parseTarget([first]), target != .off else { throw Fail(usage) }
-            let audience: TeamRoster.ShareTarget
-            switch target {
-            case .members(let names): audience = .members(try names.map { try teammate($0) })
-            default: audience = target
-            }
-            let caps = (r.options["cap"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty }
-            guard !caps.isEmpty, caps.allSatisfy({ TeamGrants.capabilities.contains($0) }) else {
-                throw Fail("--cap takes a comma list of \(TeamGrants.capabilities.joined(separator: ", "))")
-            }
-            let threads: TeamGrants.Threads
-            if let t = r.options["threads"], t != "true", t != "*" {
-                threads = .some(t.split(separator: ",").map(String.init).filter { !$0.isEmpty })
-            } else {
-                threads = .all
-            }
-            let preauthorized = Set((r.options["pre"] ?? "").split(separator: ",").map(String.init).filter { !$0.isEmpty })
-            var expires: Int?
-            if let e = r.options["expires"] {
-                guard let seconds = Int(e), seconds > 0 else { throw Fail("--expires takes seconds from now") }
-                expires = Int(Date().timeIntervalSince1970) + seconds
-            }
-            let grant = await model.team.addGrant(audience: audience, threads: threads, capabilities: Set(caps),
-                                                   preauthorized: preauthorized, expires: expires)
-            if let err = model.team.lastError { throw Fail(err) }
-            guard let grant else { throw Fail("grant not saved") }
-            return ControlReply(ok: true, result: try JSONValue.of(grant))
-
-        case "team-revoke":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: team-revoke <id>") }
-            let removed = await model.team.revokeGrant(id: id)
-            if let err = model.team.lastError { throw Fail(err) }
-            return ControlReply(ok: true, result: .object(["removed": .bool(removed)]))
-
-        case "team-pending":
-            guard model.team.inTeam else { throw Fail("not in a team") }
-            return ControlReply(ok: true, result: try JSONValue.of(model.team.pendingCommands))
-
-        case "team-allow", "team-deny":
-            guard let id = r.args.first, !id.isEmpty else { throw Fail("usage: \(r.command) <command id>") }
-            guard let ack = await model.team.decide(id, allow: r.command == "team-allow") else {
-                throw Fail("no waiting command \(id); see team-pending")
-            }
-            return ControlReply(ok: true, result: try JSONValue.of(ack))
-
-        case "team-drive":
-            let usage = "usage: team-drive <kid|name> <thread|-> <view|send|interrupt|new> [text…] [--project <title|id>]"
-            guard r.args.count >= 3 else { throw Fail(usage) }
-            let kid = try teammate(r.args[0])
-            let action = r.args[2]
-            guard TeamGrants.capabilities.contains(action) else { throw Fail(usage) }
-            let text = r.args.dropFirst(3).joined(separator: " ")
-            guard let delivery = await model.team.drive(kid: kid, thread: r.args[1], action: action, text: text.isEmpty ? nil : text,
-                                                        project: r.options["project"].flatMap { $0 == "true" ? nil : $0 }) else {
-                throw Fail(model.team.lastError ?? "team-drive: not delivered")
-            }
-            return ControlReply(ok: true, result: try JSONValue.of(delivery))
-
-        case "team-acks":
-            guard model.team.inTeam else { throw Fail("not in a team") }
-            return ControlReply(ok: true, result: try JSONValue.of(model.team.acks))
+            return ControlReply(ok: true, result: .object(["projects": .array(TeamExclusions.load(paths: model.teamDays.paths).projects.map { .string($0) })]))
 
         case "desktop-token":
             // The dispatcher has one entry, the Unix socket (the phone goes

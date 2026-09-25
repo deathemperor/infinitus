@@ -41,7 +41,7 @@ public final class TeamDays {
         var days: [String: Stats.Day]
     }
 
-    private let paths: TeamPaths
+    public let paths: TeamPaths
     private var fold: Fold?
 
     public init(paths: TeamPaths) { self.paths = paths }
@@ -53,7 +53,7 @@ public final class TeamDays {
     /// and answers empty with generation 0.
     public func reply(days: Int, now: Date = Date()) -> Reply {
         let exclusions = TeamExclusions.load(paths: paths)
-        let floorDay = TeamPublisher.floorDay(now: now, historyDays: days, calendar: calendar)
+        let floorDay = TeamFold.floorDay(now: now, historyDays: days, calendar: calendar)
         let generation = scanGeneration()
         if let fold, fold.generation == generation, fold.exclusions == exclusions, fold.floorDay == floorDay {
             return Reply(days: fold.days, exclusions: exclusions.projects, generation: fold.generation)
@@ -63,7 +63,7 @@ public final class TeamDays {
             scanRequested()
             return Reply(days: [:], exclusions: exclusions.projects, generation: 0)
         }
-        let collected = TeamPublisher.collect(entries: TeamPublisher.inWindow(entries, floorDay: floorDay), exclusions: exclusions)
+        let collected = TeamFold.collect(entries: TeamFold.inWindow(entries, floorDay: floorDay), exclusions: exclusions)
         let compacted = collected.days.mapValues { $0.compacted() }
         fold = Fold(generation: generation, exclusions: exclusions, floorDay: floorDay, days: compacted)
         scanWanted = false

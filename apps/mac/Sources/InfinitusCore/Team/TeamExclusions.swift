@@ -1,9 +1,9 @@
 import Foundation
 
 /// Spec §7: Claude Code project directories this machine keeps private —
-/// nothing from them is published (no transcript, no session row, no
+/// nothing from them reaches the team (no transcript, no session row, no
 /// `Stats.Day` contribution). Local to the machine, never sent; one
-/// file for every team (`<base>/exclusions.json`).
+/// file (`<base>/exclusions.json`), read by `team-days` (#1592).
 public struct TeamExclusions: Codable, Equatable, Sendable {
     /// Absolute project directories, no trailing slash.
     public var projects: [String]

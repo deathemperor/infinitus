@@ -41,7 +41,7 @@ ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple D
 SOCKDIR="/tmp/infinitus-e2e-$$"; mkdir -p "$SOCKDIR"
 export INFINITUS_CONTROL_SOCKET="$SOCKDIR/control.sock"
 export INFINITUS_APP_SUPPORT="$SOCKDIR/app-support"   # every file the instance writes stays out of the real Infinitus/ (#506)
-export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"          # the app's team dir + file secrets (#1313: CI has no keychain)
+export INFINITUS_TEAM_DIR="$SOCKDIR/team-app"          # the private-project list (`team-exclude`) stays out of the real one
 # An empty Claude home (#1204): the stats and token-rate scanners read
 # `$CLAUDE_CONFIG_DIR/projects`, and without this the run scanned the
 # developer's real transcript tree — 14 GB on one Mac, nothing on CI — so
@@ -542,137 +542,15 @@ done
 pgrep -f "$SOCKDIR/aws" >/dev/null && fail "stub aws CLI still running"
 echo "aws: rebind refused"
 
-# --- team (#1313) ----------------------------------------------------------
-# The app creates a team on a bare repo; a second identity — the CLI
-# in-process, its own INFINITUS_TEAM_DIR — joins with a team code and
-# publishes; the app approves and reads it back. No desktop answers here,
-# so the publish carries stats and now, and the index stays empty.
-"$CTL" team-status | expect "d is None" || fail "team-status must be null before a team exists"
-git init -q --bare "$SOCKDIR/team.git"
-git -C "$SOCKDIR/team.git" config uploadpack.allowFilter true
-"$CTL" team-create Papaya --remote "file://$SOCKDIR/team.git" --as Ann \
-    | expect "d['role']=='leader' and d['members'][0]['name']=='Ann' and d['members'][0]['founder'] and 'lockEnabled' not in d" || fail "team-create"
-# The lock never touches Team (ruling 2026-09-16): the app mints and approves outright.
-CODE="$("$CTL" team-code --days 1 | json "d['code']")"
-case "$CODE" in infinitus://join/*) ;; *) fail "team-code shape" ;; esac
-CLI_TEAM="$SOCKDIR/team-cli"
-printf '%s' "$CODE" | INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team request - --name Bo >/dev/null || fail "cli team request"
-KID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team status | json "d['kid']")"
-"$CTL" team-fetch | expect "len(d['requests'])==1 and d['requests'][0]['name']=='Bo'" || fail "the request did not reach the leader"
-"$CTL" team-approve "$KID" | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members'])" || fail "team-approve"
-"$CTL" team-fetch | expect "any(m['name']=='Bo' and m['role']=='member' for m in d['members']) and not d['requests']" || fail "the approval did not reach the app"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team fetch >/dev/null || fail "cli team fetch"
-# #354: on a Mac with the app up and no INFINITUS_TEAM_DIR, `team status` is
-# the app's own view, and a subcommand the app has no verb for either refuses
-# to mint a second identity or says whose identity it is using.
-env -u INFINITUS_TEAM_DIR "$CTL" team status | expect "d['role']=='leader' and d['name']=='Papaya'" || fail "cli team status did not route to the app"
-env -u INFINITUS_TEAM_DIR "$CTL" team identity show 2>&1 | grep -q "owns this Mac's team identity\|infinitusctl's own identity" || fail "cli team identity neither refused nor named its own identity beside the app's"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team publish | expect "'published' in d" || fail "cli team publish"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team share transcripts off \
-    | expect "d['byKind']['transcripts']=='off'" || fail "team share transcripts off"
-# `now` is the one kind every publish carries; stats need a transcript corpus the CI runner has none of.
-"$CTL" team-fetch | expect "any(m['name']=='Bo' and 'now' in m['kinds'] for m in d['members'])" || fail "the member's files are not readable"
-"$CTL" team-publish | expect "'published' in d" || fail "team-publish"
-"$CTL" team-status | expect "d.get('lastPublish') is not None and d.get('lastError') is None" || fail "loop state after publish"
-"$CTL" team-share now team | expect "d['shares']['now']=='team'" || fail "team-share"
-"$CTL" team-exclude add secret-repo | expect "'secret-repo' in d['exclusions']" || fail "team-exclude add"
-"$CTL" team-exclude remove secret-repo | expect "'secret-repo' not in d['exclusions']" || fail "team-exclude remove"
-"$CTL" team-policy requests off | expect "d['policy']['requests']=='off'" || fail "team-policy"
-"$CTL" team-insights --period week | expect "d['period']=='week' and isinstance(d['blockers'], list)" || fail "team-insights"
-"$CTL" team-identity | expect "len(d['kid'])>8" || fail "team-identity"
-echo "team: ok (leader Ann, member Bo $KID)"
-# #747: the secret-carrying team verbs refuse an empty stdin by name.
-"$CTL" team-join Cy </dev/null 2>&1 | grep -q "needs the team code" || fail "team-join must ask for the code on stdin"
-"$CTL" team-leave 2>&1 | grep -q -- "--yes" || fail "team-leave must want --yes"
-
-# #822: the desktop verbs against a demo desktop (tools/demo-desktop): the
-# credential comes on stdin like every secret and stays in this run's own
-# keychain slot, the CLI reads it back over the socket and talks HTTP.
-DESK_PORT=$((50000 + $$ % 10000)); DESK_TOKEN="e2e-desktop-token-$$"
-python3 tools/demo-desktop "$DESK_PORT" "$DESK_TOKEN" &
-DESK_PID=$!
-desk_get() { python3 -c "import json,sys,urllib.request; r=urllib.request.Request('http://127.0.0.1:$DESK_PORT$1', headers={'Authorization':'Bearer $DESK_TOKEN'}); print(urllib.request.urlopen(r, timeout=3).read().decode())"; }
-i=0; until desk_get /.well-known/t3/environment >/dev/null 2>&1; do i=$((i + 1)); [ "$i" -lt 50 ] || fail "the demo desktop did not come up"; sleep 0.1; done
-"$CTL" environments </dev/null 2>&1 | grep -q "no Infinitus desktop credential" || fail "environments must want a credential first"
-"$CTL" desktop status </dev/null | expect "d['credential'] is None and d['reachable'] is False and d['port']==3773" || fail "desktop status without a credential"
-printf 'x' | "$CTL" desktop-credential --origin nope 2>&1 | grep -q "http(s) URL" || fail "desktop-credential must want an http origin"
-printf '%s' "$DESK_TOKEN" | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" --expiresAt 2099-01-01T00:00:00Z \
-    | expect "d['stored'] is True and d['origin']=='http://127.0.0.1:$DESK_PORT' and d['expiresAt']=='2099-01-01T00:00:00Z'" || fail "desktop-credential store"
-"$CTL" desktop-status | expect "d['credential']=='…'+'$DESK_TOKEN'[-4:] and d['stale'] is True" || fail "desktop-status must mask the credential and flag the moved port"
-"$CTL" desktop status | expect "d['reachable'] is True and d['version']=='0.0.0-demo'" || fail "desktop status reachable"
-"$CTL" desktop status | grep -q "$DESK_TOKEN" && fail "desktop status must never print the token"
-"$CTL" desktop credential | expect "d['stored'] is True and d['accepted'] is True and d['label'].startswith('…')" || fail "desktop credential accepted"
-"$CTL" environments | expect "d[0]['id']=='env-demo' and d[0]['status']=='reachable' and d[0]['origin']=='http://127.0.0.1:$DESK_PORT' and d[0]['platform']=='darwin'" || fail "environments"
-"$CTL" projects | expect "d[0]['id']=='p-demo' and d[0]['name']=='Demo project' and d[0]['env']=='env-demo'" || fail "projects"
-"$CTL" threads | expect "[t['id'] for t in d]==['t-running','t-idle'] and d[0]['status']=='running' and d[1]['status']=='held' and d[1]['hold']['summary']=='at limit until 09:00' and d[0]['project']=='Demo project'" || fail "threads"
-"$CTL" threads --status held | expect "len(d)==1 and d[0]['id']=='t-idle'" || fail "threads --status held"
-"$CTL" threads --status bogus 2>&1 | grep -q "usage: threads --status" || fail "threads must refuse an unknown status"
-"$CTL" thread show t-idle --turns 1 | expect "d['thread']['status']=='held' and [m['text'] for m in d['messages']]==['hello','hi there']" || fail "thread show"
-"$CTL" thread show t-none 2>&1 | grep -q "no thread t-none" || fail "thread show must name a missing thread"
-"$CTL" thread send t-running "more" 2>&1 | grep -q "turn running; --steer" || fail "send on a running thread must refuse without --steer"
-"$CTL" thread send t-idle "more" 2>&1 | grep -q "turn running; --steer" || fail "send on a held thread must refuse without --steer"
-"$CTL" thread send t-running "more" --steer | expect "d['steered'] is True and len(d['messageId'])==36" || fail "thread send --steer"
-"$CTL" thread release t-idle | expect "d['released'] is True" || fail "thread release"
-"$CTL" thread release t-idle | expect "d['released'] is False and d['reason']=='not held'" || fail "a second release reports the reason"
-printf 'ping\n' | "$CTL" thread send t-idle - --wait | expect "d['text']=='echo: ping' and d['turn']['state']=='completed'" || fail "thread send --wait"
-"$CTL" thread new --project "Demo project" "Fix the build" --worktree fix/build 2>&1 | grep -q "pass --base" || fail "thread new --worktree must want a base when the project dir is not a repo"
-"$CTL" thread new --project "Demo project" "Fix the build" --worktree fix/build --base main --wait | expect "d['text']=='echo: Fix the build' and len(d['threadId'])==36" || fail "thread new --wait"
-"$CTL" threads --project p-demo | expect "any(t['title']=='Fix the build' and t['branch']=='fix/build' and t['worktree']=='/tmp/demo-project/.wt/'+t['id'] for t in d)" || fail "the new thread shows its worktree"
-"$CTL" thread new --project nope "x" 2>&1 | grep -q "no project nope" || fail "thread new must name a missing project"
-"$CTL" thread interrupt t-running | expect "d['ok'] is True and d['turnId']=='u-1'" || fail "thread interrupt"
-"$CTL" threads --status running | expect "d==[]" || fail "the interrupted thread is no longer running"
-desk_get /api/demo/dispatches | expect "[c['type'] for c in d]==['thread.turn.start','thread.turn.start','thread.turn.start','thread.turn.interrupt'] and d[0]['runtimeMode']=='full-access' and d[0]['message']['role']=='user' and d[0]['message']['attachments']==[] and d[1]['runtimeMode']=='approval-required' and d[2]['bootstrap']['createThread']['projectId']=='p-demo' and d[2]['bootstrap']['createThread']['modelSelection']=={'provider':'claude','model':'opus'} and d[2]['bootstrap']['prepareWorktree']['branch']=='fix/build' and d[2]['bootstrap']['prepareWorktree']['projectCwd']=='/tmp/demo-project' and d[2]['bootstrap']['prepareWorktree']['baseBranch']=='main' and d[2]['titleSeed']=='Fix the build' and d[3]['turnId']=='u-1'" || fail "the dispatched commands must carry the desktop's shapes"
-"$CTL" thread new --project "Bare project" "No default here" --wait | expect "d['text']=='echo: No default here'" || fail "thread new must fall back to the environment's default model (#1315)"
-"$CTL" thread new --project "Bare project" "Pick one" --model codex/gpt-5 --wait | expect "d['text']=='echo: Pick one'" || fail "thread new --model instance/model"
-"$CTL" thread new --project "Demo project" "Bare model" --model haiku --wait | expect "d['text']=='echo: Bare model'" || fail "thread new --model model"
-"$CTL" thread new --project "Bare project" "x" --model /haiku 2>&1 | grep -q "wants <instanceId>/<model>" || fail "thread new must refuse a malformed --model"
-desk_get /api/demo/dispatches | expect "[c['bootstrap']['createThread']['modelSelection'] for c in d[4:7]]==[{'instanceId':'claude','model':'sonnet'},{'instanceId':'codex','model':'gpt-5'},{'instanceId':'claude','model':'haiku'}]" || fail "the new threads must carry the environment default, the explicit instance/model and the project's instance with the bare model"
-# #1313 spec §8, delegated control over the store lane: Ann (the app) grants
-# Bo (the CLI identity) send, view and new; Bo drives from his own team dir.
-# Ann's now.json predates the grant and carries no endpoints (and the app's
-# own httpBaseUrl is loopback, which a driver skips anyway), so the command
-# rides the store; the app's next fetch executes it against the demo desktop
-# and answers a sealed ack Bo reaps with `team acks`.
-ANN_KID="$("$CTL" team-identity | json "d['kid']")"
-"$CTL" team-grant "$KID" --cap send,view,new | expect "d['audience']==['$KID'] and d['threads']=='all' and sorted(d['capabilities'])==['new','send','view'] and 'preauthorized' not in d" || fail "team-grant"
-"$CTL" team-grants | expect "len(d['grants'])==1" || fail "team-grants"
-DRIVE="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle send "hello from Bo via the store")"
-printf '%s' "$DRIVE" | expect "d['lane']=='store' and d['outcome']=='queued'" || fail "team drive send must queue on the store (got $DRIVE)"
-SEND_ID="$(printf '%s' "$DRIVE" | json "d['id']")"
-"$CTL" team-fetch | expect "d['role']=='leader'" || fail "team-fetch after a queued command"
-desk_get /api/orchestration/threads/t-idle | expect "any(m.get('role')=='user' and 'hello from Bo via the store' in json.dumps(m) for m in d['messages'])" || fail "the store-lane send did not reach the desktop thread"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$SEND_ID' and a['outcome']=='delivered' and a['from']=='$ANN_KID' for a in d)" || fail "team acks after send"
-NEW_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" - new "Fix the tests" --project "Demo project" | json "d['id'] if d['lane']=='store' and d['outcome']=='queued' else ''")"
-[ -n "$NEW_ID" ] || fail "team drive new must queue"
-"$CTL" team-fetch >/dev/null || fail "team-fetch after a queued new"
-PENDING_ID="$("$CTL" team-pending | json "d[0]['id']")"
-"$CTL" team-pending | expect "len(d)==1 and d[0]['name']=='Bo' and d[0]['action']=='new' and d[0]['project']=='Demo project' and d[0]['text']=='Fix the tests'" || fail "team-pending must list the new command waiting for a tap"
-"$CTL" team-allow "$PENDING_ID" | expect "d['outcome']=='done' and len(d['detail'])==36" || fail "team-allow must start the thread"
-"$CTL" team-pending | expect "d==[]" || fail "an allowed command leaves the wait list"
-"$CTL" threads --project p-demo | expect "any(t['title']=='Fix the tests' for t in d)" || fail "the allowed new thread must exist on the desktop"
-"$CTL" team-fetch >/dev/null || fail "team-fetch to push the ack"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$NEW_ID' and a['outcome']=='done' and len(a['detail'])==36 for a in d)" || fail "team acks after allow"
-VIEW_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle view | json "d['id'] if d['lane']=='store' and d['outcome']=='queued' else ''")"
-[ -n "$VIEW_ID" ] || fail "team drive view must queue"
-"$CTL" team-fetch >/dev/null || fail "team-fetch after a queued view"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$VIEW_ID' and a['outcome']=='done' and 'echo: hello from Bo via the store' in a['detail'] for a in d)" || fail "team acks after view must carry the thread's transcript"
-"$CTL" team-fetch | expect "any(m['name']=='Bo' and m.get('controls') is None for m in d['members']) and len(d['grants'])==1 and d.get('pending') is None" || fail "team-status must carry the grant and no waits"
-GRANT_ID="$("$CTL" team-grants | json "d['grants'][0]['id']")"
-"$CTL" team-revoke "$GRANT_ID" | expect "d['removed'] is True" || fail "team-revoke"
-LATE_ID="$(INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team drive "$ANN_KID" t-idle send "after the revoke" | json "d['id'] if d['outcome']=='queued' else ''")"
-[ -n "$LATE_ID" ] || fail "team drive after revoke must still queue"
-"$CTL" team-fetch >/dev/null || fail "team-fetch after the revoke"
-INFINITUS_TEAM_DIR="$CLI_TEAM" "$CTL" team acks | expect "any(a['id']=='$LATE_ID' and a['outcome']=='noGrant' for a in d)" || fail "a revoked grant must answer noGrant"
-echo "team control: ok"
-printf 'wrong' | "$CTL" desktop-credential --origin "http://127.0.0.1:$DESK_PORT" >/dev/null || fail "desktop-credential replace"
-rc=0; "$CTL" threads >"$LOG.desk" 2>&1 || rc=$?
-[ "$rc" -eq 2 ] && grep -q "no longer accepts this credential" "$LOG.desk" || fail "a revoked credential must exit 2 with the relaunch hint (got $rc: $(head -c 200 "$LOG.desk"))"
-"$CTL" desktop credential | expect "d['stored'] is True and d['accepted'] is False" || fail "desktop credential must report the refusal"
-"$CTL" desktop-credential </dev/null | expect "d['stored'] is False and d['origin'] is None" || fail "desktop-credential with empty stdin forgets"
-"$CTL" desktop status | expect "d['credential'] is None and d['reachable'] is False" || fail "desktop status after forget"
-kill "$DESK_PID" 2>/dev/null || true
-echo "desktop verbs: ok"
-
+# --- team on Infinitus Connect (#1592) --------------------------------------
+# The team itself lives on the relay; the Mac keeps the private-project
+# list and the folded stats days the desktop publishes.
+"$CTL" team-exclusions | expect "d['projects']==[]" || fail "team-exclusions must start empty"
+"$CTL" team-exclude add /r/secret-repo | expect "d['projects']==['/r/secret-repo']" || fail "team-exclude add"
+"$CTL" team-exclusions | expect "d['projects']==['/r/secret-repo']" || fail "team-exclusions after add"
+"$CTL" team-days --days 30 | expect "d['exclusions']==['/r/secret-repo'] and isinstance(d['days'], dict) and 'generation' in d" || fail "team-days"
+"$CTL" team-exclude remove /r/secret-repo | expect "d['projects']==[]" || fail "team-exclude remove"
+echo "team: ok (exclusions and days)"
 
 # --- performance --------------------------------------------------------
 # Sampled AFTER the churn above so a timer left behind by a closed window

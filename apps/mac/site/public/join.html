@@ -20,14 +20,14 @@
   <h1 id="title">Opening Infinitus…</h1>
   <p id="note">Hold on while this link hands the invite to the app.</p>
   <code id="code" hidden></code>
-  <button id="copy" hidden type="button">Copy code</button>
+  <button id="copy" hidden type="button">Copy token</button>
 </main>
 <script>
-// A team invite (#1313): https://infinitus.run/join#<code>. The code is a
+// A team invite (#1592): https://infinitus.run/join#<token>. The token is a
 // secret and rides in the fragment, which never reaches this server. On a
 // phone with Infinitus installed the universal link never gets here — the
 // app takes it. A desktop browser is forwarded to the desktop app's own
-// infinitus://join/<code>; if nothing opens, the code is shown to paste
+// infinitus://join/<token>; if nothing opens, the token is shown to paste
 // into Settings › Team. Nothing joins on its own.
 (function () {
   var code = location.hash.replace(/^#/, "");
@@ -38,7 +38,7 @@
   var phone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   function reveal() {
     title.textContent = "Your team invite";
-    note.textContent = "If Infinitus did not open, paste this code into Settings › Team.";
+    note.textContent = "If Infinitus did not open, paste this token into Settings › Team.";
     codeEl.textContent = decodeURIComponent(code);
     codeEl.hidden = false;
     copy.hidden = false;
@@ -46,18 +46,18 @@
       navigator.clipboard.writeText(decodeURIComponent(code)).then(function () {
         copy.textContent = "Copied";
       }, function () {
-        copy.textContent = "Select the code and copy it";
+        copy.textContent = "Select the token and copy it";
       });
     };
   }
   if (!code) {
     title.textContent = "This invite link is incomplete";
-    note.textContent = "Ask the person who invited you for the full link, or paste the code they gave you into Settings › Team.";
+    note.textContent = "Ask the person who invited you for the full link, or paste the token they gave you into Settings › Team.";
     return;
   }
   if (phone) {
     title.textContent = "Open this in the Infinitus app";
-    note.textContent = "Team invites open in the Infinitus phone app. Install it, then open this link again.";
+    note.textContent = "Team invites open in Infinitus on a phone or a desktop. Install it, then open this link again.";
     return;
   }
   location.replace("infinitus://join/" + code);
