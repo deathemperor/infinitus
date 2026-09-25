@@ -187,7 +187,7 @@ export class InfinitusTeamStore extends Context.Service<
       readonly environmentId: string;
       readonly threadId: string;
     }) => E<ReadonlyArray<TranscriptRecord>>;
-    readonly listTranscriptsForMember: (teamId: string, userId: string, environmentId: string) => E<ReadonlyArray<TranscriptRecord>>;
+    readonly listTranscriptsForMember: (teamId: string, userId: string) => E<ReadonlyArray<TranscriptRecord>>;
     readonly listTranscriptsOlderThan: (createdBefore: string) => E<ReadonlyArray<TranscriptRecord>>;
     readonly listTranscriptBytesByMember: () => E<ReadonlyArray<{ teamId: string; userId: string; bytes: number }>>;
     readonly deleteTranscriptChunks: (keys: ReadonlyArray<TranscriptKey>) => E<void>;
@@ -587,18 +587,12 @@ const make = Effect.gen(function* () {
     listTranscriptsForMember: Effect.fn("relay.infinitus_team.list_transcripts_for_member")(function* (
       teamId,
       userId,
-      environmentId,
     ) {
       const rows = yield* db
         .select()
         .from(infinitusTeamTranscripts)
-        .where(
-          and(
-            eq(infinitusTeamTranscripts.teamId, teamId),
-            eq(infinitusTeamTranscripts.userId, userId),
-            eq(infinitusTeamTranscripts.environmentId, environmentId),
-          ),
-        )
+        .where(and(eq(infinitusTeamTranscripts.teamId, teamId), eq(infinitusTeamTranscripts.userId, userId)))
+        .orderBy(infinitusTeamTranscripts.createdAt)
         .pipe(Effect.mapError(failing("list_transcripts_for_member")));
       return rows.map(transcriptRow);
     }),

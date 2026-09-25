@@ -185,11 +185,11 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
           )
           .sort((a, b) => a.seq - b.seq),
       ),
-    listTranscriptsForMember: (teamId, userId, environmentId) =>
+    listTranscriptsForMember: (teamId, userId) =>
       Effect.sync(() =>
-        [...state.transcripts.values()].filter(
-          (t) => t.teamId === teamId && t.userId === userId && t.environmentId === environmentId,
-        ),
+        [...state.transcripts.values()]
+          .filter((t) => t.teamId === teamId && t.userId === userId)
+          .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.seq - b.seq)),
       ),
     listTranscriptsOlderThan: (createdBefore) =>
       Effect.sync(() => [...state.transcripts.values()].filter((t) => t.createdAt < createdBefore)),

@@ -549,3 +549,34 @@ export const RelayInfinitusTeamEnvironmentGroup = HttpApiGroup.make("infinitusTe
     OpenApi.Description,
     "Infinitus Team: what a linked environment publishes and runs for its user.",
   );
+
+/** Does `grant` let `from` run `action` on `threadId`? The relay checks this
+    when a command is queued and again when it is polled; the desktop server
+    checks it once more before running, on the grants the relay listed. */
+export function teamGrantAllows(
+  grant: TeamGrant,
+  input: {
+    readonly fromUserId: string;
+    readonly fromRole: TeamRole;
+    readonly threadId: string;
+    readonly action: TeamCapability;
+    readonly nowIso: string;
+  },
+): boolean {
+  if (grant.expiresAt !== null && grant.expiresAt <= input.nowIso) return false;
+  if (!grant.capabilities.includes(input.action)) return false;
+  const audience = grant.audience;
+  const inAudience =
+    audience === "team" ||
+    (audience === "leaders" && input.fromRole === "leader") ||
+    (Array.isArray(audience) && audience.includes(input.fromUserId));
+  if (!inAudience) return false;
+  if (input.action === "new") return input.threadId === "-";
+  if (input.threadId === "-") return false;
+  return grant.threads === "all" || grant.threads.includes(input.threadId as ThreadId);
+}
+
+/** `interrupt` and `new` ask the grantor unless the grant preauthorizes them. */
+export function teamCommandNeedsTap(grant: TeamGrant, action: TeamCapability): boolean {
+  return (action === "interrupt" || action === "new") && !grant.preauthorized.includes(action);
+}

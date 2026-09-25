@@ -8,6 +8,8 @@ import {
   TeamInviteCreate,
   TeamSnapshot,
   TeamTranscriptPublish,
+  teamCommandNeedsTap,
+  teamGrantAllows,
 } from "./relayInfinitusTeam.ts";
 
 describe("relayInfinitusTeam", () => {
@@ -72,5 +74,36 @@ describe("relayInfinitusTeam", () => {
       traceId: "trace",
     });
     expect(error.message).toBe("This invite was already used.");
+  });
+});
+
+describe("teamGrantAllows", () => {
+  const grant = {
+    grantId: "g-1",
+    environmentId: "env-1" as never,
+    audience: "leaders" as const,
+    threads: ["thread-1"] as never,
+    capabilities: ["view", "send", "new"] as const,
+    preauthorized: ["new"] as const,
+    expiresAt: null,
+  };
+  const base = { fromUserId: "user-2", fromRole: "leader" as const, threadId: "thread-1", action: "send" as const, nowIso: "2026-09-25T00:00:00.000Z" };
+  it("checks audience, capability, thread and expiry", () => {
+    expect(teamGrantAllows(grant, base)).toBe(true);
+    expect(teamGrantAllows(grant, { ...base, fromRole: "member" })).toBe(false);
+    expect(teamGrantAllows(grant, { ...base, action: "interrupt" })).toBe(false);
+    expect(teamGrantAllows(grant, { ...base, threadId: "thread-2" })).toBe(false);
+    expect(teamGrantAllows({ ...grant, expiresAt: "2025-01-01T00:00:00.000Z" }, base)).toBe(false);
+    expect(teamGrantAllows({ ...grant, audience: ["user-2"] }, { ...base, fromRole: "member" })).toBe(true);
+  });
+  it("new targets the machine, never a thread", () => {
+    expect(teamGrantAllows(grant, { ...base, action: "new", threadId: "-" })).toBe(true);
+    expect(teamGrantAllows(grant, { ...base, action: "new" })).toBe(false);
+    expect(teamGrantAllows(grant, { ...base, threadId: "-" })).toBe(false);
+  });
+  it("interrupt and new need a tap unless preauthorized", () => {
+    expect(teamCommandNeedsTap(grant, "new")).toBe(false);
+    expect(teamCommandNeedsTap(grant, "interrupt")).toBe(true);
+    expect(teamCommandNeedsTap(grant, "send")).toBe(false);
   });
 });
