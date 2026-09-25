@@ -49,7 +49,7 @@ describe("relayInfinitusTeam", () => {
       name: "Papaya",
       role: "leader",
       policy: { requests: "code" },
-      me: { name: "Loc", shares: DEFAULT_TEAM_SHARES },
+      me: { userId: "user_loc", name: "Loc", shares: DEFAULT_TEAM_SHARES },
       members: [
         {
           userId: "user-1",

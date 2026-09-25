@@ -447,6 +447,8 @@ function answer(request, socketPath) {
       return { logins: [] };
     case "client-activity":
       return { clientId: "fixture" };
+    case "team-exclusions":
+      return { projects: ["/Users/ann/secret-lab"] };
     case "team-status":
       return {
         id: "papaya",
