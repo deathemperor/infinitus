@@ -391,6 +391,18 @@ final class AccountVitalsTests: XCTestCase {
         XCTAssertFalse(AccountVitals.isPlanDead(nil))
     }
 
+    func testASpentModelWindowNeverPulsesItsLiveRow() throws {
+        // Out of Fable, plan windows well clear: alive, not dying (user
+        // 2026-09-25: a Fable-spent fleet pulsed red on every row).
+        XCTAssertFalse(AccountVitals.isDying(try usage(#"{"fiveHour":{"pct":0},"sevenDay":{"pct":67},"scoped":[{"pct":100,"name":"Fable"}]}"#)))
+        // A window still in the 90s dies soon, model or plan.
+        XCTAssertTrue(AccountVitals.isDying(try usage(#"{"fiveHour":{"pct":0},"sevenDay":{"pct":67},"scoped":[{"pct":94,"name":"Fable"}]}"#)))
+        XCTAssertTrue(AccountVitals.isDying(try usage(#"{"fiveHour":{"pct":10},"sevenDay":{"pct":95},"scoped":[{"pct":100,"name":"Fable"}]}"#)))
+        // A dead row is past dying.
+        XCTAssertFalse(AccountVitals.isDying(try usage(#"{"fiveHour":{"pct":100},"sevenDay":{"pct":95}}"#)))
+        XCTAssertFalse(AccountVitals.isDying(nil))
+    }
+
     func testSpentCreditAloneIsAlive() throws {
         // Spent usage credit = no overflow buffer; the subscription
         // windows still have headroom, so the account is NOT dead.

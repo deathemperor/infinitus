@@ -414,14 +414,6 @@
       {
         "args": [],
         "effect": "read",
-        "name": "team-status",
-        "options": [],
-        "replyShape": "{id, name, remote (masked), kid, role: leader|member|pending, rev, members: [{kid, name, role, isMe, founder, since, lastPublished, kinds, threadsNow, blockers, crashes, todayUSD, todayMessages, todayCommits, fleet}], requests: [{kid, name, platform, devices, at}], policy: {requests}, shares: {kind: audience}, exclusions: [slug], lockEnabled, lastFetch, lastPublish, lastError} | null",
-        "summary": "Settings › Team: the team this Mac is in — members with what they last published, pending requests, shares, exclusions, the loop's last fetch/publish — or null when there is none."
-      },
-      {
-        "args": [],
-        "effect": "read",
         "name": "team-exclusions",
         "options": [],
         "replyShape": "{projects: [project]}",

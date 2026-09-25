@@ -250,7 +250,7 @@ public enum AccountRowVitals {
     /// The dying set: alive, but its binding window is in the 90s —
     /// what the Mac's grid paints `CriticalPulse` over.
     public static func isCritical(_ account: Account) -> Bool {
-        !isDead(account) && (PushTriggers.worstPlanPct(account.usage) ?? 0) >= 90
+        AccountVitals.isDying(account.usage)
     }
 
     /// All Lucky 7s, RPG only — the fever background's trigger.

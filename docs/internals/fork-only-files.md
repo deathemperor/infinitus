@@ -74,8 +74,8 @@ these bullets.
   `useNewThreadHandler` with the prompt set on the draft — never sent; an
   unknown project toasts; `settings` navigates to a listed Settings section
   (`isSettingsDeepLinkPath`) and ignores any other path.
-  `join` (#1313, the Team rebuild) parks the whole link — it is the team
-  code, a secret — in `pendingTeamJoin.ts` (memory only, taken once) and
+  `join` (#1313, #1592) parks the whole link — it is the invite token, a
+  secret — in `pendingTeamJoin.ts` (memory only, taken once) and
   opens Settings › Team; the Team page's Join field takes it when that
   page lands, and nothing joins on its own. Only the link's kind is ever
   logged; `pair` stays the native app's.
@@ -186,7 +186,7 @@ these bullets.
   replaces it.
 - `apps/server/src/infinitus/Layers/InfinitusSessionHold.ts` (+ `infinitusSessionHold.logic.ts`, `Services/InfinitusSessionHold.ts`) — session priority mode, hold (#616): the `TurnStartGate` that holds a background start while the fleet reads `low`/`critical`; `infinitus.releaseThread`, `subscribeInfinitusHolds` (#741), `packages/client-runtime/src/state/infinitusThreadHold.ts` (the marker-row fold and `heldEntryFor`, the stream's per-thread read shared by web and phone rows), `apps/web/src/components/chat/useInfinitusHoldBanner.tsx` (+ `infinitusHoldBanner.logic.ts`), `sidebar/useInfinitusHeldSummary.ts`, `chat/PinAtCreationToggle.tsx`. Rules and traps: `docs/internals/session-priority.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSessionInterrupt.ts` (+ `infinitusSessionInterrupt.logic.ts`, `Services/InfinitusSessionInterrupt.ts`) — session priority mode, interrupt (#743): pauses running background turns while the fleet reads `critical` and resumes them with `CONTINUATION_PROMPT` through `TurnStartGate`. Rules and traps: `docs/internals/session-priority.md`.
-- `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+ `Services/InfinitusSecret.ts`) — `infinitus.secret` (`orchestration:operate`; the sign-in and team-join verbs for any client, the rest `access:write`), the fork's one secret-carrying path (#747): the value rides the control request line's `secret` field for a verb whose manifest entry says `stdin: "secret"` (native #766). Rules and traps: `docs/internals/infinitus-secret.md`.
+- `apps/server/src/infinitus/Layers/InfinitusSecret.ts` (+ `Services/InfinitusSecret.ts`) — `infinitus.secret` (`orchestration:operate`; the sign-in verbs for any client, the rest `access:write`), the fork's one secret-carrying path (#747): the value rides the control request line's `secret` field for a verb whose manifest entry says `stdin: "secret"` (native #766). Rules and traps: `docs/internals/infinitus-secret.md`.
 - `apps/server/src/infinitus/Layers/InfinitusServerPort.ts` (the credential step), `apps/server/src/infinitus/Layers/InfinitusHttp.ts`, the `infinitus` group in `packages/contracts/src/environmentHttp.ts` — the server half of `infinitusctl`'s desktop verbs (#822): the `infinitusctl` session and its 60 s heartbeat (#1137), `GET /api/infinitus/holds`, `POST /api/infinitus/release-thread`, `GET /api/infinitus/thread-defaults` (#1315). Rules and traps: `docs/internals/infinitusctl-desktop-verbs.md`.
 - `apps/server/src/infinitus/` — the server's Infinitus adapter: the control client, the `InfinitusService` poller behind `subscribeInfinitus` / `infinitus.command` (`events --after`, #346), the fork-port publisher (`prefs set fork_server_port`, withheld from dev and worktree servers, #640), the verb-only spans (#676). Rules and traps: `docs/internals/server-adapter.md`.
 - `apps/server/src/infinitus/Layers/InfinitusSlackSocket.ts` (+ `infinitusSlackSocket.logic.ts` — `parseSocketFrame`, `reconnectDelaySeconds`; test) — the Socket Mode client, `SlackClientLive` (#574, PR 4). Rules and traps: `docs/internals/slack-bridge.md`.
@@ -267,13 +267,6 @@ these bullets.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@infinitus/client-runtime/state/infinitusAccounts`).
-- `apps/server/src/infinitus/Layers/InfinitusTeamControlHttp.ts`,
-  `packages/contracts/src/infinitusTeamControl.ts` — delegated control's
-  network lane (#1313, spec §8): `POST /api/infinitus/team/command`,
-  unauthenticated like pairing, hands the sealed envelope to the Mac's
-  `team-inbox` and answers `{ack}`; never a reason. The Mac side
-  (`TeamControl*.swift`, the `team-grant`/`team-drive`/`team-pending` verbs) is
-  `apps/mac`'s.
 - `apps/mobile/src/features/team/` — Settings › Team on Infinitus Connect
   (#1592): the phone reads and changes the team on the relay as the signed-in
   user through the same client the web pane uses

@@ -429,11 +429,9 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # The unit tests run as two halves on two runners: the Team suites
-  # drive real git (a publish is dozens of subprocesses) and took 17 of
-  # the old single job's 20 minutes (2026-09-07). Both halves run test
-  # classes in parallel. `mac-test` is the one check the ruleset requires;
-  # it just needs both halves green.
+  # The unit tests, test classes in parallel. `mac-test` is the one check
+  # the ruleset requires. (The git-store Team suites that once split this
+  # across two runners left with #1592.)
   mac-test:
     name: mac-test
     needs: mac_changes

@@ -605,7 +605,7 @@ final class AppModel: ObservableObject {
 
     /// The desktop calls run here, one at a time: `DesktopAPI` blocks a
     /// thread per request (its transport is synchronous, like the CLI's),
-    /// so it stays off the cooperative pool, as TeamModel does.
+    /// so it stays off the cooperative pool.
     private let desktopQueue = DispatchQueue(label: "run.infinitus.desktop-api", qos: .utility)
 
     /// The busy-session count for the battle plan (#1375): the desktop's
@@ -886,69 +886,20 @@ final class AppModel: ObservableObject {
         // Infinitus/stats/ (matches the historyRecorder guard above).
         statsModel.enabled = !isPlayground && !mockMode
         statsModel.leases = leases
-        // Settings › Team (#1313): the loop rides the refresh tick; the
-        // publisher works from StatsModel's scan (#251) and gives the
-        // table back once folded (#499).
-        statsModel.scanFeedsTeam = { [weak self] in self?.team.enabled == true || self?.teamDays.scanWanted == true }
-        team.sources = { [weak self] in self?.teamSources() ?? TeamPublisher.Sources(home: NSHomeDirectory(), machine: "Mac") }
-        team.ownsScan = { [weak self] in self?.statsModel.enabled == true }
-        team.scanEntries = { [weak self] in self?.statsModel.scanEntries }
-        team.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
-        team.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
-        team.scanRequested = { [weak self] in self?.statsModel.refresh() }
-        // Team on Infinitus Connect (#1592): `team-days` folds from the same
-        // scan. The table goes back through it only while the git team is
-        // off, else that team's own fold would miss and rescan.
+        // Team on Infinitus Connect (#1592): `team-days` folds from
+        // StatsModel's scan (#251) and gives the table back once folded (#499).
+        statsModel.scanFeedsTeam = { [weak self] in self?.teamDays.scanWanted == true }
         teamDays.ownsScan = { [weak self] in self?.statsModel.enabled == true }
         teamDays.scanEntries = { [weak self] in self?.statsModel.scanEntries }
         teamDays.scanGeneration = { [weak self] in self?.statsModel.scanGeneration ?? 0 }
-        teamDays.scanConsumed = { [weak self] generation in
-            if self?.team.enabled != true { self?.statsModel.dropScanEntries(generation: generation) }
-        }
+        teamDays.scanConsumed = { [weak self] generation in self?.statsModel.dropScanEntries(generation: generation) }
         teamDays.scanRequested = { [weak self] in self?.statsModel.refresh() }
-        team.desktopCredential = { [weak self] in
-            guard let self, let origin = desktopCredential.origin, let url = URL(string: origin),
-                  let token = desktopCredential.token() else { return nil }
-            return (url, token)
-        }
-        team.onLog = { [weak self] text in self?.logEvent("team", icon: "person.2", text) }
-        team.load()
     }
 
     /// The stats days the desktop's Team publisher reads (#1592), over
     /// the same team dir as the exclusions.
     private(set) lazy var teamDays = TeamDays(paths: TeamPaths.standard())
 
-    /// Settings › Team (spec §9). Secrets in the keychain, or files when
-    /// INFINITUS_TEAM_DIR redirects the team dir (e2e, a second instance).
-    private(set) lazy var team: TeamModel = {
-        let paths = TeamPaths.standard()
-        let model = TeamModel(paths: paths, makeSecrets: TeamSecretsFactory.make(paths: paths), defaults: defaults)
-        model.enabled = !isPlayground && (!mockMode || ProcessInfo.processInfo.environment["INFINITUS_TEAM_DIR"] != nil)
-        return model
-    }()
-
-    /// What this Mac publishes to its team (spec §7) besides the scan and
-    /// the desktop's threads: each engine's active account with its window
-    /// percentages, every account for the member fleet view (#221), and
-    /// the blockers the pop-out shows (lapsed AWS logins, an all-limited
-    /// fleet). Crash reports stay on this Mac (#1422).
-    func teamSources() -> TeamPublisher.Sources {
-        var s = TeamPublisher.Sources(home: NSHomeDirectory(), machine: machineName)
-        let lastFleets = fleets.compactMap(\.lastFleet)
-        s.fleets = lastFleets.map { fleet in
-            let active = fleet.accounts.first { $0.number == fleet.activeNumber }
-            var windows: [TeamDocs.Window] = []
-            if let w = active?.usage?.fiveHour { windows.append(TeamDocs.Window(label: "5h", pct: Int(w.pct.rounded()))) }
-            if let w = active?.usage?.sevenDay { windows.append(TeamDocs.Window(label: "7d", pct: Int(w.pct.rounded()))) }
-            return TeamDocs.Fleet(engine: fleet.engineID, account: active.map { $0.alias ?? $0.email }, windows: windows)
-        }
-        s.fleetRows = lastFleets.map { TeamDocs.FleetDoc.row($0) }
-        s.blockers = awsLogins.map { "\($0.providerOrAws.loginLabel): \($0.profile)" }
-            + lastFleets.filter { !$0.accounts.isEmpty && $0.activeNumber == nil && $0.nextCandidate == nil }
-                .map { "\($0.engineID): every account limited" }
-        return s
-    }
 
     /// App-side cache of our own subprocess output (never an engine
     /// internal file).
@@ -1642,14 +1593,10 @@ final class AppModel: ObservableObject {
         let bundle = Bundle.main.bundleURL.path
         let oldSwapd = swapdSupervisor
         swapdSupervisor = nil
-        let team = team
         let keepEngine = swapdEnabled && !mockMode
         Task {
             if keepEngine { await oldSwapd?.disconnect() }
             else { await oldSwapd?.stop() }
-            // The team's now.json delete (bounded by TeamModel.quitBound), so
-            // teammates stop seeing this Mac "on" across the relaunch.
-            await team.quit()
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/sh")
             // Unbundled dev runs are a bare executable — `open` on its
@@ -1848,7 +1795,6 @@ final class AppModel: ObservableObject {
                 await historyRecorder.record(accounts: accts)
             }
             statsModel.refreshIfStale()
-            team.refreshIfStale()
             // A living UI keeps its lease; the cap only catches one that died.
             if localUIVisible { reportLocalActivity(visible: true) }
         }
@@ -1964,10 +1910,8 @@ final class AppModel: ObservableObject {
     /// explicit engine toggle disables that service.
     func shutdown() {
         let swapdSupervisor = swapdSupervisor
-        let team = team
         Task {
             await swapdSupervisor?.disconnect()
-            await team.quit()
             await MainActor.run {
                 NSApplication.shared.terminate(nil)
             }

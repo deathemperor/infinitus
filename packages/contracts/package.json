@@ -35,10 +35,6 @@
       "types": "./src/infinitusPairing.ts",
       "import": "./src/infinitusPairing.ts"
     },
-    "./infinitusTeamControl": {
-      "types": "./src/infinitusTeamControl.ts",
-      "import": "./src/infinitusTeamControl.ts"
-    },
     "./infinitusAlert": {
       "types": "./src/infinitusAlert.ts",
       "import": "./src/infinitusAlert.ts"

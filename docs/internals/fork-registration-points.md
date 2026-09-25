@@ -76,12 +76,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
-  routes (#710), and `InfinitusTeamControlHttpApi`: a teammate's sealed team
-  command for the Mac (#1313), so the typed HTTP clients carry them; the
+  routes (#710), so the typed HTTP clients carry them (the git-store team's
+  `InfinitusTeamControlHttpApi` left with #1592); the
   `infinitus` group's `POST /api/infinitus/alert` (#1375) takes the Mac's
   account alert on the operate scope.
 - `packages/contracts/package.json` — the `./infinitus`,
-  `./infinitusPairing`, `./infinitusTeamControl`, `./captures`,
+  `./infinitusPairing`, `./captures`,
   `./infinitusAlert`, `./relayInfinitusAlert` (#1375) and
   `./relayInfinitusTeam` (#1592) subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
@@ -162,8 +162,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`.
-  `infinitusPairingHttpApiLayer` and `infinitusTeamControlHttpApiLayer` in
-  `makeRoutesLayer`
+  `infinitusPairingHttpApiLayer` in `makeRoutesLayer`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
   client and `ProcessRunner.layer` (#1076; the thread-card layer it was merged with left with #1375).
   `infinitusHttpApiLayer` is provided `InfinitusAlertRelayLive` over the
@@ -605,7 +604,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac) and the `SettingsTeam` route
-  (Settings › Team, #1313; `team?code=…` is where an invite link lands).
+  (Settings › Team, #1313, on the relay since #1592; `team?code=…` is where an invite link lands).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` and `SettingsTeam` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the rows of
@@ -644,7 +643,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fork's build fell through to upstream's T3 mark and drew the T3 logo
   beside the Infinitus wordmark on every loading screen. Any new
   variant-keyed asset needs an `infinitus` branch for the same reason.
-- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
+- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313, #1592: `infinitus.run/join#<token>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
   `infinitusComposerSendMode` (#807, `"queue" | "steer"`) keys (interface
@@ -700,6 +699,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusSideQuestionSheet.tsx`, `sideQuestions.ts`) — a side question from the phone (#269 C, #881, #887). Rules and traps: `docs/internals/side-question.md`.
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusThreadUsageSheet.tsx`, `threadUsage.logic.ts`) — the thread's usage from the phone (#834, #907, #927). Rules and traps: `docs/internals/turn-usage.md`.
 - `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` route in the new-task sheet), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`.
+- `apps/mobile/src/Stack.tsx` (`RootStackLayout`'s share effect), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`discardShare`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/state/use-thread-outbox-drain.ts` (+ test) — `usePinAtCreation` after a delivered creation, `threadsByKey` (#1278), `queueBehindRunningTurn` around both `resolveThreadOutboxDeliveryAction` calls (#807) and its `thread.turn.queue` form on a `turnQueue` server (#812: `sendQueuedMessage` `via`, `completeQueuedMessageDelivery` `retainInFeed`). Rules and traps: `docs/internals/phone-outbox-drain.md`.
 - `apps/mobile/src/lib/composerImages.ts` (+ test) — `originalImagePassthroughMimeType`: a picked still over `ORIGINAL_STILL_IMAGE_MAX_BYTES` (2 MB) takes upstream's bounded-JPEG path instead of passing through up to the 10 MB provider cap; a GIF keeps the cap. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
 - `apps/mobile/src/lib/attachmentUpload.ts` (+ test) — `uploadFileBytes` aborts and fails a transfer after `ATTACHMENT_UPLOAD_TIMEOUT_MS`: the relay cut a 7.7 MB image at two minutes, iOS's background session kept replaying it, and the one-at-a-time outbox held every queued reply behind it (2026-09-19). The session stays `background` on purpose, so an upload survives a locked phone. Offered upstream as well; drop this bullet once their copy carries it.
