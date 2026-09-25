@@ -26,5 +26,12 @@ export const mapTeamErrors = <A, R>(
 ): Effect.Effect<A, RelayInfinitusTeamRefusedError | RelayInternalError, R> =>
   Effect.gen(function* () {
     const traceId = yield* currentTraceId;
-    return yield* effect.pipe(Effect.mapError((error) => toApiError(error, traceId)));
+    return yield* effect.pipe(
+      Effect.tapError((error) =>
+        error._tag === "TeamRefused"
+          ? Effect.void
+          : Effect.logError("infinitus team request failed", { error }),
+      ),
+      Effect.mapError((error) => toApiError(error, traceId)),
+    );
   });
