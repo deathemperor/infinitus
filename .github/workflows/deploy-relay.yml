@@ -31,7 +31,7 @@ jobs:
 =======
     # A manual run from another branch would deploy that branch to production.
     if: github.ref == 'refs/heads/main'
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-c13f7d93f-upstream-renamed
     timeout-minutes: 15
     environment:
