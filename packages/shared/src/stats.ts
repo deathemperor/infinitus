@@ -1,4 +1,5 @@
 /** Pure calendar and merge rules shared by the server and clients. */
+import * as DateTime from "effect/DateTime";
 import type {
   StatsDay,
   StatsRequest,
@@ -14,20 +15,18 @@ export function statsDayFormatter(timeZone: string) {
     month: "2-digit",
     day: "2-digit",
   });
-  return (ms: number) => format.format(new Date(ms));
+  return (ms: number) => format.format(ms);
 }
 
 export function shiftStatsDay(day: string, count: number): string {
-  const date = new Date(day + "T12:00:00Z");
-  date.setUTCDate(date.getUTCDate() + count);
-  return date.toISOString().slice(0, 10);
+  const date = DateTime.makeUnsafe(day + "T12:00:00Z");
+  return DateTime.formatIsoDateUtc(DateTime.add(date, { days: count }));
 }
 
 /** Calendar periods, Monday weeks, identical regardless of the server's zone. */
 export function statsWindow(input: StatsRequest) {
-  const date = new Date(input.today + "T12:00:00Z");
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== input.today)
-    throw new Error("Invalid reporting day");
+  const date = DateTime.makeUnsafe(input.today + "T12:00:00Z");
+  if (DateTime.formatIsoDateUtc(date) !== input.today) throw new Error("Invalid reporting day");
   statsDayFormatter(input.timeZone);
   let from = input.today as string;
   let previousFrom: string;
@@ -38,22 +37,21 @@ export function statsWindow(input: StatsRequest) {
       to = from;
       break;
     case "week":
-      from = shiftStatsDay(from, -((date.getUTCDay() + 6) % 7));
+      from = shiftStatsDay(from, -((DateTime.toPartsUtc(date).weekDay + 6) % 7));
       previousFrom = shiftStatsDay(from, -7);
       to = shiftStatsDay(from, 6);
       break;
-    case "month":
-      date.setUTCDate(1);
-      from = date.toISOString().slice(0, 10);
-      date.setUTCMonth(date.getUTCMonth() + 1);
-      to = shiftStatsDay(date.toISOString().slice(0, 10), -1);
-      date.setUTCMonth(date.getUTCMonth() - 2);
-      previousFrom = date.toISOString().slice(0, 10);
+    case "month": {
+      const first = DateTime.setPartsUtc(date, { day: 1 });
+      from = DateTime.formatIsoDateUtc(first);
+      to = shiftStatsDay(DateTime.formatIsoDateUtc(DateTime.add(first, { months: 1 })), -1);
+      previousFrom = DateTime.formatIsoDateUtc(DateTime.add(first, { months: -1 }));
       break;
+    }
     case "year":
-      from = `${date.getUTCFullYear()}-01-01`;
-      to = `${date.getUTCFullYear()}-12-31`;
-      previousFrom = `${date.getUTCFullYear() - 1}-01-01`;
+      from = `${DateTime.toPartsUtc(date).year}-01-01`;
+      to = `${DateTime.toPartsUtc(date).year}-12-31`;
+      previousFrom = `${DateTime.toPartsUtc(date).year - 1}-01-01`;
       break;
   }
   return { from, to, previousFrom };
