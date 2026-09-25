@@ -292,6 +292,7 @@ import {
   ProviderConsumeResetCreditInput,
   ProviderConsumeResetCreditResult,
 } from "./providerUsageLimits.ts";
+import { StatsRequest, StatsSnapshot } from "./stats.ts";
 import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
 import { ServerSettings, ServerSettingsError, ServerSettingsPatch } from "./settings.ts";
 import {
@@ -424,6 +425,7 @@ export const WS_METHODS = {
   serverReportClientActivity: "server.reportClientActivity",
   serverReportHostPowerState: "server.reportHostPowerState",
   serverGetBackgroundPolicy: "server.getBackgroundPolicy",
+  serverGetStats: "server.getStats",
   serverGetUsageSummary: "server.getUsageSummary",
   serverRefreshUsageRates: "server.refreshUsageRates",
 
@@ -700,6 +702,12 @@ const WsServerRetryResourceTelemetryRpc = Rpc.make(WS_METHODS.serverRetryResourc
   payload: Schema.Struct({}),
   success: ResourceTelemetryRetryResult,
   error: EnvironmentAuthorizationError,
+});
+
+const WsServerGetStatsRpc = Rpc.make(WS_METHODS.serverGetStats, {
+  payload: StatsRequest,
+  success: StatsSnapshot,
+  error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
 });
 
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
@@ -1601,6 +1609,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetProcessResourceHistoryRpc,
   WsServerGetResourceTelemetryHistoryRpc,
   WsServerRetryResourceTelemetryRpc,
+  WsServerGetStatsRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,

@@ -236,9 +236,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               onClick={handleAccountsClick}
             />
           ) : null}
-          {accountsSupported ? (
-            <SidebarUtilityItem icon={<ChartLineIcon />} label="Stats" onClick={handleStatsClick} />
-          ) : null}
+          <SidebarUtilityItem icon={<ChartLineIcon />} label="Stats" onClick={handleStatsClick} />
           {accountsSupported ? (
             <SidebarUtilityItem
               icon={<GaugeIcon />}

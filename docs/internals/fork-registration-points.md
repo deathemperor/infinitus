@@ -10,6 +10,15 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
+- Closed popups stop blocking keys: `apps/web/src/components/ChatView.tsx`
+  (`TYPE_TO_FOCUS_FLOATING_LAYER_SELECTOR`) and `RightPanelTabs.tsx`
+  (`LAUNCHER_SHORTCUT_BLOCKING_LAYERS`) qualify every popup slot with
+  `:is([data-open],[data-ending-style])`, like upstream's dialog entries.
+  Upstream #12453 keeps the chat header's actions menu mounted while
+  closed, which killed type-to-focus and the launcher letters.
+  `ComposerPromptEditorTiptap.tsx` (`focusAt`) focuses through
+  `editor.view.focus()` so the caret lands after the first redirected key
+  instead of before it. Drop both once upstream fixes them.
 - Fleet-wide Claude resets (#1554): `packages/contracts/src/infinitus.ts`
   (`InfinitusAccount.resets`, `InfinitusAccountResets`, additive) is
   fork-owned; the upstream edits are the hub section left unmounted —
@@ -433,7 +442,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (`ProviderCommandReactor.buildGeneratedWorktreeBranchName` strips both);
   `GitManager.ts` / `BitbucketApi.ts` build fork-PR checkout branches from the
   constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
-- `packages/shared/src/agentAwareness.ts` — `resolveThreadAwarenessPhase` answers `running` for a settled thread whose `backgroundLiveness` is `working`, so the lock-screen card counts the threads the lists call Working; `monitoring` stays Done. With it, `shouldPublishAgentAwarenessEvent` in `apps/server/src/relay/AgentAwarenessRelay.ts` lets `task.started`, `task.updated` and `task.completed` activities publish (never `task.progress`), so the card follows background work ending instead of waiting out the relay's two-hour row expiry. Both carry a test. The same file's `AGENT_AWARENESS_HEARTBEAT_INTERVAL` loop republishes every live thread each half hour (`resolveAgentAwarenessHeartbeatThreadIds`, past the unchanged-state dedupe) and `resolveAgentAwarenessRelayPublishSnapshot` stamps a live state with the publish time: the relay ages a running row out two hours after its `updatedAt`, so a thread Working longer than that fell off the card's count while the phone's list still said Working.
+- `packages/shared/src/agentAwareness.ts` — `resolveThreadAwarenessPhase` answers `running` for a settled thread whose `backgroundLiveness` is `working`, so the lock-screen card counts the threads the lists call Working, and a new `monitoring` phase for a watch loop alone, so the card says Monitoring where the lists do. The phase is a literal in `packages/contracts/src/relay.ts`'s `RelayAgentAwarenessPhase`, and each consumer names it: the relay's `statusForPhase`, `activityPhasePriority` (with running) and running-row TTL (`infra/relay/src/agentActivity/agentActivityAggregate.ts`, `agentActivityPayloads.ts`), the iOS widget's tint and sort buckets (`apps/mobile/src/widgets/AgentActivity.tsx`) and Android's `ActivityPhase.MONITORING` (`AgentActivityPresentation.kt`). With it, `shouldPublishAgentAwarenessEvent` in `apps/server/src/relay/AgentAwarenessRelay.ts` lets `task.started`, `task.updated` and `task.completed` activities publish (never `task.progress`), so the card follows background work ending instead of waiting out the relay's two-hour row expiry. Both carry a test. The same file's `AGENT_AWARENESS_HEARTBEAT_INTERVAL` loop republishes every live thread each half hour (`resolveAgentAwarenessHeartbeatThreadIds`, past the unchanged-state dedupe) and `resolveAgentAwarenessRelayPublishSnapshot` stamps a live state with the publish time: the relay ages a running row out two hours after its `updatedAt`, so a thread Working longer than that fell off the card's count while the phone's list still said Working.
 - `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); re-flipped after every sync with its two fixtures, `packages/shared/src/cliRelease.test.ts` and `packages/ssh/src/tunnel.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/shared/package.json` — the `./productName`, `./homeDir` and
   `./desktopIdentity` exports.
@@ -638,6 +647,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   same alert (#1375).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the fork's slots (`infinitusReconnectingNotice` #832, `infinitusHoldBanner` #742, `infinitusQueuedTurns` #806, `infinitusBestOfCard` #269 B, `infinitusTurnFooters` #952) and the thread header menu (`useThreadHeaderMenu`, #941; `usePullRequestHeaderItem`, #269 F), built in `ThreadRouteScreen.tsx`. `ThreadRouteScreen.tsx`'s `ThreadHeader` takes it as `infinitusMenu` (the Android action ahead of the git controls, its `version` in `optionsVersion`) and `apps/mobile/src/features/threads/useThreadHeaderOptions.tsx` takes the iOS item as `infinitusHeaderItem`, ahead of the git items in both header layouts. Rules and traps: `docs/internals/phone-thread-screen.md`.
 - `apps/mobile/src/components/FilePreviewModal.tsx` (+ `FilePreviewModal.types.ts`, where the source types moved) — the optional `cachedUrl` on an environment-hosted source, and the one retry with a fresh URL when a reused one is refused (`previewUrlReuse.logic.ts`). Why: `docs/internals/mobile-navigation.md`.
+- `packages/client-runtime/package.json` — the fork's `./state/infinitus*` subpath exports (`infinitusAccounts`, `infinitusUtilization`, `infinitusQuotaTimeline` and the rest), one entry per fork-owned model file.
+- `apps/web/src/timestampFormat.ts` — `timestampLocale` exported, so the Accounts page's quota timeline (`QuotaTimeline.tsx`) writes its day labels in the same locale as every other timestamp.
 - `packages/client-runtime/src/state/assets.ts` — `expiresAt` on the `Success` asset URL state, so a client can tell how long the URL it is showing stays valid.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — the optional `infinitusMessageMenu` prop (revert to a message the user sent; `useRevertMessageMenu` + `revertMessage.logic.ts`, `restoreAttachments.ts`). Rules and traps: `docs/internals/phone-thread-screen.md`. Also `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl`.
 - `apps/mobile/src/features/threads/thread-list-v2-items.tsx` — an idle
@@ -657,7 +668,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   check; the label is full-strength and hueless like `Sidebar.tsx`'s and
   does not pulse — monitoring is background presence, not progress. A babysat row still
   labels ahead of it, since `babysitLabel` says the same thing with the
-  round count.
+  round count. The same two files take the web's `held` / `limited` states
+  (#741, #270 I): the row reads the Mac's holds stream through
+  `features/infinitus/useThreadHeldEntry.ts` and passes the entry's kind to
+  the resolver ahead of the session row, so a turn parked on a usage limit
+  reads "Limit" with the held row's line where the branch sits, not "Failed"
+  with the adapter's error.
 - `apps/mobile/src/state/entities.ts` — `useThreadShells` drops side
   questions (`sideOf != null`, #269 C) and `useThreadShell` answers null for
   one, so a side question is in no phone list and never opens as a page;

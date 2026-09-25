@@ -2776,6 +2776,10 @@ const makeWsRpcLayer = (
               "rpc.aggregate": "server",
             },
           ),
+        [WS_METHODS.serverGetStats]: (input) =>
+          observeRpcEffect(WS_METHODS.serverGetStats, usage.readStats(input), {
+            "rpc.aggregate": "server",
+          }),
         [WS_METHODS.serverGetUsageSummary]: (input) =>
           observeRpcEffect(WS_METHODS.serverGetUsageSummary, usage.readSummary(input), {
             "rpc.aggregate": "server",

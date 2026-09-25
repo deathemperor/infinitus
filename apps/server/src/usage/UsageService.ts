@@ -1,3 +1,13 @@
+import * as NodeCrypto from "node:crypto";
+import { StatsRequest, StatsSnapshot, type StatsSession } from "@infinitus/contracts";
+import { statsWindow, shiftStatsDay, statsDayFormatter } from "@infinitus/shared/stats";
+import {
+  activityCollector,
+  emptyTranscriptActivity,
+  summarizeStatsSession,
+} from "../stats/statsTranscripts.ts";
+import { makeStatsRepositoryScanner } from "../stats/statsRepositories.ts";
+import * as ProcessRunner from "../processRunner.ts";
 /**
  * UsageService - scans provider transcripts and returns priced usage buckets.
  *
@@ -67,6 +77,7 @@ import {
   encodeScanCache,
   pruneScanCache,
   type ScanCache,
+  type CachedFile,
 } from "./usageScanCache.ts";
 import { addTotals, EMPTY_TOTALS, type UsageRecord } from "./usageTranscripts.ts";
 
@@ -86,8 +97,8 @@ const RATES_REFRESH_FLOOR_MS = 60 * 1000;
 const MTIME_SLACK_MS = 36 * 60 * 60 * 1000;
 const MAX_HOURLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Longest window the UI offers, plus slack. Older entries are pruned. */
-const CACHE_RETENTION_DAYS = 90;
+/** Stats compares calendar years: retain two years plus boundary slack. */
+const CACHE_RETENTION_DAYS = 800;
 
 const decodeCodexSettings = Schema.decodeOption(CodexSettings);
 const decodeClaudeSettings = Schema.decodeOption(ClaudeSettings);
@@ -133,6 +144,7 @@ const SESSION_ID = /^[A-Za-z0-9_-]{1,128}$/;
 export class UsageService extends Context.Service<
   UsageService,
   {
+    readonly readStats: (input: StatsRequest) => Effect.Effect<StatsSnapshot, UsageReadError>;
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
     /** Refetches the rate table ahead of its TTL. See `ensureRates`. */
     readonly refreshRates: Effect.Effect<UsagePricing>;
@@ -159,6 +171,20 @@ const EMPTY_PRICING: UsagePricing = {
 export const layerTest = Layer.succeed(
   UsageService,
   UsageService.of({
+    readStats: (input) =>
+      Effect.succeed({
+        contractVersion: 1,
+        readAt: "1970-01-01T00:00:00.000Z",
+        timeZone: input.timeZone,
+        ...statsWindow(input),
+        historyFrom: input.today,
+        activeDays: [],
+        sources: [],
+        sessions: [],
+        repositories: [],
+        pricing: EMPTY_PRICING,
+        unavailable: [],
+      }),
     readSummary: (input) =>
       Effect.succeed({
         contractVersion: USAGE_CONTRACT_VERSION,
@@ -227,6 +253,13 @@ export const make = Effect.gen(function* () {
   const hostEnvironment = yield* HostProcessEnvironment;
 
   const fileCache: ScanCache = new Map();
+  const statsSessions = new Map<
+    string,
+    { entry: CachedFile; key: string; records: readonly UsageRecord[]; session: StatsSession }
+  >();
+  const scanLock = yield* Semaphore.make(1);
+  const runner = yield* Effect.serviceOption(ProcessRunner.ProcessRunner);
+  const scanRepositories = Option.isSome(runner) ? makeStatsRepositoryScanner(runner.value) : null;
   const sourceCache = new Map<string, typeof CachedSource.Type>();
   let cacheDirty = false;
   const isWithinDirectory = (filePath: string, dir: string) => {
@@ -464,6 +497,7 @@ export const make = Effect.gen(function* () {
     size: number,
     mtimeMs: number,
     provider: UsageProviderKind,
+    withStats = false,
   ): Effect.Effect<readonly UsageRecord[]> =>
     Effect.gen(function* () {
       const cached = fileCache.get(filePath);
@@ -473,7 +507,8 @@ export const make = Effect.gen(function* () {
         cached &&
         cached.size === size &&
         cached.mtimeMs === mtimeMs &&
-        cached.provider === provider
+        cached.provider === provider &&
+        (!withStats || cached.activity !== undefined)
       ) {
         return cached.tailRecords.length === 0
           ? cached.records
@@ -483,12 +518,23 @@ export const make = Effect.gen(function* () {
       // Only a strictly grown file may resume. Same size with a new mtime, or
       // a shrunken file, means rewritten content; re-parse it whole.
       const resumeFrom =
-        cached !== undefined && cached.provider === provider && size > cached.size
+        cached !== undefined &&
+        cached.provider === provider &&
+        size > cached.size &&
+        // Activity includes the prior tail; replay the file so it is not observed twice.
+        (cached.activity === undefined || cached.position.resumeOffset >= cached.size) &&
+        (!withStats || cached.activity !== undefined)
           ? cached.position
           : undefined;
 
+      const observer =
+        withStats || cached?.activity !== undefined
+          ? activityCollector(
+              cached?.activity ?? emptyTranscriptActivity(/[\\/]subagents[\\/]/.test(filePath)),
+            )
+          : undefined;
       const parsed = yield* Effect.promise(() =>
-        readTranscriptRecords(filePath, provider, resumeFrom),
+        readTranscriptRecords(filePath, provider, resumeFrom, observer),
       );
       // A read failure is not an empty transcript: caching it under this
       // (size, mtime) would silently drop the file's usage until it changes.
@@ -511,6 +557,7 @@ export const make = Effect.gen(function* () {
         records,
         tailRecords,
         position: parsed.position,
+        ...(observer === undefined ? {} : { activity: observer.finish() }),
       });
       cacheDirty = true;
       return tailRecords.length === 0 ? records : [...records, ...tailRecords];
@@ -518,6 +565,7 @@ export const make = Effect.gen(function* () {
 
   /** One provider directory's walk and parse, before rates are involved. */
   interface ScannedDir {
+    readonly failedFiles: number;
     readonly provider: UsageProviderKind;
     readonly dir: string;
     readonly volumeId: string;
@@ -531,6 +579,7 @@ export const make = Effect.gen(function* () {
     windowStartMs: number,
     settings: ServerSettingsValue,
     retentionCutoffMs: number,
+    withStats = false,
   ) {
     // The home resolvers ask for `Path` themselves; satisfy them from the
     // instance we already hold so the scan stays context-free.
@@ -543,18 +592,30 @@ export const make = Effect.gen(function* () {
         .exists(dir)
         .pipe(Effect.catchCause(() => Effect.succeed(false)));
       if (!exists) {
-        scanned.push({ provider, dir, volumeId, files: null });
+        scanned.push({ provider, dir, volumeId, files: null, failedFiles: 0 });
         continue;
       }
+      let failedFiles = 0;
       const files = yield* Effect.promise(() =>
-        listTranscriptFiles(dir, windowStartMs, fileName === undefined ? undefined : { fileName }),
+        listTranscriptFiles(dir, windowStartMs, {
+          ...(fileName === undefined ? {} : { fileName }),
+          onError: () => {
+            failedFiles++;
+          },
+        }),
       );
       const parsedFiles: { path: string; records: readonly UsageRecord[] }[] = [];
       for (const file of files) {
-        const records = yield* readFileRecords(file.path, file.size, file.mtimeMs, provider);
+        const records = yield* readFileRecords(
+          file.path,
+          file.size,
+          file.mtimeMs,
+          provider,
+          withStats,
+        );
         parsedFiles.push({ path: file.path, records });
       }
-      scanned.push({ provider, dir, volumeId, files: parsedFiles });
+      scanned.push({ provider, dir, volumeId, files: parsedFiles, failedFiles });
     }
     return scanned;
   });
@@ -777,7 +838,7 @@ export const make = Effect.gen(function* () {
         inflightScans.set(key, created);
         // Detached so one departing client cannot tear the scan out from under
         // the fibers awaiting it; a finished scan warms the cache either way.
-        yield* scanSummary(input, settings).pipe(
+        yield* scanLock.withPermit(scanSummary(input, settings)).pipe(
           Effect.onExit((exit) =>
             Effect.sync(() => inflightScans.delete(key)).pipe(
               Effect.andThen(Deferred.done(created, exit)),
@@ -841,7 +902,281 @@ export const make = Effect.gen(function* () {
     return found;
   });
 
-  return { readSummary, refreshRates, readSessionUsage } as const;
+  const readStatsTranscripts = Effect.fn("UsageService.readStatsTranscripts")(function* (
+    input: StatsRequest,
+  ) {
+    const window = yield* Effect.try({
+      try: () => statsWindow(input),
+      catch: (cause) =>
+        new UsageReadError({
+          reason: "invalidWindow",
+          detail: "Stats requires a valid reporting date and timezone.",
+          cause,
+        }),
+    });
+    const settings = yield* readSettings;
+    yield* ensureScanCacheLoaded;
+    yield* ensureRates(false);
+    const overrides = createOverrideRateTable(settings.usagePriceOverrides);
+    const hostId = NodeOS.hostname();
+    const since = window.previousFrom;
+    const historyFrom = shiftStatsDay(input.today, -800);
+    const toDay = statsDayFormatter(input.timeZone);
+    const activeDays = new Set<string>();
+    const cutoff = Date.parse(historyFrom + "T00:00:00Z") - MTIME_SLACK_MS;
+    const retentionCutoffMs =
+      (yield* Clock.currentTimeMillis) - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const dirs = yield* collectDirs(cutoff, settings, retentionCutoffMs, true);
+    const sessions: StatsSession[] = [];
+    const sources: UsageSource[] = [];
+    const cwds = new Set<string>();
+    const seenUsage = new Set<string>();
+    const sessionFileId = (filePath: string, entry: CachedFile) => {
+      const fileId = path
+        .basename(filePath, ".jsonl")
+        .match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
+      const source = dirs.find(
+        (d) => d.provider === entry.provider && isWithinDirectory(filePath, d.dir),
+      );
+      const rawId =
+        entry.activity?.sessionId ||
+        entry.records.find((r) => r.sessionId)?.sessionId ||
+        fileId ||
+        NodeCrypto.createHash("sha256")
+          .update(encodeUsageRecordKey([hostId, source?.volumeId, filePath]))
+          .digest("hex");
+      return (
+        entry.provider +
+        ":" +
+        rawId +
+        (entry.activity?.subagent ? ":" + path.basename(filePath) : "")
+      );
+    };
+    // Copying a file changes mtime, not the age of its history.
+    const recency = new Map<string, number>();
+    for (const [filePath, entry] of fileCache) {
+      let last = 0;
+      for (const event of entry.activity?.events ?? []) last = Math.max(last, event.at);
+      for (const record of entry.records) last = Math.max(last, record.timestampMs);
+      for (const record of entry.tailRecords) last = Math.max(last, record.timestampMs);
+      recency.set(filePath, last);
+    }
+    const summaryKey = encodeUsageRecordKey([
+      input.timeZone,
+      window,
+      pricing(),
+      settings.usagePriceOverrides,
+    ]);
+    const owners = new Map<string, string>();
+    for (const [filePath, entry] of fileCache) {
+      if (
+        entry.mtimeMs < cutoff ||
+        !dirs.some((d) => d.provider === entry.provider && isWithinDirectory(filePath, d.dir))
+      )
+        continue;
+      const id = sessionFileId(filePath, entry),
+        old = owners.get(id);
+      if (
+        old === undefined ||
+        recency.get(filePath)! > recency.get(old)! ||
+        (recency.get(filePath) === recency.get(old) && entry.size > fileCache.get(old)!.size)
+      )
+        owners.set(id, filePath);
+    }
+    for (const source of dirs) {
+      const fingerprint = {
+        hostId,
+        provider: source.provider,
+        resolvedHomePath: source.dir,
+        volumeId: source.volumeId,
+      };
+      const sourceId = NodeCrypto.createHash("sha256")
+        .update(encodeUsageRecordKey(fingerprint))
+        .digest("hex");
+      let scannedFiles = 0,
+        skippedFiles = source.failedFiles;
+      const sessionIds = new Set<string>();
+      for (const [filePath, entry] of fileCache) {
+        if (
+          entry.provider !== source.provider ||
+          !isWithinDirectory(filePath, source.dir) ||
+          entry.mtimeMs < cutoff
+        )
+          continue;
+        if (!entry.activity) skippedFiles++;
+        scannedFiles++;
+        if (entry.activity?.cwd) cwds.add(entry.activity.cwd);
+        const id = sessionFileId(filePath, entry);
+        if (owners.get(id) !== filePath) continue;
+        if (entry.activity && !entry.activity.subagent)
+          for (const event of entry.activity.events) {
+            if (event.kind !== "human" && event.kind !== "phone") continue;
+            const day = toDay(event.at);
+            if (day >= historyFrom && day <= input.today) activeDays.add(day);
+          }
+        const records = [...entry.records, ...entry.tailRecords].filter((record) => {
+          if (record.dedupeKey === null) return true;
+          const key = source.provider + ":" + record.dedupeKey;
+          if (seenUsage.has(key)) return false;
+          seenUsage.add(key);
+          return true;
+        });
+        const memo = statsSessions.get(filePath);
+        const key = summaryKey + sourceId;
+        const session =
+          memo?.entry === entry &&
+          memo.key === key &&
+          memo.records.length === records.length &&
+          memo.records.every((record, i) => record === records[i])
+            ? memo.session
+            : summarizeStatsSession({
+                id,
+                sourceId,
+                updatedAt: recency.get(filePath) ?? entry.mtimeMs,
+                activity: entry.activity ?? emptyTranscriptActivity(),
+                records,
+                provider: source.provider,
+                timeZone: input.timeZone,
+                sinceDay: since,
+                untilDay: window.to,
+                rates,
+                overrides,
+              });
+        statsSessions.set(filePath, { entry, key, records, session });
+        if (session.days.length > 0) {
+          sessions.push(session);
+          sessionIds.add(id);
+        }
+      }
+      sources.push({
+        fingerprint,
+        status:
+          source.files === null && scannedFiles === 0 ? "missing" : skippedFiles ? "partial" : "ok",
+        scannedFiles,
+        skippedFiles,
+        malformedRecords: 0,
+        distinctSessions: sessionIds.size,
+        message: skippedFiles
+          ? "Some transcripts could not report activity. Available saved usage is included."
+          : source.files === null
+            ? "No transcript directory on this environment."
+            : null,
+      });
+    }
+    if (pruneScanCache(fileCache, retentionCutoffMs) > 0) cacheDirty = true;
+    for (const filePath of statsSessions.keys())
+      if (!fileCache.has(filePath)) statsSessions.delete(filePath);
+    yield* persistScanCache();
+    return {
+      window,
+      hostId,
+      since,
+      historyFrom,
+      toDay,
+      activeDays,
+      cwds,
+      sources,
+      sessions,
+      pricing: pricing(),
+    };
+  });
+
+  const readStats = Effect.fn("UsageService.readStats")(function* (input: StatsRequest) {
+    // Git and GitHub do not touch transcript caches and must not hold up Usage reads.
+    const {
+      window,
+      hostId,
+      since,
+      historyFrom,
+      toDay,
+      activeDays,
+      cwds,
+      sources,
+      sessions,
+      pricing: snapshotPricing,
+    } = yield* scanLock.withPermit(readStatsTranscripts(input));
+    const scannedRepositories = scanRepositories
+      ? yield* scanRepositories([...cwds], shiftStatsDay(historyFrom, -2), hostId)
+      : [];
+    for (const repo of scannedRepositories)
+      for (const commit of repo.commits) {
+        const day = toDay(commit.at);
+        if (day >= historyFrom && day <= input.today) activeDays.add(day);
+      }
+    const repositories = scannedRepositories.map((repo) => ({
+      ...repo,
+      commits: repo.commits.filter((c) => toDay(c.at) >= since && toDay(c.at) <= window.to),
+      pullRequests: repo.pullRequests.filter(
+        (pr) =>
+          (toDay(pr.openedAt) >= since && toDay(pr.openedAt) <= window.to) ||
+          (pr.mergedAt !== null && toDay(pr.mergedAt) >= since && toDay(pr.mergedAt) <= window.to),
+      ),
+    }));
+    const unavailable = [
+      "Account switches, limit stops, revivals, ignites and resumes require the native Infinitus history.",
+      "Cursor, OpenCode and Antigravity do not provide Stats transcript metrics.",
+    ];
+    if (sources.some((s) => s.fingerprint.provider === "grok" && s.scannedFiles > 0))
+      unavailable.push("Grok provides token and cost totals; detailed activity is unavailable.");
+    if (!scanRepositories || repositories.some((r) => !r.complete))
+      unavailable.push("Repository history is incomplete or unavailable.");
+    if (repositories.some((r) => !r.pullRequestsAvailable))
+      unavailable.push(
+        "Pull-request history is incomplete or unavailable; sign in to gh on the affected environment.",
+      );
+    return {
+      contractVersion: 1,
+      readAt: DateTime.formatIso(yield* DateTime.now),
+      timeZone: input.timeZone,
+      ...window,
+      historyFrom,
+      activeDays: [...activeDays].sort(),
+      sources,
+      sessions,
+      repositories,
+      pricing: snapshotPricing,
+      unavailable,
+    } satisfies StatsSnapshot;
+  });
+
+  const statsScans = new Map<string, Deferred.Deferred<StatsSnapshot, UsageReadError>>();
+  const readSharedStats = Effect.fn("UsageService.readSharedStats")(function* (
+    input: StatsRequest,
+  ) {
+    const settings = yield* readSettings;
+    const key = encodeUsageRecordKey([
+      input,
+      settings.usagePriceOverrides,
+      settings.providers,
+      settings.providerInstances,
+    ]);
+    const deferred = yield* Effect.uninterruptible(
+      Effect.gen(function* () {
+        const existing = statsScans.get(key);
+        if (existing) return existing;
+        const created = Deferred.makeUnsafe<StatsSnapshot, UsageReadError>();
+        statsScans.set(key, created);
+        yield* readStats(input).pipe(
+          Effect.onExit((exit) =>
+            Effect.sync(() => statsScans.delete(key)).pipe(
+              Effect.andThen(Deferred.done(created, exit)),
+            ),
+          ),
+          Effect.forkDetach,
+        );
+        return created;
+      }),
+    );
+    return yield* Deferred.await(deferred);
+  });
+
+  return {
+    readSummary,
+    refreshRates,
+    readSessionUsage: (input: { readonly sessionIds: ReadonlyArray<string> }) =>
+      scanLock.withPermit(readSessionUsage(input)),
+    readStats: readSharedStats,
+  } as const;
 });
 
-export const layer = Layer.effect(UsageService, make);
+export const layer = Layer.effect(UsageService, make).pipe(Layer.provide(ProcessRunner.layer));

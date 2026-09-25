@@ -822,6 +822,40 @@ final class ControlServer {
             guard changed else { return ControlReply(ok: true, result: .object(["unchanged": .bool(true)])) }
             return ControlReply(ok: true, result: .object(["restarting": .bool(true)]), restarting: true)
 
+        case "engine-update-check":
+            guard r.args == ["swapd"] else { throw Fail("usage: engine-update-check swapd") }
+            let location = SwapdUpdate.Location()
+            let current = model.swapdVersion
+            do {
+                let release = try await SwapdUpdater(location: location).latest()
+                let latest = release?.version
+                return ControlReply(ok: true, result: try .of(SwapdUpdate.Check(
+                    current: current, latest: latest,
+                    updatable: EngineVersion.isNewer(latest, than: current),
+                    installed: location.installedVersion(), error: nil)))
+            } catch {
+                return ControlReply(ok: true, result: try .of(SwapdUpdate.Check(
+                    current: current, latest: nil, updatable: false,
+                    installed: location.installedVersion(), error: error.localizedDescription)))
+            }
+
+        case "engine-update":
+            guard r.args == ["swapd"] else { throw Fail("usage: engine-update swapd") }
+            guard model.swapd != nil, !model.mockMode else { throw Fail("the swapd engine is not the real one here") }
+            let updater = SwapdUpdater()
+            guard let release = try await updater.latest() else {
+                throw Fail("the newest swapd release has no build for this Mac yet")
+            }
+            guard EngineVersion.isNewer(release.version, than: model.swapdVersion) else {
+                throw Fail("swapd \(model.swapdVersion ?? "?") is already the newest release")
+            }
+            try await updater.install(release)
+            // The reply's flag only tells the CLI to wait; the relaunch is
+            // the model's, as it is for `engine` and the secret verbs.
+            model.relaunchApp()
+            return ControlReply(ok: true, result: .object(["restarting": .bool(true), "version": .string(release.version)]),
+                                restarting: true)
+
         case "proxy":
             // The proxy serves its own management panel at /management.html
             // (its own docs); a build with the control panel disabled answers

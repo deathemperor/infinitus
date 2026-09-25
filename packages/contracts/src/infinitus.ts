@@ -90,6 +90,19 @@ export const InfinitusEngineState = Schema.Struct({
 });
 export type InfinitusEngineState = typeof InfinitusEngineState.Type;
 
+/** The `engine-update-check` reply (#1577): the engine's running version,
+    the newest release for that Mac's platform, whether the second is newer,
+    a release already installed beside the bundle, and the fetch's own error. */
+export const InfinitusEngineUpdateCheck = Schema.Struct({
+  engine: Schema.String,
+  current: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  latest: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  updatable: Schema.Boolean,
+  installed: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  error: Schema.optionalKey(Schema.NullOr(Schema.String)),
+});
+export type InfinitusEngineUpdateCheck = typeof InfinitusEngineUpdateCheck.Type;
+
 /** The `status` command's reply: app build, the socket it answers on, the menu
     bar badge, and which engines are on. */
 export const InfinitusStatus = Schema.Struct({

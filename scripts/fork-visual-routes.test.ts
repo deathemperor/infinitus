@@ -106,8 +106,8 @@ describe("routeFailures", () => {
     const stats = FORK_VISUAL_ROUTES.find((route) => route.route === "/stats")!;
     const capture = [stats.marker, ...stats.shows!].join(" ");
     expect(routeFailures(stats, capture)).toEqual([]);
-    expect(routeFailures(stats, capture.replace("Nudges 21", "Nudges 0"))).toEqual([
-      'missing "Nudges 21"',
+    expect(routeFailures(stats, capture.replace("Nudges 1", "Nudges 0"))).toEqual([
+      'missing "Nudges 1"',
     ]);
   });
 

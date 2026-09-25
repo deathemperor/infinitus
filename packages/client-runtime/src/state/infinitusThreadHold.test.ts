@@ -1,4 +1,4 @@
-import { EventId, TurnId, type OrchestrationThreadActivity } from "@infinitus/contracts";
+import { EventId, ThreadId, TurnId, type OrchestrationThreadActivity } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -8,6 +8,7 @@ import {
   PAUSE_MARKER_KIND,
   RELEASE_MARKER_KIND,
   RESUME_MARKER_KIND,
+  heldEntryFor,
   threadHold,
 } from "./infinitusThreadHold.ts";
 
@@ -212,5 +213,41 @@ describe("threadHold", () => {
         latestTurn: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("heldEntryFor", () => {
+  const one = ThreadId.make("thread-1");
+  const two = ThreadId.make("thread-2");
+  const three = ThreadId.make("thread-3");
+
+  it("is the row's kind and line for a held or limited thread and null for any other", () => {
+    const holds = [
+      { threadId: one, since: "2026-09-11T10:00:00.000Z", summary: "Held on claude" },
+      {
+        threadId: three,
+        since: "2026-09-11T10:01:00.000Z",
+        summary: "Limit hit on one@example.com",
+        kind: "limited" as const,
+        resetsAt: "2026-09-11T14:00:00.000Z",
+      },
+    ];
+    // No kind: a server before limits joined the stream, so held.
+    expect(heldEntryFor(holds, one)).toEqual({
+      kind: "held",
+      summary: "Held on claude",
+      resetsAt: null,
+    });
+    expect(heldEntryFor(holds, three)).toEqual({
+      kind: "limited",
+      summary: "Limit hit on one@example.com",
+      resetsAt: "2026-09-11T14:00:00.000Z",
+    });
+    expect(heldEntryFor(holds, two)).toBeNull();
+  });
+
+  it("is null while the list has not arrived (older server, stream not up yet)", () => {
+    expect(heldEntryFor(undefined, one)).toBeNull();
+    expect(heldEntryFor(null, one)).toBeNull();
   });
 });

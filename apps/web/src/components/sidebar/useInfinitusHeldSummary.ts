@@ -2,7 +2,7 @@ import type { EnvironmentId, ThreadId } from "@infinitus/contracts";
 
 import { infinitusEnvironment } from "../../state/infinitus";
 import { useEnvironmentQuery } from "../../state/query";
-import { heldEntryFor } from "./infinitusHeld.logic";
+import { heldEntryFor } from "@infinitus/client-runtime/state/infinitusThreadHold";
 
 /**
  * Whether the server holds this thread's turn start for headroom (#616,

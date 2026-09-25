@@ -374,6 +374,10 @@
     "./gitPatchPath": {
       "types": "./src/gitPatchPath.ts",
       "import": "./src/gitPatchPath.ts"
+    },
+    "./stats": {
+      "types": "./src/stats.ts",
+      "import": "./src/stats.ts"
     }
   },
   "scripts": {

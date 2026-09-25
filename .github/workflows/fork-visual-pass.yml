@@ -61,6 +61,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node scripts/fork-visual-stats.mjs "$RUNNER_TEMP/t3home"
           # Both outlive this step: their own sessions, nothing on the step's pipes.
           setsid nohup node scripts/fork-visual-fixture.mjs --socket "$INFINITUS_CONTROL_SOCKET" \
             > "$RUNNER_TEMP/fixture.log" 2>&1 < /dev/null &

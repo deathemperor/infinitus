@@ -141,33 +141,23 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     route: "/stats",
     label: "Stats",
     marker: "Session lengths",
-    // The tiles whose figure the fixture used to leave out, so each read zero
-    // and a tile that stopped reading its field looked the same as one that
-    // worked (#1115). Each phrase is a tile's name and the figure beside it —
-    // the capture joins a tile's spans with a space.
+    // Real transcript fixtures exercise the server RPC and pricing; native-only
+    // history stays unavailable on the portable endpoint.
     shows: [
-      "Reverts 7",
-      "Repos 3",
-      "Nudges 21",
-      "Sub-agents 28",
-      "Longest unattended 34 tool calls",
-      "Questions 49",
-      "Denied tools 7",
-      "Tool errors 35",
-      "API retries 14",
-      "Accounts hit a limit 14",
-      "Revivals 14",
-      "Minutes lost, all out 77",
-      "Ignites 7",
-      "Resumes 21",
-      // The Cost group's four ratio tiles, which the web left out until it was
-      // diffed against the Mac's own catalogue. Each divides two figures, so a
-      // tile that stopped reading one of them reads "—" rather than a number.
-      "Per commit $2.04",
-      "Per PR $9.20",
-      "Tokens / line 141.2",
-      "Mean hours to merge 4.5",
+      "All environments",
+      "Output tokens 2,000",
+      "Nudges 1",
+      "Questions 1",
+      "Sessions 2",
+      "Longest unattended 1 tool calls",
+      "Accounts hit a limit —",
+      "Ignites —",
+      "Claude Code",
+      "Codex CLI",
+      "$0.02",
+      "Data coverage",
     ],
+    absent: ["Stats is unavailable", "unpriced responses"],
   },
 ];
 

@@ -36,11 +36,16 @@ export { snoozeWakeLabel };
  *
  * Five visual states, three colors: color is reserved for "act now"
  * (approval), "in motion" (working), and "broken" (failed). Monitoring is
- * calm background presence, ready the unlabeled resting state.
+ * calm background presence, ready the unlabeled resting state. Held (#741)
+ * and limited (#270 I) come from the Mac's holds stream, not the thread:
+ * a start waiting for headroom, or a turn parked on its account's usage
+ * limit until the account swaps — parked, not working, not failed.
  */
 export type ThreadListV2Status =
   | "approval"
   | "input"
+  | "held"
+  | "limited"
   | "working"
   | "monitoring"
   | "failed"
@@ -127,12 +132,24 @@ export function resolveThreadListV2Status(
     EnvironmentThreadShell,
     "hasPendingApprovals" | "hasPendingUserInput" | "session" | "backgroundLiveness"
   >,
+  options?: { readonly held?: boolean; readonly limited?: boolean },
 ): ThreadListV2Status {
   if (thread.hasPendingApprovals) {
     return "approval";
   }
   if (thread.hasPendingUserInput) {
     return "input";
+  }
+  // A held start is not under way whatever the session row says: the turn
+  // was requested, never sent.
+  if (options?.held === true) {
+    return "held";
+  }
+  // A limit-stopped turn is parked, whatever the session row still says: it
+  // stays "running" until resumed or interrupted, or reads "error" once the
+  // adapter has given up on it. Either way the row says Limit, not Failed.
+  if (options?.limited === true) {
+    return "limited";
   }
   if (thread.session?.status === "running" || thread.session?.status === "starting") {
     return "working";
@@ -385,6 +402,9 @@ function resolveThreadListV2ItemTimeLabel(
 ): string {
   const { thread, variant, snoozed } = item;
   if (showSnoozeWakeLabel) return "";
+  // No holds here: a held or limited row draws its label in place of the
+  // time, so the stamp is unused for it whatever the resolver says without
+  // them, and a held row's spare minute tick costs less than reading the stream.
   if (variant === "card" && resolveThreadListV2Status(thread) !== "ready") return "";
   const settledTimestamp =
     variant === "slim" && !snoozed ? resolveSettledThreadTimestamp(thread) : null;

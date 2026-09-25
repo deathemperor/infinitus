@@ -29,7 +29,7 @@ import {
   unlockNotificationAudio,
 } from "../threadNotifications";
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
-import { heldEntryFor } from "./sidebar/infinitusHeld.logic";
+import { heldEntryFor } from "@infinitus/client-runtime/state/infinitusThreadHold";
 import { toastManager } from "./ui/toast";
 
 export function ThreadNotificationCoordinator() {

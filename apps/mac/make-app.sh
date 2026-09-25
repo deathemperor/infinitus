@@ -26,9 +26,13 @@ mkdir -p "$APP/Contents/Resources/bin"
 ln -s ../../MacOS/infinitusctl "$APP/Contents/Resources/bin/infinitus"
 # Releases pass the pinned engine built by build-swapd.sh. Keep source-only
 # development builds usable without requiring a Rust toolchain.
+SWAPD_VERSION=""
 if [ -n "${INFINITUS_BUNDLED_SWAPD:-}" ]; then
     [ -x "$INFINITUS_BUNDLED_SWAPD" ] || { echo "Bundled swapd is not executable" >&2; exit 2; }
     cp "$INFINITUS_BUNDLED_SWAPD" "$APP/Contents/MacOS/swapd"
+    # Stamped so the locator can tell an installed update (#1577) from a
+    # stale one without running either binary at launch.
+    SWAPD_VERSION="$("$INFINITUS_BUNDLED_SWAPD" --version | awk '{print $2}')"
 fi
 [ -f AppIcon.icns ] || ./make-icon.sh
 cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
@@ -58,6 +62,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${VERSION:-0.0.0}</string>
     <key>CFBundleVersion</key><string>${SHA}</string>
+    <key>InfinitusSwapdVersion</key><string>${SWAPD_VERSION}</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>

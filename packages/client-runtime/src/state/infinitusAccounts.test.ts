@@ -19,6 +19,8 @@ import {
   infinitusCapabilityAcross,
   infinitusCapabilityOf,
   infinitusPageState,
+  providerAccountCounts,
+  fleetsForProvider,
   buildSignInRows,
   signInCommandArgs,
   signInDismissCommandArgs,
@@ -838,5 +840,46 @@ describe("sign-in rows", () => {
       args: ["me@example.com"],
       options: { local: "true" },
     });
+  });
+});
+
+describe("providerAccountCounts", () => {
+  const one = {
+    number: 1,
+    email: "a@example.com",
+    active: false,
+    isOrganization: false,
+    usageStatus: "ok",
+  };
+  const two = { ...one, number: 2 };
+  const fleets: InfinitusFleet[] = [
+    {
+      key: "claude",
+      engineID: "swapd",
+      provider: "claude",
+      capabilities: [],
+      accounts: [one, two],
+    },
+    { key: "codex", engineID: "cliproxy", provider: "codex", capabilities: [], accounts: [] },
+    {
+      key: "claude-proxy",
+      engineID: "cliproxy",
+      provider: "claude",
+      capabilities: [],
+      accounts: [one],
+    },
+  ];
+  it("sums each provider's accounts across its fleets, in first-seen order", () => {
+    expect(providerAccountCounts(fleets)).toEqual([
+      { provider: "claude", accounts: 3 },
+      { provider: "codex", accounts: 0 },
+    ]);
+  });
+
+  it("narrows to the picked provider, and shows all of them for one this machine lacks", () => {
+    expect(fleetsForProvider(fleets, "codex").fleets.map((fleet) => fleet.key)).toEqual(["codex"]);
+    const fallback = fleetsForProvider(fleets, "gemini");
+    expect(fallback.shown).toBe("all");
+    expect(fallback.fleets).toBe(fleets);
   });
 });

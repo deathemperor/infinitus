@@ -36,7 +36,9 @@ import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useThreadPr } from "../../state/use-thread-pr";
 import { reconnectingRowLabel } from "../infinitus/reconnecting.logic";
+import { limitedLine, resetLabelFor } from "../infinitus/holdBanner.logic";
 import { babysitLabel } from "../infinitus/prHeader.logic";
+import { useThreadHeldEntry } from "../infinitus/useThreadHeldEntry";
 import { useThreadReadyForReview } from "../infinitus/useThreadReadyForReview";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regeneration-menu";
@@ -72,6 +74,11 @@ const STATUS_LABEL_BY_STATUS: Partial<
   monitoring: { label: "Monitoring", className: "text-foreground" },
   failed: { label: "Failed", className: "text-danger-foreground" },
 };
+
+// Held and limited are parked, nothing in motion, so no hue (web sidebar):
+// they take the row's own muted color, which depends on the pane and on
+// selection, so they are built in the row rather than listed above.
+const PARKED_LABEL: Record<"held" | "limited", string> = { held: "Held", limited: "Limit" };
 
 const READY_FOR_REVIEW_LABEL = {
   label: "Ready for review",
@@ -559,7 +566,14 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const selected = props.selected === true;
   const rowAppearance = getThreadListV2RowAppearance(theme, sidebarPane, selected);
 
-  const status = resolveThreadListV2Status(thread);
+  // Infinitus (#741, #270 I): a start the Mac holds for headroom, or a turn
+  // parked on its account's usage limit, reads Held / Limit ahead of the
+  // session row — the web sidebar's `useInfinitusHeldSummary`.
+  const heldEntry = useThreadHeldEntry(thread.environmentId, thread.id);
+  const status = resolveThreadListV2Status(thread, {
+    held: heldEntry?.kind === "held",
+    limited: heldEntry?.kind === "limited",
+  });
   // Infinitus (#269 F): an idle active row whose PR waits on a reviewer says so
   // instead of its time. Settled rows keep the stamp they sort by.
   const readyForReview = useThreadReadyForReview(thread);
@@ -577,7 +591,14 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         ? { label: babysitting, className: "text-adaptive-sky-600-400" }
         : status === "ready" && variant === "card" && readyForReview
           ? READY_FOR_REVIEW_LABEL
-          : STATUS_LABEL_BY_STATUS[status];
+          : status === "held" || status === "limited"
+            ? {
+                label: PARKED_LABEL[status],
+                className: selected
+                  ? selectedThreadRowColors.mutedForegroundClassName
+                  : rowAppearance.mutedForegroundClassName,
+              }
+            : STATUS_LABEL_BY_STATUS[status];
   // The timestamp is precomputed on the list item (same stamps the settled
   // tail sorts by) so a minute tick only re-renders rows that draw it.
   const timeLabel = props.timeLabel;
@@ -929,7 +950,24 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         </View>
       ) : null}
       <View className="mt-1 flex-row items-center gap-2">
-        {status === "failed" && thread.session?.lastError ? (
+        {heldEntry !== null && (status === "held" || status === "limited") ? (
+          /* The web puts the held row's line in the pill's tooltip; the phone
+             has none, so the line takes the branch's slot: which account,
+             and for a limit, when its window resets. */
+          <Text
+            className={cn(
+              "flex-1 text-xs",
+              selected
+                ? selectedThreadRowColors.mutedForegroundClassName
+                : rowAppearance.mutedForegroundClassName,
+            )}
+            numberOfLines={1}
+          >
+            {status === "limited"
+              ? limitedLine(heldEntry.summary, resetLabelFor(heldEntry.resetsAt))
+              : heldEntry.summary}
+          </Text>
+        ) : status === "failed" && thread.session?.lastError ? (
           <Text
             className={cn(
               "flex-1 text-xs",

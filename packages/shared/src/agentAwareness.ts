@@ -8,6 +8,7 @@ import type {
 export type AgentAwarenessPhase =
   | "starting"
   | "running"
+  | "monitoring"
   | "waiting_for_approval"
   | "waiting_for_input"
   | "completed"
@@ -96,9 +97,12 @@ function resolveThreadAwarenessPhase(
   // Fork: a settled turn whose subagents or workflows run on is still an
   // active agent. The thread lists say Working for it (`backgroundLiveness`),
   // so the card has to, or its count runs short and Done rings early. A watch
-  // loop alone ("monitoring") is not agent work and stays Done.
+  // loop alone reads Monitoring on the lists, and on the card.
   if (thread.backgroundLiveness === "working") {
     return "running";
+  }
+  if (thread.backgroundLiveness === "monitoring") {
+    return "monitoring";
   }
   if (thread.latestTurn?.state === "completed") {
     return "completed";
@@ -130,6 +134,8 @@ function headlineForPhase(phase: AgentAwarenessPhase): string {
       return "Starting agent";
     case "running":
       return "Agent is working";
+    case "monitoring":
+      return "Agent is monitoring";
     case "waiting_for_approval":
       return "Approval needed";
     case "waiting_for_input":

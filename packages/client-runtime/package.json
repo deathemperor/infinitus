@@ -159,6 +159,10 @@
       "types": "./src/state/infinitusStats.ts",
       "default": "./src/state/infinitusStats.ts"
     },
+    "./state/infinitusQuotaTimeline": {
+      "types": "./src/state/infinitusQuotaTimeline.ts",
+      "default": "./src/state/infinitusQuotaTimeline.ts"
+    },
     "./state/infinitusUtilization": {
       "types": "./src/state/infinitusUtilization.ts",
       "default": "./src/state/infinitusUtilization.ts"
@@ -326,6 +330,10 @@
     "./device/model": {
       "types": "./src/device/model.ts",
       "default": "./src/device/model.ts"
+    },
+    "./state/stats": {
+      "types": "./src/state/stats.ts",
+      "default": "./src/state/stats.ts"
     }
   },
   "scripts": {

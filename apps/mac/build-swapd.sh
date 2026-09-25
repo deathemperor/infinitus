@@ -10,7 +10,8 @@ set -eu
 # + #54 (0.3.1): a profile credential without a refresh token is not read back as a rotation.
 # + #56: `list` reports each account's banked Claude limit resets as `resets`, and `reset <slot>` spends one as that slot (#1554).
 # 0.3.2: #56 released, with #57 (a test).
+# + #60: with every account spent, one whose reset has already passed is re-checked after a minute, not five; the daemon had slept past the account coming back.
 cargo install --locked --git https://github.com/deathemperor/swapd \
-    --rev ce599ab705a84ab0c33ab70e21229beccdc74fc0 \
+    --rev 6a0a6dc89bd06edee49e65b23233f6587380611d \
     --root "$INFINITUS_ENGINE_BUILD_ROOT" swapd
 "$INFINITUS_ENGINE_BUILD_ROOT/bin/swapd" --version
