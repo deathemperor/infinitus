@@ -1,1 +1,1 @@
-Mac: Accounts out of Fable no longer flash red — only a window still in the 90s pulses its row.
+Mac: An account out of Fable reads "Fable down" again instead of an empty bar and a red pulse.
