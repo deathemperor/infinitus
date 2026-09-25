@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+<<<<<<< HEAD
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -19,6 +20,19 @@ import {
   consumeClaudeResetCredit,
   readClaudeResetCredits,
 } from "./claudeResetCredits.ts";
+=======
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Fiber from "effect/Fiber";
+import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
+import * as TestClock from "effect/testing/TestClock";
+import { HttpClient, HttpClientResponse, UrlParams } from "effect/unstable/http";
+import { describe, expect, it } from "vite-plus/test";
+
+import * as ClaudeResetCredits from "./claudeResetCredits.ts";
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
 
 const NOW = Date.parse("2026-09-22T12:00:00.000Z");
 const grant = (overrides: Record<string, unknown>) => ({
@@ -27,7 +41,10 @@ const grant = (overrides: Record<string, unknown>) => ({
   usable_now: true,
   ...overrides,
 });
+<<<<<<< HEAD
 const encoder = new TextEncoder();
+=======
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
 
 const writeLogin = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -35,9 +52,17 @@ const writeLogin = Effect.gen(function* () {
   const directory = yield* fs.makeTempDirectoryScoped();
   yield* fs.writeFileString(
     path.join(directory, ".credentials.json"),
+<<<<<<< HEAD
     '{"claudeAiOauth":{"accessToken":"oauth-token","expiresAt":4102444800000}}',
   );
   return { configDir: directory, keychainService: "Claude Code-credentials" };
+=======
+    '{"claudeAiOauth":{"accessToken":"oauth-token"}}',
+  );
+  const accountConfigPath = path.join(directory, ".claude.json");
+  yield* fs.writeFileString(accountConfigPath, '{"oauthAccount":{"organizationUuid":"org-1"}}');
+  return { configDir: directory, accountConfigPath };
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
 });
 
 const respond = (status: number, body: unknown) =>
@@ -46,6 +71,7 @@ const respond = (status: number, body: unknown) =>
   );
 const refuseRequests = HttpClient.make(() => Effect.die("must not send a request"));
 
+<<<<<<< HEAD
 /** A `security` that answers every `find-generic-password` with `payload`. */
 const keychainLayer = (payload: string, code = 0) =>
   Layer.succeed(
@@ -97,14 +123,30 @@ describe("claudeResetCreditsToContract", () => {
   it("counts live grants, pins the next one and names the offer", () => {
     expect(
       claudeResetCreditsToContract(
+=======
+describe("claudeResetCreditsToContract", () => {
+  it("counts live grants and pins the next usable one", () => {
+    expect(
+      ClaudeResetCredits.claudeResetCreditsToContract(
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
         {
           eligible: true,
           next_grant_id: "grant_a",
           grants: [
+<<<<<<< HEAD
             grant({ resets_left: 2, label: "Opus 5.5 launch", ends_at: "2026-10-01T00:00:00Z" }),
             grant({ id: "paused", paused: true }),
             grant({ id: "expired", ends_at: "2026-09-01T00:00:00Z" }),
             grant({ id: "garbled", ends_at: "not a date" }),
+=======
+            grant({ resets_left: 2, ends_at: "2026-10-01T00:00:00Z" }),
+            grant({ id: "paused", paused: true }),
+            grant({ id: "expired", ends_at: "2026-09-01T00:00:00Z" }),
+            grant({ id: "garbled", ends_at: "not a date" }),
+            grant({ id: "date_only", ends_at: "2026-10-01" }),
+            grant({ id: "impossible", ends_at: "2027-02-30T00:00:00Z" }),
+            grant({ id: "empty", ends_at: "" }),
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
             grant({ id: "Not Valid" }),
             grant({ id: "grant_b", resets_left: 3, usable_now: false }),
           ],
@@ -112,6 +154,7 @@ describe("claudeResetCreditsToContract", () => {
         NOW,
       ),
     ).toEqual({
+<<<<<<< HEAD
       availableCount: 6,
       nextCreditId: "grant_a",
       nextExpiresAt: "2026-10-01T00:00:00.000Z",
@@ -167,10 +210,38 @@ describe("claudeResetCreditsToContract", () => {
     expect(claudeResetCreditsToContract({ eligible: true, grants: [] }, NOW)).toEqual({
       availableCount: 0,
     });
+=======
+      availableCount: 2,
+      nextCreditId: "grant_a",
+      nextExpiresAt: "2026-10-01T00:00:00.000Z",
+    });
+  });
+
+  it("offers nothing to redeem without a usable next grant or an eligible account", () => {
+    expect(
+      ClaudeResetCredits.claudeResetCreditsToContract(
+        { eligible: true, next_grant_id: "grant_a", grants: [grant({ usable_now: false })] },
+        NOW,
+      ),
+    ).toEqual({ availableCount: 0 });
+    expect(
+      ClaudeResetCredits.claudeResetCreditsToContract({ eligible: true, grants: [grant({})] }, NOW),
+    ).toEqual({
+      availableCount: 0,
+    });
+    expect(
+      ClaudeResetCredits.claudeResetCreditsToContract(
+        { eligible: false, grants: [grant({})] },
+        NOW,
+      ),
+    ).toBeUndefined();
+    expect(ClaudeResetCredits.claudeResetCreditsToContract(undefined, NOW)).toBeUndefined();
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
   });
 });
 
 effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
+<<<<<<< HEAD
   it.effect("reads the grants with the CLI's request from the file login", () =>
     Effect.gen(function* () {
       const login = yield* writeLogin;
@@ -188,11 +259,36 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         Effect.provideService(HostProcessPlatform, "linux"),
         Effect.provideService(HttpClient.HttpClient, client),
         Effect.provide(noSpawns),
+=======
+  it.effect("reads the grants with the CLI's request", () =>
+    Effect.gen(function* () {
+      const { configDir } = yield* writeLogin;
+      const client = HttpClient.make((request) => {
+        expect(request.method).toBe("GET");
+        expect(request.url).toBe("https://api.anthropic.com/api/oauth/usage");
+        expect(UrlParams.toString(request.urlParams)).toBe("cedar_ember=1&skip_spend=1");
+        expect(request.headers.authorization).toBe("Bearer oauth-token");
+        expect(request.headers["anthropic-beta"]).toBe("oauth-2025-04-20");
+        expect(request.headers["user-agent"]).toBe("claude-cli/2.1.0 (external, cli)");
+        return Effect.succeed(
+          HttpClientResponse.fromWeb(
+            request,
+            Response.json({
+              cedar_ember: { eligible: true, next_grant_id: "grant_a", grants: [grant({})] },
+            }),
+          ),
+        );
+      });
+      const credits = yield* ClaudeResetCredits.readClaudeResetCredits(configDir, "2.1.0").pipe(
+        Effect.provideService(HostProcessPlatform, "linux"),
+        Effect.provideService(HttpClient.HttpClient, client),
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
       );
       expect(credits).toEqual({ availableCount: 1, nextCreditId: "grant_a" });
     }),
   );
 
+<<<<<<< HEAD
   it.effect("reads the macOS login from the keychain item, never the file", () =>
     Effect.gen(function* () {
       const login = { configDir: "/nowhere", keychainService: "Claude Code-credentials" };
@@ -237,6 +333,20 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         Effect.provide(noSpawns),
       );
       expect([missingItem, lapsed, limited]).toEqual([undefined, undefined, undefined]);
+=======
+  it.effect("reads nothing from keychain logins or failed requests", () =>
+    Effect.gen(function* () {
+      const { configDir } = yield* writeLogin;
+      const darwin = yield* ClaudeResetCredits.readClaudeResetCredits(configDir, "2.1.0").pipe(
+        Effect.provideService(HostProcessPlatform, "darwin"),
+        Effect.provideService(HttpClient.HttpClient, refuseRequests),
+      );
+      const limited = yield* ClaudeResetCredits.readClaudeResetCredits(configDir, "2.1.0").pipe(
+        Effect.provideService(HostProcessPlatform, "linux"),
+        Effect.provideService(HttpClient.HttpClient, respond(429, {})),
+      );
+      expect([darwin, limited]).toEqual([undefined, undefined]);
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
     }),
   );
 });
@@ -245,6 +355,7 @@ const ClaimBody = Schema.fromJsonString(
   Schema.Struct({ program: Schema.String, grant_id: Schema.String, request_id: Schema.String }),
 );
 const decodeClaimBody = Schema.decodeEffect(ClaimBody);
+<<<<<<< HEAD
 const PROFILE = { account: { uuid: "acct-1" }, organization: { uuid: "org-1" } };
 
 /** Answers the profile read, then hands the claim to `claim`. */
@@ -259,19 +370,32 @@ const claimClient = (
       ),
     ),
   );
+=======
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
 
 const consume = (client: HttpClient.HttpClient, ids = { grantId: "grant_a", requestId: "r-1" }) =>
   Effect.gen(function* () {
     const login = yield* writeLogin;
+<<<<<<< HEAD
     return yield* consumeClaudeResetCredit({ login, version: "2.1.280", ...ids }).pipe(
       Effect.provideService(HostProcessPlatform, "linux"),
       Effect.provideService(HttpClient.HttpClient, client),
       Effect.provide(noSpawns),
+=======
+    return yield* ClaudeResetCredits.consumeClaudeResetCredit({
+      ...login,
+      version: "2.1.0",
+      ...ids,
+    }).pipe(
+      Effect.provideService(HostProcessPlatform, "linux"),
+      Effect.provideService(HttpClient.HttpClient, client),
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
       Effect.result,
     );
   });
 
 effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
+<<<<<<< HEAD
   it.effect("claims the grant against the token's own organization", () =>
     Effect.gen(function* () {
       let claimed = "";
@@ -292,6 +416,28 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
         grant_id: "grant_a",
         request_id: "r-1",
       });
+=======
+  it.effect("claims the grant for the organization", () =>
+    Effect.gen(function* () {
+      const client = HttpClient.make((request) =>
+        Effect.gen(function* () {
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe(
+            "https://api.anthropic.com/api/organizations/org-1/reset_rate_limits",
+          );
+          expect(request.headers.authorization).toBe("Bearer oauth-token");
+          const body =
+            request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : "";
+          expect(yield* decodeClaimBody(body)).toEqual({
+            program: "cedar_ember",
+            grant_id: "grant_a",
+            request_id: "r-1",
+          });
+          return HttpClientResponse.fromWeb(request, Response.json({ result: "reset" }));
+        }).pipe(Effect.orDie),
+      );
+      expect(yield* consume(client)).toMatchObject({ _tag: "Success", success: "reset" });
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
     }),
   );
 
@@ -301,6 +447,7 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
         ["not_limited", "nothingToReset"],
         ["already_used", "alreadyRedeemed"],
         ["ineligible", "noCredit"],
+<<<<<<< HEAD
         ["unavailable", "noCredit"],
       ] as const) {
         expect(yield* consume(claimClient(() => Response.json({ result })))).toMatchObject({
@@ -317,16 +464,82 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
           _tag: "Failure",
           failure: { reason },
         });
+=======
+      ] as const) {
+        expect(yield* consume(respond(200, { result }))).toMatchObject({ success: outcome });
+      }
+      for (const client of [
+        respond(200, { result: "cooldown" }),
+        respond(429, {}),
+        respond(401, {}),
+      ]) {
+        const result = yield* consume(client);
+        expect(result).toMatchObject({ _tag: "Failure" });
+        // Claude answered, so a retry must be a new claim.
+        if (result._tag === "Failure") {
+          expect(ClaudeResetCredits.isSettledClaudeResetCreditFailure(result.failure)).toBe(true);
+        }
+      }
+      // No answer, or Claude could not confirm the claim: a retry is the same claim.
+      for (const client of [respond(500, {}), respond(200, { result: "unavailable" })]) {
+        const unanswered = yield* consume(client);
+        expect(unanswered).toMatchObject({ _tag: "Failure" });
+        if (unanswered._tag === "Failure") {
+          expect(ClaudeResetCredits.isSettledClaudeResetCreditFailure(unanswered.failure)).toBe(
+            false,
+          );
+        }
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
       }
     }),
   );
 
+<<<<<<< HEAD
   it.effect("refuses without a login or an organization, and malformed ids before sending", () =>
+=======
+  it.effect("times out a stalled claim body", () =>
+    Effect.gen(function* () {
+      const login = yield* writeLogin;
+      const readingBody = yield* Deferred.make<void>();
+      const client = HttpClient.make((request) => {
+        const response = HttpClientResponse.fromWeb(request, Response.json({ result: "reset" }));
+        Object.defineProperty(response, "json", {
+          value: Deferred.succeed(readingBody, undefined).pipe(Effect.andThen(Effect.never)),
+        });
+        return Effect.succeed(response);
+      });
+      const claim = yield* ClaudeResetCredits.consumeClaudeResetCredit({
+        ...login,
+        version: "2.1.0",
+        grantId: "grant_a",
+        requestId: "r-1",
+      }).pipe(
+        Effect.provideService(HostProcessPlatform, "linux"),
+        Effect.provideService(HttpClient.HttpClient, client),
+        Effect.result,
+        Effect.forkChild,
+      );
+      yield* Deferred.await(readingBody);
+      yield* TestClock.adjust("26 seconds");
+      expect(yield* Fiber.join(claim)).toMatchObject({
+        _tag: "Failure",
+        failure: {
+          _tag: "ClaudeResetCreditError",
+          reason: "requestFailed",
+          cause: { _tag: "TimeoutError" },
+        },
+      });
+    }).pipe(Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("refuses malformed ids without sending anything", () =>
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
     Effect.gen(function* () {
       for (const ids of [
         { grantId: "Bad Grant", requestId: "r-1" },
         { grantId: "grant_a", requestId: "has space" },
       ]) {
+<<<<<<< HEAD
         expect(yield* consume(refuseRequests, ids)).toMatchObject({
           _tag: "Failure",
           failure: { reason: "malformedCredit" },
@@ -341,6 +554,10 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
         _tag: "Failure",
         failure: { reason: "signedOut" },
       });
+=======
+        expect(yield* consume(refuseRequests, ids)).toMatchObject({ _tag: "Failure" });
+      }
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
     }),
   );
 });

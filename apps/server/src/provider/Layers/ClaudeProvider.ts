@@ -3,6 +3,7 @@ import {
   type ModelCapabilities,
   type ServerProviderResetCredits,
   type ServerProviderSlashCommand,
+  type ServerProviderResetCredits,
 } from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -428,7 +429,11 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   modelCatalog: ClaudeModelCatalog = BUNDLED_CLAUDE_MODEL_CATALOG,
   /** Shared with the adapter so turn events reuse the scoped-bucket names this probe saw. */
   scopedLimitNames?: Ref.Ref<ClaudeScopedLimitNames>,
+<<<<<<< HEAD
   /** Banked resets for a subscription login, given the CLI version for the user agent (#1553). */
+=======
+  /** Banked resets for a subscription login, given the CLI version for the user agent. */
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
   resolveResetCredits?: (version: string) => Effect.Effect<ServerProviderResetCredits | undefined>,
 ): Effect.fn.Return<
   ServerProviderDraft,
@@ -572,7 +577,10 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
           checkedAt,
         })
       : claudeUsageResponseToLimits({ response: capabilities.usage, checkedAt }).limits;
+<<<<<<< HEAD
   // Only a subscription login banks resets; an API key or Bedrock never does.
+=======
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
   const resetCredits =
     resolveResetCredits &&
     capabilities.subscriptionType &&

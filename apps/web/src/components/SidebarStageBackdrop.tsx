@@ -36,6 +36,7 @@ export function resolveSidebarStageBackdropVariant(
   return normalized === "dev" ? "dev" : "nightly";
 }
 
+<<<<<<< HEAD
 export function resolveSidebarStageFocusRingOffsetClass(
   variant: SidebarStageBackdropVariant,
 ): string {
@@ -45,6 +46,8 @@ export function resolveSidebarStageFocusRingOffsetClass(
     : "focus-visible:ring-offset-(--stage-night-bottom)";
 }
 
+=======
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
 export function resolveEnvironmentIdentificationPillLabel(
   stageLabel: string,
 ): EnvironmentIdentificationPillLabel | null {
@@ -153,7 +156,8 @@ function NightlySkyArt({ compact = false }: { compact?: boolean }) {
 
   return (
     <svg
-      className="stage-art stage-nightly h-full w-full"
+      data-stage-art="nightly"
+      className="h-full w-full"
       fill="none"
       preserveAspectRatio="xMinYMin slice"
       viewBox={compact ? "96 0 8192 96" : STAGE_BACKDROP_VIEW_BOX}
@@ -267,7 +271,8 @@ function DevBlueprintArt({ compact = false }: { compact?: boolean }) {
 
   return (
     <svg
-      className="stage-art stage-blueprint h-full w-full"
+      data-stage-art="blueprint"
+      className="h-full w-full"
       fill="none"
       preserveAspectRatio="xMinYMin slice"
       viewBox={compact ? "64 0 8192 96" : STAGE_BACKDROP_VIEW_BOX}

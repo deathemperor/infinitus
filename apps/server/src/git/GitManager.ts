@@ -2098,7 +2098,7 @@ export const make = Effect.gen(function* () {
         title: generated.title,
         bodyFile,
       })
-      .pipe(Effect.ensuring(fileSystem.remove(bodyFile).pipe(Effect.catch(() => Effect.void))));
+      .pipe(Effect.ensuring(fileSystem.remove(bodyFile).pipe(Effect.ignore)));
 
     const created = yield* findOpenPr(cwd, headContext);
     if (!created) {

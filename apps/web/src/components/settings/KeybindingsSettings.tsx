@@ -256,7 +256,7 @@ function WarningTooltipIcon({
             tabIndex={focusable ? 0 : undefined}
             aria-label={label}
             className={cn(
-              "inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-warning outline-none transition-colors hover:bg-warning/10 focus-visible:ring-[3px] focus-visible:ring-warning/25",
+              "inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-warning outline-none transition-colors hover:bg-warning/10 focus-visible:ring-3 focus-visible:ring-warning/25",
               className,
             )}
           />
@@ -669,7 +669,7 @@ function WhenExpressionBuilder({
           ) : null}
         </InputGroup>
         {parseError ? (
-          <div className="flex items-center gap-1.5 text-[11px] text-destructive">
+          <div className="flex items-center gap-1.5 text-2xs text-destructive">
             <CircleXIcon className="size-3.5" />
             {parseError}
           </div>
@@ -699,7 +699,7 @@ function WhenExpressionBuilder({
           </div>
         )}
         {parseError ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-[1px]">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-xs">
             Fix the expression above to continue editing visually.
           </div>
         ) : null}
@@ -843,7 +843,7 @@ function KeybindingKeyControl({
           onClick={() => setDraft({ isRecording: true })}
           aria-label={`Edit shortcut for ${commandLabel(row.command)}: ${formatShortcutLabel(row.binding.shortcut)}`}
           className={cn(
-            "inline-flex h-8 cursor-pointer items-center rounded-md border border-transparent px-1.5 sm:h-7 outline-none transition-colors hover:border-border/70 hover:bg-accent focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/24",
+            "inline-flex h-8 cursor-pointer items-center rounded-md border border-transparent px-1.5 sm:h-7 outline-none transition-colors hover:border-border/70 hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/24",
             pillClassName,
           )}
         >
@@ -990,7 +990,7 @@ function KeybindingRowWhen({
 }) {
   return (
     <span className="flex h-6 items-center gap-1.5">
-      <span className="text-[12px] leading-none text-muted-foreground/70">When</span>
+      <span className="text-xs leading-none text-muted-foreground/70">When</span>
       <WhenClauseControl
         label={commandLabel(row.command)}
         expression={editor.whenDraftExpression}
@@ -1235,7 +1235,7 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
       title="New keybinding"
       description={
         <span className="flex h-6 items-center gap-1.5">
-          <span className="text-[12px] leading-none text-muted-foreground/70">When</span>
+          <span className="text-xs leading-none text-muted-foreground/70">When</span>
           <NewKeybindingWhen draft={draft} variables={variables} />
         </span>
       }
@@ -1313,7 +1313,7 @@ function KeybindingsList(props: KeybindingsListProps) {
 /** Shown in the browser build only; the desktop app receives every shortcut. */
 function BrowserKeybindingNotice() {
   return (
-    <div className="flex items-center gap-2 px-3 py-2.5 text-[12px] leading-[1.45] text-muted-foreground sm:px-4">
+    <div className="flex items-center gap-2 px-3 py-2.5 text-xs leading-normal text-muted-foreground sm:px-4">
       <TriangleAlertIcon className="size-3.5 shrink-0 text-warning" aria-hidden />
       <span>
         Some shortcuts may be claimed by the browser before {PRODUCT_NAME} sees them. Use the
@@ -1489,7 +1489,7 @@ export function KeybindingsSettingsPanel() {
   const cancelAdd = useCallback(() => setIsAddingBinding(false), []);
 
   const bindingsCount = (
-    <span className="text-[11px] text-muted-foreground">
+    <span className="text-2xs text-muted-foreground">
       {rows.length + (isAddingBinding ? 1 : 0)}{" "}
       {rows.length + (isAddingBinding ? 1 : 0) === 1 ? "binding" : "bindings"}
     </span>

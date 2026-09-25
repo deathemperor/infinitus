@@ -187,6 +187,7 @@ function readSessionClerkToken(
   session: ManagedRelaySession,
 ): Effect.Effect<string, ManagedRelaySessionError> {
   return session.readClerkToken().pipe(
+<<<<<<< HEAD
     Effect.flatMap((token) =>
       token
         ? Effect.succeed(token)
@@ -195,6 +196,14 @@ function readSessionClerkToken(
               message: `The ${CONNECT_NAME} session token is unavailable.`,
             }),
           ),
+=======
+    Effect.filterOrFail(
+      (token): token is string => Boolean(token),
+      () =>
+        new ManagedRelaySessionError({
+          message: "The T3 Connect session token is unavailable.",
+        }),
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
     ),
   );
 }

@@ -56,8 +56,52 @@ Every Infinitus build comes from one [GitHub release](https://github.com/deathem
 
 ### Not available yet
 
+<<<<<<< HEAD
 - A macOS server archive. A Mac either runs the desktop app or a [build from source](./docs/user/install.md#build-from-source); for the same reason a Mac cannot yet be set up as an SSH remote from the desktop.
 - Windows server archives.
+=======
+To try it once without installing, run `npx t3@latest` instead.
+
+### Desktop app
+
+Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
+
+#### Windows (`winget`)
+
+```bash
+winget install T3Tools.T3Code
+```
+
+#### macOS (Homebrew)
+
+```bash
+brew install --cask t3-code
+```
+
+#### Debian, Ubuntu (`.deb`)
+
+Download the `.deb` from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), then:
+
+```bash
+sudo apt install ./T3-Code-*.deb
+```
+
+#### Arch Linux (AUR)
+
+Stable:
+
+```bash
+yay -S t3code-bin
+```
+
+Nightly:
+
+```bash
+yay -S t3code-nightly-bin
+```
+
+The AUR packaging is maintained in this repository under [`packaging/aur`](./packaging/aur).
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
 
 ## Some notes
 

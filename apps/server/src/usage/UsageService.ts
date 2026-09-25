@@ -300,7 +300,7 @@ export const make = Effect.gen(function* () {
 
     yield* encodeRatesCache({ fetchedAtMs: now, document: fetched }).pipe(
       Effect.flatMap((serialized) => fileSystem.writeFileString(ratesCachePath, serialized)),
-      Effect.catchCause(() => Effect.void),
+      Effect.ignoreCause,
     );
   });
 
@@ -447,7 +447,7 @@ export const make = Effect.gen(function* () {
         cacheDirty = false;
       }),
       // A cache we cannot write is a slower next start, not a failed read.
-      Effect.catchCause(() => Effect.void),
+      Effect.ignoreCause,
     );
   });
 

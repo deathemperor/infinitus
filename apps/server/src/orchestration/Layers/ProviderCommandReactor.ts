@@ -520,14 +520,14 @@ const make = Effect.gen(function* () {
       Effect.andThen(
         gitWorkflow.createWorktree({ cwd, refName: branch, path: worktreePath }, { submodules }),
       ),
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.failCause(cause)
-          : Effect.logWarning("provider command reactor failed to recreate worktree", {
-              threadId: thread.id,
-              worktreePath,
-              cause: Cause.pretty(cause),
-            }),
+      Effect.catchCauseIf(
+        (cause) => !Cause.hasInterruptsOnly(cause),
+        (cause) =>
+          Effect.logWarning("provider command reactor failed to recreate worktree", {
+            threadId: thread.id,
+            worktreePath,
+            cause: Cause.pretty(cause),
+          }),
       ),
     );
   });
@@ -1163,15 +1163,14 @@ const make = Effect.gen(function* () {
         return;
       }
       const result = yield* regenerateThreadTitle(event, requestId).pipe(
-        Effect.catchCause((cause) => {
-          if (Cause.hasInterruptsOnly(cause)) {
-            return Effect.failCause(cause);
-          }
-          return Effect.logWarning("provider command reactor failed to regenerate thread title", {
-            threadId: event.payload.threadId,
-            cause: Cause.pretty(cause),
-          }).pipe(Effect.as({ _tag: "Completed", title: undefined } as const));
-        }),
+        Effect.catchCauseIf(
+          (cause) => !Cause.hasInterruptsOnly(cause),
+          (cause) =>
+            Effect.logWarning("provider command reactor failed to regenerate thread title", {
+              threadId: event.payload.threadId,
+              cause: Cause.pretty(cause),
+            }).pipe(Effect.as({ _tag: "Completed", title: undefined } as const)),
+        ),
       );
       if (result._tag === "Superseded") {
         return;
@@ -1183,34 +1182,26 @@ const make = Effect.gen(function* () {
         ...(result.title !== undefined ? { title: result.title } : {}),
       };
       yield* dispatchThreadTitleRegenerationCompletion(completion).pipe(
-        Effect.catchCause((cause) => {
-          if (Cause.hasInterruptsOnly(cause)) {
-            return Effect.failCause(cause);
-          }
-          return Effect.logWarning(
-            "provider command reactor retrying title regeneration completion",
-            {
+        Effect.catchCauseIf(
+          (cause) => !Cause.hasInterruptsOnly(cause),
+          (cause) =>
+            Effect.logWarning("provider command reactor retrying title regeneration completion", {
               threadId: event.payload.threadId,
               cause: Cause.pretty(cause),
-            },
-          ).pipe(Effect.andThen(dispatchThreadTitleRegenerationCompletion(completion)));
-        }),
+            }).pipe(Effect.andThen(dispatchThreadTitleRegenerationCompletion(completion))),
+        ),
       );
     },
     (effect, event) =>
       effect.pipe(
-        Effect.catchCause((cause) => {
-          if (Cause.hasInterruptsOnly(cause)) {
-            return Effect.failCause(cause);
-          }
-          return Effect.logWarning(
-            "provider command reactor failed to complete title regeneration",
-            {
+        Effect.catchCauseIf(
+          (cause) => !Cause.hasInterruptsOnly(cause),
+          (cause) =>
+            Effect.logWarning("provider command reactor failed to complete title regeneration", {
               threadId: event.payload.threadId,
               cause: Cause.pretty(cause),
-            },
-          );
-        }),
+            }),
+        ),
       ),
   );
   const threadTitleRegenerationWorker = yield* makeDrainableWorker(
@@ -1543,7 +1534,34 @@ const make = Effect.gen(function* () {
           Effect.forkScoped,
         );
       }),
+<<<<<<< HEAD
     });
+=======
+      ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
+      ...(event.payload.modelSelection !== undefined
+        ? { modelSelection: event.payload.modelSelection }
+        : {}),
+      interactionMode: event.payload.interactionMode,
+      createdAt: event.payload.createdAt,
+    }).pipe(
+      Effect.asSome,
+      Effect.catchCause((cause) => handleTurnStartFailure(cause).pipe(Effect.as(Option.none()))),
+    );
+
+    if (Option.isNone(sendTurnRequest)) {
+      return;
+    }
+
+    const send = providerService
+      .sendTurn(sendTurnRequest.value)
+      .pipe(Effect.asVoid, Effect.catchCause(recoverTurnStartFailure));
+    // The forked send settles `sent` from here on, so drop the entry the post-processing hook uses.
+    if (resumed && event.commandId !== null) resumedTurnStarts.delete(event.commandId);
+    yield* send.pipe(
+      Effect.ensuring(resumed ? Deferred.succeed(resumed.sent, undefined) : Effect.void),
+      Effect.forkScoped,
+    );
+>>>>>>> upstream-sync-c13f7d93f-upstream-renamed
   });
 
   const processTurnInterruptRequested = Effect.fn("processTurnInterruptRequested")(function* (
