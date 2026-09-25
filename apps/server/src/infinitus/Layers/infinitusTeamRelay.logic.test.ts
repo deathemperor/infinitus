@@ -21,6 +21,7 @@ import {
 } from "./infinitusTeamRelay.logic.ts";
 
 const NOW = 1_790_000_000;
+const RESET_AT = Math.floor(Date.parse("2026-09-25T09:00:00.000Z") / 1000);
 
 const shellThread = (input: {
   id: string;
@@ -90,13 +91,13 @@ describe("buildThreadsDocument", () => {
       ["t-start", null],
     ]);
     expect(built.live[0]?.startedAt).toBe(Math.floor(Date.parse("2026-09-25T06:59:30.000Z") / 1000));
-    expect(built.document.threads.map((row) => row.status)).toEqual([
-      "running",
-      "waiting",
-      "waiting",
-      "idle",
-      "starting",
-    ]);
+    expect(Object.fromEntries(built.document.threads.map((row) => [row.id, row.status]))).toEqual({
+      "t-run": "running",
+      "t-wait": "waiting",
+      "t-input": "waiting",
+      "t-idle": "idle",
+      "t-start": "starting",
+    });
   });
 
   it("indexes newest first, capped, with basenames only", () => {
@@ -183,7 +184,7 @@ describe("fleet documents", () => {
     ]);
     expect(document.fleets[0]?.active).toBe("work");
     expect(document.fleets[0]?.accounts[0]?.windows).toEqual([
-      { label: "5h", pct: 42, resetsAt: Math.floor(Date.parse("2026-09-25T09:00:00.000Z") / 1000) },
+      { label: "5h", pct: 42, resetsAt: RESET_AT },
       { label: "7d", pct: 91 },
     ]);
     const text = `${dayDigest(document)}${Object.values(document.fleets[0]?.accounts ?? []).map((row) => row.label).join()}`;
@@ -199,7 +200,11 @@ describe("fleet documents", () => {
     } as never;
     const now = buildNowDocument({ at: NOW, machine: "Loc's Mac", live: [], snapshot });
     expect(now.fleets).toEqual([
-      { engine: "claude", account: "work", windows: [{ label: "5h", pct: 42, resetsAt: 1790067600 }, { label: "7d", pct: 91 }] },
+      {
+        engine: "claude",
+        account: "work",
+        windows: [{ label: "5h", pct: 42, resetsAt: RESET_AT }, { label: "7d", pct: 91 }],
+      },
       { engine: "claude", account: null, windows: [] },
     ]);
     expect(now.blockers).toEqual(["AWS login: papaya", "claude: every account limited"]);
@@ -282,7 +287,9 @@ describe("decideCommand", () => {
   const live = new Set(["t-1"]);
   const nowIso = "2026-09-25T07:00:00.000Z";
 
-  it.each([
+  const cases: Array<
+    [string, TeamQueuedCommand, { grants: ReadonlyArray<TeamGrant>; liveThreadIds: ReadonlySet<string> }, Record<string, unknown>]
+  > = [
     ["runs a send on a live thread", command({}), { grants: [grant], liveThreadIds: live }, { run: true }],
     ["refuses a revoked grant", command({}), { grants: [], liveThreadIds: live }, { run: false, outcome: "refused" }],
     [
@@ -302,7 +309,8 @@ describe("decideCommand", () => {
     ["interrupt preauthorized runs", command({ action: "interrupt" }), { grants: [grant], liveThreadIds: live }, { run: true }],
     ["new waits for the tap", command({ action: "new", threadId: "-", text: "go", project: "Limitless" }), { grants: [grant], liveThreadIds: live }, { run: false, outcome: "pending" }],
     ["view needs no live thread", command({ action: "view" }), { grants: [grant], liveThreadIds: new Set() }, { run: true }],
-  ] as const)("%s", (_name, input, context, expected) => {
+  ];
+  it.each(cases)("%s", (_name, input, context, expected) => {
     expect(decideCommand(input, { ...context, nowIso })).toMatchObject(expected);
   });
 });

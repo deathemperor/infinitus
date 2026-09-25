@@ -36,6 +36,7 @@ import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusTeamRelay } from "../Services/InfinitusTeamRelay.ts";
 import {
+  basename,
   buildFleetDocument,
   buildNowDocument,
   buildThreadsDocument,
@@ -50,9 +51,9 @@ import {
 } from "./infinitusTeamRelay.logic.ts";
 import { manifestHasVerb } from "./infinitusSignInLapse.logic.ts";
 
-export const NOW_INTERVAL = Duration.seconds(60);
-export const FULL_INTERVAL = Duration.seconds(300);
-export const POLL_INTERVAL = Duration.seconds(15);
+const NOW_INTERVAL = Duration.seconds(60);
+const FULL_INTERVAL = Duration.seconds(300);
+const POLL_INTERVAL = Duration.seconds(15);
 /** Days of stats the Mac folds for the team. */
 const STATS_DAYS = 30;
 /** The whole thread, as the Mac read it. */
@@ -129,7 +130,7 @@ export const InfinitusTeamRelayLive = Layer.effect(
       const headers = { authorization: `Bearer ${credential}` };
       return { userId, environmentId, headers, api: client.infinitusTeamEnvironment };
     });
-    type Link = NonNullable<Effect.Effect.Success<typeof readLink>>;
+    type Link = NonNullable<Effect.Success<typeof readLink>>;
 
     const memberships = (link: Link) =>
       link.api
@@ -234,7 +235,7 @@ export const InfinitusTeamRelayLive = Layer.effect(
           const updatedAt = unixSeconds(thread.updatedAt) ?? at;
           if (updatedAt < floor || sent.get(thread.id) === updatedAt) continue;
           const root = projects.get(thread.projectId);
-          const project = root === undefined ? thread.projectId : root.split("/").filter(Boolean).pop() ?? "";
+          const project = root === undefined ? thread.projectId : basename(root);
           if (isExcluded(project, exclusions)) continue;
           const detail = yield* snapshotQuery
             .getThreadDetailSnapshot(thread.id, { turnLimit: TRANSCRIPT_TURN_LIMIT })

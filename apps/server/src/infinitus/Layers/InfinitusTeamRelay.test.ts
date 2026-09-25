@@ -15,7 +15,6 @@ import type {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 
@@ -33,7 +32,7 @@ import { InfinitusTeamRelay } from "../Services/InfinitusTeamRelay.ts";
 import { InfinitusTeamRelayLive } from "./InfinitusTeamRelay.ts";
 
 const environmentId = EnvironmentId.make("env-1");
-const decodeBody = Schema.decodeUnknownSync(Schema.UnknownFromJsonString);
+const decodeBody = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 const thread = (id: string, input: { running?: boolean; updatedAt?: string; projectId?: string } = {}) =>
   ({
@@ -137,7 +136,7 @@ function harness(input: {
         },
   );
   const http = HttpClient.make((request) =>
-    Effect.gen(function* () {
+    Effect.sync(() => {
       const path = new URL(request.url).pathname;
       const body =
         request.body._tag === "Uint8Array" ? decodeBody(new TextDecoder().decode(request.body.body)) : null;
@@ -280,11 +279,15 @@ describe("InfinitusTeamRelay publishes", () => {
       const relay = yield* InfinitusTeamRelay.pipe(Effect.provide(h.layer));
       yield* relay.publishAll;
       const chunks = h.requests.filter((request) => request.path.endsWith("/transcripts"));
-      expect(chunks).toHaveLength(1);
-      expect(chunks[0]?.body).toMatchObject({ threadId: "t-1", seq: 3, rows: 1 });
-      expect((chunks[0]?.body as { lines: string }).lines).toBe(
-        '{"role":"assistant","text":"cd ~/x with [redacted-key]","at":1790319600}\n',
-      );
+      expect(chunks.map((chunk) => chunk.body)).toEqual([
+        {
+          userId: "user-1",
+          threadId: "t-1",
+          seq: 3,
+          rows: 1,
+          lines: '{"role":"assistant","text":"cd ~/x with [redacted-key]","at":1790319600}\n',
+        },
+      ]);
       const index = documentsOf(h.requests).find((document) => document.kind === "threads");
       expect((index?.body as { threads: Array<{ id: string }> }).threads.map((row) => row.id)).toEqual(["t-1"]);
       h.requests.length = 0;
@@ -298,9 +301,9 @@ describe("InfinitusTeamRelay publishes", () => {
       const h = harness({ teams: [membership()], mac: null, days: { "2026-09-25": {} } });
       const relay = yield* InfinitusTeamRelay.pipe(Effect.provide(h.layer));
       yield* relay.publishNow;
-      const [now] = documentsOf(h.requests);
-      expect(now?.kind).toBe("now");
-      expect(now?.body).toMatchObject({ desktop: true, fleets: [], blockers: [] });
+      expect(documentsOf(h.requests)).toMatchObject([
+        { kind: "now", body: { desktop: true, fleets: [], blockers: [] } },
+      ]);
       h.requests.length = 0;
       yield* relay.publishAll;
       expect(documentsOf(h.requests).map((document) => document.kind)).toEqual(["now", "threads"]);

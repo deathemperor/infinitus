@@ -32,13 +32,13 @@ import * as Schema from "effect/Schema";
  */
 
 /** Newest threads the index carries; older ones fall off it. */
-export const THREADS_INDEX_CAP = 500;
+const THREADS_INDEX_CAP = 500;
 /** A transcript chunk never passes this many bytes of lines. */
-export const TRANSCRIPT_CHUNK_MAX_BYTES = 1 << 20;
+const TRANSCRIPT_CHUNK_MAX_BYTES = 1 << 20;
 /** Threads updated within this window publish transcripts. */
 export const TRANSCRIPT_HISTORY_DAYS = 30;
 /** A `view` answer is cut here. */
-export const VIEW_MAX_CHARS = 4096;
+const VIEW_MAX_CHARS = 4096;
 /** A window at or past this is "limited". */
 const LIMITED_PCT = 90;
 const EXPIRED_STATUSES = new Set(["relogin_required", "token_expired", "no_credentials"]);
@@ -93,16 +93,12 @@ export const basename = (path: string): string => {
 /** archived | failed | starting | waiting | running | idle: the Mac's
     `TeamThreadSources.status`, the two states a teammate wants to see over
     the desktop verbs' word. */
-export function threadStatus(thread: OrchestrationThreadShell): string {
+function threadStatus(thread: OrchestrationThreadShell): string {
   if (thread.archivedAt !== null) return "archived";
   if (thread.latestTurn?.state === "error") return "failed";
   if (thread.session?.status === "starting") return "starting";
   if (thread.hasPendingApprovals || thread.hasPendingUserInput) return "waiting";
-  if (
-    thread.latestTurn?.state === "running" ||
-    thread.session?.status === "running" ||
-    thread.session?.status === "starting"
-  ) {
+  if (thread.latestTurn?.state === "running" || thread.session?.status === "running") {
     return "running";
   }
   return "idle";
@@ -193,10 +189,10 @@ const window = (label: string, w: typeof UsageWindow.Type): TeamWindow => {
   return { label, pct: Math.round(w.pct), ...(resetsAt === undefined ? {} : { resetsAt }) };
 };
 
-export const accountLabel = (account: InfinitusAccount): string =>
+const accountLabel = (account: InfinitusAccount): string =>
   account.alias !== undefined && account.alias.length > 0 ? account.alias : `#${account.number}`;
 
-export function accountWindows(account: InfinitusAccount): {
+function accountWindows(account: InfinitusAccount): {
   readonly windows: ReadonlyArray<TeamWindow>;
   readonly models: ReadonlyArray<TeamWindow>;
   readonly pcts: ReadonlyArray<number>;
@@ -211,7 +207,7 @@ export function accountWindows(account: InfinitusAccount): {
 
 /** `held` | `expiredLogin` | `dead` (a window maxed) | `limited` (one in
     the 90s) | `ok`, the old `FleetDoc.status`. */
-export function accountStatus(account: InfinitusAccount): string {
+function accountStatus(account: InfinitusAccount): string {
   if (account.disabled === true) return "held";
   if (EXPIRED_STATUSES.has(account.usageStatus)) return "expiredLogin";
   const { pcts } = accountWindows(account);
@@ -249,7 +245,7 @@ export function buildFleetDocument(fleets: ReadonlyArray<InfinitusFleet>, at: nu
 }
 
 /** `now.fleets`: each engine's active account with its two windows. */
-export function nowFleets(fleets: ReadonlyArray<InfinitusFleet>) {
+function nowFleets(fleets: ReadonlyArray<InfinitusFleet>) {
   return fleets.map((fleet) => {
     const active = fleet.accounts.find((account) => account.number === fleet.activeNumber);
     return {
@@ -262,7 +258,7 @@ export function nowFleets(fleets: ReadonlyArray<InfinitusFleet>) {
 
 /** The blockers the Mac's pop-out shows: lapsed logins and an engine with
     every account limited. */
-export function blockers(snapshot: InfinitusSnapshot): ReadonlyArray<string> {
+function blockers(snapshot: InfinitusSnapshot): ReadonlyArray<string> {
   const logins = (snapshot.awsLogins ?? []).map(
     (login: InfinitusAwsLogin) =>
       `${login.provider === "gcloud" ? "gcloud login" : "AWS login"}: ${login.profile}`,
