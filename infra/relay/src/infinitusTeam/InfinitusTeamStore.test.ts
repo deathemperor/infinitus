@@ -22,7 +22,11 @@ describe("InfinitusTeamStore", () => {
       const error = yield* Effect.flip(store.getTeam("team-1"));
       expect(error).toMatchObject({ _tag: "InfinitusTeamPersistenceError", op: "get_team" });
       expect(error.cause).toBe(cause);
-    }).pipe(Effect.provide(InfinitusTeamStore.layer.pipe(Layer.provide(Layer.succeed(RelayDb.RelayDb, fakeDb)))));
+    }).pipe(
+      Effect.provide(
+        InfinitusTeamStore.layer.pipe(Layer.provide(Layer.succeed(RelayDb.RelayDb, fakeDb))),
+      ),
+    );
   });
 
   it.effect("reads a member's shares off the jsonb column", () => {
@@ -39,7 +43,13 @@ describe("InfinitusTeamStore", () => {
                     userId: "user-1",
                     role: "leader",
                     name: "Loc",
-                    sharesJson: { now: "team", fleet: "off", threads: "off", stats: "off", transcripts: "off" },
+                    sharesJson: {
+                      now: "team",
+                      fleet: "off",
+                      threads: "off",
+                      stats: "off",
+                      transcripts: "off",
+                    },
                     since: "2026-09-25T00:00:00.000Z",
                     updatedAt: "2026-09-25T00:00:00.000Z",
                   },
@@ -54,6 +64,10 @@ describe("InfinitusTeamStore", () => {
       const member = yield* store.getMember("team-1", "user-1");
       expect(member?.shares.now).toBe("team");
       expect(member?.role).toBe("leader");
-    }).pipe(Effect.provide(InfinitusTeamStore.layer.pipe(Layer.provide(Layer.succeed(RelayDb.RelayDb, fakeDb)))));
+    }).pipe(
+      Effect.provide(
+        InfinitusTeamStore.layer.pipe(Layer.provide(Layer.succeed(RelayDb.RelayDb, fakeDb))),
+      ),
+    );
   });
 });

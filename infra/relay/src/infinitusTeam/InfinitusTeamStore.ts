@@ -145,8 +145,14 @@ export class InfinitusTeamStore extends Context.Service<
       readonly founderUserId: string;
       readonly now: string;
     }) => E<void>;
-    readonly updateTeamPolicy: (teamId: string, requests: TeamPolicyRequests, now: string) => E<void>;
-    readonly listTeamsForUser: (userId: string) => E<ReadonlyArray<{ teamId: string; name: string; role: TeamRole }>>;
+    readonly updateTeamPolicy: (
+      teamId: string,
+      requests: TeamPolicyRequests,
+      now: string,
+    ) => E<void>;
+    readonly listTeamsForUser: (
+      userId: string,
+    ) => E<ReadonlyArray<{ teamId: string; name: string; role: TeamRole }>>;
     readonly listMembers: (teamId: string) => E<ReadonlyArray<MemberRecord>>;
     readonly getMember: (teamId: string, userId: string) => E<MemberRecord | null>;
     readonly upsertMember: (input: MemberRecord & { readonly now: string }) => E<void>;
@@ -171,7 +177,11 @@ export class InfinitusTeamStore extends Context.Service<
       readonly teamId: string;
       readonly userId: string;
       readonly environmentId: string;
-      readonly documents: ReadonlyArray<{ readonly kind: TeamKind; readonly key: string; readonly body: unknown }>;
+      readonly documents: ReadonlyArray<{
+        readonly kind: TeamKind;
+        readonly key: string;
+        readonly body: unknown;
+      }>;
       readonly now: string;
     }) => E<void>;
     readonly listDocuments: (input: {
@@ -187,9 +197,16 @@ export class InfinitusTeamStore extends Context.Service<
       readonly environmentId: string;
       readonly threadId: string;
     }) => E<ReadonlyArray<TranscriptRecord>>;
-    readonly listTranscriptsForMember: (teamId: string, userId: string) => E<ReadonlyArray<TranscriptRecord>>;
-    readonly listTranscriptsOlderThan: (createdBefore: string) => E<ReadonlyArray<TranscriptRecord>>;
-    readonly listTranscriptBytesByMember: () => E<ReadonlyArray<{ teamId: string; userId: string; bytes: number }>>;
+    readonly listTranscriptsForMember: (
+      teamId: string,
+      userId: string,
+    ) => E<ReadonlyArray<TranscriptRecord>>;
+    readonly listTranscriptsOlderThan: (
+      createdBefore: string,
+    ) => E<ReadonlyArray<TranscriptRecord>>;
+    readonly listTranscriptBytesByMember: () => E<
+      ReadonlyArray<{ teamId: string; userId: string; bytes: number }>
+    >;
     readonly deleteTranscriptChunks: (keys: ReadonlyArray<TranscriptKey>) => E<void>;
     readonly createGrant: (input: GrantRecord) => E<void>;
     readonly getGrant: (grantId: string) => E<GrantRecord | null>;
@@ -198,8 +215,14 @@ export class InfinitusTeamStore extends Context.Service<
     readonly createCommand: (input: CommandRecord) => E<void>;
     readonly getCommand: (commandId: string) => E<CommandRecord | null>;
     /** Flips the environment's queued, unexpired commands to running and returns them. */
-    readonly takeQueuedForEnvironment: (environmentId: string, now: string) => E<ReadonlyArray<CommandRecord>>;
-    readonly listPendingForUser: (teamId: string, toUserId: string) => E<ReadonlyArray<CommandRecord>>;
+    readonly takeQueuedForEnvironment: (
+      environmentId: string,
+      now: string,
+    ) => E<ReadonlyArray<CommandRecord>>;
+    readonly listPendingForUser: (
+      teamId: string,
+      toUserId: string,
+    ) => E<ReadonlyArray<CommandRecord>>;
     readonly updateCommand: (
       commandId: string,
       patch: {
@@ -213,7 +236,8 @@ export class InfinitusTeamStore extends Context.Service<
   }
 >()("infinitus-relay/infinitusTeam/InfinitusTeamStore") {}
 
-const failing = (op: string) => (cause: unknown) => new InfinitusTeamPersistenceError({ op, cause });
+const failing = (op: string) => (cause: unknown) =>
+  new InfinitusTeamPersistenceError({ op, cause });
 
 const memberRow = (row: typeof infinitusTeamMembers.$inferSelect): MemberRecord => ({
   teamId: row.teamId,
@@ -322,21 +346,31 @@ const make = Effect.gen(function* () {
         })
         .pipe(Effect.mapError(failing("create_team")));
     }),
-    updateTeamPolicy: Effect.fn("relay.infinitus_team.update_policy")(function* (teamId, requests, now) {
-      yield* db
-        .update(infinitusTeams)
-        .set({ policyRequests: requests, updatedAt: now })
-        .where(eq(infinitusTeams.teamId, teamId))
-        .pipe(Effect.mapError(failing("update_policy")));
-    }),
+    updateTeamPolicy: Effect.fn("relay.infinitus_team.update_policy")(
+      function* (teamId, requests, now) {
+        yield* db
+          .update(infinitusTeams)
+          .set({ policyRequests: requests, updatedAt: now })
+          .where(eq(infinitusTeams.teamId, teamId))
+          .pipe(Effect.mapError(failing("update_policy")));
+      },
+    ),
     listTeamsForUser: Effect.fn("relay.infinitus_team.list_teams_for_user")(function* (userId) {
       const rows = yield* db
-        .select({ teamId: infinitusTeams.teamId, name: infinitusTeams.name, role: infinitusTeamMembers.role })
+        .select({
+          teamId: infinitusTeams.teamId,
+          name: infinitusTeams.name,
+          role: infinitusTeamMembers.role,
+        })
         .from(infinitusTeamMembers)
         .innerJoin(infinitusTeams, eq(infinitusTeams.teamId, infinitusTeamMembers.teamId))
         .where(eq(infinitusTeamMembers.userId, userId))
         .pipe(Effect.mapError(failing("list_teams_for_user")));
-      return rows.map((row) => ({ teamId: row.teamId, name: row.name, role: row.role as TeamRole }));
+      return rows.map((row) => ({
+        teamId: row.teamId,
+        name: row.name,
+        role: row.role as TeamRole,
+      }));
     }),
     listMembers: Effect.fn("relay.infinitus_team.list_members")(function* (teamId) {
       const rows = yield* db
@@ -369,36 +403,55 @@ const make = Effect.gen(function* () {
         })
         .onConflictDoUpdate({
           target: [infinitusTeamMembers.teamId, infinitusTeamMembers.userId],
-          set: { role: input.role, name: input.name, sharesJson: input.shares, updatedAt: input.now },
+          set: {
+            role: input.role,
+            name: input.name,
+            sharesJson: input.shares,
+            updatedAt: input.now,
+          },
         })
         .pipe(Effect.mapError(failing("upsert_member")));
     }),
-    updateMember: Effect.fn("relay.infinitus_team.update_member")(function* (teamId, userId, patch, now) {
-      yield* db
-        .update(infinitusTeamMembers)
-        .set({
-          ...(patch.name === undefined ? {} : { name: patch.name }),
-          ...(patch.shares === undefined ? {} : { sharesJson: patch.shares }),
-          ...(patch.role === undefined ? {} : { role: patch.role }),
-          updatedAt: now,
-        })
-        .where(memberFilter(teamId, userId))
-        .pipe(Effect.mapError(failing("update_member")));
-    }),
+    updateMember: Effect.fn("relay.infinitus_team.update_member")(
+      function* (teamId, userId, patch, now) {
+        yield* db
+          .update(infinitusTeamMembers)
+          .set({
+            ...(patch.name === undefined ? {} : { name: patch.name }),
+            ...(patch.shares === undefined ? {} : { sharesJson: patch.shares }),
+            ...(patch.role === undefined ? {} : { role: patch.role }),
+            updatedAt: now,
+          })
+          .where(memberFilter(teamId, userId))
+          .pipe(Effect.mapError(failing("update_member")));
+      },
+    ),
     deleteMember: Effect.fn("relay.infinitus_team.delete_member")(function* (teamId, userId) {
       const fail = failing("delete_member");
       const transcripts = yield* db
         .select()
         .from(infinitusTeamTranscripts)
-        .where(and(eq(infinitusTeamTranscripts.teamId, teamId), eq(infinitusTeamTranscripts.userId, userId)))
+        .where(
+          and(
+            eq(infinitusTeamTranscripts.teamId, teamId),
+            eq(infinitusTeamTranscripts.userId, userId),
+          ),
+        )
         .pipe(Effect.mapError(fail));
       yield* db
         .delete(infinitusTeamTranscripts)
-        .where(and(eq(infinitusTeamTranscripts.teamId, teamId), eq(infinitusTeamTranscripts.userId, userId)))
+        .where(
+          and(
+            eq(infinitusTeamTranscripts.teamId, teamId),
+            eq(infinitusTeamTranscripts.userId, userId),
+          ),
+        )
         .pipe(Effect.mapError(fail));
       yield* db
         .delete(infinitusTeamDocuments)
-        .where(and(eq(infinitusTeamDocuments.teamId, teamId), eq(infinitusTeamDocuments.userId, userId)))
+        .where(
+          and(eq(infinitusTeamDocuments.teamId, teamId), eq(infinitusTeamDocuments.userId, userId)),
+        )
         .pipe(Effect.mapError(fail));
       yield* db
         .delete(infinitusTeamGrants)
@@ -415,9 +468,14 @@ const make = Effect.gen(function* () {
         .pipe(Effect.mapError(fail));
       yield* db
         .delete(infinitusTeamRequests)
-        .where(and(eq(infinitusTeamRequests.teamId, teamId), eq(infinitusTeamRequests.userId, userId)))
+        .where(
+          and(eq(infinitusTeamRequests.teamId, teamId), eq(infinitusTeamRequests.userId, userId)),
+        )
         .pipe(Effect.mapError(fail));
-      yield* db.delete(infinitusTeamMembers).where(memberFilter(teamId, userId)).pipe(Effect.mapError(fail));
+      yield* db
+        .delete(infinitusTeamMembers)
+        .where(memberFilter(teamId, userId))
+        .pipe(Effect.mapError(fail));
       return transcripts.map(transcriptRow);
     }),
     createInvite: Effect.fn("relay.infinitus_team.create_invite")(function* (input) {
@@ -445,22 +503,31 @@ const make = Effect.gen(function* () {
         .pipe(Effect.mapError(failing("get_invite")));
       return rows[0] ? inviteRow(rows[0]) : null;
     }),
-    markInviteUsed: Effect.fn("relay.infinitus_team.mark_invite_used")(function* (inviteId, userId) {
-      yield* db
-        .update(infinitusTeamInvites)
-        .set({ usedByUserId: userId })
-        .where(eq(infinitusTeamInvites.inviteId, inviteId))
-        .pipe(Effect.mapError(failing("mark_invite_used")));
-    }),
-    revokeInvite: Effect.fn("relay.infinitus_team.revoke_invite")(function* (teamId, inviteId, now) {
-      const rows = yield* db
-        .update(infinitusTeamInvites)
-        .set({ revokedAt: now })
-        .where(and(eq(infinitusTeamInvites.teamId, teamId), eq(infinitusTeamInvites.inviteId, inviteId)))
-        .returning({ inviteId: infinitusTeamInvites.inviteId })
-        .pipe(Effect.mapError(failing("revoke_invite")));
-      return rows.length > 0;
-    }),
+    markInviteUsed: Effect.fn("relay.infinitus_team.mark_invite_used")(
+      function* (inviteId, userId) {
+        yield* db
+          .update(infinitusTeamInvites)
+          .set({ usedByUserId: userId })
+          .where(eq(infinitusTeamInvites.inviteId, inviteId))
+          .pipe(Effect.mapError(failing("mark_invite_used")));
+      },
+    ),
+    revokeInvite: Effect.fn("relay.infinitus_team.revoke_invite")(
+      function* (teamId, inviteId, now) {
+        const rows = yield* db
+          .update(infinitusTeamInvites)
+          .set({ revokedAt: now })
+          .where(
+            and(
+              eq(infinitusTeamInvites.teamId, teamId),
+              eq(infinitusTeamInvites.inviteId, inviteId),
+            ),
+          )
+          .returning({ inviteId: infinitusTeamInvites.inviteId })
+          .pipe(Effect.mapError(failing("revoke_invite")));
+        return rows.length > 0;
+      },
+    ),
     listInvites: Effect.fn("relay.infinitus_team.list_invites")(function* (teamId) {
       const rows = yield* db
         .select()
@@ -490,7 +557,9 @@ const make = Effect.gen(function* () {
       const rows = yield* db
         .select()
         .from(infinitusTeamRequests)
-        .where(and(eq(infinitusTeamRequests.teamId, teamId), eq(infinitusTeamRequests.userId, userId)))
+        .where(
+          and(eq(infinitusTeamRequests.teamId, teamId), eq(infinitusTeamRequests.userId, userId)),
+        )
         .limit(1)
         .pipe(Effect.mapError(failing("get_request")));
       return rows[0] ?? null;
@@ -506,7 +575,9 @@ const make = Effect.gen(function* () {
     deleteRequest: Effect.fn("relay.infinitus_team.delete_request")(function* (teamId, userId) {
       yield* db
         .delete(infinitusTeamRequests)
-        .where(and(eq(infinitusTeamRequests.teamId, teamId), eq(infinitusTeamRequests.userId, userId)))
+        .where(
+          and(eq(infinitusTeamRequests.teamId, teamId), eq(infinitusTeamRequests.userId, userId)),
+        )
         .pipe(Effect.mapError(failing("delete_request")));
     }),
     upsertDocuments: Effect.fn("relay.infinitus_team.upsert_documents")(function* (input) {
@@ -542,7 +613,9 @@ const make = Effect.gen(function* () {
         .where(
           and(
             eq(infinitusTeamDocuments.teamId, input.teamId),
-            ...(input.userId === undefined ? [] : [eq(infinitusTeamDocuments.userId, input.userId)]),
+            ...(input.userId === undefined
+              ? []
+              : [eq(infinitusTeamDocuments.userId, input.userId)]),
             ...(input.environmentId === undefined
               ? []
               : [eq(infinitusTeamDocuments.environmentId, input.environmentId)]),
@@ -568,54 +641,68 @@ const make = Effect.gen(function* () {
         })
         .pipe(Effect.mapError(failing("insert_transcript")));
     }),
-    listTranscriptChunks: Effect.fn("relay.infinitus_team.list_transcript_chunks")(function* (input) {
-      const rows = yield* db
-        .select()
-        .from(infinitusTeamTranscripts)
-        .where(
-          and(
-            eq(infinitusTeamTranscripts.teamId, input.teamId),
-            eq(infinitusTeamTranscripts.userId, input.userId),
-            eq(infinitusTeamTranscripts.environmentId, input.environmentId),
-            eq(infinitusTeamTranscripts.threadId, input.threadId),
-          ),
-        )
-        .orderBy(infinitusTeamTranscripts.seq)
-        .pipe(Effect.mapError(failing("list_transcript_chunks")));
-      return rows.map(transcriptRow);
-    }),
-    listTranscriptsForMember: Effect.fn("relay.infinitus_team.list_transcripts_for_member")(function* (
-      teamId,
-      userId,
-    ) {
-      const rows = yield* db
-        .select()
-        .from(infinitusTeamTranscripts)
-        .where(and(eq(infinitusTeamTranscripts.teamId, teamId), eq(infinitusTeamTranscripts.userId, userId)))
-        .orderBy(infinitusTeamTranscripts.createdAt)
-        .pipe(Effect.mapError(failing("list_transcripts_for_member")));
-      return rows.map(transcriptRow);
-    }),
-    listTranscriptsOlderThan: Effect.fn("relay.infinitus_team.list_transcripts_older_than")(function* (createdBefore) {
-      const rows = yield* db
-        .select()
-        .from(infinitusTeamTranscripts)
-        .where(lt(infinitusTeamTranscripts.createdAt, createdBefore))
-        .pipe(Effect.mapError(failing("list_transcripts_older_than")));
-      return rows.map(transcriptRow);
-    }),
-    listTranscriptBytesByMember: Effect.fn("relay.infinitus_team.list_transcript_bytes")(function* () {
-      const rows = yield* db
-        .select({
-          teamId: infinitusTeamTranscripts.teamId,
-          userId: infinitusTeamTranscripts.userId,
-          bytes: sql<number>`coalesce(sum(${infinitusTeamTranscripts.bytes}), 0)::int`,
-        })
-        .from(infinitusTeamTranscripts)
-        .groupBy(infinitusTeamTranscripts.teamId, infinitusTeamTranscripts.userId)
-        .pipe(Effect.mapError(failing("list_transcript_bytes")));
-      return rows.map((row) => ({ teamId: row.teamId, userId: row.userId, bytes: Number(row.bytes) }));
-    }),
+    listTranscriptChunks: Effect.fn("relay.infinitus_team.list_transcript_chunks")(
+      function* (input) {
+        const rows = yield* db
+          .select()
+          .from(infinitusTeamTranscripts)
+          .where(
+            and(
+              eq(infinitusTeamTranscripts.teamId, input.teamId),
+              eq(infinitusTeamTranscripts.userId, input.userId),
+              eq(infinitusTeamTranscripts.environmentId, input.environmentId),
+              eq(infinitusTeamTranscripts.threadId, input.threadId),
+            ),
+          )
+          .orderBy(infinitusTeamTranscripts.seq)
+          .pipe(Effect.mapError(failing("list_transcript_chunks")));
+        return rows.map(transcriptRow);
+      },
+    ),
+    listTranscriptsForMember: Effect.fn("relay.infinitus_team.list_transcripts_for_member")(
+      function* (teamId, userId) {
+        const rows = yield* db
+          .select()
+          .from(infinitusTeamTranscripts)
+          .where(
+            and(
+              eq(infinitusTeamTranscripts.teamId, teamId),
+              eq(infinitusTeamTranscripts.userId, userId),
+            ),
+          )
+          .orderBy(infinitusTeamTranscripts.createdAt)
+          .pipe(Effect.mapError(failing("list_transcripts_for_member")));
+        return rows.map(transcriptRow);
+      },
+    ),
+    listTranscriptsOlderThan: Effect.fn("relay.infinitus_team.list_transcripts_older_than")(
+      function* (createdBefore) {
+        const rows = yield* db
+          .select()
+          .from(infinitusTeamTranscripts)
+          .where(lt(infinitusTeamTranscripts.createdAt, createdBefore))
+          .pipe(Effect.mapError(failing("list_transcripts_older_than")));
+        return rows.map(transcriptRow);
+      },
+    ),
+    listTranscriptBytesByMember: Effect.fn("relay.infinitus_team.list_transcript_bytes")(
+      function* () {
+        const rows = yield* db
+          .select({
+            teamId: infinitusTeamTranscripts.teamId,
+            userId: infinitusTeamTranscripts.userId,
+            bytes: sql<number>`coalesce(sum(${infinitusTeamTranscripts.bytes}), 0)::int`,
+          })
+          .from(infinitusTeamTranscripts)
+          .groupBy(infinitusTeamTranscripts.teamId, infinitusTeamTranscripts.userId)
+          .pipe(Effect.mapError(failing("list_transcript_bytes")));
+        return rows.map((row) => ({
+          teamId: row.teamId,
+          userId: row.userId,
+          bytes: Number(row.bytes),
+        }));
+      },
+    ),
     deleteTranscriptChunks: Effect.fn("relay.infinitus_team.delete_transcripts")(function* (keys) {
       for (const key of keys) {
         yield* db
@@ -666,20 +753,22 @@ const make = Effect.gen(function* () {
         .pipe(Effect.mapError(failing("list_grants")));
       return rows.map(grantRow);
     }),
-    deleteGrant: Effect.fn("relay.infinitus_team.delete_grant")(function* (teamId, grantId, userId) {
-      const rows = yield* db
-        .delete(infinitusTeamGrants)
-        .where(
-          and(
-            eq(infinitusTeamGrants.teamId, teamId),
-            eq(infinitusTeamGrants.grantId, grantId),
-            eq(infinitusTeamGrants.userId, userId),
-          ),
-        )
-        .returning({ grantId: infinitusTeamGrants.grantId })
-        .pipe(Effect.mapError(failing("delete_grant")));
-      return rows.length > 0;
-    }),
+    deleteGrant: Effect.fn("relay.infinitus_team.delete_grant")(
+      function* (teamId, grantId, userId) {
+        const rows = yield* db
+          .delete(infinitusTeamGrants)
+          .where(
+            and(
+              eq(infinitusTeamGrants.teamId, teamId),
+              eq(infinitusTeamGrants.grantId, grantId),
+              eq(infinitusTeamGrants.userId, userId),
+            ),
+          )
+          .returning({ grantId: infinitusTeamGrants.grantId })
+          .pipe(Effect.mapError(failing("delete_grant")));
+        return rows.length > 0;
+      },
+    ),
     createCommand: Effect.fn("relay.infinitus_team.create_command")(function* (input) {
       yield* db
         .insert(infinitusTeamCommands)
@@ -711,36 +800,40 @@ const make = Effect.gen(function* () {
         .pipe(Effect.mapError(failing("get_command")));
       return rows[0] ? commandRow(rows[0]) : null;
     }),
-    takeQueuedForEnvironment: Effect.fn("relay.infinitus_team.take_queued")(function* (environmentId, now) {
-      const rows = yield* db
-        .update(infinitusTeamCommands)
-        .set({ status: "running" })
-        .where(
-          and(
-            eq(infinitusTeamCommands.environmentId, environmentId),
-            eq(infinitusTeamCommands.status, "queued"),
-            sql`${infinitusTeamCommands.expiresAt} > ${now}`,
-          ),
-        )
-        .returning()
-        .pipe(Effect.mapError(failing("take_queued")));
-      return rows.map(commandRow);
-    }),
-    listPendingForUser: Effect.fn("relay.infinitus_team.list_pending")(function* (teamId, toUserId) {
-      const rows = yield* db
-        .select()
-        .from(infinitusTeamCommands)
-        .where(
-          and(
-            eq(infinitusTeamCommands.teamId, teamId),
-            eq(infinitusTeamCommands.toUserId, toUserId),
-            eq(infinitusTeamCommands.status, "pending"),
-          ),
-        )
-        .orderBy(infinitusTeamCommands.createdAt)
-        .pipe(Effect.mapError(failing("list_pending")));
-      return rows.map(commandRow);
-    }),
+    takeQueuedForEnvironment: Effect.fn("relay.infinitus_team.take_queued")(
+      function* (environmentId, now) {
+        const rows = yield* db
+          .update(infinitusTeamCommands)
+          .set({ status: "running" })
+          .where(
+            and(
+              eq(infinitusTeamCommands.environmentId, environmentId),
+              eq(infinitusTeamCommands.status, "queued"),
+              sql`${infinitusTeamCommands.expiresAt} > ${now}`,
+            ),
+          )
+          .returning()
+          .pipe(Effect.mapError(failing("take_queued")));
+        return rows.map(commandRow);
+      },
+    ),
+    listPendingForUser: Effect.fn("relay.infinitus_team.list_pending")(
+      function* (teamId, toUserId) {
+        const rows = yield* db
+          .select()
+          .from(infinitusTeamCommands)
+          .where(
+            and(
+              eq(infinitusTeamCommands.teamId, teamId),
+              eq(infinitusTeamCommands.toUserId, toUserId),
+              eq(infinitusTeamCommands.status, "pending"),
+            ),
+          )
+          .orderBy(infinitusTeamCommands.createdAt)
+          .pipe(Effect.mapError(failing("list_pending")));
+        return rows.map(commandRow);
+      },
+    ),
     updateCommand: Effect.fn("relay.infinitus_team.update_command")(function* (commandId, patch) {
       yield* db
         .update(infinitusTeamCommands)

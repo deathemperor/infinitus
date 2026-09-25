@@ -1,4 +1,14 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 /**
  * Team on Infinitus Connect (#1592). Times are ISO strings like the rest of
@@ -76,7 +86,9 @@ export const infinitusTeamDocuments = pgTable(
     updatedAt: varchar("updated_at", { length: 64 }).notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.teamId, table.userId, table.environmentId, table.kind, table.key] }),
+    primaryKey({
+      columns: [table.teamId, table.userId, table.environmentId, table.kind, table.key],
+    }),
     index("idx_infinitus_team_documents_team_kind").on(table.teamId, table.kind),
   ],
 );

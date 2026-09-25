@@ -19,10 +19,7 @@ import { CONNECT_NAME, PRODUCT_NAME } from "./productName.ts";
 import { RelayInfinitusAlertRequest } from "./relayInfinitusAlert.ts";
 // Fork (#1592): Team on Infinitus Connect — the client group on the bearer
 // auth, the environment group on the environment credential.
-import {
-  RelayInfinitusTeamEnvironmentGroup,
-  RelayInfinitusTeamGroup,
-} from "./relayInfinitusTeam.ts";
+import { makeRelayInfinitusTeamGroups } from "./relayInfinitusTeam.ts";
 
 export const RelayAgentAwarenessPlatform = Schema.Literals(["ios", "android"]);
 export type RelayAgentAwarenessPlatform = typeof RelayAgentAwarenessPlatform.Type;
@@ -1131,6 +1128,10 @@ const RelayInfinitusAlertGroup = HttpApiGroup.make("infinitusAlert")
   )
   .annotate(OpenApi.Description, "Environment-authenticated account alert publication.")
   .middleware(RelayEnvironmentAuth);
+
+// Fork (#1592): built here so the team routes can name the internal error.
+export const { RelayInfinitusTeamGroup, RelayInfinitusTeamEnvironmentGroup } =
+  makeRelayInfinitusTeamGroups(RelayInternalError);
 
 export const RelayApi = HttpApi.make("RelayApi")
   .add(

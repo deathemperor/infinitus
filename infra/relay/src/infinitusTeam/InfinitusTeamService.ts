@@ -17,7 +17,6 @@ import {
   type TeamPendingCommand,
   type TeamPolicyRequests,
   type TeamQueuedCommand,
-  type TeamRole,
   type TeamShares,
   type TeamSnapshot,
   type TeamTranscriptChunkRow,
@@ -83,19 +82,61 @@ export class InfinitusTeamService extends Context.Service<
   InfinitusTeamService,
   {
     readonly listTeams: (userId: string) => E<ReadonlyArray<TeamListRow>>;
-    readonly createTeam: (input: { userId: string; name: string; memberName: string }) => E<TeamSnapshot>;
-    readonly joinTeam: (input: { userId: string; token: string; memberName: string }) => E<TeamJoinResponse>;
+    readonly createTeam: (input: {
+      userId: string;
+      name: string;
+      memberName: string;
+    }) => E<TeamSnapshot>;
+    readonly joinTeam: (input: {
+      userId: string;
+      token: string;
+      memberName: string;
+    }) => E<TeamJoinResponse>;
     readonly getTeam: (input: { userId: string; teamId: string }) => E<TeamSnapshot>;
-    readonly updateMe: (input: { userId: string; teamId: string; name?: string; shares?: TeamShares }) => E<TeamSnapshot>;
+    readonly updateMe: (input: {
+      userId: string;
+      teamId: string;
+      name?: string;
+      shares?: TeamShares;
+    }) => E<TeamSnapshot>;
     readonly leaveTeam: (input: { userId: string; teamId: string }) => E<void>;
-    readonly createInvite: (input: { userId: string; teamId: string; days: number; oneUse: boolean }) => E<TeamInviteCreated>;
+    readonly createInvite: (input: {
+      userId: string;
+      teamId: string;
+      days: number;
+      oneUse: boolean;
+    }) => E<TeamInviteCreated>;
     readonly revokeInvite: (input: { userId: string; teamId: string; inviteId: string }) => E<void>;
-    readonly approveRequest: (input: { userId: string; teamId: string; targetUserId: string }) => E<TeamSnapshot>;
-    readonly declineRequest: (input: { userId: string; teamId: string; targetUserId: string }) => E<TeamSnapshot>;
-    readonly promoteMember: (input: { userId: string; teamId: string; targetUserId: string }) => E<TeamSnapshot>;
-    readonly demoteMember: (input: { userId: string; teamId: string; targetUserId: string }) => E<TeamSnapshot>;
-    readonly removeMember: (input: { userId: string; teamId: string; targetUserId: string }) => E<TeamSnapshot>;
-    readonly updatePolicy: (input: { userId: string; teamId: string; requests: TeamPolicyRequests }) => E<TeamSnapshot>;
+    readonly approveRequest: (input: {
+      userId: string;
+      teamId: string;
+      targetUserId: string;
+    }) => E<TeamSnapshot>;
+    readonly declineRequest: (input: {
+      userId: string;
+      teamId: string;
+      targetUserId: string;
+    }) => E<TeamSnapshot>;
+    readonly promoteMember: (input: {
+      userId: string;
+      teamId: string;
+      targetUserId: string;
+    }) => E<TeamSnapshot>;
+    readonly demoteMember: (input: {
+      userId: string;
+      teamId: string;
+      targetUserId: string;
+    }) => E<TeamSnapshot>;
+    readonly removeMember: (input: {
+      userId: string;
+      teamId: string;
+      targetUserId: string;
+    }) => E<TeamSnapshot>;
+    readonly updatePolicy: (input: {
+      userId: string;
+      teamId: string;
+      requests: TeamPolicyRequests;
+    }) => E<TeamSnapshot>;
     readonly listDocuments: (input: {
       userId: string;
       teamId: string;
@@ -118,7 +159,9 @@ export class InfinitusTeamService extends Context.Service<
       threadId: string;
       seq: number;
     }) => E<string>;
-    readonly createGrant: (input: { userId: string; teamId: string } & TeamGrantCreate) => E<TeamGrant>;
+    readonly createGrant: (
+      input: { userId: string; teamId: string } & TeamGrantCreate,
+    ) => E<TeamGrant>;
     readonly revokeGrant: (input: { userId: string; teamId: string; grantId: string }) => E<void>;
     readonly createCommand: (input: {
       userId: string;
@@ -130,10 +173,25 @@ export class InfinitusTeamService extends Context.Service<
       text?: string;
       project?: string;
     }) => E<TeamCommandState>;
-    readonly listPendingCommands: (input: { userId: string; teamId: string }) => E<ReadonlyArray<TeamPendingCommand>>;
-    readonly getCommand: (input: { userId: string; teamId: string; commandId: string }) => E<TeamCommandState>;
-    readonly allowCommand: (input: { userId: string; teamId: string; commandId: string }) => E<TeamCommandState>;
-    readonly denyCommand: (input: { userId: string; teamId: string; commandId: string }) => E<TeamCommandState>;
+    readonly listPendingCommands: (input: {
+      userId: string;
+      teamId: string;
+    }) => E<ReadonlyArray<TeamPendingCommand>>;
+    readonly getCommand: (input: {
+      userId: string;
+      teamId: string;
+      commandId: string;
+    }) => E<TeamCommandState>;
+    readonly allowCommand: (input: {
+      userId: string;
+      teamId: string;
+      commandId: string;
+    }) => E<TeamCommandState>;
+    readonly denyCommand: (input: {
+      userId: string;
+      teamId: string;
+      commandId: string;
+    }) => E<TeamCommandState>;
 
     /** Environment side. Every call first proves the link for that user, environment and key. */
     readonly memberships: (input: {
@@ -205,7 +263,11 @@ const normalizeShares = (shares: TeamShares | Record<string, string> | undefined
 };
 
 /** May `reader` see `publisher`'s `kind`? The publisher always sees their own. */
-export const readable = (publisher: MemberRecord, reader: MemberRecord, kind: TeamKind): boolean => {
+export const readable = (
+  publisher: MemberRecord,
+  reader: MemberRecord,
+  kind: TeamKind,
+): boolean => {
   if (publisher.userId === reader.userId) return true;
   const share = normalizeShares(publisher.shares)[kind];
   return share === "team" || (share === "leaders" && reader.role === "leader");
@@ -231,33 +293,47 @@ export const make = Effect.gen(function* () {
       .pipe(Effect.map(Encoding.encodeBase64Url), Effect.orDie);
 
   const requireTeam = (teamId: string) =>
-    store.getTeam(teamId).pipe(
-      Effect.flatMap((team) => (team ? Effect.succeed(team) : Effect.fail(refuse("This team does not exist.")))),
-    );
+    store
+      .getTeam(teamId)
+      .pipe(
+        Effect.flatMap((team) =>
+          team ? Effect.succeed(team) : Effect.fail(refuse("This team does not exist.")),
+        ),
+      );
   const requireMember = (teamId: string, userId: string) =>
-    store.getMember(teamId, userId).pipe(
-      Effect.flatMap((member) =>
-        member ? Effect.succeed(member) : Effect.fail(refuse("You are not in this team.")),
-      ),
-    );
+    store
+      .getMember(teamId, userId)
+      .pipe(
+        Effect.flatMap((member) =>
+          member ? Effect.succeed(member) : Effect.fail(refuse("You are not in this team.")),
+        ),
+      );
   const requireLeader = (teamId: string, userId: string) =>
     requireMember(teamId, userId).pipe(
       Effect.flatMap((member) =>
-        member.role === "leader" ? Effect.succeed(member) : Effect.fail(refuse("Only a leader can do that.")),
+        member.role === "leader"
+          ? Effect.succeed(member)
+          : Effect.fail(refuse("Only a leader can do that.")),
       ),
     );
   const requireTarget = (teamId: string, targetUserId: string) =>
-    store.getMember(teamId, targetUserId).pipe(
-      Effect.flatMap((member) =>
-        member ? Effect.succeed(member) : Effect.fail(refuse("That person is not in this team.")),
-      ),
-    );
-  const leaderCount = (members: ReadonlyArray<MemberRecord>) => members.filter((m) => m.role === "leader").length;
+    store
+      .getMember(teamId, targetUserId)
+      .pipe(
+        Effect.flatMap((member) =>
+          member ? Effect.succeed(member) : Effect.fail(refuse("That person is not in this team.")),
+        ),
+      );
+  const leaderCount = (members: ReadonlyArray<MemberRecord>) =>
+    members.filter((m) => m.role === "leader").length;
 
   const deleteTranscriptObjects = (records: ReadonlyArray<TranscriptRecord>) =>
     records.length === 0 ? Effect.void : transcripts.delete(records.map((r) => r.objectKey));
 
-  const snapshot = Effect.fn("relay.infinitus_team.snapshot")(function* (teamId: string, userId: string) {
+  const snapshot = Effect.fn("relay.infinitus_team.snapshot")(function* (
+    teamId: string,
+    userId: string,
+  ) {
     const team = yield* requireTeam(teamId);
     const me = yield* requireMember(teamId, userId);
     const members = yield* store.listMembers(teamId);
@@ -268,14 +344,20 @@ export const make = Effect.gen(function* () {
 
     const rows: Array<TeamSnapshot["members"][number]> = [];
     for (const member of [...members].sort((a, b) => (a.since < b.since ? -1 : 1))) {
-      const visible = documents.filter((d) => d.userId === member.userId && readable(member, me, d.kind));
+      const visible = documents.filter(
+        (d) => d.userId === member.userId && readable(member, me, d.kind),
+      );
       const environmentIds = [...new Set(visible.map((d) => d.environmentId))];
-      const linked = environmentIds.length === 0 ? [] : yield* links.listForUser({ userId: member.userId });
+      const linked =
+        environmentIds.length === 0 ? [] : yield* links.listForUser({ userId: member.userId });
       const machines: Array<TeamMachine> = environmentIds.map((environmentId) => {
         const nowDoc = visible.find((d) => d.environmentId === environmentId && d.kind === "now");
         const latest = visible
           .filter((d) => d.environmentId === environmentId)
-          .reduce<string | null>((acc, d) => (acc === null || d.updatedAt > acc ? d.updatedAt : acc), null);
+          .reduce<string | null>(
+            (acc, d) => (acc === null || d.updatedAt > acc ? d.updatedAt : acc),
+            null,
+          );
         return {
           environmentId: environmentId as EnvironmentId,
           label: linked.find((l) => l.environmentId === environmentId)?.label ?? "Machine",
@@ -309,7 +391,12 @@ export const make = Effect.gen(function* () {
       requests: requests.map((r) => ({ userId: r.userId, name: r.name, at: r.createdAt })),
       invites: invites
         .filter((i) => i.revokedAt === null && i.expiresAt > now)
-        .map((i) => ({ inviteId: i.inviteId, oneUse: i.oneUse, expiresAt: i.expiresAt, usedBy: i.usedByUserId })),
+        .map((i) => ({
+          inviteId: i.inviteId,
+          oneUse: i.oneUse,
+          expiresAt: i.expiresAt,
+          usedBy: i.usedByUserId,
+        })),
       grants: grants.filter((g) => g.userId === userId).map(grantOf),
       pending: pending.map((c) => ({
         commandId: c.commandId,
@@ -340,16 +427,17 @@ export const make = Effect.gen(function* () {
     } satisfies TeamSnapshot;
   });
 
-  const assertEnvironmentUser = Effect.fn("relay.infinitus_team.assert_environment_user")(function* (input: {
-    userId: string;
-    environmentId: string;
-    environmentPublicKey: string;
-  }) {
-    const link = yield* links.getForUser({ userId: input.userId, environmentId: input.environmentId });
-    if (link === null || link.environmentPublicKey !== input.environmentPublicKey) {
-      return yield* refuse("This environment is not linked to that user.");
-    }
-  });
+  const assertEnvironmentUser = Effect.fn("relay.infinitus_team.assert_environment_user")(
+    function* (input: { userId: string; environmentId: string; environmentPublicKey: string }) {
+      const link = yield* links.getForUser({
+        userId: input.userId,
+        environmentId: input.environmentId,
+      });
+      if (link === null || link.environmentPublicKey !== input.environmentPublicKey) {
+        return yield* refuse("This environment is not linked to that user.");
+      }
+    },
+  );
 
   const finishCommand = (record: CommandRecord, now: string, ack: TeamCommandAckBody) =>
     store.updateCommand(record.commandId, {
@@ -360,9 +448,13 @@ export const make = Effect.gen(function* () {
 
   return InfinitusTeamService.of({
     listTeams: (userId) =>
-      store.listTeamsForUser(userId).pipe(
-        Effect.map((rows) => rows.map((r) => ({ teamId: r.teamId as TeamId, name: r.name, role: r.role }))),
-      ),
+      store
+        .listTeamsForUser(userId)
+        .pipe(
+          Effect.map((rows) =>
+            rows.map((r) => ({ teamId: r.teamId as TeamId, name: r.name, role: r.role })),
+          ),
+        ),
 
     createTeam: Effect.fn("relay.infinitus_team.create")(function* (input) {
       const now = yield* nowIso;
@@ -386,7 +478,8 @@ export const make = Effect.gen(function* () {
       if (invite === null) return yield* refuse("This invite is not valid.");
       if (invite.revokedAt !== null) return yield* refuse("This invite was revoked.");
       if (invite.expiresAt <= now) return yield* refuse("This invite has expired.");
-      if (invite.oneUse && invite.usedByUserId !== null) return yield* refuse("This invite was already used.");
+      if (invite.oneUse && invite.usedByUserId !== null)
+        return yield* refuse("This invite was already used.");
       const team = yield* requireTeam(invite.teamId);
       const existing = yield* store.getMember(team.teamId, input.userId);
       if (existing) return { teamId: team.teamId as TeamId, status: "member" as const };
@@ -495,7 +588,12 @@ export const make = Effect.gen(function* () {
     promoteMember: Effect.fn("relay.infinitus_team.promote")(function* (input) {
       yield* requireLeader(input.teamId, input.userId);
       yield* requireTarget(input.teamId, input.targetUserId);
-      yield* store.updateMember(input.teamId, input.targetUserId, { role: "leader" }, yield* nowIso);
+      yield* store.updateMember(
+        input.teamId,
+        input.targetUserId,
+        { role: "leader" },
+        yield* nowIso,
+      );
       return yield* snapshot(input.teamId, input.userId);
     }),
 
@@ -506,15 +604,22 @@ export const make = Effect.gen(function* () {
       if (target.role === "leader" && leaderCount(members) === 1) {
         return yield* refuse("A team keeps at least one leader.");
       }
-      yield* store.updateMember(input.teamId, input.targetUserId, { role: "member" }, yield* nowIso);
+      yield* store.updateMember(
+        input.teamId,
+        input.targetUserId,
+        { role: "member" },
+        yield* nowIso,
+      );
       return yield* snapshot(input.teamId, input.userId);
     }),
 
     removeMember: Effect.fn("relay.infinitus_team.remove")(function* (input) {
       yield* requireLeader(input.teamId, input.userId);
       const team = yield* requireTeam(input.teamId);
-      if (input.targetUserId === team.founderUserId) return yield* refuse("The founder cannot be removed.");
-      if (input.targetUserId === input.userId) return yield* refuse("Leave the team instead of removing yourself.");
+      if (input.targetUserId === team.founderUserId)
+        return yield* refuse("The founder cannot be removed.");
+      if (input.targetUserId === input.userId)
+        return yield* refuse("Leave the team instead of removing yourself.");
       yield* requireTarget(input.teamId, input.targetUserId);
       const gone = yield* store.deleteMember(input.teamId, input.targetUserId);
       yield* deleteTranscriptObjects(gone);
@@ -552,23 +657,32 @@ export const make = Effect.gen(function* () {
         }));
     }),
 
-    listTranscriptChunks: Effect.fn("relay.infinitus_team.list_transcript_chunks")(function* (input) {
-      const me = yield* requireMember(input.teamId, input.userId);
-      const owner = yield* requireTarget(input.teamId, input.ownerUserId);
-      if (!readable(owner, me, "transcripts")) return yield* refuse("Transcripts are not shared with you.");
-      const rows = yield* store.listTranscriptChunks({
-        teamId: input.teamId,
-        userId: input.ownerUserId,
-        environmentId: input.environmentId,
-        threadId: input.threadId,
-      });
-      return rows.map((r) => ({ seq: r.seq, rows: r.rows, bytes: r.bytes, createdAt: r.createdAt }));
-    }),
+    listTranscriptChunks: Effect.fn("relay.infinitus_team.list_transcript_chunks")(
+      function* (input) {
+        const me = yield* requireMember(input.teamId, input.userId);
+        const owner = yield* requireTarget(input.teamId, input.ownerUserId);
+        if (!readable(owner, me, "transcripts"))
+          return yield* refuse("Transcripts are not shared with you.");
+        const rows = yield* store.listTranscriptChunks({
+          teamId: input.teamId,
+          userId: input.ownerUserId,
+          environmentId: input.environmentId,
+          threadId: input.threadId,
+        });
+        return rows.map((r) => ({
+          seq: r.seq,
+          rows: r.rows,
+          bytes: r.bytes,
+          createdAt: r.createdAt,
+        }));
+      },
+    ),
 
     readTranscriptChunk: Effect.fn("relay.infinitus_team.read_transcript_chunk")(function* (input) {
       const me = yield* requireMember(input.teamId, input.userId);
       const owner = yield* requireTarget(input.teamId, input.ownerUserId);
-      if (!readable(owner, me, "transcripts")) return yield* refuse("Transcripts are not shared with you.");
+      if (!readable(owner, me, "transcripts"))
+        return yield* refuse("Transcripts are not shared with you.");
       const lines = yield* transcripts.get(
         objectKey({
           teamId: input.teamId,
@@ -584,9 +698,13 @@ export const make = Effect.gen(function* () {
 
     createGrant: Effect.fn("relay.infinitus_team.create_grant")(function* (input) {
       yield* requireMember(input.teamId, input.userId);
-      const link = yield* links.getForUser({ userId: input.userId, environmentId: input.environmentId });
+      const link = yield* links.getForUser({
+        userId: input.userId,
+        environmentId: input.environmentId,
+      });
       if (link === null) return yield* refuse("That machine is not linked to you.");
-      if (input.capabilities.length === 0) return yield* refuse("A grant needs at least one capability.");
+      if (input.capabilities.length === 0)
+        return yield* refuse("A grant needs at least one capability.");
       const now = yield* nowIso;
       const record: GrantRecord = {
         grantId: yield* uuid,
@@ -597,7 +715,8 @@ export const make = Effect.gen(function* () {
         threads: input.threads,
         capabilities: input.capabilities,
         preauthorized: (input.preauthorized ?? []).filter((c) => input.capabilities.includes(c)),
-        expiresAt: input.expiresInSeconds === undefined ? null : plusSeconds(now, input.expiresInSeconds),
+        expiresAt:
+          input.expiresInSeconds === undefined ? null : plusSeconds(now, input.expiresInSeconds),
         createdAt: now,
       };
       yield* store.createGrant(record);
@@ -614,7 +733,8 @@ export const make = Effect.gen(function* () {
       const me = yield* requireMember(input.teamId, input.userId);
       yield* requireTarget(input.teamId, input.toUserId);
       if (input.action !== "new" && input.threadId === "-") return yield* refuse("Name a thread.");
-      if (input.action === "new" && input.threadId !== "-") return yield* refuse("A new thread targets the machine, not a thread.");
+      if (input.action === "new" && input.threadId !== "-")
+        return yield* refuse("A new thread targets the machine, not a thread.");
       if ((input.action === "send" || input.action === "new") && !input.text?.trim()) {
         return yield* refuse("Say what to send.");
       }
@@ -674,7 +794,8 @@ export const make = Effect.gen(function* () {
 
     getCommand: Effect.fn("relay.infinitus_team.get_command")(function* (input) {
       const command = yield* store.getCommand(input.commandId);
-      if (command === null || command.teamId !== input.teamId) return yield* refuse("That command does not exist.");
+      if (command === null || command.teamId !== input.teamId)
+        return yield* refuse("That command does not exist.");
       if (command.fromUserId !== input.userId && command.toUserId !== input.userId) {
         return yield* refuse("That command is not yours.");
       }
@@ -683,7 +804,11 @@ export const make = Effect.gen(function* () {
 
     allowCommand: Effect.fn("relay.infinitus_team.allow_command")(function* (input) {
       const command = yield* store.getCommand(input.commandId);
-      if (command === null || command.teamId !== input.teamId || command.toUserId !== input.userId) {
+      if (
+        command === null ||
+        command.teamId !== input.teamId ||
+        command.toUserId !== input.userId
+      ) {
         return yield* refuse("That command is not waiting for you.");
       }
       if (command.status !== "pending") return yield* refuse("That command is no longer waiting.");
@@ -697,7 +822,11 @@ export const make = Effect.gen(function* () {
 
     denyCommand: Effect.fn("relay.infinitus_team.deny_command")(function* (input) {
       const command = yield* store.getCommand(input.commandId);
-      if (command === null || command.teamId !== input.teamId || command.toUserId !== input.userId) {
+      if (
+        command === null ||
+        command.teamId !== input.teamId ||
+        command.toUserId !== input.userId
+      ) {
         return yield* refuse("That command is not waiting for you.");
       }
       if (command.status !== "pending") return yield* refuse("That command is no longer waiting.");
@@ -731,7 +860,11 @@ export const make = Effect.gen(function* () {
           grants: grants
             .filter((g) => g.userId === input.userId && g.environmentId === input.environmentId)
             .map(grantOf),
-          transcripts: [...cursors].map(([threadId, c]) => ({ threadId, rows: c.rows, nextSeq: c.nextSeq })),
+          transcripts: [...cursors].map(([threadId, c]) => ({
+            threadId,
+            rows: c.rows,
+            nextSeq: c.nextSeq,
+          })),
         });
       }
       return { userId: input.userId, teams: out };
@@ -741,7 +874,9 @@ export const make = Effect.gen(function* () {
       yield* assertEnvironmentUser(input);
       const member = yield* requireMember(input.teamId, input.userId);
       const shares = normalizeShares(member.shares);
-      const allowed = input.documents.filter((d) => d.kind !== "transcripts" && shares[d.kind] !== "off");
+      const allowed = input.documents.filter(
+        (d) => d.kind !== "transcripts" && shares[d.kind] !== "off",
+      );
       if (allowed.length === 0) return;
       yield* store.upsertDocuments({
         teamId: input.teamId,
@@ -755,7 +890,8 @@ export const make = Effect.gen(function* () {
     publishTranscript: Effect.fn("relay.infinitus_team.publish_transcript")(function* (input) {
       yield* assertEnvironmentUser(input);
       const member = yield* requireMember(input.teamId, input.userId);
-      if (normalizeShares(member.shares).transcripts === "off") return yield* refuse("Transcripts are not shared.");
+      if (normalizeShares(member.shares).transcripts === "off")
+        return yield* refuse("Transcripts are not shared.");
       const existing = yield* store.listTranscriptChunks({
         teamId: input.teamId,
         userId: input.userId,
@@ -826,7 +962,11 @@ export const make = Effect.gen(function* () {
     ackCommand: Effect.fn("relay.infinitus_team.ack_command")(function* (input) {
       yield* assertEnvironmentUser(input);
       const command = yield* store.getCommand(input.commandId);
-      if (command === null || command.environmentId !== input.environmentId || command.toUserId !== input.userId) {
+      if (
+        command === null ||
+        command.environmentId !== input.environmentId ||
+        command.toUserId !== input.userId
+      ) {
         return yield* refuse("That command is not this machine's.");
       }
       const now = yield* nowIso;
@@ -860,7 +1000,9 @@ export const make = Effect.gen(function* () {
         }
       }
       const seen = new Set<string>();
-      const doomed = [...aged, ...over].filter((r) => (seen.has(r.objectKey) ? false : (seen.add(r.objectKey), true)));
+      const doomed = [...aged, ...over].filter((r) =>
+        seen.has(r.objectKey) ? false : (seen.add(r.objectKey), true),
+      );
       if (doomed.length > 0) {
         yield* transcripts.delete(doomed.map((r) => r.objectKey));
         yield* store.deleteTranscriptChunks(doomed);

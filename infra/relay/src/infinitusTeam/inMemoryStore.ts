@@ -41,10 +41,20 @@ export const emptyState = (): InMemoryTeamState => ({
 });
 
 const memberKey = (teamId: string, userId: string) => `${teamId}\u0000${userId}`;
-const documentKey = (d: { teamId: string; userId: string; environmentId: string; kind: string; key: string }) =>
-  [d.teamId, d.userId, d.environmentId, d.kind, d.key].join("\u0000");
-const transcriptKey = (t: { teamId: string; userId: string; environmentId: string; threadId: string; seq: number }) =>
-  [t.teamId, t.userId, t.environmentId, t.threadId, String(t.seq)].join("\u0000");
+const documentKey = (d: {
+  teamId: string;
+  userId: string;
+  environmentId: string;
+  kind: string;
+  key: string;
+}) => [d.teamId, d.userId, d.environmentId, d.kind, d.key].join("\u0000");
+const transcriptKey = (t: {
+  teamId: string;
+  userId: string;
+  environmentId: string;
+  threadId: string;
+  seq: number;
+}) => [t.teamId, t.userId, t.environmentId, t.threadId, String(t.seq)].join("\u0000");
 
 export const make = (state: InMemoryTeamState = emptyState()) =>
   InfinitusTeamStore.of({
@@ -73,8 +83,10 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
             return team ? [{ teamId: team.teamId, name: team.name, role: m.role }] : [];
           }),
       ),
-    listMembers: (teamId) => Effect.sync(() => [...state.members.values()].filter((m) => m.teamId === teamId)),
-    getMember: (teamId, userId) => Effect.sync(() => state.members.get(memberKey(teamId, userId)) ?? null),
+    listMembers: (teamId) =>
+      Effect.sync(() => [...state.members.values()].filter((m) => m.teamId === teamId)),
+    getMember: (teamId, userId) =>
+      Effect.sync(() => state.members.get(memberKey(teamId, userId)) ?? null),
     upsertMember: (input) =>
       Effect.sync(() => {
         const { now: _now, ...record } = input;
@@ -94,12 +106,17 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
       }),
     deleteMember: (teamId, userId) =>
       Effect.sync(() => {
-        const transcripts = [...state.transcripts.values()].filter((t) => t.teamId === teamId && t.userId === userId);
+        const transcripts = [...state.transcripts.values()].filter(
+          (t) => t.teamId === teamId && t.userId === userId,
+        );
         for (const t of transcripts) state.transcripts.delete(transcriptKey(t));
-        for (const [key, d] of state.documents) if (d.teamId === teamId && d.userId === userId) state.documents.delete(key);
-        for (const [key, g] of state.grants) if (g.teamId === teamId && g.userId === userId) state.grants.delete(key);
+        for (const [key, d] of state.documents)
+          if (d.teamId === teamId && d.userId === userId) state.documents.delete(key);
+        for (const [key, g] of state.grants)
+          if (g.teamId === teamId && g.userId === userId) state.grants.delete(key);
         for (const [key, c] of state.commands) {
-          if (c.teamId === teamId && (c.fromUserId === userId || c.toUserId === userId)) state.commands.delete(key);
+          if (c.teamId === teamId && (c.fromUserId === userId || c.toUserId === userId))
+            state.commands.delete(key);
         }
         state.requests.delete(memberKey(teamId, userId));
         state.members.delete(memberKey(teamId, userId));
@@ -133,7 +150,8 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
       Effect.sync(() => {
         state.requests.set(memberKey(input.teamId, input.userId), input);
       }),
-    getRequest: (teamId, userId) => Effect.sync(() => state.requests.get(memberKey(teamId, userId)) ?? null),
+    getRequest: (teamId, userId) =>
+      Effect.sync(() => state.requests.get(memberKey(teamId, userId)) ?? null),
     listRequests: (teamId) =>
       Effect.sync(() =>
         [...state.requests.values()]
@@ -189,7 +207,9 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
       Effect.sync(() =>
         [...state.transcripts.values()]
           .filter((t) => t.teamId === teamId && t.userId === userId)
-          .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.seq - b.seq)),
+          .sort((a, b) =>
+            a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.seq - b.seq,
+          ),
       ),
     listTranscriptsOlderThan: (createdBefore) =>
       Effect.sync(() => [...state.transcripts.values()].filter((t) => t.createdAt < createdBefore)),
@@ -212,7 +232,8 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
         state.grants.set(input.grantId, input);
       }),
     getGrant: (grantId) => Effect.sync(() => state.grants.get(grantId) ?? null),
-    listGrantsForTeam: (teamId) => Effect.sync(() => [...state.grants.values()].filter((g) => g.teamId === teamId)),
+    listGrantsForTeam: (teamId) =>
+      Effect.sync(() => [...state.grants.values()].filter((g) => g.teamId === teamId)),
     deleteGrant: (teamId, grantId, userId) =>
       Effect.sync(() => {
         const grant = state.grants.get(grantId);
@@ -258,11 +279,15 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
     expireCommands: (now) =>
       Effect.sync(() => {
         for (const [key, c] of state.commands) {
-          if ((c.status === "queued" || c.status === "pending" || c.status === "running") && c.expiresAt < now) {
+          if (
+            (c.status === "queued" || c.status === "pending" || c.status === "running") &&
+            c.expiresAt < now
+          ) {
             state.commands.set(key, { ...c, status: "expired", answeredAt: now });
           }
         }
       }),
   });
 
-export const layer = (state: InMemoryTeamState = emptyState()) => Layer.succeed(InfinitusTeamStore, make(state));
+export const layer = (state: InMemoryTeamState = emptyState()) =>
+  Layer.succeed(InfinitusTeamStore, make(state));

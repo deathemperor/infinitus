@@ -4,15 +4,17 @@ import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import { EnvironmentId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import type { RelayInternalError } from "./relay.ts";
 
 /**
  * Team on Infinitus Connect (#1592): a team is a relay row, a member a Clerk
  * user, an invite a one-use or reusable token the relay checks, what a member
  * shares a document the desktop server publishes with its environment
- * credential. Schemas and the two route groups only; `relay.ts` attaches the
- * auth middleware where it adds the groups to `RelayApi`, so this file never
- * imports `relay.ts` (which imports it). The bearer header schema is inlined
- * for the same reason.
+ * credential. Schemas and the two route groups only; `relay.ts` builds the
+ * groups with its internal error class and attaches the auth middleware where
+ * it adds them to `RelayApi`, so this file never imports a value from
+ * `relay.ts` (which imports it). The bearer header schema is inlined for the
+ * same reason.
  */
 
 export const TeamId = TrimmedNonEmptyString.pipe(Schema.brand("TeamId"));
@@ -24,7 +26,13 @@ export const TeamShareAudience = Schema.Literals(["off", "leaders", "team"]);
 export type TeamShareAudience = typeof TeamShareAudience.Type;
 export const TeamKind = Schema.Literals(["now", "fleet", "threads", "stats", "transcripts"]);
 export type TeamKind = typeof TeamKind.Type;
-export const TEAM_KINDS: ReadonlyArray<TeamKind> = ["now", "fleet", "threads", "stats", "transcripts"];
+export const TEAM_KINDS: ReadonlyArray<TeamKind> = [
+  "now",
+  "fleet",
+  "threads",
+  "stats",
+  "transcripts",
+];
 export const TeamShares = Schema.Record(TeamKind, TeamShareAudience);
 export type TeamShares = typeof TeamShares.Type;
 /** Every kind starts `off`; a member turns each on. */
@@ -39,7 +47,10 @@ export const TeamPolicyRequests = Schema.Literals(["code", "off"]);
 export type TeamPolicyRequests = typeof TeamPolicyRequests.Type;
 export const TeamCapability = Schema.Literals(["view", "send", "interrupt", "new"]);
 export type TeamCapability = typeof TeamCapability.Type;
-export const TeamAudience = Schema.Union([Schema.Literals(["team", "leaders"]), Schema.Array(TeamUserId)]);
+export const TeamAudience = Schema.Union([
+  Schema.Literals(["team", "leaders"]),
+  Schema.Array(TeamUserId),
+]);
 export type TeamAudience = typeof TeamAudience.Type;
 export const TeamThreadsSelector = Schema.Union([Schema.Literal("all"), Schema.Array(ThreadId)]);
 export type TeamThreadsSelector = typeof TeamThreadsSelector.Type;
@@ -147,7 +158,10 @@ export const TeamListRow = Schema.Struct({ teamId: TeamId, name: Schema.String, 
 export type TeamListRow = typeof TeamListRow.Type;
 export const TeamCreateRequest = Schema.Struct({ name: TeamName, memberName: MemberName });
 export type TeamCreateRequest = typeof TeamCreateRequest.Type;
-export const TeamJoinRequest = Schema.Struct({ token: TrimmedNonEmptyString, memberName: MemberName });
+export const TeamJoinRequest = Schema.Struct({
+  token: TrimmedNonEmptyString,
+  memberName: MemberName,
+});
 export type TeamJoinRequest = typeof TeamJoinRequest.Type;
 export const TeamJoinResponse = Schema.Struct({
   teamId: TeamId,
@@ -239,7 +253,9 @@ export const TeamEnvironmentMembership = Schema.Struct({
   /** This environment's grants, for the command poller's local re-check. */
   grants: Schema.Array(TeamGrant),
   /** Rows already published per thread: the publisher resumes after them. */
-  transcripts: Schema.Array(Schema.Struct({ threadId: Schema.String, rows: Schema.Int, nextSeq: Schema.Int })),
+  transcripts: Schema.Array(
+    Schema.Struct({ threadId: Schema.String, rows: Schema.Int, nextSeq: Schema.Int }),
+  ),
 });
 export type TeamEnvironmentMembership = typeof TeamEnvironmentMembership.Type;
 export const TeamEnvironmentMemberships = Schema.Struct({
@@ -258,7 +274,9 @@ export const TeamDocumentPublish = Schema.Struct({
 export type TeamDocumentPublish = typeof TeamDocumentPublish.Type;
 export const TeamDocumentsPublish = Schema.Struct({
   userId: TeamUserId,
-  documents: Schema.Array(TeamDocumentPublish).check(Schema.isMaxLength(TEAM_DOCUMENTS_PER_PUBLISH)),
+  documents: Schema.Array(TeamDocumentPublish).check(
+    Schema.isMaxLength(TEAM_DOCUMENTS_PER_PUBLISH),
+  ),
 });
 export type TeamDocumentsPublish = typeof TeamDocumentsPublish.Type;
 export const TEAM_TRANSCRIPT_CHUNK_MAX_BYTES = 1_048_576;
@@ -317,238 +335,275 @@ const BearerAndUser = Schema.Struct({
 });
 const teamParams = Schema.Struct({ teamId: TeamId });
 const memberParams = Schema.Struct({ teamId: TeamId, userId: TeamUserId });
-const refused = RelayInfinitusTeamRefusedError;
-
-export const RelayInfinitusTeamGroup = HttpApiGroup.make("infinitusTeam")
-  .add(
-    HttpApiEndpoint.get("listTeams", "/v1/infinitus/teams", {
-      headers: Bearer,
-      success: Schema.Array(TeamListRow),
-    }).annotate(OpenApi.Summary, "List the teams the user is in"),
-    HttpApiEndpoint.post("createTeam", "/v1/infinitus/teams", {
-      headers: Bearer,
-      payload: TeamCreateRequest,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Create a team; the caller is its founding leader"),
-    HttpApiEndpoint.post("joinTeam", "/v1/infinitus/team-join", {
-      headers: Bearer,
-      payload: TeamJoinRequest,
-      success: TeamJoinResponse,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Join with an invite token: at once for a one-use invite, as a request otherwise"),
-    HttpApiEndpoint.get("getTeam", "/v1/infinitus/teams/:teamId", {
-      headers: Bearer,
-      params: teamParams,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "The team as the caller sees it"),
-    HttpApiEndpoint.put("updateMe", "/v1/infinitus/teams/:teamId/me", {
-      headers: Bearer,
-      params: teamParams,
-      payload: TeamMeUpdate,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Change my name or what I share"),
-    HttpApiEndpoint.post("leaveTeam", "/v1/infinitus/teams/:teamId/leave", {
-      headers: Bearer,
-      params: teamParams,
-      success: TeamOk,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Leave; never the last leader"),
-    HttpApiEndpoint.post("createInvite", "/v1/infinitus/teams/:teamId/invites", {
-      headers: Bearer,
-      params: teamParams,
-      payload: TeamInviteCreate,
-      success: TeamInviteCreated,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Mint an invite token (leaders); the token is answered once"),
-    HttpApiEndpoint.delete("revokeInvite", "/v1/infinitus/teams/:teamId/invites/:inviteId", {
-      headers: Bearer,
-      params: Schema.Struct({ teamId: TeamId, inviteId: TrimmedNonEmptyString }),
-      success: TeamOk,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Revoke an invite (leaders)"),
-    HttpApiEndpoint.post("approveRequest", "/v1/infinitus/teams/:teamId/requests/:userId/approve", {
-      headers: Bearer,
-      params: memberParams,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Approve a join request (leaders)"),
-    HttpApiEndpoint.post("declineRequest", "/v1/infinitus/teams/:teamId/requests/:userId/decline", {
-      headers: Bearer,
-      params: memberParams,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Decline a join request (leaders)"),
-    HttpApiEndpoint.post("promoteMember", "/v1/infinitus/teams/:teamId/members/:userId/promote", {
-      headers: Bearer,
-      params: memberParams,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Make a member a leader (leaders)"),
-    HttpApiEndpoint.post("demoteMember", "/v1/infinitus/teams/:teamId/members/:userId/demote", {
-      headers: Bearer,
-      params: memberParams,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Make a leader a member (leaders); never the last leader"),
-    HttpApiEndpoint.post("removeMember", "/v1/infinitus/teams/:teamId/members/:userId/remove", {
-      headers: Bearer,
-      params: memberParams,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Remove a member with everything they published (leaders); never the founder"),
-    HttpApiEndpoint.put("updatePolicy", "/v1/infinitus/teams/:teamId/policy", {
-      headers: Bearer,
-      params: teamParams,
-      payload: TeamPolicyUpdate,
-      success: TeamSnapshot,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Who may request to join (leaders)"),
-    HttpApiEndpoint.get("listDocuments", "/v1/infinitus/teams/:teamId/documents", {
-      headers: Bearer,
-      params: teamParams,
-      query: TeamDocumentsQuery,
-      success: Schema.Array(TeamDocumentRow),
-      error: refused,
-    }).annotate(OpenApi.Summary, "Teammates' documents the caller may read, by the publisher's share and the caller's role"),
-    HttpApiEndpoint.get(
-      "listTranscriptChunks",
-      "/v1/infinitus/teams/:teamId/transcripts/:userId/:environmentId/:threadId",
-      {
-        headers: Bearer,
-        params: Schema.Struct({
-          teamId: TeamId,
-          userId: TeamUserId,
-          environmentId: EnvironmentId,
-          threadId: TrimmedNonEmptyString,
-        }),
-        success: Schema.Array(TeamTranscriptChunkRow),
-        error: refused,
-      },
-    ).annotate(OpenApi.Summary, "A teammate's transcript chunks for one thread"),
-    HttpApiEndpoint.get(
-      "readTranscriptChunk",
-      "/v1/infinitus/teams/:teamId/transcripts/:userId/:environmentId/:threadId/:seq",
-      {
-        headers: Bearer,
-        params: Schema.Struct({
-          teamId: TeamId,
-          userId: TeamUserId,
-          environmentId: EnvironmentId,
-          threadId: TrimmedNonEmptyString,
-          seq: Schema.NumberFromString,
-        }),
-        success: TeamTranscriptChunk,
-        error: refused,
-      },
-    ).annotate(OpenApi.Summary, "One transcript chunk's lines"),
-    HttpApiEndpoint.post("createGrant", "/v1/infinitus/teams/:teamId/grants", {
-      headers: Bearer,
-      params: teamParams,
-      payload: TeamGrantCreate,
-      success: TeamGrant,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Let an audience drive my threads on one of my environments"),
-    HttpApiEndpoint.delete("revokeGrant", "/v1/infinitus/teams/:teamId/grants/:grantId", {
-      headers: Bearer,
-      params: Schema.Struct({ teamId: TeamId, grantId: TrimmedNonEmptyString }),
-      success: TeamOk,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Take a grant back"),
-    HttpApiEndpoint.post("createCommand", "/v1/infinitus/teams/:teamId/commands", {
-      headers: Bearer,
-      params: teamParams,
-      payload: TeamCommandCreate,
-      success: TeamCommandState,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Queue a command on a teammate's thread under their grant"),
-    HttpApiEndpoint.get("listPendingCommands", "/v1/infinitus/teams/:teamId/commands", {
-      headers: Bearer,
-      params: teamParams,
-      success: Schema.Array(TeamPendingCommand),
-      error: refused,
-    }).annotate(OpenApi.Summary, "Commands waiting for my tap"),
-    HttpApiEndpoint.get("getCommand", "/v1/infinitus/teams/:teamId/commands/:commandId", {
-      headers: Bearer,
-      params: Schema.Struct({ teamId: TeamId, commandId: TrimmedNonEmptyString }),
-      success: TeamCommandState,
-      error: refused,
-    }).annotate(OpenApi.Summary, "A command's state (its sender or its grantor)"),
-    HttpApiEndpoint.post("allowCommand", "/v1/infinitus/teams/:teamId/commands/:commandId/allow", {
-      headers: Bearer,
-      params: Schema.Struct({ teamId: TeamId, commandId: TrimmedNonEmptyString }),
-      success: TeamCommandState,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Run a waiting command (the grantor)"),
-    HttpApiEndpoint.post("denyCommand", "/v1/infinitus/teams/:teamId/commands/:commandId/deny", {
-      headers: Bearer,
-      params: Schema.Struct({ teamId: TeamId, commandId: TrimmedNonEmptyString }),
-      success: TeamCommandState,
-      error: refused,
-    }).annotate(OpenApi.Summary, "Refuse a waiting command (the grantor)"),
-  )
-  .annotate(
-    OpenApi.Description,
-    "Infinitus Team: membership, sharing and delegated control for the signed-in user.",
-  );
-
 const envParams = Schema.Struct({ environmentId: EnvironmentId });
 const envTeamParams = Schema.Struct({ environmentId: EnvironmentId, teamId: TeamId });
 
-export const RelayInfinitusTeamEnvironmentGroup = HttpApiGroup.make("infinitusTeamEnvironment")
-  .add(
-    HttpApiEndpoint.get("memberships", "/v1/environments/:environmentId/infinitus-team", {
-      headers: BearerAndUser,
-      params: envParams,
-      success: TeamEnvironmentMemberships,
-      error: refused,
-    }).annotate(OpenApi.Summary, "The linked user's teams, shares, this environment's grants and transcript cursors"),
-    HttpApiEndpoint.post(
-      "publishDocuments",
-      "/v1/environments/:environmentId/infinitus-team/:teamId/documents",
-      {
+/** Every route may refuse (409) or fail in the store (the relay's 500). */
+export const makeRelayInfinitusTeamGroups = (InternalError: typeof RelayInternalError) => {
+  const refused = [RelayInfinitusTeamRefusedError, InternalError] as const;
+
+  const RelayInfinitusTeamGroup = HttpApiGroup.make("infinitusTeam")
+    .add(
+      HttpApiEndpoint.get("listTeams", "/v1/infinitus/teams", {
         headers: Bearer,
-        params: envTeamParams,
-        payload: TeamDocumentsPublish,
+        success: Schema.Array(TeamListRow),
+        error: refused,
+      }).annotate(OpenApi.Summary, "List the teams the user is in"),
+      HttpApiEndpoint.post("createTeam", "/v1/infinitus/teams", {
+        headers: Bearer,
+        payload: TeamCreateRequest,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Create a team; the caller is its founding leader"),
+      HttpApiEndpoint.post("joinTeam", "/v1/infinitus/team-join", {
+        headers: Bearer,
+        payload: TeamJoinRequest,
+        success: TeamJoinResponse,
+        error: refused,
+      }).annotate(
+        OpenApi.Summary,
+        "Join with an invite token: at once for a one-use invite, as a request otherwise",
+      ),
+      HttpApiEndpoint.get("getTeam", "/v1/infinitus/teams/:teamId", {
+        headers: Bearer,
+        params: teamParams,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(OpenApi.Summary, "The team as the caller sees it"),
+      HttpApiEndpoint.put("updateMe", "/v1/infinitus/teams/:teamId/me", {
+        headers: Bearer,
+        params: teamParams,
+        payload: TeamMeUpdate,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Change my name or what I share"),
+      HttpApiEndpoint.post("leaveTeam", "/v1/infinitus/teams/:teamId/leave", {
+        headers: Bearer,
+        params: teamParams,
         success: TeamOk,
         error: refused,
-      },
-    ).annotate(OpenApi.Summary, "Upsert this environment's documents for one team"),
-    HttpApiEndpoint.post(
-      "publishTranscript",
-      "/v1/environments/:environmentId/infinitus-team/:teamId/transcripts",
-      {
+      }).annotate(OpenApi.Summary, "Leave; never the last leader"),
+      HttpApiEndpoint.post("createInvite", "/v1/infinitus/teams/:teamId/invites", {
         headers: Bearer,
-        params: envTeamParams,
-        payload: TeamTranscriptPublish,
+        params: teamParams,
+        payload: TeamInviteCreate,
+        success: TeamInviteCreated,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Mint an invite token (leaders); the token is answered once"),
+      HttpApiEndpoint.delete("revokeInvite", "/v1/infinitus/teams/:teamId/invites/:inviteId", {
+        headers: Bearer,
+        params: Schema.Struct({ teamId: TeamId, inviteId: TrimmedNonEmptyString }),
         success: TeamOk,
         error: refused,
-      },
-    ).annotate(OpenApi.Summary, "Append one transcript chunk; refused unless transcripts are shared"),
-    HttpApiEndpoint.get("pollCommands", "/v1/environments/:environmentId/infinitus-team/commands", {
-      headers: BearerAndUser,
-      params: envParams,
-      success: Schema.Array(TeamQueuedCommand),
-      error: refused,
-    }).annotate(OpenApi.Summary, "Queued commands for this environment; each is marked running"),
-    HttpApiEndpoint.post(
-      "ackCommand",
-      "/v1/environments/:environmentId/infinitus-team/commands/:commandId/ack",
-      {
+      }).annotate(OpenApi.Summary, "Revoke an invite (leaders)"),
+      HttpApiEndpoint.post(
+        "approveRequest",
+        "/v1/infinitus/teams/:teamId/requests/:userId/approve",
+        {
+          headers: Bearer,
+          params: memberParams,
+          success: TeamSnapshot,
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "Approve a join request (leaders)"),
+      HttpApiEndpoint.post(
+        "declineRequest",
+        "/v1/infinitus/teams/:teamId/requests/:userId/decline",
+        {
+          headers: Bearer,
+          params: memberParams,
+          success: TeamSnapshot,
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "Decline a join request (leaders)"),
+      HttpApiEndpoint.post("promoteMember", "/v1/infinitus/teams/:teamId/members/:userId/promote", {
         headers: Bearer,
-        params: Schema.Struct({ environmentId: EnvironmentId, commandId: TrimmedNonEmptyString }),
-        payload: TeamCommandAck,
+        params: memberParams,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Make a member a leader (leaders)"),
+      HttpApiEndpoint.post("demoteMember", "/v1/infinitus/teams/:teamId/members/:userId/demote", {
+        headers: Bearer,
+        params: memberParams,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Make a leader a member (leaders); never the last leader"),
+      HttpApiEndpoint.post("removeMember", "/v1/infinitus/teams/:teamId/members/:userId/remove", {
+        headers: Bearer,
+        params: memberParams,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(
+        OpenApi.Summary,
+        "Remove a member with everything they published (leaders); never the founder",
+      ),
+      HttpApiEndpoint.put("updatePolicy", "/v1/infinitus/teams/:teamId/policy", {
+        headers: Bearer,
+        params: teamParams,
+        payload: TeamPolicyUpdate,
+        success: TeamSnapshot,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Who may request to join (leaders)"),
+      HttpApiEndpoint.get("listDocuments", "/v1/infinitus/teams/:teamId/documents", {
+        headers: Bearer,
+        params: teamParams,
+        query: TeamDocumentsQuery,
+        success: Schema.Array(TeamDocumentRow),
+        error: refused,
+      }).annotate(
+        OpenApi.Summary,
+        "Teammates' documents the caller may read, by the publisher's share and the caller's role",
+      ),
+      HttpApiEndpoint.get(
+        "listTranscriptChunks",
+        "/v1/infinitus/teams/:teamId/transcripts/:userId/:environmentId/:threadId",
+        {
+          headers: Bearer,
+          params: Schema.Struct({
+            teamId: TeamId,
+            userId: TeamUserId,
+            environmentId: EnvironmentId,
+            threadId: TrimmedNonEmptyString,
+          }),
+          success: Schema.Array(TeamTranscriptChunkRow),
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "A teammate's transcript chunks for one thread"),
+      HttpApiEndpoint.get(
+        "readTranscriptChunk",
+        "/v1/infinitus/teams/:teamId/transcripts/:userId/:environmentId/:threadId/:seq",
+        {
+          headers: Bearer,
+          params: Schema.Struct({
+            teamId: TeamId,
+            userId: TeamUserId,
+            environmentId: EnvironmentId,
+            threadId: TrimmedNonEmptyString,
+            seq: Schema.NumberFromString,
+          }),
+          success: TeamTranscriptChunk,
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "One transcript chunk's lines"),
+      HttpApiEndpoint.post("createGrant", "/v1/infinitus/teams/:teamId/grants", {
+        headers: Bearer,
+        params: teamParams,
+        payload: TeamGrantCreate,
+        success: TeamGrant,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Let an audience drive my threads on one of my environments"),
+      HttpApiEndpoint.delete("revokeGrant", "/v1/infinitus/teams/:teamId/grants/:grantId", {
+        headers: Bearer,
+        params: Schema.Struct({ teamId: TeamId, grantId: TrimmedNonEmptyString }),
         success: TeamOk,
         error: refused,
-      },
-    ).annotate(OpenApi.Summary, "A command's outcome; `pending` waits for the grantor's tap"),
-  )
-  .annotate(
-    OpenApi.Description,
-    "Infinitus Team: what a linked environment publishes and runs for its user.",
-  );
+      }).annotate(OpenApi.Summary, "Take a grant back"),
+      HttpApiEndpoint.post("createCommand", "/v1/infinitus/teams/:teamId/commands", {
+        headers: Bearer,
+        params: teamParams,
+        payload: TeamCommandCreate,
+        success: TeamCommandState,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Queue a command on a teammate's thread under their grant"),
+      HttpApiEndpoint.get("listPendingCommands", "/v1/infinitus/teams/:teamId/commands", {
+        headers: Bearer,
+        params: teamParams,
+        success: Schema.Array(TeamPendingCommand),
+        error: refused,
+      }).annotate(OpenApi.Summary, "Commands waiting for my tap"),
+      HttpApiEndpoint.get("getCommand", "/v1/infinitus/teams/:teamId/commands/:commandId", {
+        headers: Bearer,
+        params: Schema.Struct({ teamId: TeamId, commandId: TrimmedNonEmptyString }),
+        success: TeamCommandState,
+        error: refused,
+      }).annotate(OpenApi.Summary, "A command's state (its sender or its grantor)"),
+      HttpApiEndpoint.post(
+        "allowCommand",
+        "/v1/infinitus/teams/:teamId/commands/:commandId/allow",
+        {
+          headers: Bearer,
+          params: Schema.Struct({ teamId: TeamId, commandId: TrimmedNonEmptyString }),
+          success: TeamCommandState,
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "Run a waiting command (the grantor)"),
+      HttpApiEndpoint.post("denyCommand", "/v1/infinitus/teams/:teamId/commands/:commandId/deny", {
+        headers: Bearer,
+        params: Schema.Struct({ teamId: TeamId, commandId: TrimmedNonEmptyString }),
+        success: TeamCommandState,
+        error: refused,
+      }).annotate(OpenApi.Summary, "Refuse a waiting command (the grantor)"),
+    )
+    .annotate(
+      OpenApi.Description,
+      "Infinitus Team: membership, sharing and delegated control for the signed-in user.",
+    );
+
+  const RelayInfinitusTeamEnvironmentGroup = HttpApiGroup.make("infinitusTeamEnvironment")
+    .add(
+      HttpApiEndpoint.get("memberships", "/v1/environments/:environmentId/infinitus-team", {
+        headers: BearerAndUser,
+        params: envParams,
+        success: TeamEnvironmentMemberships,
+        error: refused,
+      }).annotate(
+        OpenApi.Summary,
+        "The linked user's teams, shares, this environment's grants and transcript cursors",
+      ),
+      HttpApiEndpoint.post(
+        "publishDocuments",
+        "/v1/environments/:environmentId/infinitus-team/:teamId/documents",
+        {
+          headers: Bearer,
+          params: envTeamParams,
+          payload: TeamDocumentsPublish,
+          success: TeamOk,
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "Upsert this environment's documents for one team"),
+      HttpApiEndpoint.post(
+        "publishTranscript",
+        "/v1/environments/:environmentId/infinitus-team/:teamId/transcripts",
+        {
+          headers: Bearer,
+          params: envTeamParams,
+          payload: TeamTranscriptPublish,
+          success: TeamOk,
+          error: refused,
+        },
+      ).annotate(
+        OpenApi.Summary,
+        "Append one transcript chunk; refused unless transcripts are shared",
+      ),
+      HttpApiEndpoint.get(
+        "pollCommands",
+        "/v1/environments/:environmentId/infinitus-team/commands",
+        {
+          headers: BearerAndUser,
+          params: envParams,
+          success: Schema.Array(TeamQueuedCommand),
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "Queued commands for this environment; each is marked running"),
+      HttpApiEndpoint.post(
+        "ackCommand",
+        "/v1/environments/:environmentId/infinitus-team/commands/:commandId/ack",
+        {
+          headers: Bearer,
+          params: Schema.Struct({ environmentId: EnvironmentId, commandId: TrimmedNonEmptyString }),
+          payload: TeamCommandAck,
+          success: TeamOk,
+          error: refused,
+        },
+      ).annotate(OpenApi.Summary, "A command's outcome; `pending` waits for the grantor's tap"),
+    )
+    .annotate(
+      OpenApi.Description,
+      "Infinitus Team: what a linked environment publishes and runs for its user.",
+    );
+
+  return { RelayInfinitusTeamGroup, RelayInfinitusTeamEnvironmentGroup };
+};
 
 /** Does `grant` let `from` run `action` on `threadId`? The relay checks this
     when a command is queued and again when it is polled; the desktop server
