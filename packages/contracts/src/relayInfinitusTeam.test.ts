@@ -32,7 +32,9 @@ describe("relayInfinitusTeam", () => {
   it("caps a publish at forty documents", () => {
     const decode = Schema.decodeUnknownSync(TeamDocumentsPublish);
     const document = { kind: "stats", key: "2026-09-25", body: {} };
-    expect(() => decode({ userId: "u", documents: Array.from({ length: 41 }, () => document) })).toThrow();
+    expect(() =>
+      decode({ userId: "u", documents: Array.from({ length: 41 }, () => document) }),
+    ).toThrow();
     expect(decode({ userId: "u", documents: [document] }).documents).toHaveLength(1);
   });
 
@@ -87,14 +89,22 @@ describe("teamGrantAllows", () => {
     preauthorized: ["new"] as const,
     expiresAt: null,
   };
-  const base = { fromUserId: "user-2", fromRole: "leader" as const, threadId: "thread-1", action: "send" as const, nowIso: "2026-09-25T00:00:00.000Z" };
+  const base = {
+    fromUserId: "user-2",
+    fromRole: "leader" as const,
+    threadId: "thread-1",
+    action: "send" as const,
+    nowIso: "2026-09-25T00:00:00.000Z",
+  };
   it("checks audience, capability, thread and expiry", () => {
     expect(teamGrantAllows(grant, base)).toBe(true);
     expect(teamGrantAllows(grant, { ...base, fromRole: "member" })).toBe(false);
     expect(teamGrantAllows(grant, { ...base, action: "interrupt" })).toBe(false);
     expect(teamGrantAllows(grant, { ...base, threadId: "thread-2" })).toBe(false);
     expect(teamGrantAllows({ ...grant, expiresAt: "2025-01-01T00:00:00.000Z" }, base)).toBe(false);
-    expect(teamGrantAllows({ ...grant, audience: ["user-2"] }, { ...base, fromRole: "member" })).toBe(true);
+    expect(
+      teamGrantAllows({ ...grant, audience: ["user-2"] }, { ...base, fromRole: "member" }),
+    ).toBe(true);
   });
   it("new targets the machine, never a thread", () => {
     expect(teamGrantAllows(grant, { ...base, action: "new", threadId: "-" })).toBe(true);

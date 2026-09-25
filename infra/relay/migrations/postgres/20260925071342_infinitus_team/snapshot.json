@@ -2,9 +2,7 @@
   "version": "8",
   "dialect": "postgres",
   "id": "f1b834f8-e48d-48aa-97f8-0f4bf707df40",
-  "prevIds": [
-    "4b6d0d21-8d78-4499-9dde-b42bcf633d05"
-  ],
+  "prevIds": ["4b6d0d21-8d78-4499-9dde-b42bcf633d05"],
   "ddl": [
     {
       "isRlsEnabled": false,
@@ -2584,11 +2582,7 @@
       "table": "infinitus_team_transcripts"
     },
     {
-      "columns": [
-        "environment_id",
-        "environment_public_key",
-        "thread_id"
-      ],
+      "columns": ["environment_id", "environment_public_key", "thread_id"],
       "nameExplicit": false,
       "name": "relay_agent_activity_rows_pkey",
       "entityType": "pks",
@@ -2596,10 +2590,7 @@
       "table": "relay_agent_activity_rows"
     },
     {
-      "columns": [
-        "thumbprint",
-        "jti"
-      ],
+      "columns": ["thumbprint", "jti"],
       "nameExplicit": false,
       "name": "relay_dpop_proofs_pkey",
       "entityType": "pks",
@@ -2607,10 +2598,7 @@
       "table": "relay_dpop_proofs"
     },
     {
-      "columns": [
-        "user_id",
-        "environment_id"
-      ],
+      "columns": ["user_id", "environment_id"],
       "nameExplicit": false,
       "name": "relay_environment_links_pkey",
       "entityType": "pks",
@@ -2618,10 +2606,7 @@
       "table": "relay_environment_links"
     },
     {
-      "columns": [
-        "user_id",
-        "device_id"
-      ],
+      "columns": ["user_id", "device_id"],
       "nameExplicit": false,
       "name": "relay_live_activities_pkey",
       "entityType": "pks",
@@ -2629,10 +2614,7 @@
       "table": "relay_live_activities"
     },
     {
-      "columns": [
-        "user_id",
-        "environment_id"
-      ],
+      "columns": ["user_id", "environment_id"],
       "nameExplicit": false,
       "name": "relay_managed_endpoint_allocations_pkey",
       "entityType": "pks",
@@ -2640,10 +2622,7 @@
       "table": "relay_managed_endpoint_allocations"
     },
     {
-      "columns": [
-        "user_id",
-        "device_id"
-      ],
+      "columns": ["user_id", "device_id"],
       "nameExplicit": false,
       "name": "relay_mobile_devices_pkey",
       "entityType": "pks",
@@ -2651,13 +2630,7 @@
       "table": "relay_mobile_devices"
     },
     {
-      "columns": [
-        "team_id",
-        "user_id",
-        "environment_id",
-        "kind",
-        "key"
-      ],
+      "columns": ["team_id", "user_id", "environment_id", "kind", "key"],
       "nameExplicit": false,
       "name": "infinitus_team_documents_pkey",
       "entityType": "pks",
@@ -2665,10 +2638,7 @@
       "table": "infinitus_team_documents"
     },
     {
-      "columns": [
-        "team_id",
-        "user_id"
-      ],
+      "columns": ["team_id", "user_id"],
       "nameExplicit": false,
       "name": "infinitus_team_members_pkey",
       "entityType": "pks",
@@ -2676,10 +2646,7 @@
       "table": "infinitus_team_members"
     },
     {
-      "columns": [
-        "team_id",
-        "user_id"
-      ],
+      "columns": ["team_id", "user_id"],
       "nameExplicit": false,
       "name": "infinitus_team_requests_pkey",
       "entityType": "pks",
@@ -2687,13 +2654,7 @@
       "table": "infinitus_team_requests"
     },
     {
-      "columns": [
-        "team_id",
-        "user_id",
-        "environment_id",
-        "thread_id",
-        "seq"
-      ],
+      "columns": ["team_id", "user_id", "environment_id", "thread_id", "seq"],
       "nameExplicit": false,
       "name": "infinitus_team_transcripts_pkey",
       "entityType": "pks",
@@ -2701,9 +2662,7 @@
       "table": "infinitus_team_transcripts"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "relay_delivery_attempts_pkey",
       "schema": "public",
@@ -2711,9 +2670,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "credential_id"
-      ],
+      "columns": ["credential_id"],
       "nameExplicit": false,
       "name": "relay_environment_credentials_pkey",
       "schema": "public",
@@ -2721,9 +2678,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "nameExplicit": false,
       "name": "relay_managed_tunnel_limits_pkey",
       "schema": "public",
@@ -2731,9 +2686,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "command_id"
-      ],
+      "columns": ["command_id"],
       "nameExplicit": false,
       "name": "infinitus_team_commands_pkey",
       "schema": "public",
@@ -2741,9 +2694,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "grant_id"
-      ],
+      "columns": ["grant_id"],
       "nameExplicit": false,
       "name": "infinitus_team_grants_pkey",
       "schema": "public",
@@ -2751,9 +2702,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "invite_id"
-      ],
+      "columns": ["invite_id"],
       "nameExplicit": false,
       "name": "infinitus_team_invites_pkey",
       "schema": "public",
@@ -2761,9 +2710,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "team_id"
-      ],
+      "columns": ["team_id"],
       "nameExplicit": false,
       "name": "infinitus_teams_pkey",
       "schema": "public",
