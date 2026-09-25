@@ -55,7 +55,7 @@ export function syncSwitches(snapshot: InfinitusSnapshot | null): SyncSwitches {
   return { settings: on("sync_settings"), names: on("sync_account_names") };
 }
 
-export function switchesEqual(a: SyncSwitches, b: SyncSwitches): boolean {
+function switchesEqual(a: SyncSwitches, b: SyncSwitches): boolean {
   return a.settings === b.settings && a.names === b.names;
 }
 
@@ -90,7 +90,7 @@ export function syncMachines(
     }));
 }
 
-export function nameKey(provider: string, email: string): string {
+function nameKey(provider: string, email: string): string {
   return `${provider}/${email}`;
 }
 

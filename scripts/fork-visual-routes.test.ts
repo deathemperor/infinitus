@@ -121,19 +121,19 @@ describe("routeFailures", () => {
   it("fails a field whose label rendered but whose value did not", () => {
     const devices = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/devices")!;
     const port = "[Server port: 3773]";
-    const missing = 'missing "[Sync settings via iCloud Drive: on]"';
+    const missing = 'missing "[Sync settings across machines: on]"';
     // The label alone is what `innerText` captured, and what a switch that
     // never took its pref still draws.
-    expect(routeFailures(devices, `Sync settings via iCloud Drive ${port}`)).toEqual([missing]);
-    expect(routeFailures(devices, `[Sync settings via iCloud Drive: off] ${port}`)).toEqual([
+    expect(routeFailures(devices, `Sync settings across machines ${port}`)).toEqual([missing]);
+    expect(routeFailures(devices, `[Sync settings across machines: off] ${port}`)).toEqual([
       missing,
     ]);
-    expect(routeFailures(devices, `[Sync settings via iCloud Drive: on] ${port}`)).toEqual([]);
+    expect(routeFailures(devices, `[Sync settings across machines: on] ${port}`)).toEqual([]);
   });
 
   it("fails the port #1110 grouped into 3,773", () => {
     const devices = FORK_VISUAL_ROUTES.find((route) => route.route === "/settings/devices")!;
-    const on = "[Sync settings via iCloud Drive: on] No phones registered.";
+    const on = "[Sync settings across machines: on] No phones registered.";
     expect(routeFailures(devices, `${on} [Server port: 3,773]`)).toEqual([
       'missing "[Server port: 3773]"',
     ]);

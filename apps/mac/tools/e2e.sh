@@ -388,7 +388,7 @@ echo "headroom: interrupt mode says critical, hold re-reads it as low (#743)"
 # #1178: the Devices page's prefs.
 "$CTL" prefs set machine_name "E2E Mac" | expect "d['value']=='E2E Mac' and d['section']=='devices'" || fail "prefs set machine_name"
 "$CTL" prefs set machine_name "" | expect "d['value']==''" || fail "prefs set machine_name back"
-"$CTL" prefs get icloud_sync | expect "[p['value'] for p in d['prefs']]==[False]" || fail "prefs get icloud_sync"
+"$CTL" prefs get sync_settings sync_account_names | expect "[p['value'] for p in d['prefs']]==[False, False]" || fail "prefs get sync_settings sync_account_names"
 pgrep -P "$APP_PID" -f cloudflared >/dev/null && fail "the e2e instance ran cloudflared"
 echo "prefs: ok"
 
