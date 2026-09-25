@@ -91,14 +91,9 @@ describe("CheckpointDiffQuery.layer", () => {
             getEventReplayStats: () => Effect.die("unused"),
             getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
             getProjectShells: () => Effect.die("unused"),
-<<<<<<< HEAD
-            getProjectShellById: () => Effect.succeed(Option.none()),
-            getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-            getWorktreeHolders: () => Effect.die("unused"),
-=======
             getProjectShellById: () => Effect.succeedNone,
             getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+            getWorktreeHolders: () => Effect.die("unused"),
             getImportedAgentSessionSources: () => Effect.die("unused"),
             getThreadCheckpointContext: () =>
               Effect.sync(() => {
@@ -214,14 +209,9 @@ describe("CheckpointDiffQuery.layer", () => {
             getEventReplayStats: () => Effect.die("unused"),
             getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
             getProjectShells: () => Effect.die("unused"),
-<<<<<<< HEAD
-            getProjectShellById: () => Effect.succeed(Option.none()),
-            getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-            getWorktreeHolders: () => Effect.die("unused"),
-=======
             getProjectShellById: () => Effect.succeedNone,
             getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+            getWorktreeHolders: () => Effect.die("unused"),
             getImportedAgentSessionSources: () => Effect.die("unused"),
             getThreadCheckpointContext: () => Effect.succeedSome(threadCheckpointContext),
             getFullThreadDiffContext: () => Effect.die("unused"),
@@ -312,14 +302,9 @@ describe("CheckpointDiffQuery.layer", () => {
             getEventReplayStats: () => Effect.die("unused"),
             getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
             getProjectShells: () => Effect.die("unused"),
-<<<<<<< HEAD
-            getProjectShellById: () => Effect.succeed(Option.none()),
-            getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-            getWorktreeHolders: () => Effect.die("unused"),
-=======
             getProjectShellById: () => Effect.succeedNone,
             getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+            getWorktreeHolders: () => Effect.die("unused"),
             getImportedAgentSessionSources: () => Effect.die("unused"),
             getThreadCheckpointContext: () => Effect.succeedSome(threadCheckpointContext),
             getFullThreadDiffContext: () => Effect.die("unused"),
@@ -395,14 +380,9 @@ describe("CheckpointDiffQuery.layer", () => {
             getEventReplayStats: () => Effect.die("unused"),
             getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
             getProjectShells: () => Effect.die("unused"),
-<<<<<<< HEAD
-            getProjectShellById: () => Effect.succeed(Option.none()),
-            getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-            getWorktreeHolders: () => Effect.die("unused"),
-=======
             getProjectShellById: () => Effect.succeedNone,
             getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+            getWorktreeHolders: () => Effect.die("unused"),
             getImportedAgentSessionSources: () => Effect.die("unused"),
             getThreadCheckpointContext: () => Effect.succeedSome(threadCheckpointContext),
             getFullThreadDiffContext: () => Effect.die("unused"),
@@ -463,14 +443,9 @@ describe("CheckpointDiffQuery.layer", () => {
             getEventReplayStats: () => Effect.die("unused"),
             getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
             getProjectShells: () => Effect.die("unused"),
-<<<<<<< HEAD
-            getProjectShellById: () => Effect.succeed(Option.none()),
-            getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-            getWorktreeHolders: () => Effect.die("unused"),
-=======
             getProjectShellById: () => Effect.succeedNone,
             getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+            getWorktreeHolders: () => Effect.die("unused"),
             getImportedAgentSessionSources: () => Effect.die("unused"),
             getThreadCheckpointContext: () => Effect.succeedNone,
             getFullThreadDiffContext: () => Effect.succeedNone,

@@ -450,12 +450,8 @@ describe("OrchestrationEngine", () => {
           getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
           getProjectShellById: () => Effect.succeedNone,
           getProjectShells: () => Effect.succeed([]),
-<<<<<<< HEAD
-          getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-          getWorktreeHolders: () => Effect.die("unused"),
-=======
           getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+          getWorktreeHolders: () => Effect.die("unused"),
           getImportedAgentSessionSources: () => Effect.die("unused"),
           getThreadCheckpointContext: () => Effect.succeedNone,
           getFullThreadDiffContext: () => Effect.succeedNone,

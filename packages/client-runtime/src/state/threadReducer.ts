@@ -288,18 +288,13 @@ export function applyThreadDetailEvent(
         },
       };
 
-<<<<<<< HEAD
     // ── Server-side message queue (fork #806) ───────────────────────
     case "thread.turn-queued":
     case "thread.turn-queue-updated":
-=======
-    case "thread.auto-settle-set":
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
       return {
         kind: "updated",
         thread: {
           ...thread,
-<<<<<<< HEAD
           queuedTurns: upsertQueuedTurn(thread.queuedTurns, event.payload.queuedTurn),
         },
       };
@@ -332,14 +327,16 @@ export function applyThreadDetailEvent(
         },
       };
     }
-
-=======
+    case "thread.auto-settle-set":
+      return {
+        kind: "updated",
+        thread: {
+          ...thread,
           autoSettleDisabledAt: event.payload.autoSettleDisabledAt,
           updatedAt: event.payload.updatedAt,
         },
       };
 
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
     // ── Thread metadata ─────────────────────────────────────────────
     case "thread.meta-updated":
       return {

@@ -10,7 +10,11 @@ export function isSidebarUtilityPage(pathname: string) {
     pathname.startsWith("/settings/") ||
     pathname.startsWith("/projects/") ||
     pathname === "/usage" ||
-    pathname === "/pull-requests"
+    pathname === "/pull-requests" ||
+    // Fork: the Accounts, Stats and Utilization pages in the same row.
+    pathname === "/accounts" ||
+    pathname === "/stats" ||
+    pathname === "/utilization"
   );
 }
 

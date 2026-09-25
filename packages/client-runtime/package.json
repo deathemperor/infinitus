@@ -343,11 +343,10 @@
       "types": "./src/device/model.ts",
       "default": "./src/device/model.ts"
     },
-<<<<<<< HEAD
     "./state/stats": {
       "types": "./src/state/stats.ts",
       "default": "./src/state/stats.ts"
-=======
+    },
     "./device/duo-viewer": {
       "types": "./src/device/duoViewer.ts",
       "default": "./src/device/duoViewer.ts"
@@ -355,7 +354,6 @@
     "./device/duo-control": {
       "types": "./src/device/duoControl.ts",
       "default": "./src/device/duoControl.ts"
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
     }
   },
   "scripts": {

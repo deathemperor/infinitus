@@ -192,18 +192,9 @@ export function WelcomeWizard({
         <WizardHeader
           title={`Set up ${PRODUCT_NAME}`}
           identity={
-<<<<<<< HEAD
-            <span className="text-[1.4rem] font-medium tracking-tight text-muted-foreground">
+            <span className="text-2xl font-medium tracking-tight text-muted-foreground">
               {PRODUCT_NAME}
             </span>
-=======
-            <div className="flex items-baseline gap-1.5" role="img" aria-label="T3 Code">
-              <InfinitusWordmark className="h-4 w-auto shrink-0" aria-hidden />
-              <span className="text-2xl font-medium tracking-tight text-muted-foreground">
-                Code
-              </span>
-            </div>
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
           }
         >
           <WizardSteps

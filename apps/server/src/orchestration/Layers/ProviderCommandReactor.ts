@@ -1514,7 +1514,7 @@ const make = Effect.gen(function* () {
           interactionMode: event.payload.interactionMode,
           createdAt: event.payload.createdAt,
         }).pipe(
-          Effect.map(Option.some),
+          Effect.asSome,
           Effect.catchCause((cause) =>
             handleTurnStartFailure(cause).pipe(Effect.as(Option.none())),
           ),
@@ -1534,34 +1534,7 @@ const make = Effect.gen(function* () {
           Effect.forkScoped,
         );
       }),
-<<<<<<< HEAD
     });
-=======
-      ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
-      ...(event.payload.modelSelection !== undefined
-        ? { modelSelection: event.payload.modelSelection }
-        : {}),
-      interactionMode: event.payload.interactionMode,
-      createdAt: event.payload.createdAt,
-    }).pipe(
-      Effect.asSome,
-      Effect.catchCause((cause) => handleTurnStartFailure(cause).pipe(Effect.as(Option.none()))),
-    );
-
-    if (Option.isNone(sendTurnRequest)) {
-      return;
-    }
-
-    const send = providerService
-      .sendTurn(sendTurnRequest.value)
-      .pipe(Effect.asVoid, Effect.catchCause(recoverTurnStartFailure));
-    // The forked send settles `sent` from here on, so drop the entry the post-processing hook uses.
-    if (resumed && event.commandId !== null) resumedTurnStarts.delete(event.commandId);
-    yield* send.pipe(
-      Effect.ensuring(resumed ? Deferred.succeed(resumed.sent, undefined) : Effect.void),
-      Effect.forkScoped,
-    );
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   });
 
   const processTurnInterruptRequested = Effect.fn("processTurnInterruptRequested")(function* (

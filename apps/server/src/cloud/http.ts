@@ -98,12 +98,8 @@ import {
 import * as CliTokenManager from "./CliTokenManager.ts";
 import { getOrCreateEnvironmentKeyPairFromSecretStore } from "./environmentKeys.ts";
 import { traceRelayRequest } from "./traceRelayRequest.ts";
-<<<<<<< HEAD
-import { filterRelayResponse, relayRequestError } from "./relayResponse.ts";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
-=======
 import { filterRelayResponse, relayRequestError, shouldRetryCloudLink } from "./relayResponse.ts";
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 const CLOUD_MINT_NONCE_PREFIX = "cloud-mint-nonce-";
 const CLOUD_MINT_JTI_PREFIX = "cloud-mint-jti-";
@@ -1094,7 +1090,7 @@ export const recoverManagedCloudTunnel = Effect.fn("environment.cloud.recoverMan
     });
     if (recovered.endpointRuntime.providerKind !== "cloudflare_tunnel") {
       return yield* new EnvironmentHttpInternalServerError({
-        message: "T3 Connect returned an unsupported managed tunnel configuration.",
+        message: `${CONNECT_NAME} returned an unsupported managed tunnel configuration.`,
       });
     }
 

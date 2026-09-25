@@ -3840,13 +3840,9 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       : {}),
     private: true,
     packageManager: rootPackageJson.packageManager,
-<<<<<<< HEAD
     description: `${DESKTOP_PRODUCT_NAME} desktop build`,
-=======
-    description: "T3 Code desktop build",
     // Required by the .deb control file.
-    homepage: "https://t3.codes",
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+    homepage: "https://infinitus.run",
     author: "T3 Tools",
     main: "apps/desktop/dist-electron/boot.cjs",
     build: yield* createBuildConfig(

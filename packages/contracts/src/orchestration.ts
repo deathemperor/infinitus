@@ -976,7 +976,6 @@ export const OrchestrationThread = Schema.Struct({
   // Manual Active placement. Keyless threads retain their creation/re-entry
   // order above the arranged run. Settling clears this slot.
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-<<<<<<< HEAD
   // Fork (#806): the server-side message queue, in queue order. Optional so
   // payloads from pre-queue servers still decode.
   queuedTurns: Schema.optional(Schema.Array(OrchestrationQueuedTurn)),
@@ -991,12 +990,10 @@ export const OrchestrationThread = Schema.Struct({
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
   // Fork (#269 B): the best-of-N group this thread was started in, if any.
   groupId: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-=======
   // Set while the user has turned automatic settlement off for this thread.
   // Survives manual settle, un-settle, and activity: only the user clears it.
   // Optional so payloads from older servers still decode.
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(IsoDateTime)),
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   titleState: Schema.optional(Schema.NullOr(ThreadTitleState)),
@@ -1067,7 +1064,6 @@ export const OrchestrationThreadShell = Schema.Struct({
   pinnedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-<<<<<<< HEAD
   // Fork (#806): the server-side message queue, in queue order. Optional so
   // payloads from pre-queue servers still decode.
   queuedTurns: Schema.optional(Schema.Array(OrchestrationQueuedTurn)),
@@ -1082,9 +1078,7 @@ export const OrchestrationThreadShell = Schema.Struct({
   sideOf: Schema.optional(Schema.NullOr(ThreadId)),
   // Fork (#269 B): the best-of-N group this thread was started in, if any.
   groupId: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
-=======
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(IsoDateTime)),
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   titleState: Schema.optional(Schema.NullOr(ThreadTitleState)),
   session: Schema.NullOr(OrchestrationSession),
@@ -2155,7 +2149,6 @@ export const ThreadPinReorderedPayload = Schema.Struct({
   updatedAt: IsoDateTime,
 });
 
-<<<<<<< HEAD
 // Fork (#806): the server-side message queue.
 export const ThreadTurnQueuedPayload = Schema.Struct({
   threadId: ThreadId,
@@ -2177,12 +2170,13 @@ export const ThreadTurnQueueMovedPayload = Schema.Struct({
   threadId: ThreadId,
   queueId: QueueId,
   orderKey: TrimmedNonEmptyString,
-=======
+  updatedAt: IsoDateTime,
+});
+
 export const ThreadAutoSettleSetPayload = Schema.Struct({
   threadId: ThreadId,
   // Null re-enables automatic settlement.
   autoSettleDisabledAt: Schema.NullOr(IsoDateTime),
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   updatedAt: IsoDateTime,
 });
 
@@ -2469,7 +2463,6 @@ export const OrchestrationEvent = Schema.Union([
   }),
   Schema.Struct({
     ...EventBaseFields,
-<<<<<<< HEAD
     type: Schema.Literal("thread.turn-queued"),
     payload: ThreadTurnQueuedPayload,
   }),
@@ -2487,10 +2480,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.turn-queue-moved"),
     payload: ThreadTurnQueueMovedPayload,
-=======
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
     type: Schema.Literal("thread.auto-settle-set"),
     payload: ThreadAutoSettleSetPayload,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   }),
   Schema.Struct({
     ...EventBaseFields,

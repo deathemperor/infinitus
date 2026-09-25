@@ -190,13 +190,9 @@ export interface CodexSessionRuntimeOptions {
   readonly serviceTier?: CodexServiceTier | undefined;
   readonly resumeCursor?: CodexResumeCursor;
   readonly appServerArgs?: ReadonlyArray<string>;
-<<<<<<< HEAD
-  /** Capabilities the session's `infinitus` MCP credential grants; drives the prompt blocks. */
-=======
   /** The provider's model list; supplies the display name for runtime info. */
   readonly models?: Effect.Effect<ReadonlyArray<ServerProviderModel>>;
-  /** Capabilities the session's `t3-code` MCP credential grants; drives the prompt blocks. */
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+  /** Capabilities the session's `infinitus` MCP credential grants; drives the prompt blocks. */
   readonly mcpCapabilities?: ReadonlySet<string>;
 }
 

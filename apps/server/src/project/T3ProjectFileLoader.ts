@@ -71,11 +71,10 @@ export const make = Effect.gen(function* () {
 
   const load: T3ProjectFileLoader["Service"]["load"] = Effect.fn("T3ProjectFileLoader.load")(
     function* (workspaceRoot) {
-<<<<<<< HEAD
       for (const fileName of T3_PROJECT_FILE_NAMES) {
         const filePath = path.join(workspaceRoot, fileName);
         const raw = yield* fileSystem.readFileString(filePath).pipe(
-          Effect.map(Option.some),
+          Effect.asSome,
           Effect.catchTags({
             PlatformError: (error) =>
               error.reason._tag === "NotFound"
@@ -95,7 +94,7 @@ export const make = Effect.gen(function* () {
         // both files never silently falls back to the older one.
         if (Option.isNone(raw)) continue;
         return yield* decodeT3ProjectFileJson(raw.value).pipe(
-          Effect.map(Option.some),
+          Effect.asSome,
           Effect.catchTags({
             SchemaError: (error) =>
               logT3ProjectFileLoadError(
@@ -110,42 +109,6 @@ export const make = Effect.gen(function* () {
         );
       }
       return Option.none<T3ProjectFile>();
-=======
-      const filePath = path.join(workspaceRoot, T3_PROJECT_FILE_NAME);
-      const raw = yield* fileSystem.readFileString(filePath).pipe(
-        Effect.asSome,
-        Effect.catchTags({
-          PlatformError: (error) =>
-            error.reason._tag === "NotFound"
-              ? Effect.succeed(Option.none<string>())
-              : logT3ProjectFileLoadError(
-                  new T3ProjectFileLoadError({
-                    operation: "read",
-                    workspaceRoot,
-                    filePath,
-                    cause: error,
-                  }),
-                ).pipe(Effect.as(Option.none<string>())),
-        }),
-      );
-      if (Option.isNone(raw)) {
-        return Option.none<T3ProjectFile>();
-      }
-      return yield* decodeT3ProjectFileJson(raw.value).pipe(
-        Effect.asSome,
-        Effect.catchTags({
-          SchemaError: (error) =>
-            logT3ProjectFileLoadError(
-              new T3ProjectFileLoadError({
-                operation: "decode",
-                workspaceRoot,
-                filePath,
-                cause: error,
-              }),
-            ).pipe(Effect.as(Option.none<T3ProjectFile>())),
-        }),
-      );
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
     },
   );
 

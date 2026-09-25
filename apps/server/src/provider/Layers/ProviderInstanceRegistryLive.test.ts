@@ -467,7 +467,15 @@ describe("ProviderInstanceRegistryLive — multi-instance codex slice", () => {
       );
       const client = HttpClient.make((request) =>
         Effect.gen(function* () {
-          if (request.url.endsWith("/api/oauth/usage")) {
+          // Fork: the fork's reader (#1553) asks with a query string and
+          // reads the organization from the token's profile.
+          if (request.url.endsWith("/api/oauth/profile")) {
+            return HttpClientResponse.fromWeb(
+              request,
+              Response.json({ organization: { uuid: "fake-org" } }),
+            );
+          }
+          if (request.url.includes("/api/oauth/usage")) {
             return HttpClientResponse.fromWeb(
               request,
               Response.json({

@@ -9,6 +9,7 @@ import {
   PreviewViewportSetting,
   PreviewViewportSize,
 } from "./preview.ts";
+import { PRODUCT_NAME } from "./productName.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
 const BoundedUrl = Schema.String.check(Schema.isTrimmed())
@@ -723,7 +724,7 @@ export class PreviewAutomationNoAvailableHostError extends Schema.TaggedError<Pr
   },
 ) {
   override get message(): string {
-    return `No preview automation host is available for ${this.operation} in environment ${this.environmentId}. Preview tools run in a T3 Code desktop app that is open and connected to this environment; a headless server has no browser of its own. Do not retry. To check a page, use a headless browser from the shell, such as Playwright, or curl, or ask the user to open this thread in the T3 Code desktop app.`;
+    return `No preview automation host is available for ${this.operation} in environment ${this.environmentId}. Preview tools run in an ${PRODUCT_NAME} desktop app that is open and connected to this environment; a headless server has no browser of its own. Do not retry. To check a page, use a headless browser from the shell, such as Playwright, or curl, or ask the user to open this thread in the ${PRODUCT_NAME} desktop app.`;
   }
 }
 

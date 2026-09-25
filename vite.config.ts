@@ -282,6 +282,31 @@ export default defineConfig({
         },
       },
       {
+        // Fork: pages written before upstream's token rules arrived (#1601). They keep
+        // their pixel sizes and palette colours until they move to theme tokens; new
+        // fork files follow the rules.
+        files: [
+          "apps/web/src/components/accounts/AccountRow.tsx",
+          "apps/web/src/components/accounts/QuotaTimeline.tsx",
+          "apps/web/src/components/activity/ActivityPage.tsx",
+          "apps/web/src/components/captures/ComposerCapturesMenu.tsx",
+          "apps/web/src/components/chat/ThreadUsagePopover.tsx",
+          "apps/web/src/components/settings/ProxyProviderFields.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusCrashesCard.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusEngineControls.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusEnginePolicy.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusEngineSecrets.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusEnginesPanel.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusPairingRequestsCard.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusPrefsPanel.tsx",
+          "apps/web/src/components/settings/infinitus/InfinitusTeamPanel.tsx",
+          "apps/web/src/components/sidebar/SidebarNeedsAttention.tsx",
+          "apps/web/src/components/stats/StatsTiles.tsx",
+          "apps/web/src/components/utilization/UtilizationPage.tsx",
+        ],
+        rules: { "shadcn/no-arbitrary-values": "off", "shadcn/no-raw-colors": "off" },
+      },
+      {
         // The sign-in masthead is T3 brand artwork: fixed gradients, not theme surfaces.
         files: ["apps/web/src/components/auth/AuthSurfaceShell.tsx"],
         rules: { "shadcn/no-arbitrary-values": "off" },

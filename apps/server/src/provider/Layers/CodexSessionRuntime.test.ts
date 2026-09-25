@@ -5,7 +5,6 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { describe } from "vite-plus/test";
 import { DEFAULT_MODEL, ThreadId } from "@infinitus/contracts";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as CodexErrors from "effect-codex-app-server/errors";
 import * as CodexRpc from "effect-codex-app-server/rpc";
 import * as EffectCodexSchema from "effect-codex-app-server/schema";
@@ -587,23 +586,7 @@ describe("Codex MCP elicitation approvals", () => {
 });
 
 describe("buildCodexDeveloperInstructions", () => {
-<<<<<<< HEAD
-  it("appends runtime info after the mode instructions", () => {
-    const instructions = buildCodexDeveloperInstructions("default", {
-      model: "gpt-5.3-codex",
-      reasoningEffort: "high",
-    });
-
-    NodeAssert.match(instructions, /^<collaboration_mode># Collaboration Mode: Default/);
-    NodeAssert.match(instructions, new RegExp(PRODUCT_NAME));
-    NodeAssert.match(instructions, /Codex harness/);
-    NodeAssert.match(instructions, /as gpt-5\.3-codex with high reasoning effort/);
-  });
-
-  it("describes Markdown media support in the runtime context in both modes", () => {
-=======
   it("keeps T3 context out of the mode prompt, which the model catalog can replace", () => {
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
     for (const mode of ["default", "plan"] as const) {
       const instructions = buildCodexDeveloperInstructions(mode);
       NodeAssert.match(instructions, /^<collaboration_mode>[\s\S]*<\/collaboration_mode>$/);
@@ -657,34 +640,9 @@ describe("buildCodexAdditionalContext", () => {
 describe("T3 tool instructions", () => {
   const runtime = { model: "gpt-5.3-codex", reasoningEffort: "high" };
 
-<<<<<<< HEAD
-  it("prefers the product-native preview tools in both collaboration modes", () => {
-    for (const mode of ["default", "plan"] as const) {
-      const instructions = buildCodexDeveloperInstructions(mode, runtime, true);
-      NodeAssert.match(instructions, /`infinitus` MCP server/);
-      NodeAssert.match(instructions, /preview_status/);
-      NodeAssert.match(instructions, /preview_open/);
-      NodeAssert.match(instructions, /Do not switch to global browser skills/);
-    }
-  });
-
-  it("omits the browser block entirely when the preview tools are not attached", () => {
-    for (const mode of ["default", "plan"] as const) {
-      const instructions = buildCodexDeveloperInstructions(mode, runtime, false);
-      NodeAssert.doesNotMatch(instructions, /preview_status/);
-      NodeAssert.doesNotMatch(instructions, /preview_open/);
-      NodeAssert.doesNotMatch(instructions, new RegExp(`${PRODUCT_NAME} collaborative browser`));
-      // Steering away from other browser automation must go with the tools;
-      // keeping it would leave the model talked out of its only option.
-      NodeAssert.doesNotMatch(instructions, /Do not switch to global browser skills/);
-      // The rest of the collaboration mode is untouched.
-      NodeAssert.match(instructions, /<collaboration_mode>/);
-      NodeAssert.match(instructions, /<\/collaboration_mode>/);
-    }
-=======
   it("prefers the product-native preview tools when they are attached", () => {
     const tools = buildCodexAdditionalContext(runtime, true).t3_code_tools?.value ?? "";
-    NodeAssert.match(tools, /t3-code/);
+    NodeAssert.match(tools, /`infinitus` MCP server/);
     NodeAssert.match(tools, /preview_status/);
     NodeAssert.match(tools, /preview_open/);
     NodeAssert.match(tools, /Do not switch to global browser skills/);
@@ -697,7 +655,6 @@ describe("T3 tool instructions", () => {
       "";
     NodeAssert.match(tools, /device_open/);
     NodeAssert.doesNotMatch(tools, /preview_open/);
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   });
 
   it("omits the tool entry entirely when no tools are attached", () => {

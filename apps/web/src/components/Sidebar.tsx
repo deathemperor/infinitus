@@ -1166,17 +1166,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         : status === "held"
           ? {
-<<<<<<< HEAD
               // Held (#741): waiting for headroom, nothing in motion, so no
               // color — the held row's line rides the title.
               label: "Held",
               icon: null,
               className: "text-muted-foreground",
-=======
-              label: "Approval",
-              icon: "approval" as const,
-              className: "text-warning-foreground",
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
             }
           : status === "limited"
             ? {
@@ -1194,15 +1188,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 }
               : status === "input"
                 ? {
-<<<<<<< HEAD
                     label: "Input",
                     icon: "input" as const,
                     className: "text-indigo-600 dark:text-indigo-300",
-=======
-                    label: "Woke",
-                    icon: "woke" as const,
-                    className: "text-warning-foreground",
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
                   }
                 : status === "failed"
                   ? {

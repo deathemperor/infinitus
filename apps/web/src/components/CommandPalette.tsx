@@ -510,7 +510,6 @@ export function CommandPalette({ children }: { children: ReactNode }) {
       ? selectActiveRightPanel(state.byThreadKey, routeThreadRef) === "preview"
       : false,
   );
-  const navigate = useNavigate();
   const { environments } = useEnvironments();
   // Same gate as the sidebar item: one connected server running Infinitus is
   // enough, because the page picks the environment itself.

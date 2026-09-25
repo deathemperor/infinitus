@@ -26,13 +26,9 @@ concurrency:
 jobs:
   deploy_relay:
     name: Deploy production relay
-<<<<<<< HEAD
-    runs-on: ubuntu-24.04
-=======
     # A manual run from another branch would deploy that branch to production.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
     timeout-minutes: 15
     environment:
       name: production
@@ -70,11 +66,7 @@ jobs:
               - --filter=infinitus-relay...
 
       - name: Deploy production relay stage
-<<<<<<< HEAD
-        run: vp run --filter infinitus-relay deploy --stage prod --yes --no-input
-=======
-        run: vp run --filter t3code-relay deploy --stage prod --yes --no-input ${{ inputs.force && '--force' || '' }}
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+        run: vp run --filter infinitus-relay deploy --stage prod --yes --no-input ${{ inputs.force && '--force' || '' }}
         env:
           # The PublishClientConfig action writes the client env here instead
           # of the repo-root .env; nothing on the runner reads it.

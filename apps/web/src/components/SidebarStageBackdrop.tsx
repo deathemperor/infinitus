@@ -36,18 +36,6 @@ export function resolveSidebarStageBackdropVariant(
   return normalized === "dev" ? "dev" : "nightly";
 }
 
-<<<<<<< HEAD
-export function resolveSidebarStageFocusRingOffsetClass(
-  variant: SidebarStageBackdropVariant,
-): string {
-  // Every scene but the blueprint is drawn from the night palette.
-  return variant === "dev"
-    ? "focus-visible:ring-offset-(--stage-art-bottom)"
-    : "focus-visible:ring-offset-(--stage-night-bottom)";
-}
-
-=======
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
 export function resolveEnvironmentIdentificationPillLabel(
   stageLabel: string,
 ): EnvironmentIdentificationPillLabel | null {
@@ -467,7 +455,8 @@ function TideArt({ compact = false }: { compact?: boolean }) {
 
   return (
     <svg
-      className="stage-art stage-tide h-full w-full"
+      data-stage-art="tide"
+      className="h-full w-full"
       fill="none"
       preserveAspectRatio="xMinYMin slice"
       viewBox={compact ? "96 0 8192 96" : STAGE_BACKDROP_VIEW_BOX}
@@ -570,7 +559,8 @@ function DawnArt({ compact = false }: { compact?: boolean }) {
 
   return (
     <svg
-      className="stage-art stage-dawn h-full w-full"
+      data-stage-art="dawn"
+      className="h-full w-full"
       fill="none"
       preserveAspectRatio="xMinYMin slice"
       viewBox={compact ? "96 0 8192 96" : STAGE_BACKDROP_VIEW_BOX}
@@ -719,7 +709,8 @@ function NebulaArt({ compact = false }: { compact?: boolean }) {
 
   return (
     <svg
-      className="stage-art stage-nebula h-full w-full"
+      data-stage-art="nebula"
+      className="h-full w-full"
       fill="none"
       preserveAspectRatio="xMinYMin slice"
       viewBox={compact ? "96 0 8192 96" : STAGE_BACKDROP_VIEW_BOX}

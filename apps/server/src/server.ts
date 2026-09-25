@@ -942,12 +942,14 @@ const makeServerLayer = Layer.unwrap(
                     ),
                   }),
                   Effect.tap((recovered) =>
-                    recovered ? Effect.logInfo("T3 Connect managed tunnel recovered") : Effect.void,
+                    recovered
+                      ? Effect.logInfo(`${CONNECT_NAME} managed tunnel recovered`)
+                      : Effect.void,
                   ),
                   Effect.catchCause((cause) =>
                     Cause.hasInterrupts(cause)
                       ? Effect.interrupt
-                      : Effect.logWarning("Failed to recover the T3 Connect managed tunnel", {
+                      : Effect.logWarning(`Failed to recover the ${CONNECT_NAME} managed tunnel`, {
                           cause,
                         }),
                   ),
@@ -966,22 +968,10 @@ const makeServerLayer = Layer.unwrap(
             const wantsCliLink = hasCloudPublicConfig
               ? yield* CloudCliState.readCliDesiredCloudLink.pipe(
                   Effect.catch((cause) =>
-                    Effect.logWarning("Failed to read the desired T3 Connect link", { cause }).pipe(
-                      Effect.as(false),
-                    ),
+                    Effect.logWarning(`Failed to read the desired ${CONNECT_NAME} link`, {
+                      cause,
+                    }).pipe(Effect.as(false)),
                   ),
-<<<<<<< HEAD
-                  Schedule.upTo({ duration: "10 minutes" }),
-                ),
-              }),
-              Effect.tap(() =>
-                Effect.logInfo(`${CONNECT_NAME} desired link reconciled on startup`),
-              ),
-              Effect.catch((cause) =>
-                Effect.logWarning(`Failed to reconcile ${CONNECT_NAME} desired link on startup`, {
-                  message: cause.message,
-                }),
-=======
                 )
               : false;
             // A failed read must not end this fiber before it registers
@@ -990,7 +980,7 @@ const makeServerLayer = Layer.unwrap(
             const desiredCliLinkMode = wantsCliLink
               ? yield* CloudCliState.readCliDesiredLinkMode.pipe(
                   Effect.catch((cause) =>
-                    Effect.logWarning("Failed to read the desired T3 Connect link mode", {
+                    Effect.logWarning(`Failed to read the desired ${CONNECT_NAME} link mode`, {
                       cause,
                     }).pipe(Effect.as("managed" as const)),
                   ),
@@ -1003,7 +993,7 @@ const makeServerLayer = Layer.unwrap(
                 ? false
                 : yield* startManagedCloudTunnelIfOriginConfirmed(localOrigin).pipe(
                     Effect.catch((cause) =>
-                      Effect.logWarning("Failed to start the confirmed T3 Connect tunnel", {
+                      Effect.logWarning(`Failed to start the confirmed ${CONNECT_NAME} tunnel`, {
                         cause,
                       }).pipe(Effect.as(false)),
                     ),
@@ -1014,12 +1004,12 @@ const makeServerLayer = Layer.unwrap(
               Effect.tap((started) =>
                 started
                   ? Effect.logWarning(
-                      "T3 Connect started the stored tunnel without relay confirmation",
+                      `${CONNECT_NAME} started the stored tunnel without relay confirmation`,
                     )
                   : Effect.void,
               ),
               Effect.catch((cause) =>
-                Effect.logWarning("Failed to start the stored T3 Connect tunnel", { cause }),
+                Effect.logWarning(`Failed to start the stored ${CONNECT_NAME} tunnel`, { cause }),
               ),
               Effect.asVoid,
             );
@@ -1034,16 +1024,18 @@ const makeServerLayer = Layer.unwrap(
             ).pipe(
               Effect.tap((result) =>
                 result.status === "ready"
-                  ? Effect.logInfo("T3 Connect managed tunnel recovery registered")
+                  ? Effect.logInfo(`${CONNECT_NAME} managed tunnel recovery registered`)
                   : Effect.void,
               ),
               Effect.catchCause((cause) =>
                 Cause.hasInterrupts(cause)
                   ? Effect.interrupt
-                  : Effect.logWarning("Failed to register T3 Connect managed tunnel recovery", {
-                      cause,
-                    }).pipe(Effect.as({ status: "unavailable" as const })),
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+                  : Effect.logWarning(
+                      `Failed to register ${CONNECT_NAME} managed tunnel recovery`,
+                      {
+                        cause,
+                      },
+                    ).pipe(Effect.as({ status: "unavailable" as const })),
               ),
             );
             // A host without a confirmed marker is on its first boot after the
@@ -1086,10 +1078,10 @@ const makeServerLayer = Layer.unwrap(
                 Effect.tap((mode) =>
                   mode === null
                     ? Effect.void
-                    : Effect.logInfo("T3 Connect desired link reconciled on startup"),
+                    : Effect.logInfo(`${CONNECT_NAME} desired link reconciled on startup`),
                 ),
                 Effect.catch((cause) =>
-                  Effect.logWarning("Failed to reconcile T3 Connect desired link on startup", {
+                  Effect.logWarning(`Failed to reconcile ${CONNECT_NAME} desired link on startup`, {
                     cause,
                   }).pipe(Effect.as(null)),
                 ),

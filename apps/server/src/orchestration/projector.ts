@@ -43,14 +43,11 @@ import {
   ThreadSettledPayload,
   ThreadPinnedPayload,
   ThreadPinReorderedPayload,
-<<<<<<< HEAD
   ThreadTurnQueuedPayload,
   ThreadTurnQueueMovedPayload,
   ThreadTurnQueueRemovedPayload,
   ThreadTurnQueueUpdatedPayload,
-=======
   ThreadAutoSettleSetPayload,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   ThreadPullRequestLinkedPayload,
   ThreadPullRequestSyncedPayload,
   ThreadPullRequestUnlinkedPayload,

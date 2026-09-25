@@ -26,13 +26,9 @@ import type { CodexScanState, UsageRecord } from "./usageTranscripts.ts";
 // entries would keep serving double-counted records forever.
 // v3: entries carry the parse position and reducer state so a grown file
 // re-parses only its appended bytes instead of starting over.
-<<<<<<< HEAD
-const USAGE_SCAN_CACHE_VERSION = 3 as const;
-const decodeActivity = Schema.decodeUnknownOption(TranscriptActivity);
-=======
 // v4: records carry Claude fast mode, which v3 rows never captured.
 const USAGE_SCAN_CACHE_VERSION = 4 as const;
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+const decodeActivity = Schema.decodeUnknownOption(TranscriptActivity);
 
 export interface CachedFile {
   readonly activity?: typeof TranscriptActivity.Type;

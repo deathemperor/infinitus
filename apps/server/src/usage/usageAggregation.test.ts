@@ -205,7 +205,7 @@ describe("UsageAggregator", () => {
   });
 
   it("attributes Claude records to the account the hook names, the rest to unattributed or notClaude", () => {
-    const oneRecordUsd = priceUsage(rates, record().model, record().totals, null).costUsd;
+    const oneRecordUsd = priceUsage(rates, record()).costUsd;
     const aggregator = new UsageAggregator({
       timeZone: "UTC",
       sinceDay: "2026-08-01",

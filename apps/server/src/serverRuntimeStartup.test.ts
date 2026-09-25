@@ -189,12 +189,8 @@ it.effect("resolveAutoBootstrapWelcomeTargets returns existing project and threa
           }),
         getProjectShells: () => Effect.die("unused"),
         getProjectShellById: () => Effect.die("unused"),
-<<<<<<< HEAD
-        getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.some(bootstrapThreadId)),
-        getWorktreeHolders: () => Effect.die("unused"),
-=======
         getFirstActiveThreadIdByProjectId: () => Effect.succeedSome(bootstrapThreadId),
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+        getWorktreeHolders: () => Effect.die("unused"),
         getImportedAgentSessionSources: () => Effect.die("unused"),
         getThreadCheckpointContext: () => Effect.succeedNone,
         getFullThreadDiffContext: () => Effect.succeedNone,
@@ -324,12 +320,8 @@ it.effect.each([
           ),
         getProjectShells: () => Effect.die("unused"),
         getProjectShellById: () => Effect.die("unused"),
-<<<<<<< HEAD
-        getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-        getWorktreeHolders: () => Effect.die("unused"),
-=======
         getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+        getWorktreeHolders: () => Effect.die("unused"),
         getImportedAgentSessionSources: () => Effect.die("unused"),
         getThreadCheckpointContext: () => Effect.succeedNone,
         getFullThreadDiffContext: () => Effect.succeedNone,
@@ -468,12 +460,8 @@ it.effect("resolveAutoBootstrapWelcomeTargets preserves typed UUID generation fa
         getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
         getProjectShells: () => Effect.die("unused"),
         getProjectShellById: () => Effect.die("unused"),
-<<<<<<< HEAD
-        getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-        getWorktreeHolders: () => Effect.die("unused"),
-=======
         getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+        getWorktreeHolders: () => Effect.die("unused"),
         getImportedAgentSessionSources: () => Effect.die("unused"),
         getThreadCheckpointContext: () => Effect.succeedNone,
         getFullThreadDiffContext: () => Effect.succeedNone,

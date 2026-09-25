@@ -55,59 +55,6 @@ function subscriptionUsageProps(
     .map((account) => Date.parse(account.limits.checkedAt));
   return {
     checkedAt: checked.length > 0 && checked.every(Number.isFinite) ? Math.min(...checked) : 0,
-<<<<<<< HEAD
-    providers: (["codex", "claudeAgent"] as const).map((driver) => {
-      const pool = pools.find((candidate) => candidate.driver === driver);
-      const name = driver === "codex" ? "Codex" : "Claude";
-      if (!pool)
-        return { name, detail: "No limits available", windows: [], expiresAt: 0, totalWindows: 0 };
-      const checkedAt = Math.min(...pool.accounts.map((a) => Date.parse(a.limits.checkedAt)));
-      const expiresAt = Math.min(
-        checkedAt + SNAPSHOT_MAX_AGE,
-        ...pool.windows.flatMap((window) => window.resets.map((reset) => reset.at)),
-      );
-      const fresh = Number.isFinite(expiresAt) && expiresAt > now;
-      const sortedWindows = [...pool.windows].sort(
-        (a, b) => a.remainingPercent - b.remainingPercent,
-      );
-      // Keep a session and weekly limit when scoped limits fill the storage budget.
-      const selectedWindows = [
-        ...new Set([
-          sortedWindows.find((window) => window.kind === "session"),
-          sortedWindows.find((window) => window.kind === "weekly"),
-          ...sortedWindows,
-        ]),
-      ]
-        .filter((window) => window !== undefined)
-        .slice(0, 6)
-        .sort((a, b) => a.remainingPercent - b.remainingPercent);
-      return {
-        name,
-        detail: !fresh
-          ? "Open Infinitus to refresh"
-          : pool.accounts.length > 1
-            ? `${pool.accounts.length} accounts · pooled`
-            : "Subscription remaining",
-        expiresAt: fresh ? expiresAt : 0,
-        totalWindows: fresh ? pool.windows.length : 0,
-        windows: fresh
-          ? selectedWindows.map((window) => ({
-              kind: window.kind,
-              label: window.label,
-              remaining: Math.round(window.remainingPercent),
-              reset: window.resets[0]
-                ? `Next reset ${new Date(window.resets[0].at).toLocaleString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}`
-                : "Reset time unavailable",
-            }))
-          : [],
-      };
-    }),
-=======
     providers: (["codex", "claudeAgent"] as const)
       .filter(
         (driver) =>
@@ -147,7 +94,7 @@ function subscriptionUsageProps(
         return {
           name,
           detail: !fresh
-            ? "Open T3 to refresh"
+            ? "Open Infinitus to refresh"
             : pool.accounts.length > 1
               ? `${pool.accounts.length} accounts · pooled`
               : "Subscription remaining",
@@ -170,7 +117,6 @@ function subscriptionUsageProps(
             : [],
         };
       }),
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
   };
 }
 

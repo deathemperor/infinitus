@@ -1119,14 +1119,9 @@ const buildAppUnderTest = (options?: {
               eventCount: Math.max(0, toSequenceInclusive - fromSequenceExclusive),
               payloadBytes: 0,
             }),
-<<<<<<< HEAD
-          getActiveProjectByWorkspaceRoot: () => Effect.succeed(Option.none()),
-          getFirstActiveThreadIdByProjectId: () => Effect.succeed(Option.none()),
-          getWorktreeHolders: () => Effect.succeed({ count: 0, oldestArchived: [] }),
-=======
           getActiveProjectByWorkspaceRoot: () => Effect.succeedNone,
           getFirstActiveThreadIdByProjectId: () => Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
+          getWorktreeHolders: () => Effect.succeed({ count: 0, oldestArchived: [] }),
           getImportedAgentSessionSources: () => Effect.succeed([]),
           getThreadCheckpointContext: () => Effect.succeedNone,
           ...options?.layers?.projectionSnapshotQuery,
@@ -1281,13 +1276,8 @@ const buildAppUnderTest = (options?: {
       ),
       Layer.provide(
         Layer.mock(CloudCliTokenManager.CloudCliTokenManager)({
-<<<<<<< HEAD
           get: Effect.die(new Error("Unexpected Infinitus Connect CLI authorization request.")),
-          getExisting: Effect.succeed(Option.none()),
-=======
-          get: Effect.die(new Error("Unexpected T3 Connect CLI authorization request.")),
           getExisting: Effect.succeedNone,
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
           hasCredential: Effect.succeed(false),
           clear: Effect.void,
           ...options?.layers?.cloudCliTokenManager,

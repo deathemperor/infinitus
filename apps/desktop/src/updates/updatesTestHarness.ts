@@ -34,16 +34,13 @@ export interface UpdatesHarnessOptions {
   readonly stopBackend?: Effect.Effect<void>;
   readonly startBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
-<<<<<<< HEAD
   readonly settings?: Partial<DesktopAppSettings.DesktopSettings>;
   readonly appVersion?: string;
   /** Where a packaged build's `app-update.yml` is read from; missing by default. */
   readonly resourcesPath?: string;
-=======
   readonly platform?: NodeJS.Platform;
   /** Contents of the resources/package-type marker a Linux package ships. */
   readonly packageType?: string | undefined;
->>>>>>> upstream-sync-e3e7cc3fc-upstream-renamed
 }
 
 export function makeHarness(options: UpdatesHarnessOptions = {}) {
@@ -231,28 +228,38 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   // Tracks the restart markers installs leave, so installs stay free of real
   // disk I/O that would outrun the tests' settle loops.
   const updateRestartMarkers = new Set<string>();
-  const fileSystemLayer = FileSystem.layerNoop({
-    readFileString: (path) =>
-      path === "/missing/resources/package-type" && options.packageType !== undefined
-        ? Effect.succeed(options.packageType)
-        : Effect.fail(
-            PlatformError.systemError({
-              module: "FileSystem",
-              method: "readFileString",
-              _tag: "NotFound",
-              pathOrDescriptor: path,
-            }),
-          ),
-    makeDirectory: () => Effect.void,
-    writeFileString: (path) =>
-      Effect.sync(() => {
-        updateRestartMarkers.add(path);
-      }),
-    remove: (path) =>
-      Effect.sync(() => {
-        updateRestartMarkers.delete(path);
-      }),
-  });
+  // Fork (#1042): a test that names `resourcesPath` writes its own
+  // `app-update.yml` there, so reads under it go to the real disk.
+  const realResourcesPath = options.resourcesPath;
+  const fileSystemLayer = Layer.unwrap(
+    Effect.gen(function* () {
+      const realFileSystem = yield* FileSystem.FileSystem;
+      return FileSystem.layerNoop({
+        readFileString: (path) =>
+          path === "/missing/resources/package-type" && options.packageType !== undefined
+            ? Effect.succeed(options.packageType)
+            : realResourcesPath !== undefined && path.startsWith(`${realResourcesPath}/`)
+              ? realFileSystem.readFileString(path)
+              : Effect.fail(
+                  PlatformError.systemError({
+                    module: "FileSystem",
+                    method: "readFileString",
+                    _tag: "NotFound",
+                    pathOrDescriptor: path,
+                  }),
+                ),
+        makeDirectory: () => Effect.void,
+        writeFileString: (path) =>
+          Effect.sync(() => {
+            updateRestartMarkers.add(path);
+          }),
+        remove: (path) =>
+          Effect.sync(() => {
+            updateRestartMarkers.delete(path);
+          }),
+      });
+    }),
+  ).pipe(Layer.provide(NodeServices.layer));
 
   const layer = DesktopUpdates.layer.pipe(
     Layer.provide(fileSystemLayer),
