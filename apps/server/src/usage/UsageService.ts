@@ -900,7 +900,9 @@ export const make = Effect.gen(function* () {
     return found;
   });
 
-  const readStats = Effect.fn("UsageService.readStats")(function* (input: StatsRequest) {
+  const readStatsTranscripts = Effect.fn("UsageService.readStatsTranscripts")(function* (
+    input: StatsRequest,
+  ) {
     const window = yield* Effect.try({
       try: () => statsWindow(input),
       catch: (cause) =>
@@ -920,7 +922,9 @@ export const make = Effect.gen(function* () {
     const toDay = statsDayFormatter(input.timeZone);
     const activeDays = new Set<string>();
     const cutoff = Date.parse(historyFrom + "T00:00:00Z") - MTIME_SLACK_MS;
-    const dirs = yield* collectDirs(cutoff, settings, cutoff, true);
+    const retentionCutoffMs =
+      (yield* Clock.currentTimeMillis) - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const dirs = yield* collectDirs(cutoff, settings, retentionCutoffMs, true);
     const sessions: StatsSession[] = [];
     const sources: UsageSource[] = [];
     const cwds = new Set<string>();
@@ -1057,10 +1061,38 @@ export const make = Effect.gen(function* () {
             : null,
       });
     }
-    if (pruneScanCache(fileCache, cutoff) > 0) cacheDirty = true;
+    if (pruneScanCache(fileCache, retentionCutoffMs) > 0) cacheDirty = true;
     for (const filePath of statsSessions.keys())
       if (!fileCache.has(filePath)) statsSessions.delete(filePath);
     yield* persistScanCache();
+    return {
+      window,
+      hostId,
+      since,
+      historyFrom,
+      toDay,
+      activeDays,
+      cwds,
+      sources,
+      sessions,
+      pricing: pricing(),
+    };
+  });
+
+  const readStats = Effect.fn("UsageService.readStats")(function* (input: StatsRequest) {
+    // Git and GitHub do not touch transcript caches and must not hold up Usage reads.
+    const {
+      window,
+      hostId,
+      since,
+      historyFrom,
+      toDay,
+      activeDays,
+      cwds,
+      sources,
+      sessions,
+      pricing: snapshotPricing,
+    } = yield* scanLock.withPermit(readStatsTranscripts(input));
     const scannedRepositories = scanRepositories
       ? yield* scanRepositories([...cwds], shiftStatsDay(historyFrom, -2), hostId)
       : [];
@@ -1100,7 +1132,7 @@ export const make = Effect.gen(function* () {
       sources,
       sessions,
       repositories,
-      pricing: pricing(),
+      pricing: snapshotPricing,
       unavailable,
     } satisfies StatsSnapshot;
   });
@@ -1122,7 +1154,7 @@ export const make = Effect.gen(function* () {
         if (existing) return existing;
         const created = Deferred.makeUnsafe<StatsSnapshot, UsageReadError>();
         statsScans.set(key, created);
-        yield* scanLock.withPermit(readStats(input)).pipe(
+        yield* readStats(input).pipe(
           Effect.onExit((exit) =>
             Effect.sync(() => statsScans.delete(key)).pipe(
               Effect.andThen(Deferred.done(created, exit)),

@@ -6,7 +6,7 @@ import type { StatsCommit, StatsRepository } from "@infinitus/contracts";
 import { readDirectoryVolumeId } from "../usage/usageTranscriptReader.ts";
 import type { ProcessRunner } from "../processRunner.ts";
 
-export const STATS_LOG_FORMAT =
+const STATS_LOG_FORMAT =
   "%x1e%H%x1f%aI%x1f%ae%x1f%s%x1f%(trailers:key=Co-authored-by,valueonly,separator=%x20)";
 export function parseStatsLog(raw: string): StatsCommit[] {
   return raw.split("\x1e").flatMap((record) => {

@@ -131,7 +131,6 @@ export const StatsRepository = Schema.Struct({
 });
 export type StatsRepository = typeof StatsRepository.Type;
 
-export const STATS_CONTRACT_VERSION = 1;
 export const StatsSnapshot = Schema.Struct({
   contractVersion: Schema.Finite,
   readAt: Schema.String,

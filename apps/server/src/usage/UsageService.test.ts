@@ -25,6 +25,8 @@ import * as Layer from "effect/Layer";
 import * as Scheduler from "effect/Scheduler";
 import * as Schema from "effect/Schema";
 import * as TestClock from "effect/testing/TestClock";
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import { ProcessRunner } from "../processRunner.ts";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 
 import * as ServerConfig from "../config.ts";
@@ -830,6 +832,85 @@ describe("UsageService", () => {
 });
 
 describe("portable Stats service", () => {
+  it.live("a future reporting date cannot prune retained usage after transcript cleanup", () =>
+    Effect.gen(function* () {
+      const { transcript, settings, home } = yield* setup;
+      yield* Effect.promise(() => NodeFSP.writeFile(transcript, claudeLine(1, 5)));
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        assert.strictEqual(totalOutputTokens(yield* service.readSummary(WINDOW)), 5);
+        yield* Effect.promise(() => NodeFSP.unlink(transcript));
+        yield* service.readStats({
+          period: "week",
+          today: UsageDay.make("2035-01-01"),
+          timeZone: "UTC",
+        });
+        // Restart so neither the summary memo nor the in-memory cache can hide data loss.
+        const restarted = yield* UsageService.make;
+        assert.strictEqual(totalOutputTokens(yield* restarted.readSummary(WINDOW)), 5);
+      }).pipe(Effect.provide(serviceLayers({ prefix: "stats-retention", home, settings })));
+    }).pipe(Effect.scoped),
+  );
+
+  it.live("Usage reads finish while a Stats repository command is blocked", () =>
+    Effect.gen(function* () {
+      const { transcript, settings, home } = yield* setup;
+      yield* Effect.promise(() =>
+        NodeFSP.writeFile(
+          transcript,
+          encodeUnknownJsonString({
+            type: "user",
+            sessionId: "session-1",
+            cwd: home,
+            timestamp: "2026-08-01T09:59:00Z",
+            message: { content: "hello" },
+          }) +
+            "\n" +
+            claudeLine(1, 5),
+        ),
+      );
+      const repositoryStarted = yield* Deferred.make<void>();
+      const releaseRepository = yield* Deferred.make<void>();
+      const runner = ProcessRunner.of({
+        run: () =>
+          Effect.gen(function* () {
+            yield* Deferred.succeed(repositoryStarted, undefined);
+            yield* Deferred.await(releaseRepository);
+            return {
+              stdout: "",
+              stderr: "",
+              code: ChildProcessSpawner.ExitCode(1),
+              timedOut: false,
+              stdoutTruncated: false,
+              stderrTruncated: false,
+              stdoutInvalidUtf8: false,
+              stderrInvalidUtf8: false,
+            };
+          }),
+      });
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        const stats = yield* service
+          .readStats({
+            period: "week",
+            today: UsageDay.make("2026-08-01"),
+            timeZone: "UTC",
+          })
+          .pipe(Effect.forkChild);
+        yield* Deferred.await(repositoryStarted);
+        yield* Effect.gen(function* () {
+          assert.strictEqual(totalOutputTokens(yield* service.readSummary(WINDOW)), 5);
+          const sessions = yield* service.readSessionUsage({ sessionIds: ["session"] });
+          assert.strictEqual(sessions.get("session")?.totals.outputTokens, 5);
+        }).pipe(Effect.ensuring(Deferred.succeed(releaseRepository, undefined)));
+        yield* Fiber.join(stats);
+      }).pipe(
+        Effect.provideService(ProcessRunner, runner),
+        Effect.provide(serviceLayers({ prefix: "stats-concurrency", home, settings })),
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.live("backfills a Usage cache, resumes activity, and reprices historical Codex usage", () =>
     Effect.gen(function* () {
       const { home, settings } = yield* setup;
