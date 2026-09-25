@@ -17,7 +17,11 @@ describe("incoming share presentation", () => {
       isShareSheetPresented: true,
       pendingShareId: "share-1",
     });
-    expect(whilePresented).toEqual({ state: presented.state, shareIdToPresent: null });
+    expect(whilePresented).toEqual({
+      state: presented.state,
+      shareIdToPresent: null,
+      shareIdToDiscard: null,
+    });
 
     const dismissed = transitionIncomingSharePresentation(whilePresented.state, {
       isShareSheetPresented: false,
@@ -30,7 +34,42 @@ describe("incoming share presentation", () => {
         isShareSheetPresented: false,
         pendingShareId: "share-1",
       }),
-    ).toEqual({ state: dismissed.state, shareIdToPresent: null });
+    ).toEqual({ state: dismissed.state, shareIdToPresent: null, shareIdToDiscard: null });
+  });
+
+  it("discards a share exactly once when its sheet closes without importing it", () => {
+    const presented = transitionIncomingSharePresentation(EMPTY_INCOMING_SHARE_PRESENTATION_STATE, {
+      isShareSheetPresented: false,
+      pendingShareId: "share-1",
+    });
+    expect(presented.shareIdToDiscard).toBeNull();
+
+    const dismissed = transitionIncomingSharePresentation(presented.state, {
+      isShareSheetPresented: false,
+      pendingShareId: "share-1",
+    });
+    expect(dismissed.shareIdToDiscard).toBe("share-1");
+
+    // The inbox removal is asynchronous: until it lands, the same id is still
+    // pending and must neither re-present nor discard again.
+    const settling = transitionIncomingSharePresentation(dismissed.state, {
+      isShareSheetPresented: false,
+      pendingShareId: "share-1",
+    });
+    expect(settling.shareIdToDiscard).toBeNull();
+    expect(settling.shareIdToPresent).toBeNull();
+  });
+
+  it("does not discard a share the sheet imported before closing", () => {
+    const presented = {
+      presentedShareId: "share-1",
+      dismissedShareId: null,
+    };
+    const closedAfterImport = transitionIncomingSharePresentation(presented, {
+      isShareSheetPresented: false,
+      pendingShareId: null,
+    });
+    expect(closedAfterImport.shareIdToDiscard).toBeNull();
   });
 
   it("presents the next queued share immediately after the previous sheet closes", () => {
