@@ -1,3 +1,15 @@
 # Stats page
 
-`apps/web/src/routes/stats.tsx`, `apps/web/src/components/stats/` — the `/stats` page (#659): the pop-out's Stats pane in the fork — period picker (localStorage `infinitus.statsPeriod`), the tile groups (Throughput, Messages & sessions, Autonomy, Friction, Limits, Cost — value, delta vs the previous period, sparkline), session lengths, and the effort tables (activities, models, engines, effort). Sidebar "Stats" beside Accounts. Its read model is `packages/client-runtime/src/state/infinitusStats.ts` (exported as `@infinitus/client-runtime/state/infinitusStats`): the `stats --period p` reply decoded defensively and folded like native `StatsPresentation`. The read goes through `infinitusEnvironment.stats`, a query atom re-read every 5 min and dropped a minute after the page leaves, so nothing is requested unmounted; the page subscribes to the snapshot with `needs: ["stats"]` (`InfinitusSubscribeInput`, `subscribeInfinitus`'s payload), which the server ref-counts into the `client-activity` lease's `stats` scope only while a page holds it (#587 step 2, minimal form; #625 had dropped the scope for good reason). Estimates, never billing truth.
+Web and Electron Stats use `server.getStats` on each selected environment. The portable
+scanner extends Usage's incremental transcript cache and uses the same live pricing and
+custom overrides. Native `infinitusctl stats` remains a separate, compatible endpoint.
+
+The travelling Stats model preserves session identities and sparse UTC minute buckets.
+Clients select the newest copy of a session before folding totals; summing already-folded
+summaries would count shared histories twice and cannot reconstruct a simultaneous peak.
+Git object hashes and pull-request URLs deduplicate repository activity across clones.
+All environments bucket in the requesting client's timezone and calendar window.
+
+Missing provider metrics and inaccessible repository history are coverage gaps, not zero
+activity. The native-only switch/limit history has no portable source. Streak history is
+bounded to 800 days and a streak reaching that boundary is shown as a lower bound.

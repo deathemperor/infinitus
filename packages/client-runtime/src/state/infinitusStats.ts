@@ -1,96 +1,21 @@
 import * as Schema from "effect/Schema";
 
-/**
- * The Stats page's read model (#659): the `stats --period p` reply — native's
- * `Stats.Summary.compacted()` — decoded defensively and folded into the tile
- * groups, session-length rows and effort tables the pop-out's Stats pane drew
- * (`Sources/InfinitusCore/StatsPresentation.swift`, ported here so web and
- * mobile show the same numbers). Every figure is an estimate the Mac derived
- * from transcripts and repos, never billing truth.
+/** Shared presentation for portable server Stats and legacy native summaries.
+ * All costs are API-equivalent estimates, never subscription bills.
  */
 
-export const STATS_PERIODS = ["day", "week", "month", "year"] as const;
-export type StatsPeriod = (typeof STATS_PERIODS)[number];
-
-/** `Stats.ActivityTally` travels under compact keys. */
-const ActivityTallyPayload = Schema.Struct({
-  n: Schema.optionalKey(Schema.Finite),
-  s: Schema.optionalKey(Schema.Finite),
-  in: Schema.optionalKey(Schema.Finite),
-  out: Schema.optionalKey(Schema.Finite),
-  usd: Schema.optionalKey(Schema.Finite),
-  cr: Schema.optionalKey(Schema.Finite),
-  cw: Schema.optionalKey(Schema.Finite),
-  sv: Schema.optionalKey(Schema.Finite),
-});
-type ActivityTallyPayload = typeof ActivityTallyPayload.Type;
-
-const Tallies = Schema.optionalKey(Schema.Record(Schema.String, ActivityTallyPayload));
-const Count = Schema.optionalKey(Schema.Finite);
-
-/** One `Stats.Day` in its travelling form. Every key is optional: the struct
-    is wide and grows, and a missing figure reads as zero, never as a throw. */
-const DayPayload = Schema.Struct({
-  humanMessages: Count,
-  phoneMessages: Count,
-  agentMessages: Count,
-  nudges: Count,
-  turns: Count,
-  toolCalls: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
-  toolErrors: Count,
-  questions: Count,
-  denials: Count,
-  waitingSeconds: Count,
-  subagents: Count,
-  compactions: Count,
-  retries: Count,
-  longestUnattended: Count,
-  inputTokens: Count,
-  outputTokens: Count,
-  usd: Count,
-  cacheReadTokens: Count,
-  cacheWriteTokens: Count,
-  cacheSavingsUSD: Count,
-  peakTokensPerMinute: Count,
-  activities: Tallies,
-  byModel: Tallies,
-  byEngine: Tallies,
-  byEffort: Tallies,
-  sessions: Schema.optionalKey(Schema.Array(Schema.String)),
-  sessionTally: Count,
-  sessionSeconds: Count,
-  sessionBuckets: Schema.optionalKey(Schema.Array(Schema.Finite)),
-  commits: Count,
-  linesAdded: Count,
-  linesRemoved: Count,
-  filesTouched: Count,
-  coAuthoredByClaude: Count,
-  reverts: Count,
-  prsOpened: Count,
-  prsMerged: Count,
-  mergeHoursTotal: Count,
-  mergeCount: Count,
-  repos: Schema.optionalKey(Schema.Array(Schema.String)),
-  repoTally: Count,
-  switches: Count,
-  limitStops: Count,
-  revivals: Count,
-  minutesLostToLimits: Count,
-  ignites: Count,
-  resumes: Count,
-});
-export type StatsDay = typeof DayPayload.Type;
-
-const SummaryPayload = Schema.Struct({
-  period: Schema.Literals(STATS_PERIODS),
-  from: Schema.String,
-  to: Schema.String,
-  total: DayPayload,
-  previous: DayPayload,
-  daily: Schema.Array(Schema.Struct({ key: Schema.String, day: DayPayload })),
-  streak: Schema.optionalKey(Schema.Finite),
-});
-export type StatsSummary = typeof SummaryPayload.Type;
+import {
+  SummaryPayload,
+  type ActivityTallyPayload,
+  type StatsDay,
+  type StatsSummary,
+} from "@infinitus/contracts";
+export {
+  STATS_PERIODS,
+  type StatsPeriod,
+  type StatsDay,
+  type StatsSummary,
+} from "@infinitus/contracts";
 
 const decodeSummary = Schema.decodeUnknownOption(SummaryPayload);
 
@@ -237,8 +162,12 @@ function percentTile(s: StatsSummary, id: string, read: DayRatio): StatsTile {
   };
 }
 
-const money = (s: StatsSummary, id: string, read: DayNumber) =>
-  tile(s, id, read, { mean: true, format: formatMoney });
+const money = (s: StatsSummary, id: string, read: DayNumber) => {
+  const result = tile(s, id, read, { mean: true, format: formatMoney });
+  return n(s.total.unpricedRecords) + n(s.previous.unpricedRecords) > 0
+    ? { ...result, delta: null }
+    : result;
+};
 const minutes = (s: StatsSummary, id: string, read: DayNumber) =>
   tile(s, id, read, { format: formatMinutes });
 
@@ -352,6 +281,7 @@ export interface EffortRow {
   readonly minutes: number;
   readonly tokens: number;
   readonly usd: number;
+  readonly unpriced: boolean;
   readonly share: number;
   /** Cache reads' share of the row's input; null when the table does not
       track caching at all (per-activity tallies) rather than tracking zero. */
@@ -373,10 +303,11 @@ const ACTIVITY_TITLES: ReadonlyArray<readonly [string, string]> = [
 const ENGINE_TITLES: Readonly<Record<string, string>> = {
   claude: "Claude Code",
   codex: "Codex CLI",
+  grok: "Grok Build",
 };
 
 export const ACTIVITY_FOOTNOTE =
-  "Heuristic: each stretch between two of your messages is labeled by its strongest signal. A stretch counts on the day it started; sub-agent spend shows under models, engines and effort only. Models without a price count tokens at $0.";
+  "Heuristic: each stretch between two of your messages is labeled by its strongest signal. A stretch counts on the day it started; sub-agent spend shows under models, engines and effort only. Models without a price contribute tokens but are excluded from estimated cost.";
 
 function row(id: string, tally: ActivityTallyPayload, share: number): EffortRow {
   const cache = n(tally.cr) + n(tally.cw);
@@ -387,6 +318,7 @@ function row(id: string, tally: ActivityTallyPayload, share: number): EffortRow 
     minutes: Math.floor(n(tally.s) / 60),
     tokens: n(tally.in) + n(tally.out),
     usd: n(tally.usd),
+    unpriced: n(tally.unpriced) > 0,
     share,
     cachedShare: cache > 0 ? n(tally.cr) / inputTotal : null,
   };
@@ -462,6 +394,7 @@ export function modelRows(s: StatsSummary): ReadonlyArray<EffortRow> {
       in: n(current.in) + n(t.in),
       out: n(current.out) + n(t.out),
       usd: n(current.usd) + n(t.usd),
+      unpriced: n(current.unpriced) + n(t.unpriced),
       cr: n(current.cr) + n(t.cr),
       cw: n(current.cw) + n(t.cw),
       sv: n(current.sv) + n(t.sv),
@@ -475,7 +408,11 @@ export function modelRows(s: StatsSummary): ReadonlyArray<EffortRow> {
 export function engineRows(s: StatsSummary): ReadonlyArray<EffortRow> {
   return keyedRows(s.total.byEngine ?? {}, (key, tally) => {
     const title = ENGINE_TITLES[key] ?? key;
-    return n(tally.usd) === 0 && n(tally.in) + n(tally.out) > 0 ? `${title} · unpriced` : title;
+    const unpriced =
+      tally.unpriced === undefined
+        ? n(tally.usd) === 0 && n(tally.in) + n(tally.out) > 0
+        : tally.unpriced > 0;
+    return unpriced ? `${title} · unpriced` : title;
   });
 }
 

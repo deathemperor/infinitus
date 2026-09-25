@@ -271,6 +271,7 @@ export const make = Effect.gen(function* () {
           }
         : {}),
       ...(desktopAppUpdate ? { desktopAppUpdate: true } : {}),
+      stats: true,
       infinitus: infinitusSocketPath !== null,
       turnQueue: true,
       turnQueueSendAt: true,

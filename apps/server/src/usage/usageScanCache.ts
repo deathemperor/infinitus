@@ -1,3 +1,6 @@
+import * as Schema from "effect/Schema";
+import * as Option from "effect/Option";
+import { TranscriptActivity } from "../stats/statsTranscripts.ts";
 /**
  * Durable per-file scan cache.
  *
@@ -24,8 +27,10 @@ import type { CodexScanState, UsageRecord } from "./usageTranscripts.ts";
 // v3: entries carry the parse position and reducer state so a grown file
 // re-parses only its appended bytes instead of starting over.
 const USAGE_SCAN_CACHE_VERSION = 3 as const;
+const decodeActivity = Schema.decodeUnknownOption(TranscriptActivity);
 
 export interface CachedFile {
+  readonly activity?: typeof TranscriptActivity.Type;
   readonly size: number;
   readonly mtimeMs: number;
   readonly provider: UsageProviderKind;
@@ -61,6 +66,7 @@ type SerializedRecord = readonly [
 ];
 
 interface SerializedFile {
+  readonly a?: typeof TranscriptActivity.Type;
   readonly s: number;
   readonly m: number;
   readonly p: UsageProviderKind;
@@ -114,6 +120,7 @@ export function encodeScanCache(cache: ScanCache): SerializedCache {
   const files: Record<string, SerializedFile> = {};
   for (const [path, entry] of cache) {
     files[path] = {
+      ...(entry.activity === undefined ? {} : { a: entry.activity }),
       s: entry.size,
       m: entry.mtimeMs,
       p: entry.provider,
@@ -244,7 +251,9 @@ export function decodeScanCache(document: unknown): ScanCache {
     const tailRecords = decodeRecords(entry.t, provider);
     if (records === null || tailRecords === null) continue;
 
+    const activity = decodeActivity(entry.a);
     cache.set(path, {
+      ...(Option.isSome(activity) ? { activity: activity.value } : {}),
       size: entry.s,
       mtimeMs: entry.m,
       provider,

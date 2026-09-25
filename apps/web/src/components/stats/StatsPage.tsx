@@ -1,12 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
-import {
-  infinitusCapabilityOf,
-  infinitusPageState,
-} from "@infinitus/client-runtime/state/infinitusAccounts";
+import { createStatsAtoms } from "@infinitus/client-runtime/state/stats";
 import {
   ACTIVITY_FOOTNOTE,
   activityRows,
-  decodeStatsSummary,
   effortRows,
   effortText,
   engineRows,
@@ -19,19 +15,21 @@ import {
   type StatsPeriod,
   type StatsSummary,
 } from "@infinitus/client-runtime/state/infinitusStats";
+import { runAtomCommand } from "@infinitus/client-runtime/state/runtime";
+import type { EnvironmentId, StatsRequest, UsageDay } from "@infinitus/contracts";
+import { mergeStats, statsDayFormatter } from "@infinitus/shared/stats";
 import * as Schema from "effect/Schema";
-import { useMemo, type ReactNode } from "react";
-
+import { useMemo, useState } from "react";
+import { ChevronDownIcon } from "lucide-react";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
-
 import { isElectron } from "../../env";
+import { useNowMinute } from "../../hooks/useNowMinute";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
-import { usePrimaryEnvironmentId } from "../../state/environments";
-import { infinitusEnvironment } from "../../state/infinitus";
-import { useEnvironmentQuery } from "../../state/query";
-import { primaryServerConfigAtom } from "../../state/server";
-import { AccountsUnavailable } from "../accounts/AccountsUnavailable";
+import { appAtomRegistry } from "../../rpc/atomRegistry";
+import { environmentPresentations } from "../../state/presentation";
+import { serverEnvironment } from "../../state/server";
 import { Button } from "../ui/button";
+import { Menu, MenuTrigger, MenuPopup, MenuCheckboxItem, MenuSeparator } from "../ui/menu";
 import { ScrollArea } from "../ui/scroll-area";
 import { SidebarInset } from "../ui/sidebar";
 import { Skeleton } from "../ui/skeleton";
@@ -40,138 +38,291 @@ import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { StatsTileGroupView } from "./StatsTiles";
 
-const PERIOD_KEY = "infinitus.statsPeriod";
+const PERIOD_SCHEMA = Schema.Literals(STATS_PERIODS);
+const REPORTING_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const reportDay = statsDayFormatter(REPORTING_TIME_ZONE);
 const PERIOD_LABELS: Record<StatsPeriod, string> = {
   day: "Today",
   week: "Week",
   month: "Month",
   year: "Year",
 };
-const ESTIMATE_NOTE = "Estimates from transcripts and repos on the Mac, never billing truth.";
+const ESTIMATE_NOTE = "Estimates from selected environments, never billing truth.";
+const statsAtoms = createStatsAtoms({
+  server: serverEnvironment,
+  presentations: environmentPresentations,
+});
+const NATIVE_TILES = [
+  "Switches",
+  "Accounts hit a limit",
+  "Revivals",
+  "Minutes lost, all out",
+  "Ignites",
+  "Resumes",
+];
 
-/**
- * `/stats` (#659): the pop-out's Stats pane, in the fork. Reads `stats
- * --period p` through the stats query atom, which is held and re-read every
- * 5 min only while this page is mounted, and subscribes to the snapshot with
- * `needs: ["stats"]` so the server's lease carries the `stats` scope — the
- * Mac's transcript rescan runs at its 5-min cadence only while someone is
- * looking (#625). Primary environment only.
- */
 export function StatsPage() {
-  const environmentId = usePrimaryEnvironmentId();
-  const capability = infinitusCapabilityOf(
-    useAtomValue(primaryServerConfigAtom)?.environment.capabilities,
-  );
   const [period, setPeriod] = useLocalStorage<StatsPeriod, string>(
-    PERIOD_KEY,
+    "infinitus.statsPeriod",
     "week",
-    Schema.Literals(STATS_PERIODS),
+    PERIOD_SCHEMA,
   );
-  const ready = capability === true && environmentId !== null;
-  const snapshotQuery = useEnvironmentQuery(
-    ready ? infinitusEnvironment.snapshot({ environmentId, input: { needs: ["stats"] } }) : null,
+  const [selectedIds, setSelectedIds] = useState<EnvironmentId[] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const minute = useNowMinute();
+  const today = reportDay(Date.parse(minute + ":00Z")) as UsageDay;
+  const request = useMemo<StatsRequest>(
+    () => ({ period, today, timeZone: REPORTING_TIME_ZONE }),
+    [period, today],
   );
-  const snapshot = snapshotQuery.data;
-  const hasVerb =
-    snapshot?.available === true && snapshot.commands.some((command) => command.name === "stats");
-  const statsQuery = useEnvironmentQuery(
-    ready && hasVerb
-      ? infinitusEnvironment.stats({
-          environmentId,
-          input: { command: "stats", args: [], options: { period } },
-        })
-      : null,
+  const key = JSON.stringify({ request, selectedIds });
+  const environments = useAtomValue(statsAtoms(key));
+  const selected = environments.filter((e) => e.selected);
+  const snapshots = useMemo(
+    () => environments.flatMap((e) => (e.selected && e.snapshot ? [e.snapshot] : [])),
+    [environments],
   );
-  const summary = useMemo(
-    () => (statsQuery.data === null ? null : decodeStatsSummary(statsQuery.data.result)),
-    [statsQuery.data],
-  );
-
-  const topbarContent = (
-    <div className="flex w-full min-w-0 items-center gap-x-3 py-2">
-      <WorkspaceBreadcrumb ariaLabel="Stats breadcrumb" className="min-w-0">
-        <WorkspaceBreadcrumbItem current>
-          <h1>Stats</h1>
-        </WorkspaceBreadcrumbItem>
-      </WorkspaceBreadcrumb>
-      <div className="ms-auto flex items-center gap-1" role="radiogroup" aria-label="Period">
-        {STATS_PERIODS.map((option) => (
-          <Button
-            key={option}
-            size="sm"
-            variant={option === period ? "secondary" : "ghost"}
-            role="radio"
-            aria-checked={option === period}
-            onClick={() => setPeriod(option)}
-          >
-            {PERIOD_LABELS[option]}
-          </Button>
-        ))}
-      </div>
-      <Button
-        onClick={() => statsQuery.refresh()}
-        aria-label="Refresh stats"
-        aria-busy={statsQuery.isPending}
-        disabled={!hasVerb}
-        size="icon-sm"
-        variant="ghost"
-      >
-        <RefreshIcon className="size-3.5" refreshing={statsQuery.isPending} />
-      </Button>
-    </div>
-  );
-
-  let body: ReactNode;
-  const gate = infinitusPageState({ capability, snapshot });
-  if (gate === "unsupported") {
-    body = (
-      <section className="max-w-xl rounded-lg border p-4">
-        <p className="text-muted-foreground text-sm">
-          This server has no Infinitus adapter for this platform.
-        </p>
-      </section>
-    );
-  } else if (gate === "loading" || snapshot === null) {
-    body = <StatsSkeleton />;
-  } else if (gate === "unavailable") {
-    body = (
-      <AccountsUnavailable
-        reason={snapshot.unavailableReason ?? null}
-        socketPath={snapshot.status?.socket ?? null}
-        onRetry={snapshotQuery.refresh}
-      />
-    );
-  } else if (!hasVerb) {
-    body = <p className="text-muted-foreground text-sm">This Infinitus build has no stats verb.</p>;
-  } else if (statsQuery.error !== null) {
-    body = <p className="text-destructive text-sm">{statsQuery.error}</p>;
-  } else if (summary === null) {
-    body =
-      statsQuery.data === null ? (
-        <StatsSkeleton />
-      ) : (
-        <p className="text-muted-foreground text-sm">The stats reply could not be read.</p>
-      );
-  } else {
-    body = <StatsBody summary={summary} />;
+  const summary = useMemo(() => mergeStats(snapshots, request), [snapshots, request]);
+  const notes = [
+    ...new Set(
+      snapshots.flatMap((s) => [
+        ...s.unavailable,
+        ...s.sources.flatMap((source) =>
+          source.message && source.status !== "missing" ? [source.message] : [],
+        ),
+      ]),
+    ),
+  ];
+  const unavailable = new Set(NATIVE_TILES);
+  if (
+    snapshots.length > 0 &&
+    snapshots.every(
+      (s) => s.repositories.length === 0 || s.repositories.every((r) => !r.pullRequestsAvailable),
+    )
+  ) {
+    for (const id of ["PRs opened", "PRs merged", "Per PR", "Mean hours to merge"])
+      unavailable.add(id);
   }
-
+  if ((summary.total.unpricedRecords ?? 0) > 0 && (summary.total.pricedRecords ?? 0) === 0) {
+    for (const id of ["Spend", "Cache savings", "Per commit", "Per PR"]) unavailable.add(id);
+  }
+  if ((summary.total.unpricedRecords ?? 0) > 0) {
+    unavailable.add("Per commit");
+    unavailable.add("Per PR");
+  }
+  if (
+    snapshots.length > 0 &&
+    snapshots.every(
+      (s) =>
+        s.repositories.length === 0 ||
+        s.repositories.every((r) => !r.complete && r.commits.length === 0),
+    )
+  ) {
+    for (const id of [
+      "Commits",
+      "Lines +",
+      "Lines −",
+      "Files touched",
+      "Co-authored by Claude",
+      "Reverts",
+      "Repos",
+      "Messages / commit",
+      "Per commit",
+      "Tokens / line",
+    ])
+      unavailable.add(id);
+  }
+  if (
+    snapshots.length > 0 &&
+    snapshots.every(
+      (s) =>
+        !s.sources.some(
+          (source) => source.fingerprint.provider !== "grok" && source.status !== "missing",
+        ),
+    )
+  ) {
+    for (const id of [
+      "Turns",
+      "Tool calls",
+      "Keyboard",
+      "Phone",
+      "Agents",
+      "Nudges",
+      "Sub-agents",
+      "Tool calls / message",
+      "Longest unattended",
+      "Human share",
+      "Waiting on you",
+      "Questions",
+      "Denied tools",
+      "Tool errors",
+      "API retries",
+      "Compactions",
+    ])
+      unavailable.add(id);
+  }
+  const pending = selected.some((e) => e.status === "scanning");
+  const missing = selected.filter((e) => e.status !== "ready");
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all(
+        selected
+          .filter((e) => e.status === "ready" || e.status === "scanning" || e.status === "error")
+          .map(async (e) => {
+            await runAtomCommand(
+              appAtomRegistry,
+              serverEnvironment.refreshUsageRates,
+              { environmentId: e.environmentId, input: {} },
+              { reportFailure: false },
+            );
+            appAtomRegistry.refresh(
+              serverEnvironment.stats({ environmentId: e.environmentId, input: request }),
+            );
+          }),
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none isolate">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
         <WorkspacePageHeader electron={isElectron} className="h-auto">
-          {topbarContent}
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 py-2">
+            <WorkspaceBreadcrumb ariaLabel="Stats breadcrumb">
+              <WorkspaceBreadcrumbItem current>
+                <h1>Stats</h1>
+              </WorkspaceBreadcrumbItem>
+            </WorkspaceBreadcrumb>
+            <div className="ms-auto flex items-center gap-1" role="radiogroup" aria-label="Period">
+              {STATS_PERIODS.map((option) => (
+                <Button
+                  key={option}
+                  size="sm"
+                  variant={option === period ? "secondary" : "ghost"}
+                  role="radio"
+                  aria-checked={option === period}
+                  onClick={() => setPeriod(option)}
+                >
+                  {PERIOD_LABELS[option]}
+                </Button>
+              ))}
+            </div>
+            <Menu>
+              <MenuTrigger render={<Button variant="outline" size="sm" />}>
+                {selectedIds === null
+                  ? "All environments"
+                  : selected.length === 1
+                    ? selected[0]!.label
+                    : `${selected.length} environments`}
+                <ChevronDownIcon className="size-3.5" />
+              </MenuTrigger>
+              <MenuPopup align="end">
+                <MenuCheckboxItem
+                  checked={selectedIds === null}
+                  onCheckedChange={() => setSelectedIds(null)}
+                >
+                  All environments
+                </MenuCheckboxItem>
+                <MenuSeparator />
+                {environments.map((e) => (
+                  <MenuCheckboxItem
+                    key={e.environmentId}
+                    checked={e.selected}
+                    onCheckedChange={(checked) => {
+                      const next = new Set(selected.map((item) => item.environmentId));
+                      if (checked) next.add(e.environmentId);
+                      else next.delete(e.environmentId);
+                      setSelectedIds([...next]);
+                    }}
+                  >
+                    {e.label}
+                    {e.status === "ready" || e.status === "unselected" ? "" : ` · ${e.status}`}
+                  </MenuCheckboxItem>
+                ))}
+              </MenuPopup>
+            </Menu>
+            <Button
+              onClick={() => void refresh()}
+              aria-label="Refresh stats"
+              aria-busy={refreshing || pending}
+              disabled={refreshing || selected.length === 0}
+              size="icon-sm"
+              variant="ghost"
+            >
+              <RefreshIcon className="size-3.5" refreshing={refreshing || pending} />
+            </Button>
+          </div>
         </WorkspacePageHeader>
         <ScrollArea className="min-h-0 flex-1">
-          <WorkspacePageContainer width="wide">{body}</WorkspacePageContainer>
+          <WorkspacePageContainer width="wide">
+            <div className="flex flex-col gap-4">
+              {missing.length > 0 ? (
+                <p role="status" className="text-muted-foreground text-xs">
+                  {snapshots.length > 0 ? "Partial totals. " : ""}
+                  {missing
+                    .map(
+                      (e) =>
+                        `${e.label}: ${e.status === "unsupported" ? "update this server to enable Stats" : e.status}`,
+                    )
+                    .join(" · ")}
+                </p>
+              ) : null}
+              {selected.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  Select an environment to view Stats.
+                </p>
+              ) : snapshots.length === 0 ? (
+                pending ? (
+                  <StatsSkeleton />
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Stats is unavailable. Connect or update an environment, then refresh.
+                  </p>
+                )
+              ) : (
+                <>
+                  {(summary.total.unpricedRecords ?? 0) > 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      Costs exclude {summary.total.unpricedRecords} unpriced responses. Set model
+                      prices in Usage or refresh pricing.
+                    </p>
+                  ) : null}
+                  <StatsBody summary={summary} unavailable={unavailable} />
+                  {notes.length > 0 ? (
+                    <details className="text-muted-foreground text-xs">
+                      <summary className="cursor-pointer">Data coverage</summary>
+                      <ul className="mt-2 list-disc space-y-1 ps-4">
+                        {notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
+                </>
+              )}
+            </div>
+          </WorkspacePageContainer>
         </ScrollArea>
       </div>
     </SidebarInset>
   );
 }
 
-function StatsBody({ summary }: { readonly summary: StatsSummary }) {
-  const groups = statsTileGroups(summary);
+function StatsBody({
+  summary,
+  unavailable,
+}: {
+  readonly summary: StatsSummary;
+  readonly unavailable: ReadonlySet<string>;
+}) {
+  const groups = statsTileGroups(summary).map((group) => ({
+    ...group,
+    tiles: group.tiles.map((tile) =>
+      unavailable.has(tile.id) ? { ...tile, value: "—", delta: null, series: [] } : tile,
+    ),
+  }));
   const tables: ReadonlyArray<{ readonly title: string; readonly rows: ReadonlyArray<EffortRow> }> =
     [
       { title: "Activities", rows: activityRows(summary) },
@@ -183,7 +334,8 @@ function StatsBody({ summary }: { readonly summary: StatsSummary }) {
   return (
     <div className="flex flex-col gap-6">
       <p className="text-muted-foreground text-xs">
-        {summary.from} – {summary.to} · {streak}-day streak · {ESTIMATE_NOTE}
+        {summary.from} – {summary.to} · {summary.streakCapped ? "≥" : ""}
+        {streak}-day streak · {ESTIMATE_NOTE}
       </p>
       {groups.map((group) => (
         <StatsTileGroupView key={group.id} group={group} />
@@ -257,7 +409,13 @@ function EffortTable({
               <td className="py-1 text-right tabular-nums">{effortText.minutes(row.minutes)}</td>
               <td className="py-1 text-right tabular-nums">{effortText.tokens(row.tokens)}</td>
               <td className="py-1 text-right tabular-nums">{effortText.cached(row.cachedShare)}</td>
-              <td className="py-1 text-right tabular-nums">{effortText.usd(row.usd)}</td>
+              <td className="py-1 text-right tabular-nums">
+                {row.unpriced
+                  ? row.usd > 0
+                    ? `${effortText.usd(row.usd)} + unpriced`
+                    : "Unpriced"
+                  : effortText.usd(row.usd)}
+              </td>
               <td className="py-1 text-right tabular-nums">{effortText.share(row.share)}</td>
             </tr>
           ))}

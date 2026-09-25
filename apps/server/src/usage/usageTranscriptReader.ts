@@ -100,7 +100,7 @@ function fnv1a(buffer: Buffer): number {
 export async function listTranscriptFiles(
   root: string,
   sinceMs: number,
-  options?: { readonly fileName?: string },
+  options?: { readonly fileName?: string; readonly onError?: () => void },
 ): Promise<readonly TranscriptFile[]> {
   const found: TranscriptFile[] = [];
   const fileName = options?.fileName;
@@ -110,6 +110,7 @@ export async function listTranscriptFiles(
     try {
       entries = await NodeFSP.readdir(dir, { withFileTypes: true });
     } catch {
+      options?.onError?.();
       return;
     }
     for (const entry of entries) {
@@ -129,6 +130,7 @@ export async function listTranscriptFiles(
           found.push({ path: child, size: stats.size, mtimeMs: stats.mtimeMs });
         }
       } catch {
+        options?.onError?.();
         // Vanished between readdir and stat.
       }
     }
@@ -194,6 +196,10 @@ export async function readTranscriptRecords(
   filePath: string,
   provider: UsageProviderKind,
   resumeFrom?: TranscriptParsePosition,
+  observer?: {
+    readonly reset: () => void;
+    readonly line: (line: string, provider: UsageProviderKind, state: CodexScanState) => void;
+  },
 ): Promise<TranscriptParseResult | null> {
   let handle: NodeFSP.FileHandle;
   try {
@@ -217,7 +223,9 @@ export async function readTranscriptRecords(
       resumed = true;
     }
 
-    const parseLine = (line: string, state: CodexScanState, out: UsageRecord[]): void => {
+    if (!resumed) observer?.reset();
+
+    const parseUsageLine = (line: string, state: CodexScanState, out: UsageRecord[]): void => {
       if (provider === "codex") {
         if (
           !mightCarryUsage(line, provider) &&
@@ -237,6 +245,11 @@ export async function readTranscriptRecords(
       }
       const record = parseClaudeLine(line);
       if (record !== null) out.push(record);
+    };
+
+    const parseLine = (line: string, state: CodexScanState, out: UsageRecord[]): void => {
+      parseUsageLine(line, state, out);
+      observer?.line(line, provider, state);
     };
 
     const toLineString = (lineBuffer: Buffer): string => {
