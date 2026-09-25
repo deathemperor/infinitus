@@ -1184,7 +1184,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               ? {
                   label: "Approval",
                   icon: "approval" as const,
-                  className: "text-amber-700 dark:text-amber-300",
+                  className: "text-warning-foreground",
                 }
               : status === "input"
                 ? {
@@ -1202,7 +1202,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                     ? {
                         label: "Woke",
                         icon: "woke" as const,
-                        className: "text-amber-700 dark:text-amber-300",
+                        className: "text-warning-foreground",
                       }
                     : isUnread
                       ? {
