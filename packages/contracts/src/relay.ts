@@ -17,6 +17,12 @@ import {
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import { CONNECT_NAME, PRODUCT_NAME } from "./productName.ts";
 import { RelayInfinitusAlertRequest } from "./relayInfinitusAlert.ts";
+// Fork (#1592): Team on Infinitus Connect — the client group on the bearer
+// auth, the environment group on the environment credential.
+import {
+  RelayInfinitusTeamEnvironmentGroup,
+  RelayInfinitusTeamGroup,
+} from "./relayInfinitusTeam.ts";
 
 export const RelayAgentAwarenessPlatform = Schema.Literals(["ios", "android"]);
 export type RelayAgentAwarenessPlatform = typeof RelayAgentAwarenessPlatform.Type;
@@ -1136,6 +1142,8 @@ export const RelayApi = HttpApi.make("RelayApi")
     RelayDpopClientGroup,
     RelayServerGroup,
     RelayInfinitusAlertGroup,
+    RelayInfinitusTeamGroup.middleware(RelayClientAuth),
+    RelayInfinitusTeamEnvironmentGroup.middleware(RelayEnvironmentAuth),
   )
   .annotate(OpenApi.Title, `${PRODUCT_NAME} Relay API`)
   .annotate(OpenApi.Version, "1.0.0")

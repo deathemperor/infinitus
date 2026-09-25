@@ -23,6 +23,10 @@
       "types": "./src/relayInfinitusAlert.ts",
       "import": "./src/relayInfinitusAlert.ts"
     },
+    "./relayInfinitusTeam": {
+      "types": "./src/relayInfinitusTeam.ts",
+      "import": "./src/relayInfinitusTeam.ts"
+    },
     "./infinitus": {
       "types": "./src/infinitus.ts",
       "import": "./src/infinitus.ts"
