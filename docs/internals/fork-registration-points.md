@@ -168,7 +168,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   client and `ProcessRunner.layer` (#1076; the thread-card layer it was merged with left with #1375).
   `infinitusHttpApiLayer` is provided `InfinitusAlertRelayLive` over the
   secret store and `FetchHttpClient.layer` (#1375). `InfinitusSlackLive` (provided `SlackClientLive` over
-  `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
+  `FetchHttpClient.layer`) beside it (#574). `InfinitusTeamRelayLive` (provided the secret store and
+  `FetchHttpClient.layer`) beside it (#1592). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
@@ -445,8 +446,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
 - `packages/shared/src/agentAwareness.ts` — `resolveThreadAwarenessPhase` answers `running` for a settled thread whose `backgroundLiveness` is `working`, so the lock-screen card counts the threads the lists call Working, and a new `monitoring` phase for a watch loop alone, so the card says Monitoring where the lists do. The phase is a literal in `packages/contracts/src/relay.ts`'s `RelayAgentAwarenessPhase`, and each consumer names it: the relay's `statusForPhase`, `activityPhasePriority` (with running) and running-row TTL (`infra/relay/src/agentActivity/agentActivityAggregate.ts`, `agentActivityPayloads.ts`), the iOS widget's tint and sort buckets (`apps/mobile/src/widgets/AgentActivity.tsx`) and Android's `ActivityPhase.MONITORING` (`AgentActivityPresentation.kt`). With it, `shouldPublishAgentAwarenessEvent` in `apps/server/src/relay/AgentAwarenessRelay.ts` lets `task.started`, `task.updated` and `task.completed` activities publish (never `task.progress`), so the card follows background work ending instead of waiting out the relay's two-hour row expiry. Both carry a test. The same file's `AGENT_AWARENESS_HEARTBEAT_INTERVAL` loop republishes every live thread each half hour (`resolveAgentAwarenessHeartbeatThreadIds`, past the unchanged-state dedupe) and `resolveAgentAwarenessRelayPublishSnapshot` stamps a live state with the publish time: the relay ages a running row out two hours after its `updatedAt`, so a thread Working longer than that fell off the card's count while the phone's list still said Working.
 - `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); re-flipped after every sync with its two fixtures, `packages/shared/src/cliRelease.test.ts` and `packages/ssh/src/tunnel.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
-- `packages/shared/package.json` — the `./productName`, `./homeDir` and
-  `./desktopIdentity` exports.
+- `packages/shared/package.json` — the `./productName`, `./homeDir`,
+  `./desktopIdentity` and `./infinitusTeamRedaction` (#1592) exports.
+- `apps/server/src/orchestration/Layers/OrchestrationReactor.ts` (+ test,
+  `integration/OrchestrationEngineHarness.integration.ts`) — starts
+  `InfinitusTeamRelay` after the awareness relay (#1592); the test and the
+  harness stub it beside `AgentAwarenessRelay`.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
   `@infinitus/shared/desktopIdentity` (`infinitus-desktop` / `infinitus-desktop-dev`), plus the
   `adoptsLegacyUserDataDir` flag that gates upstream's legacy-directory rule.

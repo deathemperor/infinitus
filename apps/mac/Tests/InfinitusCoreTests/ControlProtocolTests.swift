@@ -137,7 +137,8 @@ final class ControlProtocolTests: XCTestCase {
     func testTeamVerbsAreDeclaredWithTheirSecrets() {
         let byName = Dictionary(uniqueKeysWithValues: ControlCommand.all.map { ($0.name, $0) })
         for name in ["team-status", "team-create", "team-join", "team-code", "team-fetch", "team-publish", "team-approve", "team-decline",
-                     "team-remove", "team-promote", "team-leave", "team-share", "team-exclude", "team-policy", "team-insights", "team-identity"] {
+                     "team-remove", "team-promote", "team-leave", "team-share", "team-exclude", "team-policy", "team-insights", "team-identity",
+                     "team-days", "team-exclusions"] {
             XCTAssertNotNil(byName[name], name)
         }
         XCTAssertEqual(byName["team-create"]?.stdin, "secret"); XCTAssertEqual(byName["team-join"]?.stdin, "secret")
