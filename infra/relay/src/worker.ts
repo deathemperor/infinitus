@@ -74,6 +74,14 @@ import * as MobileRegistrations from "./agentActivity/MobileRegistrations.ts";
 // Fork (#1375): Infinitus account alerts, thread-less, on the relay's key.
 import { infinitusAlertApi } from "./infinitusAlerts/InfinitusAlertApi.ts";
 import * as InfinitusAlertPublisher from "./infinitusAlerts/InfinitusAlertPublisher.ts";
+// Fork (#1592): Team on Infinitus Connect — the two route groups, the rules,
+// the rows and the transcript bucket.
+import * as RemovalPolicy from "alchemy/RemovalPolicy";
+import { infinitusTeamApi } from "./infinitusTeam/InfinitusTeamApi.ts";
+import { infinitusTeamEnvironmentApi } from "./infinitusTeam/InfinitusTeamEnvironmentApi.ts";
+import * as InfinitusTeamService from "./infinitusTeam/InfinitusTeamService.ts";
+import * as InfinitusTeamStore from "./infinitusTeam/InfinitusTeamStore.ts";
+import * as InfinitusTeamTranscriptStore from "./infinitusTeam/InfinitusTeamTranscriptStore.ts";
 
 const webcryptoLayer = Layer.succeed(
   Crypto.Crypto,
@@ -107,9 +115,16 @@ const relayApiLayer = Layer.mergeAll(
   dpopClientApi,
   serverApi,
   infinitusAlertApi,
+  infinitusTeamApi,
+  infinitusTeamEnvironmentApi,
 );
 
 const CloudMintKeyPair = Alchemy.KeyPair("CloudMintKeyPair");
+// Fork (#1592): transcript chunks live in R2, one row per chunk in Postgres.
+// Retained: a destroyed stack must not take the team's transcripts with it.
+const InfinitusTeamTranscriptsBucket = Cloudflare.R2.Bucket("InfinitusTeamTranscripts").pipe(
+  RemovalPolicy.retain(),
+);
 const ApnsDeliveryJobSigningSecret = Alchemy.makeRandom("ApnsDeliveryJobSigningSecret", {
   bytes: 32,
 });
@@ -138,6 +153,7 @@ export const ApiLive = Api.make(
     const fcmDeliveryQueue = yield* RelayFcmDeliveryQueue;
     const fcmDeliveryDeadLetterQueue = yield* RelayFcmDeliveryDeadLetterQueue;
     const cloudMintKeyPair = yield* CloudMintKeyPair;
+    const teamTranscriptsBucket = yield* InfinitusTeamTranscriptsBucket;
     const relayApiZone = yield* RelayApiZone;
     const managedEndpointZone = yield* ManagedEndpointZone;
     const randomApnsDeliveryJobSigningSecret = yield* ApnsDeliveryJobSigningSecret;
@@ -180,6 +196,7 @@ export const ApiLive = Api.make(
     const db = yield* Drizzle.Postgres(hyperdrive.connectionString);
 
     const managedEndpointTunnelBinding = yield* Cloudflare.Tunnel.ReadWriteTunnel();
+    const teamTranscriptsBinding = yield* Cloudflare.R2.ReadWriteBucket(teamTranscriptsBucket);
     // Keep Worker custom-domain reconciliation ordered after API zone provisioning.
     yield* yield* relayApiZone.zoneId;
     const managedEndpointDnsBinding = yield* Cloudflare.DNS.ReadWriteDns(managedEndpointZone);
@@ -231,6 +248,13 @@ export const ApiLive = Api.make(
         Layer.mergeAll(
           AgentActivityPublisher.layer,
           InfinitusAlertPublisher.layer.pipe(Layer.provide(fcmDeliveryQueueSenderLayer)),
+          // Fork (#1592): the team rules over their rows and the transcript bucket.
+          InfinitusTeamService.layer.pipe(
+            Layer.provide(InfinitusTeamStore.layer),
+            Layer.provide(
+              InfinitusTeamTranscriptStore.layerR2(teamTranscriptsBinding, alchemyRuntimeContext),
+            ),
+          ),
         ),
       ),
       Layer.provideMerge(EnvironmentConnector.layer),
@@ -343,6 +367,10 @@ export const ApiLive = Api.make(
             ),
           ),
         ),
+        // Fork (#1592): expired team commands, transcripts past retention.
+        Effect.andThen(
+          InfinitusTeamService.InfinitusTeamService.pipe(Effect.flatMap((teams) => teams.prune)),
+        ),
         Effect.withSpan("relay.cron.prune_expired_state"),
         Effect.provide(runtimeLayer),
       ),
@@ -372,6 +400,7 @@ export const ApiLive = Api.make(
         Layer.provideMerge(Cloudflare.Workers.CronEventSourceLive),
         Layer.provideMerge(Cloudflare.Queues.WriteQueueBinding),
         Layer.provideMerge(Cloudflare.Queues.EventSourceLive),
+        Layer.provideMerge(Cloudflare.R2.ReadWriteBucketBinding),
         Layer.provideMerge(Cloudflare.Tunnel.ReadWriteTunnelBinding),
         Layer.provideMerge(Cloudflare.DNS.ReadWriteDnsHttp),
       ),

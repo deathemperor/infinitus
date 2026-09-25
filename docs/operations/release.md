@@ -126,6 +126,10 @@ Required repository secrets shared by relay deployments:
 - `NEON_API_KEY`
 - `AXIOM_TOKEN`
 
+`CLOUDFLARE_API_TOKEN` also needs Workers R2 Storage Read and Write: the relay keeps team
+transcripts in an R2 bucket (#1592), and R2 may ask the Cloudflare account for a payment method
+before its first bucket.
+
 Required `production` environment variables:
 
 - `RELAY_API_ZONE_NAME`
