@@ -296,7 +296,7 @@ export async function readTranscriptRecords(
     const tailRecords: UsageRecord[] = [];
     if (pendingChunks.length > 0) {
       const pending = pendingChunks.length === 1 ? pendingChunks[0]! : Buffer.concat(pendingChunks);
-      if (pending.length > 0) parseUsageLine(toLineString(pending), { ...codexState }, tailRecords);
+      if (pending.length > 0) parseLine(toLineString(pending), { ...codexState }, tailRecords);
     }
 
     const guardLength = Math.min(GUARD_LENGTH, resumeOffset);

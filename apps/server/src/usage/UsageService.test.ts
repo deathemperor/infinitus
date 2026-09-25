@@ -832,6 +832,74 @@ describe("UsageService", () => {
 });
 
 describe("portable Stats service", () => {
+  for (const provider of ["claude", "codex"] as const) {
+    it.live(
+      `counts an unterminated ${provider} activity event once across cache, restart, and append`,
+      () =>
+        Effect.gen(function* () {
+          const { transcript, settings, home } = yield* setup;
+          const codexDir = NodePath.join(home, "codex", "sessions");
+          yield* Effect.promise(() => NodeFSP.mkdir(codexDir, { recursive: true }));
+          const file =
+            provider === "claude" ? transcript : NodePath.join(codexDir, "rollout.jsonl");
+          const event = (type: string, payload: unknown) =>
+            encodeUnknownJsonString({
+              type,
+              payload,
+              timestamp: "2026-08-01T10:00:00Z",
+            }) + "\n";
+          const prefix =
+            provider === "claude"
+              ? claudeLine(1, 5)
+              : event("session_meta", { id: "tail-session" }) +
+                event("turn_context", { model: "gpt-test" }) +
+                event("event_msg", {
+                  type: "token_count",
+                  info: { last_token_usage: { input_tokens: 10, output_tokens: 5 } },
+                });
+          const user = (second: number) =>
+            encodeUnknownJsonString(
+              provider === "claude"
+                ? {
+                    type: "user",
+                    sessionId: "session-1",
+                    timestamp: `2026-08-01T10:00:0${second}Z`,
+                    message: { content: "hello" },
+                  }
+                : {
+                    type: "event_msg",
+                    timestamp: `2026-08-01T10:00:0${second}Z`,
+                    payload: { type: "user_message", message: "hello" },
+                  },
+            );
+          yield* Effect.promise(() => NodeFSP.writeFile(file, prefix + user(1)));
+          yield* Effect.gen(function* () {
+            const service = yield* UsageService.make;
+            const request = {
+              period: "week" as const,
+              today: UsageDay.make("2026-08-01"),
+              timeZone: "UTC",
+            };
+            yield* service.readSummary(WINDOW);
+            const first = yield* service.readStats(request);
+            assert.strictEqual(first.sessions[0]?.days[0]?.day.humanMessages, 1);
+            assert.strictEqual(first.sessions[0]?.days[0]?.day.outputTokens, 5);
+            assert.deepStrictEqual((yield* service.readStats(request)).sessions, first.sessions);
+            const restarted = yield* UsageService.make;
+            assert.deepStrictEqual((yield* restarted.readStats(request)).sessions, first.sessions);
+            yield* Effect.promise(() => NodeFSP.appendFile(file, "\n" + user(2) + "\n"));
+            // Usage can be the first reader of the grown file with cached activity.
+            yield* restarted.readSummary(WINDOW);
+            const grown = yield* restarted.readStats(request);
+            assert.strictEqual(grown.sessions[0]?.days[0]?.day.humanMessages, 2);
+            assert.strictEqual(grown.sessions[0]?.days[0]?.day.outputTokens, 5);
+          }).pipe(
+            Effect.provide(serviceLayers({ prefix: `stats-tail-${provider}`, home, settings })),
+          );
+        }).pipe(Effect.scoped),
+    );
+  }
+
   it.live("a future reporting date cannot prune retained usage after transcript cleanup", () =>
     Effect.gen(function* () {
       const { transcript, settings, home } = yield* setup;

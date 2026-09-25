@@ -521,6 +521,8 @@ export const make = Effect.gen(function* () {
         cached !== undefined &&
         cached.provider === provider &&
         size > cached.size &&
+        // Activity includes the prior tail; replay the file so it is not observed twice.
+        (cached.activity === undefined || cached.position.resumeOffset >= cached.size) &&
         (!withStats || cached.activity !== undefined)
           ? cached.position
           : undefined;
