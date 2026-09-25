@@ -83,6 +83,17 @@ struct InfinitusApp: App {
         #endif
         RenameMigration.run()   // before anything reads App Support
         PrivateWindowCleanup.run()
+        // The app runs the Mac's default Claude login, as its swapd daemon
+        // does. Launched from a Claude Code session (an agent's `open`), it
+        // inherited that session's profile, and every swapd and `claude` it
+        // ran read the profile's keychain item: a healthy active account
+        // read "token expired" (user 2026-09-25, after each agent relaunch).
+        // A dev instance (its own socket) keeps the profile it was given:
+        // e2e and fixtures point it away from the real ~/.claude.
+        if ProcessInfo.processInfo.environment["INFINITUS_CONTROL_SOCKET"] == nil {
+            for name in ["CLAUDE_CONFIG_DIR", "CLAUDECODE", "ANTHROPIC_BASE_URL",
+                         "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"] { unsetenv(name) }
+        }
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
         appDelegate.model = model
