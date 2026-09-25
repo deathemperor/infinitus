@@ -82,7 +82,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   account alert on the operate scope.
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing`, `./infinitusTeamControl`, `./captures`,
-  `./infinitusAlert` and `./relayInfinitusAlert` (#1375) subpath exports.
+  `./infinitusAlert`, `./relayInfinitusAlert` (#1375) and
+  `./relayInfinitusTeam` (#1592) subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
   (#812) and `turnQueueSendAt` (#1318) capabilities on `ExecutionEnvironmentCapabilities`; `alternateHttpBaseUrls` (optional) on
   `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls` (optional, #651)
@@ -479,7 +480,18 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   and publisher merged into the worker's API and runtime layers; the alert
   publisher gets the same FCM queue sender `FcmDeliveries` is given, hoisted
   into `fcmDeliveryQueueSenderLayer`. The runtime layer pipe has twenty
-  stages, the most `pipe` takes: a new layer joins an existing stage.
+  stages, the most `pipe` takes: a new layer joins an existing stage. The
+  `infinitusTeam` and `infinitusTeamEnvironment` groups (#1592) are built
+  in `relay.ts` by `makeRelayInfinitusTeamGroups(RelayInternalError)` and
+  added with their auth middleware; the worker merges their handlers, the
+  team service (store, R2 transcript store on the retained
+  `InfinitusTeamTranscripts` bucket, `Cloudflare.R2.ReadWriteBucketBinding`
+  in the binding stage) and the cron's `prune`.
+- `infra/relay/src/persistence/schema.ts` — re-exports
+  `../infinitusTeam/schema.ts` (#1592): `Drizzle.Schema` in `db.ts` reads
+  this one path, so the team tables join it here and their migration is
+  generated locally (`drizzle-kit generate … --name infinitus_team`) and
+  committed.
 - `infra/relay/src/agentActivity/apnsDeliveryJobs.ts`, `ApnsClient.ts`,
   `ApnsDeliveries.ts` — `ApnsNotificationPayload.threadId` is optional
   (#1375): an Infinitus account alert names no thread, so the request omits
