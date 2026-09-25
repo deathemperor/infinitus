@@ -274,9 +274,15 @@ these bullets.
   `team-inbox` and answers `{ack}`; never a reason. The Mac side
   (`TeamControl*.swift`, the `team-grant`/`team-drive`/`team-pending` verbs) is
   `apps/mac`'s.
-- `apps/mobile/src/features/team/` — Settings › Team (#1313): members, the
-  leader's requests, join from a code or the site's `/join#<code>` invite
-  link; the phone's subset of the web pane's `team.logic.ts`.
+- `apps/mobile/src/features/team/` — Settings › Team on Infinitus Connect
+  (#1592): the phone reads and changes the team on the relay as the signed-in
+  user through the same client the web pane uses
+  (`@infinitus/client-runtime/relay/infinitusTeam`), no Mac in the loop:
+  members with their machines and live threads, the leader's requests,
+  what waits for the user's Allow, and Join from a token or the site's
+  `/join#<token>` link (`team.logic.ts` keeps that link's rewrite for
+  `App.tsx`). Creating, sharing, grants, transcripts and leaving are the
+  desktop's.
 - `packages/client-runtime/src/connection/roaming.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on one host, connect on another (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect; public hosts are dialed before private ones (the LAN address). No server fills the list since the Cloudflare tunnels retired (`InfinitusDescriptor.ts` went with them). Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
