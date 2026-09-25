@@ -1130,7 +1130,7 @@ const RelayInfinitusAlertGroup = HttpApiGroup.make("infinitusAlert")
   .middleware(RelayEnvironmentAuth);
 
 // Fork (#1592): built here so the team routes can name the internal error.
-export const { RelayInfinitusTeamGroup, RelayInfinitusTeamEnvironmentGroup } =
+const { RelayInfinitusTeamGroup, RelayInfinitusTeamEnvironmentGroup } =
   makeRelayInfinitusTeamGroups(RelayInternalError);
 
 export const RelayApi = HttpApi.make("RelayApi")

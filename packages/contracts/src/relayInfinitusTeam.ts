@@ -220,7 +220,7 @@ export const TeamGrantCreate = Schema.Struct({
   expiresInSeconds: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
 });
 export type TeamGrantCreate = typeof TeamGrantCreate.Type;
-export const TEAM_COMMAND_TEXT_MAX = 16_384;
+const TEAM_COMMAND_TEXT_MAX = 16_384;
 export const TeamCommandCreate = Schema.Struct({
   toUserId: TeamUserId,
   environmentId: EnvironmentId,
@@ -263,8 +263,7 @@ export const TeamEnvironmentMemberships = Schema.Struct({
   teams: Schema.Array(TeamEnvironmentMembership),
 });
 export type TeamEnvironmentMemberships = typeof TeamEnvironmentMemberships.Type;
-export const TEAM_DOCUMENTS_PER_PUBLISH = 40;
-export const TEAM_DOCUMENT_MAX_BYTES = 262_144;
+const TEAM_DOCUMENTS_PER_PUBLISH = 40;
 export const TeamDocumentPublish = Schema.Struct({
   kind: TeamKind,
   /** `-` for the single-document kinds, the day (`2026-09-25`) for `stats`. */
@@ -279,7 +278,7 @@ export const TeamDocumentsPublish = Schema.Struct({
   ),
 });
 export type TeamDocumentsPublish = typeof TeamDocumentsPublish.Type;
-export const TEAM_TRANSCRIPT_CHUNK_MAX_BYTES = 1_048_576;
+const TEAM_TRANSCRIPT_CHUNK_MAX_BYTES = 1_048_576;
 export const TeamTranscriptPublish = Schema.Struct({
   userId: TeamUserId,
   threadId: TrimmedNonEmptyString,
