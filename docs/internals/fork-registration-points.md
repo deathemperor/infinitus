@@ -30,17 +30,32 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `settingsSearch.ts` (+ test, the `usage-providers` entry dropped) — since
   the Accounts page reads every hub through the Mac app. The rest is
   fork-owned (`fork-only-files.md`); rules: `docs/internals/accounts-page.md`.
-- Claude banked resets (#1553): `apps/server/src/provider/Drivers/ClaudeDriver.ts`
-  (the instance's `login` location, `consumeResetCredit` through
-  `CodexResetCreditCoordinator`, the probe's `resolveResetCredits`),
+- Claude banked resets (#1553): `apps/server/src/provider/Layers/claudeResetCredits.ts`
+  (+ test) is the fork's whole module, taken over upstream's #13118 on every
+  sync: ours reads the macOS keychain and the token's profile, upstream's
+  skips macOS and reads `.claude.json` (#1601). `Drivers/ClaudeDriver.ts`
+  (the instance's `login` location, `consumeResetCredit` through upstream's
+  `ResetCreditCoordinator` with a fork settled-failure predicate, the
+  probe's `resolveResetCredits`), `Layers/ProviderInstanceRegistryLive.test.ts`
+  (upstream's two redeem tests also answer the fork's profile request and
+  match the usage URL's query),
   `Layers/ClaudeProvider.ts` (`checkClaudeProviderStatus`'s last parameter,
   attached only for a subscription login), `Layers/ProviderRegistry.test.ts`
   (one test), `packages/contracts/src/providerUsageLimits.ts`
   (`ServerProviderResetCredits.label` / `nextHold`, additive), and the reset
   control's held state on `apps/web/src/components/usage/UsageLimits.tsx`
   (`resetHoldText`), `UsageLimitsPooled.tsx` and
-  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`. The module itself
-  is in `fork-only-files.md`.
+  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`.
+- `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
+  also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
+  in the sidebar's utility row, so their Back returns to the main app (#1601).
+- `vite.config.ts` — one override turning `shadcn/no-arbitrary-values` and
+  `shadcn/no-raw-colors` off for the fork-only web pages written before
+  upstream added those rules (#1601); a file leaves the list once it uses
+  theme tokens.
+- `apps/desktop/src/updates/updatesTestHarness.ts` — the `resourcesPath`
+  option (#1042); under upstream's no-op file system, reads below it go to
+  the real disk so the feed-swap test's own `app-update.yml` is found.
 - Pi provider (#1409 follow-on). Registration points only:
   `packages/contracts/src/settings.ts` (`PiSettings`, the `pi` arm of the
   provider-config union) and `src/model.ts` (`PI_DEFAULT_MODEL`);
