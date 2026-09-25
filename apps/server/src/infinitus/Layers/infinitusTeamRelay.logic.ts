@@ -82,7 +82,9 @@ export interface TeamTranscriptRow {
 export const unixSeconds = (iso: string | null | undefined): number | undefined => {
   if (!iso) return undefined;
   const parsed = DateTime.make(iso);
-  return Option.isSome(parsed) ? Math.floor(DateTime.toEpochMillis(parsed.value) / 1000) : undefined;
+  return Option.isSome(parsed)
+    ? Math.floor(DateTime.toEpochMillis(parsed.value) / 1000)
+    : undefined;
 };
 
 export const basename = (path: string): string => {
@@ -161,13 +163,23 @@ export function buildThreadsDocument(
         project,
         ...(startedAt === undefined ? {} : { startedAt }),
         ...(status === "waiting"
-          ? { activityLine: thread.hasPendingApprovals ? "Waiting for approval" : "Waiting for input" }
+          ? {
+              activityLine: thread.hasPendingApprovals
+                ? "Waiting for approval"
+                : "Waiting for input",
+            }
           : {}),
       });
     }
   }
-  rows.sort((a, b) => (a.updatedAt === b.updatedAt ? (a.id < b.id ? -1 : 1) : b.updatedAt - a.updatedAt));
-  return { document: { at: input.now, threads: rows.slice(0, THREADS_INDEX_CAP) }, live, projectOf };
+  rows.sort((a, b) =>
+    a.updatedAt === b.updatedAt ? (a.id < b.id ? -1 : 1) : b.updatedAt - a.updatedAt,
+  );
+  return {
+    document: { at: input.now, threads: rows.slice(0, THREADS_INDEX_CAP) },
+    live,
+    projectOf,
+  };
 }
 
 const UsageWindow = Schema.Struct({
@@ -293,7 +305,9 @@ export function buildNowDocument(input: {
 
 /** A thread's messages as transcript rows, oldest first, as the Mac read
     them off the desktop: every finished message with text. */
-export function transcriptRows(messages: ReadonlyArray<OrchestrationMessage>): ReadonlyArray<TeamTranscriptRow> {
+export function transcriptRows(
+  messages: ReadonlyArray<OrchestrationMessage>,
+): ReadonlyArray<TeamTranscriptRow> {
   const rows: Array<TeamTranscriptRow> = [];
   for (const message of messages) {
     if (message.streaming || message.text.length === 0) continue;
@@ -382,7 +396,8 @@ export function decideCommand(
   },
 ): CommandDecision {
   const grant = input.grants.find((candidate) => candidate.grantId === command.grant.grantId);
-  if (grant === undefined) return { run: false, outcome: "refused", detail: "That grant was revoked." };
+  if (grant === undefined)
+    return { run: false, outcome: "refused", detail: "That grant was revoked." };
   const action: TeamCapability = command.action;
   const covers =
     (grant.expiresAt === null || grant.expiresAt > input.nowIso) &&
@@ -395,7 +410,10 @@ export function decideCommand(
   if ((action === "send" || action === "interrupt") && !input.liveThreadIds.has(command.threadId)) {
     return { run: false, outcome: "notLive", detail: "That thread is not live." };
   }
-  if ((action === "send" || action === "new") && (command.text === undefined || command.text.trim().length === 0)) {
+  if (
+    (action === "send" || action === "new") &&
+    (command.text === undefined || command.text.trim().length === 0)
+  ) {
     return { run: false, outcome: "badRequest", detail: "Nothing to send." };
   }
   if (teamCommandNeedsTap(grant, action)) {

@@ -90,7 +90,9 @@ describe("buildThreadsDocument", () => {
       ["t-input", "Waiting for input"],
       ["t-start", null],
     ]);
-    expect(built.live[0]?.startedAt).toBe(Math.floor(Date.parse("2026-09-25T06:59:30.000Z") / 1000));
+    expect(built.live[0]?.startedAt).toBe(
+      Math.floor(Date.parse("2026-09-25T06:59:30.000Z") / 1000),
+    );
     expect(Object.fromEntries(built.document.threads.map((row) => [row.id, row.status]))).toEqual({
       "t-run": "running",
       "t-wait": "waiting",
@@ -155,7 +157,10 @@ describe("fleet documents", () => {
       active: true,
       isOrganization: false,
       usageStatus: "ok",
-      usage: { fiveHour: { pct: 42.4, resetsAt: "2026-09-25T09:00:00.000Z" }, sevenDay: { pct: 91 } },
+      usage: {
+        fiveHour: { pct: 42.4, resetsAt: "2026-09-25T09:00:00.000Z" },
+        sevenDay: { pct: 91 },
+      },
     },
     {
       number: 2,
@@ -187,7 +192,9 @@ describe("fleet documents", () => {
       { label: "5h", pct: 42, resetsAt: RESET_AT },
       { label: "7d", pct: 91 },
     ]);
-    const text = `${dayDigest(document)}${Object.values(document.fleets[0]?.accounts ?? []).map((row) => row.label).join()}`;
+    const text = `${dayDigest(document)}${Object.values(document.fleets[0]?.accounts ?? [])
+      .map((row) => row.label)
+      .join()}`;
     expect(text).not.toContain("@");
   });
 
@@ -203,12 +210,17 @@ describe("fleet documents", () => {
       {
         engine: "claude",
         account: "work",
-        windows: [{ label: "5h", pct: 42, resetsAt: RESET_AT }, { label: "7d", pct: 91 }],
+        windows: [
+          { label: "5h", pct: 42, resetsAt: RESET_AT },
+          { label: "7d", pct: 91 },
+        ],
       },
       { engine: "claude", account: null, windows: [] },
     ]);
     expect(now.blockers).toEqual(["AWS login: papaya", "claude: every account limited"]);
-    expect(buildNowDocument({ at: NOW, machine: "m", live: [], snapshot: null }).fleets).toEqual([]);
+    expect(buildNowDocument({ at: NOW, machine: "m", live: [], snapshot: null }).fleets).toEqual(
+      [],
+    );
   });
 });
 
@@ -228,7 +240,9 @@ describe("transcripts", () => {
 
   it("chunks never split a line and stay under the cap", () => {
     const rows = transcriptRows(
-      Array.from({ length: 30 }, (_, i) => message(i % 2 === 0 ? "user" : "assistant", "x".repeat(400), i)),
+      Array.from({ length: 30 }, (_, i) =>
+        message(i % 2 === 0 ? "user" : "assistant", "x".repeat(400), i),
+      ),
     );
     const chunks = chunkLines(rows, redact, 1000);
     expect(chunks.reduce((sum, chunk) => sum + chunk.rows, 0)).toBe(30);
@@ -249,7 +263,9 @@ describe("transcripts", () => {
     ]);
     expect(rows).toHaveLength(1);
     const [chunk] = chunkLines(rows, redact);
-    expect(chunk?.lines).toBe('{"role":"user","text":"cd ~/x && export KEY=[redacted-key]","at":1790319600}\n');
+    expect(chunk?.lines).toBe(
+      '{"role":"user","text":"cd ~/x && export KEY=[redacted-key]","at":1790319600}\n',
+    );
     expect(viewText([message("user", "token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234", 0)], redact)).toBe(
       "user: token [redacted-key]",
     );
@@ -288,10 +304,25 @@ describe("decideCommand", () => {
   const nowIso = "2026-09-25T07:00:00.000Z";
 
   const cases: Array<
-    [string, TeamQueuedCommand, { grants: ReadonlyArray<TeamGrant>; liveThreadIds: ReadonlySet<string> }, Record<string, unknown>]
+    [
+      string,
+      TeamQueuedCommand,
+      { grants: ReadonlyArray<TeamGrant>; liveThreadIds: ReadonlySet<string> },
+      Record<string, unknown>,
+    ]
   > = [
-    ["runs a send on a live thread", command({}), { grants: [grant], liveThreadIds: live }, { run: true }],
-    ["refuses a revoked grant", command({}), { grants: [], liveThreadIds: live }, { run: false, outcome: "refused" }],
+    [
+      "runs a send on a live thread",
+      command({}),
+      { grants: [grant], liveThreadIds: live },
+      { run: true },
+    ],
+    [
+      "refuses a revoked grant",
+      command({}),
+      { grants: [], liveThreadIds: live },
+      { run: false, outcome: "refused" },
+    ],
     [
       "noGrant past expiry",
       command({}),
@@ -304,11 +335,36 @@ describe("decideCommand", () => {
       { grants: [{ ...grant, threads: ["t-1"] as never }], liveThreadIds: new Set(["t-9"]) },
       { run: false, outcome: "noGrant" },
     ],
-    ["notLive", command({ threadId: "t-1" }), { grants: [grant], liveThreadIds: new Set() }, { run: false, outcome: "notLive" }],
-    ["badRequest with nothing to send", command({ text: " " }), { grants: [grant], liveThreadIds: live }, { run: false, outcome: "badRequest" }],
-    ["interrupt preauthorized runs", command({ action: "interrupt" }), { grants: [grant], liveThreadIds: live }, { run: true }],
-    ["new waits for the tap", command({ action: "new", threadId: "-", text: "go", project: "Limitless" }), { grants: [grant], liveThreadIds: live }, { run: false, outcome: "pending" }],
-    ["view needs no live thread", command({ action: "view" }), { grants: [grant], liveThreadIds: new Set() }, { run: true }],
+    [
+      "notLive",
+      command({ threadId: "t-1" }),
+      { grants: [grant], liveThreadIds: new Set() },
+      { run: false, outcome: "notLive" },
+    ],
+    [
+      "badRequest with nothing to send",
+      command({ text: " " }),
+      { grants: [grant], liveThreadIds: live },
+      { run: false, outcome: "badRequest" },
+    ],
+    [
+      "interrupt preauthorized runs",
+      command({ action: "interrupt" }),
+      { grants: [grant], liveThreadIds: live },
+      { run: true },
+    ],
+    [
+      "new waits for the tap",
+      command({ action: "new", threadId: "-", text: "go", project: "Limitless" }),
+      { grants: [grant], liveThreadIds: live },
+      { run: false, outcome: "pending" },
+    ],
+    [
+      "view needs no live thread",
+      command({ action: "view" }),
+      { grants: [grant], liveThreadIds: new Set() },
+      { run: true },
+    ],
   ];
   it.each(cases)("%s", (_name, input, context, expected) => {
     expect(decideCommand(input, { ...context, nowIso })).toMatchObject(expected);

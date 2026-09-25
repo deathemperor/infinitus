@@ -34,7 +34,10 @@ import { InfinitusTeamRelayLive } from "./InfinitusTeamRelay.ts";
 const environmentId = EnvironmentId.make("env-1");
 const decodeBody = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
-const thread = (id: string, input: { running?: boolean; updatedAt?: string; projectId?: string } = {}) =>
+const thread = (
+  id: string,
+  input: { running?: boolean; updatedAt?: string; projectId?: string } = {},
+) =>
   ({
     id,
     projectId: input.projectId ?? "p-1",
@@ -69,7 +72,12 @@ const shell = (threads: ReadonlyArray<OrchestrationThreadShell>): OrchestrationS
         workspaceRoot: "/Users/loc/death/limitless",
         defaultModelSelection: { provider: "claude", model: "opus" },
       },
-      { id: "p-2", title: "Secret", workspaceRoot: "/Users/loc/secret", defaultModelSelection: null },
+      {
+        id: "p-2",
+        title: "Secret",
+        workspaceRoot: "/Users/loc/secret",
+        defaultModelSelection: null,
+      },
     ],
     threads,
   }) as never;
@@ -139,8 +147,15 @@ function harness(input: {
     Effect.sync(() => {
       const path = new URL(request.url).pathname;
       const body =
-        request.body._tag === "Uint8Array" ? decodeBody(new TextDecoder().decode(request.body.body)) : null;
-      requests.push({ method: request.method, path, user: request.headers["x-infinitus-user"], body });
+        request.body._tag === "Uint8Array"
+          ? decodeBody(new TextDecoder().decode(request.body.body))
+          : null;
+      requests.push({
+        method: request.method,
+        path,
+        user: request.headers["x-infinitus-user"],
+        body,
+      });
       const json = path.endsWith("/infinitus-team")
         ? { userId: "user-1", teams: input.teams }
         : path.endsWith("/infinitus-team/commands")
@@ -155,7 +170,16 @@ function harness(input: {
       ? ({
           available: true,
           fleets: [],
-          commands: [{ name: "team-days", args: [], options: [], effect: "read", summary: "", replyShape: "" }],
+          commands: [
+            {
+              name: "team-days",
+              args: [],
+              options: [],
+              effect: "read",
+              summary: "",
+              replyShape: "",
+            },
+          ],
         } as never)
       : input.mac === null
         ? ({ available: false, unavailableReason: "away", fleets: [], commands: [] } as never)
@@ -216,21 +240,38 @@ function harness(input: {
 const documentsOf = (requests: ReadonlyArray<Recorded>) =>
   requests
     .filter((request) => request.path.endsWith("/documents"))
-    .flatMap((request) => (request.body as { documents: Array<{ kind: string; key: string; body: unknown }> }).documents);
+    .flatMap(
+      (request) =>
+        (request.body as { documents: Array<{ kind: string; key: string; body: unknown }> })
+          .documents,
+    );
 
 describe("InfinitusTeamRelay publishes", () => {
   it.effect("skips the kinds shared off and publishes the rest", () =>
     Effect.gen(function* () {
       const h = harness({
-        teams: [membership({ shares: { now: "team", fleet: "off", threads: "leaders", stats: "off", transcripts: "off" } })],
+        teams: [
+          membership({
+            shares: {
+              now: "team",
+              fleet: "off",
+              threads: "leaders",
+              stats: "off",
+              transcripts: "off",
+            },
+          }),
+        ],
         threads: [thread("t-1", { running: true })],
       });
       const relay = yield* InfinitusTeamRelay.pipe(Effect.provide(h.layer));
       yield* relay.publishAll;
       const documents = documentsOf(h.requests);
       expect(documents.map((document) => document.kind)).toEqual(["now", "threads"]);
-      expect((documents[0]?.body as { live: Array<{ id: string }> }).live.map((row) => row.id)).toEqual(["t-1"]);
-      expect(h.requests[0]).toMatchObject({ path: "/v1/environments/env-1/infinitus-team", user: "user-1" });
+      expect(documents[0]?.body).toMatchObject({ live: [{ id: "t-1" }] });
+      expect(h.requests[0]).toMatchObject({
+        path: "/v1/environments/env-1/infinitus-team",
+        user: "user-1",
+      });
       expect(h.requests.some((request) => request.path.endsWith("/transcripts"))).toBe(false);
     }),
   );
@@ -262,38 +303,40 @@ describe("InfinitusTeamRelay publishes", () => {
     }),
   );
 
-  it.effect("transcripts resume after the relay's cursor, redacted, and skip an excluded project", () =>
-    Effect.gen(function* () {
-      const h = harness({
-        teams: [membership({ transcripts: [{ threadId: "t-1", rows: 1, nextSeq: 3 }] })],
-        threads: [thread("t-1"), thread("t-2", { projectId: "p-2" })],
-        messages: {
-          "t-1": [
-            { role: "user", text: "already there" },
-            { role: "assistant", text: "cd /Users/loc/x with sk-abcdefghijklmnopqrstuvwxyz" },
-          ],
-          "t-2": [{ role: "user", text: "private" }],
-        },
-        exclusions: ["secret"],
-      });
-      const relay = yield* InfinitusTeamRelay.pipe(Effect.provide(h.layer));
-      yield* relay.publishAll;
-      const chunks = h.requests.filter((request) => request.path.endsWith("/transcripts"));
-      expect(chunks.map((chunk) => chunk.body)).toEqual([
-        {
-          userId: "user-1",
-          threadId: "t-1",
-          seq: 3,
-          rows: 1,
-          lines: '{"role":"assistant","text":"cd ~/x with [redacted-key]","at":1790319600}\n',
-        },
-      ]);
-      const index = documentsOf(h.requests).find((document) => document.kind === "threads");
-      expect((index?.body as { threads: Array<{ id: string }> }).threads.map((row) => row.id)).toEqual(["t-1"]);
-      h.requests.length = 0;
-      yield* relay.publishAll;
-      expect(h.requests.some((request) => request.path.endsWith("/transcripts"))).toBe(false);
-    }),
+  it.effect(
+    "transcripts resume after the relay's cursor, redacted, and skip an excluded project",
+    () =>
+      Effect.gen(function* () {
+        const h = harness({
+          teams: [membership({ transcripts: [{ threadId: "t-1", rows: 1, nextSeq: 3 }] })],
+          threads: [thread("t-1"), thread("t-2", { projectId: "p-2" })],
+          messages: {
+            "t-1": [
+              { role: "user", text: "already there" },
+              { role: "assistant", text: "cd /Users/loc/x with sk-abcdefghijklmnopqrstuvwxyz" },
+            ],
+            "t-2": [{ role: "user", text: "private" }],
+          },
+          exclusions: ["secret"],
+        });
+        const relay = yield* InfinitusTeamRelay.pipe(Effect.provide(h.layer));
+        yield* relay.publishAll;
+        const chunks = h.requests.filter((request) => request.path.endsWith("/transcripts"));
+        expect(chunks.map((chunk) => chunk.body)).toEqual([
+          {
+            userId: "user-1",
+            threadId: "t-1",
+            seq: 3,
+            rows: 1,
+            lines: '{"role":"assistant","text":"cd ~/x with [redacted-key]","at":1790319600}\n',
+          },
+        ]);
+        const index = documentsOf(h.requests).find((document) => document.kind === "threads");
+        expect(index?.body).toMatchObject({ threads: [{ id: "t-1" }] });
+        h.requests.length = 0;
+        yield* relay.publishAll;
+        expect(h.requests.some((request) => request.path.endsWith("/transcripts"))).toBe(false);
+      }),
   );
 
   it.effect("a Mac that is away still publishes now with empty fleets and no stats", () =>
@@ -339,7 +382,10 @@ describe("InfinitusTeamRelay runs commands", () => {
       yield* relay.publishNow;
       yield* relay.pollCommands;
       expect(h.dispatched.map((command) => command.type)).toEqual(["thread.turn.start"]);
-      expect(h.dispatched[0]).toMatchObject({ threadId: "t-1", message: { text: "hello from Bo" } });
+      expect(h.dispatched[0]).toMatchObject({
+        threadId: "t-1",
+        message: { text: "hello from Bo" },
+      });
       expect(acksOf(h.requests)).toEqual([{ userId: "user-1", outcome: "done" }]);
     }),
   );
@@ -354,7 +400,9 @@ describe("InfinitusTeamRelay runs commands", () => {
           queued({ commandId: "c-gone", grant: { ...grant, grantId: "g-old" } }),
           queued({ commandId: "c-view", action: "view" }),
         ],
-        messages: { "t-1": [{ role: "assistant", text: "token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234" }] },
+        messages: {
+          "t-1": [{ role: "assistant", text: "token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234" }],
+        },
       });
       const relay = yield* InfinitusTeamRelay.pipe(Effect.provide(h.layer));
       yield* relay.publishNow;

@@ -143,7 +143,11 @@ export const InfinitusTeamRelayLive = Layer.effect(
     const publishDocuments = (
       link: Link,
       teamId: TeamEnvironmentMembership["teamId"],
-      documents: ReadonlyArray<{ kind: "now" | "fleet" | "threads" | "stats"; key: string; body: unknown }>,
+      documents: ReadonlyArray<{
+        kind: "now" | "fleet" | "threads" | "stats";
+        key: string;
+        body: unknown;
+      }>,
     ) =>
       Effect.forEach(
         Array.from({ length: Math.ceil(documents.length / DOCUMENTS_PER_PUBLISH) }, (_, i) =>
@@ -159,7 +163,9 @@ export const InfinitusTeamRelayLive = Layer.effect(
       );
 
     const on = (share: TeamShareAudience) => share !== "off";
-    const nowSeconds = DateTime.now.pipe(Effect.map((now) => Math.floor(DateTime.toEpochMillis(now) / 1000)));
+    const nowSeconds = DateTime.now.pipe(
+      Effect.map((now) => Math.floor(DateTime.toEpochMillis(now) / 1000)),
+    );
 
     /** The Mac's snapshot when it answers, null when it does not. */
     const macSnapshot: Effect.Effect<InfinitusSnapshot | null> = infinitus.snapshot.pipe(
@@ -182,22 +188,30 @@ export const InfinitusTeamRelayLive = Layer.effect(
                 }),
               ),
               Effect.catchCause((cause) =>
-                Effect.logWarning("infinitus.team.days-failed", { cause: Cause.pretty(cause) }).pipe(
-                  Effect.as(null),
-                ),
+                Effect.logWarning("infinitus.team.days-failed", {
+                  cause: Cause.pretty(cause),
+                }).pipe(Effect.as(null)),
               ),
             );
 
     const warn = (stage: string, extra: Record<string, unknown> = {}) =>
       Effect.catchCause((cause: Cause.Cause<unknown>) =>
-        Effect.logWarning("infinitus.team.publish-failed", { stage, ...extra, cause: Cause.pretty(cause) }),
+        Effect.logWarning("infinitus.team.publish-failed", {
+          stage,
+          ...extra,
+          cause: Cause.pretty(cause),
+        }),
       );
 
     const shellSnapshot: Effect.Effect<OrchestrationShellSnapshot> = snapshotQuery
       .getShellSnapshot()
       .pipe(Effect.orDie);
 
-    const nowDocument = (shell: OrchestrationShellSnapshot, snapshot: InfinitusSnapshot | null, at: number) =>
+    const nowDocument = (
+      shell: OrchestrationShellSnapshot,
+      snapshot: InfinitusSnapshot | null,
+      at: number,
+    ) =>
       buildNowDocument({
         at,
         machine,
@@ -230,7 +244,9 @@ export const InfinitusTeamRelayLive = Layer.effect(
         const floor = at - TRANSCRIPT_HISTORY_DAYS * 86_400;
         const sent = sentThreads.get(team.teamId) ?? new Map<string, number>();
         sentThreads.set(team.teamId, sent);
-        const projects = new Map(shell.projects.map((project) => [project.id, project.workspaceRoot]));
+        const projects = new Map(
+          shell.projects.map((project) => [project.id, project.workspaceRoot]),
+        );
         for (const thread of shell.threads) {
           const updatedAt = unixSeconds(thread.updatedAt) ?? at;
           if (updatedAt < floor || sent.get(thread.id) === updatedAt) continue;
@@ -249,7 +265,13 @@ export const InfinitusTeamRelayLive = Layer.effect(
             yield* link.api.publishTranscript({
               params: { environmentId: link.environmentId, teamId: team.teamId },
               headers: link.headers,
-              payload: { userId: link.userId, threadId: thread.id, seq, rows: chunk.rows, lines: chunk.lines },
+              payload: {
+                userId: link.userId,
+                threadId: thread.id,
+                seq,
+                rows: chunk.rows,
+                lines: chunk.lines,
+              },
             });
             seq += 1;
           }
@@ -270,10 +292,16 @@ export const InfinitusTeamRelayLive = Layer.effect(
       const now = buildNowDocument({ at, machine, live: threads.live, snapshot });
       const fleet = snapshot === null ? null : buildFleetDocument(snapshot.fleets, at);
       for (const team of reply.teams) {
-        const documents: Array<{ kind: "now" | "fleet" | "threads" | "stats"; key: string; body: unknown }> = [];
+        const documents: Array<{
+          kind: "now" | "fleet" | "threads" | "stats";
+          key: string;
+          body: unknown;
+        }> = [];
         if (on(team.shares.now)) documents.push({ kind: "now", key: "-", body: now });
-        if (on(team.shares.fleet) && fleet !== null) documents.push({ kind: "fleet", key: "-", body: fleet });
-        if (on(team.shares.threads)) documents.push({ kind: "threads", key: "-", body: threads.document });
+        if (on(team.shares.fleet) && fleet !== null)
+          documents.push({ kind: "fleet", key: "-", body: fleet });
+        if (on(team.shares.threads))
+          documents.push({ kind: "threads", key: "-", body: threads.document });
         const digests = sentDays.get(team.teamId) ?? new Map<string, string>();
         if (on(team.shares.stats) && days !== null) {
           for (const [day, body] of Object.entries(days.days)) {
@@ -287,7 +315,8 @@ export const InfinitusTeamRelayLive = Layer.effect(
             Effect.tap(() =>
               Effect.sync(() => {
                 for (const document of documents) {
-                  if (document.kind === "stats") digests.set(document.key, dayDigest(document.body));
+                  if (document.kind === "stats")
+                    digests.set(document.key, dayDigest(document.body));
                 }
                 sentDays.set(team.teamId, digests);
               }),
@@ -296,7 +325,9 @@ export const InfinitusTeamRelayLive = Layer.effect(
           );
         }
         if (on(team.shares.transcripts)) {
-          yield* publishTranscripts(link, team, shell, at).pipe(warn("transcripts", { teamId: team.teamId }));
+          yield* publishTranscripts(link, team, shell, at).pipe(
+            warn("transcripts", { teamId: team.teamId }),
+          );
         }
       }
     }).pipe(warn("memberships"));
@@ -356,7 +387,10 @@ export const InfinitusTeamRelayLive = Layer.effect(
               return { outcome: "badRequest" as const, detail: "No such project." };
             }
             if (project.defaultModelSelection === null) {
-              return { outcome: "badRequest" as const, detail: "That project has no default model." };
+              return {
+                outcome: "badRequest" as const,
+                detail: "That project has no default model.",
+              };
             }
             const text = command.text ?? "";
             const newThreadId = ThreadId.make(yield* crypto.randomUUIDv4);
@@ -404,7 +438,9 @@ export const InfinitusTeamRelayLive = Layer.effect(
       if (queued.length === 0) return;
       const shell = yield* shellSnapshot;
       const live = new Set(
-        buildThreadsDocument(shell, { now: yield* nowSeconds, exclusions }).live.map((row) => row.id),
+        buildThreadsDocument(shell, { now: yield* nowSeconds, exclusions }).live.map(
+          (row) => row.id,
+        ),
       );
       const at = yield* nowIso;
       for (const command of queued) {
@@ -451,7 +487,12 @@ export const InfinitusTeamRelayLive = Layer.effect(
         yield* forkParked(
           publishNow.pipe(Effect.delay(NOW_INTERVAL), Effect.repeat(Schedule.spaced(NOW_INTERVAL))),
         );
-        yield* forkParked(pollCommands.pipe(Effect.delay(POLL_INTERVAL), Effect.repeat(Schedule.spaced(POLL_INTERVAL))));
+        yield* forkParked(
+          pollCommands.pipe(
+            Effect.delay(POLL_INTERVAL),
+            Effect.repeat(Schedule.spaced(POLL_INTERVAL)),
+          ),
+        );
       });
 
     return { start, publishNow, publishAll, pollCommands };
