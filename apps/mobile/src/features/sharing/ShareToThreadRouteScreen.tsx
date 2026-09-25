@@ -1,6 +1,11 @@
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import { LegendList } from "@legendapp/list/react-native";
-import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
+import {
+  StackActions,
+  useNavigation,
+  usePreventRemove,
+  type StaticScreenProps,
+} from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
@@ -124,6 +129,10 @@ export function ShareToThreadRouteScreen({
   const { consumeShare, getShare } = useIncomingShare();
   const [query, setQuery] = useState("");
   const [importingThreadKey, setImportingThreadKey] = useState<string | null>(null);
+  // Closing the sheet over an unimported share discards it and sweeps its
+  // files; a swipe-down mid-merge would race that sweep against the draft
+  // taking the files over.
+  usePreventRemove(importingThreadKey !== null, () => undefined);
   const mountedRef = useRef(true);
   const usesNativeMailSearchToolbar = Platform.OS === "ios" && NATIVE_MAIL_SEARCH_TOOLBAR_SUPPORTED;
   const rows = useMemo(
