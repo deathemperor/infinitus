@@ -2,6 +2,7 @@ import type {
   InfinitusCommandInput,
   InfinitusManifestCommand,
 } from "@infinitus/contracts/infinitus";
+import { ThreadId } from "@infinitus/contracts";
 import { InfinitusTeamExclusions } from "@infinitus/contracts/infinitus";
 import type { TeamCapability, TeamGrantCreate } from "@infinitus/contracts/relayInfinitusTeam";
 import { InfinitusTeamError } from "@infinitus/client-runtime/relay/infinitusTeam";
@@ -16,7 +17,9 @@ import * as Schema from "effect/Schema";
  */
 
 /** A Mac whose manifest answers `team-exclusions` (≥ 0.5.0-alpha.36). */
-export function teamExclusionsSupported(commands: ReadonlyArray<InfinitusManifestCommand>): boolean {
+export function teamExclusionsSupported(
+  commands: ReadonlyArray<InfinitusManifestCommand>,
+): boolean {
   return commands.some((command) => command.name === "team-exclusions");
 }
 
@@ -109,7 +112,7 @@ export function teamGrantDraft(input: {
   return {
     environmentId: input.environmentId,
     audience: audience === "leaders" || audience === "team" ? audience : [audience],
-    threads: threads.length === 0 ? "all" : (threads as TeamGrantCreate["threads"]),
+    threads: threads.length === 0 ? "all" : threads.map((id) => ThreadId.make(id)),
     capabilities,
     ...(preauthorized.length === 0 ? {} : { preauthorized }),
   };

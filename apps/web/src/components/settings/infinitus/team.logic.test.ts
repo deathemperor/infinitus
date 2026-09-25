@@ -65,7 +65,13 @@ describe("team.logic (#1592)", () => {
       }),
     ).toEqual({ environmentId, audience: "team", threads: "all", capabilities: ["new"] });
     expect(
-      teamGrantDraft({ environmentId, audience: "team", capabilities: [], threads: "", preauthorized: [] }),
+      teamGrantDraft({
+        environmentId,
+        audience: "team",
+        capabilities: [],
+        threads: "",
+        preauthorized: [],
+      }),
     ).toBeNull();
   });
 
@@ -76,7 +82,9 @@ describe("team.logic (#1592)", () => {
     expect(teamErrorMessage(new InfinitusTeamError("failed", "Relay is down.", "trace-1"))).toBe(
       "Relay is down. Trace ID: trace-1",
     );
-    expect(teamErrorMessage(new InfinitusTeamError("signedOut", "Sign in first."))).toBe("Sign in first.");
+    expect(teamErrorMessage(new InfinitusTeamError("signedOut", "Sign in first."))).toBe(
+      "Sign in first.",
+    );
     expect(teamErrorMessage(new Error("boom"))).toBe("boom");
     expect(teamErrorMessage(undefined)).toBe("Something went wrong.");
   });

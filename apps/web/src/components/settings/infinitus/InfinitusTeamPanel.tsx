@@ -1,29 +1,49 @@
 /**
- * Settings › Team (#1313): the team this Mac is in, read over the
- * control socket's `team-status`, with Fetch now / Publish now; for a
- * leader the pending requests' Approve / Decline, Remove / Promote on the
- * roster, the invite code and who
- * may request to join. Every member picks the audience per kind and keeps
- * projects private. With no team the page offers Join — this Mac's roster
- * name as the argument, the team code or invite link on `infinitus.secret` —
- * and Create: team name, your name, an empty private repo's URL, and the
- * remote's write token on the secret channel when it needs one (an ssh remote
- * needs none and goes over `infinitus.command`). Delegated control (spec §8):
- * the grants this Mac gave (add / revoke), the teammates' commands waiting
- * for its tap (Allow / Deny), and on each member what they let you do; the
- * driving itself is `infinitusctl team drive`, not a page. Every secret field is
- * `type="password"`, never remembered, cleared on submit; a minted code is
- * shown once and never logged; the Mac's own error verbatim, the value never
- * in it.
+ * Settings › Team on Infinitus Connect (#1592): the teams the signed-in
+ * user is in, read and changed on the relay with the user's Clerk token.
+ * Signed out, one card offers the sign-in the sidebar offers. Signed in:
+ * a team picker when in several; Members (a leader's Promote / Demote /
+ * Remove; a row expands to the member's threads index, a thread to its
+ * transcript rows), Requests, Invites (minted once, shown once, with Copy
+ * and Copy link), Sharing, Policy, Grants and Waiting for you, Leave; then
+ * Join (the bare token or either link shape) and Create. Private projects
+ * stay the Mac's, over its `team-exclusions` / `team-exclude` verbs. Every
+ * relay error is its reason verbatim.
  *
  * @module InfinitusTeamPanel
  */
-import * as Redacted from "effect/Redacted";
-import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@clerk/react";
+import type { InfinitusTeamClient } from "@infinitus/client-runtime/relay/infinitusTeam";
+import {
+  audienceLabel,
+  buildJoinLink,
+  grantSummary,
+  machineIsOnline,
+  machineNow,
+  memberSummary,
+  parseJoinInput,
+  pendingSummary,
+  relativeTime,
+  threadsIndex,
+  transcriptRows,
+  untilTime,
+  type TeamThreadRow,
+  type TeamTranscriptRow,
+} from "@infinitus/client-runtime/relay/infinitusTeamLogic";
+import type {
+  TeamListRow,
+  TeamMemberRow,
+  TeamShares,
+  TeamSnapshot,
+} from "@infinitus/contracts/relayInfinitusTeam";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
+import { hasCloudPublicConfig } from "../../../cloud/publicConfig";
+import { useInfinitusConnectAuthPrompt } from "../../clerk/useInfinitusConnectAuthPrompt";
 import { usePendingTeamJoinStore } from "../../deepLinks/pendingTeamJoin";
 import {
   AlertDialog,
@@ -45,509 +65,289 @@ import {
   useRelativeTimeTick,
 } from "../settingsLayout";
 import { InfinitusPanelNotice, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
-import { infinitusCommandFailure, infinitusPanelMessage } from "./panel.logic";
+import { infinitusCommandFailure } from "./panel.logic";
 import {
-  infinitusSecretFailure,
-  parseTeamCode,
-  parseTeamStatus,
-  relativeUnix,
+  parseTeamExclusions,
   TEAM_CAPABILITIES,
+  TEAM_EXCLUSIONS_INPUT,
   TEAM_KINDS,
   TEAM_SHARE_TARGETS,
-  teamCommandInput,
-  teamCreateCommandInput,
-  teamCreateDraft,
-  teamCreateSecretArgs,
-  teamCreateSupported,
+  teamErrorMessage,
+  teamExcludeInput,
   teamExclusionSlug,
-  teamGrantAudience,
+  teamExclusionsSupported,
   teamGrantDraft,
-  teamGrantSummary,
-  teamJoinLink,
-  teamJoinSecretArgs,
-  teamJoinSupported,
   teamMemberName,
-  teamMemberSummary,
-  teamPendingSummary,
   teamRoleLabel,
-  teamStatusSupported,
-  type TeamAction,
-  type TeamStatus,
 } from "./team.logic";
-
-const UNSUPPORTED = "This Infinitus build has no team commands (needs ≥ 0.5.0-alpha.17).";
+import { useInfinitusTeamClient } from "./useInfinitusTeamClient";
 
 export function InfinitusTeamPanel() {
-  const { environmentId, capability, snapshot } = useInfinitusEnvironment();
-  const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
-  const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
-  const nowMs = useRelativeTimeTick(30_000);
-  /** `undefined` before the first read; null once the Mac says it is in no team. */
-  const [team, setTeam] = useState<TeamStatus | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<TeamAction["type"] | "join" | "create" | null>(null);
-  const [joinName, setJoinName] = useState("");
-  /** The code, a secret: in memory only, cleared on submit, gone with the page. */
-  // A join link the desktop received (infinitus://join/…) lands here as the
-  // code, once: on mount when the link opened this page, by subscription when
-  // it arrived with the page already open. The user still presses Request to join.
-  const [joinCode, setJoinCode] = useState(() => usePendingTeamJoinStore.getState().take() ?? "");
-  useEffect(
-    () =>
-      usePendingTeamJoinStore.subscribe((state) => {
-        if (state.code === null) return;
-        setJoinCode(usePendingTeamJoinStore.getState().take() ?? "");
-      }),
-    [],
-  );
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [createName, setCreateName] = useState("");
-  const [createLeader, setCreateLeader] = useState("");
-  const [createRemote, setCreateRemote] = useState("");
-  /** The remote's write token, a secret: in memory only, cleared on submit. */
-  const [createToken, setCreateToken] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
-  /** The code minted last, shown once; gone with the page. */
-  const [minted, setMinted] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const [exclusionDraft, setExclusionDraft] = useState("");
-  const [grantAudience, setGrantAudience] = useState("leaders");
-  const [grantCapabilities, setGrantCapabilities] = useState<ReadonlyArray<string>>(["view"]);
-  const [grantThreads, setGrantThreads] = useState("");
-  const [grantPreauthorized, setGrantPreauthorized] = useState<ReadonlyArray<string>>([]);
-  const [leaveOpen, setLeaveOpen] = useState(false);
-
-  const supported =
-    snapshot !== null && snapshot.available && teamStatusSupported(snapshot.commands);
-  const joinSupported = snapshot !== null && teamJoinSupported(snapshot.commands);
-  const createSupported = snapshot !== null && teamCreateSupported(snapshot.commands);
-
-  const applyStatus = useCallback((result: unknown) => {
-    const parsed = parseTeamStatus(result);
-    if (parsed === null) {
-      setError("Infinitus answered team-status with a shape this build cannot read.");
-      return;
-    }
-    setError(null);
-    setTeam(parsed.team);
-  }, []);
-
-  /** One secret-free verb; every one but publish, code and leave answers team-status. */
-  const send = useCallback(
-    async (action: TeamAction) => {
-      if (environmentId === null) return;
-      const result = await runCommand({ environmentId, input: teamCommandInput(action) });
-      if (result._tag === "Failure") {
-        setError(infinitusCommandFailure(result.cause).message);
-        return;
-      }
-      if (action.type === "code") {
-        const code = parseTeamCode(result.value.result);
-        if (code === null) {
-          setError("Infinitus answered team-code with a shape this build cannot read.");
-          return;
-        }
-        setError(null);
-        setCopied(null);
-        setMinted(code.code);
-        return;
-      }
-      if (
-        action.type === "publish" ||
-        action.type === "leave" ||
-        action.type === "grant" ||
-        action.type === "revoke" ||
-        action.type === "allow" ||
-        action.type === "deny"
-      ) {
-        // Publish answers what it pushed, leave {left}, grant the grant,
-        // revoke {removed}, allow/deny the ack; a read follows so the page
-        // shows the state it changed.
-        const status = await runCommand({
-          environmentId,
-          input: teamCommandInput({ type: "status" }),
-        });
-        if (status._tag === "Failure") {
-          setError(infinitusCommandFailure(status.cause).message);
-          return;
-        }
-        applyStatus(status.value.result);
-        return;
-      }
-      applyStatus(result.value.result);
-    },
-    [applyStatus, environmentId, runCommand],
-  );
-
-  /** A write from a control: busy while the Mac answers. */
-  const run = async (action: Exclude<TeamAction, { type: "status" }>) => {
-    setBusy(action.type);
-    await send(action);
-    setBusy(null);
-  };
-
-  useEffect(() => {
-    if (!supported) return;
-    void send({ type: "status" });
-  }, [send, supported]);
-
-  const join = async () => {
-    if (environmentId === null) return;
-    const name = teamMemberName(joinName);
-    const code = joinCode.trim();
-    setJoinCode("");
-    if (name === null) {
-      setJoinError("Give this Mac a name for the roster.");
-      return;
-    }
-    if (code.length === 0) {
-      setJoinError("Paste the team code or invite link.");
-      return;
-    }
-    setBusy("join");
-    setJoinError(null);
-    const result = await runSecret({
-      environmentId,
-      input: { ...teamJoinSecretArgs(name), secret: Redacted.make(code) },
-    });
-    setBusy(null);
-    if (result._tag === "Failure") {
-      setJoinError(infinitusSecretFailure(result.cause));
-      return;
-    }
-    applyStatus(result.value.result);
-  };
-
-  const create = async () => {
-    if (environmentId === null) return;
-    const draft = teamCreateDraft(createName, createLeader, createRemote);
-    const token = createToken.trim();
-    setCreateToken("");
-    if (draft === null) {
-      setCreateError(
-        "Fill in the team name, your name and the repo URL (each under 128 characters).",
-      );
-      return;
-    }
-    setBusy("create");
-    setCreateError(null);
-    // A token rides the secret channel; without one the verb needs no stdin
-    // and goes over the plain command like every other write.
-    const result =
-      token.length === 0
-        ? await runCommand({ environmentId, input: teamCreateCommandInput(draft) })
-        : await runSecret({
-            environmentId,
-            input: { ...teamCreateSecretArgs(draft), secret: Redacted.make(token) },
-          });
-    setBusy(null);
-    if (result._tag === "Failure") {
-      setCreateError(
-        token.length === 0
-          ? infinitusCommandFailure(result.cause).message
-          : infinitusSecretFailure(result.cause),
-      );
-      return;
-    }
-    applyStatus(result.value.result);
-  };
-
-  const copy = async (what: "code" | "link") => {
-    if (minted === null) return;
-    try {
-      await navigator.clipboard.writeText(what === "code" ? minted : teamJoinLink(minted));
-      setCopied(what);
-    } catch {
-      setError("Copy failed — select the code and copy it by hand.");
-    }
-  };
-
-  const addGrant = async () => {
-    const draft = teamGrantDraft(
-      grantAudience,
-      grantCapabilities,
-      grantThreads,
-      grantPreauthorized,
-    );
-    if (draft === null) {
-      setError("Pick who and at least one capability.");
-      return;
-    }
-    setGrantThreads("");
-    await run({ type: "grant", draft });
-  };
-
-  const toggle = (list: ReadonlyArray<string>, item: string, on: boolean) =>
-    on ? (list.includes(item) ? list : [...list, item]) : list.filter((c) => c !== item);
-
-  const addExclusion = async () => {
-    const slug = teamExclusionSlug(exclusionDraft);
-    if (slug === null) {
-      setError("A project is its folder's name, not a path.");
-      return;
-    }
-    setExclusionDraft("");
-    await run({ type: "exclude", slug, on: true });
-  };
-
-  if (capability !== true || snapshot === null || !snapshot.available || !supported) {
-    const state =
-      capability !== true
-        ? "unsupported"
-        : snapshot === null
-          ? "loading"
-          : !snapshot.available
-            ? "unavailable"
-            : "empty";
+  if (!hasCloudPublicConfig()) {
     return (
       <SettingsPageContainer>
         <SettingsSection id="infinitus-team" title="Team">
           <InfinitusPanelNotice
-            message={infinitusPanelMessage(state, snapshot?.unavailableReason, UNSUPPORTED)}
+            message={`${CONNECT_NAME} is not configured on this build; Team needs it.`}
           />
+        </SettingsSection>
+        <PrivateProjectsSection />
+      </SettingsPageContainer>
+    );
+  }
+  return <ConnectedTeamPanel />;
+}
+
+function ConnectedTeamPanel() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { openAuthPrompt } = useInfinitusConnectAuthPrompt();
+  const client = useInfinitusTeamClient();
+  if (!isLoaded) {
+    return (
+      <SettingsPageContainer>
+        <SettingsSection id="infinitus-team" title="Team">
+          <InfinitusPanelNotice message="Loading…" />
         </SettingsSection>
       </SettingsPageContainer>
     );
   }
+  if (!isSignedIn) {
+    return (
+      <SettingsPageContainer>
+        <SettingsSection id="infinitus-team" title="Team">
+          <SettingsRow
+            title={`Sign in to ${CONNECT_NAME} to use Team`}
+            description="Teams live on your account: join from any of your machines, and what each one shares reaches your teammates through the relay."
+            control={
+              <Button size="sm" onClick={openAuthPrompt}>
+                Sign in
+              </Button>
+            }
+          />
+        </SettingsSection>
+        <PrivateProjectsSection />
+      </SettingsPageContainer>
+    );
+  }
+  return <TeamPane client={client} />;
+}
+
+type Busy = string | null;
+
+function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
+  const { environmentId } = useInfinitusEnvironment();
+  const nowMs = useRelativeTimeTick(30_000);
+  /** `undefined` before the first read. */
+  const [teams, setTeams] = useState<ReadonlyArray<TeamListRow> | undefined>(undefined);
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [team, setTeam] = useState<TeamSnapshot | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Busy>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const fail = useCallback((cause: unknown) => setError(teamErrorMessage(cause)), []);
+
+  const loadTeam = useCallback(
+    async (id: string) => {
+      try {
+        setTeam(await client.getTeam(id));
+        setError(null);
+      } catch (cause) {
+        fail(cause);
+      }
+    },
+    [client, fail],
+  );
+
+  // The picked team survives a reload without being an effect dependency,
+  // so the first read runs once per client.
+  const pickedRef = useRef<string | null>(null);
+  const loadTeams = useCallback(
+    async (prefer?: string) => {
+      try {
+        const list = await client.listTeams();
+        setTeams(list);
+        setError(null);
+        const wanted = prefer ?? pickedRef.current;
+        const next = list.find((row) => row.teamId === wanted)?.teamId ?? list[0]?.teamId ?? null;
+        pickedRef.current = next;
+        setTeamId(next);
+        if (next === null) setTeam(null);
+        else await loadTeam(next);
+      } catch (cause) {
+        setTeams([]);
+        fail(cause);
+      }
+    },
+    [client, fail, loadTeam],
+  );
+
+  useEffect(() => {
+    void loadTeams();
+  }, [loadTeams]);
+
+  /** One relay write that answers the snapshot. */
+  const apply = async (label: string, run: () => Promise<TeamSnapshot>) => {
+    setBusy(label);
+    try {
+      setTeam(await run());
+      setError(null);
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** One relay write that answers nothing; the snapshot is read again. */
+  const applyThenReload = async (label: string, run: () => Promise<unknown>) => {
+    setBusy(label);
+    try {
+      await run();
+      setError(null);
+      if (teamId !== null) await loadTeam(teamId);
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const isLeader = team?.role === "leader";
-  const inTeam = team !== null && team !== undefined;
+  const id = team?.teamId ?? null;
 
   return (
     <SettingsPageContainer>
       <SettingsSection id="infinitus-team" title="Team">
-        {team === undefined ? (
-          <InfinitusPanelNotice message="Reading the team…" />
-        ) : team === null ? (
-          <InfinitusPanelNotice message="This Mac is not in a team." />
+        {teams === undefined ? (
+          <InfinitusPanelNotice message="Reading your teams…" />
+        ) : teams.length === 0 ? (
+          <InfinitusPanelNotice message="You are in no team yet. Join one below, or create one." />
+        ) : teams.length === 1 && team !== null ? (
+          <SettingsRow
+            title={team.name}
+            description={`${teamRoleLabel(team.role)} · you are ${team.me.name}`}
+          />
         ) : (
-          <>
-            <SettingsRow
-              title={team.name}
-              description={`${teamRoleLabel(team.role)} · ${team.remote} · fetched ${relativeUnix(team.lastFetch, nowMs)} · published ${relativeUnix(team.lastPublish, nowMs)}`}
-              control={
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy !== null}
-                    onClick={() => void run({ type: "fetch" })}
-                  >
-                    {busy === "fetch" ? "Fetching…" : "Fetch now"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy !== null || team.role === "pending"}
-                    onClick={() => void run({ type: "publish" })}
-                  >
-                    {busy === "publish" ? "Publishing…" : "Publish now"}
-                  </Button>
-                </>
-              }
-            />
-            {team.role === "pending" ? (
-              <InfinitusPanelNotice message="Waiting for a leader to approve you." />
-            ) : null}
-            {team.lastError === null || team.lastError === undefined ? null : (
-              <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
-                {team.lastError}
-              </p>
-            )}
-          </>
+          <SettingsRow
+            title="Team"
+            description={
+              team === null ? "Reading…" : `${teamRoleLabel(team.role)} · you are ${team.me.name}`
+            }
+            control={
+              <Select
+                value={teamId ?? ""}
+                onValueChange={(value) => {
+                  if (typeof value === "string" && value.length > 0) {
+                    pickedRef.current = value;
+                    setTeamId(value);
+                    void loadTeam(value);
+                  }
+                }}
+              >
+                <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Team">
+                  <SelectValue>
+                    {teams.find((row) => row.teamId === teamId)?.name ?? "Pick a team"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup align="end" alignItemWithTrigger={false}>
+                  {teams.map((row) => (
+                    <SelectItem hideIndicator key={row.teamId} value={row.teamId}>
+                      {row.name}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+            }
+          />
         )}
+        {notice === null ? null : <InfinitusPanelNotice message={notice} />}
         {error === null ? null : (
           <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
             {error}
           </p>
         )}
       </SettingsSection>
-      {!inTeam ? null : (
-        <SettingsSection title="Members">
-          {team.members.length === 0 ? (
-            <InfinitusPanelNotice message="No roster yet." />
-          ) : (
-            team.members.map((member) => (
-              <SettingsRow
-                key={member.kid}
-                title={member.name}
-                description={
-                  (member.controls?.length ?? 0) > 0
-                    ? `${teamMemberSummary(member, nowMs)} · lets you ${member.controls!.join(", ")}`
-                    : teamMemberSummary(member, nowMs)
-                }
-                control={
-                  isLeader && !member.isMe ? (
-                    <>
-                      {member.role === "leader" ? null : (
+      {team === null || id === null ? null : (
+        <>
+          <MembersSection
+            client={client}
+            team={team}
+            nowMs={nowMs}
+            busy={busy}
+            onPromote={(userId) => apply("promote", () => client.promoteMember(id, userId))}
+            onDemote={(userId) => apply("demote", () => client.demoteMember(id, userId))}
+            onRemove={(userId) => apply("remove", () => client.removeMember(id, userId))}
+            onError={fail}
+          />
+          {!isLeader ? null : (
+            <SettingsSection title="Requests">
+              {team.requests.length === 0 ? (
+                <InfinitusPanelNotice message="No one is asking to join." />
+              ) : (
+                team.requests.map((request) => (
+                  <SettingsRow
+                    key={request.userId}
+                    title={request.name}
+                    description={`asked ${relativeTime(request.at, nowMs)}`}
+                    control={
+                      <>
                         <Button
                           size="sm"
                           variant="outline"
                           disabled={busy !== null}
-                          aria-label={`Promote ${member.name}`}
-                          onClick={() => void run({ type: "promote", kid: member.kid })}
+                          aria-label={`Decline ${request.name}`}
+                          onClick={() =>
+                            void apply("decline", () => client.declineRequest(id, request.userId))
+                          }
                         >
-                          Make leader
+                          Decline
                         </Button>
-                      )}
-                      {member.founder === true ? null : (
                         <Button
                           size="sm"
-                          variant="outline"
                           disabled={busy !== null}
-                          aria-label={`Remove ${member.name}`}
-                          onClick={() => void run({ type: "remove", kid: member.kid })}
+                          aria-label={`Approve ${request.name}`}
+                          onClick={() =>
+                            void apply("approve", () => client.approveRequest(id, request.userId))
+                          }
                         >
-                          Remove
+                          Approve
                         </Button>
-                      )}
-                    </>
-                  ) : undefined
-                }
-              />
-            ))
+                      </>
+                    }
+                  />
+                ))
+              )}
+            </SettingsSection>
           )}
-        </SettingsSection>
-      )}
-      {!inTeam || !isLeader ? null : (
-        <SettingsSection title="Requests">
-          {(team.requests ?? []).length === 0 ? (
-            <InfinitusPanelNotice message="No one is asking to join." />
-          ) : (
-            (team.requests ?? []).map((request) => (
-              <SettingsRow
-                key={request.kid}
-                title={request.name}
-                description={`${request.platform ?? "?"} · ${(request.devices ?? []).join(", ")} · ${relativeUnix(request.at, nowMs)}`}
-                control={
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={busy !== null}
-                      aria-label={`Decline ${request.name}`}
-                      onClick={() => void run({ type: "decline", kid: request.kid })}
-                    >
-                      Decline
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={busy !== null}
-                      aria-label={`Approve ${request.name}`}
-                      onClick={() => void run({ type: "approve", kid: request.kid })}
-                    >
-                      Approve
-                    </Button>
-                  </>
-                }
-              />
-            ))
+          {!isLeader ? null : (
+            <InvitesSection
+              client={client}
+              team={team}
+              nowMs={nowMs}
+              busy={busy}
+              setBusy={setBusy}
+              onError={fail}
+              onRevoke={(inviteId) =>
+                applyThenReload("revoke-invite", () => client.revokeInvite(id, inviteId))
+              }
+              onPolicy={(requests) => apply("policy", () => client.updatePolicy(id, requests))}
+            />
           )}
-        </SettingsSection>
-      )}
-      {!inTeam || !isLeader ? null : (
-        <SettingsSection id="infinitus-team-invite" title="Invite">
-          <SettingsRow
-            title="Team code"
-            description="A code is good for 7 days; an invite link is a code with a one-time nonce this Mac approves on its own. Both are secrets: shown once, never logged."
-            control={
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy !== null}
-                  onClick={() => void run({ type: "code", days: 7, invite: false })}
-                >
-                  {busy === "code" ? "Minting…" : "Mint a code"}
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={busy !== null}
-                  onClick={() => void run({ type: "code", days: 7, invite: true })}
-                >
-                  Mint an invite link
-                </Button>
-              </>
-            }
-          />
-          {minted === null ? null : (
-            <div className="flex flex-col gap-2 px-3 py-2 sm:px-4">
-              {/* The code is a secret: masked, in memory only, gone with the page. */}
-              <Input
-                type="password"
-                size="sm"
-                readOnly
-                autoComplete="off"
-                aria-label="Minted team code"
-                value={minted}
-              />
-              <div className="flex items-center justify-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => void copy("code")}>
-                  {copied === "code" ? "Copied" : "Copy code"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void copy("link")}>
-                  {copied === "link" ? "Copied" : "Copy link"}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setMinted(null)}>
-                  Done
-                </Button>
-              </div>
-              <p className="text-[13px] text-muted-foreground">
-                The link opens the Infinitus app on a phone or this desktop; the code pastes into
-                Settings › Team on any Mac.
-              </p>
-            </div>
-          )}
-          <SettingsRow
-            title="Who may request to join"
-            description="With a code, anyone holding one this team minted; off, nobody — invite links still work."
-            control={
-              <Select
-                disabled={busy !== null}
-                value={team.policy?.requests ?? "code"}
-                onValueChange={(value) => {
-                  if (value === "code" || value === "off")
-                    void run({ type: "policy", requests: value });
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className="w-full sm:w-44"
-                  aria-label="Who may request to join"
-                >
-                  <SelectValue>
-                    {team.policy?.requests === "off" ? "Nobody" : "With a code"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem hideIndicator value="code">
-                    With a code
-                  </SelectItem>
-                  <SelectItem hideIndicator value="off">
-                    Nobody
-                  </SelectItem>
-                </SelectPopup>
-              </Select>
-            }
-          />
-        </SettingsSection>
-      )}
-      {!inTeam || team.role === "pending" ? null : (
-        <SettingsSection id="infinitus-team-sharing" title="Sharing">
-          {TEAM_KINDS.map(({ kind, label }) => {
-            const current = team.shares?.[kind] ?? "leaders";
-            return (
+          <SettingsSection id="infinitus-team-sharing" title="Sharing">
+            {TEAM_KINDS.map(({ kind, label }) => (
               <SettingsRow
                 key={kind}
                 title={label}
                 control={
                   <Select
                     disabled={busy !== null}
-                    value={current}
+                    value={team.me.shares[kind]}
                     onValueChange={(value) => {
-                      const target = TEAM_SHARE_TARGETS.find((choice) => choice.target === value);
-                      if (target !== undefined)
-                        void run({ type: "share", kind, target: target.target });
+                      if (value === "off" || value === "leaders" || value === "team") {
+                        const shares: TeamShares = { ...team.me.shares, [kind]: value };
+                        void apply(`share-${kind}`, () => client.updateMe(id, { shares }));
+                      }
                     }}
                   >
                     <SelectTrigger
@@ -556,114 +356,547 @@ export function InfinitusTeamPanel() {
                       aria-label={`Share ${kind} with`}
                     >
                       <SelectValue>
-                        {TEAM_SHARE_TARGETS.find((choice) => choice.target === current)?.label ??
-                          current}
+                        {TEAM_SHARE_TARGETS.find((entry) => entry.target === team.me.shares[kind])
+                          ?.label ?? "Nobody"}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectPopup align="end" alignItemWithTrigger={false}>
-                      {TEAM_SHARE_TARGETS.map((choice) => (
-                        <SelectItem hideIndicator key={choice.target} value={choice.target}>
-                          {choice.label}
+                      {TEAM_SHARE_TARGETS.map(({ target, label: targetLabel }) => (
+                        <SelectItem hideIndicator key={target} value={target}>
+                          {targetLabel}
                         </SelectItem>
                       ))}
                     </SelectPopup>
                   </Select>
                 }
               />
-            );
-          })}
-          <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
-            Applies to the next publish; history already shared stays as it was. Everything is
-            redacted on the Mac before it is sealed to its audience.
-          </p>
-        </SettingsSection>
+            ))}
+            <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+              What every machine of yours publishes to this team, once a minute for Now and every
+              five for the rest. Transcripts are redacted before they leave, and kept 90 days.
+            </p>
+          </SettingsSection>
+          <GrantsSection
+            team={team}
+            nowMs={nowMs}
+            busy={busy}
+            environmentId={environmentId}
+            onGrant={(draft) => applyThenReload("grant", () => client.createGrant(id, draft))}
+            onRevoke={(grantId) =>
+              applyThenReload("revoke-grant", () => client.revokeGrant(id, grantId))
+            }
+            onAllow={(commandId) =>
+              applyThenReload("allow", () => client.allowCommand(id, commandId))
+            }
+            onDeny={(commandId) => applyThenReload("deny", () => client.denyCommand(id, commandId))}
+            onError={setError}
+          />
+          <LeaveSection
+            team={team}
+            busy={busy}
+            onLeave={async () => {
+              setBusy("leave");
+              try {
+                await client.leaveTeam(id);
+                setError(null);
+                setTeam(null);
+                await loadTeams("");
+              } catch (cause) {
+                fail(cause);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          />
+        </>
       )}
-      {!inTeam || team.role === "pending" ? null : (
-        <SettingsSection id="infinitus-team-exclusions" title="Private projects">
-          {(team.exclusions ?? []).map((slug) => (
+      <JoinSection
+        client={client}
+        busy={busy}
+        setBusy={setBusy}
+        onJoined={async (joined) => {
+          setNotice(
+            joined.status === "pending"
+              ? "Your request is in; a leader approves it."
+              : "You are in.",
+          );
+          await loadTeams(joined.teamId);
+        }}
+      />
+      <CreateSection
+        client={client}
+        busy={busy}
+        setBusy={setBusy}
+        onCreated={async (created) => {
+          setNotice(null);
+          await loadTeams(created.teamId);
+        }}
+      />
+      <PrivateProjectsSection />
+    </SettingsPageContainer>
+  );
+}
+
+function MembersSection({
+  client,
+  team,
+  nowMs,
+  busy,
+  onPromote,
+  onDemote,
+  onRemove,
+  onError,
+}: {
+  readonly client: InfinitusTeamClient;
+  readonly team: TeamSnapshot;
+  readonly nowMs: number;
+  readonly busy: Busy;
+  readonly onPromote: (userId: string) => Promise<void>;
+  readonly onDemote: (userId: string) => Promise<void>;
+  readonly onRemove: (userId: string) => Promise<void>;
+  readonly onError: (cause: unknown) => void;
+}) {
+  const isLeader = team.role === "leader";
+  const [expanded, setExpanded] = useState<string | null>(null);
+  /** userId → environmentId → the member's threads index. */
+  const [indexes, setIndexes] = useState<
+    Record<string, ReadonlyArray<{ environmentId: string; threads: ReadonlyArray<TeamThreadRow> }>>
+  >({});
+  const [transcript, setTranscript] = useState<{
+    readonly key: string;
+    readonly rows: ReadonlyArray<TeamTranscriptRow>;
+  } | null>(null);
+  const [reading, setReading] = useState<string | null>(null);
+
+  const expand = async (member: TeamMemberRow) => {
+    if (expanded === member.userId) {
+      setExpanded(null);
+      return;
+    }
+    setExpanded(member.userId);
+    if (indexes[member.userId] !== undefined) return;
+    try {
+      const documents = await client.listDocuments(team.teamId, {
+        userId: member.userId,
+        kind: "threads",
+      });
+      setIndexes((current) => ({
+        ...current,
+        [member.userId]: documents.map((document) => ({
+          environmentId: document.environmentId,
+          threads: threadsIndex(document.body),
+        })),
+      }));
+    } catch (cause) {
+      onError(cause);
+    }
+  };
+
+  const open = async (member: TeamMemberRow, environmentId: string, threadId: string) => {
+    const key = `${member.userId}/${environmentId}/${threadId}`;
+    if (transcript?.key === key) {
+      setTranscript(null);
+      return;
+    }
+    setReading(key);
+    try {
+      const input = { teamId: team.teamId, userId: member.userId, environmentId, threadId };
+      const chunks = await client.listTranscriptChunks(input);
+      const rows: Array<TeamTranscriptRow> = [];
+      for (const chunk of chunks) {
+        rows.push(
+          ...transcriptRows(await client.readTranscriptChunk({ ...input, seq: chunk.seq })),
+        );
+      }
+      setTranscript({ key, rows });
+    } catch (cause) {
+      onError(cause);
+    } finally {
+      setReading(null);
+    }
+  };
+
+  return (
+    <SettingsSection title="Members">
+      {team.members.map((member) => {
+        const isMe = member.userId === team.me.userId;
+        const machineLabel = (environmentId: string) =>
+          member.machines.find((machine) => machine.environmentId === environmentId)?.label ??
+          environmentId;
+        return (
+          <div key={member.userId}>
             <SettingsRow
-              key={slug}
-              title={slug}
-              description="Kept off every kind: stats, threads, transcripts."
+              title={member.name}
+              description={memberSummary(member, nowMs)}
               control={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy !== null}
-                  aria-label={`Share ${slug} again`}
-                  onClick={() => void run({ type: "exclude", slug, on: false })}
-                >
-                  Share again
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`${expanded === member.userId ? "Collapse" : "Expand"} ${member.name}`}
+                    onClick={() => void expand(member)}
+                  >
+                    {expanded === member.userId ? "Less" : "Threads"}
+                  </Button>
+                  {isLeader && !isMe ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy !== null}
+                        aria-label={`${member.role === "leader" ? "Demote" : "Promote"} ${member.name}`}
+                        onClick={() =>
+                          void (member.role === "leader"
+                            ? onDemote(member.userId)
+                            : onPromote(member.userId))
+                        }
+                      >
+                        {member.role === "leader" ? "Make member" : "Make leader"}
+                      </Button>
+                      {member.founder ? null : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy !== null}
+                          aria-label={`Remove ${member.name}`}
+                          onClick={() => void onRemove(member.userId)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </>
+                  ) : null}
+                </>
               }
             />
-          ))}
-          <form
-            className="flex items-center gap-2 px-3 py-2 sm:px-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void addExclusion();
-            }}
-          >
+            {expanded !== member.userId ? null : (
+              <div className="flex flex-col gap-2 px-3 pb-3 text-[13px] sm:px-4">
+                {member.machines.map((machine) => {
+                  const now = machineNow(machine);
+                  return (
+                    <p key={machine.environmentId} className="text-muted-foreground">
+                      {machine.label} · {machineIsOnline(machine, nowMs) ? "online" : "offline"} ·
+                      published {relativeTime(machine.lastPublished, nowMs)}
+                      {now.live.length === 0
+                        ? ""
+                        : ` · live: ${now.live.map((row) => row.title).join(", ")}`}
+                      {now.blockers.length === 0 ? "" : ` · blocked: ${now.blockers.join(", ")}`}
+                    </p>
+                  );
+                })}
+                {indexes[member.userId] === undefined ? (
+                  <p className="text-muted-foreground">Reading their threads…</p>
+                ) : indexes[member.userId]!.every((entry) => entry.threads.length === 0) ? (
+                  <p className="text-muted-foreground">No threads shared with you.</p>
+                ) : (
+                  indexes[member.userId]!.map((entry) => (
+                    <ul key={entry.environmentId} className="flex flex-col gap-1">
+                      {entry.threads.map((thread) => {
+                        const key = `${member.userId}/${entry.environmentId}/${thread.id}`;
+                        return (
+                          <li key={thread.id} className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              className="text-left hover:underline"
+                              disabled={reading !== null}
+                              onClick={() => void open(member, entry.environmentId, thread.id)}
+                            >
+                              {thread.title}{" "}
+                              <span className="text-muted-foreground">
+                                · {thread.project} · {thread.status} ·{" "}
+                                {machineLabel(entry.environmentId)}
+                              </span>
+                            </button>
+                            {transcript?.key !== key ? null : transcript.rows.length === 0 ? (
+                              <p className="text-muted-foreground">
+                                No transcript shared with you.
+                              </p>
+                            ) : (
+                              <ol className="flex max-h-96 flex-col gap-1 overflow-auto rounded border border-border p-2">
+                                {transcript.rows.map((row, index) => (
+                                  // A row's position is stable: the transcript is read whole.
+                                  // oxlint-disable-next-line react/no-array-index-key
+                                  <li key={index} className="whitespace-pre-wrap break-words">
+                                    <span className="text-muted-foreground">{row.role}: </span>
+                                    {row.text}
+                                  </li>
+                                ))}
+                              </ol>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </SettingsSection>
+  );
+}
+
+function InvitesSection({
+  client,
+  team,
+  nowMs,
+  busy,
+  setBusy,
+  onError,
+  onRevoke,
+  onPolicy,
+}: {
+  readonly client: InfinitusTeamClient;
+  readonly team: TeamSnapshot;
+  readonly nowMs: number;
+  readonly busy: Busy;
+  readonly setBusy: (busy: Busy) => void;
+  readonly onError: (cause: unknown) => void;
+  readonly onRevoke: (inviteId: string) => Promise<void>;
+  readonly onPolicy: (requests: "code" | "off") => Promise<void>;
+}) {
+  const [days, setDays] = useState("7");
+  const [oneUse, setOneUse] = useState(true);
+  /** The token minted last, shown once; gone with the page. */
+  const [minted, setMinted] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"token" | "link" | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+
+  const mint = async () => {
+    const n = Math.min(Math.max(Number.parseInt(days, 10) || 7, 1), 3650);
+    setBusy("invite");
+    try {
+      const created = await client.createInvite(team.teamId, { days: n, oneUse });
+      setMinted(created.token);
+      setCopied(null);
+      setCopyError(null);
+    } catch (cause) {
+      onError(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const copy = async (what: "token" | "link") => {
+    if (minted === null) return;
+    try {
+      await navigator.clipboard.writeText(what === "token" ? minted : buildJoinLink(minted));
+      setCopied(what);
+    } catch {
+      setCopyError("Copy failed — select the token and copy it by hand.");
+    }
+  };
+
+  return (
+    <SettingsSection id="infinitus-team-invite" title="Invites">
+      <SettingsRow
+        title="Mint an invite"
+        description="A one-use invite joins whoever opens it at once; a reusable one asks, and a leader approves. Both are secrets: shown once, never logged."
+        control={
+          <>
             <Input
               size="sm"
-              aria-label="Project folder name"
-              placeholder="Project folder name, e.g. secret-repo"
-              autoComplete="off"
-              spellCheck={false}
-              value={exclusionDraft}
+              type="number"
+              min={1}
+              max={3650}
+              aria-label="Days the invite is good for"
+              className="w-20"
+              value={days}
               disabled={busy !== null}
-              onChange={(event) => setExclusionDraft(event.currentTarget.value)}
+              onChange={(event) => setDays(event.currentTarget.value)}
             />
-            <Button type="submit" size="sm" variant="outline" disabled={busy !== null}>
-              Keep private
+            <label className="flex items-center gap-2 text-[13px]">
+              <Checkbox
+                aria-label="One use"
+                checked={oneUse}
+                disabled={busy !== null}
+                onCheckedChange={(checked) => setOneUse(checked === true)}
+              />
+              one use
+            </label>
+            <Button size="sm" disabled={busy !== null} onClick={() => void mint()}>
+              {busy === "invite" ? "Minting…" : "Mint"}
             </Button>
-          </form>
-        </SettingsSection>
+          </>
+        }
+      />
+      {minted === null ? null : (
+        <div className="flex flex-col gap-2 px-3 py-2 sm:px-4">
+          {/* The token is a secret: masked, in memory only, gone with the page. */}
+          <Input
+            type="password"
+            size="sm"
+            readOnly
+            autoComplete="off"
+            aria-label="Minted invite token"
+            value={minted}
+          />
+          <div className="flex items-center justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => void copy("token")}>
+              {copied === "token" ? "Copied" : "Copy token"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void copy("link")}>
+              {copied === "link" ? "Copied" : "Copy link"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setMinted(null)}>
+              Done
+            </Button>
+          </div>
+          {copyError === null ? null : (
+            <p role="alert" className="text-[13px] text-destructive">
+              {copyError}
+            </p>
+          )}
+          <p className="text-[13px] text-muted-foreground">
+            The link opens Infinitus on a phone or a desktop; the token pastes into Settings › Team
+            anywhere.
+          </p>
+        </div>
       )}
-      {!inTeam || team.role === "pending" ? null : (
-        <SettingsSection id="infinitus-team-grants" title="Delegated control">
-          {(team.grants ?? []).map((grant) => (
-            <SettingsRow
-              key={grant.id}
-              title={teamGrantAudience(grant.audience, team.members)}
-              description={teamGrantSummary(grant, nowMs)}
-              control={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy !== null}
-                  aria-label={`Revoke grant ${grant.id}`}
-                  onClick={() => void run({ type: "revoke", id: grant.id })}
-                >
-                  Revoke
-                </Button>
-              }
-            />
-          ))}
+      {team.invites.map((invite) => (
+        <SettingsRow
+          key={invite.inviteId}
+          title={invite.oneUse ? "One-use invite" : "Reusable invite"}
+          description={
+            invite.usedBy !== null ? "used" : `expires ${untilTime(invite.expiresAt, nowMs)}`
+          }
+          control={
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy !== null || invite.usedBy !== null}
+              aria-label={`Revoke invite ${invite.inviteId}`}
+              onClick={() => void onRevoke(invite.inviteId)}
+            >
+              Revoke
+            </Button>
+          }
+        />
+      ))}
+      <SettingsRow
+        title="Who may request to join"
+        description="With a reusable invite, anyone holding one; off, nobody — one-use invites still join."
+        control={
+          <Select
+            disabled={busy !== null}
+            value={team.policy.requests}
+            onValueChange={(value) => {
+              if (value === "code" || value === "off") void onPolicy(value);
+            }}
+          >
+            <SelectTrigger
+              size="sm"
+              className="w-full sm:w-44"
+              aria-label="Who may request to join"
+            >
+              <SelectValue>
+                {team.policy.requests === "off" ? "Nobody" : "With an invite"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              <SelectItem hideIndicator value="code">
+                With an invite
+              </SelectItem>
+              <SelectItem hideIndicator value="off">
+                Nobody
+              </SelectItem>
+            </SelectPopup>
+          </Select>
+        }
+      />
+    </SettingsSection>
+  );
+}
+
+function GrantsSection({
+  team,
+  nowMs,
+  busy,
+  environmentId,
+  onGrant,
+  onRevoke,
+  onAllow,
+  onDeny,
+  onError,
+}: {
+  readonly team: TeamSnapshot;
+  readonly nowMs: number;
+  readonly busy: Busy;
+  readonly environmentId: ReturnType<typeof useInfinitusEnvironment>["environmentId"];
+  readonly onGrant: (draft: NonNullable<ReturnType<typeof teamGrantDraft>>) => Promise<void>;
+  readonly onRevoke: (grantId: string) => Promise<void>;
+  readonly onAllow: (commandId: string) => Promise<void>;
+  readonly onDeny: (commandId: string) => Promise<void>;
+  readonly onError: (message: string) => void;
+}) {
+  const [audience, setAudience] = useState("leaders");
+  const [capabilities, setCapabilities] = useState<ReadonlyArray<string>>(["view"]);
+  const [threads, setThreads] = useState("");
+  const [preauthorized, setPreauthorized] = useState<ReadonlyArray<string>>([]);
+  const toggle = (list: ReadonlyArray<string>, item: string, on: boolean) =>
+    on ? (list.includes(item) ? list : [...list, item]) : list.filter((c) => c !== item);
+  const others = team.members.filter((member) => member.userId !== team.me.userId);
+
+  return (
+    <>
+      <SettingsSection id="infinitus-team-grants" title="Delegated control">
+        {team.grants.map((grant) => (
+          <SettingsRow
+            key={grant.grantId}
+            title={audienceLabel(grant.audience, team.members)}
+            description={grantSummary(grant, nowMs)}
+            control={
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy !== null}
+                aria-label={`Revoke grant ${grant.grantId}`}
+                onClick={() => void onRevoke(grant.grantId)}
+              >
+                Revoke
+              </Button>
+            }
+          />
+        ))}
+        {environmentId === null ? (
+          <InfinitusPanelNotice message="Grants name this desktop's environment; connect it first." />
+        ) : (
           <form
             className="flex flex-col gap-2 px-3 py-2 sm:px-4"
             onSubmit={(event) => {
               event.preventDefault();
-              void addGrant();
+              const draft = teamGrantDraft({
+                environmentId,
+                audience,
+                capabilities,
+                threads,
+                preauthorized,
+              });
+              if (draft === null) {
+                onError("Pick who and at least one capability.");
+                return;
+              }
+              setThreads("");
+              void onGrant(draft);
             }}
           >
             <div className="flex items-center gap-2">
               <Select
                 disabled={busy !== null}
-                value={grantAudience}
+                value={audience}
                 onValueChange={(value) => {
-                  if (typeof value === "string") setGrantAudience(value);
+                  if (typeof value === "string") setAudience(value);
                 }}
               >
                 <SelectTrigger size="sm" className="w-full sm:w-48" aria-label="Grant to">
                   <SelectValue>
-                    {grantAudience === "leaders"
+                    {audience === "leaders"
                       ? "Leaders"
-                      : grantAudience === "team"
+                      : audience === "team"
                         ? "Whole team"
-                        : (team.members.find((member) => member.kid === grantAudience)?.name ??
-                          grantAudience)}
+                        : (others.find((member) => member.userId === audience)?.name ?? audience)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -673,13 +906,11 @@ export function InfinitusTeamPanel() {
                   <SelectItem hideIndicator value="team">
                     Whole team
                   </SelectItem>
-                  {team.members
-                    .filter((member) => !member.isMe)
-                    .map((member) => (
-                      <SelectItem hideIndicator key={member.kid} value={member.kid}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
+                  {others.map((member) => (
+                    <SelectItem hideIndicator key={member.userId} value={member.userId}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
                 </SelectPopup>
               </Select>
               <Input
@@ -688,9 +919,9 @@ export function InfinitusTeamPanel() {
                 placeholder="Thread ids, comma-separated; blank = all"
                 autoComplete="off"
                 spellCheck={false}
-                value={grantThreads}
+                value={threads}
                 disabled={busy !== null}
-                onChange={(event) => setGrantThreads(event.currentTarget.value)}
+                onChange={(event) => setThreads(event.currentTarget.value)}
               />
             </div>
             {TEAM_CAPABILITIES.map(({ capability, label, asks }) => (
@@ -698,22 +929,22 @@ export function InfinitusTeamPanel() {
                 <label className="flex items-center gap-2">
                   <Checkbox
                     aria-label={`Allow ${capability}`}
-                    checked={grantCapabilities.includes(capability)}
+                    checked={capabilities.includes(capability)}
                     disabled={busy !== null}
                     onCheckedChange={(checked) =>
-                      setGrantCapabilities((list) => toggle(list, capability, checked === true))
+                      setCapabilities((list) => toggle(list, capability, checked === true))
                     }
                   />
                   {label}
                 </label>
-                {!asks || !grantCapabilities.includes(capability) ? null : (
+                {!asks || !capabilities.includes(capability) ? null : (
                   <label className="flex items-center gap-2 text-muted-foreground">
                     <Checkbox
                       aria-label={`${capability} without asking`}
-                      checked={grantPreauthorized.includes(capability)}
+                      checked={preauthorized.includes(capability)}
                       disabled={busy !== null}
                       onCheckedChange={(checked) =>
-                        setGrantPreauthorized((list) => toggle(list, capability, checked === true))
+                        setPreauthorized((list) => toggle(list, capability, checked === true))
                       }
                     />
                     without asking
@@ -727,35 +958,35 @@ export function InfinitusTeamPanel() {
               </Button>
             </div>
           </form>
-          <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
-            A teammate drives with <code>infinitusctl team drive</code>. Interrupt and new ask you
-            first unless ticked; view and send never ask.
-          </p>
-        </SettingsSection>
-      )}
-      {!inTeam || (team.pending ?? []).length === 0 ? null : (
+        )}
+        <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+          Interrupt and new ask you first unless ticked; view and send never ask. The desktop runs
+          what it is asked within fifteen seconds.
+        </p>
+      </SettingsSection>
+      {team.pending.length === 0 ? null : (
         <SettingsSection id="infinitus-team-pending" title="Waiting for you">
-          {(team.pending ?? []).map((pending) => (
+          {team.pending.map((pending) => (
             <SettingsRow
-              key={pending.id}
-              title={pending.name}
-              description={teamPendingSummary(pending, nowMs)}
+              key={pending.commandId}
+              title={pending.fromName}
+              description={pendingSummary(pending, nowMs)}
               control={
                 <>
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={busy !== null}
-                    aria-label={`Deny ${pending.id}`}
-                    onClick={() => void run({ type: "deny", id: pending.id })}
+                    aria-label={`Deny ${pending.commandId}`}
+                    onClick={() => void onDeny(pending.commandId)}
                   >
                     Deny
                   </Button>
                   <Button
                     size="sm"
                     disabled={busy !== null}
-                    aria-label={`Allow ${pending.id}`}
-                    onClick={() => void run({ type: "allow", id: pending.id })}
+                    aria-label={`Allow ${pending.commandId}`}
+                    onClick={() => void onAllow(pending.commandId)}
                   >
                     Allow
                   </Button>
@@ -765,172 +996,344 @@ export function InfinitusTeamPanel() {
           ))}
         </SettingsSection>
       )}
-      {!inTeam ? null : (
-        <SettingsSection id="infinitus-team-leave" title="Leave">
-          <SettingsRow
-            title="Leave this team"
-            description="Deletes this Mac's files on the store, tells the leaders and forgets the team here. Your identity stays."
-            control={
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={busy !== null}
-                onClick={() => setLeaveOpen(true)}
-              >
-                Leave…
-              </Button>
-            }
-          />
-          <AlertDialog
-            open={leaveOpen}
-            onOpenChange={(open) => {
-              if (busy === "leave") return;
-              setLeaveOpen(open);
-            }}
+    </>
+  );
+}
+
+function LeaveSection({
+  team,
+  busy,
+  onLeave,
+}: {
+  readonly team: TeamSnapshot;
+  readonly busy: Busy;
+  readonly onLeave: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <SettingsSection id="infinitus-team-leave" title="Leave">
+      <SettingsRow
+        title="Leave this team"
+        description="What your machines published to it, transcripts included, is deleted. Joining again takes a new invite."
+        control={
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={busy !== null}
+            onClick={() => setOpen(true)}
           >
-            <AlertDialogPopup>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Leave {team.name}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  What this Mac published is deleted from the store and the team forgotten here.
-                  Joining again takes a new code.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogClose disabled={busy === "leave"} render={<Button variant="outline" />}>
-                  Cancel
-                </AlertDialogClose>
-                <Button
-                  variant="destructive"
-                  disabled={busy === "leave"}
-                  onClick={() => {
-                    void run({ type: "leave" }).then(() => setLeaveOpen(false));
-                  }}
-                >
-                  {busy === "leave" ? "Leaving…" : "Leave"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogPopup>
-          </AlertDialog>
-        </SettingsSection>
-      )}
-      {team !== null ? null : (
-        <SettingsSection id="infinitus-team-join" title="Join a team">
-          {joinSupported ? (
-            <form
-              className="flex flex-col gap-2 px-3 py-2 sm:px-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void join();
+            Leave…
+          </Button>
+        }
+      />
+      <AlertDialog
+        open={open}
+        onOpenChange={(next) => {
+          if (busy === "leave") return;
+          setOpen(next);
+        }}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave {team.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Everything your machines published is deleted from the relay. A last leader promotes
+              someone first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose disabled={busy === "leave"} render={<Button variant="outline" />}>
+              Cancel
+            </AlertDialogClose>
+            <Button
+              variant="destructive"
+              disabled={busy === "leave"}
+              onClick={() => {
+                void onLeave().then(() => setOpen(false));
               }}
             >
-              <Input
-                size="sm"
-                aria-label="Your name"
-                placeholder="Your name in the roster"
-                autoComplete="off"
-                value={joinName}
-                disabled={busy !== null}
-                onChange={(event) => setJoinName(event.currentTarget.value)}
-              />
-              {/* The code is a secret: masked, never remembered, cleared on submit. */}
-              <Input
-                type="password"
-                size="sm"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="Team code or invite link"
-                placeholder="Team code or invite link"
-                value={joinCode}
-                disabled={busy !== null}
-                onChange={(event) => setJoinCode(event.currentTarget.value)}
-              />
-              <div className="flex items-center justify-end gap-2">
-                <Button type="submit" size="sm" disabled={busy !== null}>
-                  {busy === "join" ? "Requesting…" : "Request to join"}
-                </Button>
-              </div>
-              {joinError === null ? null : (
-                <p role="alert" className="text-[13px] text-destructive">
-                  {joinError}
-                </p>
-              )}
-            </form>
-          ) : (
-            <InfinitusPanelNotice message="This Infinitus build does not take a team code from here." />
-          )}
-        </SettingsSection>
-      )}
-      {team !== null ? null : (
-        <SettingsSection id="infinitus-team-create" title="Create a team">
-          {createSupported ? (
-            <form
-              className="flex flex-col gap-2 px-3 py-2 sm:px-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void create();
-              }}
+              {busy === "leave" ? "Leaving…" : "Leave"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </SettingsSection>
+  );
+}
+
+function JoinSection({
+  client,
+  busy,
+  setBusy,
+  onJoined,
+}: {
+  readonly client: InfinitusTeamClient;
+  readonly busy: Busy;
+  readonly setBusy: (busy: Busy) => void;
+  readonly onJoined: (joined: { teamId: string; status: "member" | "pending" }) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  // A join link the desktop received (infinitus://join/…) lands here once:
+  // on mount when the link opened this page, by subscription when it arrived
+  // with the page open. The user still presses Join.
+  const [token, setToken] = useState(() => usePendingTeamJoinStore.getState().take() ?? "");
+  useEffect(
+    () =>
+      usePendingTeamJoinStore.subscribe((state) => {
+        if (state.code === null) return;
+        setToken(usePendingTeamJoinStore.getState().take() ?? "");
+      }),
+    [],
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const join = async () => {
+    const memberName = teamMemberName(name);
+    const parsed = parseJoinInput(token);
+    if (memberName === null) {
+      setError("Give yourself a name for the roster.");
+      return;
+    }
+    if (parsed === null) {
+      setError("Paste the invite token or link.");
+      return;
+    }
+    setBusy("join");
+    setError(null);
+    try {
+      const joined = await client.joinTeam({ token: parsed, memberName });
+      setToken("");
+      await onJoined(joined);
+    } catch (cause) {
+      setError(teamErrorMessage(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <SettingsSection id="infinitus-team-join" title="Join a team">
+      <form
+        className="flex flex-col gap-2 px-3 py-2 sm:px-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void join();
+        }}
+      >
+        <Input
+          size="sm"
+          aria-label="Your name"
+          placeholder="Your name in the roster"
+          autoComplete="off"
+          value={name}
+          disabled={busy !== null}
+          onChange={(event) => setName(event.currentTarget.value)}
+        />
+        {/* The token is a secret: masked, never remembered, cleared on join. */}
+        <Input
+          type="password"
+          size="sm"
+          autoComplete="off"
+          spellCheck={false}
+          aria-label="Invite token or link"
+          placeholder="Invite token or link"
+          value={token}
+          disabled={busy !== null}
+          onChange={(event) => setToken(event.currentTarget.value)}
+        />
+        <div className="flex items-center justify-end gap-2">
+          <Button type="submit" size="sm" disabled={busy !== null}>
+            {busy === "join" ? "Joining…" : "Join"}
+          </Button>
+        </div>
+        {error === null ? null : (
+          <p role="alert" className="text-[13px] text-destructive">
+            {error}
+          </p>
+        )}
+      </form>
+    </SettingsSection>
+  );
+}
+
+function CreateSection({
+  client,
+  busy,
+  setBusy,
+  onCreated,
+}: {
+  readonly client: InfinitusTeamClient;
+  readonly busy: Busy;
+  readonly setBusy: (busy: Busy) => void;
+  readonly onCreated: (created: TeamSnapshot) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [memberName, setMemberName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    const teamName = teamMemberName(name);
+    const mine = teamMemberName(memberName);
+    if (teamName === null || mine === null) {
+      setError("Fill in the team's name and yours (each under 64 characters).");
+      return;
+    }
+    setBusy("create");
+    setError(null);
+    try {
+      const created = await client.createTeam({ name: teamName, memberName: mine });
+      setName("");
+      await onCreated(created);
+    } catch (cause) {
+      setError(teamErrorMessage(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <SettingsSection id="infinitus-team-create" title="Create a team">
+      <form
+        className="flex flex-col gap-2 px-3 py-2 sm:px-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void create();
+        }}
+      >
+        <Input
+          size="sm"
+          aria-label="Team name"
+          placeholder="Team name"
+          autoComplete="off"
+          value={name}
+          disabled={busy !== null}
+          onChange={(event) => setName(event.currentTarget.value)}
+        />
+        <Input
+          size="sm"
+          aria-label="Your name as leader"
+          placeholder="Your name in the roster"
+          autoComplete="off"
+          value={memberName}
+          disabled={busy !== null}
+          onChange={(event) => setMemberName(event.currentTarget.value)}
+        />
+        <p className="text-[13px] text-muted-foreground">
+          You become its founding leader. Nothing to host: the team lives on {CONNECT_NAME}.
+        </p>
+        <div className="flex items-center justify-end gap-2">
+          <Button type="submit" size="sm" disabled={busy !== null}>
+            {busy === "create" ? "Creating…" : "Create team"}
+          </Button>
+        </div>
+        {error === null ? null : (
+          <p role="alert" className="text-[13px] text-destructive">
+            {error}
+          </p>
+        )}
+      </form>
+    </SettingsSection>
+  );
+}
+
+/** The Mac's private projects: read over `team-exclusions`, changed over
+    `team-exclude`; local to the Mac, never sent anywhere. */
+function PrivateProjectsSection() {
+  const { environmentId, snapshot } = useInfinitusEnvironment();
+  const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
+  const supported =
+    snapshot !== null && snapshot.available && teamExclusionsSupported(snapshot.commands);
+  const [projects, setProjects] = useState<ReadonlyArray<string> | null>(null);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const read = useCallback(async () => {
+    if (environmentId === null) return;
+    const result = await runCommand({ environmentId, input: TEAM_EXCLUSIONS_INPUT });
+    if (result._tag === "Failure") {
+      setError(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    const parsed = parseTeamExclusions(result.value.result);
+    if (parsed === null) {
+      setError("Infinitus answered team-exclusions with a shape this build cannot read.");
+      return;
+    }
+    setError(null);
+    setProjects(parsed);
+  }, [environmentId, runCommand]);
+
+  useEffect(() => {
+    if (supported) void read();
+  }, [read, supported]);
+
+  const write = async (slug: string, on: boolean) => {
+    if (environmentId === null) return;
+    setBusy(true);
+    const result = await runCommand({ environmentId, input: teamExcludeInput(slug, on) });
+    if (result._tag === "Failure") setError(infinitusCommandFailure(result.cause).message);
+    else await read();
+    setBusy(false);
+  };
+
+  if (!supported) return null;
+  return (
+    <SettingsSection id="infinitus-team-private" title="Private projects">
+      {(projects ?? []).map((project) => (
+        <SettingsRow
+          key={project}
+          title={project.slice(project.lastIndexOf("/") + 1) || project}
+          description={project}
+          control={
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              aria-label={`Share ${project} again`}
+              onClick={() => void write(project, false)}
             >
-              <Input
-                size="sm"
-                aria-label="Team name"
-                placeholder="Team name"
-                autoComplete="off"
-                value={createName}
-                disabled={busy !== null}
-                onChange={(event) => setCreateName(event.currentTarget.value)}
-              />
-              <Input
-                size="sm"
-                aria-label="Your name as leader"
-                placeholder="Your name in the roster"
-                autoComplete="off"
-                value={createLeader}
-                disabled={busy !== null}
-                onChange={(event) => setCreateLeader(event.currentTarget.value)}
-              />
-              <Input
-                size="sm"
-                aria-label="Empty private repo URL"
-                placeholder="Empty private repo URL"
-                autoComplete="off"
-                spellCheck={false}
-                value={createRemote}
-                disabled={busy !== null}
-                onChange={(event) => setCreateRemote(event.currentTarget.value)}
-              />
-              {/* The token is a secret: masked, never remembered, cleared on submit. */}
-              <Input
-                type="password"
-                size="sm"
-                autoComplete="off"
-                spellCheck={false}
-                aria-label="Write token (optional)"
-                placeholder="Write token (optional; stays in the Mac's keychain)"
-                value={createToken}
-                disabled={busy !== null}
-                onChange={(event) => setCreateToken(event.currentTarget.value)}
-              />
-              <p className="text-[13px] text-muted-foreground">
-                Paste the URL of an empty private repo and a token that can push to it, or an ssh
-                URL your Mac can already use. The only out-of-app step.
-              </p>
-              <div className="flex items-center justify-end gap-2">
-                <Button type="submit" size="sm" disabled={busy !== null}>
-                  {busy === "create" ? "Creating…" : "Create team"}
-                </Button>
-              </div>
-              {createError === null ? null : (
-                <p role="alert" className="text-[13px] text-destructive">
-                  {createError}
-                </p>
-              )}
-            </form>
-          ) : (
-            <InfinitusPanelNotice message="This Infinitus build does not create a team from here." />
-          )}
-        </SettingsSection>
+              Share again
+            </Button>
+          }
+        />
+      ))}
+      <form
+        className="flex items-center gap-2 px-3 py-2 sm:px-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const slug = teamExclusionSlug(draft);
+          if (slug === null) {
+            setError("A project is its folder's name or path, without spaces.");
+            return;
+          }
+          setDraft("");
+          void write(slug, true);
+        }}
+      >
+        <Input
+          size="sm"
+          aria-label="Project to keep private"
+          placeholder="Project folder or path to keep private"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft}
+          disabled={busy}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+        />
+        <Button type="submit" size="sm" variant="outline" disabled={busy}>
+          Keep private
+        </Button>
+      </form>
+      <p className="px-3 pb-2 text-[13px] text-muted-foreground sm:px-4">
+        Nothing from a private project leaves this Mac: no thread, no transcript, no stats. Local to
+        the Mac, never sent.
+      </p>
+      {error === null ? null : (
+        <p role="alert" className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+          {error}
+        </p>
       )}
-    </SettingsPageContainer>
+    </SettingsSection>
   );
 }
