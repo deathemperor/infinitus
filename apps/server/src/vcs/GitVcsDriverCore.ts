@@ -549,7 +549,9 @@ function trace2ChildKey(record: Record<string, unknown>): string | null {
 const Trace2Record = Schema.Record(Schema.String, Schema.Unknown);
 const decodeTrace2Record = decodeJsonResult(Trace2Record);
 
-const createTrace2Monitor = Effect.fn("createTrace2Monitor")(function* (
+// Untraced because it runs on every git spawn and returns at once without hook
+// callbacks. Its errors fail the runGitCommand span.
+const createTrace2Monitor = Effect.fnUntraced(function* (
   input: Pick<GitVcsDriver.ExecuteGitInput, "operation" | "cwd" | "args">,
   progress: GitVcsDriver.ExecuteGitProgress | undefined,
 ): Effect.fn.Return<
@@ -2358,9 +2360,10 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     if (indexExists) {
       const { mtime } = yield* fileSystem.stat(indexPath);
       yield* fileSystem.copyFile(indexPath, tempIndexPath);
-      // A newer copy timestamp hides racily clean edits. Round down before Git reads or rewrites it.
+      // Node FileSystem.stat truncates bigint timestamps to milliseconds before creating its Date.
+      // Flooring preserves the source second without making preceding-second files racy.
       const indexTime = Option.isSome(mtime)
-        ? Math.max(0, Math.floor((mtime.value.getTime() - 1) / 1000))
+        ? Math.max(0, Math.floor(mtime.value.getTime() / 1000))
         : 0;
       yield* fileSystem.utimes(tempIndexPath, indexTime, indexTime);
     }
