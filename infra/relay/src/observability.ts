@@ -223,8 +223,13 @@ export const makeRelayTraceLayer = (input: {
     OtlpTracer.make({
       url: input.tracesEndpoint,
       resource: {
+<<<<<<< HEAD
         serviceName: "infinitus-relay-worker",
+=======
+        serviceName: "t3code-relay",
+>>>>>>> upstream-sync-295d7cba0-upstream-renamed
         attributes: {
+          "service.namespace": "t3code",
           "service.runtime": "cloudflare-worker",
           "service.component": "relay",
         },
