@@ -28,6 +28,7 @@ import * as Schema from "effect/Schema";
 import { Command, Flag } from "effect/unstable/cli";
 
 import packageJson from "../../package.json" with { type: "json" };
+import * as BootService from "../cloud/bootService.ts";
 import * as ServerConfig from "../config.ts";
 import { resolveBaseDir } from "../os-jank.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
@@ -202,8 +203,16 @@ export const triageCommand = Command.make("triage", {
             dbPath: paths.dbPath,
             settingsPath: paths.settingsPath,
             logsDir: paths.logsDir,
+<<<<<<< HEAD
             serverLogPath: paths.serverLogPath,
             serverLogNdjsonPath: paths.serverLogNdjsonPath,
+=======
+            // The server writes no log file of its own. Service installs and the
+            // desktop app capture its output. The glob covers every desktop backend
+            // (such as WSL) and rotated copies; names come from DesktopObservability.ts.
+            serviceLogPath: path.join(paths.logsDir, BootService.BOOT_SERVICE_LOG_FILE),
+            desktopBackendLogGlob: path.join(paths.logsDir, "server-child*.log*"),
+>>>>>>> upstream-sync-a21b42cec-upstream-renamed
             serverTracePath: paths.serverTracePath,
             providerEventLogPath: paths.providerEventLogPath,
             terminalLogsDir: paths.terminalLogsDir,

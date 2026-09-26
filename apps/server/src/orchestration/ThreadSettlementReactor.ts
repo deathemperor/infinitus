@@ -27,7 +27,7 @@ import {
 } from "../infinitus/Services/InfinitusLimitStops.ts";
 import * as OrchestrationEngine from "./Services/OrchestrationEngine.ts";
 import * as ProjectionSnapshotQuery from "./Services/ProjectionSnapshotQuery.ts";
-import { pullRequestMatchesProject } from "./ThreadPullRequestReactor.ts";
+import { pullRequestMatchesProject, readSweepSnapshot } from "./ThreadPullRequestReactor.ts";
 import {
   isAutoSettlementCandidate,
   resolveAutoSettlementAt,
@@ -100,11 +100,12 @@ export const make = Effect.gen(function* () {
     if (!autoSettlementConfigured(settings)) {
       return;
     }
-    const snapshot = yield* snapshots.getShellSnapshot();
+    const snapshot = yield* readSweepSnapshot(snapshots, threadId ?? null);
     const now = DateTime.formatIso(yield* DateTime.now);
     const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
     // A merge rechecks all candidates, including branches that discovery has
     // not linked yet. Those lookups can still have cached the PR as open.
+<<<<<<< HEAD
     const candidates = yield* Effect.filter(
       snapshot.threads.filter(
         (thread) =>
@@ -116,10 +117,13 @@ export const make = Effect.gen(function* () {
           Effect.map(([stopped, resuming]) => !stopped && !resuming),
         ),
     );
+=======
+    const candidates = snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now));
+>>>>>>> upstream-sync-a21b42cec-upstream-renamed
 
     // Return the thread when it still needs a pull request decision. A rejected
     // dispatch skips it for this snapshot instead of retrying through a lookup.
-    const settleThread = Effect.fn("ThreadSettlementReactor.settleThread")(
+    const settleThread = Effect.fnUntraced(
       function* (thread: (typeof candidates)[number], pullRequest: SettlementPullRequest | null) {
         const settings = resolveProjectSettings(
           yield* settingsService.getSettings,
