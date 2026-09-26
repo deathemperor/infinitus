@@ -12,7 +12,7 @@ import {
   OrchestrationProposedPlanId,
   OrchestrationReadModel,
   OrchestrationThreadSearchSource,
-  OrchestrationShellSnapshot,
+  type OrchestrationShellSnapshot,
   OrchestrationThread,
   OrchestrationThreadDetailSnapshot,
   ProjectScript,
@@ -77,11 +77,11 @@ import {
   type ProjectionSnapshotCounts,
   type ProjectionThreadCheckpointContext,
   type ProjectionThreadDetailQuery,
+  type ProjectionThreadPullRequests,
   type ProjectionSnapshotQueryShape,
 } from "../Services/ProjectionSnapshotQuery.ts";
 
 const decodeReadModel = Schema.decodeUnknownEffect(OrchestrationReadModel);
-const decodeShellSnapshot = Schema.decodeUnknownEffect(OrchestrationShellSnapshot);
 const decodeThread = Schema.decodeUnknownEffect(OrchestrationThread);
 const decodeImportedTranscriptsPayload = Schema.decodeUnknownOption(
   Schema.fromJsonString(
@@ -799,6 +799,41 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
         WHERE threads.deleted_at IS NULL
           AND threads.archived_at IS NULL
         ORDER BY links.thread_id ASC, links.linked_at ASC, links.number ASC
+      `,
+  });
+
+  // One row per link, in the shell snapshot's thread order and link order.
+  const listActiveThreadPullRequestSyncRows = SqlSchema.findAll({
+    Request: Schema.Void,
+    Result: ProjectionThreadPullRequestDbRowSchema.mapFields(
+      Struct.assign({
+        projectId: ProjectionThread.fields.projectId,
+        settledOverride: ProjectionThread.fields.settledOverride,
+        settledAt: ProjectionThread.fields.settledAt,
+      }),
+    ),
+    execute: () =>
+      sql`
+        SELECT
+          links.thread_id AS "threadId",
+          threads.project_id AS "projectId",
+          threads.settled_override AS "settledOverride",
+          threads.settled_at AS "settledAt",
+          links.host,
+          links.repository,
+          links.number,
+          links.url,
+          links.source,
+          links.linked_at AS "linkedAt",
+          links.snapshot_json AS "snapshot",
+          links.stack_json AS "stack"
+        FROM projection_thread_pull_requests links
+        INNER JOIN projection_threads threads
+          ON threads.thread_id = links.thread_id
+        WHERE threads.deleted_at IS NULL
+          AND threads.archived_at IS NULL
+        ORDER BY threads.project_id ASC, threads.created_at ASC, threads.thread_id ASC,
+          links.linked_at ASC, links.number ASC
       `,
   });
 
@@ -2710,7 +2745,10 @@ pending_approval_requests AS (
               );
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
 
-              const snapshot = {
+              // Built from schema-decoded rows, so no second decode here. The HTTP
+              // and RPC layers encode it against OrchestrationShellSnapshot on the
+              // way out, like the per-item shells from getThreadShellById.
+              return {
                 snapshotSequence: computeSnapshotSequence(stateRows),
                 projects: Arr.filterMap(projectRows, (row) =>
                   row.deletedAt === null
@@ -2764,15 +2802,7 @@ pending_approval_requests AS (
                     : Result.failVoid,
                 ),
                 updatedAt: updatedAt ?? "1970-01-01T00:00:00.000Z",
-              };
-
-              return yield* decodeShellSnapshot(snapshot).pipe(
-                Effect.mapError(
-                  toPersistenceDecodeError(
-                    "ProjectionSnapshotQuery.getShellSnapshot:decodeShellSnapshot",
-                  ),
-                ),
-              );
+              } satisfies OrchestrationShellSnapshot;
             }),
         ),
         Effect.mapError((error) => {
@@ -2781,6 +2811,35 @@ pending_approval_requests AS (
           }
           return toPersistenceSqlError("ProjectionSnapshotQuery.getShellSnapshot:query")(error);
         }),
+      );
+
+  const listThreadsWithPullRequests: ProjectionSnapshotQueryShape["listThreadsWithPullRequests"] =
+    () =>
+      listActiveThreadPullRequestSyncRows(undefined).pipe(
+        Effect.map((rows) => {
+          const threads = new Map<
+            ThreadId,
+            ProjectionThreadPullRequests & { readonly pullRequests: Array<ThreadPullRequestLink> }
+          >();
+          for (const row of rows) {
+            const thread = threads.get(row.threadId) ?? {
+              id: row.threadId,
+              projectId: row.projectId,
+              settledOverride: row.settledOverride,
+              settledAt: row.settledAt,
+              pullRequests: [],
+            };
+            thread.pullRequests.push(mapPullRequestRow(row));
+            threads.set(row.threadId, thread);
+          }
+          return [...threads.values()];
+        }),
+        Effect.mapError(
+          toPersistenceSqlOrDecodeError(
+            "ProjectionSnapshotQuery.listThreadsWithPullRequests:query",
+            "ProjectionSnapshotQuery.listThreadsWithPullRequests:decodeRows",
+          ),
+        ),
       );
 
   const getArchivedShellSnapshot: ProjectionSnapshotQueryShape["getArchivedShellSnapshot"] = () =>
@@ -2876,7 +2935,7 @@ pending_approval_requests AS (
                 sessionRows.map((row) => [row.threadId, mapSessionRow(row)] as const),
               );
 
-              const snapshot = {
+              return {
                 snapshotSequence: computeSnapshotSequence(stateRows),
                 projects: Arr.filterMap(projectRows, (row) =>
                   row.deletedAt === null && activeProjectIds.has(row.projectId)
@@ -2926,15 +2985,7 @@ pending_approval_requests AS (
                   planProgress: threadPlanProgress.getThreadPlanProgress(row.threadId),
                 })),
                 updatedAt: updatedAt ?? "1970-01-01T00:00:00.000Z",
-              };
-
-              return yield* decodeShellSnapshot(snapshot).pipe(
-                Effect.mapError(
-                  toPersistenceDecodeError(
-                    "ProjectionSnapshotQuery.getArchivedShellSnapshot:decodeShellSnapshot",
-                  ),
-                ),
-              );
+              } satisfies OrchestrationShellSnapshot;
             }),
         ),
         Effect.mapError((error) => {
@@ -3778,6 +3829,7 @@ pending_approval_requests AS (
     listActivitiesByKind,
     getSnapshot,
     getShellSnapshot,
+    listThreadsWithPullRequests,
     getArchivedShellSnapshot,
     getDeletedWorktreeThreads,
     searchThreads,
