@@ -110,6 +110,7 @@ function makeEnvironmentLinks(
       Effect.succeed([
         {
           userId: "dev:julius",
+          environmentLabel: "dev box",
           notificationsEnabled: true,
           liveActivitiesEnabled: true,
         },
