@@ -15,6 +15,7 @@ import * as ThreadPullRequestReactor from "../ThreadPullRequestReactor.ts";
 import { OrchestrationReactor } from "../Services/OrchestrationReactor.ts";
 import { makeOrchestrationReactor } from "./OrchestrationReactor.ts";
 import * as AgentAwarenessRelay from "../../relay/AgentAwarenessRelay.ts";
+import { InfinitusTeamRelay } from "../../infinitus/Services/InfinitusTeamRelay.ts";
 import { StorageCleanup } from "../../storageCleanup.ts";
 
 describe("OrchestrationReactor", () => {
@@ -114,6 +115,17 @@ describe("OrchestrationReactor", () => {
             },
           }),
         ),
+        Layer.provideMerge(
+          Layer.succeed(InfinitusTeamRelay, {
+            publishNow: Effect.void,
+            publishAll: Effect.void,
+            pollCommands: Effect.void,
+            start: () => {
+              started.push("infinitus-team-relay");
+              return Effect.void;
+            },
+          }),
+        ),
       ),
     );
 
@@ -130,6 +142,7 @@ describe("OrchestrationReactor", () => {
       "thread-settlement-reactor",
       "pull-request-sync-reactor",
       "agent-awareness-relay",
+      "infinitus-team-relay",
       "storage-cleanup",
     ]);
 

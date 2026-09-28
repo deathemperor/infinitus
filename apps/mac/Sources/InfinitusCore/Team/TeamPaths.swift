@@ -1,7 +1,7 @@
 import Foundation
 
-/// Where team state lives (spec §4.2): `<base>/<team-id>/{config.json,
-/// roster.json, store/}` plus `<base>/secrets/` for `FileSecrets`.
+/// Where the Mac keeps its team-side files (#1592): `<base>/exclusions.json`
+/// today; the git-store layout below it left with the git-store Team.
 /// `INFINITUS_TEAM_DIR` overrides the base (tests, the e2e gate, a second
 /// instance on one machine).
 public struct TeamPaths {

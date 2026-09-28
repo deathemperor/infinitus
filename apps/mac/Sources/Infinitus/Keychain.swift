@@ -8,8 +8,6 @@ enum Keychain {
     static let service = "run.infinitus.cliproxy"
     /// 9Router's dashboard password (third engine), account = base URL.
     static let nineRouterService = "run.infinitus.9router"
-    /// The team identity secret and store tokens (#1313), account = secret name.
-    static let teamService = "run.infinitus.team"
 
     static func readData(account: String, service: String) -> Data? {
         read(account: account, service: service).flatMap { Data(base64Encoded: $0) }

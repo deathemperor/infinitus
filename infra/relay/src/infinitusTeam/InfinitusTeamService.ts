@@ -386,7 +386,7 @@ export const make = Effect.gen(function* () {
       name: team.name,
       role: me.role,
       policy: { requests: team.policyRequests },
-      me: { name: me.name, shares: normalizeShares(me.shares) },
+      me: { userId: me.userId, name: me.name, shares: normalizeShares(me.shares) },
       members: rows,
       requests: requests.map((r) => ({ userId: r.userId, name: r.name, at: r.createdAt })),
       invites: invites

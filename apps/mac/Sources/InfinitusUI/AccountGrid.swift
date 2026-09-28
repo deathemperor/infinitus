@@ -512,10 +512,7 @@ struct SentinelActionText<M: FleetModel>: View {
 extension AccountGrid {
     /// Accounts alive but with a binding window at 90%+ — the dying set.
     var criticalNumbers: [Int] {
-        model.displayAccounts.filter { a in
-            !AccountVitals.isPlanDead(a.usage)
-                && (PushTriggers.worstPlanPct(a.usage) ?? 0) >= 90
-        }.map(\.number)
+        model.displayAccounts.filter { AccountVitals.isDying($0.usage) }.map(\.number)
     }
 
     /// `numbers` is computed by the caller, outside the GeometryReader:

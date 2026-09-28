@@ -58,7 +58,7 @@ export function InfinitusPairingRequestsCard() {
 
   return (
     <SettingsSection id="infinitus-pairing-requests" title="Pairing requests">
-      <div className="flex flex-col gap-3 px-3 py-3 text-[13px] sm:px-4">
+      <div className="flex flex-col gap-3 px-3 py-3 text-sm sm:px-4">
         {access.kind === "forbidden" ? (
           <p role="status" className="text-muted-foreground">
             {FORBIDDEN_NOTICE}
@@ -91,7 +91,7 @@ export function InfinitusPairingRequestsCard() {
                   </span>
                 </div>
                 <span
-                  className="font-mono text-2xl tracking-[0.2em] text-foreground"
+                  className="font-mono text-2xl tracking-widest text-foreground"
                   aria-label={`Match code ${row.matchCode}`}
                 >
                   {row.matchCode}

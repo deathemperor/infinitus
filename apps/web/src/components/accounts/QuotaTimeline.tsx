@@ -168,7 +168,7 @@ export function QuotaTimeline({
               <div
                 key={tick}
                 className={cn(
-                  "flex min-w-0 flex-1 flex-col items-center text-[10px] text-muted-foreground tabular-nums leading-tight",
+                  "flex min-w-0 flex-1 flex-col items-center text-3xs text-muted-foreground tabular-nums leading-tight",
                   view === "weekly" && new Date(tick).toDateString() === today
                     ? "text-foreground"
                     : null,
@@ -257,13 +257,13 @@ function Lane({
           ) : null}
           {lane.autoIgnite ? (
             <FlameIcon
-              className="size-3 shrink-0 fill-current text-orange-500"
+              className="size-3 shrink-0 fill-current text-warning"
               aria-label="Kept warm"
             />
           ) : null}
         </span>
         {lane.windows.length === 0 ? null : (
-          <span className="flex flex-wrap gap-x-2 text-[10px] text-muted-foreground tabular-nums">
+          <span className="flex flex-wrap gap-x-2 text-3xs text-muted-foreground tabular-nums">
             {lane.windows.map((window) => (
               <span key={window.name}>
                 {window.name} <span className="text-foreground">{window.pct}%</span>
@@ -358,7 +358,7 @@ function Segment({
             role="img"
             aria-label={`${lane.label}: ${what}`}
             className={cn(
-              "absolute inset-y-2 flex cursor-default items-center overflow-hidden rounded-full px-2 text-[10px] tabular-nums whitespace-nowrap",
+              "absolute inset-y-2 flex cursor-default items-center overflow-hidden rounded-full px-2 text-3xs tabular-nums whitespace-nowrap",
               segment.kind === "current"
                 ? "border border-foreground/30 bg-foreground/10 text-foreground"
                 : segment.kind === "elapsed"

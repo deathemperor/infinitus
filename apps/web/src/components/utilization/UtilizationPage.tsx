@@ -272,13 +272,13 @@ function ForecastLine({
       <div className="flex items-center gap-2 text-sm">
         <span className="font-medium text-foreground">{line.label}</span>
         {line.active ? (
-          <span className="text-xs text-orange-500">Active</span>
+          <span className="text-xs text-warning-foreground">Active</span>
         ) : line.disabled ? (
           <span className="text-muted-foreground text-xs">On Hold</span>
         ) : null}
         <span className="ms-auto text-xs">
           {line.bindsAt !== null && line.bindsWindow !== null ? (
-            <span className="text-orange-500">
+            <span className="text-warning-foreground">
               {line.bindsWindow} binds first,{" "}
               {formatUpcomingTimestamp(line.bindsAt, timestampFormat)}
             </span>
@@ -326,7 +326,7 @@ function ForecastWindowRow({
         {window.ratePctPerHour === null ? "Pace unknown" : rateLabel(window.ratePctPerHour)}
       </span>
       {outcome ? (
-        <span className={outcome.warn ? "text-orange-500" : "text-muted-foreground"}>
+        <span className={outcome.warn ? "text-warning-foreground" : "text-muted-foreground"}>
           {outcome.text}
         </span>
       ) : null}
@@ -342,7 +342,7 @@ function ForecastWindowRow({
 /** One stroke per account; the fleet rarely has more, and a sixth wraps around. */
 const LINE_COLORS = [
   "text-primary",
-  "text-orange-500",
+  "text-warning-foreground",
   "text-emerald-500",
   "text-sky-500",
   "text-violet-500",
@@ -403,7 +403,7 @@ function HistorySection({
                 />
                 <span className="text-foreground">{line.label}</span>
                 <span className="text-muted-foreground">{Math.round(line.latestPct)}%</span>
-                {line.active ? <span className="text-orange-500">Active</span> : null}
+                {line.active ? <span className="text-warning-foreground">Active</span> : null}
               </li>
             ))}
           </ul>
@@ -561,7 +561,7 @@ function FiveHourRow({
             {window.samples} {window.samples === 1 ? "poll" : "polls"}
           </span>
         ) : (
-          <span className="text-orange-500">Still ticking</span>
+          <span className="text-warning-foreground">Still ticking</span>
         )}
       </span>
     </li>

@@ -71,7 +71,10 @@ public actor SwapdLaunchAgent: EngineLifecycle {
             "RunAtLoad": true,
             "KeepAlive": true,
             "ThrottleInterval": 30,
-            "ProcessType": "Background",
+            // Not Background: that tier (and every `security` read the engine
+            // spawns) gets starved on a busy Mac, reads blow the engine's 15s
+            // keychain timeout, and the tick that should switch is fenced.
+            "ProcessType": "Standard",
             // Do not inherit the UI's supervised-stdin contract or profile.
             "EnvironmentVariables": ["HOME": location.home.path, "SWAPD_SUPERVISED": "0"],
             "StandardOutPath": location.output.path,

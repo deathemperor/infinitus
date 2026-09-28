@@ -13,6 +13,7 @@ import * as ThreadSettlementReactor from "../ThreadSettlementReactor.ts";
 import * as PullRequestSyncReactor from "../PullRequestSyncReactor.ts";
 import * as ThreadPullRequestReactor from "../ThreadPullRequestReactor.ts";
 import * as AgentAwarenessRelay from "../../relay/AgentAwarenessRelay.ts";
+import { InfinitusTeamRelay } from "../../infinitus/Services/InfinitusTeamRelay.ts";
 import * as StorageCleanup from "../../storageCleanup.ts";
 
 export const makeOrchestrationReactor = Effect.gen(function* () {
@@ -24,6 +25,8 @@ export const makeOrchestrationReactor = Effect.gen(function* () {
   const pullRequestSyncReactor = yield* PullRequestSyncReactor.PullRequestSyncReactor;
   const threadPullRequestReactor = yield* ThreadPullRequestReactor.ThreadPullRequestReactor;
   const agentAwarenessRelay = yield* AgentAwarenessRelay.AgentAwarenessRelay;
+  // Fork (#1592): the Team publisher and command runner on Infinitus Connect.
+  const infinitusTeamRelay = yield* InfinitusTeamRelay;
   const storageCleanup = yield* StorageCleanup.StorageCleanup;
 
   const start: OrchestrationReactorShape["start"] = Effect.fn("start")(function* () {
@@ -35,6 +38,7 @@ export const makeOrchestrationReactor = Effect.gen(function* () {
     yield* threadSettlementReactor.start();
     yield* pullRequestSyncReactor.start();
     yield* agentAwarenessRelay.start();
+    yield* infinitusTeamRelay.start();
     yield* storageCleanup.start();
   });
 

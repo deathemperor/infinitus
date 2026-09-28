@@ -40,15 +40,15 @@ final class TeamCollectTests: XCTestCase {
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: scratch) }
 
     func testTranscriptIdentity() {
-        let main = TeamPublisher.transcriptIdentity("/h/.claude/projects/-r-app/s1.jsonl")
+        let main = TeamFold.transcriptIdentity("/h/.claude/projects/-r-app/s1.jsonl")
         XCTAssertEqual(main.session, "s1"); XCTAssertNil(main.agent); XCTAssertEqual(main.projectDir, "-r-app")
-        let sub = TeamPublisher.transcriptIdentity("/h/.claude/projects/-r-app/s1/subagents/agent-a1.jsonl")
+        let sub = TeamFold.transcriptIdentity("/h/.claude/projects/-r-app/s1/subagents/agent-a1.jsonl")
         XCTAssertEqual(sub.session, "s1"); XCTAssertEqual(sub.agent, "agent-a1"); XCTAssertEqual(sub.projectDir, "-r-app")
         // #346: pure string work, the same answers URL path math gave —
         // only the last extension goes, a dotless name stays whole.
-        let dotted = TeamPublisher.transcriptIdentity("/h/.claude/projects/-r-app/2026-09-12T10.00.jsonl")
+        let dotted = TeamFold.transcriptIdentity("/h/.claude/projects/-r-app/2026-09-12T10.00.jsonl")
         XCTAssertEqual(dotted.session, "2026-09-12T10.00"); XCTAssertEqual(dotted.projectDir, "-r-app")
-        XCTAssertEqual(TeamPublisher.transcriptIdentity("/h/.codex/sessions/2026/09/12/rollout").session, "rollout")
+        XCTAssertEqual(TeamFold.transcriptIdentity("/h/.codex/sessions/2026/09/12/rollout").session, "rollout")
     }
 
     func testScanExposesEntriesAndCollectHonoursExclusions() throws {
@@ -57,20 +57,20 @@ final class TeamCollectTests: XCTestCase {
         XCTAssertEqual(scan.entries.count, 3)
         XCTAssertEqual(Set(scan.entries.values.compactMap(\.cwd)), ["/r/app", "/r/secret"])
 
-        let all = TeamPublisher.collect(entries: scan.entries, exclusions: TeamExclusions())
+        let all = TeamFold.collect(entries: scan.entries, exclusions: TeamExclusions())
         XCTAssertEqual(all.days["2026-09-04"]?.inputTokens, 25)
         // Three assistant lines land in the same minute (12:00:05Z), one output
         // token each: finalizePeak must run on the merged minuteTokens, not per-file.
         XCTAssertEqual(all.days["2026-09-04"]?.peakTokensPerMinute, 3)
 
-        let some = TeamPublisher.collect(entries: scan.entries, exclusions: TeamExclusions(projects: ["/r/secret"]))
+        let some = TeamFold.collect(entries: scan.entries, exclusions: TeamExclusions(projects: ["/r/secret"]))
         XCTAssertEqual(some.days["2026-09-04"]?.inputTokens, 15)
         XCTAssertEqual(some.days["2026-09-04"]?.peakTokensPerMinute, 2)   // s1 + its sub-agent, secret excluded
 
         // A file whose cwd is unknown is still excluded through its project dir's slug.
         var blind = scan.entries
         for (path, var entry) in blind where path.contains("-r-secret") { entry.cwd = nil; blind[path] = entry }
-        XCTAssertEqual(TeamPublisher.collect(entries: blind, exclusions: TeamExclusions(projects: ["/r/secret"])).days["2026-09-04"]?.inputTokens, 15)
+        XCTAssertEqual(TeamFold.collect(entries: blind, exclusions: TeamExclusions(projects: ["/r/secret"])).days["2026-09-04"]?.inputTokens, 15)
 
         // A thread names its project by basename; the same exclusion catches it.
         XCTAssertTrue(TeamExclusions(projects: ["/r/secret"]).excludes(project: "secret"))

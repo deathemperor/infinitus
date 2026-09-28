@@ -20,6 +20,7 @@ import {
   ThreadTurnQueueUpdatedPayload as ContractsThreadTurnQueueUpdatedPayloadSchema,
   ThreadTurnQueueRemovedPayload as ContractsThreadTurnQueueRemovedPayloadSchema,
   ThreadTurnQueueMovedPayload as ContractsThreadTurnQueueMovedPayloadSchema,
+  ThreadAutoSettleSetPayload as ContractsThreadAutoSettleSetPayloadSchema,
   ThreadPullRequestLinkedPayload as ContractsThreadPullRequestLinkedPayloadSchema,
   ThreadPullRequestUnlinkedPayload as ContractsThreadPullRequestUnlinkedPayloadSchema,
   ThreadPullRequestSyncedPayload as ContractsThreadPullRequestSyncedPayloadSchema,
@@ -63,6 +64,7 @@ export const ThreadTurnQueueRemovedPayload = ContractsThreadTurnQueueRemovedPayl
 export const ThreadTurnQueueMovedPayload = ContractsThreadTurnQueueMovedPayloadSchema;
 export const ThreadTurnUsageRecordedPayload = ContractsThreadTurnUsageRecordedPayloadSchema;
 export const ThreadUsageBackfilledPayload = ContractsThreadUsageBackfilledPayloadSchema;
+export const ThreadAutoSettleSetPayload = ContractsThreadAutoSettleSetPayloadSchema;
 export const ThreadPullRequestLinkedPayload = ContractsThreadPullRequestLinkedPayloadSchema;
 export const ThreadPullRequestUnlinkedPayload = ContractsThreadPullRequestUnlinkedPayloadSchema;
 export const ThreadPullRequestSyncedPayload = ContractsThreadPullRequestSyncedPayloadSchema;

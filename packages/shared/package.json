@@ -43,6 +43,10 @@
       "types": "./src/agentAwareness.ts",
       "import": "./src/agentAwareness.ts"
     },
+    "./infinitusTeamRedaction": {
+      "types": "./src/infinitusTeamRedaction.ts",
+      "import": "./src/infinitusTeamRedaction.ts"
+    },
     "./git": {
       "types": "./src/git.ts",
       "import": "./src/git.ts"

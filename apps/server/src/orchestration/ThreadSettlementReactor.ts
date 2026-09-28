@@ -148,13 +148,13 @@ export const make = Effect.gen(function* () {
       },
       (effect, thread) =>
         effect.pipe(
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause)
-              : Effect.logWarning("automatic thread settlement skipped", {
-                  threadId: thread.id,
-                  cause: Cause.pretty(cause),
-                }).pipe(Effect.as(null)),
+          Effect.catchCauseIf(
+            (cause) => !Cause.hasInterruptsOnly(cause),
+            (cause) =>
+              Effect.logWarning("automatic thread settlement skipped", {
+                threadId: thread.id,
+                cause: Cause.pretty(cause),
+              }).pipe(Effect.as(null)),
           ),
         ),
     );
@@ -316,13 +316,13 @@ export const make = Effect.gen(function* () {
             discard: true,
           });
         }).pipe(
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Effect.failCause(cause)
-              : Effect.logWarning("automatic thread settlement skipped", {
-                  threadIds: group.map((thread) => thread.id),
-                  cause: Cause.pretty(cause),
-                }),
+          Effect.catchCauseIf(
+            (cause) => !Cause.hasInterruptsOnly(cause),
+            (cause) =>
+              Effect.logWarning("automatic thread settlement skipped", {
+                threadIds: group.map((thread) => thread.id),
+                cause: Cause.pretty(cause),
+              }),
           ),
         ),
       { concurrency: 8, discard: true },
@@ -334,12 +334,12 @@ export const make = Effect.gen(function* () {
     threadId?: ThreadId,
   ) =>
     sweep(mergedPullRequest, threadId).pipe(
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause)
-          ? Effect.failCause(cause)
-          : Effect.logWarning("automatic thread settlement sweep failed", {
-              cause: Cause.pretty(cause),
-            }),
+      Effect.catchCauseIf(
+        (cause) => !Cause.hasInterruptsOnly(cause),
+        (cause) =>
+          Effect.logWarning("automatic thread settlement sweep failed", {
+            cause: Cause.pretty(cause),
+          }),
       ),
     );
   const worker = yield* makeDrainableWorker((threadId: ThreadId | undefined) =>

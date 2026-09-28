@@ -648,7 +648,7 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
               yield* Deferred.await(releaseThreadShell);
               return Option.some(thread);
             }),
-          getProjectShellById: () => Effect.succeed(Option.some(project)),
+          getProjectShellById: () => Effect.succeedSome(project),
         } as unknown as ProjectionSnapshotQueryShape;
 
         const descriptor = {
@@ -865,8 +865,8 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
                 threads: [thread],
                 updatedAt: now,
               } satisfies OrchestrationShellSnapshot),
-            getThreadShellById: () => Effect.succeed(Option.some(thread)),
-            getProjectShellById: () => Effect.succeed(Option.some(project)),
+            getThreadShellById: () => Effect.succeedSome(thread),
+            getProjectShellById: () => Effect.succeedSome(project),
           } as unknown as ProjectionSnapshotQueryShape),
         );
 
@@ -987,7 +987,7 @@ describe.sequential("signRelayAgentActivityPublishProof", () => {
           Layer.succeed(OrchestrationEngineService, {} as OrchestrationEngineShape),
           Layer.succeed(ProjectionSnapshotQuery, {
             getThreadShellById: () => Effect.sync(() => Option.fromNullishOr(currentThread)),
-            getProjectShellById: () => Effect.succeed(Option.some(project)),
+            getProjectShellById: () => Effect.succeedSome(project),
           } as unknown as ProjectionSnapshotQueryShape),
         );
 

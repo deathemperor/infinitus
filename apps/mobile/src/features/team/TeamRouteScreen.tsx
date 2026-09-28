@@ -1,8 +1,18 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAuth } from "@clerk/expo";
+import type { InfinitusTeamClient } from "@infinitus/client-runtime/relay/infinitusTeam";
+import {
+  machineIsOnline,
+  machineNow,
+  memberSummary,
+  parseJoinInput,
+  pendingSummary,
+  relativeTime,
+} from "@infinitus/client-runtime/relay/infinitusTeamLogic";
+import type { TeamListRow, TeamSnapshot } from "@infinitus/contracts/relayInfinitusTeam";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { type StaticScreenProps, useNavigation } from "@react-navigation/native";
-import * as Redacted from "effect/Redacted";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, ScrollView, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
@@ -10,53 +20,29 @@ import { AppText as Text, AppTextInput as TextInput } from "../../components/App
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
-import { infinitusEnvironment } from "../../state/infinitus";
-import { environmentPresentations } from "../../state/presentation";
-import { useEnvironmentQuery } from "../../state/query";
-import { environmentServerConfigsAtom } from "../../state/server";
-import { useAtomCommand } from "../../state/use-atom-command";
-import {
-  commandFailureMessage,
-  type InfinitusMac,
-  infinitusMacs,
-} from "../accounts/accountsRoute.logic";
 import { useNowMinute } from "../accounts/useNowMinute";
+import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { ConnectionSheetButton } from "../connection/ConnectionSheetButton";
 import { SettingsSection } from "../settings/components/SettingsSection";
-import {
-  parseTeamStatus,
-  relativeUnix,
-  secretFailureMessage,
-  type TeamAction,
-  teamCommandInput,
-  teamJoinCode,
-  teamJoinSecretArgs,
-  teamJoinSupported,
-  teamLeads,
-  teamMemberName,
-  teamMemberSummary,
-  teamStatusSupported,
-  type TeamStatus,
-} from "./team.logic";
+import { teamErrorMessage, teamMemberName, teamRoleLabel } from "./team.logic";
+import { useInfinitusTeamClient } from "./useInfinitusTeamClient";
 
 export type TeamRouteParams = {
-  /** The code an invite link (`https://infinitus.run/join#<code>`) carried; prefills Join. */
+  /** The token an invite link (`https://infinitus.run/join#<token>`) carried; prefills Join. */
   readonly code?: string;
 };
 
-const UNSUPPORTED = "This Infinitus build has no team commands (needs ≥ 0.5.0-alpha.17).";
 const INPUT =
   "rounded-[14px] border border-input-border bg-input px-4 py-3.5 text-base text-foreground";
 
-/** Settings › Team (#1313): each paired Mac's team, read and driven through
-    the T3 server's adapter. Members, the leader's requests, join from a code
-    or invite link. Creating, sharing and leaving stay on the Mac (spec §6.3). */
+/** Settings › Team on Infinitus Connect (#1592): the teams the signed-in
+    user is in, read and changed on the relay as that user, no Mac in the
+    loop. Members with their machines and live threads, the leader's
+    requests, what is waiting for the user's Allow, and Join. Creating,
+    sharing, grants, transcripts and leaving are the desktop's. */
 export function TeamRouteScreen({ route }: StaticScreenProps<TeamRouteParams | undefined>) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const configs = useAtomValue(environmentServerConfigsAtom);
-  const presentations = useAtomValue(environmentPresentations.presentationsAtom);
-  const macs = useMemo(() => infinitusMacs(configs, presentations), [configs, presentations]);
   const code = route.params?.code ?? "";
 
   return (
@@ -73,183 +59,226 @@ export function TeamRouteScreen({ route }: StaticScreenProps<TeamRouteParams | u
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        {macs.length === 0 ? (
-          <EmptyState
-            title="No Infinitus Mac"
-            detail="A team appears here once a paired Mac runs Infinitus. Plain servers have nothing to show."
-          />
+        {hasCloudPublicConfig() ? (
+          <ConnectedTeam code={code} />
         ) : (
-          macs.map((mac) => (
-            <MacTeam key={mac.environmentId} mac={mac} titled={macs.length > 1} code={code} />
-          ))
+          <EmptyState
+            title={`${CONNECT_NAME} is not configured`}
+            detail="Team needs it: a team lives on your account, not on a Mac."
+          />
         )}
-        {macs.length > 0 ? (
-          <Text className="px-2 text-xs text-foreground-tertiary">
-            Teams are created, shared and left in Infinitus on the Mac.
-          </Text>
-        ) : null}
       </ScrollView>
     </View>
   );
 }
 
-function MacTeam(props: {
-  readonly mac: InfinitusMac;
-  readonly titled: boolean;
-  readonly code: string;
-}) {
-  const { mac } = props;
-  const view = useEnvironmentQuery(
-    infinitusEnvironment.snapshot({ environmentId: mac.environmentId, input: {} }),
-  );
-  const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
-  const runSecret = useAtomCommand(infinitusEnvironment.secret, { reportFailure: false });
+function ConnectedTeam(props: { readonly code: string }) {
+  const navigation = useNavigation();
+  const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
+  if (!isLoaded) {
+    return <Text className="px-2 text-sm text-foreground-muted">Checking your sign-in…</Text>;
+  }
+  if (!isSignedIn) {
+    return (
+      <EmptyState
+        title={`Sign in to ${CONNECT_NAME}`}
+        detail="Teams live on your account: join from here, and every machine you sign in on shares with them."
+        actionLabel="Sign in"
+        onAction={() => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" })}
+      />
+    );
+  }
+  return <TeamPane code={props.code} />;
+}
+
+function TeamPane(props: { readonly code: string }) {
+  const client = useInfinitusTeamClient();
   const nowMs = useNowMinute();
-  /** `undefined` before the first read; null once the Mac says it is in no team. */
-  const [team, setTeam] = useState<TeamStatus | null | undefined>(undefined);
+  /** `undefined` before the first read. */
+  const [teams, setTeams] = useState<ReadonlyArray<TeamListRow> | undefined>(undefined);
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [team, setTeam] = useState<TeamSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [joinName, setJoinName] = useState("");
-  /** The code, a secret: in memory only, cleared on submit, gone with the screen. */
-  const [joinCode, setJoinCode] = useState(props.code);
-  const [joinError, setJoinError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const snapshot = view.data;
-  const supported =
-    snapshot !== null && snapshot.available && teamStatusSupported(snapshot.commands);
-  const joinSupported = snapshot !== null && teamJoinSupported(snapshot.commands);
+  const fail = useCallback((cause: unknown) => setError(teamErrorMessage(cause)), []);
 
-  const applyStatus = useCallback((result: unknown) => {
-    const parsed = parseTeamStatus(result);
-    if (parsed === null) {
-      setError("Infinitus answered team-status with a shape this build cannot read.");
-      return;
-    }
-    setError(null);
-    setTeam(parsed.team);
-  }, []);
-
-  /** One secret-free verb; every one answers team-status. */
-  const send = useCallback(
-    async (action: TeamAction) => {
-      const result = await runCommand({
-        environmentId: mac.environmentId,
-        input: teamCommandInput(action),
-      });
-      if (result._tag === "Failure") {
-        setError(commandFailureMessage(result.cause));
-        return;
+  const loadTeam = useCallback(
+    async (id: string) => {
+      try {
+        setTeam(await client.getTeam(id));
+        setError(null);
+      } catch (cause) {
+        fail(cause);
       }
-      applyStatus(result.value.result);
     },
-    [applyStatus, mac.environmentId, runCommand],
+    [client, fail],
   );
 
-  const run = async (action: Exclude<TeamAction, { type: "status" }>, key: string) => {
-    setBusy(key);
-    await send(action);
-    setBusy(null);
-  };
+  // The picked team survives a reload without being an effect dependency,
+  // so the first read runs once per client.
+  const pickedRef = useRef<string | null>(null);
+  const loadTeams = useCallback(
+    async (prefer?: string) => {
+      try {
+        const list = await client.listTeams();
+        setTeams(list);
+        setError(null);
+        const wanted = prefer ?? pickedRef.current;
+        const next = list.find((row) => row.teamId === wanted)?.teamId ?? list[0]?.teamId ?? null;
+        pickedRef.current = next;
+        setTeamId(next);
+        if (next === null) setTeam(null);
+        else await loadTeam(next);
+      } catch (cause) {
+        setTeams([]);
+        fail(cause);
+      }
+    },
+    [client, fail, loadTeam],
+  );
 
   useEffect(() => {
-    if (!supported) return;
-    void send({ type: "status" });
-  }, [send, supported]);
+    void loadTeams();
+  }, [loadTeams]);
 
-  const join = async () => {
-    const name = teamMemberName(joinName);
-    const code = teamJoinCode(joinCode);
-    if (name === null) {
-      setJoinError("Give this Mac a name for the roster.");
-      return;
+  /** One relay write that answers the snapshot. */
+  const apply = async (label: string, run: () => Promise<TeamSnapshot>) => {
+    setBusy(label);
+    try {
+      setTeam(await run());
+      setError(null);
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
     }
-    if (code.length === 0) {
-      setJoinError("Paste the team code or invite link.");
-      return;
-    }
-    setJoinCode("");
-    setBusy("join");
-    setJoinError(null);
-    const result = await runSecret({
-      environmentId: mac.environmentId,
-      input: { ...teamJoinSecretArgs(name), secret: Redacted.make(code) },
-    });
-    setBusy(null);
-    if (result._tag === "Failure") {
-      setJoinError(secretFailureMessage(result.cause));
-      return;
-    }
-    applyStatus(result.value.result);
   };
 
+  /** One relay write that answers nothing; the snapshot is read again. */
+  const applyThenReload = async (label: string, run: () => Promise<unknown>) => {
+    setBusy(label);
+    try {
+      await run();
+      setError(null);
+      if (teamId !== null) await loadTeam(teamId);
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const id = team?.teamId ?? null;
+  const isLeader = team?.role === "leader";
+
   return (
-    <View className="gap-3">
-      {props.titled ? (
-        <Text className="px-2 text-sm font-infinitus-medium text-foreground-muted">
-          {mac.connected ? mac.label : `${mac.label} · disconnected`}
+    <View className="gap-5">
+      {teams === undefined ? (
+        <Text className="px-2 text-sm text-foreground-muted">Reading your teams…</Text>
+      ) : null}
+      {teams !== undefined && teams.length === 0 ? (
+        <Text className="px-2 text-sm text-foreground-muted">
+          You are in no team yet. Join one below, or create one on the desktop.
         </Text>
       ) : null}
-      {view.error ? <ErrorBanner message={view.error} /> : null}
-      {snapshot === null && view.error === null ? (
-        <Text className="px-2 text-sm text-foreground-muted">Reading Infinitus…</Text>
+      {teams !== undefined && teams.length > 1 ? (
+        <SettingsSection title="Teams">
+          {teams.map((row, index) => (
+            <Pressable
+              key={row.teamId}
+              accessibilityRole="button"
+              accessibilityState={{ selected: row.teamId === teamId }}
+              className={
+                index === teams.length - 1
+                  ? "flex-row items-center justify-between px-4 py-3"
+                  : "flex-row items-center justify-between border-b border-border px-4 py-3"
+              }
+              onPress={() => {
+                pickedRef.current = row.teamId;
+                setTeamId(row.teamId);
+                void loadTeam(row.teamId);
+              }}
+            >
+              <Text className="text-base text-foreground">{row.name}</Text>
+              <Text className="text-xs text-foreground-muted">
+                {row.teamId === teamId ? "shown" : teamRoleLabel(row.role)}
+              </Text>
+            </Pressable>
+          ))}
+        </SettingsSection>
       ) : null}
-      {snapshot !== null && !snapshot.available ? (
-        <EmptyState
-          title="Infinitus is not answering"
-          detail={snapshot.unavailableReason ?? "The app is not running on this Mac."}
-          actionLabel="Retry"
-          onAction={view.refresh}
-        />
-      ) : null}
-      {snapshot !== null && snapshot.available && !supported ? (
-        <Text className="px-2 text-sm text-foreground-muted">{UNSUPPORTED}</Text>
-      ) : null}
-      {supported && error ? <ErrorBanner message={error} /> : null}
-      {supported && team === undefined && error === null ? (
-        <Text className="px-2 text-sm text-foreground-muted">Reading the team…</Text>
-      ) : null}
+      {notice ? <Text className="px-2 text-sm text-foreground-muted">{notice}</Text> : null}
+      {error ? <ErrorBanner message={error} /> : null}
 
-      {supported && team ? (
+      {team !== null && id !== null ? (
         <>
           <SettingsSection title={team.name}>
-            {team.members.map((member, index) => (
-              <View
-                key={member.kid}
-                className={
-                  index === team.members.length - 1
-                    ? "gap-0.5 px-4 py-3"
-                    : "gap-0.5 border-b border-border px-4 py-3"
-                }
-              >
-                <Text className="text-base text-foreground">{member.name}</Text>
-                <Text className="text-xs text-foreground-muted">
-                  {teamMemberSummary(member, nowMs)}
-                </Text>
-              </View>
-            ))}
+            <Text className="px-4 pt-3 text-xs text-foreground-muted">
+              {`${teamRoleLabel(team.role)} · you are ${team.me.name}`}
+            </Text>
+            {team.members.map((member, index) => {
+              const machines = member.machines.map((machine) => {
+                const now = machineNow(machine);
+                const live = now.live.map((row) => row.title).join(", ");
+                return [
+                  machine.label,
+                  machineIsOnline(machine, nowMs) ? "online" : "offline",
+                  `published ${relativeTime(machine.lastPublished, nowMs)}`,
+                  live.length === 0 ? null : `live: ${live}`,
+                  now.blockers.length === 0 ? null : `blocked: ${now.blockers.join(", ")}`,
+                ]
+                  .filter((part) => part !== null)
+                  .join(" · ");
+              });
+              return (
+                <View
+                  key={member.userId}
+                  className={
+                    index === team.members.length - 1
+                      ? "gap-0.5 px-4 py-3"
+                      : "gap-0.5 border-b border-border px-4 py-3"
+                  }
+                >
+                  <Text className="text-base text-foreground">
+                    {member.userId === team.me.userId ? `${member.name} (you)` : member.name}
+                  </Text>
+                  <Text className="text-xs text-foreground-muted">
+                    {memberSummary(member, nowMs)}
+                  </Text>
+                  {machines.map((line, machineIndex) => (
+                    <Text
+                      key={member.machines[machineIndex]!.environmentId}
+                      className="text-xs text-foreground-tertiary"
+                    >
+                      {line}
+                    </Text>
+                  ))}
+                </View>
+              );
+            })}
           </SettingsSection>
 
-          {teamLeads(team) ? (
+          {isLeader ? (
             <SettingsSection title="Requests">
-              {(team.requests?.length ?? 0) === 0 ? (
+              {team.requests.length === 0 ? (
                 <Text className="px-4 py-3 text-sm text-foreground-muted">
                   Nobody is waiting to join.
                 </Text>
               ) : (
-                team.requests!.map((request, index) => (
+                team.requests.map((request, index) => (
                   <View
-                    key={request.kid}
+                    key={request.userId}
                     className={
-                      index === team.requests!.length - 1
+                      index === team.requests.length - 1
                         ? "gap-2 px-4 py-3"
                         : "gap-2 border-b border-border px-4 py-3"
                     }
                   >
                     <Text className="text-base text-foreground">{request.name}</Text>
                     <Text className="text-xs text-foreground-muted">
-                      {[request.platform, `asked ${relativeUnix(request.at, nowMs)}`]
-                        .filter((part) => part !== undefined)
-                        .join(" · ")}
+                      {`asked ${relativeTime(request.at, nowMs)}`}
                     </Text>
                     <View className="flex-row gap-2">
                       <ConnectionSheetButton
@@ -259,17 +288,17 @@ function MacTeam(props: {
                         compact
                         disabled={busy !== null}
                         onPress={() =>
-                          void run({ type: "approve", kid: request.kid }, `approve:${request.kid}`)
+                          void apply("approve", () => client.approveRequest(id, request.userId))
                         }
                       />
                       <ConnectionSheetButton
                         icon="xmark"
-                        label="Deny"
+                        label="Decline"
                         tone="danger"
                         compact
                         disabled={busy !== null}
                         onPress={() =>
-                          void run({ type: "decline", kid: request.kid }, `decline:${request.kid}`)
+                          void apply("decline", () => client.declineRequest(id, request.userId))
                         }
                       />
                     </View>
@@ -279,65 +308,152 @@ function MacTeam(props: {
             </SettingsSection>
           ) : null}
 
-          <View className="gap-1.5">
-            <ConnectionSheetButton
-              icon="arrow.clockwise"
-              label={busy === "fetch" ? "Fetching…" : "Fetch now"}
-              disabled={busy !== null}
-              onPress={() => void run({ type: "fetch" }, "fetch")}
-            />
-            <Text className="px-2 text-xs text-foreground-tertiary">
-              {`Last fetch ${relativeUnix(team.lastFetch, nowMs)} · last publish ${relativeUnix(team.lastPublish, nowMs)}`}
-              {team.lastError ? ` · ${team.lastError}` : ""}
-            </Text>
-          </View>
+          {team.pending.length > 0 ? (
+            <SettingsSection title="Waiting for you">
+              {team.pending.map((pending, index) => (
+                <View
+                  key={pending.commandId}
+                  className={
+                    index === team.pending.length - 1
+                      ? "gap-2 px-4 py-3"
+                      : "gap-2 border-b border-border px-4 py-3"
+                  }
+                >
+                  <Text className="text-base text-foreground">{pending.fromName}</Text>
+                  <Text className="text-xs text-foreground-muted">
+                    {pendingSummary(pending, nowMs)}
+                  </Text>
+                  <View className="flex-row gap-2">
+                    <ConnectionSheetButton
+                      icon="checkmark"
+                      label="Allow"
+                      tone="primary"
+                      compact
+                      disabled={busy !== null}
+                      onPress={() =>
+                        void applyThenReload("allow", () =>
+                          client.allowCommand(id, pending.commandId),
+                        )
+                      }
+                    />
+                    <ConnectionSheetButton
+                      icon="xmark"
+                      label="Deny"
+                      tone="danger"
+                      compact
+                      disabled={busy !== null}
+                      onPress={() =>
+                        void applyThenReload("deny", () =>
+                          client.denyCommand(id, pending.commandId),
+                        )
+                      }
+                    />
+                  </View>
+                </View>
+              ))}
+            </SettingsSection>
+          ) : null}
+
+          <ConnectionSheetButton
+            icon="arrow.clockwise"
+            label={busy === "refresh" ? "Refreshing…" : "Refresh"}
+            disabled={busy !== null}
+            onPress={() => void applyThenReload("refresh", () => Promise.resolve())}
+          />
         </>
       ) : null}
 
-      {supported && team === null ? (
-        <SettingsSection title="Join a team">
-          <View className="gap-3 p-4">
-            {joinSupported ? (
-              <>
-                <Text className="text-sm text-foreground-muted">
-                  This Mac is in no team. Ask a leader for a code or an invite link; a leader
-                  approves the request on their Mac.
-                </Text>
-                <TextInput
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  placeholder="Your name on the roster"
-                  value={joinName}
-                  onChangeText={setJoinName}
-                  className={INPUT}
-                />
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  secureTextEntry
-                  placeholder="Team code or invite link"
-                  value={joinCode}
-                  onChangeText={setJoinCode}
-                  className={INPUT}
-                />
-                {joinError ? <ErrorBanner message={joinError} /> : null}
-                <ConnectionSheetButton
-                  icon="link"
-                  label={busy === "join" ? "Requesting…" : "Request to join"}
-                  tone="primary"
-                  disabled={busy !== null}
-                  onPress={() => void join()}
-                />
-              </>
-            ) : (
-              <Text className="text-sm text-foreground-muted">
-                This Mac is in no team, and this Infinitus build cannot take a code from the phone.
-                Join from the Mac.
-              </Text>
-            )}
-          </View>
-        </SettingsSection>
-      ) : null}
+      <JoinSection
+        client={client}
+        code={props.code}
+        busy={busy}
+        setBusy={setBusy}
+        onJoined={async (joined) => {
+          setNotice(
+            joined.status === "pending"
+              ? "Your request is in; a leader approves it."
+              : "You are in.",
+          );
+          await loadTeams(joined.teamId);
+        }}
+      />
+      <Text className="px-2 text-xs text-foreground-tertiary">
+        Creating a team, choosing what each machine shares, delegated control and leaving are on the
+        desktop.
+      </Text>
     </View>
+  );
+}
+
+function JoinSection(props: {
+  readonly client: InfinitusTeamClient;
+  readonly code: string;
+  readonly busy: string | null;
+  readonly setBusy: (busy: string | null) => void;
+  readonly onJoined: (joined: { teamId: string; status: "member" | "pending" }) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  /** The token, a secret: in memory only, cleared on submit, gone with the screen. */
+  const [token, setToken] = useState(props.code);
+  const [error, setError] = useState<string | null>(null);
+
+  const join = async () => {
+    const memberName = teamMemberName(name);
+    const parsed = parseJoinInput(token);
+    if (memberName === null) {
+      setError("Give yourself a name for the roster.");
+      return;
+    }
+    if (parsed === null) {
+      setError("Paste the invite token or link.");
+      return;
+    }
+    props.setBusy("join");
+    setError(null);
+    try {
+      const joined = await props.client.joinTeam({ token: parsed, memberName });
+      setToken("");
+      await props.onJoined(joined);
+    } catch (cause) {
+      setError(teamErrorMessage(cause));
+    } finally {
+      props.setBusy(null);
+    }
+  };
+
+  return (
+    <SettingsSection title="Join a team">
+      <View className="gap-3 p-4">
+        <Text className="text-sm text-foreground-muted">
+          Ask a leader for an invite. A one-use invite joins you at once; a reusable one asks, and a
+          leader approves.
+        </Text>
+        <TextInput
+          autoCapitalize="words"
+          autoCorrect={false}
+          placeholder="Your name on the roster"
+          value={name}
+          onChangeText={setName}
+          className={INPUT}
+        />
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          placeholder="Invite token or link"
+          value={token}
+          onChangeText={setToken}
+          className={INPUT}
+        />
+        {error ? <ErrorBanner message={error} /> : null}
+        <ConnectionSheetButton
+          icon="link"
+          label={props.busy === "join" ? "Joining…" : "Join"}
+          tone="primary"
+          disabled={props.busy !== null}
+          onPress={() => void join()}
+        />
+      </View>
+    </SettingsSection>
   );
 }

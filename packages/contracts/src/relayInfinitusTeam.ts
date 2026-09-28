@@ -140,7 +140,7 @@ export const TeamSnapshot = Schema.Struct({
   name: Schema.String,
   role: TeamRole,
   policy: Schema.Struct({ requests: TeamPolicyRequests }),
-  me: Schema.Struct({ name: MemberName, shares: TeamShares }),
+  me: Schema.Struct({ userId: TeamUserId, name: MemberName, shares: TeamShares }),
   members: Schema.Array(TeamMemberRow),
   /** Leaders only; `[]` for a member. */
   requests: Schema.Array(TeamRequestRow),

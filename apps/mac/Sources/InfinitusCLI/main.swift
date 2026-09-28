@@ -20,10 +20,6 @@ let programName: String = {
 if let code = runDesktopVerbs(args) {
     exit(code)
 }
-// `team` runs in-process (TeamCommand.swift) and needs no app.
-if args.first == "team" {
-    exit(runTeam(Array(args.dropFirst())))
-}
 
 func usage() -> String {
     var out = "usage: \(programName) <command> [args] [--option value]\n\n"
@@ -34,11 +30,10 @@ func usage() -> String {
         if !c.options.isEmpty { out += "  [\(c.options.joined(separator: ", "))]" }
         out += "\n"
     }
-    out += "  team <subcommand>      teams: create, code, request, approve, share… (`\(programName) team --help`)\n"
     out += "  environments | projects | threads | thread show|send|new|interrupt|release|rename|title | desktop status|credential\n"
     out += "                         Infinitus desktop's projects and threads (`\(programName) thread --help`)\n"
     out += "\nFleet keys come from `infinitusctl fleets` (e.g. swapd/claude, cliproxy/claude).\n"
-    out += "proxy-key, 9router-password, aws-login-code, gcloud-login-code, signin-code, team-create and team-join read their secret from stdin.\n"
+    out += "proxy-key, 9router-password, aws-login-code, gcloud-login-code, signin-code read their secret from stdin.\n"
     out += "Socket: \(ControlProtocol.socketURL().path)\n"
     return out
 }
@@ -60,9 +55,7 @@ while i < args.count {
     let a = args[i]
     if a.hasPrefix("--") {
         let key = String(a.dropFirst(2))
-        // `--remote` is a bare flag for aws-login but carries a URL for
-        // team-create (the app's fallback to the second positional stays as a belt).
-        let flagOnly = command == "team-create" ? ["yes", "local", "status", "invite", "export"] : ["yes", "local", "remote", "status", "invite", "export"]
+        let flagOnly = ["yes", "local", "remote", "status", "invite", "export"]
         if flagOnly.contains(key) || i + 1 >= args.count || args[i + 1].hasPrefix("--") {
             options[key] = "true"
         } else {
@@ -80,7 +73,7 @@ while i < args.count {
 // read (a body-less verb hung a run for 90 min, 2026-09-11).
 let stdinPiped = isatty(0) == 0
 var secret: String?
-if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "push", "desktop-credential", "team-create", "team-join", "team-inbox"].contains(command) {
+if stdinPiped, ["proxy-key", "9router-password", "aws-login-code", "gcloud-login-code", "signin-code", "aws-login-callback", "push", "desktop-credential"].contains(command) {
     let data = FileHandle.standardInput.readDataToEndOfFile()
     secret = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }

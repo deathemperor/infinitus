@@ -20,6 +20,7 @@ import {
 import { createIncomingSharePayloadReader } from "./incoming-share-native";
 import { IncomingShareInbox } from "./incoming-share-inbox";
 import { persistComposerAttachmentFile } from "../../lib/composerImages";
+import { scheduleUnusedComposerAttachmentCleanup } from "../../state/use-composer-drafts";
 import {
   loadIncomingShareDrafts,
   removeIncomingShareDraft,
@@ -37,6 +38,8 @@ type IncomingShareContextValue = {
     expectedDestination: IncomingShareDestination,
   ) => Promise<void>;
   readonly consumeShare: (shareId: string) => Promise<void>;
+  /** Drops a share the user declined, files included. */
+  readonly discardShare: (shareId: string) => Promise<void>;
   readonly refresh: () => Promise<void>;
 };
 
@@ -296,6 +299,18 @@ export function IncomingShareProvider(props: React.PropsWithChildren) {
       setDrafts(snapshot);
     }
   }, []);
+  const discardShare = useCallback(
+    async (shareId: string) => {
+      const draft = drafts.find((candidate) => candidate.id === shareId);
+      await consumeShare(shareId);
+      if (draft) {
+        // The inbox entry was the last owner of the files it persisted; the
+        // sweep re-checks ownership, so one a draft already picked up stays.
+        scheduleUnusedComposerAttachmentCleanup(draft.attachments);
+      }
+    },
+    [consumeShare, drafts],
+  );
   const reserveShare = useCallback(
     async (shareId: string, destination: IncomingShareDestination) => {
       const snapshot = await incomingShareInbox.reserve(shareId, destination);
@@ -328,10 +343,12 @@ export function IncomingShareProvider(props: React.PropsWithChildren) {
       releaseShareReservation,
       reserveShare,
       consumeShare,
+      discardShare,
       refresh,
     }),
     [
       consumeShare,
+      discardShare,
       drafts,
       error,
       getShare,

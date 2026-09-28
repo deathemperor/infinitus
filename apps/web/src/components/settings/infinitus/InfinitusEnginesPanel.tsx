@@ -82,7 +82,7 @@ function InfinitusEngineStatusList({
       {rows
         .filter((row) => row.error !== null)
         .map((row) => (
-          <p key={row.key} className="px-3 py-2 text-[13px] text-destructive sm:px-4">
+          <p key={row.key} className="px-3 py-2 text-sm text-destructive sm:px-4">
             {row.label}: {row.error}
           </p>
         ))}

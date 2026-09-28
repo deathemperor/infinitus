@@ -457,6 +457,19 @@ public enum AccountVitals {
         return plan.contains { $0 >= 100 }
     }
 
+    /// The row's dying flash: alive (`isPlanDead` false) with a window in
+    /// the 90s. A spent model window has already died — its cell reads
+    /// "down" — so it never pulses the live row that carries it (user
+    /// 2026-09-25: a fleet out of Fable was "flashing red like crazy").
+    public static func isDying(_ usage: Usage?) -> Bool {
+        guard let usage, !isPlanDead(usage) else { return false }
+        var pcts: [Double] = []
+        if let p = usage.fiveHour?.pct { pcts.append(p) }
+        if let p = usage.sevenDay?.pct { pcts.append(p) }
+        for w in usage.scoped ?? [] { pcts.append(w.pct) }
+        return pcts.contains { $0 >= 90 && $0 < 100 }
+    }
+
     /// The one per-model window that alone kills this account ("Fable"):
     /// nil when a plan window (5h/7d) is spent too, when two models are,
     /// or when nothing is. The account still has plan headroom for other

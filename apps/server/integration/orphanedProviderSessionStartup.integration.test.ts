@@ -102,7 +102,7 @@ const startupDependencies = Layer.mergeAll(
   Layer.succeed(ServiceLauncherClient.ServiceLauncherClient, {
     managed: false,
     requestUpdate: () => Effect.die("unused"),
-    prepareTrial: Effect.sync(() => undefined),
+    prepareTrial: Effect.undefined,
   }),
   Layer.succeed(
     HttpServer.HttpServer,

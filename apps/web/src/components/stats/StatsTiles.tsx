@@ -35,7 +35,7 @@ function StatsTileView({ tile }: { readonly tile: StatsTile }) {
           {tile.value}
         </span>
         {tile.delta === null ? null : (
-          <span className={`text-[11px] tabular-nums ${deltaClass}`}>{tile.delta}</span>
+          <span className={`text-2xs tabular-nums ${deltaClass}`}>{tile.delta}</span>
         )}
       </p>
       <Sparkline series={tile.series} />

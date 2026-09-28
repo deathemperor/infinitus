@@ -95,6 +95,8 @@ final class SwapdLaunchAgentTests: XCTestCase {
         let plist = try XCTUnwrap(PropertyListSerialization.propertyList(
             from: Data(contentsOf: location.plist), format: nil) as? [String: Any])
         XCTAssertEqual(plist["KeepAlive"] as? Bool, true)
+        XCTAssertEqual(plist["ProcessType"] as? String, "Standard",
+                       "a Background engine is starved of CPU exactly when the fleet is busiest")
         XCTAssertEqual(plist["ProgramArguments"] as? [String], [location.binary.path, "auto", "--json"])
         XCTAssertEqual((plist["EnvironmentVariables"] as? [String: String])?["SWAPD_SUPERVISED"], "0")
 

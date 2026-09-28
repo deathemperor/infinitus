@@ -50,7 +50,8 @@ contributor shorthand for this TypeScript tree and the Swift app.
   (`051`–`057`, `059`, `061` and `062`, #806 onward) is renumbered after them in the merge
   (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
   is the fork's `058`, its `052_ProjectionThreadTitleState` the fork's
-  `061`, its `053_PullRequestFilesViewed` the fork's `063`), so an existing fork database never skips it. Upstream commits
+  `061`, its `053_PullRequestFilesViewed` the fork's `063`, its
+  `054_ProjectionThreadsAutoSettleDisabledAt` the fork's `064`), so an existing fork database never skips it. Upstream commits
   `.pnpm-store/v11/index.db` (#11265) and rewrites it on every install; the
   fork ignores the file and drops it from the merge (`git rm --cached`), so
   each sync meets it as a modify/delete conflict resolved the same way.

@@ -892,7 +892,9 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/team",
     targetId: "infinitus-team",
     infinitusOnly: true,
-    searchTerms: ["team members invite code join create share transcripts leader roster"],
+    searchTerms: [
+      "team members invite token join create share transcripts leader grants private projects connect",
+    ],
   },
   {
     id: "infinitus-push",

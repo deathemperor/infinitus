@@ -544,7 +544,7 @@ function RootStackLayout(props: {
   readonly state: NavigationState;
 }) {
   const navigation = useNavigation();
-  const { pendingShare } = useIncomingShare();
+  const { pendingShare, discardShare } = useIncomingShare();
   const sharePresentationRef = useRef(EMPTY_INCOMING_SHARE_PRESENTATION_STATE);
   useAgentNotificationNavigation();
   // Presents the T3 Connect onboarding sheet after an in-session sign-in.
@@ -558,6 +558,14 @@ function RootStackLayout(props: {
       pendingShareId: pendingShare?.id ?? null,
     });
     sharePresentationRef.current = transition.state;
+    if (transition.shareIdToDiscard) {
+      // Fork: the sheet closing over an unimported share declines it. Any
+      // navigation away counts, a notification tap included: nothing else
+      // surfaces the inbox, so keeping the item would only replay the sheet.
+      void discardShare(transition.shareIdToDiscard).catch((error) => {
+        console.warn("[incoming-share] could not discard a dismissed share", error);
+      });
+    }
     if (!transition.shareIdToPresent) {
       return;
     }
@@ -565,7 +573,7 @@ function RootStackLayout(props: {
       screen: "NewTask",
       params: { incomingShareId: transition.shareIdToPresent },
     });
-  }, [navigation, pendingShare, props.state]);
+  }, [discardShare, navigation, pendingShare, props.state]);
   // Full pathname (sheets included) for keyboard-command scoping; the
   // workspace layout only reacts to the underlying non-overlay route.
   const path = getPathFromState(props.state, navigationPathConfig);

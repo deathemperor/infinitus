@@ -165,7 +165,7 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
             value={draft}
             placeholder="Type or paste, Enter to capture"
             aria-label="New capture"
-            className="w-full resize-none rounded-md border border-border/60 bg-background px-2 py-1 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full resize-none rounded-md border border-border/60 bg-background px-2 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -204,7 +204,7 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
                       aria-checked={done}
                       aria-label={done ? "Reopen capture" : "Mark capture done"}
                       className={cn(
-                        "flex size-4 items-center justify-center rounded-[.25rem] border border-input",
+                        "flex size-4 items-center justify-center rounded-xs border border-input",
                         done && "bg-primary text-primary-foreground",
                       )}
                       onPointerDown={(event) => event.preventDefault()}

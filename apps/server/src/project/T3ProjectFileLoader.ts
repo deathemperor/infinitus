@@ -74,7 +74,7 @@ export const make = Effect.gen(function* () {
       for (const fileName of T3_PROJECT_FILE_NAMES) {
         const filePath = path.join(workspaceRoot, fileName);
         const raw = yield* fileSystem.readFileString(filePath).pipe(
-          Effect.map(Option.some),
+          Effect.asSome,
           Effect.catchTags({
             PlatformError: (error) =>
               error.reason._tag === "NotFound"
@@ -94,7 +94,7 @@ export const make = Effect.gen(function* () {
         // both files never silently falls back to the older one.
         if (Option.isNone(raw)) continue;
         return yield* decodeT3ProjectFileJson(raw.value).pipe(
-          Effect.map(Option.some),
+          Effect.asSome,
           Effect.catchTags({
             SchemaError: (error) =>
               logT3ProjectFileLoadError(

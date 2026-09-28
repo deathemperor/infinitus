@@ -265,14 +265,8 @@ export function summarizeStatsSession(input: {
     if (row.usage) {
       const record = row.usage;
       model = record.model;
-      const priced = priceUsage(
-        input.rates,
-        model,
-        record.totals,
-        record.reportedCostUsd,
-        input.overrides,
-      );
-      const savings = cacheSavingsUsd(input.rates, model, record.totals, input.overrides);
+      const priced = priceUsage(input.rates, record, input.overrides);
+      const savings = cacheSavingsUsd(input.rates, record, input.overrides);
       const unpriced = priced.costSource === "unpriced" ? 1 : 0;
       const tally = {
         in: record.totals.uncachedInputTokens,

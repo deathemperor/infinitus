@@ -199,11 +199,11 @@ const readPersistedBackendObservabilitySettings = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const raw = yield* fileSystem.readFileString(environment.serverSettingsPath).pipe(
-    Effect.map(Option.some),
+    Effect.asSome,
     Effect.catchTags({
       PlatformError: (cause) =>
         cause.reason._tag === "NotFound"
-          ? Effect.succeed(Option.none())
+          ? Effect.succeedNone
           : logBackendObservabilitySettingsReadFailure(environment.serverSettingsPath, cause).pipe(
               Effect.as(Option.none()),
             ),
@@ -550,7 +550,16 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
 
     return {
       executablePath: process.execPath,
-      args: [environment.backendEntryPath, "--bootstrap-fd", "3"],
+      // Packaged builds only, so a dev instance never shares the cache with the
+      // prod app it is often run from. `--require` rather than NODE_COMPILE_CACHE,
+      // so the setting does not leak into the provider and terminal processes
+      // the backend starts.
+      args: [
+        ...(environment.isPackaged ? ["--require", environment.compileCachePath] : []),
+        environment.backendEntryPath,
+        "--bootstrap-fd",
+        "3",
+      ],
       entryPath: environment.backendEntryPath,
       cwd: environment.backendCwd,
       env: {

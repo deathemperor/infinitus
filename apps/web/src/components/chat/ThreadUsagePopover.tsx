@@ -67,7 +67,7 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
             <div className="min-w-0">
               <div className="font-medium text-muted-foreground text-xs">Thread usage</div>
               {missingCostLine ? (
-                <div className="mt-1 text-pretty text-[11px] text-secondary-label leading-4">
+                <div className="mt-1 text-pretty text-2xs text-secondary-label leading-4">
                   {missingCostLine}
                 </div>
               ) : (
@@ -76,9 +76,9 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
                 </div>
               )}
             </div>
-            <div className="shrink-0 text-[11px] text-secondary-label">estimates</div>
+            <div className="shrink-0 text-2xs text-secondary-label">estimates</div>
           </div>
-          <dl className="flex flex-col gap-2 text-[11px] leading-4">
+          <dl className="flex flex-col gap-2 text-2xs leading-4">
             {sections.map((section, index) => (
               <div
                 key={section[0]?.label ?? index}
@@ -103,7 +103,7 @@ export function ThreadUsagePopover({ usage }: { usage: ThreadUsageRollup }) {
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <div className="cursor-help text-pretty text-secondary-label text-[11px] underline decoration-dotted underline-offset-2" />
+                  <div className="cursor-help text-pretty text-secondary-label text-2xs underline decoration-dotted underline-offset-2" />
                 }
               >
                 {sourceLine}

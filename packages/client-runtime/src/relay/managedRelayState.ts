@@ -187,14 +187,12 @@ function readSessionClerkToken(
   session: ManagedRelaySession,
 ): Effect.Effect<string, ManagedRelaySessionError> {
   return session.readClerkToken().pipe(
-    Effect.flatMap((token) =>
-      token
-        ? Effect.succeed(token)
-        : Effect.fail(
-            new ManagedRelaySessionError({
-              message: `The ${CONNECT_NAME} session token is unavailable.`,
-            }),
-          ),
+    Effect.filterOrFail(
+      (token): token is string => Boolean(token),
+      () =>
+        new ManagedRelaySessionError({
+          message: `The ${CONNECT_NAME} session token is unavailable.`,
+        }),
     ),
   );
 }

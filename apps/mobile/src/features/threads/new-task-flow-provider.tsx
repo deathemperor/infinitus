@@ -19,6 +19,7 @@ import {
   T3_PROJECT_FILE_NAME,
   ThreadId,
 } from "@infinitus/contracts";
+import { sanitizeNewRefName } from "@infinitus/shared/git";
 import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import * as Arr from "effect/Array";
@@ -93,6 +94,7 @@ import {
 } from "../../state/legacy-plan-mode";
 import { useLegacyPlanModeState } from "./use-legacy-plan-mode-enabled";
 import {
+  filterNewTaskBranches,
   resolveNewTaskBranchWorktreePath,
   resolveNewTaskLocalWorkspaceSelection,
 } from "./new-task-context-presentation";
@@ -129,6 +131,9 @@ export function branchBadgeLabel(input: {
   }
   if (input.branch.worktreePath && input.branch.worktreePath !== input.project?.workspaceRoot) {
     return "worktree";
+  }
+  if (input.branch.isRemote) {
+    return "remote";
   }
   if (input.branch.isDefault) {
     return "default";
@@ -641,7 +646,8 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     }
     replaceComposerDraftAttachments(selectedProjectDraftKey, []);
   }, [selectedProjectDraftKey]);
-  const debouncedBranchQuery = useDebouncedValue(branchQuery, BRANCH_SEARCH_DEBOUNCE_MS);
+  const branchSearchQuery = sanitizeNewRefName(branchQuery);
+  const debouncedBranchQuery = useDebouncedValue(branchSearchQuery, BRANCH_SEARCH_DEBOUNCE_MS);
   const branchTarget = useMemo(
     () => ({
       environmentId: selectedProject?.environmentId ?? null,
@@ -652,7 +658,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
     [debouncedBranchQuery, selectedProject?.environmentId, selectedProject?.workspaceRoot],
   );
   const branchState = usePaginatedBranches(branchTarget);
-  const branchSearchIsDebouncing = branchQuery.trim() !== debouncedBranchQuery.trim();
+  const branchSearchIsDebouncing = branchSearchQuery !== debouncedBranchQuery;
   const branchesLoading =
     branchSearchIsDebouncing || (branchState.isPending && branchState.data === null);
   const branchesFetchingNextPage = branchState.isFetchingNextPage;
@@ -684,17 +690,10 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   );
   const currentCheckoutBranchName = projectGitStatus.data?.refName ?? null;
 
-  const filteredBranches = useMemo(() => {
-    const query = branchQuery.trim().toLowerCase();
-    if (query.length === 0) {
-      return availableBranches;
-    }
-
-    return pipe(
-      availableBranches,
-      Arr.filter((branch) => branch.name.toLowerCase().includes(query)),
-    );
-  }, [availableBranches, branchQuery]);
+  const filteredBranches = useMemo(
+    () => filterNewTaskBranches(allBranchRefs, branchQuery),
+    [allBranchRefs, branchQuery],
+  );
 
   // The composer's draft follows the project it will be sent to: switching
   // mid-compose keeps the same draft and moves it, so typed text follows the

@@ -101,6 +101,7 @@ describe("Stats transcript activity", () => {
           sessionId: "child",
           dedupeKey: null,
           reportedCostUsd: null,
+          fast: false,
           totals: {
             uncachedInputTokens: 100,
             cachedInputTokens: 0,

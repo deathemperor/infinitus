@@ -2,7 +2,7 @@
 
 ## The team invite link
 
-`apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal link `https://infinitus.run/join#<code>` into the `team?code=` route (`getInitialURL` / `subscribe`, `features/team/team.logic.ts`, #1313). The site's `/pair` universal link (#724, #746) left with #1407: a pairing link is upstream's plain `<origin>/pair#token=…` from Settings › Connections, read by the in-app scanner and the route's `pairingUrl`.
+`apps/mobile/src/App.tsx` — `appLinking` rewrites an incoming universal link `https://infinitus.run/join#<token>` into the `team?code=` route (`getInitialURL` / `subscribe`, `features/team/team.logic.ts`, #1313; the token is a relay invite since #1592). The site's `/pair` universal link (#724, #746) left with #1407: a pairing link is upstream's plain `<origin>/pair#token=…` from Settings › Connections, read by the in-app scanner and the route's `pairingUrl`.
 
 ## The bridges
 

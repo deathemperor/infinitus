@@ -681,7 +681,11 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         }) { entry in
             let w = entry.win
             Group {
-                if showAsDead, let cause = ownCause({ $0.blocks(scoped: w.name) }) {
+                // A spent model reads "down" on a live row too (#1575
+                // keeps the row alive; its empty bar read as a gauge,
+                // user 2026-09-25) — after the death beat, as a row's.
+                if !model.dying.contains(account.number),
+                   let cause = ownCause({ $0.blocks(scoped: w.name) }) {
                     deadLine(of: cause,
                              timer: !weeklyAlreadyShows(cause) && !repeatsClock(cause))
                 } else if hiddenInCompact(w.pct) {

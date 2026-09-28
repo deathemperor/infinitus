@@ -30,17 +30,28 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `settingsSearch.ts` (+ test, the `usage-providers` entry dropped) — since
   the Accounts page reads every hub through the Mac app. The rest is
   fork-owned (`fork-only-files.md`); rules: `docs/internals/accounts-page.md`.
-- Claude banked resets (#1553): `apps/server/src/provider/Drivers/ClaudeDriver.ts`
-  (the instance's `login` location, `consumeResetCredit` through
-  `CodexResetCreditCoordinator`, the probe's `resolveResetCredits`),
+- Claude banked resets (#1553): `apps/server/src/provider/Layers/claudeResetCredits.ts`
+  (+ test) is the fork's whole module, taken over upstream's #13118 on every
+  sync: ours reads the macOS keychain and the token's profile, upstream's
+  skips macOS and reads `.claude.json` (#1601). `Drivers/ClaudeDriver.ts`
+  (the instance's `login` location, `consumeResetCredit` through upstream's
+  `ResetCreditCoordinator` with a fork settled-failure predicate, the
+  probe's `resolveResetCredits`), `Layers/ProviderInstanceRegistryLive.test.ts`
+  (upstream's two redeem tests also answer the fork's profile request and
+  match the usage URL's query),
   `Layers/ClaudeProvider.ts` (`checkClaudeProviderStatus`'s last parameter,
   attached only for a subscription login), `Layers/ProviderRegistry.test.ts`
   (one test), `packages/contracts/src/providerUsageLimits.ts`
   (`ServerProviderResetCredits.label` / `nextHold`, additive), and the reset
   control's held state on `apps/web/src/components/usage/UsageLimits.tsx`
   (`resetHoldText`), `UsageLimitsPooled.tsx` and
-  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`. The module itself
-  is in `fork-only-files.md`.
+  `apps/mobile/src/features/usage/UsageLimitsSection.tsx`.
+- `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
+  also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
+  in the sidebar's utility row, so their Back returns to the main app (#1601).
+- `apps/desktop/src/updates/updatesTestHarness.ts` — the `resourcesPath`
+  option (#1042); under upstream's no-op file system, reads below it go to
+  the real disk so the feed-swap test's own `app-update.yml` is found.
 - Pi provider (#1409 follow-on). Registration points only:
   `packages/contracts/src/settings.ts` (`PiSettings`, the `pi` arm of the
   provider-config union) and `src/model.ts` (`PI_DEFAULT_MODEL`);
@@ -76,12 +87,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
-  routes (#710), and `InfinitusTeamControlHttpApi`: a teammate's sealed team
-  command for the Mac (#1313), so the typed HTTP clients carry them; the
+  routes (#710), so the typed HTTP clients carry them (the git-store team's
+  `InfinitusTeamControlHttpApi` left with #1592); the
   `infinitus` group's `POST /api/infinitus/alert` (#1375) takes the Mac's
   account alert on the operate scope.
 - `packages/contracts/package.json` — the `./infinitus`,
-  `./infinitusPairing`, `./infinitusTeamControl`, `./captures`,
+  `./infinitusPairing`, `./captures`,
   `./infinitusAlert`, `./relayInfinitusAlert` (#1375) and
   `./relayInfinitusTeam` (#1592) subpath exports.
 - `packages/contracts/src/environment.ts` — the `infinitus`, `turnQueue`
@@ -162,13 +173,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   type error.
 - `apps/server/src/server.ts` — `InfinitusLayerLive` in
   `RuntimeDependenciesLive`. `InfinitusResumeOnLimitLive` in `ReactorLayerLive`.
-  `infinitusPairingHttpApiLayer` and `infinitusTeamControlHttpApiLayer` in
-  `makeRoutesLayer`
+  `infinitusPairingHttpApiLayer` in `makeRoutesLayer`
   (#648). `InfinitusSignInLapseLive` beside it, with its own control
   client and `ProcessRunner.layer` (#1076; the thread-card layer it was merged with left with #1375).
   `infinitusHttpApiLayer` is provided `InfinitusAlertRelayLive` over the
   secret store and `FetchHttpClient.layer` (#1375). `InfinitusSlackLive` (provided `SlackClientLive` over
-  `FetchHttpClient.layer`) beside it (#574). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
+  `FetchHttpClient.layer`) beside it (#574). `InfinitusTeamRelayLive` (provided the secret store and
+  `FetchHttpClient.layer`) beside it (#1592). `InfinitusPairingLive` (provided `AuthLayerLive`) beside them, and
   `infinitusPairingHttpApiLayer` in the `HttpApiBuilder.layer` provides
   (#710). `InfinitusSessionHoldLayers` in `ReactorLayerLive` (#616): the hold,
   and the `TurnStartGate` it implements; `InfinitusSessionInterruptLive` just
@@ -445,8 +456,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   constant. Upstream's own `t3code/…` fixtures in tests stay as legacy data.
 - `packages/shared/src/agentAwareness.ts` — `resolveThreadAwarenessPhase` answers `running` for a settled thread whose `backgroundLiveness` is `working`, so the lock-screen card counts the threads the lists call Working, and a new `monitoring` phase for a watch loop alone, so the card says Monitoring where the lists do. The phase is a literal in `packages/contracts/src/relay.ts`'s `RelayAgentAwarenessPhase`, and each consumer names it: the relay's `statusForPhase`, `activityPhasePriority` (with running) and running-row TTL (`infra/relay/src/agentActivity/agentActivityAggregate.ts`, `agentActivityPayloads.ts`), the iOS widget's tint and sort buckets (`apps/mobile/src/widgets/AgentActivity.tsx`) and Android's `ActivityPhase.MONITORING` (`AgentActivityPresentation.kt`). With it, `shouldPublishAgentAwarenessEvent` in `apps/server/src/relay/AgentAwarenessRelay.ts` lets `task.started`, `task.updated` and `task.completed` activities publish (never `task.progress`), so the card follows background work ending instead of waiting out the relay's two-hour row expiry. Both carry a test. The same file's `AGENT_AWARENESS_HEARTBEAT_INTERVAL` loop republishes every live thread each half hour (`resolveAgentAwarenessHeartbeatThreadIds`, past the unchanged-state dedupe) and `resolveAgentAwarenessRelayPublishSnapshot` stamps a live state with the publish time: the relay ages a running row out two hours after its `updatedAt`, so a thread Working longer than that fell off the card's count while the phone's list still said Working.
 - `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); re-flipped after every sync with its two fixtures, `packages/shared/src/cliRelease.test.ts` and `packages/ssh/src/tunnel.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
-- `packages/shared/package.json` — the `./productName`, `./homeDir` and
-  `./desktopIdentity` exports.
+- `packages/shared/package.json` — the `./productName`, `./homeDir`,
+  `./desktopIdentity` and `./infinitusTeamRedaction` (#1592) exports.
+- `apps/server/src/orchestration/Layers/OrchestrationReactor.ts` (+ test,
+  `integration/OrchestrationEngineHarness.integration.ts`) — starts
+  `InfinitusTeamRelay` after the awareness relay (#1592); the test and the
+  harness stub it beside `AgentAwarenessRelay`.
 - `apps/desktop/src/app/DesktopEnvironment.ts` — `userDataDirName` comes from
   `@infinitus/shared/desktopIdentity` (`infinitus-desktop` / `infinitus-desktop-dev`), plus the
   `adoptsLegacyUserDataDir` flag that gates upstream's legacy-directory rule.
@@ -600,7 +615,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
 - `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
   Accounts, the Infinitus fleet per paired Mac) and the `SettingsTeam` route
-  (Settings › Team, #1313; `team?code=…` is where an invite link lands).
+  (Settings › Team, #1313, on the relay since #1592; `team?code=…` is where an invite link lands).
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` and `SettingsTeam` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the rows of
@@ -639,7 +654,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   fork's build fell through to upstream's T3 mark and drew the T3 logo
   beside the Infinitus wordmark on every loading screen. Any new
   variant-keyed asset needs an `infinitus` branch for the same reason.
-- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313: `infinitus.run/join#<code>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
+- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313, #1592: `infinitus.run/join#<token>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`, `InfinitusHoldsBridge` (#1278). Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) /
   `infinitusComposerSendMode` (#807, `"queue" | "steer"`) keys (interface
@@ -659,7 +674,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   same alert (#1375).
 - `apps/mobile/src/features/threads/ThreadDetailScreen.tsx` — the fork's slots (`infinitusReconnectingNotice` #832, `infinitusHoldBanner` #742, `infinitusQueuedTurns` #806, `infinitusBestOfCard` #269 B, `infinitusTurnFooters` #952) and the thread header menu (`useThreadHeaderMenu`, #941; `usePullRequestHeaderItem`, #269 F), built in `ThreadRouteScreen.tsx`. `ThreadRouteScreen.tsx`'s `ThreadHeader` takes it as `infinitusMenu` (the Android action ahead of the git controls, its `version` in `optionsVersion`) and `apps/mobile/src/features/threads/useThreadHeaderOptions.tsx` takes the iOS item as `infinitusHeaderItem`, ahead of the git items in both header layouts. Rules and traps: `docs/internals/phone-thread-screen.md`.
 - `apps/mobile/src/components/FilePreviewModal.tsx` (+ `FilePreviewModal.types.ts`, where the source types moved) — the optional `cachedUrl` on an environment-hosted source, and the one retry with a fresh URL when a reused one is refused (`previewUrlReuse.logic.ts`). Why: `docs/internals/mobile-navigation.md`.
-- `packages/client-runtime/package.json` — the fork's `./state/infinitus*` subpath exports (`infinitusAccounts`, `infinitusUtilization`, `infinitusQuotaTimeline` and the rest), one entry per fork-owned model file.
+- `packages/client-runtime/package.json` — the fork's `./state/infinitus*` subpath exports (`infinitusAccounts`, `infinitusUtilization`, `infinitusQuotaTimeline` and the rest), one entry per fork-owned model file, and `./relay/infinitusTeam` + `./relay/infinitusTeamLogic` (#1592).
 - `apps/web/src/timestampFormat.ts` — `timestampLocale` exported, so the Accounts page's quota timeline (`QuotaTimeline.tsx`) writes its day labels in the same locale as every other timestamp.
 - `packages/client-runtime/src/state/assets.ts` — `expiresAt` on the `Success` asset URL state, so a client can tell how long the URL it is showing stays valid.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — the optional `infinitusMessageMenu` prop (revert to a message the user sent; `useRevertMessageMenu` + `revertMessage.logic.ts`, `restoreAttachments.ts`). Rules and traps: `docs/internals/phone-thread-screen.md`. Also `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl`.
@@ -695,6 +710,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusSideQuestionSheet.tsx`, `sideQuestions.ts`) — a side question from the phone (#269 C, #881, #887). Rules and traps: `docs/internals/side-question.md`.
 - `apps/mobile/src/features/threads/ThreadRouteScreen.tsx`, `apps/mobile/src/Stack.tsx` (+ the fork's `InfinitusThreadUsageSheet.tsx`, `threadUsage.logic.ts`) — the thread's usage from the phone (#834, #907, #927). Rules and traps: `docs/internals/turn-usage.md`.
 - `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` route in the new-task sheet), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`.
+- `apps/mobile/src/Stack.tsx` (`RootStackLayout`'s share effect), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`discardShare`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/state/use-thread-outbox-drain.ts` (+ test) — `usePinAtCreation` after a delivered creation, `threadsByKey` (#1278), `queueBehindRunningTurn` around both `resolveThreadOutboxDeliveryAction` calls (#807) and its `thread.turn.queue` form on a `turnQueue` server (#812: `sendQueuedMessage` `via`, `completeQueuedMessageDelivery` `retainInFeed`). Rules and traps: `docs/internals/phone-outbox-drain.md`.
 - `apps/mobile/src/lib/composerImages.ts` (+ test) — `originalImagePassthroughMimeType`: a picked still over `ORIGINAL_STILL_IMAGE_MAX_BYTES` (2 MB) takes upstream's bounded-JPEG path instead of passing through up to the 10 MB provider cap; a GIF keeps the cap. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
 - `apps/mobile/src/lib/attachmentUpload.ts` (+ test) — `uploadFileBytes` aborts and fails a transfer after `ATTACHMENT_UPLOAD_TIMEOUT_MS`: the relay cut a 7.7 MB image at two minutes, iOS's background session kept replaying it, and the one-at-a-time outbox held every queued reply behind it (2026-09-19). The session stays `background` on purpose, so an upload survives a locked phone. Offered upstream as well; drop this bullet once their copy carries it.
