@@ -118,7 +118,12 @@ function harness(input?: {
   const fcm: FcmDeliveryJob[] = [];
   const consumed: Array<{ thumbprint: string; jti: string }> = [];
   const users = input?.users ?? [
-    { userId: "user:one", notificationsEnabled: true, liveActivitiesEnabled: true },
+    {
+      userId: "user:one",
+      environmentLabel: "death2’s MacBook Pro",
+      notificationsEnabled: true,
+      liveActivitiesEnabled: true,
+    },
   ];
   const targets = input?.targets ?? {
     "user:one": [
@@ -204,8 +209,10 @@ describe("InfinitusAlertPublisher", () => {
       expect(response.ok).toBe(true);
       expect(response.deliveries.map((row) => row.deviceId).sort()).toEqual(["droid", "phone"]);
       expect(h.apns).toHaveLength(1);
+      // The phone hears from every linked machine: the banner names the
+      // machine as this user labelled it, in place of the sent title.
       expect(h.apns[0]?.notification).toEqual({
-        title: "Infinitus",
+        title: "death2’s MacBook Pro",
         body: "switched to account 2 (work)",
         environmentId,
         deepLink: "/settings/accounts",
@@ -218,7 +225,7 @@ describe("InfinitusAlertPublisher", () => {
         state: null,
         alert: {
           alert_id: "alert-jti",
-          alert_title: "Infinitus",
+          alert_title: "death2’s MacBook Pro",
           alert_body: "switched to account 2 (work)",
           alert_path: "/settings/accounts",
         },
@@ -229,11 +236,39 @@ describe("InfinitusAlertPublisher", () => {
     }).pipe(Effect.provide(h.layer));
   });
 
+  it.effect("keeps the sent title for a link without a label", () => {
+    const h = harness({
+      users: [
+        {
+          userId: "user:one",
+          environmentLabel: "",
+          notificationsEnabled: true,
+          liveActivitiesEnabled: true,
+        },
+      ],
+    });
+    return Effect.gen(function* () {
+      yield* publish(yield* request());
+      expect(h.apns[0]?.notification.title).toBe("Infinitus");
+      expect(h.fcm[0]?.alert?.alert_title).toBe("Infinitus");
+    }).pipe(Effect.provide(h.layer));
+  });
+
   it.effect("skips users whose link has notifications off", () => {
     const h = harness({
       users: [
-        { userId: "user:one", notificationsEnabled: false, liveActivitiesEnabled: true },
-        { userId: "user:two", notificationsEnabled: true, liveActivitiesEnabled: false },
+        {
+          userId: "user:one",
+          environmentLabel: "one",
+          notificationsEnabled: false,
+          liveActivitiesEnabled: true,
+        },
+        {
+          userId: "user:two",
+          environmentLabel: "two",
+          notificationsEnabled: true,
+          liveActivitiesEnabled: false,
+        },
       ],
       targets: {
         "user:one": [target({ deviceId: "muted", platform: "ios", pushToken: "t1" })],

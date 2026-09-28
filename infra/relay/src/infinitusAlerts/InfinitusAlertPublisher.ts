@@ -304,13 +304,20 @@ export const make = Effect.gen(function* () {
                 }),
             ),
           );
+          // The phone hears from every machine it is linked to, so the
+          // banner's title is the machine as this user named it; the sent
+          // title only stands in for a link without a label.
+          const alert =
+            user.environmentLabel.length > 0
+              ? { ...input.request.alert, title: user.environmentLabel }
+              : input.request.alert;
           return yield* Effect.forEach(
             targets,
             (target) =>
               deliverToTarget({
                 environmentId: input.environmentId,
                 target,
-                alert: input.request.alert,
+                alert,
                 alertId,
                 nowMs,
               }),

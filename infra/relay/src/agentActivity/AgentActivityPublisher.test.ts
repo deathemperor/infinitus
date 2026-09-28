@@ -88,6 +88,7 @@ function makeEnvironmentLinks(
       Effect.succeed([
         {
           userId: "dev:julius",
+          environmentLabel: "dev box",
           notificationsEnabled: true,
           liveActivitiesEnabled: true,
         },
@@ -317,6 +318,7 @@ describe("AgentActivityPublisher", () => {
                         return [
                           {
                             userId: "dev:julius",
+                            environmentLabel: "dev box",
                             notificationsEnabled: true,
                             liveActivitiesEnabled: true,
                           },
@@ -512,6 +514,7 @@ describe("AgentActivityPublisher", () => {
                       Effect.succeed([
                         {
                           userId: "dev:julius",
+                          environmentLabel: "dev box",
                           notificationsEnabled: true,
                           liveActivitiesEnabled: false,
                         },
@@ -625,6 +628,7 @@ describe("AgentActivityPublisher", () => {
                         Effect.succeed([
                           {
                             userId: "dev:julius",
+                            environmentLabel: "dev box",
                             notificationsEnabled: true,
                             liveActivitiesEnabled: false,
                           },

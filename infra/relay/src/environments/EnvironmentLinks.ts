@@ -20,6 +20,8 @@ export interface RelayLinkedEnvironmentRecord extends RelayClientEnvironmentReco
 
 export interface AgentAwarenessDeliveryUserRecord {
   readonly userId: string;
+  /** What this user calls the environment; empty when the link carries no label. */
+  readonly environmentLabel: string;
   readonly notificationsEnabled: boolean;
   readonly liveActivitiesEnabled: boolean;
 }
@@ -202,6 +204,7 @@ const make = Effect.gen(function* () {
       return yield* db
         .select({
           userId: relayEnvironmentLinks.userId,
+          environmentLabel: relayEnvironmentLinks.environmentLabel,
           notificationsEnabled: relayEnvironmentLinks.notificationsEnabled,
           liveActivitiesEnabled: relayEnvironmentLinks.liveActivitiesEnabled,
         })
@@ -211,6 +214,7 @@ const make = Effect.gen(function* () {
           Effect.map((rows) =>
             rows.map((row) => ({
               userId: row.userId,
+              environmentLabel: row.environmentLabel.trim(),
               notificationsEnabled: row.notificationsEnabled,
               liveActivitiesEnabled: row.liveActivitiesEnabled,
             })),

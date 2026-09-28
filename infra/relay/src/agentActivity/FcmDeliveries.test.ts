@@ -168,6 +168,7 @@ function harness() {
             ? [
                 {
                   userId: "user",
+                  environmentLabel: "dev box",
                   notificationsEnabled: !current.mutedEnvironments.includes(input.environmentId),
                   liveActivitiesEnabled: !current.notificationOnlyEnvironments.includes(
                     input.environmentId,
