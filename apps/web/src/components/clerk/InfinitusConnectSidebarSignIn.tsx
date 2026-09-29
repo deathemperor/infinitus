@@ -1,10 +1,9 @@
 import { UserButton, useAuth } from "@clerk/react";
-import { LogInIcon, ServerIcon, SmartphoneIcon } from "lucide-react";
+import { LogInIcon } from "lucide-react";
 
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
-import { MobileClientsUserProfilePage } from "./MobileClientsUserProfilePage";
-import { InfinitusConnectUserProfilePage } from "./InfinitusConnectUserProfilePage";
+import { T3_CONNECT_ACCOUNT_PAGES } from "./InfinitusConnectAccountPages";
 import { useInfinitusConnectAuthPrompt } from "./useInfinitusConnectAuthPrompt";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 
@@ -34,6 +33,7 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
         },
       }}
     >
+<<<<<<< HEAD
       <UserButton.UserProfilePage
         label="Mobile clients"
         labelIcon={<SmartphoneIcon className="size-4" />}
@@ -48,6 +48,18 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
       >
         <InfinitusConnectUserProfilePage />
       </UserButton.UserProfilePage>
+=======
+      {T3_CONNECT_ACCOUNT_PAGES.map((page) => (
+        <UserButton.UserProfilePage
+          key={page.url}
+          label={page.label}
+          labelIcon={page.icon}
+          url={page.url}
+        >
+          {page.content}
+        </UserButton.UserProfilePage>
+      ))}
+>>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     </UserButton>
   );
 }
