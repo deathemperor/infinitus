@@ -19,10 +19,21 @@ const usageCommandOrder = new Map<KeybindingCommand, number>(
   [...METRIC_OPTIONS, ...WINDOW_OPTIONS].map((option, index) => [option.command, index]),
 );
 
+// Fork: `usage.open` leads the page's own shortcuts. Upstream ranked only the
+// page's shortcuts and let `usage.open` fall through to the caller's string
+// comparison, which disagrees with the page order (tokens before limits, but
+// limits before open before tokens by name), so the result depended on the
+// order the bindings came in — and the fork's extra defaults change that order.
+function usageCommandRank(command: KeybindingCommand): number | undefined {
+  const index = usageCommandOrder.get(command);
+  if (index !== undefined) return index + 1;
+  return command.startsWith("usage.") ? 0 : undefined;
+}
+
 function compareUsageCommands(left: KeybindingCommand, right: KeybindingCommand): number | null {
-  const leftIndex = usageCommandOrder.get(left);
-  const rightIndex = usageCommandOrder.get(right);
-  return leftIndex !== undefined && rightIndex !== undefined ? leftIndex - rightIndex : null;
+  const leftRank = usageCommandRank(left);
+  const rightRank = usageCommandRank(right);
+  return leftRank !== undefined && rightRank !== undefined ? leftRank - rightRank : null;
 }
 
 export type KeybindingSource = "Default" | "Custom" | "Project";

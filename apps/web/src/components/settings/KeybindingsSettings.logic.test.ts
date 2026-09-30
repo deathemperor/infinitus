@@ -47,9 +47,10 @@ describe("KeybindingsSettings.logic", () => {
     },
   );
   it("orders Usage bindings and command choices like the page", () => {
+    // Fork: `usage.open` leads; the page's shortcuts follow in the page's order.
     const expected = [
-      "usage.cost",
       "usage.open",
+      "usage.cost",
       "usage.tokens",
       "usage.limits",
       "usage.period.day",
