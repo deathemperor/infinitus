@@ -24,6 +24,8 @@ final class ControlServer {
     /// engine pass). Reads still run alongside.
     private var writeTail: Task<ControlReply, Never>?
     private var task: Task<Void, Never>?
+    /// The last `peer-sync` error logged (nil: the last push applied).
+    private var peerSyncError: String?
 
     init(model: AppModel) { self.model = model }
 
@@ -148,12 +150,32 @@ final class ControlServer {
 
     private func serve(_ conn: NWConnection) {
         conn.start(queue: queue)
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, _, error in
-            guard let self, let data, error == nil else { conn.cancel(); return }
+        Self.receiveLine(conn) { [weak self] line in
+            guard let self, let line else { conn.cancel(); return }
             Task { @MainActor in
-                let reply = await self.handle(line: data)
+                let reply = await self.handle(line: line)
                 let bytes = (try? ControlCodec.encode(reply)) ?? Data("{\"ok\":false}\n".utf8)
                 conn.send(content: bytes, completion: .contentProcessed { _ in conn.cancel() })
+            }
+        }
+    }
+
+    /// One request is one JSON line, but a big one — a `peer-sync` push
+    /// carrying every other machine's fleets — arrives over several reads.
+    /// A single read handed `handle` the first chunk, a cut line it refused
+    /// as a bad request, so the popup lost the other machines whenever the
+    /// push outgrew one read (user 2026-09-25). Reads until the newline
+    /// (both clients end the line with one), the peer's close, or 8 MB.
+    nonisolated private static func receiveLine(_ conn: NWConnection, _ buffer: Data = Data(),
+                                                done: @escaping @Sendable (Data?) -> Void) {
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { data, _, isComplete, error in
+            guard error == nil else { return done(nil) }
+            var buffer = buffer
+            if let data { buffer.append(data) }
+            if isComplete || buffer.contains(0x0A) || buffer.count > 8 << 20 {
+                done(buffer.isEmpty ? nil : buffer)
+            } else {
+                receiveLine(conn, buffer, done: done)
             }
         }
     }
@@ -194,7 +216,20 @@ final class ControlServer {
         writeTail = mine
         let reply = await mine.value
         if writeTail == mine { writeTail = nil }
+        if request.command == PeerFleets.command { notePeerSync(reply) }
         return reply
+    }
+
+    /// The desktop pushes `peer-sync` every 30 s and drops a failed reply,
+    /// so a push the app refuses empties the popup's other machines with no
+    /// trace anywhere (user 2026-09-25): each new error is logged once, and
+    /// the recovery.
+    private func notePeerSync(_ reply: ControlReply) {
+        let error = reply.ok ? nil : (reply.error ?? "failed")
+        guard error != peerSyncError else { return }
+        peerSyncError = error
+        if let error { Self.log.error("peer-sync refused: \(error, privacy: .public)") }
+        else { Self.log.notice("peer-sync applied again") }
     }
 
     private func answer(_ request: ControlRequest) async -> ControlReply {
