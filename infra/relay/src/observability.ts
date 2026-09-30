@@ -225,6 +225,7 @@ export const makeRelayTraceLayer = (input: {
       resource: {
         serviceName: "infinitus-relay-worker",
         attributes: {
+          "service.namespace": "t3code",
           "service.runtime": "cloudflare-worker",
           "service.component": "relay",
         },

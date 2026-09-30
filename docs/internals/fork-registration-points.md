@@ -27,7 +27,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `UsageProviderSettings.tsx` (a plain title in place of the search id, so
   the unmounted file still compiles), `knip.jsonc` (that file and
   `AddUsageLimitSourceDialog.tsx` ignored as unused files) and
-  `settingsSearch.ts` (+ test, the `usage-providers` entry dropped) — since
+  `settingsSearch.ts` (+ test, the `usage-providers` and `cursor-keychain-usage`
+  entries dropped; the Cursor Keychain toggle upstream's #13870 put in that
+  section is reached from the Usage page's enable action) — since
   the Accounts page reads every hub through the Mac app. The rest is
   fork-owned (`fork-only-files.md`); rules: `docs/internals/accounts-page.md`.
 - Claude banked resets (#1553): `apps/server/src/provider/Layers/claudeResetCredits.ts`
@@ -568,6 +570,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   in any spawned env: the bundle self-check inherits the host's env, and a
   runner hosted by the desktop app (an agent inside Infinitus) carries that
   variable, so the upstream assertion failed there.
+- `apps/web/src/components/settings/KeybindingsSettings.logic.ts` (+ test) —
+  `compareUsageCommands` ranks `usage.open` ahead of the Usage page's own
+  shortcuts instead of falling through to the name comparison: upstream's
+  mixed comparator was order-dependent, and the fork's extra default bindings
+  change the input order (upstream's #10158 test expected the artifact).
+- `packages/client-runtime/src/platform/persistence.test.ts` — the cache
+  encoding property test runs with a 30 s budget: it samples 1000 thread
+  shells, and the fork's shell has enough extra fields that vitest's 5 s
+  default times out on a loaded CI runner.
 - `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
   temp directory's real path: the service canonicalises transcript roots,
   and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),

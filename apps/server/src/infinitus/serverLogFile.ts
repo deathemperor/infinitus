@@ -17,7 +17,7 @@ import * as Logger from "effect/Logger";
  *
  * So the backend writes its own, whoever spawned it: one NDJSON record per
  * line, rotated by the same sink the trace file uses. It is a separate file
- * from `serverLogPath` on purpose — a boot service redirects stdout there,
+ * from the boot service's log on purpose — that one is redirected stdout,
  * and writing both would put every line in that file twice, in two formats.
  */
 const SERVER_LOG_FILE_MAX_BYTES = 10 * 1024 * 1024;

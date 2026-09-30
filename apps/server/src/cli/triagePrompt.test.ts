@@ -52,7 +52,8 @@ it("context file carries every path the playbook depends on", () => {
       dbPath: "/home/u/.t3/userdata/state.sqlite",
       settingsPath: "/home/u/.t3/userdata/settings.json",
       logsDir: "/home/u/.t3/userdata/logs",
-      serverLogPath: "/home/u/.t3/userdata/logs/server.log",
+      serviceLogPath: "/home/u/.t3/userdata/logs/boot-service.log",
+      desktopBackendLogGlob: "/home/u/.t3/userdata/logs/server-child*.log*",
       serverLogNdjsonPath: "/home/u/.t3/userdata/logs/server.log.ndjson",
       serverTracePath: "/home/u/.t3/userdata/logs/server.trace.ndjson",
       providerEventLogPath: "/home/u/.t3/userdata/logs/provider/events.log",
@@ -65,6 +66,8 @@ it("context file carries every path the playbook depends on", () => {
   assert.include(context, "/home/u/.t3/userdata/state.sqlite");
   assert.include(context, "/home/u/.t3/userdata/logs/server.trace.ndjson");
   assert.include(context, "/home/u/.t3/userdata/logs/server.log.ndjson");
+  assert.include(context, "/home/u/.t3/userdata/logs/boot-service.log");
+  assert.include(context, "/home/u/.t3/userdata/logs/server-child*.log*");
   assert.include(context, "/home/u/.t3/userdata/logs/provider/events.log");
   assert.include(context, "/home/u/.t3/userdata/secrets");
   assert.include(context, "/home/u/.t3/source");

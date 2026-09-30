@@ -51,6 +51,7 @@ const environment = (id: string, accounts: UsageSummary["accounts"]) => ({
   label: id,
   isPending: false,
   error: null,
+  needsCursorKeychainAccess: false,
   summary: summary(accounts),
 });
 

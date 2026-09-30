@@ -137,6 +137,14 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
     "apps/web/src/components/clerk/InfinitusConnectSidebarSignIn.tsx",
   ],
   [
+    "apps/web/src/components/clerk/T3ConnectAccountPages.tsx",
+    "apps/web/src/components/clerk/InfinitusConnectAccountPages.tsx",
+  ],
+  [
+    "apps/web/src/components/clerk/RemoveT3ConnectEnvironmentDialog.tsx",
+    "apps/web/src/components/clerk/RemoveInfinitusConnectEnvironmentDialog.tsx",
+  ],
+  [
     "apps/web/src/components/clerk/T3ConnectUserProfilePage.tsx",
     "apps/web/src/components/clerk/InfinitusConnectUserProfilePage.tsx",
   ],

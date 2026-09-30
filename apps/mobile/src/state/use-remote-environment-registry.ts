@@ -1,5 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useNavigation } from "@react-navigation/native";
 import type { EnvironmentId } from "@infinitus/contracts";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Cause from "effect/Cause";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { useCallback, useMemo } from "react";
@@ -111,6 +113,7 @@ export function useRemoteConnectionStatus() {
 
 export function useRemoteConnections() {
   const controller = useConnectionController();
+  const navigation = useNavigation();
   const connectionPairingUrl = useAtomValue(connectionPairingUrlAtom);
   const pendingConnectionError = useAtomValue(pendingConnectionErrorAtom);
   const { connectedEnvironments, connectionError, connectionState } = useRemoteConnectionStatus();
@@ -171,22 +174,37 @@ export function useRemoteConnections() {
       if (!environment) {
         return;
       }
+      const remove = {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => {
+          void controller.removeEnvironment(environmentId);
+        },
+      } as const;
+      // Removing a T3 Connect environment here leaves its account registration
+      // and host space, so point to where it can be deregistered.
+      if (environment.isRelayManaged) {
+        Alert.alert(
+          "Remove from this device?",
+          `Forget ${environment.environmentLabel} and its cached threads on this device.\n\nIt stays on your ${CONNECT_NAME} account and keeps its host space. Deregister it under ${PRODUCT_NAME} Account → ${CONNECT_NAME} to free it.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: `Open ${PRODUCT_NAME} Account`,
+              onPress: () => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" }),
+            },
+            remove,
+          ],
+        );
+        return;
+      }
       Alert.alert(
         "Remove from this device?",
         `Forget ${environment.environmentLabel} and its cached threads on this device. Switch it off instead to keep it saved.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Remove",
-            style: "destructive",
-            onPress: () => {
-              void controller.removeEnvironment(environmentId);
-            },
-          },
-        ],
+        [{ text: "Cancel", style: "cancel" }, remove],
       );
     },
-    [connectedEnvironments, controller],
+    [connectedEnvironments, controller, navigation],
   );
 
   return {
