@@ -1,3 +1,4 @@
+import { isChatGptUsageLimitError } from "@infinitus/shared/usageLimits";
 import { useLoadBalancedEnvironment } from "../hooks/useLoadBalancedEnvironment";
 import { visibleThreadPullRequests } from "@infinitus/shared/threadPullRequests";
 import type { UsageLimitSourceSnapshots } from "@infinitus/contracts";
@@ -9809,6 +9810,7 @@ export default function ChatView(props: ChatViewProps) {
               />
               <ThreadErrorBanner
                 error={visibleThreadError}
+                chatGptUsageLimit={isChatGptUsageLimitError(threadActivities, visibleThreadError)}
                 onDismiss={() => {
                   setThreadError(activeThread.id, null);
                   dismissThreadErrorBannerForSession(threadErrorBannerKey);
