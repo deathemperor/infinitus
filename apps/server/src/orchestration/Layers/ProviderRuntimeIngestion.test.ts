@@ -4116,6 +4116,7 @@ describe("ProviderRuntimeIngestion", () => {
       turnId: asTurnId("turn-runtime-error-activity"),
       payload: {
         message: "runtime activity exploded",
+        code: "subscription_sharing_usage_limit_exceeded",
       },
     });
 
@@ -4132,6 +4133,7 @@ describe("ProviderRuntimeIngestion", () => {
 
     expect(activity?.kind).toBe("runtime.error");
     expect(activityPayload?.message).toBe("runtime activity exploded");
+    expect(activityPayload?.code).toBe("subscription_sharing_usage_limit_exceeded");
   });
 
   it("keeps the session running when a runtime.warning arrives during an active turn", async () => {

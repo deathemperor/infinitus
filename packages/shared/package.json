@@ -379,9 +379,23 @@
       "types": "./src/gitPatchPath.ts",
       "import": "./src/gitPatchPath.ts"
     },
+<<<<<<< HEAD
     "./stats": {
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"
+=======
+    "./providerAuthReturnUrl": {
+      "types": "./src/providerAuthReturnUrl.ts",
+      "import": "./src/providerAuthReturnUrl.ts"
+    },
+    "./codexAuthCallback": {
+      "types": "./src/codexAuthCallback.ts",
+      "import": "./src/codexAuthCallback.ts"
+    },
+    "./codexAuthHandoff": {
+      "types": "./src/codexAuthHandoff.ts",
+      "import": "./src/codexAuthHandoff.ts"
+>>>>>>> upstream-sync-c18e5ea6e-upstream-renamed
     }
   },
   "scripts": {
