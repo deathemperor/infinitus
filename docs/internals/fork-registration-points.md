@@ -570,6 +570,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   in any spawned env: the bundle self-check inherits the host's env, and a
   runner hosted by the desktop app (an agent inside Infinitus) carries that
   variable, so the upstream assertion failed there.
+- `packages/client-runtime/src/platform/persistence.test.ts` — the cache
+  encoding property test runs with a 30 s budget: it samples 1000 thread
+  shells, and the fork's shell has enough extra fields that vitest's 5 s
+  default times out on a loaded CI runner.
 - `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
   temp directory's real path: the service canonicalises transcript roots,
   and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),
