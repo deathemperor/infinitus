@@ -255,16 +255,22 @@ export async function readTranscriptRecords(
   filePath: string,
   provider: UsageProviderKind,
   resumeFrom?: TranscriptParsePosition,
-<<<<<<< HEAD
-  observer?: {
-    readonly reset: () => void;
-    readonly line: (line: string, provider: UsageProviderKind, state: CodexScanState) => void;
+  options?: {
+    readonly streamingThresholdBytes?: number;
+    /**
+     * Fork: sees every parsed line (the activity stats). A record over the
+     * streaming threshold is projected, not parsed as a line, so it is skipped.
+     */
+    readonly observer?:
+      | {
+          readonly reset: () => void;
+          readonly line: (line: string, provider: UsageProviderKind, state: CodexScanState) => void;
+        }
+      | undefined;
   },
-=======
-  options?: { readonly streamingThresholdBytes?: number },
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 ): Promise<TranscriptParseResult | null> {
   const streamingThresholdBytes = options?.streamingThresholdBytes ?? STREAMING_THRESHOLD_BYTES;
+  const observer = options?.observer;
   let handle: NodeFSP.FileHandle;
   try {
     handle = await NodeFSP.open(filePath, "r");

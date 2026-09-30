@@ -16,6 +16,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
+import { PRODUCT_NAME } from "./productName.ts";
+
 import { OtlpHeadersFromString, OtlpProtocol, type SignalExport } from "./observability.ts";
 
 /** The signals T3 Code exports, spelled as the variable names spell them. */
@@ -207,7 +209,7 @@ const exporter = (name: string): Config.Config<Setting<Exporter>> =>
         ? { value }
         : {
             value,
-            warning: `${name} names ${ignored.join(", ")}, which T3 Code does not export to, so ${ignored.length === 1 ? "it was" : "they were"} ignored`,
+            warning: `${name} names ${ignored.join(", ")}, which ${PRODUCT_NAME} does not export to, so ${ignored.length === 1 ? "it was" : "they were"} ignored`,
           };
     }),
   );

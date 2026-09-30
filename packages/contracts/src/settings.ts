@@ -1042,7 +1042,6 @@ export const UsageLimitSourceConfig = Schema.Struct({
 export type UsageLimitSourceConfig = typeof UsageLimitSourceConfig.Type;
 
 /**
-<<<<<<< HEAD
  * Fork (#574): the Slack bridge. A separate "Infinitus" Slack app: its
  * app-level token opens the Socket Mode connection, its bot token posts.
  * Both travel like a usage-limit source's key — redacted before a client
@@ -1068,7 +1067,8 @@ export const InfinitusSlackSettingsPatch = Schema.Struct({
   botToken: Schema.optionalKey(TrimmedString),
 });
 export type InfinitusSlackSettingsPatch = typeof InfinitusSlackSettingsPatch.Type;
-=======
+
+/**
  * Bitbucket API credentials for this environment, used before the
  * `T3CODE_BITBUCKET_*` environment variables. The tokens live in the server's
  * secret store; settings and clients only see a redaction marker when one is
@@ -1080,7 +1080,6 @@ export const BitbucketSettings = Schema.Struct({
   apiToken: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
 });
 export type BitbucketSettings = typeof BitbucketSettings.Type;
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),

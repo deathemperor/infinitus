@@ -231,11 +231,8 @@ const make = Effect.gen(function* () {
   const vcsStatusBroadcaster = yield* VcsStatusBroadcaster;
   const textGeneration = yield* TextGeneration;
   const serverSettingsService = yield* ServerSettingsService;
-<<<<<<< HEAD
   const turnStartGate = yield* TurnStartGate;
-=======
   const terminalManager = yield* TerminalManager.TerminalManager;
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   /** Environment settings with the thread's project overrides applied. */
   const projectSettingsForThread = Effect.fnUntraced(function* (threadId: ThreadId) {
     const settings = yield* serverSettingsService.getSettings;
@@ -1532,6 +1529,11 @@ const make = Effect.gen(function* () {
             : {}),
           interactionMode: event.payload.interactionMode,
           createdAt: event.payload.createdAt,
+          // Later turns must not reuse the current title as titleSeed. Only the
+          // first prompt seed should suppress a not-yet-renamed session title.
+          ...(!hasOtherUserMessages && event.payload.titleSeed !== undefined
+            ? { titleSeed: event.payload.titleSeed }
+            : {}),
         }).pipe(
           Effect.asSome,
           Effect.catchCause((cause) =>
@@ -1553,39 +1555,7 @@ const make = Effect.gen(function* () {
           Effect.forkScoped,
         );
       }),
-<<<<<<< HEAD
     });
-=======
-      ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
-      ...(event.payload.modelSelection !== undefined
-        ? { modelSelection: event.payload.modelSelection }
-        : {}),
-      interactionMode: event.payload.interactionMode,
-      createdAt: event.payload.createdAt,
-      // Later turns must not reuse the current title as titleSeed. Only the
-      // first prompt seed should suppress a not-yet-renamed session title.
-      ...(!hasOtherUserMessages && event.payload.titleSeed !== undefined
-        ? { titleSeed: event.payload.titleSeed }
-        : {}),
-    }).pipe(
-      Effect.asSome,
-      Effect.catchCause((cause) => handleTurnStartFailure(cause).pipe(Effect.as(Option.none()))),
-    );
-
-    if (Option.isNone(sendTurnRequest)) {
-      return;
-    }
-
-    const send = providerService
-      .sendTurn(sendTurnRequest.value)
-      .pipe(Effect.asVoid, Effect.catchCause(recoverTurnStartFailure));
-    // The forked send settles `sent` from here on, so drop the entry the post-processing hook uses.
-    if (resumed && event.commandId !== null) resumedTurnStarts.delete(event.commandId);
-    yield* send.pipe(
-      Effect.ensuring(resumed ? Deferred.succeed(resumed.sent, undefined) : Effect.void),
-      Effect.forkScoped,
-    );
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   });
 
   const processTurnInterruptRequested = Effect.fn("processTurnInterruptRequested")(function* (

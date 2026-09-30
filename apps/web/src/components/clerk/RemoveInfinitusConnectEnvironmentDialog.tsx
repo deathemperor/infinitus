@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { useState } from "react";
 
 import {
@@ -48,7 +49,7 @@ export function RemoveInfinitusConnectEnvironmentDialog({
               This forgets its pairing, credentials, and cached threads here.
             </AlertDialogDescription>
             <AlertDialogDescription>
-              It stays on your T3 Connect account and keeps its host space. Deregister it in{" "}
+              It stays on your {CONNECT_NAME} account and keeps its host space. Deregister it in{" "}
               {openAccountPage ? (
                 <InlineButton
                   onClick={() => {
@@ -56,10 +57,10 @@ export function RemoveInfinitusConnectEnvironmentDialog({
                     openAccountPage();
                   }}
                 >
-                  T3 Connect settings
+                  {CONNECT_NAME} settings
                 </InlineButton>
               ) : (
-                "T3 Connect settings"
+                `${CONNECT_NAME} settings`
               )}{" "}
               to free it.
             </AlertDialogDescription>

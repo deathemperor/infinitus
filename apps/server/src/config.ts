@@ -44,12 +44,8 @@ export interface ServerDerivedPaths {
   /** Screenshots the agent asks the collaborative browser to keep for the user. */
   readonly browserArtifactsDir: string;
   readonly logsDir: string;
-<<<<<<< HEAD
-  readonly serverLogPath: string;
-  /** The backend's own log file (#1182); `serverLogPath` is a boot service's stdout. */
+  /** The backend's own log file (#1182); a boot service's stdout goes to BOOT_SERVICE_LOG_FILE. */
   readonly serverLogNdjsonPath: string;
-=======
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   readonly serverTracePath: string;
   readonly providerLogsDir: string;
   readonly providerEventLogPath: string;
@@ -159,11 +155,7 @@ export const deriveServerPaths = Effect.fn(function* (
     attachmentsDir,
     browserArtifactsDir: join(stateDir, "browser-artifacts"),
     logsDir,
-<<<<<<< HEAD
-    serverLogPath: join(logsDir, "server.log"),
     serverLogNdjsonPath: join(logsDir, "server.log.ndjson"),
-=======
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     serverTracePath: join(logsDir, "server.trace.ndjson"),
     providerLogsDir,
     providerEventLogPath: join(providerLogsDir, "events.log"),

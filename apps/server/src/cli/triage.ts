@@ -203,16 +203,12 @@ export const triageCommand = Command.make("triage", {
             dbPath: paths.dbPath,
             settingsPath: paths.settingsPath,
             logsDir: paths.logsDir,
-<<<<<<< HEAD
-            serverLogPath: paths.serverLogPath,
-            serverLogNdjsonPath: paths.serverLogNdjsonPath,
-=======
             // The server writes no log file of its own. Service installs and the
             // desktop app capture its output. The glob covers every desktop backend
             // (such as WSL) and rotated copies; names come from DesktopObservability.ts.
             serviceLogPath: path.join(paths.logsDir, BootService.BOOT_SERVICE_LOG_FILE),
             desktopBackendLogGlob: path.join(paths.logsDir, "server-child*.log*"),
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
+            serverLogNdjsonPath: paths.serverLogNdjsonPath,
             serverTracePath: paths.serverTracePath,
             providerEventLogPath: paths.providerEventLogPath,
             terminalLogsDir: paths.terminalLogsDir,

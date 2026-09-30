@@ -1,6 +1,7 @@
 import * as NodeOS from "node:os";
 import type { CursorSettings, ServerProviderUsageWindow } from "@infinitus/contracts";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { CURSOR_USAGE_WINDOWS } from "@infinitus/shared/usageLimits";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -93,7 +94,7 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
         return makeUnavailableUsageLimits({
           checkedAt,
           reason: "unsupported",
-          message: "Enable Cursor account usage in T3 Code to read its Keychain login.",
+          message: `Enable Cursor account usage in ${PRODUCT_NAME} to read its Keychain login.`,
         });
       }
       if (endpoint !== DEFAULT_CURSOR_API_ENDPOINT) {

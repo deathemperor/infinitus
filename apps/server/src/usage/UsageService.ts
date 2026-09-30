@@ -242,13 +242,10 @@ function foldSessionUsage(
 }
 
 export const make = Effect.gen(function* () {
-<<<<<<< HEAD
   // Per-account spend (#779) needs a swap timeline only a server next to
   // Infinitus can have; without the service the summary simply has no accounts.
   const attribution = yield* Effect.serviceOption(UsageAttribution);
-=======
   const crypto = yield* Crypto.Crypto;
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* ServerConfig;
@@ -539,7 +536,7 @@ export const make = Effect.gen(function* () {
             )
           : undefined;
       const parsed = yield* Effect.promise(() =>
-        readTranscriptRecords(filePath, provider, resumeFrom, observer),
+        readTranscriptRecords(filePath, provider, resumeFrom, { observer }),
       );
       // A read failure is not an empty transcript: caching it under this
       // (size, mtime) would silently drop the file's usage until it changes.
@@ -651,6 +648,7 @@ export const make = Effect.gen(function* () {
     ])) {
       const result = yield* Effect.promise(() => readOpenCodeUsage(dir, windowStartMs));
       scanned.push({
+        failedFiles: 0,
         provider: "opencode",
         dir,
         volumeId: yield* Effect.promise(() => readDirectoryVolumeId(dir)),
@@ -707,6 +705,7 @@ export const make = Effect.gen(function* () {
         (error) => error === dir || error.startsWith(`${dir}${path.sep}`),
       );
       scanned.push({
+        failedFiles: 0,
         provider: "antigravity",
         dir,
         volumeId: yield* Effect.promise(() => readDirectoryVolumeId(dir)),
@@ -742,6 +741,7 @@ export const make = Effect.gen(function* () {
       !settings.cursorKeychainUsageEnabled
     ) {
       scanned.push({
+        failedFiles: 0,
         provider: "cursor",
         dir: cursorAuthPath,
         volumeId: "",
@@ -775,6 +775,7 @@ export const make = Effect.gen(function* () {
       // A stable remote fingerprint prevents connected environments counting it twice.
       const source = `cursor-account:${account.accountKey}`;
       scanned.push({
+        failedFiles: 0,
         provider: "cursor",
         dir: source,
         hostId: "cursor.com",
@@ -785,6 +786,7 @@ export const make = Effect.gen(function* () {
       return scanned;
     }
     scanned.push({
+      failedFiles: 0,
       provider: "cursor",
       dir: cursorAuthPath,
       volumeId: yield* Effect.promise(() => readDirectoryVolumeId(cursorAuthPath)),

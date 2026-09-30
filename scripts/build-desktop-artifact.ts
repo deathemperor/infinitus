@@ -3452,16 +3452,7 @@ export const validateWindowsPackagedPayload = Effect.fn(
         ),
       );
     }
-<<<<<<< HEAD
-    const requiredMembers = [
-      `${stem}/infinitus`,
-      `${stem}/client`,
-      `${stem}/node_modules`,
-      `${stem}/node_modules/node-pty/build/Release/pty.node`,
-    ];
-=======
-    const requiredMembers = [`${stem}/t3`, `${stem}/client`, `${stem}/node_modules`];
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
+    const requiredMembers = [`${stem}/infinitus`, `${stem}/client`, `${stem}/node_modules`];
     const missingMembers = requiredMembers.filter((member) => !members.includes(member));
     // node-pty can load a source build or the prebuild for the WSL target.
     const ptyCandidates = [

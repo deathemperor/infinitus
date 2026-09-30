@@ -119,7 +119,6 @@ Claude quotas. Tap it to open **Usage → Limits**. On iOS, use **Edit Widget** 
 Weekly, or both for each provider. Reopen Infinitus to refresh expired readings. The Android widget
 requires Android 12L or later.
 
-<<<<<<< HEAD
 ## Compare activity across machines
 
 Open **Stats** on web or desktop to combine activity from your connected macOS, Linux,
@@ -136,7 +135,7 @@ count once across machines. The Data coverage note explains missing metrics.
 
 Stats uses your browser's timezone. Long streaks reaching the retained history boundary
 are shown with `≥`. The native Mac Stats view remains local to that Mac.
-=======
+
 ## Keyboard shortcuts
 
 On web and desktop, open Usage from the command palette. While on Usage,
@@ -145,4 +144,3 @@ Use `Ctrl+Shift+1/2/3/4` (`Cmd+Shift+1/2/3/4` on macOS) for the past
 24 hours, 7 days, 30 days, or 90 days. Period shortcuts do nothing on Limits.
 Press `Escape` to return to the previous page. Customize these shortcuts in
 **Settings → Keybindings**.
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed

@@ -582,26 +582,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-<<<<<<< HEAD
-=======
-    id: "usage-providers",
-    title: "Usage providers",
-    to: "/settings/providers",
-    searchTerms: [
-      "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
-    ],
-    providerSettingsOnly: true,
-  },
-  {
-    id: "cursor-keychain-usage",
-    title: "Cursor account usage",
-    to: "/settings/providers",
-    searchTerms: ["cursor macOS keychain usage tokens cost limits permission"],
-    providerSettingsOnly: true,
-    macProviderSettingsOnly: true,
-  },
-  {
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     id: "provider-health-check-interval",
     title: "Health check interval",
     to: "/settings/providers",

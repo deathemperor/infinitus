@@ -105,21 +105,13 @@ export const make = Effect.gen(function* () {
     const projects = new Map(snapshot.projects.map((project) => [project.id, project]));
     // A merge rechecks all candidates, including branches that discovery has
     // not linked yet. Those lookups can still have cached the PR as open.
-<<<<<<< HEAD
     const candidates = yield* Effect.filter(
-      snapshot.threads.filter(
-        (thread) =>
-          (threadId === undefined || thread.id === threadId) &&
-          isAutoSettlementCandidate(thread, now),
-      ),
+      snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now)),
       (thread) =>
         Effect.all([limitStops.isStopped(thread.id), limitStops.isResuming(thread.id)]).pipe(
           Effect.map(([stopped, resuming]) => !stopped && !resuming),
         ),
     );
-=======
-    const candidates = snapshot.threads.filter((thread) => isAutoSettlementCandidate(thread, now));
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 
     // Return the thread when it still needs a pull request decision. A rejected
     // dispatch skips it for this snapshot instead of retrying through a lookup.

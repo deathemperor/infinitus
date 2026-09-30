@@ -33,22 +33,6 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
         },
       }}
     >
-<<<<<<< HEAD
-      <UserButton.UserProfilePage
-        label="Mobile clients"
-        labelIcon={<SmartphoneIcon className="size-4" />}
-        url="mobile-clients"
-      >
-        <MobileClientsUserProfilePage />
-      </UserButton.UserProfilePage>
-      <UserButton.UserProfilePage
-        label={CONNECT_NAME}
-        labelIcon={<ServerIcon className="size-4" />}
-        url="t3-connect"
-      >
-        <InfinitusConnectUserProfilePage />
-      </UserButton.UserProfilePage>
-=======
       {T3_CONNECT_ACCOUNT_PAGES.map((page) => (
         <UserButton.UserProfilePage
           key={page.url}
@@ -59,7 +43,6 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
           {page.content}
         </UserButton.UserProfilePage>
       ))}
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     </UserButton>
   );
 }

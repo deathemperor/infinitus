@@ -141,8 +141,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
-<<<<<<< HEAD
-  const searchableItems = useAvailableSettingsSearchItems();
+  const searchableItems = useAvailableSettingsSearchItems(scopeSearch);
   const { environments } = useEnvironments();
   // One connected Infinitus is enough: the pages read the primary environment
   // but the nav only decides whether they lead anywhere at all.
@@ -160,9 +159,6 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       ),
     [infinitusSupported, scopeSearch],
   );
-=======
-  const searchableItems = useAvailableSettingsSearchItems(scopeSearch);
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   const results = useMemo(() => searchSettings(query, searchableItems), [query, searchableItems]);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;

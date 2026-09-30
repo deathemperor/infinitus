@@ -4736,8 +4736,7 @@ export default function Sidebar() {
           </SidebarGroup>
         }
       >
-<<<<<<< HEAD
-        <SidebarGroup className="flex-1">
+        <SidebarGroup className="flex-1" role="presentation">
           {!isSearchingThreads ? (
             <SidebarNeedsAttention
               threads={searchableThreads}
@@ -4750,9 +4749,6 @@ export default function Sidebar() {
               onThreadClick={handleThreadClick}
             />
           ) : null}
-=======
-        <SidebarGroup className="flex-1" role="presentation">
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider

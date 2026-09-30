@@ -150,7 +150,6 @@ function usageLimitSourceSecretName(sourceId: string): string {
   return `usage-limit-source-${Buffer.from(sourceId, "utf8").toString("base64url")}`;
 }
 
-<<<<<<< HEAD
 /** Fork (#574): the Slack bridge's two tokens, kept like a hub key. */
 const INFINITUS_SLACK_SECRET_NAMES = {
   appToken: "infinitus-slack-app-token",
@@ -163,11 +162,10 @@ function redactInfinitusSlack(
 ): ServerSettings["infinitusSlack"] {
   return {
     ...slack,
-    appToken: slack.appToken.length > 0 ? USAGE_LIMIT_SOURCE_KEY_REDACTED : "",
-    botToken: slack.botToken.length > 0 ? USAGE_LIMIT_SOURCE_KEY_REDACTED : "",
+    appToken: slack.appToken.length > 0 ? SECRET_REDACTED : "",
+    botToken: slack.botToken.length > 0 ? SECRET_REDACTED : "",
   };
 }
-=======
 const BITBUCKET_SECRET_NAMES = {
   accessToken: "bitbucket-access-token",
   apiToken: "bitbucket-api-token",
@@ -175,7 +173,6 @@ const BITBUCKET_SECRET_NAMES = {
 const BITBUCKET_SECRET_FIELDS = ["accessToken", "apiToken"] as const;
 
 const redactSecret = (value: string) => (value.length > 0 ? SECRET_REDACTED : "");
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 
 function redactProviderEnvironmentVariable(
   variable: ProviderInstanceEnvironmentVariable,
@@ -213,21 +210,18 @@ export function redactServerSettingsForClient(settings: ServerSettings): ServerS
       },
     ]),
   );
-<<<<<<< HEAD
-  return {
-    ...settings,
-    providerInstances,
-    usageLimitSources,
-    infinitusSlack: redactInfinitusSlack(settings.infinitusSlack),
-  };
-=======
   const bitbucket = {
     ...settings.bitbucket,
     accessToken: redactSecret(settings.bitbucket.accessToken),
     apiToken: redactSecret(settings.bitbucket.apiToken),
   };
-  return { ...settings, providerInstances, usageLimitSources, bitbucket };
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
+  return {
+    ...settings,
+    providerInstances,
+    usageLimitSources,
+    bitbucket,
+    infinitusSlack: redactInfinitusSlack(settings.infinitusSlack),
+  };
 }
 
 export class ServerSettingsService extends Context.Service<
@@ -743,7 +737,7 @@ const make = Effect.gen(function* () {
     field: InfinitusSlackTokenField,
     value: string,
   ): Effect.Effect<string, ServerSettingsError> =>
-    value !== USAGE_LIMIT_SOURCE_KEY_REDACTED
+    value !== SECRET_REDACTED
       ? Effect.succeed(value)
       : secretStore.get(INFINITUS_SLACK_SECRET_NAMES[field]).pipe(
           Effect.map((secret) => (Option.isSome(secret) ? textDecoder.decode(secret.value) : "")),
@@ -809,13 +803,11 @@ const make = Effect.gen(function* () {
           managementKey: Option.isSome(secret) ? textDecoder.decode(secret.value) : "",
         };
       }
-<<<<<<< HEAD
       const infinitusSlack = {
         ...settings.infinitusSlack,
         appToken: yield* readInfinitusSlackToken("appToken", settings.infinitusSlack.appToken),
         botToken: yield* readInfinitusSlackToken("botToken", settings.infinitusSlack.botToken),
       };
-=======
       const bitbucket = { ...settings.bitbucket };
       for (const field of BITBUCKET_SECRET_FIELDS) {
         if (bitbucket[field] !== SECRET_REDACTED) continue;
@@ -828,16 +820,12 @@ const make = Effect.gen(function* () {
           );
         bitbucket[field] = Option.isSome(secret) ? textDecoder.decode(secret.value) : "";
       }
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
       return {
         ...settings,
         providerInstances: providerInstances as ServerSettings["providerInstances"],
         usageLimitSources: usageLimitSources as ServerSettings["usageLimitSources"],
-<<<<<<< HEAD
         infinitusSlack,
-=======
         bitbucket,
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
       };
     });
 
@@ -875,14 +863,14 @@ const make = Effect.gen(function* () {
     value: string,
     changes: Array<SecretChange>,
   ): string => {
-    if (value === USAGE_LIMIT_SOURCE_KEY_REDACTED) return value;
+    if (value === SECRET_REDACTED) return value;
     const secretName = INFINITUS_SLACK_SECRET_NAMES[field];
     if (value.length === 0) {
       changes.push({ kind: "remove", secretName, operation: "remove-secret" });
       return "";
     }
     changes.push({ kind: "write", secretName, value: textEncoder.encode(value) });
-    return USAGE_LIMIT_SOURCE_KEY_REDACTED;
+    return SECRET_REDACTED;
   };
 
   const persistProviderEnvironmentSecrets = (current: ServerSettings, next: ServerSettings) =>
@@ -997,13 +985,11 @@ const make = Effect.gen(function* () {
         });
       }
 
-<<<<<<< HEAD
       const infinitusSlack = {
         ...next.infinitusSlack,
         appToken: planInfinitusSlackToken("appToken", next.infinitusSlack.appToken, changes),
         botToken: planInfinitusSlackToken("botToken", next.infinitusSlack.botToken, changes),
       };
-=======
       const bitbucket = { ...next.bitbucket };
       for (const field of BITBUCKET_SECRET_FIELDS) {
         let value = bitbucket[field];
@@ -1023,17 +1009,13 @@ const make = Effect.gen(function* () {
         bitbucket[field] = SECRET_REDACTED;
       }
 
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
       return {
         settings: {
           ...next,
           providerInstances: providerInstances as ServerSettings["providerInstances"],
           usageLimitSources: usageLimitSources as ServerSettings["usageLimitSources"],
-<<<<<<< HEAD
           infinitusSlack,
-=======
           bitbucket,
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
         },
         changes,
       };

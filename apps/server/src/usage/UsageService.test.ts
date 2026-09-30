@@ -128,7 +128,6 @@ function totalOutputTokens(summary: { buckets: readonly { totals: { outputTokens
 }
 
 describe("UsageService", () => {
-<<<<<<< HEAD
   it.live("attributes Claude records to the account the timeline names (#779)", () =>
     Effect.gen(function* () {
       const { transcript, settings, home } = yield* setup;
@@ -230,7 +229,13 @@ describe("UsageService", () => {
             settings,
             ratesDocument: {
               "claude-fable-5": { input_cost_per_token: 1e-5, output_cost_per_token: 5e-5 },
-=======
+            },
+          }),
+        ),
+      );
+    }).pipe(Effect.scoped),
+  );
+
   it.live("omits Cursor account usage when no file login is saved", () =>
     Effect.gen(function* () {
       const { settings, home } = yield* setup;
@@ -431,13 +436,10 @@ describe("UsageService", () => {
             environment: {
               OPENCODE_DATA_DIR: `${opencode},${opencodeAlias}`,
               ANTIGRAVITY_DATA_DIR: `${antigravityA},${antigravityB}`,
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
             },
           }),
         ),
       );
-<<<<<<< HEAD
-=======
       const summary = yield* service.readSummary(WINDOW);
       const sourcesFor = (provider: "opencode" | "antigravity") =>
         summary.sources.filter((source) => source.fingerprint.provider === provider);
@@ -451,7 +453,6 @@ describe("UsageService", () => {
         sourcesFor("antigravity")[0]?.fingerprint.resolvedHomePath,
         yield* Effect.promise(() => NodeFSP.realpath(conversations)),
       );
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     }).pipe(Effect.scoped),
   );
 

@@ -3182,11 +3182,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
       });
     }
 
-<<<<<<< HEAD
-    context.turns.push({
-      id: turnState.turnId,
-      items: [...turnState.items],
-    });
+    context.turns.push({ id: turnState.turnId });
     // Fork (#270 E2): a completed turn's last assistant message is where a
     // fork of this session at this turn resumes.
     const anchorAt = context.lastAssistantHeadUuid ?? context.lastAssistantUuid;
@@ -3196,9 +3192,6 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         context.anchors.splice(0, context.anchors.length - MAX_CLAUDE_TURN_ANCHORS);
       }
     }
-=======
-    context.turns.push({ id: turnState.turnId });
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 
     yield* emitThreadTokenUsage(context, usageSnapshot, {
       rawMethod: "claude/result",
@@ -3240,13 +3233,10 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
 
     const updatedAt = yield* nowIso;
     context.turnState = undefined;
-<<<<<<< HEAD
     context.reconnect = undefined;
-=======
     if (context.interruptedTurnSettled) {
       yield* Deferred.succeed(context.interruptedTurnSettled, undefined);
     }
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     context.session = {
       ...context.session,
       status: "ready",

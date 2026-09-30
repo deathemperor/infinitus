@@ -936,6 +936,8 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
         projectId: ProjectionThread.fields.projectId,
         settledOverride: ProjectionThread.fields.settledOverride,
         settledAt: ProjectionThread.fields.settledAt,
+        // Fork (#269 A): a babysat thread keeps its open pull request synced.
+        babysit: ProjectionThread.fields.babysit,
       }),
     ),
     execute: () =>
@@ -945,6 +947,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           threads.project_id AS "projectId",
           threads.settled_override AS "settledOverride",
           threads.settled_at AS "settledAt",
+          threads.babysit_json AS "babysit",
           links.host,
           links.repository,
           links.number,
@@ -2900,7 +2903,6 @@ pending_approval_requests AS (
               ),
             ),
           ),
-<<<<<<< HEAD
           listThreadQueuedTurnRows(undefined).pipe(
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
@@ -2909,10 +2911,7 @@ pending_approval_requests AS (
               ),
             ),
           ),
-          listActiveLatestTurnRows(undefined).pipe(
-=======
           listActiveLatestTurnRows({ unsettledOnly }).pipe(
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
             Effect.mapError(
               toPersistenceSqlOrDecodeError(
                 "ProjectionSnapshotQuery.getShellSnapshot:listLatestTurns:query",
@@ -3064,6 +3063,7 @@ pending_approval_requests AS (
               projectId: row.projectId,
               settledOverride: row.settledOverride,
               settledAt: row.settledAt,
+              ...babysitField(row.babysit),
               pullRequests: [],
             };
             thread.pullRequests.push(mapPullRequestRow(row));

@@ -314,33 +314,10 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
       hasServerConfig: environment.serverConfig !== null,
     }),
   )?.environmentId;
-  const searchableCursorEnvironmentId = options.find(
-    (environment) =>
-      environment.serverConfig?.environment.platform.os === "darwin" &&
-      isProviderSettingsEnvironmentAvailable({
-        connectionPhase: environment.connection.phase,
-        hasServerConfig: true,
-      }),
-  )?.environmentId;
   useEffect(() => {
     if (
       !target.scoped &&
-<<<<<<< HEAD
       searchTargetId === searchableSetting("provider-health-check-interval").id &&
-=======
-      searchTargetId === searchableSetting("cursor-keychain-usage").id &&
-      (!selectedEnvironmentCanRenderSettings ||
-        selectedEnvironment?.serverConfig?.environment.platform.os !== "darwin") &&
-      searchableCursorEnvironmentId !== undefined
-    ) {
-      setSelectedEnvironmentId(searchableCursorEnvironmentId);
-      return;
-    }
-    if (
-      !target.scoped &&
-      (searchTargetId === searchableSetting("provider-health-check-interval").id ||
-        searchTargetId === searchableSetting("usage-providers").id) &&
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
       !selectedEnvironmentCanRenderSettings &&
       searchableEnvironmentId !== undefined
     ) {
@@ -348,9 +325,7 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
     }
   }, [
     searchTargetId,
-    searchableCursorEnvironmentId,
     searchableEnvironmentId,
-    selectedEnvironment,
     selectedEnvironmentCanRenderSettings,
     target.scoped,
   ]);
@@ -1121,20 +1096,8 @@ export function EnvironmentProviderSettings({
         </SettingsGroup>
       </SettingsSection>
 
-<<<<<<< HEAD
       {/* Upstream's "Usage providers" hub section is not mounted here: the
           Accounts page reads every hub through the Mac app (#1554). */}
-=======
-      <UsageProviderSettings
-        key={environmentId}
-        environmentId={environmentId}
-        environmentLabel={environmentLabel}
-        sources={settings.usageLimitSources}
-        cursorKeychainUsageEnabled={settings.cursorKeychainUsageEnabled}
-        readOnly={readOnly}
-      />
-
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
       <SettingsSection title="Advanced">
         <SettingsRow
           id={searchableSetting("provider-health-check-interval").id}

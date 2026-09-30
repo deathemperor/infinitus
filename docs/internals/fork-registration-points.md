@@ -27,7 +27,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `UsageProviderSettings.tsx` (a plain title in place of the search id, so
   the unmounted file still compiles), `knip.jsonc` (that file and
   `AddUsageLimitSourceDialog.tsx` ignored as unused files) and
-  `settingsSearch.ts` (+ test, the `usage-providers` entry dropped) — since
+  `settingsSearch.ts` (+ test, the `usage-providers` and `cursor-keychain-usage`
+  entries dropped; the Cursor Keychain toggle upstream's #13870 put in that
+  section is reached from the Usage page's enable action) — since
   the Accounts page reads every hub through the Mac app. The rest is
   fork-owned (`fork-only-files.md`); rules: `docs/internals/accounts-page.md`.
 - Claude banked resets (#1553): `apps/server/src/provider/Layers/claudeResetCredits.ts`

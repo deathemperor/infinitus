@@ -162,12 +162,8 @@ describe("DesktopLinuxUrlHandler", () => {
     const entry = DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
       displayName: "T3 Code (Nightly)",
       execTarget: '/home/al ice/Apps/T3 "100%" $HOME\\x.AppImage',
-<<<<<<< HEAD
       scheme: "infinitus",
-=======
-      scheme: "t3code",
       iconPath: "/home/al ice/icons/T3\\x.png",
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     });
 
     assert.include(entry, "[Desktop Entry]");
@@ -181,12 +177,8 @@ describe("DesktopLinuxUrlHandler", () => {
     );
     assert.include(entry, "NoDisplay=true");
     assert.notInclude(entry, "StartupWMClass=");
-<<<<<<< HEAD
     assert.include(entry, "MimeType=x-scheme-handler/infinitus;");
-=======
-    assert.include(entry, "MimeType=x-scheme-handler/t3code;");
     assert.include(entry, "Icon=/home/al ice/icons/T3\\\\x.png");
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   });
 
   it("carries structured context on registration errors", () => {
@@ -224,27 +216,6 @@ describe("DesktopLinuxUrlHandler", () => {
       return Effect.gen(function* () {
         yield* runRegister(recorded);
 
-<<<<<<< HEAD
-      assert.deepEqual(recorded.directories, ["/home/alice/.local/share/applications"]);
-      assert.equal(recorded.files.length, 1);
-      assert.equal(
-        recorded.files[0]?.path,
-        "/home/alice/.local/share/applications/com.t3tools.T3Code.desktop",
-      );
-      assert.include(
-        recorded.files[0]?.content,
-        'Exec="/home/alice/Applications/T3-Code.AppImage" %U',
-      );
-      assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/infinitus;");
-      assert.deepEqual(recorded.commands, [
-        {
-          command: "xdg-mime",
-          args: ["default", "com.t3tools.T3Code.desktop", "x-scheme-handler/infinitus"],
-        },
-      ]);
-    });
-  });
-=======
         assert.deepEqual(recorded.directories, ["/home/alice/.local/share/applications"]);
         assert.equal(recorded.files.length, 1);
         assert.equal(
@@ -255,7 +226,7 @@ describe("DesktopLinuxUrlHandler", () => {
           recorded.files[0]?.content,
           'Exec="/home/alice/Applications/T3-Code.AppImage" %U',
         );
-        assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/t3code;");
+        assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/infinitus;");
         assert.deepEqual(recorded.commands, [
           {
             command: "update-desktop-database",
@@ -263,13 +234,12 @@ describe("DesktopLinuxUrlHandler", () => {
           },
           {
             command: "xdg-mime",
-            args: ["default", "com.t3tools.T3Code.desktop", "x-scheme-handler/t3code"],
+            args: ["default", "com.t3tools.T3Code.desktop", "x-scheme-handler/infinitus"],
           },
         ]);
       });
     },
   );
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 
   it.effect("falls back to the process executable outside an AppImage", () => {
     const recorded = emptyRecording();
@@ -292,12 +262,8 @@ describe("DesktopLinuxUrlHandler", () => {
         existingEntry: DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
           displayName: "T3 Code (Alpha)",
           execTarget: "/home/alice/Applications/T3-Code.AppImage",
-<<<<<<< HEAD
           scheme: "infinitus",
-=======
-          scheme: "t3code",
           iconPath: "/home/alice/.local/share/icons/com.t3tools.T3Code.desktop.png",
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
         }),
       });
 
@@ -310,7 +276,7 @@ describe("DesktopLinuxUrlHandler", () => {
         },
         {
           command: "xdg-mime",
-          args: ["default", "com.t3tools.T3Code.desktop", "x-scheme-handler/t3code"],
+          args: ["default", "com.t3tools.T3Code.desktop", "x-scheme-handler/infinitus"],
         },
       ]);
     });
@@ -325,7 +291,7 @@ describe("DesktopLinuxUrlHandler", () => {
         existingEntry: DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
           displayName: "T3 Code (Alpha)",
           execTarget: "/home/alice/Applications/T3-Code.AppImage",
-          scheme: "t3code",
+          scheme: "infinitus",
           iconPath,
         }),
       });

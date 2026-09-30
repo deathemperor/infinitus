@@ -35,15 +35,12 @@ import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useThreadPr } from "../../state/use-thread-pr";
-<<<<<<< HEAD
 import { reconnectingRowLabel } from "../infinitus/reconnecting.logic";
 import { limitedLine, resetLabelFor } from "../infinitus/holdBanner.logic";
 import { babysitLabel } from "../infinitus/prHeader.logic";
 import { useThreadHeldEntry } from "../infinitus/useThreadHeldEntry";
 import { useThreadReadyForReview } from "../infinitus/useThreadReadyForReview";
-=======
 import { useSwipeRowDormant } from "../home/swipe-row-activation";
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regeneration-menu";
 import {

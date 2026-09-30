@@ -24,11 +24,8 @@ import {
 import {
   DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE,
   DEFAULT_UNIFIED_SETTINGS,
-<<<<<<< HEAD
   type ComposerSendMode,
-=======
   type ChatWidth,
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   type DiffLayout,
   type EnvironmentIdentificationMode,
   MAX_APPEARANCE_CONTRAST,

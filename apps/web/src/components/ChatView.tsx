@@ -7487,13 +7487,8 @@ export default function ChatView(props: ChatViewProps) {
       annotation: PreviewAnnotationPayload;
       image: ComposerImageAttachment | null;
     },
-<<<<<<< HEAD
-    /** A queued message being sent now instead of the live composer draft. */
-    queuedMessage?: QueuedComposerMessage,
     // Fork (#269 B): the models of a best-of send; the draft starts once per chip.
     bestOf?: ReadonlyArray<BestOfChip>,
-=======
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
   ) => {
     e?.preventDefault();
     // Typed out in full rather than picked from the menu. Attachments or contexts
@@ -7828,7 +7823,6 @@ export default function ChatView(props: ChatViewProps) {
       );
       return;
     }
-<<<<<<< HEAD
     // A send during a running turn waits in the queue. It leaves on the next
     // tool boundary, when the turn ends, or when the user clicks Steer. The
     // provider treats a mid-turn send as a steer of the active turn, so the
@@ -7839,7 +7833,6 @@ export default function ChatView(props: ChatViewProps) {
     // sends into the running turn at once — so upstream's client-side queue
     // never takes a message here; it would double the row. Upstream's
     // `followUpBehavior` (#11964) is the fork's `composerSendMode` (#270 F).
-=======
     // A queued message that will still leave on its own goes first, so a new
     // send lines up behind it instead of overtaking it.
     const queueStillSending =
@@ -7847,17 +7840,11 @@ export default function ChatView(props: ChatViewProps) {
       (useQueuedMessageStore.getState().queuesByThreadKey[activeThreadKey] ?? []).some(
         (message) => message.sending !== undefined || !message.holdUntilUserAction,
       );
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     if (
       !directAnnotation &&
       activeThreadKey &&
-<<<<<<< HEAD
-      !isServerThread
-=======
-      (queueStillSending ||
-        (phase === "running" &&
-          (settings.followUpBehavior === "queue") !== (submissionIntent === "alternate")))
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
+      !isServerThread &&
+      (queueStillSending || phase === "running")
     ) {
       const sendSettings = readComposerSendSettings(sendCtx);
       if (
@@ -10431,14 +10418,7 @@ export default function ChatView(props: ChatViewProps) {
                             }
                             onBestOf={
                               supportsBestOf
-                                ? (chips) =>
-                                    void onSend(
-                                      undefined,
-                                      "foreground",
-                                      undefined,
-                                      undefined,
-                                      chips,
-                                    )
+                                ? (chips) => void onSend(undefined, "foreground", undefined, chips)
                                 : undefined
                             }
                             onSend={onSend}

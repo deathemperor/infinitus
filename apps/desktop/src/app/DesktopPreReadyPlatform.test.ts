@@ -34,15 +34,10 @@ vi.mock("electron", () => ({
   app: {
     setDesktopName: setDesktopNameMock,
     getVersion: () => "0.0.37",
-<<<<<<< HEAD
     getAppPath: () => "/Applications/Infinitus.app/Contents/Resources/app.asar",
     isPackaged: true,
     configureWebAuthn: configureWebAuthnMock,
     on: () => undefined,
-=======
-    isPackaged: true,
-    getAppPath: () => "/tmp/.mount_T3/resources/app.asar",
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
     commandLine: {
       appendSwitch: appendSwitchMock,
       getSwitchValue: getSwitchValueMock,
@@ -174,18 +169,13 @@ describe("DesktopPreReadyPlatform", () => {
             const identity = yield* Effect.promise(() => portalIdentity);
             assert.equal(identity.desktopName, "com.t3tools.T3Code.desktop");
             assert.include(identity.desktopEntry ?? "", 'Exec="/Applications/current.AppImage" %U');
-<<<<<<< HEAD
             assert.include(identity.desktopEntry ?? "", `Name=${PRODUCT_NAME}\n`);
             assert.include(identity.desktopEntry ?? "", "MimeType=x-scheme-handler/infinitus;");
-=======
-            assert.include(identity.desktopEntry ?? "", "Name=T3 Code (Alpha)");
-            assert.include(identity.desktopEntry ?? "", "MimeType=x-scheme-handler/t3code;");
             assert.include(
               identity.desktopEntry ?? "",
               "Icon=/xdg/icons/com.t3tools.T3Code.desktop.png",
             );
             assert.isTrue(identity.iconInstalled);
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
           }),
         ).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())));
       },
@@ -212,7 +202,7 @@ describe("DesktopPreReadyPlatform", () => {
     return Effect.gen(function* () {
       yield* DesktopPreReadyPlatform.make;
       const contents = writeFileSyncMock.mock.calls[0]?.[1];
-      assert.include(contents, "MimeType=x-scheme-handler/t3code;");
+      assert.include(contents, "MimeType=x-scheme-handler/infinitus;");
       assert.include(contents, "Icon=");
       assert.equal(setDesktopNameMock.mock.calls.length, 1);
     }).pipe(Effect.provideService(HostProcessPlatform, "linux"));

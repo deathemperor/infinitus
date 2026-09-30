@@ -1,4 +1,5 @@
 import { useAuth, useClerk } from "@clerk/react";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { ServerIcon, SmartphoneIcon } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
@@ -15,7 +16,7 @@ export const T3_CONNECT_ACCOUNT_PAGES = [
     content: <MobileClientsUserProfilePage />,
   },
   {
-    label: "T3 Connect",
+    label: CONNECT_NAME,
     url: "t3-connect",
     icon: <ServerIcon className="size-4" />,
     content: <InfinitusConnectUserProfilePage />,

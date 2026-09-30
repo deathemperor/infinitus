@@ -35,7 +35,6 @@ See [images and videos](#images-and-videos-in-messages) for previewing and savin
 
 ## Send while the agent is working
 
-<<<<<<< HEAD
 A message sent during a running turn is queued on the server and goes out on
 its own when the turn ends. The queue is listed at the composer: reorder,
 edit, send a message now or remove it, from any device signed in to the
@@ -46,22 +45,6 @@ the message waits for the agent's current tool call to finish, then goes
 into the turn (or out when the turn ends, if that comes first); such a row
 is marked "at next step" in the queue. ⌘↩ (Ctrl+Enter) uses the other mode
 for one message; "Send now" on a queued row sends it into the turn at once.
-=======
-On web and desktop, a message sent during a running turn waits at the end of the conversation as a
-dashed bubble. It goes out on its own when the agent finishes its next tool
-call, or when the turn ends, even while you have another thread open. Use the arrow under the bubble to send it right
-away, or the X to move it back into the composer. Stop returns every queued
-message to the composer.
-
-In **Settings → General → Follow-up behavior**, choose **Queue** to keep this
-behavior or **Steer** to send new messages immediately. This setting applies to
-the current client. Messages already queued keep their place.
-
-Use `Cmd+Shift+Enter` on macOS or `Ctrl+Shift+Enter` on Windows and Linux to send
-the oldest queued message now. Change `thread.steerQueuedMessage` in
-**Settings → Keybindings** to use another shortcut. It leaves the current draft
-in the composer and waits if the agent needs an approval or an answer.
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
 
 ## Queue messages offline on mobile
 

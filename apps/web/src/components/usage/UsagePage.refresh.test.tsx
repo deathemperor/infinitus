@@ -21,16 +21,12 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("../../state/presentation", () => ({
   environmentPresentations: { presentationsAtom: null },
 }));
-<<<<<<< HEAD
-vi.mock("../../state/server", () => ({ serverEnvironment: { refreshProviders: null } }));
-// Fork: the "By account" section reads the primary server config; not under test here.
-vi.mock("./UsageAccounts", () => ({ UsageAccountsSection: () => null }));
-=======
 vi.mock("../../state/server", () => ({
   serverEnvironment: { refreshProviders: null },
   primaryServerKeybindingsAtom: "keybindings",
 }));
->>>>>>> upstream-sync-d2c9281b8-upstream-renamed
+// Fork: the "By account" section reads the primary server config; not under test here.
+vi.mock("./UsageAccounts", () => ({ UsageAccountsSection: () => null }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => state.refreshProviders }));
 vi.mock("../../env", () => ({ isElectron: false }));
 vi.mock("../../hooks/useSettings", () => ({ usePrimarySettings: () => "24h" }));

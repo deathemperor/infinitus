@@ -67,7 +67,7 @@ export interface ProjectionFullThreadDiffContext {
 /** The thread fields pull request sync reads, for a thread with at least one link. */
 export type ProjectionThreadPullRequests = Pick<
   OrchestrationThreadShell,
-  "id" | "projectId" | "settledOverride" | "settledAt" | "pullRequests"
+  "id" | "projectId" | "settledOverride" | "settledAt" | "pullRequests" | "babysit"
 >;
 
 export interface ProjectionThreadDetailQuery {

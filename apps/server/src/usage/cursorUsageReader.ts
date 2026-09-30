@@ -4,6 +4,8 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeCrypto from "node:crypto";
 import * as NodeTimersPromises from "node:timers/promises";
 
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+
 import type { UsageRecord } from "./usageTranscripts.ts";
 import {
   CursorKeychainTimeoutError,
@@ -90,7 +92,7 @@ export async function readCursorAccountUsage(
         : typeof credentialSource === "string"
           ? "Cursor credentials could not be read."
           : cause instanceof CursorKeychainTimeoutError
-            ? "Allow Keychain access on the Mac running T3 Code, then refresh."
+            ? `Allow Keychain access on the Mac running ${PRODUCT_NAME}, then refresh.`
             : "Cursor Keychain credentials could not be read.",
     };
   }
