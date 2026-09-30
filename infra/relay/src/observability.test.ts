@@ -81,7 +81,7 @@ it.effect("exports schema error fields as span attributes", () =>
     expect(request.authorization).toBe("Bearer test-token");
     expect(request.dataset).toBe("relay-test-traces");
     expect(resourceAttributes).toMatchObject({
-      "service.name": "t3code-relay",
+      "service.name": "infinitus-relay-worker",
       "service.namespace": "t3code",
     });
     expect(attributes).toMatchObject({
