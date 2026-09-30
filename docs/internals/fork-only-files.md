@@ -388,3 +388,4 @@ these bullets.
   touched keeps its whole from→to hunks; the base is resolved without
   `GitVcsDriverCore` (its layer needs would leak into `vcsLayer`), so a
   non-`origin` remote falls back to the local base branch.
+- `scripts/infinitus-showcase-story.ts` — the Infinitus screenshot story the harness seeds under `SHOWCASE_APP_VARIANT=infinitus` (`mobile-showcase-environment.ts`): its own projects and Macs, a flagship thread about the account fleet with a `infinitus.thread.held` row after its turn so the thread scene shows the hold card, an `infinitusctl fleet` terminal transcript and a forecast diff. Why: App Review rejected 1.2.1 under 4.3(a) when the screenshots were upstream's fixture with the name swapped (issue #10, 2026-09-28).

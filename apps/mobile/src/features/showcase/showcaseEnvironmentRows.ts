@@ -7,6 +7,10 @@ const SHOWCASE_LOCAL_ENVIRONMENT_DISPLAY_URLS: Readonly<Record<string, string>> 
   "Moonbase Terminal": "https://moonbase.tail9f3a.ts.net/",
   "Suspense Station": "https://suspense-vps.hel1.t3.sh/",
   "Kernel Cabin": "http://100.82.16.5:3773/",
+  // Fork: the Infinitus story's labels (scripts/infinitus-showcase-story.ts).
+  "Mac Studio": "https://studio.tail9f3a.ts.net/",
+  "Work MacBook": "http://192.168.4.21:3773/",
+  "Home Mini": "https://mini.hel1.example.net/",
 };
 
 export function applyShowcaseLocalEnvironmentDisplayUrls(
