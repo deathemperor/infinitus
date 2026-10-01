@@ -379,14 +379,28 @@
       "types": "./src/gitPatchPath.ts",
       "import": "./src/gitPatchPath.ts"
     },
+<<<<<<< HEAD
     "./stats": {
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"
+=======
+    "./providerAuthReturnUrl": {
+      "types": "./src/providerAuthReturnUrl.ts",
+      "import": "./src/providerAuthReturnUrl.ts"
+    },
+    "./codexAuthCallback": {
+      "types": "./src/codexAuthCallback.ts",
+      "import": "./src/codexAuthCallback.ts"
+    },
+    "./codexAuthHandoff": {
+      "types": "./src/codexAuthHandoff.ts",
+      "import": "./src/codexAuthHandoff.ts"
+>>>>>>> upstream-sync-5cc99e1c2-upstream-renamed
     }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vp test run"
+    "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
     "@infinitus/contracts": "workspace:*",
