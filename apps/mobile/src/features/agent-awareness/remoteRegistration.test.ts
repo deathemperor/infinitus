@@ -1059,6 +1059,7 @@ describe("makeRelayDeviceRegistrationRequest", () => {
       type: "android",
       data: "fcm-token",
     });
+    vi.mocked(loadPreferences).mockResolvedValue({ liveActivitiesEnabled: true } as Preferences);
     vi.stubGlobal(
       "fetch",
       vi.fn((request: RequestInfo | URL) => {
