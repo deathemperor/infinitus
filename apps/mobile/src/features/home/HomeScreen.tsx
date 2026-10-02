@@ -310,8 +310,8 @@ export function HomeScreen(props: HomeScreenProps) {
     (event: GestureResponderEvent, started: boolean) => {
       const { changedTouches, touches } = event.nativeEvent;
       swipeRowActivation.trackTouches(
-        started ? changedTouches.map((touch) => touch.identifier) : [],
-        touches.map((touch) => touch.identifier),
+        started ? changedTouches.map((touch) => String(touch.identifier)) : [],
+        touches.map((touch) => String(touch.identifier)),
       );
     },
     [swipeRowActivation],
@@ -946,6 +946,7 @@ export function HomeScreen(props: HomeScreenProps) {
     );
   }
 
+<<<<<<< HEAD
   // Infinitus (fork, #572): a paired Mac's lapsed AWS / gcloud sign-ins sit
   // above the list; the component renders nothing when there are none.
   const listHeader = (
@@ -954,6 +955,9 @@ export function HomeScreen(props: HomeScreenProps) {
       <InfinitusSignIns className="px-4 pb-3" />
     </>
   );
+=======
+  const listHeader = Platform.OS === "ios" ? undefined : <HomeTopContentSpacer />;
+>>>>>>> upstream-sync-54084ae1e-upstream-renamed
 
   // Project scoping lives in the header filter menu (no inline chip row on
   // mobile — the menu is the one filter surface).
@@ -962,7 +966,7 @@ export function HomeScreen(props: HomeScreenProps) {
   // Use the v2 project scope for its empty state. Snoozed threads need no
   // special empty state: their shelf header is a list row even while collapsed.
   const v2ListEmpty =
-    hasSearchQuery && threadSearch.isPending ? null : hasSearchQuery ? (
+    hasSearchQuery && threadSearch.isPending ? undefined : hasSearchQuery ? (
       <EmptyState
         title="No results"
         detail={`No threads matching "${props.searchQuery}".`}

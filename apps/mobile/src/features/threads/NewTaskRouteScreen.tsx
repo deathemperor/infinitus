@@ -7,7 +7,11 @@ import {
   type StaticScreenProps,
 } from "@react-navigation/native";
 import { SymbolView } from "../../components/AppSymbol";
+import { canCreateProjectInEnvironment } from "@infinitus/client-runtime/operations/projects";
+import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
+import * as Cause from "effect/Cause";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,7 +21,10 @@ import { MaterialButton } from "../../components/MaterialButton";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { AppText as Text } from "../../components/AppText";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
-import { useProjects } from "../../state/entities";
+import { useProjects, useServerConfigs, waitForProject } from "../../state/entities";
+import { projectEnvironment } from "../../state/projects";
+import { useAtomCommand } from "../../state/use-atom-command";
+import { useRemoteConnectionStatus } from "../../state/use-remote-environment-registry";
 import type { WorkspaceState } from "../../state/workspaceModel";
 import { useWorkspaceState } from "../../state/workspace";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
@@ -147,7 +154,16 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     : null;
   const screenTitle = incomingShare ? "Start a task" : "Choose project";
   const projectEmptyState = deriveProjectEmptyState(catalogState);
-  const visibleScopes = filterProjectScopes(projectScopes, searchText);
+  const serverConfigs = useServerConfigs();
+  // Scratch projects are reached through the No project row, never as rows
+  // of their own.
+  const listScopes = projectScopes.filter(
+    (scope) =>
+      !scope.projects.every((project) =>
+        isScratchProject(project, serverConfigs.get(project.environmentId)?.scratchWorkspaceRoot),
+      ),
+  );
+  const visibleScopes = filterProjectScopes(listScopes, searchText);
   const resumedDestinationKeyRef = useRef<string | null>(null);
   const reservedDestinationProject = incomingShare?.destination
     ? (projects.find(
@@ -156,6 +172,26 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
           project.id === incomingShare.destination?.projectId,
       ) ?? null)
     : null;
+  const { connectedEnvironments } = useRemoteConnectionStatus();
+  const ensureScratch = useAtomCommand(projectEnvironment.ensureScratch, {
+    reportFailure: false,
+  });
+  // Threads without a project need a connected environment that offers them.
+  // The row starts on the selected environment when it has one, otherwise the
+  // first that does; the draft page's machine picker moves it from there.
+  const scratchEnvironments = connectedEnvironments.filter(
+    (environment) =>
+      canCreateProjectInEnvironment(environment.connectionState) &&
+      serverConfigs.get(environment.environmentId)?.scratchWorkspaceRoot !== undefined,
+  );
+  const scratchEnvironment =
+    scratchEnvironments.find(
+      (environment) => environment.environmentId === selectedEnvironmentId,
+    ) ??
+    scratchEnvironments[0] ??
+    null;
+  const canStartScratch = scratchEnvironment !== null && reservedDestinationProject === null;
+  const scratchStartInFlightRef = useRef(false);
 
   async function selectProject(project: EnvironmentProject): Promise<void> {
     if (incomingShare?.destination && !reservedDestinationProject) {
@@ -189,6 +225,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     );
   }
 
+<<<<<<< HEAD
   async function selectExistingThread(): Promise<void> {
     if (!incomingShare) {
       return;
@@ -209,6 +246,36 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     navigation.dispatch(
       StackActions.push("NewTaskShareThread", { incomingShareId: incomingShare.id }),
     );
+=======
+  async function startScratch(): Promise<void> {
+    if (!scratchEnvironment || scratchStartInFlightRef.current) return;
+    const environmentId = scratchEnvironment.environmentId;
+    scratchStartInFlightRef.current = true;
+    try {
+      const result = await ensureScratch({ environmentId, input: {} });
+      if (AsyncResult.isFailure(result)) {
+        const error = Cause.squash(result.cause);
+        Alert.alert(
+          "Could not start without a project",
+          error instanceof Error
+            ? error.message
+            : "The folder for threads without a project could not be created.",
+        );
+        return;
+      }
+      const project = await waitForProject({ environmentId, projectId: result.value.projectId });
+      if (project === null) {
+        Alert.alert(
+          "Could not start without a project",
+          "It has not reached this device yet. Pick No project from the list once it appears.",
+        );
+        return;
+      }
+      await selectProject(project);
+    } finally {
+      scratchStartInFlightRef.current = false;
+    }
+>>>>>>> upstream-sync-54084ae1e-upstream-renamed
   }
 
   useEffect(() => {
@@ -268,6 +335,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               : {}),
           }}
         >
+<<<<<<< HEAD
           {/* Fork: a share can also land in an existing thread. */}
           {incomingShare && projectScopes.length > 0 ? (
             <View
@@ -296,19 +364,54 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   accessibilityLabel="Add to an existing thread"
                   disabled={reservedDestinationProject !== null}
                   onPress={() => void selectExistingThread()}
+=======
+          {canStartScratch && listScopes.length > 0 ? (
+            Platform.OS === "android" ? (
+              <View collapsable={false} className="overflow-hidden rounded-[28px] bg-card">
+                <MaterialListRow
+                  title="No project"
+                  subtitle="Start a task without a project"
+                  onPress={() => void startScratch()}
+                  leading={
+                    <SymbolView
+                      name="text.bubble"
+                      size={22}
+                      tintColorClassName="accent-icon-muted"
+                      type="monochrome"
+                    />
+                  }
+                />
+              </View>
+            ) : (
+              <View collapsable={false} className="overflow-hidden rounded-[24px] bg-card">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="No project"
+                  onPress={() => void startScratch()}
+>>>>>>> upstream-sync-54084ae1e-upstream-renamed
                   className="flex-row items-center gap-3 bg-card px-4 py-3.5"
                 >
                   <View className="h-7 w-7 items-center justify-center">
                     <SymbolView
                       name="text.bubble"
+<<<<<<< HEAD
                       size={20}
+=======
+                      size={18}
+>>>>>>> upstream-sync-54084ae1e-upstream-renamed
                       tintColorClassName="accent-icon-muted"
                       type="monochrome"
                     />
                   </View>
                   <View className="min-w-0 flex-1">
+<<<<<<< HEAD
                     <Text className="text-base leading-snug font-infinitus-bold">
                       Add to an existing thread
+=======
+                    <Text className="text-base font-infinitus-bold leading-snug">No project</Text>
+                    <Text className="text-xs leading-snug text-foreground-muted" numberOfLines={1}>
+                      Start a task without a project
+>>>>>>> upstream-sync-54084ae1e-upstream-renamed
                     </Text>
                   </View>
                   <SymbolView
@@ -318,10 +421,17 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                     type="monochrome"
                   />
                 </Pressable>
+<<<<<<< HEAD
               )}
             </View>
           ) : null}
           {projectScopes.length === 0 ? (
+=======
+              </View>
+            )
+          ) : null}
+          {listScopes.length === 0 ? (
+>>>>>>> upstream-sync-54084ae1e-upstream-renamed
             <View
               collapsable={false}
               className={cn(
@@ -339,15 +449,24 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 {projectEmptyState.detail}
               </Text>
               {Platform.OS === "android" ? (
-                <MaterialButton
-                  label={catalogState.hasReadyEnvironment ? "Add new project" : "Add environment"}
-                  tone="primary"
-                  onPress={() =>
-                    catalogState.hasReadyEnvironment
-                      ? navigation.dispatch(StackActions.push("AddProject"))
-                      : navigation.navigate("ConnectionsNew")
-                  }
-                />
+                <>
+                  <MaterialButton
+                    label={catalogState.hasReadyEnvironment ? "Add new project" : "Add environment"}
+                    tone="primary"
+                    onPress={() =>
+                      catalogState.hasReadyEnvironment
+                        ? navigation.dispatch(StackActions.push("AddProject"))
+                        : navigation.navigate("ConnectionsNew")
+                    }
+                  />
+                  {canStartScratch ? (
+                    <MaterialButton
+                      label="Start without a project"
+                      tone="secondary"
+                      onPress={() => void startScratch()}
+                    />
+                  ) : null}
+                </>
               ) : !catalogState.hasReadyEnvironment ? (
                 <Pressable
                   className="mt-1 rounded-full bg-primary px-4 py-2.5 active:opacity-70"
@@ -358,14 +477,26 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   </Text>
                 </Pressable>
               ) : (
-                <Pressable
-                  className="mt-1 rounded-full bg-primary px-4 py-2.5 active:opacity-70"
-                  onPress={() => navigation.dispatch(StackActions.push("AddProject"))}
-                >
-                  <Text className="text-sm font-infinitus-bold text-primary-foreground">
-                    Add new project
-                  </Text>
-                </Pressable>
+                <>
+                  <Pressable
+                    className="mt-1 rounded-full bg-primary px-4 py-2.5 active:opacity-70"
+                    onPress={() => navigation.dispatch(StackActions.push("AddProject"))}
+                  >
+                    <Text className="text-sm font-infinitus-bold text-primary-foreground">
+                      Add new project
+                    </Text>
+                  </Pressable>
+                  {canStartScratch ? (
+                    <Pressable
+                      className="rounded-full bg-subtle px-4 py-2.5 active:opacity-70"
+                      onPress={() => void startScratch()}
+                    >
+                      <Text className="text-sm font-infinitus-bold text-foreground">
+                        Start without a project
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </>
               )}
             </View>
           ) : visibleScopes.length === 0 ? (
