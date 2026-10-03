@@ -263,7 +263,7 @@ export function ConnectionsNewRouteScreen({
                 />
               </View>
             ) : (
-              <View className="items-center gap-3 rounded-[24px] border-continuous bg-card px-5 py-8">
+              <View className="items-center gap-3 rounded-[24px] border-continuous bg-grouped-card px-5 py-8">
                 <Text className="text-center text-sm leading-normal text-foreground-muted">
                   Camera permission is required to scan a QR code.
                 </Text>
@@ -279,8 +279,12 @@ export function ConnectionsNewRouteScreen({
               </View>
             )
           ) : (
+<<<<<<< HEAD
             <View collapsable={false} className="gap-4 rounded-[24px] bg-card p-4">
               <InfinitusNearbyServers onPick={handleNearbyPick} />
+=======
+            <View collapsable={false} className="gap-4 rounded-[24px] bg-grouped-card p-4">
+>>>>>>> upstream-sync-e8545b293-upstream-renamed
               <ConnectionFormField
                 label="Host"
                 autoCapitalize="none"

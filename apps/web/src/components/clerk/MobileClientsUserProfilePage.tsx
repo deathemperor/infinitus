@@ -95,7 +95,11 @@ function EmptyMobileClients() {
       <EmptyHeader>
         <EmptyTitle>No mobile clients</EmptyTitle>
         <EmptyDescription>
+<<<<<<< HEAD
           Sign in to {PRODUCT_NAME} on your iPhone to register it for push notifications and Live
+=======
+          Install T3 Code on your phone and sign in to T3 Connect to get push notifications and Live
+>>>>>>> upstream-sync-e8545b293-upstream-renamed
           Activities.
         </EmptyDescription>
       </EmptyHeader>
@@ -113,7 +117,11 @@ export function MobileClientsUserProfilePage() {
   return (
     <ClerkUserProfilePage
       title="Mobile clients"
+<<<<<<< HEAD
       description={`Devices registered to receive ${CONNECT_NAME} activity from your environments.`}
+=======
+      description="Mobile devices that get notifications from your environments."
+>>>>>>> upstream-sync-e8545b293-upstream-renamed
       action={
         <ClerkUserProfileRefreshButton
           isPending={devicesState.isPending}

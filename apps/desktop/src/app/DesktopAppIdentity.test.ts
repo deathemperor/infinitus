@@ -15,6 +15,7 @@ import * as DesktopAssets from "./DesktopAssets.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+import * as DesktopUserData from "./DesktopUserData.ts";
 
 const defaultEnvironmentInput = {
   dirname: "/repo/apps/desktop/dist-electron",
@@ -139,13 +140,14 @@ const withIdentity = <A, E, R>(
   return effect.pipe(
     Effect.provide(
       DesktopAppIdentity.layer.pipe(
+        Layer.provide(NodePath.layerPosix),
         Layer.provideMerge(
           FileSystem.layerNoop({
             exists: (path) =>
               input.legacyPathProbeError
                 ? Effect.fail(input.legacyPathProbeError)
                 : Effect.succeed(
-                    input.legacyPathExists === true && path.includes("T3 Code (Alpha)"),
+                    input.legacyPathExists === true && /T3 Code \((Alpha|Dev)\)/.test(path),
                   ),
             readFileString: () =>
               Effect.succeed(input.packageJson ?? '{"t3codeCommitHash":"abcdef1234567890"}'),
@@ -162,6 +164,7 @@ const withIdentity = <A, E, R>(
 };
 
 describe("DesktopAppIdentity", () => {
+<<<<<<< HEAD
   it.effect("never adopts the installed T3 Code's userData directory", () =>
     withIdentity(
       Effect.gen(function* () {
@@ -195,19 +198,38 @@ describe("DesktopAppIdentity", () => {
   );
 
   it.effect("still adopts a legacy directory a build does claim", () =>
+=======
+  it.effect("isolates the V2 profile even when the legacy V1 profile exists", () =>
+>>>>>>> upstream-sync-e8545b293-upstream-renamed
     withIdentity(
       Effect.gen(function* () {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         const userDataPath = yield* identity.resolveUserDataPath;
 
-        assert.equal(userDataPath, "/Users/alice/Library/Application Support/T3 Code (Alpha)");
+        assert.equal(userDataPath, "/Users/alice/Library/Application Support/t3code-v2");
       }),
       { adoptsLegacyUserDataDir: true, legacyPathExists: true },
     ),
   );
 
+  it.effect("keeps using the legacy development profile", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        assert.equal(
+          yield* identity.resolveUserDataPath,
+          "/Users/alice/Library/Application Support/T3 Code (Dev)",
+        );
+      }),
+      {
+        legacyPathExists: true,
+        environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
+      },
+    ),
+  );
+
   it.effect("preserves failures while inspecting the legacy userData path", () => {
-    const legacyPath = "/Users/alice/Library/Application Support/T3 Code (Alpha)";
+    const legacyPath = "/Users/alice/Library/Application Support/T3 Code (Dev)";
     const cause = PlatformError.systemError({
       _tag: "PermissionDenied",
       module: "FileSystem",
@@ -221,15 +243,22 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         const error = yield* identity.resolveUserDataPath.pipe(Effect.flip);
 
-        assert.instanceOf(error, DesktopAppIdentity.DesktopUserDataPathResolutionError);
-        assert.equal(error.legacyPath, legacyPath);
+        assert.instanceOf(error, DesktopUserData.DesktopUserDataInitializationError);
+        assert.equal(error.resourcePath, legacyPath);
         assert.strictEqual(error.cause, cause);
         assert.equal(
           error.message,
-          `Failed to inspect legacy desktop user-data path at "${legacyPath}".`,
+          `Could not initialize Electron user data during inspect at ${legacyPath} (PermissionDenied).`,
         );
       }),
+<<<<<<< HEAD
       { adoptsLegacyUserDataDir: true, legacyPathProbeError: cause },
+=======
+      {
+        legacyPathProbeError: cause,
+        environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
+      },
+>>>>>>> upstream-sync-e8545b293-upstream-renamed
     );
   });
 
