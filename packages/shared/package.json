@@ -3,9 +3,15 @@
   "private": true,
   "type": "module",
   "exports": {
+<<<<<<< HEAD
     "./orderKeys": {
       "types": "./src/orderKeys.ts",
       "import": "./src/orderKeys.ts"
+=======
+    "./orchestrationV2ThreadError": {
+      "types": "./src/orchestrationV2ThreadError.ts",
+      "import": "./src/orchestrationV2ThreadError.ts"
+>>>>>>> upstream-sync-db514607f-upstream-renamed
     },
     "./legacyCliLauncher": {
       "types": "./src/legacyCliLauncher.ts",
@@ -110,6 +116,10 @@
     "./toolActivity": {
       "types": "./src/toolActivity.ts",
       "import": "./src/toolActivity.ts"
+    },
+    "./toolOutput": {
+      "types": "./src/toolOutput.ts",
+      "import": "./src/toolOutput.ts"
     },
     "./favicon": {
       "types": "./src/favicon.ts",
@@ -363,6 +373,22 @@
       "types": "./src/nodeSqliteClient.ts",
       "import": "./src/nodeSqliteClient.ts"
     },
+    "./orchestrationV2Timeline": {
+      "types": "./src/orchestrationV2Timeline.ts",
+      "import": "./src/orchestrationV2Timeline.ts"
+    },
+    "./t3McpToolPresentation": {
+      "types": "./src/t3McpToolPresentation.ts",
+      "import": "./src/t3McpToolPresentation.ts"
+    },
+    "./Array": {
+      "types": "./src/Array.ts",
+      "import": "./src/Array.ts"
+    },
+    "./orchestrationV2PendingBackgroundWork": {
+      "types": "./src/orchestrationV2PendingBackgroundWork.ts",
+      "import": "./src/orchestrationV2PendingBackgroundWork.ts"
+    },
     "./hostClassification": {
       "types": "./src/hostClassification.ts",
       "import": "./src/hostClassification.ts"
@@ -379,14 +405,28 @@
       "types": "./src/gitPatchPath.ts",
       "import": "./src/gitPatchPath.ts"
     },
+<<<<<<< HEAD
     "./stats": {
       "types": "./src/stats.ts",
       "import": "./src/stats.ts"
+=======
+    "./providerAuthReturnUrl": {
+      "types": "./src/providerAuthReturnUrl.ts",
+      "import": "./src/providerAuthReturnUrl.ts"
+    },
+    "./codexAuthCallback": {
+      "types": "./src/codexAuthCallback.ts",
+      "import": "./src/codexAuthCallback.ts"
+    },
+    "./codexAuthHandoff": {
+      "types": "./src/codexAuthHandoff.ts",
+      "import": "./src/codexAuthHandoff.ts"
+>>>>>>> upstream-sync-db514607f-upstream-renamed
     }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vp test run"
+    "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
     "@infinitus/contracts": "workspace:*",

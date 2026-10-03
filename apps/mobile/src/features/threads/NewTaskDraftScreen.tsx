@@ -32,6 +32,7 @@ import {
   PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
   resolveEnvironmentMachineKind,
 } from "@infinitus/contracts";
+import { deriveThreadTitleSeed } from "@infinitus/client-runtime/operations";
 
 import {
   ComposerEditor,
@@ -104,7 +105,7 @@ import {
   type ComposerDraft,
   waitForComposerDraftsLoaded,
 } from "../../state/use-composer-drafts";
-import { useEnvironmentServerConfig, useProjects } from "../../state/entities";
+import { useEnvironmentServerConfig, useProjects, useThreadShells } from "../../state/entities";
 import { useProjectClone } from "../../state/projectClones";
 import { projectEnvironment } from "../../state/projects";
 import { sourceControlEnvironment } from "../../state/sourceControl";
@@ -114,7 +115,6 @@ import {
   isModelSelectionUnavailable,
   resolveSelectableModelSelection,
 } from "../../lib/modelOptions";
-import { deriveThreadTitleFromPrompt } from "../../lib/projectThreadStartTurn";
 import { armAgentAwarenessLiveActivityForLocalWork } from "../agent-awareness/remoteRegistration";
 import { enqueueThreadOutboxMessage } from "../../state/thread-outbox";
 import { useRemoteConnectionStatus } from "../../state/use-remote-environment-registry";
@@ -464,7 +464,11 @@ export function NewTaskDraftScreen(props: {
     draftMessage: flow.prompt,
     ownerKey: flow.draftKey,
     environmentId: selectedProject?.environmentId ?? null,
+<<<<<<< HEAD
     promptSnippets,
+=======
+    threadShells: useThreadShells(),
+>>>>>>> upstream-sync-db514607f-upstream-renamed
     pullRequestProjectId: selectedEnvironmentServerConfig?.environment.capabilities.pullRequests
       ? (selectedProject?.id ?? null)
       : null,
@@ -1289,7 +1293,10 @@ export function NewTaskDraftScreen(props: {
       // finds no work and ends the card within seconds.
       armAgentAwarenessLiveActivityForLocalWork({
         environmentId: selectedProject.environmentId,
-        threadTitle: deriveThreadTitleFromPrompt(initialMessageText),
+        threadTitle: deriveThreadTitleSeed({
+          text: initialMessageText,
+          attachments: draft.attachments,
+        }),
         projectTitle: selectedProject.title,
       });
     }
@@ -1463,7 +1470,49 @@ export function NewTaskDraftScreen(props: {
     navigation.dispatch(StackActions.push(routeName));
   };
 
-  const hero = (
+  const environmentControl = (
+    <ComposerInlineControl
+      accessibilityLabel={`Environment: ${selectedEnvironmentLabel}`}
+      chevronDirection="right"
+      disabled={isComposerInteractionLocked || voiceInput.isBusy}
+      renderIcon={(size) => (
+        <EnvironmentMachineSymbol
+          kind={resolveEnvironmentMachineKind(selectedEnvironmentServerConfig)}
+          size={size}
+          tintColorClassName="accent-icon-muted"
+        />
+      )}
+      label={`on ${selectedEnvironmentLabel}`}
+      maxWidth={flow.isScratchDraft ? 170 : 260}
+      onPress={
+        flow.environments.length > 1 ? () => openContextPicker("NewTaskEnvironment") : undefined
+      }
+      showChevron={flow.environments.length > 1}
+      static={flow.environments.length <= 1}
+    />
+  );
+  // A thread without a project has no project to name, so it asks plainly,
+  // like web, and puts the project picker beside the machine as a control.
+  const hero = flow.isScratchDraft ? (
+    <View className="items-center gap-2 px-6" testID="new-task-hero">
+      <Text className="text-center text-2xl font-infinitus-medium tracking-tight text-foreground">
+        What should we work on?
+      </Text>
+      {/* Wraps onto two lines only when a long machine name leaves no room. */}
+      <View className="flex-row flex-wrap items-center justify-center gap-x-1">
+        <ComposerInlineControl
+          accessibilityHint="Opens the project picker"
+          accessibilityLabel="Choose a project"
+          chevronDirection="right"
+          disabled={isComposerInteractionLocked}
+          icon="folder"
+          label="Choose a project"
+          onPress={chooseProject}
+        />
+        {environmentControl}
+      </View>
+    </View>
+  ) : (
     <View className="items-center gap-6 px-6" testID="new-task-hero">
       <View className="w-full items-center gap-1.5">
         <Text className="text-center text-2xl font-infinitus-medium tracking-tight text-foreground">
@@ -1490,25 +1539,7 @@ export function NewTaskDraftScreen(props: {
         </View>
       </View>
 
-      <ComposerInlineControl
-        accessibilityLabel={`Environment: ${selectedEnvironmentLabel}`}
-        chevronDirection="right"
-        disabled={isComposerInteractionLocked || voiceInput.isBusy}
-        renderIcon={(size) => (
-          <EnvironmentMachineSymbol
-            kind={resolveEnvironmentMachineKind(selectedEnvironmentServerConfig)}
-            size={size}
-            tintColorClassName="accent-icon-muted"
-          />
-        )}
-        label={`on ${selectedEnvironmentLabel}`}
-        maxWidth={260}
-        onPress={
-          flow.environments.length > 1 ? () => openContextPicker("NewTaskEnvironment") : undefined
-        }
-        showChevron={flow.environments.length > 1}
-        static={flow.environments.length <= 1}
-      />
+      {environmentControl}
     </View>
   );
   const heroViewport = (
@@ -1606,7 +1637,7 @@ export function NewTaskDraftScreen(props: {
           />
         </View>
       ) : null}
-      <View className="pb-1">{workspaceControls}</View>
+      {flow.canChooseWorkspace ? <View className="pb-1">{workspaceControls}</View> : null}
 
       {modelUnavailable ? (
         <Pressable
@@ -1702,6 +1733,7 @@ export function NewTaskDraftScreen(props: {
                         emphasized
                         renderIcon={(size) => (
                           <ProviderIcon
+                            iconUrl={flow.selectedModelOption?.providerIconUrl}
                             provider={flow.selectedModelOption?.providerDriver}
                             size={size}
                           />
