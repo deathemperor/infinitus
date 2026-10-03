@@ -18,8 +18,8 @@ import {
   ClaudeSettings,
   CodexSettings,
   type ProviderInstanceConfig,
-  USAGE_CONTRACT_VERSION,
   ProviderInstanceId,
+  USAGE_CONTRACT_VERSION,
   type ServerSettings as ServerSettingsValue,
   type UsageProviderKind,
   type UsageSource,
@@ -44,7 +44,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 
-import { ServerConfig } from "../config.ts";
+import * as ServerConfig from "../config.ts";
 import { expandHomePath } from "../pathExpansion.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { resolveCodexHomeLayout } from "../provider/Drivers/CodexHomeLayout.ts";
@@ -64,7 +64,9 @@ import {
   decodeScanCache,
   dedupeWithinFile,
   encodeScanCache,
+  LEGACY_SCAN_CACHE_FILE_NAME,
   pruneScanCache,
+  SCAN_CACHE_FILE_NAME,
   type ScanCache,
 } from "./usageScanCache.ts";
 import type { UsageRecord } from "./usageTranscripts.ts";
@@ -130,7 +132,7 @@ const EMPTY_PRICING: UsagePricing = {
 };
 
 /** Empty summary, for suites that only need the RPC surface to resolve. */
-export const layerTest = Layer.succeed(
+const layerTest = Layer.succeed(
   UsageService,
   UsageService.of({
     readSummary: (input) =>
@@ -153,7 +155,7 @@ export const make = Effect.gen(function* () {
   const crypto = yield* Crypto.Crypto;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const config = yield* ServerConfig;
+  const config = yield* ServerConfig.ServerConfig;
   const settingsService = yield* ServerSettings.ServerSettingsService;
   const httpClient = yield* HttpClient.HttpClient;
   const hostEnvironment = yield* HostProcessEnvironment;
@@ -168,7 +170,8 @@ export const make = Effect.gen(function* () {
   };
 
   const ratesCachePath = path.join(config.stateDir, "usage-model-rates.json");
-  const scanCachePath = path.join(config.stateDir, "usage-scan-cache.json");
+  const scanCachePath = path.join(config.stateDir, SCAN_CACHE_FILE_NAME);
+  const legacyScanCachePath = path.join(config.stateDir, LEGACY_SCAN_CACHE_FILE_NAME);
   let rates: RateTable = new Map();
   let ratesFetchedAtMs: number | null = null;
   let ratesStatus: UsagePricing["status"] = "unavailable";
@@ -271,10 +274,16 @@ export const make = Effect.gen(function* () {
     for (const driver of ["claudeAgent", "codex", "grok"] as const) {
       // Disabled accounts still have history. Explicit default slots replace
       // the legacy settings, just as they do in the provider registry.
-      const instances: Array<Pick<ProviderInstanceConfig, "config" | "environment">> =
-        Object.values(settings.providerInstances).filter((instance) => instance.driver === driver);
+      const instances: Array<
+        Pick<ProviderInstanceConfig, "config" | "environment"> & { instanceId: ProviderInstanceId }
+      > = Object.entries(settings.providerInstances)
+        .filter(([, instance]) => instance.driver === driver)
+        .map(([id, instance]) => ({ ...instance, instanceId: ProviderInstanceId.make(id) }));
       if (!Object.hasOwn(settings.providerInstances, driver)) {
-        instances.push({ config: settings.providers[driver] });
+        instances.push({
+          config: settings.providers[driver],
+          instanceId: ProviderInstanceId.make(driver),
+        });
       }
       for (const instance of instances) {
         const environment = mergeProviderInstanceEnvironment(instance.environment, hostEnvironment);
@@ -283,12 +292,15 @@ export const make = Effect.gen(function* () {
         if (driver === "codex") {
           const decoded = decodeCodexSettings(instance.config ?? {});
           if (Option.isNone(decoded)) continue;
-          const config = decoded.value;
+          const codexConfig = decoded.value;
           const environmentHome = environment.CODEX_HOME?.trim();
           const layout = yield* resolveCodexHomeLayout(
-            !config.homePath.trim() && !config.shadowHomePath.trim() && environmentHome
-              ? { ...config, homePath: environmentHome }
-              : config,
+            codexConfig.setupMode !== "managed" &&
+              !codexConfig.homePath.trim() &&
+              !codexConfig.shadowHomePath.trim() &&
+              environmentHome
+              ? { ...codexConfig, homePath: environmentHome }
+              : codexConfig,
           );
           home = layout.sharedHomePath;
         } else if (driver === "claudeAgent") {
@@ -353,10 +365,17 @@ export const make = Effect.gen(function* () {
    */
   const ensureScanCacheLoaded = yield* Effect.cached(
     Effect.gen(function* () {
-      const document = yield* fileSystem.readFileString(scanCachePath).pipe(
-        Effect.flatMap((raw) => decodeScanCacheFile(raw)),
-        Effect.catchCause(() => Effect.succeed(null)),
-      );
+      const readDocument = (filePath: string) =>
+        fileSystem.readFileString(filePath).pipe(
+          Effect.flatMap((raw) => decodeScanCacheFile(raw)),
+          Effect.catchCause(() => Effect.succeed(null)),
+        );
+      let document = yield* readDocument(scanCachePath);
+      if (document === null) {
+        document = yield* readDocument(legacyScanCachePath);
+        // Write the migrated cache to its own file on the next scan.
+        cacheDirty = document !== null;
+      }
       if (document === null) return;
       for (const [path, entry] of decodeScanCache(document)) fileCache.set(path, entry);
       const sources = decodeCachedSources(document);
