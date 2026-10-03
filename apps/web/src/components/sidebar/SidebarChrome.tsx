@@ -13,7 +13,12 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
+<<<<<<< HEAD
 import { useEnvironments } from "../../state/environments";
+=======
+import { usePullRequestsSupported } from "../../state/environments";
+import { InfinitusWordmark } from "../InfinitusWordmark";
+>>>>>>> upstream-sync-db514607f-upstream-renamed
 import {
   resolveEnvironmentIdentificationPillLabel,
   SidebarStageBackdrop,
@@ -129,6 +134,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const isOnUtilityPage = useLocation({
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
+<<<<<<< HEAD
   const { environments } = useEnvironments();
   // The page reads every connected server, so one of them offering pull requests is enough for
   // the link to lead somewhere.
@@ -140,6 +146,9 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const accountsSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
   );
+=======
+  const pullRequestsSupported = usePullRequestsSupported();
+>>>>>>> upstream-sync-db514607f-upstream-renamed
   const closeMobileSidebar = useCallback(() => {
     if (isMobile) {
       setOpenMobile(false);

@@ -37,6 +37,7 @@ import {
   usePanelNavigationSuppression,
 } from "../panelAnimations";
 import LegacyThreadSidebar from "./LegacySidebar";
+import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { SidebarChromeHeader } from "./sidebar/SidebarChrome";
@@ -226,6 +227,8 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     usePanelAnimationSettings();
   // Settings routes show the settings nav in place of whichever thread
   // sidebar is active.
+  // Seeds server-side visited tracking from this browser's localStorage the
+  useThreadVisitedMigration();
   const pathname = useLocation({ select: (location) => location.pathname });
   const canGoBack = useCanGoBack();
   // A mouse's back button (Chromium `button` 3) goes back on the pages whose
