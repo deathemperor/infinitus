@@ -144,6 +144,7 @@ import {
   handoffReviewComments,
   latestPullRequestReviewOutcomes,
   loadingPullRequestCheckoutCommand,
+  isPullRequestNotFound,
   isStackedPullRequestBase,
   pullRequestActionMenuHasGroup,
   pullRequestActionNeedsHostRefresh,
@@ -1517,6 +1518,8 @@ export function PullRequestDetailPanel({
   const statePresentation = detail
     ? resolvePullRequestState({ state: detail.state, isDraft: detail.isDraft })
     : null;
+  const showsApproveWorkflows =
+    workflowApprovalsRequired > 0 && !checksStale && can("approve-workflows");
   const checksSummary = checksStale
     ? checksState === null
       ? "No checks reported"
@@ -2551,8 +2554,13 @@ export function PullRequestDetailPanel({
               ))}
             </ToggleGroup>
             {tab === "summary" ? (
-              <span className="ml-auto inline-flex shrink-0 items-center">
-                {workflowApprovalsRequired > 0 && !checksStale && can("approve-workflows") ? (
+              <span
+                className={cn(
+                  "ml-auto flex items-center justify-end",
+                  showsApproveWorkflows ? "shrink-0" : "min-w-0 flex-1",
+                )}
+              >
+                {showsApproveWorkflows ? (
                   <Tooltip>
                     <TooltipTrigger
                       render={
@@ -2588,7 +2596,7 @@ export function PullRequestDetailPanel({
                   </Tooltip>
                 ) : (
                   <span
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                    className="flex h-4 min-w-0 flex-wrap content-start items-center justify-end gap-x-1.5 overflow-hidden text-xs text-muted-foreground"
                     aria-label={checksSummary ? `Checks: ${checksSummary}` : "Checks"}
                   >
                     {checksState !== null ? (
@@ -2601,7 +2609,7 @@ export function PullRequestDetailPanel({
                     ) : (
                       <CircleDotIcon aria-hidden className="size-3.5" />
                     )}
-                    {checksSummary}
+                    <span className="whitespace-nowrap">{checksSummary}</span>
                   </span>
                 )}
               </span>
@@ -2712,7 +2720,13 @@ export function PullRequestDetailPanel({
       >
         {detailQuery.error && !detail ? (
           <PullRequestsUnavailableState
-            error={detailQuery.error}
+            {...(isPullRequestNotFound(detailQuery.failure)
+              ? {
+                  title: `Pull request #${reference.number} not found`,
+                  error:
+                    "It may be an issue rather than a pull request, or this account can't see it.",
+                }
+              : { error: detailQuery.error })}
             refreshing={detailQuery.isPending}
             onRetry={refreshDetail}
             {...(unavailableGitHubUrl ? { gitHubUrl: unavailableGitHubUrl } : {})}
