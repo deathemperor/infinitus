@@ -965,7 +965,7 @@ jobs:
     name: Build hosted web app
     needs: [preflight, relay_public_config]
     if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.preflight.outputs.release_channel != 'preview' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
     timeout-minutes: 10
     outputs:
@@ -1065,7 +1065,7 @@ jobs:
     name: Deploy hosted web app
     needs: [preflight, build_web, release]
     if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_web.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel != 'preview' }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       DEPLOYMENT_URL: ${{ needs.build_web.outputs.deployment_url }}
@@ -1146,7 +1146,7 @@ jobs:
     name: Build marketing site
     needs: [preflight]
     if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.preflight.outputs.release_channel == 'nightly' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
     timeout-minutes: 10
     outputs:
@@ -1211,7 +1211,7 @@ jobs:
     name: Deploy marketing site
     needs: [preflight, build_marketing, release]
     if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_marketing.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel == 'nightly' }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       DEPLOYMENT_URL: ${{ needs.build_marketing.outputs.deployment_url }}
