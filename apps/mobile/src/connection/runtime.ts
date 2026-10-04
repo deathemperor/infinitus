@@ -1,6 +1,9 @@
 import { Connection } from "@infinitus/client-runtime/connection";
-import { shellSnapshotLoaderLayer } from "@infinitus/client-runtime/state/shell";
-import { threadSnapshotLoaderLayer } from "@infinitus/client-runtime/state/threads";
+import { ShellSnapshotLoader } from "@infinitus/client-runtime/state/shell";
+import {
+  boundedThreadSnapshotLoaderLayer,
+  ThreadHistoryController,
+} from "@infinitus/client-runtime/state/threads";
 import * as Layer from "effect/Layer";
 import { Atom } from "effect/unstable/reactivity";
 
@@ -20,7 +23,11 @@ const providedConnectionPlatformLayer = connectionPlatformLayer.pipe(
   Layer.provide(runtimeContextLayer),
 );
 
-const snapshotLoaderLayer = Layer.merge(threadSnapshotLoaderLayer, shellSnapshotLoaderLayer);
+const snapshotLoaderLayer = Layer.mergeAll(
+  boundedThreadSnapshotLoaderLayer,
+  ShellSnapshotLoader.layer,
+  ThreadHistoryController.layer,
+);
 
 type ConnectionLayerSource =
   | typeof Connection.layer

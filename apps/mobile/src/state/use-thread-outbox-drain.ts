@@ -1,9 +1,11 @@
 import { useAtomValue } from "@effect/atom-react";
-import type {
-  EnvironmentProject,
-  EnvironmentThreadShell,
+import {
+  threadRuntimeIsActive,
+  type EnvironmentProject,
+  type EnvironmentThreadShell,
 } from "@infinitus/client-runtime/state/shell";
 import type { AtomCommandResult } from "@infinitus/client-runtime/state/runtime";
+import { deriveThreadTitleSeed } from "@infinitus/client-runtime/operations";
 import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
@@ -48,7 +50,6 @@ import {
 import { removeThreadOutboxMessage } from "./thread-outbox-removal";
 import {
   isQueuedThreadCreationSendable,
-  modelSelectionsEqual,
   resolveThreadOutboxDeliveryAction,
   resolveThreadOutboxDispatchStep,
   resolveThreadOutboxFailureAction,
@@ -646,11 +647,14 @@ async function preserveUploadedAttachmentsForEditor(
 
 export function useThreadOutboxDrain(): void {
   const startTurn = useAtomCommand(threadEnvironment.startTurn, { reportFailure: false });
+<<<<<<< HEAD
   // Infinitus (fork, #812): the server-side queue for a busy thread.
   const queueTurn = useAtomCommand(threadEnvironment.queueTurn, { reportFailure: false });
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
+=======
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
   const setThreadRuntimeMode = useAtomCommand(threadEnvironment.setRuntimeMode, {
     reportFailure: false,
   });
@@ -822,21 +826,6 @@ export function useThreadOutboxDrain(): void {
       }
       const { reportFailure } = makeDeliveryHelpers(queuedMessage);
 
-      if (!modelSelectionsEqual(settings.modelSelection, thread.modelSelection)) {
-        const updateResult = await updateThreadMetadata({
-          environmentId: queuedMessage.environmentId,
-          input: {
-            commandId: settingsCommandId(queuedMessage, "model-selection"),
-            threadId: queuedMessage.threadId,
-            modelSelection: settings.modelSelection,
-          },
-        });
-        if (AsyncResult.isFailure(updateResult)) {
-          reportFailure(updateResult, "settings-sync");
-          return false;
-        }
-      }
-
       if (settings.runtimeMode !== thread.runtimeMode) {
         const runtimeResult = await setThreadRuntimeMode({
           environmentId: queuedMessage.environmentId,
@@ -918,6 +907,7 @@ export function useThreadOutboxDrain(): void {
         settings,
         currentConfig.providers,
       );
+<<<<<<< HEAD
       const serialized = serializeComposerMessageForServer(
         queuedMessage.text,
         uploadedComposerContext(
@@ -969,6 +959,42 @@ export function useThreadOutboxDrain(): void {
                 createdAt: queuedMessage.createdAt,
               },
             });
+=======
+      const deliveryResult = await startTurn({
+        environmentId: queuedMessage.environmentId,
+        input: {
+          commandId: queuedMessage.commandId,
+          creationSource: "mobile",
+          threadId: queuedMessage.threadId,
+          message: {
+            messageId: queuedMessage.messageId,
+            role: "user",
+            ...serializeComposerMessageForServer(
+              queuedMessage.text,
+              uploadedComposerContext(
+                queuedMessage.context,
+                queuedMessage.attachments,
+                prepared.attachments,
+              ),
+              currentConfig.environment.capabilities.inlineMessageContext === true,
+            ),
+            attachments: prepared.attachments,
+          },
+          modelSelection: sendSettings.modelSelection,
+          titleSeed: deriveThreadTitleSeed({
+            text: queuedMessage.text,
+            attachments: queuedMessage.attachments,
+          }),
+          runtimeMode: sendSettings.runtimeMode,
+          interactionMode: sendSettings.interactionMode,
+          createdAt: queuedMessage.createdAt,
+          // Rows written before follow-up behavior existed keep the previous
+          // delivery, which the server turns into a queued run when a turn is
+          // already active.
+          dispatchMode: queuedMessage.dispatchMode ?? "start",
+        },
+      });
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
       const failure = reportFailure(deliveryResult, "start-turn");
       if (failure?.action === "retry") {
         return false;
@@ -992,7 +1018,6 @@ export function useThreadOutboxDrain(): void {
       setThreadInteractionMode,
       setThreadRuntimeMode,
       startTurn,
-      updateThreadMetadata,
       restoreQueuedMessage,
     ],
   );
@@ -1151,10 +1176,10 @@ export function useThreadOutboxDrain(): void {
         threads.some(
           (thread) =>
             scopedThreadKey(thread.environmentId, thread.id) === threadKey &&
-            (thread.latestTurn !== null ||
-              thread.session?.status === "error" ||
-              thread.session?.status === "stopped" ||
-              thread.session?.status === "interrupted"),
+            (thread.latestRun !== null ||
+              thread.runtime?.status === "failed" ||
+              thread.runtime?.status === "cancelled" ||
+              thread.runtime?.status === "interrupted"),
         )
       ) {
         clearPendingThreadCreationOutcome(threadKey);
@@ -1255,6 +1280,7 @@ export function useThreadOutboxDrain(): void {
           threadBusy,
         }),
         isCreation: creation !== undefined,
+<<<<<<< HEAD
         threadBusy,
         threadHeld: isThreadHeld(
           readHeldThreads(nextQueuedMessage.environmentId, serverConfigs),
@@ -1263,6 +1289,12 @@ export function useThreadOutboxDrain(): void {
         mode: outboxQueueMode(appAtomRegistry.get(mobilePreferencesAtom)),
         serverQueues: serverConfig?.environment.capabilities.turnQueue === true,
         serverSendAt: serverConfig?.environment.capabilities.turnQueueSendAt === true,
+=======
+        threadExists: thread !== undefined,
+        shellStatus,
+        environmentConnected: environment?.connectionState === "connected",
+        threadBusy: threadRuntimeIsActive(thread?.runtime),
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
       });
       // The delivery action resolves first; capability checks apply only to
       // a message that will send. Checking earlier would restore a
@@ -1367,6 +1399,7 @@ export function useThreadOutboxDrain(): void {
             appAtomRegistry.get(environmentThreadShells.threadShellsAtom),
             nextQueuedMessage,
           );
+<<<<<<< HEAD
           const liveThreadBusy =
             liveThread?.session?.status === "running" || liveThread?.session?.status === "starting";
           // Infinitus (fork, #807/#812): the same rule against the live
@@ -1380,6 +1413,10 @@ export function useThreadOutboxDrain(): void {
               environmentConnected: environment?.connectionState === "connected",
               threadBusy: liveThreadBusy,
             }),
+=======
+          const liveThreadBusy = threadRuntimeIsActive(liveThread?.runtime);
+          const liveDeliveryAction = resolveThreadOutboxDeliveryAction({
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
             isCreation: creation !== undefined,
             threadBusy: liveThreadBusy,
             threadHeld: isThreadHeld(

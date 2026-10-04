@@ -94,6 +94,7 @@ function normalizeThreadDeepLink(value: string): string | null {
   }
 }
 
+<<<<<<< HEAD
 /** Infinitus (fork, #1375): where an environment's account alert (a limit,
     a switch, a lapsed sign-in) lands — Settings › Accounts. The relay sends
     it as an ordinary push with this deep link and no thread. */
@@ -101,6 +102,20 @@ export const INFINITUS_ACCOUNTS_DEEP_LINK = "/settings/accounts";
 /** Infinitus (fork, #1076): a lapsed sign-in's alert lands on the home
     screen, where the sign-in cards are. */
 export const INFINITUS_HOME_DEEP_LINK = "/";
+=======
+/**
+ * The deep link a notification would have to carry to target the thread the
+ * given route is showing, including its nested screens such as the file
+ * inspector. Null when the route is not inside a thread.
+ */
+export function threadDeepLinkOnScreen(pathname: string): string | null {
+  const match = /^\/threads\/([^/]+)\/([^/]+)(?:\/|$)/.exec(pathname);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+  return `/threads/${match[1]}/${match[2]}`;
+}
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
 
 export function extractAgentNotificationDeepLink(response: unknown): string | null {
   const data = dataFromNotificationResponse(response);

@@ -1,35 +1,74 @@
+<<<<<<< HEAD
 import {
   type CustomModelSetting,
   type ModelCapabilities,
   type PiSettings,
   PI_DEFAULT_MODEL,
+=======
+/**
+ * PiProvider — snapshot/probe layer for the Pi coding agent.
+ *
+ * Health is probed with `pi --version`. Models, the user's default model, and
+ * the user's commands (extension slash commands, prompt templates, skills)
+ * are discovered through a short-lived ephemeral RPC session
+ * (`pi --mode rpc --no-session`), so everything the user configured in
+ * `~/.pi/agent` — custom providers, models.json entries, extensions, skills —
+ * shows up in T3 without any hardcoded catalog.
+ */
+import {
+  type CustomModelSetting,
+  type PiSettings,
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
   type ServerProvider,
   type ServerProviderModel,
 } from "@infinitus/contracts";
 import { causeErrorTag } from "@infinitus/shared/observability";
+<<<<<<< HEAD
 import { createModelCapabilities } from "@infinitus/shared/model";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+=======
+import { resolveSpawnCommand } from "@infinitus/shared/shell";
+import { compareSemverVersions } from "@infinitus/shared/semver";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
+import * as Exit from "effect/Exit";
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import { HttpClient } from "effect/unstable/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import {
+<<<<<<< HEAD
   enrichProviderSnapshotWithVersionAdvisory,
   type ProviderMaintenanceCapabilities,
 } from "../providerMaintenance.ts";
 import {
   buildServerProvider,
   COMPACT_SLASH_COMMAND,
+=======
+  buildPiRpcLaunch,
+  resolvePiLaunchArgs,
+} from "../../orchestration-v2/Adapters/piT3McpInjection.ts";
+import {
+  makePiRpcConnection,
+  piRecordField as recordField,
+  piRecordString as recordString,
+} from "../../orchestration-v2/Adapters/PiRpc.ts";
+import {
+  buildServerProvider,
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
   isCommandMissingCause,
   parseGenericCliVersion,
   providerModelsFromSettings,
   spawnAndCollect,
   type ServerProviderDraft,
 } from "../providerSnapshot.ts";
+<<<<<<< HEAD
 import { parsePiModelsCliOutput } from "./piModels.logic.ts";
 import { piHomeEnvironment } from "./piHomeEnvironment.ts";
 
@@ -90,6 +129,143 @@ const runPiCliCommand = (
       command,
       ChildProcess.make(spawnCommand.command, spawnCommand.args, {
         env,
+=======
+import {
+  enrichProviderSnapshotWithVersionAdvisory,
+  type ProviderMaintenanceCapabilities,
+} from "../providerMaintenance.ts";
+import {
+  EMPTY_PI_MODEL_CAPABILITIES,
+  thinkingCapabilitiesForPiModel,
+} from "./piThinkingCapabilities.ts";
+import {
+  parsePiDiscoveredCommands,
+  withPiBuiltinSlashCommands,
+  type PiDiscoveredCommands,
+} from "../PiCommands.ts";
+
+const PI_PRESENTATION = {
+  displayName: "Pi",
+  showInteractionModeToggle: false,
+  supportedRuntimeModes: ["approval-required", "auto-accept-edits", "full-access"],
+  // The adapter reports context usage from Pi's streaming usage while a
+  // turn runs, so clients can reserve the meter before the first settle.
+  reportsContextWindow: true,
+  requiresNewThreadForModelChange: false,
+} as const;
+
+const VERSION_PROBE_TIMEOUT_MS = 4_000;
+const PI_RPC_DISCOVERY_TIMEOUT_MS = 15_000;
+/**
+ * get_entries arrived in 0.80.3 and agent_settled landed in source at 0.80.4.
+ * Version 0.80.5 was the first published package containing both hooks. T3
+ * needs them for rollback boundaries and reliable turn terminalization.
+ */
+export const MINIMUM_PI_VERSION = "0.80.5";
+
+/** Deferring to the user's own settings.json default model. */
+const PI_DEFAULT_MODEL: ServerProviderModel = {
+  slug: "default",
+  name: "Pi default",
+  isCustom: false,
+  capabilities: EMPTY_PI_MODEL_CAPABILITIES,
+};
+
+interface PiDiscovery extends PiDiscoveredCommands {
+  readonly models: ReadonlyArray<ServerProviderModel>;
+  readonly authenticated: boolean;
+}
+
+function piModelsFromSettings(
+  customModels: ReadonlyArray<CustomModelSetting> | undefined,
+  discovered: ReadonlyArray<ServerProviderModel> = [],
+): ReadonlyArray<ServerProviderModel> {
+  return providerModelsFromSettings(
+    [PI_DEFAULT_MODEL, ...discovered],
+    customModels ?? [],
+    EMPTY_PI_MODEL_CAPABILITIES,
+  );
+}
+
+function parseDiscoveredModels(
+  data: unknown,
+  defaultThinkingLevel: unknown,
+): ReadonlyArray<ServerProviderModel> {
+  const models = recordField(data, "models");
+  if (!Array.isArray(models)) return [];
+  const seen = new Set<string>();
+  const parsed: Array<ServerProviderModel> = [];
+  for (const model of models) {
+    const provider = recordString(model, "provider");
+    const id = recordString(model, "id");
+    if (provider === undefined || id === undefined) continue;
+    const slug = `${provider}/${id}`;
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    parsed.push({
+      slug,
+      name: recordString(model, "name") ?? slug,
+      isCustom: false,
+      capabilities: thinkingCapabilitiesForPiModel(model, defaultThinkingLevel),
+    });
+  }
+  return parsed;
+}
+
+const discoverPiViaRpc = (
+  piSettings: PiSettings,
+  environment: NodeJS.ProcessEnv,
+  launchArgs: ReadonlyArray<string>,
+  cwd?: string,
+) =>
+  Effect.gen(function* () {
+    const launch = buildPiRpcLaunch({
+      launchArgs,
+      environment,
+      mcpSession: undefined,
+      extensionPath: undefined,
+      ephemeral: true,
+    });
+    const connection = yield* makePiRpcConnection({
+      command: piSettings.binaryPath || "pi",
+      args: launch.args,
+      cwd,
+      env: launch.env,
+    });
+    yield* Stream.fromQueue(connection.events).pipe(
+      Stream.runDrain,
+      Effect.ignore,
+      Effect.forkScoped,
+    );
+    const stateData = yield* connection.request({ type: "get_state" });
+    const modelsData = yield* connection.request({ type: "get_available_models" });
+    const commandsData = yield* connection
+      .request({ type: "get_commands" })
+      .pipe(Effect.orElseSucceed(() => undefined));
+    const discoveredModels = parseDiscoveredModels(
+      modelsData,
+      recordString(stateData, "thinkingLevel"),
+    );
+    const { slashCommands, skills } = parsePiDiscoveredCommands(commandsData);
+    return {
+      models: discoveredModels,
+      slashCommands: withPiBuiltinSlashCommands(slashCommands),
+      skills,
+      authenticated: discoveredModels.length > 0,
+    } satisfies PiDiscovery;
+  }).pipe(Effect.scoped);
+
+const runPiVersionCommand = (piSettings: PiSettings, environment: NodeJS.ProcessEnv) =>
+  Effect.gen(function* () {
+    const command = piSettings.binaryPath || "pi";
+    const spawnCommand = yield* resolveSpawnCommand(command, ["--version"], {
+      env: environment,
+    });
+    return yield* spawnAndCollect(
+      command,
+      ChildProcess.make(spawnCommand.command, spawnCommand.args, {
+        env: environment,
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
         shell: spawnCommand.shell,
       }),
     );
@@ -101,7 +277,10 @@ export function buildInitialPiProviderSnapshot(
   return Effect.gen(function* () {
     const checkedAt = yield* Effect.map(DateTime.now, DateTime.formatIso);
     const models = piModelsFromSettings(piSettings.customModels);
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
     if (!piSettings.enabled) {
       return buildServerProvider({
         presentation: PI_PRESENTATION,
@@ -113,11 +292,18 @@ export function buildInitialPiProviderSnapshot(
           version: null,
           status: "warning",
           auth: { status: "unknown" },
+<<<<<<< HEAD
           message: `Pi is disabled in ${PRODUCT_NAME} settings.`,
         },
       });
     }
 
+=======
+          message: "Pi is disabled in T3 Code settings.",
+        },
+      });
+    }
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
     return buildServerProvider({
       presentation: PI_PRESENTATION,
       enabled: true,
@@ -137,6 +323,10 @@ export function buildInitialPiProviderSnapshot(
 export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function* (
   piSettings: PiSettings,
   environment: NodeJS.ProcessEnv = process.env,
+<<<<<<< HEAD
+=======
+  cwd?: string,
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
 ): Effect.fn.Return<ServerProviderDraft, never, ChildProcessSpawner.ChildProcessSpawner> {
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
   const fallbackModels = piModelsFromSettings(piSettings.customModels);
@@ -152,12 +342,20 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version: null,
         status: "warning",
         auth: { status: "unknown" },
+<<<<<<< HEAD
         message: `Pi is disabled in ${PRODUCT_NAME} settings.`,
+=======
+        message: "Pi is disabled in T3 Code settings.",
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
       },
     });
   }
 
+<<<<<<< HEAD
   const versionResult = yield* runPiCliCommand(piSettings, ["--version"], environment).pipe(
+=======
+  const versionResult = yield* runPiVersionCommand(piSettings, environment).pipe(
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
     Effect.timeoutOption(VERSION_PROBE_TIMEOUT_MS),
     Effect.result,
   );
@@ -176,7 +374,11 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
+<<<<<<< HEAD
           ? "Pi CLI (`pi`) is not installed or not on PATH."
+=======
+          ? "Pi CLI (`pi`) is not installed or not on PATH. Install with `npm install -g @earendil-works/pi-coding-agent`."
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
           : "Failed to execute Pi CLI health check.",
       },
     });
@@ -201,11 +403,14 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   const versionOutput = versionResult.success.value;
   const version = parseGenericCliVersion(`${versionOutput.stdout}\n${versionOutput.stderr}`);
   if (versionOutput.code !== 0) {
+<<<<<<< HEAD
     yield* Effect.logWarning("Pi CLI version probe exited with a non-zero status.", {
       exitCode: versionOutput.code,
       stdoutLength: versionOutput.stdout.length,
       stderrLength: versionOutput.stderr.length,
     });
+=======
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
     return buildServerProvider({
       presentation: PI_PRESENTATION,
       enabled: piSettings.enabled,
@@ -216,11 +421,16 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version,
         status: "error",
         auth: { status: "unknown" },
+<<<<<<< HEAD
         message: "Pi CLI exited with an error while reporting its version.",
+=======
+        message: "Pi CLI is installed but failed to run.",
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
       },
     });
   }
 
+<<<<<<< HEAD
   const modelsResult = yield* runPiCliCommand(piSettings, MODELS_PROBE_ARGS, environment).pipe(
     Effect.timeoutOption(MODELS_PROBE_TIMEOUT_MS),
     Effect.result,
@@ -254,10 +464,14 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   // signed in" only when the listing actually succeeded — otherwise the card
   // would tell a signed-in user to sign in because their network was slow.
   if (!modelsOutput) {
+=======
+  if (version === null) {
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
     return buildServerProvider({
       presentation: PI_PRESENTATION,
       enabled: piSettings.enabled,
       checkedAt,
+<<<<<<< HEAD
       models,
       slashCommands: [COMPACT_SLASH_COMMAND],
       probe: {
@@ -266,15 +480,105 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         status: "warning",
         auth: { status: "unknown" },
         message: "Pi is installed but listing its models failed.",
+=======
+      models: fallbackModels,
+      probe: {
+        installed: true,
+        version: null,
+        status: "error",
+        auth: { status: "unknown" },
+        message: `T3 Code could not determine the Pi version. Pi ${MINIMUM_PI_VERSION} or newer is required.`,
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
       },
     });
   }
 
+<<<<<<< HEAD
+=======
+  if (compareSemverVersions(version, MINIMUM_PI_VERSION) < 0) {
+    return buildServerProvider({
+      presentation: PI_PRESENTATION,
+      enabled: piSettings.enabled,
+      checkedAt,
+      models: fallbackModels,
+      probe: {
+        installed: true,
+        version,
+        status: "error",
+        auth: { status: "unknown" },
+        message: `Pi ${version} is unsupported. Update to Pi ${MINIMUM_PI_VERSION} or newer.`,
+      },
+    });
+  }
+
+  const resolvedLaunchArgs = resolvePiLaunchArgs(piSettings.launchArgs);
+  if (!resolvedLaunchArgs.ok) {
+    return buildServerProvider({
+      presentation: PI_PRESENTATION,
+      enabled: piSettings.enabled,
+      checkedAt,
+      models: fallbackModels,
+      probe: {
+        installed: true,
+        version,
+        status: "error",
+        auth: { status: "unknown" },
+        message: resolvedLaunchArgs.message,
+      },
+    });
+  }
+
+  const discoveryExit = yield* discoverPiViaRpc(
+    piSettings,
+    environment,
+    resolvedLaunchArgs.args,
+    cwd,
+  ).pipe(Effect.timeoutOption(PI_RPC_DISCOVERY_TIMEOUT_MS), Effect.exit);
+  if (Exit.isFailure(discoveryExit)) {
+    yield* Effect.logWarning("Pi RPC discovery failed.", {
+      errorTag: causeErrorTag(discoveryExit.cause),
+    });
+    return buildServerProvider({
+      presentation: PI_PRESENTATION,
+      enabled: piSettings.enabled,
+      checkedAt,
+      models: fallbackModels,
+      probe: {
+        installed: true,
+        version,
+        status: "ready",
+        auth: { status: "unknown" },
+        message:
+          "Pi is available, but T3 Code could not refresh its models and commands. The live session will retry startup.",
+      },
+    });
+  }
+  if (Option.isNone(discoveryExit.value)) {
+    return buildServerProvider({
+      presentation: PI_PRESENTATION,
+      enabled: piSettings.enabled,
+      checkedAt,
+      models: fallbackModels,
+      probe: {
+        installed: true,
+        version,
+        status: "ready",
+        auth: { status: "unknown" },
+        message:
+          "Pi is available, but model and command discovery needs interactive input. The live session will handle it.",
+      },
+    });
+  }
+
+  const discovery = discoveryExit.value.value;
+  const models = piModelsFromSettings(piSettings.customModels, discovery.models);
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
   return buildServerProvider({
     presentation: PI_PRESENTATION,
     enabled: piSettings.enabled,
     checkedAt,
     models,
+<<<<<<< HEAD
     // Pi enumerates no slash commands over its RPC surface, and its
     // interactive set is TUI-only, so only compaction is offered — the same
     // call Grok and Oh My Pi make.
@@ -289,6 +593,21 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         ? { status: "authenticated", type: "cached_token", label: "pi providers" }
         : { status: "unauthenticated" },
       ...(cliModels.authenticated ? {} : { message: "Run `pi` once to sign in to a provider." }),
+=======
+    slashCommands: discovery.slashCommands,
+    skills: discovery.skills,
+    probe: {
+      installed: true,
+      version,
+      status: discovery.authenticated ? "ready" : "warning",
+      auth: { status: discovery.authenticated ? "authenticated" : "unauthenticated", type: "pi" },
+      ...(discovery.authenticated
+        ? {}
+        : {
+            message:
+              "Pi has no usable models. Run `pi` in a terminal and use /login, or configure an API key in ~/.pi/agent.",
+          }),
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
     },
   });
 });
@@ -301,7 +620,10 @@ export const enrichPiSnapshot = (input: {
   readonly httpClient: HttpClient.HttpClient;
 }): Effect.Effect<void> => {
   const { snapshot, publishSnapshot } = input;
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream-sync-eac52f008-upstream-renamed
   return enrichProviderSnapshotWithVersionAdvisory(snapshot, input.maintenanceCapabilities, {
     enableProviderUpdateChecks: input.enableProviderUpdateChecks,
   }).pipe(
