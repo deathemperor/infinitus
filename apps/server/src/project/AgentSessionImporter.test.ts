@@ -1,36 +1,20 @@
-import * as NodeServices from "@effect/platform-node/NodeServices";
-import { describe, expect, it, vi } from "@effect/vitest";
+import { expect, it } from "@effect/vitest";
 import {
-  AgentSessionImportProjectChangedError,
-  CommandId,
-  MessageId,
   ProjectId,
-  ProviderDriverKind,
   ProviderInstanceId,
   ThreadId,
-  type OrchestrationCommand,
-  type OrchestrationProjectShell,
-  type OrchestrationThread,
-  type ProviderSendTurnInput,
+  type OrchestrationV2DomainEvent,
 } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
-import * as Deferred from "effect/Deferred";
-import * as Fiber from "effect/Fiber";
-import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Path from "effect/Path";
-import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import * as TestClock from "effect/testing/TestClock";
 
-import { makeTestProviderAdapterHarness } from "../../integration/TestProviderAdapter.integration.ts";
-import { ServerConfig } from "../config.ts";
-import { GitWorkflowService } from "../git/GitWorkflowService.ts";
-import { OrchestrationCommandReceiptRepositoryLive } from "../persistence/Layers/OrchestrationCommandReceipts.ts";
-import { OrchestrationEventStoreLive } from "../persistence/Layers/OrchestrationEventStore.ts";
-import { SqlitePersistenceMemory } from "../persistence/Layers/Sqlite.ts";
+import * as EventSink from "../orchestration-v2/EventSink.ts";
+import * as IdAllocator from "../orchestration-v2/IdAllocator.ts";
+import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProviderSessionRuntime from "../persistence/ProviderSessionRuntime.ts";
+<<<<<<< HEAD
 import { OrchestrationEngineLive } from "../orchestration/Layers/OrchestrationEngine.ts";
 import { OrchestrationProjectionPipelineLive } from "../orchestration/Layers/ProjectionPipeline.ts";
 import { OrchestrationProjectionSnapshotQueryLive } from "../orchestration/Layers/ProjectionSnapshotQuery.ts";
@@ -61,13 +45,18 @@ import { TerminalManager } from "../terminal/Manager.ts";
 import { VcsStatusBroadcaster } from "../vcs/VcsStatusBroadcaster.ts";
 import * as RepositoryIdentityResolver from "./RepositoryIdentityResolver.ts";
 import { importRecentAgentThreads } from "./AgentSessionImporter.ts";
+=======
+import * as AgentSessionImporter from "./AgentSessionImporter.ts";
+>>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
 import * as AgentSessionScanner from "./AgentSessionScanner.ts";
+import * as ProjectService from "./ProjectService.ts";
 
-const PROJECT_ID = ProjectId.make("project-1");
-const WORKSPACE_ROOT = "/tmp/project-from-server";
-const CLAUDE_SESSION_ID = "123e4567-e89b-42d3-a456-426614174000";
-const encodeTranscriptRecord = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const projectId = ProjectId.make("agent-session-import-project");
+const providerInstanceId = ProviderInstanceId.make("codex");
+const providerSessionId = "native-codex-thread";
+const threadId = ThreadId.make(`import:${providerInstanceId}:${providerSessionId}`);
 
+<<<<<<< HEAD
 const makeThread = (
   source: "codex" | "claudeAgent" | "omp" | "pi",
 ): AgentSessionScanner.AgentSessionThread => ({
@@ -1246,24 +1235,127 @@ it.layer(integrationLayer)("AgentSessionImporter integration", (it) => {
           role: "user",
           text: "Continue while import waits",
           attachments: [],
+=======
+it.effect("imports messages once and preserves the provider native resume binding", () => {
+  const writes: Array<ReadonlyArray<OrchestrationV2DomainEvent>> = [];
+  const upserts: Array<unknown> = [];
+  const recorded: Array<unknown> = [];
+  let imported = false;
+  const scanner = AgentSessionScanner.AgentSessionScanner.of({
+    scan: Effect.die("unused"),
+    recentThreads: () =>
+      Stream.succeed({
+        _tag: "Importable",
+        source: {
+          provider: "codex",
+          providerInstanceId,
+          providerSessionId,
+          filePath: "/tmp/native-codex-thread.jsonl",
+          size: 100,
+          mtimeMs: 2,
+          device: 3,
+          inode: 4,
+          birthtimeMs: 1,
+>>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
         },
-        runtimeMode: "full-access",
-        interactionMode: "default",
-        createdAt: "2026-08-24T10:02:00.000Z",
-      });
-      yield* Deferred.succeed(releaseImporter, undefined);
-
-      expect(yield* Fiber.join(importFiber)).toEqual({ importedCount: 0, skippedCount: 1 });
-      expect(Option.getOrThrow(yield* directory.getBinding(threadId))).toMatchObject({
-        status: "running",
-        resumeCursor: { threadId: "active-client-session" },
-        runtimePayload: { cwd: workspaceRoot, activeTurnId: "turn-active" },
-      });
-      expect(
-        Option.getOrThrow(yield* snapshots.getThreadDetailById(threadId)).messages.map(
-          (message) => message.text,
-        ),
-      ).toEqual(["Continue while import waits"]);
-    }),
+        thread: {
+          source: "codex",
+          providerInstanceId,
+          providerSessionId,
+          title: "Imported thread",
+          model: "gpt-5.4",
+          createdAt: "2026-09-01T10:00:00.000Z",
+          updatedAt: "2026-09-01T10:01:00.000Z",
+          messages: [
+            { role: "user", text: "Fix it", createdAt: "2026-09-01T10:00:00.000Z" },
+            { role: "assistant", text: "Fixed", createdAt: "2026-09-01T10:01:00.000Z" },
+          ],
+        },
+      }),
+  });
+  const testLayer = AgentSessionImporter.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(AgentSessionScanner.AgentSessionScanner, scanner),
+        Layer.mock(ProjectService.ProjectService)({
+          getById: () =>
+            Effect.succeed(
+              Option.some({ id: projectId, workspaceRoot: "/workspace/project" } as never),
+            ),
+        }),
+        Layer.mock(Orchestrator.OrchestratorV2)({
+          getThreadRecords: () =>
+            imported
+              ? Effect.succeed({
+                  thread: { id: threadId, projectId, historyOrigin: "v1_import" },
+                } as never)
+              : Effect.fail(new Orchestrator.OrchestratorProjectionError({ threadId })),
+        }),
+        Layer.mock(EventSink.EventSinkV2)({
+          write: (input) =>
+            Effect.sync(() => {
+              writes.push(input.events);
+              imported = true;
+              return [];
+            }),
+        }),
+        Layer.mock(ProviderSessionRuntime.ProviderSessionRuntimeRepository)({
+          list: () => Effect.succeed([]),
+          upsert: (input) => Effect.sync(() => void upserts.push(input)),
+          recordImportedTranscript: (input) => Effect.sync(() => void recorded.push(input)),
+        }),
+        IdAllocator.layer,
+      ),
+    ),
   );
+
+  return Effect.gen(function* () {
+    const importer = yield* AgentSessionImporter.AgentSessionImporter;
+    expect(yield* importer.importRecentAgentThreads({ projectId })).toEqual({
+      importedCount: 1,
+      skippedCount: 0,
+    });
+    expect(yield* importer.importRecentAgentThreads({ projectId })).toEqual({
+      importedCount: 1,
+      skippedCount: 0,
+    });
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.map((event) => event.type)).toEqual([
+      "thread.created",
+      "message.updated",
+      "turn-item.updated",
+      "message.updated",
+      "turn-item.updated",
+      "provider-thread.updated",
+    ]);
+    const created = writes[0]?.find((event) => event.type === "thread.created");
+    const providerThread = writes[0]?.find((event) => event.type === "provider-thread.updated");
+    expect(created?.payload).toMatchObject({
+      id: threadId,
+      activeProviderThreadId: providerThread?.payload.id,
+      historyOrigin: "v1_import",
+    });
+    expect(providerThread?.payload).toMatchObject({
+      appThreadId: threadId,
+      nativeThreadRef: {
+        driver: "codex",
+        nativeId: providerSessionId,
+        strength: "strong",
+      },
+    });
+    expect(
+      writes[0]
+        ?.filter((event) => event.type === "message.updated")
+        .map((event) => event.payload.text),
+    ).toEqual(["Fix it", "Fixed"]);
+    expect(upserts).toEqual([
+      expect.objectContaining({
+        threadId,
+        providerInstanceId,
+        resumeCursor: { threadId: providerSessionId },
+      }),
+    ]);
+    expect(recorded).toHaveLength(2);
+  }).pipe(Effect.provide(testLayer));
 });

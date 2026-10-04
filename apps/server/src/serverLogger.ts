@@ -6,11 +6,15 @@ import * as References from "effect/References";
 import * as OtlpExporter from "effect/unstable/observability/OtlpExporter";
 import * as OtlpLogger from "effect/unstable/observability/OtlpLogger";
 
+<<<<<<< HEAD
 import { otlpResource, ServerConfig } from "./config.ts";
 import { makeServerLogFileLogger } from "./infinitus/serverLogFile.ts";
+=======
+import * as ServerConfig from "./config.ts";
+>>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
 
 export const ServerLoggerLive = Effect.gen(function* () {
-  const config = yield* ServerConfig;
+  const config = yield* ServerConfig.ServerConfig;
   const minimumLogLevelLayer = Layer.succeed(References.MinimumLogLevel, config.logLevel);
 
   const logs = config.otlpLogsExport;
@@ -21,7 +25,7 @@ export const ServerLoggerLive = Effect.gen(function* () {
           url: config.otlpLogsUrl,
           exportInterval: `${logs.exportIntervalMs} millis`,
           headers: logs.headers,
-          resource: otlpResource(config),
+          resource: ServerConfig.otlpResource(config),
         });
   // Fork (#1182): stdout is only kept by whoever started the server, and a
   // packaged desktop backend has no one keeping it. `Logger.layer` takes

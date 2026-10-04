@@ -12,7 +12,7 @@ import * as Layer from "effect/Layer";
 import * as TestConsole from "effect/testing/TestConsole";
 import { Command } from "effect/unstable/cli";
 
-import { cli } from "../bin.ts";
+import { cli } from "../binCli.ts";
 import { symlinksSupported } from "@infinitus/shared/testing/symlinks";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 

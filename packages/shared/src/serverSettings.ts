@@ -2,6 +2,7 @@ import {
   isProviderDriverKind,
   isProviderAvailable,
   resolveProviderInstanceEnabled,
+  isProviderTextGenerationCapable,
   type ModelSelection,
   type ProjectId,
   type ProjectScopedServerSettingKey,
@@ -94,7 +95,9 @@ export function resolveSourceControlWriterModelSelection(
   }
 
   const provider = providers.find((candidate) => candidate.instanceId === selection.instanceId);
-  return provider?.enabled === true && isProviderAvailable(provider)
+  return provider?.enabled === true &&
+    isProviderAvailable(provider) &&
+    isProviderTextGenerationCapable(provider)
     ? selection
     : settings.textGenerationModelSelection;
 }
@@ -277,8 +280,12 @@ export function applyServerSettingsPatch(
     // Merged per entry below; its `null` removals must not reach deepMerge.
     usageLimitSources: usageLimitSourcesPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
+<<<<<<< HEAD
     // Fork (#574): merged flat below; deepMerge would merge `allowedUserIds` by index.
     infinitusSlack: infinitusSlackPatch,
+=======
+    usageModelAliases: usageModelAliasesPatch,
+>>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
     // Entry replacement: deepMerge would keep keys the client meant to clear.
     projectSettingsOverrides: projectSettingsOverridesPatch,
     // Already translated into `projectSettingsOverrides` above; the legacy
@@ -401,8 +408,18 @@ export function applyServerSettingsPatch(
           ),
         }
       : {}),
+<<<<<<< HEAD
     ...(infinitusSlackPatch !== undefined
       ? { infinitusSlack: { ...current.infinitusSlack, ...infinitusSlackPatch } }
+=======
+    ...(usageModelAliasesPatch !== undefined
+      ? {
+          usageModelAliases: mergeSettingsEntries(
+            current.usageModelAliases,
+            usageModelAliasesPatch,
+          ),
+        }
+>>>>>>> upstream-sync-0fe4fa40f-upstream-renamed
       : {}),
     ...(patch.sourceControlWriterModelSelection !== undefined
       ? { sourceControlWriterModelSelection: patch.sourceControlWriterModelSelection }
