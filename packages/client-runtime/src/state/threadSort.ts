@@ -1,8 +1,11 @@
-import type { OrchestrationThreadShell, ProjectId } from "@infinitus/contracts";
+import type { ProjectId } from "@infinitus/contracts";
 import type {
   SidebarProjectSortOrder,
   SidebarThreadSortOrder,
 } from "@infinitus/contracts/settings";
+import type { EnvironmentThreadShell } from "./models.ts";
+import * as Arr from "effect/Array";
+import * as Order from "effect/Order";
 
 export interface ThreadSortInput {
   readonly createdAt: string;
@@ -21,8 +24,8 @@ export function toSortableTimestamp(iso: string | undefined): number | null {
 }
 
 export type SettledThreadTimestampInput = Pick<
-  OrchestrationThreadShell,
-  "settledAt" | "latestUserMessageAt" | "latestTurn" | "updatedAt"
+  EnvironmentThreadShell,
+  "settledAt" | "latestUserMessageAt" | "latestRun" | "updatedAt"
 >;
 
 /** The timestamp a settled row sorts and labels by on every client: settledAt
@@ -36,9 +39,9 @@ export function resolveSettledThreadTimestamp(thread: SettledThreadTimestampInpu
   let latestMs = Number.NEGATIVE_INFINITY;
   for (const candidate of [
     thread.latestUserMessageAt,
-    thread.latestTurn?.requestedAt,
-    thread.latestTurn?.startedAt,
-    thread.latestTurn?.completedAt,
+    thread.latestRun?.requestedAt,
+    thread.latestRun?.startedAt,
+    thread.latestRun?.completedAt,
   ]) {
     const parsed = toSortableTimestamp(candidate ?? undefined);
     if (candidate != null && parsed !== null && parsed > latestMs) {
@@ -126,7 +129,7 @@ export function getThreadSortTimestamp(
  * top instead of sinking back to its creation-order slot. Shared by web and
  * mobile so both render the same order. Malformed timestamps sink to 0.
  */
-function activeThreadAnchorTimestampMs(thread: {
+export function activeThreadAnchorTimestampMs(thread: {
   readonly createdAt: string;
   readonly unsettledAt?: string | null | undefined;
 }): number {

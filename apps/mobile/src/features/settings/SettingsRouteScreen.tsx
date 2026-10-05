@@ -163,6 +163,10 @@ function SettingsIndexSections() {
         ) : null}
       </SettingsSection>
 
+      <SettingsSection title="Automations">
+        <SettingsRow icon="clock" label="Scheduled tasks" target="SettingsScheduledTasks" />
+      </SettingsSection>
+
       <SettingsSection title="Projects & threads">
         {selectedProjectKey !== null ? (
           <SettingsRow
@@ -174,11 +178,21 @@ function SettingsIndexSections() {
         ) : null}
         <SettingsRow icon="folder" label="Organization" target="SettingsOrganization" />
         <SettingsRow icon="text.bubble" label="Thread behavior" target="SettingsThreads" />
+<<<<<<< HEAD
         <InfinitusSendModeRow />
+=======
+        <SettingsRow icon="arrow.turn.left.up" label="Follow-ups" target="SettingsFollowUp" />
+>>>>>>> upstream-sync-250e052f4-upstream-renamed
         <SettingsRow icon="archivebox" label="Archived Threads" target="SettingsArchive" />
       </SettingsSection>
 
       <SettingsSection title="Server settings">
+        <SettingsRow
+          icon="person.crop.circle"
+          label="Provider accounts"
+          target="SettingsProviderAccounts"
+          disabled={noServerTargets}
+        />
         <SettingsRow
           icon="text.bubble"
           label="New threads"
