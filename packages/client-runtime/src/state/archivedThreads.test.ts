@@ -1,4 +1,4 @@
-import { EnvironmentId, type OrchestrationShellSnapshot } from "@infinitus/contracts";
+import { EnvironmentId, type OrchestrationV2ArchivedShellSnapshot } from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
 import { expect, it } from "vite-plus/test";
@@ -22,7 +22,7 @@ it("does not expose an archived snapshot failure message", () => {
   const snapshotsAtom = createArchivedThreadSnapshotsAtomFamily<Error>({
     getSnapshotAtom: () =>
       Atom.make(
-        AsyncResult.failure<OrchestrationShellSnapshot, Error>(
+        AsyncResult.failure<OrchestrationV2ArchivedShellSnapshot, Error>(
           Cause.fail(new Error("credential=secret-value")),
         ),
       ),

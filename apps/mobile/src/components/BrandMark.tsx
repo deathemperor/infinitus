@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { View } from "react-native";
 
 import { AppText as Text } from "./AppText";
+<<<<<<< HEAD
 import { resolveMobileBrandMarkVariant, resolveMobileStageLabel } from "../lib/mobileBranding";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
@@ -15,6 +16,13 @@ const BRAND_MARK_SOURCES = {
 } as const;
 const BRAND_MARK_SOURCE = BRAND_MARK_SOURCES[resolveMobileBrandMarkVariant(appVariant)];
 const DEFAULT_STAGE_LABEL = resolveMobileStageLabel(appVariant);
+=======
+import { T3_CODE_BRAND_MARK_SOURCE } from "./brandAssets";
+
+const appVariant = Constants.expoConfig?.extra?.appVariant;
+const DEFAULT_STAGE_LABEL =
+  appVariant === "development" ? "Dev" : appVariant === "preview" ? "Preview" : "Alpha";
+>>>>>>> upstream-sync-781223057-upstream-renamed
 
 export function BrandMark(props: { readonly compact?: boolean; readonly stageLabel?: string }) {
   const compact = props.compact ?? false;
@@ -24,7 +32,7 @@ export function BrandMark(props: { readonly compact?: boolean; readonly stageLab
   return (
     <View className="flex-row items-center gap-3">
       <Image
-        source={BRAND_MARK_SOURCE}
+        source={T3_CODE_BRAND_MARK_SOURCE}
         accessibilityIgnoresInvertColors
         style={{
           width: iconSize,

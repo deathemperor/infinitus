@@ -16,7 +16,11 @@ import {
   BotIcon,
   CpuIcon,
   createLucideIcon,
+<<<<<<< HEAD
   GaugeIcon,
+=======
+  CalendarClockIcon,
+>>>>>>> upstream-sync-781223057-upstream-renamed
   GitBranchIcon,
   HardDriveIcon,
   InfinityIcon,
@@ -93,6 +97,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/snap-shot": SnapShotIcon,
   "/settings/providers": BotIcon,
   "/settings/integrations": BlocksIcon,
+  "/settings/scheduled-tasks": CalendarClockIcon,
   "/settings/source-control": GitBranchIcon,
   "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
