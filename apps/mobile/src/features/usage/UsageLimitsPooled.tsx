@@ -3,6 +3,7 @@ import { useNavigation, type StaticScreenProps } from "@react-navigation/native"
 import { EnvironmentId } from "@infinitus/contracts";
 import {
   collectLimitAccounts,
+  collectExternalUsageLinks,
   collectLimitNotices,
   collectLimitPools,
   cursorUsageWindowDetails,
@@ -14,7 +15,7 @@ import {
   type LimitPoolWindow,
 } from "@infinitus/shared/usageLimits";
 import { Fragment, type ReactNode, useId, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Linking, Pressable, ScrollView, View } from "react-native";
 import { Defs, Path, Pattern, Rect, Svg } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -99,7 +100,7 @@ function PoolWindowCard({
       },
     });
   return (
-    <View className="gap-3 rounded-[24px] border-continuous bg-card p-4">
+    <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
       <View className="flex-row items-start justify-between gap-3">
         <View className="gap-1">
           <Text className="text-sm font-infinitus-medium text-foreground">
@@ -219,6 +220,7 @@ export function UsageLimitsSection({
       : new Map([...presentations].filter(([id]) => selectedEnvironmentIds.has(id)));
   const pools = collectLimitPools(collectLimitAccounts(selected), now);
   const notices = collectLimitNotices(selected);
+  const externalLinks = collectExternalUsageLinks(selected);
   const colors = useProviderColors();
   const cursorPromptAt =
     Math.max(
@@ -227,7 +229,11 @@ export function UsageLimitsSection({
     ) + 1;
   return (
     <View className="gap-6">
-      {pools.length === 0 && notices.length === 0 && failedLabels.length === 0 && !cursorPrompt ? (
+      {pools.length === 0 &&
+      notices.length === 0 &&
+      failedLabels.length === 0 &&
+      !cursorPrompt &&
+      externalLinks.length === 0 ? (
         <Text className="py-12 text-center text-base text-foreground-muted">
           {selected.size === 0
             ? "Select an environment to see limits."
@@ -268,6 +274,22 @@ export function UsageLimitsSection({
         );
       })}
       {cursorPromptAt === pools.length ? cursorPrompt : null}
+      {externalLinks.map((link) => (
+        <View key={link.url} className="gap-3 rounded-xl border border-border-subtle p-4">
+          <Text className="text-base font-infinitus-medium text-foreground">{link.label}</Text>
+          <Text className="text-xs text-foreground-muted">{link.accounts.join(", ")}</Text>
+          {link.message ? (
+            <Text className="text-sm text-foreground-muted">{link.message}</Text>
+          ) : null}
+          <Pressable
+            accessibilityRole="link"
+            className="min-h-11 justify-center"
+            onPress={() => void Linking.openURL(link.url).catch(() => undefined)}
+          >
+            <Text className="text-sm font-infinitus-medium text-primary">Manage usage</Text>
+          </Pressable>
+        </View>
+      ))}
       {notices.length > 0 || failedLabels.length > 0 ? (
         <View
           accessible
@@ -363,7 +385,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
                 </Text>
               ) : null}
             </View>
-            <View className="gap-3 rounded-[24px] border-continuous bg-card p-4">
+            <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
               <Text className="text-sm font-infinitus-medium text-foreground">{window.label}</Text>
               <Text className="text-3xl font-infinitus-bold tabular-nums text-foreground">
                 {remainingPercent(window)}% left
@@ -383,7 +405,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
                 </Text>
               ) : null}
             </View>
-            <View className="gap-2 rounded-[24px] border-continuous bg-card p-4">
+            <View className="gap-2 rounded-[24px] border-continuous bg-grouped-card p-4">
               <Text className="text-sm font-infinitus-medium text-foreground">
                 {account.environments.length ? "Signed in" : "Source"}
               </Text>
@@ -398,7 +420,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
               )}
             </View>
             {account.redeem && account.limits.resetCredits ? (
-              <View className="gap-3 rounded-[24px] border-continuous bg-card p-4">
+              <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
                 <Text className="text-sm font-infinitus-medium text-foreground">Reset credits</Text>
                 <ResetCredits
                   key={account.key}
