@@ -92,6 +92,7 @@ export const STATIC_KEYBINDING_COMMANDS = [
   "composer.branch",
   "chat.new",
   "chat.newLocal",
+  "chat.newWithoutProject",
   "editor.openFavorite",
   "accounts.open",
   "captures.toggle",
