@@ -587,7 +587,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them), and
   `export-infinitus-splash.ts` (run by hand).
-- `patches/expo-widgets@57.0.15.patch` — upstream's patch (#11604) plus the fork's `onExpoWidgetsActivityUpdate` hunk (#1277), consumer gone with #1375: drop the hunk at the next expo-widgets bump, never re-apply it. Rules and traps: `docs/internals/phone-thread-card.md`.
 - `apps/mobile/src/lib/mobileTheme.ts` — settings groups (`--color-grouped-card`) take the tonal fill in every theme whose surface matches its chrome, not only the default one (2026-09-22). Upstream's palette alignment (#12534) gave grove, ocean, ember and iris the same colour for both, so their Settings cards painted invisibly on the phone. Pinned by `mobileTheme.test.ts` ("separates settings groups … in every theme"); drop the bullet once upstream fixes the derivation.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
   upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
