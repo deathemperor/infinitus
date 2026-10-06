@@ -1,6 +1,8 @@
 import { MaterialListRow } from "../../components/MaterialListRow";
 import type { VcsRef } from "@infinitus/client-runtime/state/vcs";
-import { resolveEnvironmentMachineKind } from "@infinitus/contracts";
+import { type EnvironmentId, resolveEnvironmentMachineKind } from "@infinitus/contracts";
+import * as Cause from "effect/Cause";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { LegendList } from "@legendapp/list/react-native";
 import {
   isAtomCommandInterrupted,
@@ -28,7 +30,8 @@ import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSym
 import { ThemedSwitch } from "../../components/ThemedSwitch";
 import { cn } from "../../lib/cn";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
-import { useServerConfigs } from "../../state/entities";
+import { useServerConfigs, waitForProject } from "../../state/entities";
+import { projectEnvironment } from "../../state/projects";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { vcsEnvironment } from "../../state/vcs";
 import {
@@ -51,6 +54,7 @@ function SelectionRow(props: {
   if (Platform.OS === "android") {
     return (
       <MaterialListRow
+        className="bg-grouped-card"
         title={props.title}
         subtitle={props.subtitle}
         leading={
@@ -82,7 +86,7 @@ function SelectionRow(props: {
       accessibilityRole="radio"
       accessibilityState={{ checked: props.selected }}
       className={cn(
-        "min-h-14 flex-row items-center gap-3 bg-card px-4 py-3 active:bg-subtle",
+        "min-h-14 flex-row items-center gap-3 bg-grouped-card px-4 py-3 active:bg-subtle",
         !props.isLast && "border-b border-border-subtle",
       )}
       disabled={props.disabled}
@@ -128,7 +132,7 @@ function ToggleRow(props: {
   readonly onValueChange: (value: boolean) => void;
 }) {
   return (
-    <View className="min-h-14 flex-row items-center gap-3 bg-card px-4 py-3">
+    <View className="min-h-14 flex-row items-center gap-3 bg-grouped-card px-4 py-3">
       <Text
         className={cn(
           "min-w-0 flex-1 text-base text-foreground",
@@ -189,8 +193,8 @@ function PickerSurface(props: { readonly children: ReactNode }) {
     <View
       className={
         Platform.OS === "android"
-          ? "overflow-hidden rounded-[28px] bg-card"
-          : "overflow-hidden rounded-2xl bg-card"
+          ? "overflow-hidden rounded-[28px] bg-grouped-card"
+          : "overflow-hidden rounded-2xl bg-grouped-card"
       }
     >
       {props.children}
@@ -203,6 +207,38 @@ export function NewTaskEnvironmentPickerRouteScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const serverConfigs = useServerConfigs();
+  const ensureScratch = useAtomCommand(projectEnvironment.ensureScratch, {
+    reportFailure: false,
+  });
+  const [movingToEnvironmentId, setMovingToEnvironmentId] = useState<EnvironmentId | null>(null);
+
+  // A thread without a project moves to the other machine's own Scratch
+  // project, which is created there first if it does not exist yet.
+  async function moveScratchDraft(environmentId: EnvironmentId): Promise<void> {
+    setMovingToEnvironmentId(environmentId);
+    try {
+      const result = await ensureScratch({ environmentId, input: {} });
+      if (AsyncResult.isFailure(result)) {
+        const error = Cause.squash(result.cause);
+        Alert.alert(
+          "Could not switch machine",
+          error instanceof Error
+            ? error.message
+            : "The folder for threads without a project could not be created.",
+        );
+        return;
+      }
+      const project = await waitForProject({ environmentId, projectId: result.value.projectId });
+      if (project === null) {
+        Alert.alert("Could not switch machine", "It has not reached this device yet. Try again.");
+        return;
+      }
+      flow.setProject(project);
+      navigation.goBack();
+    } finally {
+      setMovingToEnvironmentId(null);
+    }
+  }
 
   return (
     <View className="flex-1 bg-sheet" collapsable={false}>
@@ -243,9 +279,17 @@ export function NewTaskEnvironmentPickerRouteScreen() {
                   />
                 }
                 isLast={index === flow.environments.length - 1}
+                disabled={movingToEnvironmentId !== null}
                 onPress={() => {
                   void Haptics.selectionAsync();
-                  flow.selectEnvironment(environment.environmentId);
+                  if (flow.isScratchDraft) {
+                    if (environment.environmentId !== flow.selectedEnvironmentId) {
+                      void moveScratchDraft(environment.environmentId);
+                      return;
+                    }
+                  } else {
+                    flow.selectEnvironment(environment.environmentId);
+                  }
                   navigation.goBack();
                 }}
                 selected={flow.selectedEnvironmentId === environment.environmentId}
