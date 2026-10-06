@@ -27,6 +27,7 @@ vi.mock("expo-widgets", () => ({
   createWidget: vi.fn((name: string, layout: unknown) => ({ layout, name })),
 }));
 
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { SubscriptionUsage } from "./SubscriptionUsage.android";
 import type { SubscriptionUsageSnapshot } from "./subscriptionUsageSnapshot";
 
@@ -68,25 +69,25 @@ describe("SubscriptionUsage Android layout", () => {
       ...snapshot,
       providers: [{ ...provider, expiresAt: now - 1 }],
     });
-    expect(tree).toContain("Open T3 to refresh");
+    expect(tree).toContain(`Open ${PRODUCT_NAME} to refresh`);
     expect(tree).not.toContain("LinearProgressIndicator");
-    expect(tree).not.toContain("more in T3");
+    expect(tree).not.toContain(`more in ${PRODUCT_NAME}`);
   });
 
   it("counts the quotas that did not fit", () => {
     const tree = render({ ...snapshot, providers: [{ ...provider, totalWindows: 5 }] });
-    expect(tree).toContain("3 more in T3");
+    expect(tree).toContain(`3 more in ${PRODUCT_NAME}`);
   });
 
   it("keeps quotas without an expiry deadline visible", () => {
     const tree = render({ ...snapshot, providers: [{ ...provider, expiresAt: 0 }] });
     expect(tree).toContain("5 hours · 60% left");
-    expect(tree).not.toContain("Open T3 to refresh");
+    expect(tree).not.toContain(`Open ${PRODUCT_NAME} to refresh`);
   });
 
   it("invites connecting when nothing has been checked", () => {
     const tree = render({ checkedAt: 0, providers: [] }, "light");
-    expect(tree).toContain("Tap to connect in T3");
+    expect(tree).toContain(`Tap to connect in ${PRODUCT_NAME}`);
     expect(tree).not.toContain("As of ");
     expect(tree).toContain('"containerColor":"light-surface"');
   });
