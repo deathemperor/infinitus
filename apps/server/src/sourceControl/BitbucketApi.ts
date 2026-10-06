@@ -15,8 +15,13 @@ import {
   type SourceControlRepositoryCloneUrls,
   type SourceControlRepositoryVisibility,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
 import { sanitizeBranchFragment, WORKTREE_BRANCH_PREFIX } from "@infinitus/shared/git";
+=======
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import { sanitizeBranchFragment } from "@infinitus/shared/git";
+>>>>>>> upstream-sync-76d3c96fd-upstream-renamed
 import {
   detectSourceControlProviderFromRemoteUrl,
   isSshRemoteUrl,

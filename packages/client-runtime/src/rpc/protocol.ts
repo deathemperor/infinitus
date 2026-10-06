@@ -1,6 +1,6 @@
 import { WsRpcGroup } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
-import { RpcClient } from "effect/unstable/rpc";
+import { RpcClient } from "effect/rpc";
 
 export const makeWsRpcProtocolClient = RpcClient.make(WsRpcGroup);
 type RpcClientFactory = typeof makeWsRpcProtocolClient;

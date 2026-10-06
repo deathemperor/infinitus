@@ -100,18 +100,28 @@ export const DESCRIPTOR_PRESETS_BY_KIND: Partial<
   [ProviderDriverKind.make("grok")]: [
     { id: "reasoningEffort", label: "Reasoning", type: "select", choices: EFFORT_CHOICES },
   ],
+<<<<<<< HEAD
   [ProviderDriverKind.make("omp")]: [
+=======
+  [ProviderDriverKind.make("pi")]: [
+>>>>>>> upstream-sync-76d3c96fd-upstream-renamed
     {
       id: "thinking",
       label: "Thinking",
       type: "select",
       choices: [
         { id: "off", label: "Off" },
+<<<<<<< HEAD
         // Oh My Pi offers Auto alongside Off and the model's own levels.
         { id: "auto", label: "Auto" },
         { id: "minimal", label: "Minimal" },
         { id: "low", label: "Low" },
         { id: "medium", label: "Medium" },
+=======
+        { id: "minimal", label: "Minimal" },
+        { id: "low", label: "Low" },
+        { id: "medium", label: "Medium", isDefault: true },
+>>>>>>> upstream-sync-76d3c96fd-upstream-renamed
         { id: "high", label: "High" },
         { id: "xhigh", label: "Extra High" },
         { id: "max", label: "Max" },

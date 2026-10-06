@@ -6,7 +6,7 @@ import {
   ProviderInstanceId,
   type ServerProvider,
 } from "@infinitus/contracts";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 import type {
   LocalEnvironmentUpdateGroup,

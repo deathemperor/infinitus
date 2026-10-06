@@ -4,12 +4,9 @@ import * as Output from "alchemy/Output";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
-import { OtlpExporter, OtlpSerialization, OtlpTracer } from "effect/unstable/observability";
 
 import { relayResourceNameForStage } from "./deploymentConfig.ts";
 import { PRODUCT_NAME } from "@infinitus/contracts/productName";
@@ -213,6 +210,7 @@ const withSchemaErrorAttributes = (delegate: Tracer.Tracer): Tracer.Tracer =>
     ...(delegate.context ? { context: delegate.context } : {}),
   });
 
+<<<<<<< HEAD
 export const makeRelayTraceLayer = (input: {
   readonly tracesEndpoint: string;
   readonly tracesDatasetName: string;
@@ -237,3 +235,16 @@ export const makeRelayTraceLayer = (input: {
       exportInterval: "1 second",
     }).pipe(Effect.map(withSchemaErrorAttributes)),
   ).pipe(Layer.provideMerge(OtlpExporter.layerFlusher), Layer.provide(OtlpSerialization.layerJson));
+=======
+/**
+ * Adds a failed span's schema error fields (`error.type`, `error.<field>`) to
+ * the span, on whichever tracer is current. Provide it around the work whose
+ * spans should carry them; the Worker's telemetry still owns export.
+ */
+export const withSchemaErrorSpanAttributes = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+  Effect.flatMap(Effect.tracer, (tracer) =>
+    effect.pipe(Effect.withTracer(withSchemaErrorAttributes(tracer))),
+  );
+>>>>>>> upstream-sync-76d3c96fd-upstream-renamed

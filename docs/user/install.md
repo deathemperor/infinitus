@@ -24,9 +24,47 @@ One command installs the server as a self-contained executable — no Node.js:
 curl -fsSL https://infinitus.run/install.sh | sh
 ```
 
+<<<<<<< HEAD
 It takes the newest release's `infinitus-<version>-linux-<arch>.tar.gz` (releases cut
 after 0.5.0-alpha.11 attach them, with `SHA256SUMS`), verifies it, unpacks it
 under `~/.infinitus/runtime` and links `infinitus` into `~/.local/bin`. Then run:
+=======
+On Windows, in PowerShell:
+
+```powershell
+irm https://t3.codes/install.ps1 | iex
+```
+
+This puts `t3` in `~/.local/bin`. If your shell reports `command not found`
+afterwards, that directory is not on your `PATH` yet; the installer prints the
+line to add. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
+`T3CODE_VERSION` to pin an exact version.
+
+| Task                                             | Command                                                   |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| Start the server and open the web app            | `t3`                                                      |
+| Start the server without a browser               | `t3 serve`                                                |
+| Keep it running in the background (macOS, Linux) | `t3 service install` ([details](./background-service.md)) |
+| Move to the newest release                       | `t3 update`                                               |
+| Remove it again                                  | `t3 uninstall`                                            |
+
+Run `t3 help` or `t3 --help` for the full reference. To start in a new working
+directory, use an explicit path such as `t3 ./my-project`. A bare directory name
+is accepted only if it already exists.
+
+If `t3` or `t3 start` reports an already running server, connect to that server
+instead. Stop it before starting a replacement, or use a different `--base-dir`
+for an independent server.
+
+To try Infinitus once without installing it, run `npx t3@latest` instead (needs
+Node.js for `npx`).
+
+### Intel Macs
+
+There is no `t3` executable for Intel Macs (the desktop app is available). To
+run a server there, build it from source with Node.js 24 and `vp`
+([Install vp](https://github.com/pingdotgg/t3code#install-vp)):
+>>>>>>> upstream-sync-76d3c96fd-upstream-renamed
 
 ```bash
 infinitus
@@ -78,6 +116,14 @@ The Infinitus phone app is not on a store: it is installed from a build
 machine. Follow
 [remote access](./remote-access.md) to link it through Infinitus Connect or a pairing URL.
 
+Nightly builds need the beta app. The store apps cannot connect to them. A Nightly build also
+shows these links as QR codes in **Settings → General → Mobile app**.
+
+- **iPhone and iPad:** join the [TestFlight beta](https://testflight.apple.com/join/XgaxaRtd).
+- **Android:** join the [beta group](https://groups.google.com/g/t3-code-v2-beta). With the same
+  Google account, open the [Google Play testing page](https://play.google.com/apps/testing/com.t3tools.t3code)
+  and become a tester.
+
 If the app crashes during launch, open Settings → Diagnostics on the next launch
 that succeeds. It lists startup crashes from the last 7 days with the error and
 component stack that store crash reports leave out. Copy the report and paste it
@@ -100,7 +146,11 @@ computer.
 | OpenCode    | Install [OpenCode](https://opencode.ai), then run `opencode auth login`.                                                                                  |
 | Oh My Pi    | Install [Oh My Pi](https://github.com/oh-my-pi/oh-my-pi), then run `omp` once to sign in.                                                                 |
 | Antigravity | Install and sign in with Google from Infinitus's provider settings.                                                                                       |
+<<<<<<< HEAD
 | Pi          | Install [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent), then run `pi` once to sign in.                                               |
+=======
+| Pi          | Install [Pi](https://pi.dev), then run `pi` once to finish its login or API-key setup.                                                                    |
+>>>>>>> upstream-sync-76d3c96fd-upstream-renamed
 
 Provider CLIs must be on the server's `PATH`. If Infinitus cannot find one, set its
 **Binary path** in provider settings, especially when using a version manager.
@@ -117,11 +167,12 @@ you can install the recommendation there. Otherwise use the provider's installer
 on the environment's machine. An unlisted version is unverified.
 
 When a provider CLI is behind its latest release, its provider card shows the
-available version. **Update now** appears only when Infinitus can tell which
-installer owns the CLI (its own update command, Homebrew, or a global npm, pnpm,
-bun, or Vite+ install) and runs that installer. Otherwise update the CLI the same
-way you installed it. Homebrew installs compare against the version Homebrew
-offers, which can trail the npm release by a few hours.
+available version. **Update now** runs the installer that owns the CLI
+(Homebrew, or a global npm, pnpm, Yarn, Bun, Volta, or Vite+ install), or the
+CLI's own update command when Infinitus cannot tell. Update a CLI installed with
+mise through mise. Cursor and Antigravity update with Infinitus. Homebrew installs
+compare against the version Homebrew offers, which can trail the npm release by
+a few hours.
 
 Add another provider instance for a separate account or configuration. Each
 instance can have its own environment variables, such as API keys or a custom
@@ -129,8 +180,8 @@ base URL. Mark secret values as sensitive; after saving, Infinitus does not disp
 their original values.
 
 For provider-specific setup and accounts, see [Codex](./providers-codex.md),
-[Claude](./providers-claude.md), [OpenCode](./providers-opencode.md), and
-[Antigravity](./providers-antigravity.md).
+[Claude](./providers-claude.md), [OpenCode](./providers-opencode.md),
+[Antigravity](./providers-antigravity.md), and [Pi](./providers-pi.md).
 
 ## Next steps
 
