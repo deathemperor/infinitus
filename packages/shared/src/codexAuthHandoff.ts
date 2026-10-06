@@ -2,6 +2,7 @@ import { EnvironmentId, ProviderInstanceId } from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 import { providerAuthReturnUrl } from "./providerAuthReturnUrl.ts";
 import { PRODUCT_NAME } from "./productName.ts";
+import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "./desktopIdentity.ts";
 
 export const CodexAuthHandoff = Schema.Struct({
   authorizationUrl: Schema.String.check(Schema.isMaxLength(16_384)),
@@ -86,7 +87,7 @@ export function codexCallbackUrl(value: string, redirectUri: string, state: stri
 }
 
 export function codexAuthHandoffUrl(input: CodexAuthHandoff, development = false) {
-  const url = new URL(`${development ? "t3code-dev" : "t3code"}://auth/codex`);
+  const url = new URL(`${development ? DESKTOP_DEV_URL_SCHEME : DESKTOP_URL_SCHEME}://auth/codex`);
   url.searchParams.set("request", encodeHandoff(input));
   return url.toString();
 }
@@ -96,7 +97,7 @@ export function readCodexAuthHandoff(value: string, development: boolean) {
     const url = new URL(value);
     if (
       value.length > 32_768 ||
-      url.protocol !== (development ? "t3code-dev:" : "t3code:") ||
+      url.protocol !== `${development ? DESKTOP_DEV_URL_SCHEME : DESKTOP_URL_SCHEME}:` ||
       url.host !== "auth" ||
       url.pathname !== "/codex" ||
       url.username ||

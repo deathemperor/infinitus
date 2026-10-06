@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 import { providerAuthReturnUrl } from "./providerAuthReturnUrl.ts";
+import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "./desktopIdentity.ts";
 
 describe("provider auth return destinations", () => {
-  it.each(["t3code", "t3code-dev"])(
+  it.each([DESKTOP_URL_SCHEME, DESKTOP_DEV_URL_SCHEME])(
     "returns to %s Welcome and the selected settings instance",
     (scheme) => {
       expect(providerAuthReturnUrl(`${scheme}://app/welcome?code=secret#agents:machine-id`)).toBe(

@@ -582,6 +582,11 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `fork-visual-check.ts` as scripts entries (run by hand and by the
   fork-visual-pass workflow; nothing imports them), and
   `export-infinitus-splash.ts` (run by hand).
+- `packages/shared/src/codexAuthHandoff.ts` and `providerAuthReturnUrl.ts` — the ChatGPT
+  sign-in handoff (upstream #14290) names the desktop URL scheme and the hosted web
+  origin; here they come from `desktopIdentity.ts` (`infinitus://`, #624) and
+  `connectAuth.ts`'s `DEFAULT_HOSTED_APP_URL`. Their tests build URLs from the same
+  constants; `apps/desktop/src/app/DesktopClerk.test.ts` spells the scheme out.
 - `apps/mobile/src/lib/mobileTheme.ts` — settings groups (`--color-grouped-card`) take the tonal fill in every theme whose surface matches its chrome, not only the default one (2026-09-22). Upstream's palette alignment (#12534) gave grove, ocean, ember and iris the same colour for both, so their Settings cards painted invisibly on the phone. Pinned by `mobileTheme.test.ts` ("separates settings groups … in every theme"); drop the bullet once upstream fixes the derivation.
 - `apps/mobile/package.json` — `expo-audio` pinned exact (`57.0.4`, not
   upstream's `~57.0.4`): `scripts/release-smoke.ts` deletes the lockfile and
