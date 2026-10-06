@@ -9,8 +9,8 @@ import * as Semaphore from "effect/Semaphore";
 import * as NodeOS from "node:os";
 // @effect-diagnostics-next-line nodeBuiltinImport:off - fj storage paths use explicit Windows and POSIX layouts, independently of this process's platform.
 import * as NodePath from "node:path";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { ChildProcessSpawner } from "effect/process";
 import { decodeJsonResult } from "@infinitus/shared/schemaJson";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import * as VcsProcess from "../vcs/VcsProcess.ts";

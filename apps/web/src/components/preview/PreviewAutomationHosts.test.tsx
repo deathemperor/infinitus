@@ -10,7 +10,7 @@ import {
 } from "@infinitus/contracts";
 import type { AtomCommandResult } from "@infinitus/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
