@@ -570,11 +570,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   in any spawned env: the bundle self-check inherits the host's env, and a
   runner hosted by the desktop app (an agent inside Infinitus) carries that
   variable, so the upstream assertion failed there.
-- `apps/web/src/components/settings/KeybindingsSettings.logic.ts` (+ test) —
-  `compareUsageCommands` ranks `usage.open` ahead of the Usage page's own
-  shortcuts instead of falling through to the name comparison: upstream's
-  mixed comparator was order-dependent, and the fork's extra default bindings
-  change the input order (upstream's #10158 test expected the artifact).
 - `packages/client-runtime/src/platform/persistence.test.ts` — the cache
   encoding property test runs with a 30 s budget: it samples 1000 thread
   shells, and the fork's shell has enough extra fields that vitest's 5 s
@@ -800,8 +795,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
-  upstream-sync workflow can start CI on its branch, and the Check job
-  runs `scripts/infinitus-rename.ts --check`. The sync workflow
+  upstream-sync workflow can start CI on its branch, and the Lint job
+  runs `scripts/infinitus-rename.ts --check` after `vp check`. The Mac
+  jobs sit after upstream's `Check` aggregator and are not in its `needs`:
+  they are path-filtered and required by the ruleset on their own. The sync workflow
   re-applies the runner swap after every merge, and once
   `scripts/infinitus-rename.ts --check` passes on `main` it renames
   upstream's tip on its own branch before merging (#1368 C,
