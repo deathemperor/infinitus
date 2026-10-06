@@ -64,6 +64,35 @@ created in Settings can only be copied from the client that created them while
 its Connections page stays open. If you leave or reload that page, create
 another link to share.
 
+### Reach one machine several ways
+
+A machine can have more than one route: LAN, Tailscale, a public URL, SSH, or
+Infinitus Connect. To add one, choose **Add route** in the machine's route list, or
+next to it in the Infinitus Connect list. Pairing the same machine again over another
+address also adds a route instead of a second machine. A new route is placed by
+speed, in that order, and you can reorder routes at any time.
+
+While connected through Infinitus Connect or a paired address, Infinitus also learns the
+machine's current LAN and Tailscale addresses and adds them as routes, so
+pairing once through Infinitus Connect is enough to use the LAN at home. When the
+machine's LAN address changes, for example after it joins another Wi-Fi network,
+the learned route follows it. The machine must allow network access for its LAN
+address to be learned. You can reorder a learned route, but not remove it; it
+goes away with the route it was learned through, or when the machine stops
+reporting that address.
+
+Infinitus connects over the first route that answers. Away from home, a LAN
+address that does not answer is checked briefly and skipped. It is only tried
+again, after the other routes, if none of them connect. While connected over a
+later route, Infinitus checks the earlier ones when your network changes, when you
+return to the app, and every minute, and moves back as soon as one works.
+
+On web and desktop, select the route count under the machine's name in
+**Settings → Connections** to see its routes. Drag a route to change the order,
+or remove it. On mobile, open the machine under **Settings → Environments** and
+choose **Edit**. Signing out of Infinitus Connect removes only that route; a machine
+you can still reach another way stays saved.
+
 ### Balance new threads across machines
 
 Auto balance is off by default. On web and desktop, enable it in
@@ -160,8 +189,18 @@ and keeps the same address. When the host starts again or wakes, Infinitus Conne
 creates a replacement tunnel on its own. You do not need to pair again. Cleanup
 usually runs five to ten minutes after the tunnel goes down.
 
+<<<<<<< HEAD
 On a command-line host, `infinitus connect unlink` disables exposure while retaining
 your login; `infinitus connect logout` also clears that login. Background-service
+=======
+Infinitus Connect also removes the tunnel of an environment running an older version of
+Infinitus once it has been offline for seven days. That environment shows a message
+asking you to update. Start Infinitus on that computer and update it to the latest
+version; it reconnects at the same address without pairing again.
+
+On a command-line host, `t3 connect unlink` disables exposure while retaining
+your login; `t3 connect logout` also clears that login. Background-service
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
 [removal](./background-service.md#manage-the-service) is separate.
 
 Treat pairing URLs and authorization codes as passwords. Do not include them in

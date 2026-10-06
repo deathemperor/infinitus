@@ -1,6 +1,7 @@
+import { presentThreadShell } from "@infinitus/client-runtime/state/models";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import type { EnvironmentId, ThreadId } from "@infinitus/contracts";
+import type { EnvironmentId, OrchestrationV2ThreadShell, ThreadId } from "@infinitus/contracts";
 import * as Option from "effect/Option";
 import {
   CircleAlertIcon,
@@ -11,6 +12,7 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 
 import { getClientSettings, useClientSettings } from "../hooks/useSettings";
+<<<<<<< HEAD
 import {
   attentionNotificationTitle,
   notificationKind,
@@ -20,6 +22,9 @@ import {
 import { useEnvironment, useEnvironments } from "../state/environments";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
+=======
+import { useEnvironmentIds } from "../state/environments";
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
 import { environmentShell } from "../state/shell";
 import {
   hasDesktopNotifications,
@@ -33,7 +38,7 @@ import { heldEntryFor } from "@infinitus/client-runtime/state/infinitusThreadHol
 import { toastManager } from "./ui/toast";
 
 export function ThreadNotificationCoordinator() {
-  const { environments } = useEnvironments();
+  const environmentIds = useEnvironmentIds();
   const mode = useClientSettings((settings) => settings.notificationMode);
   const inAppNotificationsEnabled = useClientSettings(
     (settings) => settings.inAppNotificationsEnabled,
@@ -48,7 +53,7 @@ export function ThreadNotificationCoordinator() {
   }, []);
 
   useEffect(() => {
-    const activeIds = new Set(environments.map(({ environmentId }) => environmentId));
+    const activeIds = new Set(environmentIds);
     const count = pending.current.size;
     for (const [tag, { environmentId, notification }] of pending.current) {
       if (activeIds.has(environmentId)) continue;
@@ -56,7 +61,7 @@ export function ThreadNotificationCoordinator() {
       pending.current.delete(tag);
     }
     if (count !== pending.current.size) setNotificationBadge(pending.current.size);
-  }, [environments]);
+  }, [environmentIds]);
 
   useEffect(() => {
     const clear = () => {
@@ -87,13 +92,19 @@ export function ThreadNotificationCoordinator() {
 
   if (mode === "off" && !inAppNotificationsEnabled) return null;
 
-  return environments.map((environment) => (
+  return environmentIds.map((environmentId) => (
     <EnvironmentNotifications
-      key={environment.environmentId}
-      environmentId={environment.environmentId}
+      key={environmentId}
+      environmentId={environmentId}
       onNotification={onNotification}
     />
   ));
+}
+
+interface NotificationState {
+  readonly raw: OrchestrationV2ThreadShell;
+  readonly attention: string | null;
+  readonly completion: number | null;
 }
 
 function EnvironmentNotifications({
@@ -104,6 +115,10 @@ function EnvironmentNotifications({
   onNotification: (environmentId: EnvironmentId, notification: Notification) => void;
 }) {
   const shell = useAtomValue(environmentShell.stateValueAtom(environmentId));
+  // The shell reducer keeps the thread list and unchanged thread objects
+  // stable, so this only rescans when a thread actually changed.
+  const threads =
+    shell.status === "live" && Option.isSome(shell.snapshot) ? shell.snapshot.value.threads : null;
   const mode = useClientSettings((settings) => settings.notificationMode);
   const inAppNotificationsEnabled = useClientSettings(
     (settings) => settings.inAppNotificationsEnabled,
@@ -112,6 +127,7 @@ function EnvironmentNotifications({
   const { environmentId: activeEnvironmentId, threadId: activeThreadId } = useParams({
     strict: false,
   });
+<<<<<<< HEAD
   // Fork (#1032): held and limited threads notify too, from the server's own
   // holds stream. Upstream has no such state, so it has no title for one.
   const supported =
@@ -124,12 +140,16 @@ function EnvironmentNotifications({
       ? null
       : `${activeEnvironmentId}:${activeThreadId}`;
   const previous = useRef(new Map<ThreadId, ThreadNotificationRecord>());
+=======
+  const previous = useRef(new Map<ThreadId, NotificationState>());
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
 
   useEffect(() => {
-    if (shell.status !== "live" || Option.isNone(shell.snapshot)) {
+    if (threads === null) {
       previous.current.clear();
       return;
     }
+<<<<<<< HEAD
     const next = new Map<ThreadId, ThreadNotificationRecord>();
     for (const thread of shell.snapshot.value.threads) {
       const held = heldEntryFor(holds, thread.id);
@@ -147,12 +167,33 @@ function EnvironmentNotifications({
       const attention = attentionNotificationTitle(status);
       const input = attention === null ? null : `${thread.latestTurn?.turnId ?? ""}:${status}`;
       const completedAt = Date.parse(thread.latestTurn?.completedAt ?? "");
+=======
+    const next = new Map<ThreadId, NotificationState>();
+    for (const rawThread of threads) {
+      if (rawThread.lineage.relationshipToParent === "subagent") continue;
+      const prior = previous.current.get(rawThread.id);
+      // The same object cannot produce a new notification.
+      if (prior?.raw === rawThread) {
+        next.set(rawThread.id, prior);
+        continue;
+      }
+      const thread = presentThreadShell(environmentId, rawThread);
+      let status = resolveSidebarThreadStatus(thread);
+      if (status === "ready" && thread.latestRun?.status === "failed") status = "failed";
+      const attention =
+        status === "input" || status === "approval" || status === "failed" || status === "limited"
+          ? `${thread.latestRun?.runId ?? ""}:${status}`
+          : null;
+      const completedAt = Date.parse(thread.latestRun?.completedAt ?? "");
+      // Commands left running (a dev server) read as ready; subagents and monitors wait.
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
       const completion =
         status === "ready" &&
-        thread.latestTurn?.state === "completed" &&
+        thread.latestRun?.status === "completed" &&
         Number.isFinite(completedAt)
           ? completedAt
           : (prior?.completion ?? null);
+<<<<<<< HEAD
       next.set(thread.id, { input, completion });
       if (!prior || (mode === "off" && !inAppNotificationsEnabled) || thread.archivedAt !== null)
         continue;
@@ -165,6 +206,27 @@ function EnvironmentNotifications({
       // banner and toast for it, and still rings.
       if (quietForViewer(viewedKey, `${environmentId}:${thread.id}`, document)) continue;
       const title = kind === "completion" ? "Thread completed" : (attention ?? "Input needed");
+=======
+      next.set(thread.id, { raw: rawThread, attention, completion });
+      if (!prior || thread.archivedAt !== null) continue;
+      const kind =
+        attention && attention !== prior.attention
+          ? "input"
+          : completion !== null && (prior.completion === null || completion > prior.completion)
+            ? "completion"
+            : null;
+      if (!kind) continue;
+      const title =
+        kind === "completion"
+          ? "Thread completed"
+          : status === "approval"
+            ? "Approval needed"
+            : status === "limited"
+              ? "Usage limit reached"
+              : status === "failed"
+                ? "Thread failed"
+                : "Input needed";
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
       if (hasNotificationSound(mode)) {
         void playNotificationSound(kind, () =>
           hasNotificationSound(getClientSettings().notificationMode),
@@ -242,8 +304,12 @@ function EnvironmentNotifications({
     mode,
     navigate,
     onNotification,
+<<<<<<< HEAD
     shell,
     viewedKey,
+=======
+    threads,
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
   ]);
 
   return null;

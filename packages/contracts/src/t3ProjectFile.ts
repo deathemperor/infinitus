@@ -2,8 +2,12 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import { ThreadEnvMode, WorktreeSubmodules } from "./environment.ts";
+<<<<<<< HEAD
 import { ProjectScriptIcon } from "./orchestration.ts";
 import { PRODUCT_NAME } from "./productName.ts";
+=======
+import { ProjectScriptIcon } from "./project.ts";
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
 import type { ProjectScopedServerSettingKey, ServerSettings } from "./settings.ts";
 
 /** File name of the checked-in project file, resolved at the workspace root. */

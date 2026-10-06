@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AuthAccessWriteScope } from "@infinitus/contracts";
 
+import { usePrimaryCloudLinkState } from "~/cloud/primaryCloudLinkState";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { isElectron } from "~/env";
 import { isLocalEnvironmentDisabled } from "~/localEnvironment";
@@ -23,6 +24,10 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
   const desktopWsl = useEnvironmentQuery(
     isElectron && !localEnvironmentDisabled ? desktopWslStateAtom : null,
   );
+  const cloudLinkState = usePrimaryCloudLinkState().data;
+  // Same fallback as the Connections row: older servers imply a tunnel from `linked`.
+  const managedTunnelActive =
+    cloudLinkState?.managedTunnelActive ?? cloudLinkState?.linked ?? false;
   const canManageLocalBackend =
     !localEnvironmentDisabled &&
     (isElectron ||
@@ -59,11 +64,16 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
         }),
         hasThreadAutoSettlement:
           getThreadAutoSettlementSearchAvailability(environments).eligibleEnvironmentIds.length > 0,
+<<<<<<< HEAD
         hasInfinitusEnvironment: environments.some(
           (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
         ),
+=======
+        managedTunnelActive,
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
       }),
     [
+      managedTunnelActive,
       canManageLocalBackend,
       desktopWsl.data,
       desktopWsl.error,

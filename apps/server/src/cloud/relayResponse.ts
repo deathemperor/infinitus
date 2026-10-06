@@ -1,45 +1,47 @@
-import {
-  EnvironmentHttpBadRequestError,
-  EnvironmentHttpConflictError,
-  EnvironmentHttpForbiddenError,
-  EnvironmentHttpInternalServerError,
-  EnvironmentHttpUnauthorizedError,
-} from "@infinitus/contracts";
 import { RelayProtectedError } from "@infinitus/contracts/relay";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse";
-import { isHttpClientError } from "effect/unstable/http/HttpClientError";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import { isHttpClientError } from "effect/http/HttpClientError";
 
-const isRelayResponseError = Schema.is(
-  Schema.Union([
-    EnvironmentHttpBadRequestError,
-    EnvironmentHttpForbiddenError,
-    EnvironmentHttpInternalServerError,
-    EnvironmentHttpUnauthorizedError,
-  ]),
-);
+/**
+ * A relay request that did not succeed. `unavailable` means it may succeed on
+ * retry; the relay refused the other kinds. The description is safe to show:
+ * it carries the relay's own explanation and trace ID, never request details.
+ */
+export class RelayRequestError extends Schema.TaggedError<RelayRequestError>()(
+  "RelayRequestError",
+  {
+    rejection: Schema.Literals(["unauthorized", "forbidden", "rejected", "unavailable"]),
+    description: Schema.String,
+  },
+) {
+  override get message(): string {
+    return this.description;
+  }
+}
 
-export function relayRequestError(cause: unknown) {
-  return isRelayResponseError(cause)
+const isRelayRequestError = Schema.is(RelayRequestError);
+
+export function relayRequestError(cause: unknown): RelayRequestError {
+  return isRelayRequestError(cause)
     ? cause
+<<<<<<< HEAD
     : new EnvironmentHttpInternalServerError({
         message: `Could not complete the ${CONNECT_NAME} relay request. ${isHttpClientError(cause) ? `The relay request failed (${cause.reason._tag}).` : "The relay returned an unexpected response."} Check this machine's network connection and relay availability, then retry.`,
+=======
+    : new RelayRequestError({
+        rejection: "unavailable",
+        description: `Could not complete the T3 Connect relay request. ${isHttpClientError(cause) ? `The relay request failed (${cause.reason._tag}).` : "The relay returned an unexpected response."} Check this machine's network connection and relay availability, then retry.`,
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
       });
 }
 
-const isPermanentCloudLinkError = Schema.is(
-  Schema.Union([
-    EnvironmentHttpBadRequestError,
-    EnvironmentHttpForbiddenError,
-    EnvironmentHttpUnauthorizedError,
-    EnvironmentHttpConflictError,
-  ]),
-);
-
-export const shouldRetryCloudLink = (error: unknown): boolean => !isPermanentCloudLinkError(error);
+/** Whether a failure may succeed on retry: anything but a relay refusal. */
+export const shouldRetryRelayRequest = (error: unknown): boolean =>
+  !isRelayRequestError(error) || error.rejection === "unavailable";
 
 function recoveryHint(error: RelayProtectedError): string {
   switch (error._tag) {
@@ -65,19 +67,29 @@ export const filterRelayResponse = Effect.fn("cloud.filter_relay_response")(func
   );
   const ray = response.headers["cf-ray"];
   const requestId = ray && /^[a-zA-Z0-9-]{1,128}$/.test(ray) ? ` Cloudflare Ray ID: ${ray}.` : "";
+<<<<<<< HEAD
   const message = Option.isSome(decoded)
     ? `${CONNECT_NAME}: ${decoded.value.message}. ${recoveryHint(decoded.value)} Trace ID: ${decoded.value.traceId}.`
     : `${CONNECT_NAME} relay returned HTTP ${response.status} without a recognized error response. Check relay access and any proxy or firewall restrictions, then restart ${PRODUCT_NAME}.${requestId}`;
+=======
+  const description = Option.isSome(decoded)
+    ? `T3 Connect: ${decoded.value.message}. ${recoveryHint(decoded.value)} Trace ID: ${decoded.value.traceId}.`
+    : `T3 Connect relay returned HTTP ${response.status} without a recognized error response. Check relay access and any proxy or firewall restrictions, then restart T3 Code.${requestId}`;
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
 
-  if (response.status === 401) return yield* new EnvironmentHttpUnauthorizedError({ message });
-  if (response.status === 403) return yield* new EnvironmentHttpForbiddenError({ message });
+  if (response.status === 401) {
+    return yield* new RelayRequestError({ rejection: "unauthorized", description });
+  }
+  if (response.status === 403) {
+    return yield* new RelayRequestError({ rejection: "forbidden", description });
+  }
   if (
     response.status >= 400 &&
     response.status < 500 &&
     response.status !== 408 &&
     response.status !== 429
   ) {
-    return yield* new EnvironmentHttpBadRequestError({ message });
+    return yield* new RelayRequestError({ rejection: "rejected", description });
   }
-  return yield* new EnvironmentHttpInternalServerError({ message });
+  return yield* new RelayRequestError({ rejection: "unavailable", description });
 });

@@ -8,8 +8,8 @@ import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
-import * as ChildProcess from "effect/unstable/process/ChildProcess";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopShellEnvironment from "./DesktopShellEnvironment.ts";
@@ -73,6 +73,7 @@ function runShellEnvironment(input: {
   /** Fork (#1078): the paths the known-CLI-dirs fallback finds; none by default. */
   readonly existingPaths?: ReadonlyArray<string>;
 }) {
+<<<<<<< HEAD
   const existingPaths = new Set(input.existingPaths ?? []);
   const fileSystemLayer = FileSystem.layerNoop({
     exists: (path) => Effect.succeed(existingPaths.has(path)),
@@ -85,12 +86,15 @@ function runShellEnvironment(input: {
       ),
   });
   const environmentLayer = Layer.succeed(
+=======
+  const layerEnvironment = Layer.succeed(
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
     DesktopEnvironment.DesktopEnvironment,
     DesktopEnvironment.DesktopEnvironment.of({
       platform: input.platform,
     } as DesktopEnvironment.DesktopEnvironment["Service"]),
   );
-  const spawnerLayer = Layer.succeed(
+  const layerSpawner = Layer.succeed(
     ChildProcessSpawner.ChildProcessSpawner,
     ChildProcessSpawner.make((command) =>
       input.failure === undefined
@@ -105,9 +109,13 @@ function runShellEnvironment(input: {
   }).pipe(
     Effect.provide(
       DesktopShellEnvironment.layer.pipe(
+<<<<<<< HEAD
         Layer.provide(
           Layer.mergeAll(environmentLayer, NodeServices.layer, spawnerLayer, fileSystemLayer),
         ),
+=======
+        Layer.provide(Layer.mergeAll(layerEnvironment, NodeServices.layer, layerSpawner)),
+>>>>>>> upstream-sync-9bd1d8009-upstream-renamed
       ),
     ),
   );
