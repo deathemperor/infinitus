@@ -7,6 +7,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Stream from "effect/Stream";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /** A connected local environment receives the callback; only the remote environment owns tokens. */
 export function subscribeCodexAuthCallback(input: CodexAuthCallbackInput) {
@@ -24,7 +25,9 @@ export function subscribeCodexAuthCallback(input: CodexAuthCallbackInput) {
           codexAuthorizationRequest(input.authorizationUrl);
           const destination = providerAuthReturnUrl(input.returnUrl);
           if (!destination || !isLoopbackHost(new URL(destination).hostname))
-            throw new Error("The local sign-in receiver needs a local T3 Code return address.");
+            throw new Error(
+              `The local sign-in receiver needs a local ${PRODUCT_NAME} return address.`,
+            );
           return destination;
         },
         catch: failure,

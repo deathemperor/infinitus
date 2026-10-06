@@ -28,6 +28,7 @@ import * as NodeCrypto from "node:crypto";
 import { ServerConfig } from "../config.ts";
 import { BUNDLED_MODEL_MANIFEST, ModelManifest } from "./ModelManifest.ts";
 import { resolveProviderCompatibility } from "./providerCompatibility.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const DRIVER = ProviderDriverKind.make("codex");
 const Version = Schema.String.check(Schema.isPattern(/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/u));
@@ -282,7 +283,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
       return executable;
     },
     Effect.mapError(
-      wrapFailure("resolve", "Codex is not installed in T3 Code. Install it to continue."),
+      wrapFailure("resolve", `Codex is not installed in ${PRODUCT_NAME}. Install it to continue.`),
     ),
   );
   const acquire = Effect.fn("CodexInstallation.acquire")(function* () {

@@ -15,6 +15,7 @@ import {
 import { createWidget, type WidgetEnvironment } from "expo-widgets";
 
 import type { SubscriptionUsageSnapshot as SubscriptionUsageProps } from "./subscriptionUsageSnapshot";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export function SubscriptionUsage(props: SubscriptionUsageProps, environment: WidgetEnvironment) {
   "widget";
@@ -29,8 +30,20 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
   });
   const muted = colors.onSurfaceVariant;
   const providers = props.providers ?? [
-    { name: "Codex", detail: "Open T3 to connect", windows: [], expiresAt: 0, totalWindows: 0 },
-    { name: "Claude", detail: "Open T3 to connect", windows: [], expiresAt: 0, totalWindows: 0 },
+    {
+      name: "Codex",
+      detail: `Open ${PRODUCT_NAME} to connect`,
+      windows: [],
+      expiresAt: 0,
+      totalWindows: 0,
+    },
+    {
+      name: "Claude",
+      detail: `Open ${PRODUCT_NAME} to connect`,
+      windows: [],
+      expiresAt: 0,
+      totalWindows: 0,
+    },
   ];
   return (
     // The card is one Button so a tap reaches the app's interaction listener,
@@ -60,7 +73,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
               </Text>
               {shown.length === 0 ? (
                 <Text color={muted} maxLines={1} style={{ fontSize: 11 }}>
-                  {stale ? "Open T3 to refresh" : provider.detail}
+                  {stale ? `Open ${PRODUCT_NAME} to refresh` : provider.detail}
                 </Text>
               ) : null}
               {shown.map((window) => {
@@ -90,7 +103,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
               })}
               {hidden > 0 ? (
                 <Text color={muted} maxLines={1} style={{ fontSize: 10 }}>
-                  {`${hidden} more in T3`}
+                  {`${hidden} more in ${PRODUCT_NAME}`}
                 </Text>
               ) : null}
             </Column>
@@ -104,7 +117,7 @@ export function SubscriptionUsage(props: SubscriptionUsageProps, environment: Wi
         >
           {props.checkedAt
             ? `As of ${new Date(props.checkedAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" })}`
-            : "Tap to connect in T3"}
+            : `Tap to connect in ${PRODUCT_NAME}`}
         </Text>
       </Column>
     </Button>

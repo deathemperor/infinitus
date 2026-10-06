@@ -15,6 +15,7 @@ import * as PlatformError from "effect/PlatformError";
 
 import { newProjectFolderName } from "@infinitus/shared/path";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 // Tailwind 600 shades: dark enough for white initials on every hue.
 const ICON_BACKGROUNDS = [
@@ -74,7 +75,7 @@ function newProjectReadme(name: string): string {
     "",
     `# ${name}`,
     "",
-    "Created in [T3 Code](https://t3.codes).",
+    `Created in [${PRODUCT_NAME}](https://infinitus.run).`,
     "",
   ].join("\n");
 }
