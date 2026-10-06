@@ -7,7 +7,7 @@ import {
 } from "@infinitus/client-runtime/state/assets";
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { AssetResource, EnvironmentId } from "@infinitus/contracts";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { useCallback, useMemo } from "react";
 
 import { assetEnvironment } from "~/state/assets";
