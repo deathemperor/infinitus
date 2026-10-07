@@ -10,6 +10,23 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.36
+
+### Mac
+- Auto-switch no longer misses a limit hit while the Mac is busy — the account engine now runs at normal priority.
+- A menu bar relaunched from a Claude Code session no longer shows a healthy active account as "token expired".
+- An account out of Fable reads "Fable down" again instead of an empty bar and a red pulse.
+- The git-store Team is gone; a team is on Infinitus Connect now, and old team folders on this Mac are left untouched and unread.
+
+### Desktop
+- This machine's threads, fleet and stats reach your team through Infinitus Connect, and teammates you grant can send to, view, interrupt or start your threads from there.
+- Settings › Team creates, joins and manages a team through Infinitus Connect; teammates' threads and shared transcripts open from the member list.
+
+### Phone
+- An account alert names the machine it comes from in its title, so a warning from one Mac is not read against another's accounts.
+- Closing the share sheet without choosing a destination now discards what you shared, instead of reopening the sheet on every launch.
+- Settings › Team joins a team and approves requests as you, through Infinitus Connect, with no Mac in the loop.
+
 ## 0.5.0-alpha.35
 
 ### Mac
