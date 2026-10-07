@@ -11,14 +11,14 @@ import {
 } from "@infinitus/client-runtime/state/runtime";
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { RelayClientEnvironmentRecord } from "@infinitus/contracts/relay";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { useCallback, useEffect } from "react";
 
-import { runtimeContextLayer } from "../../lib/runtime";
+import * as Runtime from "../../lib/runtime";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { cloudDebugLog } from "./cloudDebugLog";
 
-const managedRelayAtomRuntime = Atom.runtime(runtimeContextLayer);
+const managedRelayAtomRuntime = Atom.runtime(Runtime.layer);
 
 export const managedRelayQueryManager = createManagedRelayQueryManager(managedRelayAtomRuntime, {
   onQueryEvent: (event) =>

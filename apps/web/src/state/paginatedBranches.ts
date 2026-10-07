@@ -1,6 +1,6 @@
 import type { VcsListRefsResult } from "@infinitus/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 const DEFAULT_NEXT_PAGE_DISTANCE_PX = 96;
 
