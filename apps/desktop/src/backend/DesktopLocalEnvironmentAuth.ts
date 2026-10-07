@@ -1,16 +1,41 @@
 import { bootstrapRemoteBearerSession } from "@infinitus/client-runtime/authorization";
+import type { RemoteEnvironmentRequestError } from "@infinitus/client-runtime/rpc";
 import { PRIMARY_LOCAL_ENVIRONMENT_ID } from "@infinitus/contracts";
+import { currentDesktopBootstrapToken } from "@infinitus/shared/desktopBootstrapToken";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
-import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClient from "effect/http/HttpClient";
 
 import * as DesktopBackendPool from "./DesktopBackendPool.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+
+// A loopback /oauth/token exchange can fail transiently while the backend
+// settles (a 502-504, a refused or reset connection, a timeout). Retry those
+// for as long as the renderer's own bootstrap does; a rejected credential or a
+// server error is final.
+const BOOTSTRAP_TRANSIENT_RETRY_TIMEOUT = Duration.seconds(15);
+const BOOTSTRAP_TRANSIENT_RETRY_INTERVAL = Duration.millis(500);
+const TRANSIENT_BOOTSTRAP_STATUS_CODES = new Set([502, 503, 504]);
+
+const isTransientBearerBootstrapError = (error: RemoteEnvironmentRequestError): boolean => {
+  switch (error._tag) {
+    case "RemoteEnvironmentAuthFetchError":
+    case "RemoteEnvironmentAuthTimeoutError":
+      return true;
+    case "RemoteEnvironmentAuthUndeclaredStatusError":
+      return TRANSIENT_BOOTSTRAP_STATUS_CODES.has(error.status);
+    default:
+      return false;
+  }
+};
 
 export class DesktopLocalEnvironmentAuthBackendNotConfiguredError extends Schema.TaggedError<DesktopLocalEnvironmentAuthBackendNotConfiguredError>()(
   "DesktopLocalEnvironmentAuthBackendNotConfiguredError",
@@ -65,7 +90,14 @@ export const make = Effect.gen(function* () {
           return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
         }
         const config = configOption.value;
-        const credential = config.bootstrap.desktopBootstrapToken;
+        // A backend launched with the desktop secret accepts the current
+        // window's token, not the one frozen into its launch config; this
+        // exchange can run long after launch (e.g. after a suspend).
+        const secret = config.bootstrap.desktopBootstrapSecret;
+        const credential =
+          secret === undefined
+            ? config.bootstrap.desktopBootstrapToken
+            : currentDesktopBootstrapToken(secret, yield* Clock.currentTimeMillis);
         if (!credential) {
           return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
         }
@@ -78,6 +110,12 @@ export const make = Effect.gen(function* () {
           },
         }).pipe(
           Effect.provideService(HttpClient.HttpClient, httpClient),
+          Effect.retry({
+            while: isTransientBearerBootstrapError,
+            schedule: Schedule.spaced(BOOTSTRAP_TRANSIENT_RETRY_INTERVAL),
+          }),
+          // Bounds the attempts and any request still in flight at the deadline.
+          Effect.timeout(BOOTSTRAP_TRANSIENT_RETRY_TIMEOUT),
           Effect.mapError(
             (cause) =>
               new DesktopLocalEnvironmentAuthSessionBootstrapError({

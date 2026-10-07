@@ -1,6 +1,10 @@
 import { type DeviceToolVersions, WS_METHODS } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { Atom } from "effect/unstable/reactivity";
+=======
+import { Atom } from "effect/reactivity";
+>>>>>>> upstream-sync-cd41c4ada-upstream-renamed
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import {

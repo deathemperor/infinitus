@@ -16,8 +16,10 @@ import {
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
 import {
+  AuthTerminalOperateScope,
   CommandId,
   defaultInstanceIdForDriver,
+  AuthOrchestrationOperateScope,
   ProviderDriverKind,
   ThreadId,
 } from "@infinitus/contracts";
@@ -28,7 +30,6 @@ import {
   CheckIcon,
   ChevronRightIcon,
   CloudIcon,
-  CopyIcon,
   LinkIcon,
   MonitorIcon,
   TerminalIcon,
@@ -38,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "../../appearanceFonts";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
+import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { useInfinitusConnectAuthPrompt } from "../clerk/useInfinitusConnectAuthPrompt";
 import { useCompleteOnboarding } from "../../onboarding/firstRun";
 import {
@@ -54,7 +56,6 @@ import {
   resolveOnboardingProviderLoginCommand,
   selectOnboardingProvidersByDriver,
 } from "../../onboarding/providerReadiness.logic";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { newProjectId, randomUUID } from "../../lib/utils";
 import { agentSessionImport } from "../../state/agentSessions";
 import { readProjects, useProjects } from "../../state/entities";
@@ -63,6 +64,11 @@ import { isOnboardingRelayEnvironment } from "../../onboarding/targetEnvironment
 import { useProjectScans } from "../../onboarding/useProjectScans";
 import { projectEnvironment } from "../../state/projects";
 import { serverEnvironment } from "../../state/server";
+import {
+  readEnvironmentScope,
+  useEnvironmentScope,
+  useEnvironmentsWithScope,
+} from "../../state/session";
 import { terminalEnvironment } from "../../state/terminal";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { connectPairing } from "../../connection/onboarding";
@@ -74,8 +80,15 @@ import { readCodexSetupMode } from "../settings/CodexSetupSection.logic";
 import { buildProviderInstanceUpdatePatch } from "../settings/SettingsPanels.logic";
 import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
+<<<<<<< HEAD
 import { ClaudeAI, OmpIcon, OpenAI, PiIcon } from "../Icons";
+=======
+import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
+import { InfinitusWordmark } from "../InfinitusWordmark";
+import { Alert, AlertDescription } from "../ui/alert";
+>>>>>>> upstream-sync-cd41c4ada-upstream-renamed
 import { Button } from "../ui/button";
+import { CommandBlock } from "../CommandBlock";
 import { Checkbox } from "../ui/checkbox";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { Input } from "../ui/input";
@@ -411,8 +424,22 @@ function ConnectionStep({
           </Collapsible>
         </div>
       </div>
-      <div className="mt-6 flex items-center justify-end gap-3">
+      <div className="mt-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <p className="min-w-0 text-xs leading-relaxed text-muted-foreground">
+          T3 Code collects anonymous usage data to help us improve it. To read more about how your
+          data is used and how to opt out, see our{" "}
+          <a
+            className="underline underline-offset-2 hover:text-foreground"
+            href={PRIVACY_POLICY_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            privacy policy
+          </a>
+          .
+        </p>
         <Button
+          className="shrink-0 self-end"
           ref={continueRef}
           autoFocus={!expandPairingInitially}
           disabled={!ready || isPairing}
@@ -588,13 +615,9 @@ function PairingForm({
           />
         </div>
         {errorMessage ? (
-          <div
-            id="onboarding-pairing-error"
-            role="alert"
-            className="rounded-lg border border-destructive/30 bg-destructive/6 px-3 py-2 text-sm text-destructive"
-          >
-            {errorMessage}
-          </div>
+          <Alert id="onboarding-pairing-error" variant="error">
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
         ) : null}
         <Collapsible>
           <div className="flex items-center justify-between gap-3">
@@ -697,6 +720,7 @@ function ConnectedAgentsStep({
     displayName: string;
     autoStart: boolean;
   } | null>(null);
+  const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
 
   // Re-probe on entry so freshly installed CLIs show up without a manual
   // refresh; harmless when nothing changed (single-flighted per environment).
@@ -730,6 +754,11 @@ function ConnectedAgentsStep({
   return (
     <section>
       <h2 className="mb-2 text-sm font-medium">{machineLabel}</h2>
+      {!canOperateTerminal ? (
+        <p className="mb-2 text-sm text-muted-foreground">
+          This connection cannot control terminals.
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         {primaryAgents.map(({ driver, provider, instanceId }) =>
           driver === "codex" && serverConfig !== null ? (
@@ -744,7 +773,11 @@ function ConnectedAgentsStep({
               }
               terminalOpen={terminalSession?.driver === driver}
               onOpenTerminal={() => {
-                if (provider === undefined) return;
+                if (
+                  provider === undefined ||
+                  !readEnvironmentScope(environmentId, AuthTerminalOperateScope)
+                )
+                  return;
                 setTerminalSession({
                   environmentId,
                   driver,
@@ -770,9 +803,14 @@ function ConnectedAgentsStep({
               driver={driver}
               provider={provider}
               terminalOpen={terminalSession?.driver === driver}
-              terminalAvailable={serverConfig !== null}
+              terminalAvailable={serverConfig !== null && canOperateTerminal}
               onOpenTerminal={() => {
-                if (provider === undefined || serverConfig === null) return;
+                if (
+                  provider === undefined ||
+                  serverConfig === null ||
+                  !readEnvironmentScope(environmentId, AuthTerminalOperateScope)
+                )
+                  return;
                 setTerminalSession({
                   environmentId,
                   driver,
@@ -849,6 +887,7 @@ function OnboardingCodexSetup({
   } | null;
   readonly onAutoStartConsumed: () => void;
 }) {
+  const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   const update = useAtomCommand(serverEnvironment.updateSettings, "Codex setup settings");
   const instanceId =
     createdAccount?.instanceId ??
@@ -896,7 +935,7 @@ function OnboardingCodexSetup({
       driver="codex"
       provider={provider}
       terminalOpen={terminalOpen}
-      terminalAvailable
+      terminalAvailable={canOperateTerminal}
       onOpenTerminal={onOpenTerminal}
     />
   ) : (
@@ -929,7 +968,6 @@ function AgentCard({
   readonly onOpenTerminal: () => void;
 }) {
   const meta = getDriverOption(ProviderDriverKind.make(driver));
-  const Icon = meta?.icon;
   const displayName =
     provider?.displayName || (driver === "claudeAgent" ? "Claude Code" : (meta?.label ?? driver));
   const summary = getProviderSummary(provider);
@@ -937,9 +975,11 @@ function AgentCard({
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-4">
-      {Icon ? (
-        <Icon className={cn("size-5 shrink-0", driver !== "claudeAgent" && "fill-foreground")} />
-      ) : null}
+      <ProviderInstanceIcon
+        driverKind={ProviderDriverKind.make(driver)}
+        displayName={displayName}
+        iconClassName="size-5"
+      />
       <div className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-foreground">{displayName}</span>
         <p className="mt-0.5 text-xs leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
@@ -989,6 +1029,7 @@ function AgentInstallTerminal({
   readonly onClose: () => void;
 }) {
   const { command, cwd, driver, environmentId, keybindings, providerInstanceId } = session;
+  const canOperateTerminal = useEnvironmentScope(environmentId, AuthTerminalOperateScope);
   // Same terminal typography preference the thread drawer honors.
   const [advancedTypography] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,
@@ -1023,6 +1064,10 @@ function AgentInstallTerminal({
 
     setupQueueRef.current = setupQueueRef.current.then(async () => {
       if (activeSetupGenerationRef.current !== generation) return;
+      if (!readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
+        setSetupState("openFailed");
+        return;
+      }
       const opened = await openTerminal({
         environmentId,
         input: {
@@ -1038,6 +1083,10 @@ function AgentInstallTerminal({
       }
 
       if (activeSetupGenerationRef.current !== generation) return;
+      if (!readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
+        setSetupState("writeFailed");
+        return;
+      }
 
       const wrote = await writeTerminal({
         environmentId,
@@ -1047,15 +1096,14 @@ function AgentInstallTerminal({
       setSetupState(wrote._tag === "Success" ? "ready" : "writeFailed");
     });
 
-    // Every exit path unmounts the drawer (Done, Continue/Skip, card switch,
-    // session exit), so this cleanup is the single place the PTY dies —
-    // nothing is left running behind the wizard. An interrupted install is
-    // re-runnable from the card.
+    // Every exit path unmounts the drawer. Close the PTY only while this
+    // connection still has terminal access; revocation leaves it running.
     return () => {
       if (activeSetupGenerationRef.current === generation) {
         activeSetupGenerationRef.current = null;
       }
       setupQueueRef.current = setupQueueRef.current.then(async () => {
+        if (!readEnvironmentScope(environmentId, AuthTerminalOperateScope)) return;
         await closeTerminal({
           environmentId,
           input: { threadId: AGENT_ONBOARDING_THREAD_ID, terminalId, deleteHistory: true },
@@ -1081,7 +1129,9 @@ function AgentInstallTerminal({
     >
       <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
         <span className="text-2xs font-medium text-muted-foreground">
-          {setupState === "writeFailed" ? (
+          {!canOperateTerminal ? (
+            "This connection cannot control terminals."
+          ) : setupState === "writeFailed" ? (
             <>
               Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
               terminal.
@@ -1096,7 +1146,16 @@ function AgentInstallTerminal({
         </span>
         <div className="flex items-center gap-1">
           {setupState === "openFailed" ? (
-            <Button size="xs" variant="ghost" onClick={() => setSetupAttempt((value) => value + 1)}>
+            <Button
+              size="xs"
+              variant="ghost"
+              disabled={!canOperateTerminal}
+              onClick={() => {
+                if (readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
+                  setSetupAttempt((value) => value + 1);
+                }
+              }}
+            >
               Retry
             </Button>
           ) : null}
@@ -1131,6 +1190,8 @@ function AgentInstallTerminal({
 
 // ── Step 4: import ───────────────────────────────────────────
 
+const IMPORT_PERMISSION_MESSAGE = "This connection cannot import projects or thread history.";
+
 function ImportStep({
   scans,
   isImporting,
@@ -1147,6 +1208,7 @@ function ImportStep({
   ) => Promise<boolean>;
 }) {
   const { environments } = useEnvironments();
+  const writableEnvironments = useEnvironmentsWithScope(scans, AuthOrchestrationOperateScope);
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const importThreads = useAtomCommand(agentSessionImport, { reportFailure: false });
   const projects = useProjects();
@@ -1208,6 +1270,16 @@ function ImportStep({
   );
   const selected = candidates.filter((candidate) => selectedKeys.has(candidate.key));
 
+  const canImport = selected.every((candidate) =>
+    writableEnvironments.has(candidate.environmentId),
+  );
+  const [importError, setImportError] = useState("");
+  const visibleImportError = !canImport
+    ? IMPORT_PERMISSION_MESSAGE
+    : importError === IMPORT_PERMISSION_MESSAGE
+      ? ""
+      : importError;
+
   const finishAfterImport = () => {
     const projectRef = resolveOnboardingLandingProject(
       lastImportSelectionRef.current,
@@ -1224,6 +1296,18 @@ function ImportStep({
 
   const runImport = async (selection: typeof candidates) => {
     if (isImporting) return;
+    const hasAccess = () =>
+      selection.every((candidate) =>
+        readEnvironmentScope(candidate.environmentId, AuthOrchestrationOperateScope),
+      );
+    const stopForDeniedAccess = () => {
+      setIsImporting(false);
+      setImportError(IMPORT_PERMISSION_MESSAGE);
+    };
+    if (!hasAccess()) {
+      stopForDeniedAccess();
+      return;
+    }
     if (selection.length === 0) {
       void onDone();
       return;
@@ -1253,6 +1337,10 @@ function ImportStep({
         importGeneration !== importGenerationRef.current ||
         importedProjects !== importedProjectsRef.current
       ) {
+        return;
+      }
+      if (!hasAccess()) {
+        stopForDeniedAccess();
         return;
       }
       if (importedProjects.has(candidate.key)) continue;
@@ -1294,6 +1382,10 @@ function ImportStep({
         }
       }
 
+      if (!hasAccess()) {
+        stopForDeniedAccess();
+        return;
+      }
       const threadImportResult = await importThreads({
         environmentId,
         input: { projectId, expectedWorkspaceRoot: candidate.path },
@@ -1443,13 +1535,16 @@ function ImportStep({
           })}
         </div>
       </ScrollArea>
+      {visibleImportError ? (
+        <p className="mt-3 text-sm text-destructive">{visibleImportError}</p>
+      ) : null}
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
         <Button variant="ghost-muted" disabled={isImporting} onClick={finishAfterImport}>
           Do not import projects
         </Button>
         <Button
           autoFocus
-          disabled={isImporting || selected.length === 0}
+          disabled={!canImport || isImporting || selected.length === 0}
           onClick={() => void runImport(selected)}
         >
           {isImporting
@@ -1665,11 +1760,25 @@ function ImportRowMeta({
     <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
       <span className="flex size-4 items-center justify-center">
         {sources?.includes("claudeAgent") ? (
-          <ClaudeAI className="size-3" aria-label="Claude Code" />
+          <span role="img" aria-label="Claude Code">
+            <ProviderInstanceIcon
+              driverKind={ProviderDriverKind.make("claudeAgent")}
+              displayName="Claude Code"
+              iconClassName="size-3"
+            />
+          </span>
         ) : null}
       </span>
       <span className="flex size-4 items-center justify-center">
-        {sources?.includes("codex") ? <OpenAI className="size-3" aria-label="Codex" /> : null}
+        {sources?.includes("codex") ? (
+          <span role="img" aria-label="Codex">
+            <ProviderInstanceIcon
+              driverKind={ProviderDriverKind.make("codex")}
+              displayName="Codex"
+              iconClassName="size-3"
+            />
+          </span>
+        ) : null}
       </span>
       <span className="flex size-4 items-center justify-center">
         {sources?.includes("omp") ? <OmpIcon className="size-3" aria-label="Oh My Pi" /> : null}
@@ -1702,42 +1811,5 @@ function StepShell({
       ) : null}
       {children}
     </>
-  );
-}
-
-function CommandBlock({
-  command,
-  className,
-  prominent = false,
-}: {
-  readonly command: string;
-  readonly className?: string;
-  readonly prominent?: boolean;
-}) {
-  const { copyToClipboard, isCopied } = useCopyToClipboard({
-    timeout: 1500,
-    target: "command",
-  });
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/50 font-mono",
-        prominent ? "px-4 py-3.5 text-base" : "px-3 py-2.5 text-sm",
-        className,
-      )}
-    >
-      <span className="min-w-0 truncate">
-        <span className="mr-2 text-muted-foreground">$</span>
-        {command}
-      </span>
-      <Button
-        size="icon-xs"
-        variant="ghost"
-        aria-label="Copy command"
-        onClick={() => copyToClipboard(command, undefined)}
-      >
-        {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
-      </Button>
-    </div>
   );
 }

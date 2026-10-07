@@ -1,5 +1,12 @@
 import { useAuth } from "@clerk/react";
-import { AuthAdministrativeScopes, AuthRelayWriteScope } from "@infinitus/contracts";
+import { useAtomValue } from "@effect/atom-react";
+import {
+  AuthAdministrativeScopes,
+  AuthRelayReadScope,
+  AuthRelayWriteScope,
+  type AuthSessionState,
+} from "@infinitus/contracts";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -9,9 +16,13 @@ import {
 } from "~/cloud/connectOnboarding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
-import { usePrimarySessionState } from "~/environments/primary";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
-import { useEnvironments, usePrimaryEnvironment } from "~/state/environments";
+import {
+  useEnvironments,
+  usePrimaryEnvironment,
+  usePrimaryEnvironmentId,
+} from "~/state/environments";
+import { environmentSession, readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { CloudEnvironmentConnectRows } from "./CloudEnvironmentConnectList";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -38,6 +49,8 @@ export function ConnectOnboardingDialog() {
 
 type OnboardingStep = "publish" | "devices";
 
+const EMPTY_SESSION_STATE_ATOM = Atom.make(AsyncResult.initial<AuthSessionState>());
+
 function ConfiguredConnectOnboardingDialog() {
   // Mirrors ManagedRelayAuthProvider: a pending Clerk session must not read as
   // signed-out, or its later activation would look like a fresh sign-in.
@@ -48,22 +61,22 @@ function ConfiguredConnectOnboardingDialog() {
     ConnectOnboardingOptOutSchema,
   );
 
-  const desktopBridge = window.desktopBridge;
-  const primarySessionState = usePrimarySessionState();
-  const currentSessionScopes = desktopBridge
-    ? AuthAdministrativeScopes
-    : primarySessionState.data?.authenticated
-      ? (primarySessionState.data.scopes ?? null)
-      : null;
-  const canManageRelay = currentSessionScopes?.includes(AuthRelayWriteScope) ?? false;
+  const { isReady: environmentsReady } = useEnvironments();
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const primarySessionState = useAtomValue(
+    primaryEnvironmentId === null
+      ? EMPTY_SESSION_STATE_ATOM
+      : environmentSession.sessionStateAtom(primaryEnvironmentId),
+  );
+  const canReadRelay = useEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope);
+  const canWriteRelay = useEnvironmentScope(primaryEnvironmentId, AuthRelayWriteScope);
+  const canManageRelay = canReadRelay && canWriteRelay;
   // The publish step is only offered when we know the answer; opening the
   // wizard before the session state resolves would let the step set change
   // mid-flight. A failed session read still opens the wizard — it just means
   // no publish step.
   const sessionScopesKnown =
-    Boolean(desktopBridge) ||
-    primarySessionState.data !== null ||
-    primarySessionState.error !== null;
+    primaryEnvironmentId === null ? environmentsReady : primarySessionState._tag !== "Initial";
 
   const controller = useCloudLinkController();
   const showPublishStep = canManageRelay && controller.linkState.target !== null;
@@ -80,6 +93,12 @@ function ConfiguredConnectOnboardingDialog() {
   const [isApplying, setIsApplying] = useState(false);
   const prefilledFromLinkStateRef = useRef(false);
   const observedAccountRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (step === "publish" && sessionScopesKnown && !showPublishStep && !isApplying) {
+      setStep("devices");
+    }
+  }, [isApplying, sessionScopesKnown, showPublishStep, step]);
 
   const optOutAccounts = optOutState.optOutAccounts;
 
@@ -177,6 +196,16 @@ function ConfiguredConnectOnboardingDialog() {
   };
 
   const applyPublishSelection = async () => {
+    if (isApplying) return;
+    if (
+      primaryEnvironmentId === null ||
+      !readEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope) ||
+      !readEnvironmentScope(primaryEnvironmentId, AuthRelayWriteScope)
+    ) {
+      setStep("devices");
+      return;
+    }
+    if (linkStateData === null || controller.linkState.error !== null) return;
     // The wizard only ever enables — with both toggles off there is nothing to
     // apply, and an existing link must not be torn down from onboarding.
     if (!exposeEnvironment && !publishAgentActivity) {
@@ -226,6 +255,13 @@ function ConfiguredConnectOnboardingDialog() {
               isStepDisabled={() => isApplying}
               onStepChange={(index) => {
                 const next = steps[index];
+                if (
+                  next === "publish" &&
+                  (primaryEnvironmentId === null ||
+                    !readEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope) ||
+                    !readEnvironmentScope(primaryEnvironmentId, AuthRelayWriteScope))
+                )
+                  return;
                 if (next) setStep(next);
               }}
             />
@@ -236,10 +272,24 @@ function ConfiguredConnectOnboardingDialog() {
             <PublishStep
               exposeEnvironment={exposeEnvironment}
               publishAgentActivity={publishAgentActivity}
-              disabled={isApplying}
-              operationError={controller.operationError}
-              onExposeEnvironmentChange={setExposeEnvironment}
-              onPublishAgentActivityChange={setPublishAgentActivity}
+              disabled={isApplying || !canManageRelay || linkStateData === null}
+              operationError={controller.operationError ?? controller.linkState.error}
+              onExposeEnvironmentChange={(enabled) => {
+                if (
+                  primaryEnvironmentId !== null &&
+                  readEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope) &&
+                  readEnvironmentScope(primaryEnvironmentId, AuthRelayWriteScope)
+                )
+                  setExposeEnvironment(enabled);
+              }}
+              onPublishAgentActivityChange={(enabled) => {
+                if (
+                  primaryEnvironmentId !== null &&
+                  readEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope) &&
+                  readEnvironmentScope(primaryEnvironmentId, AuthRelayWriteScope)
+                )
+                  setPublishAgentActivity(enabled);
+              }}
             />
           ) : (
             <DevicesStep />
@@ -262,7 +312,7 @@ function ConfiguredConnectOnboardingDialog() {
                 Not now
               </Button>
               <Button
-                disabled={isApplying || (controller.linkState.isPending && linkStateData === null)}
+                disabled={isApplying || !canManageRelay || linkStateData === null}
                 onClick={() => void applyPublishSelection()}
               >
                 {isApplying ? "Enabling…" : "Continue"}

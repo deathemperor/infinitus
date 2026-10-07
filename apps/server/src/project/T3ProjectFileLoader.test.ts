@@ -10,7 +10,7 @@ import { LEGACY_T3_PROJECT_FILE_NAME, T3_PROJECT_FILE_NAME } from "@infinitus/co
 
 import * as T3ProjectFileLoader from "./T3ProjectFileLoader.ts";
 
-const TestLayer = Layer.empty.pipe(
+const layerTest = Layer.empty.pipe(
   Layer.provideMerge(T3ProjectFileLoader.layer),
   Layer.provideMerge(NodeServices.layer),
 );
@@ -32,7 +32,7 @@ const writeProjectFile = Effect.fn("writeProjectFile")(function* (
   yield* fileSystem.writeFileString(path.join(cwd, fileName), contents).pipe(Effect.orDie);
 });
 
-it.layer(TestLayer)("T3ProjectFileLoader", (it) => {
+it.layer(layerTest)("T3ProjectFileLoader", (it) => {
   describe("load", () => {
     it.effect("loads and decodes a valid project file", () =>
       Effect.gen(function* () {
