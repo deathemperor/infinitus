@@ -7,9 +7,22 @@ import * as NodeUtil from "node:util";
 
 const execFile = NodeUtil.promisify(NodeChildProcess.execFile);
 
+import {
+  INFINITUS_ACTIVITIES,
+  INFINITUS_ENVIRONMENT_LABELS,
+  INFINITUS_HOLD_MARKER,
+  INFINITUS_PROJECT_FAVICONS,
+  INFINITUS_PROJECT_TITLES,
+  INFINITUS_STORY_BRANCH,
+  INFINITUS_TERMINAL_BUFFER,
+  INFINITUS_THREADS,
+  INFINITUS_WORKSPACE_FILES,
+} from "./infinitus-showcase-story.ts";
+
 export const SHOWCASE_PROJECT_ID = "t3code";
-// Fork: `SHOWCASE_APP_VARIANT=infinitus` seeds the flagship project under the
-// Infinitus name, so store screenshots carry no upstream branding. Ids stay.
+// Fork: `SHOWCASE_APP_VARIANT=infinitus` seeds the Infinitus story from
+// `infinitus-showcase-story.ts` (its own projects, threads, diff, terminal
+// and a held thread), so store screenshots carry no upstream fixture. Ids stay.
 const INFINITUS_SHOWCASE = process.env.SHOWCASE_APP_VARIANT === "infinitus";
 const BRAND_TITLE = INFINITUS_SHOWCASE ? "Infinitus" : "T3 Code";
 const BRAND_SLUG = INFINITUS_SHOWCASE ? "infinitus" : "t3code";
@@ -60,27 +73,30 @@ const PROJECT_SCRIPTS = JSON.stringify([
   },
 ]);
 
-const SHOWCASE_TERMINAL_PROMPT = `\u001b[1;32m→\u001b[0m \u001b[1;36m${BRAND_SLUG}\u001b[0m \u001b[1;34mgit:(\u001b[1;31mfeat/remote-command-center\u001b[1;34m)\u001b[0m \u001b[1;33m✗\u001b[0m `;
+const STORY_BRANCH = INFINITUS_SHOWCASE ? INFINITUS_STORY_BRANCH : "feat/remote-command-center";
+const SHOWCASE_TERMINAL_PROMPT = `\u001b[1;32m→\u001b[0m \u001b[1;36m${BRAND_SLUG}\u001b[0m \u001b[1;34mgit:(\u001b[1;31m${STORY_BRANCH}\u001b[1;34m)\u001b[0m \u001b[1;33m✗\u001b[0m `;
 
 // A dev-server startup mirroring the web settings' terminal font preview:
 // zsh-style prompt, brand line, addresses, the thread's 612-test summary,
 // and a READY badge, so the scene exercises bold, dim, underline, the six
 // accent colors, and a background cell.
-export const SHOWCASE_TERMINAL_BUFFER = [
-  `${SHOWCASE_TERMINAL_PROMPT}vpr dev`,
-  "",
-  "  \u001b[1;32mVITE\u001b[0m \u001b[32mv7.1.1\u001b[0m  \u001b[2mready in\u001b[0m \u001b[1m1.24s\u001b[0m",
-  "",
-  "  \u001b[32m→\u001b[0m  \u001b[2mLocal:\u001b[0m    \u001b[4;36mhttp://127.0.0.1:5173/\u001b[0m",
-  "  \u001b[32m→\u001b[0m  \u001b[2mNetwork:\u001b[0m  \u001b[4;36mhttp://192.168.1.24:5173/\u001b[0m",
-  `  \u001b[32m→\u001b[0m  \u001b[2mProject:\u001b[0m  \u001b[1m${BRAND_SLUG}\u001b[0m \u001b[2m— ~/Code/${BRAND_SLUG}\u001b[0m`,
-  "",
-  "  \u001b[32m✓ 612 passed\u001b[0m   \u001b[33m△ 2 warnings\u001b[0m   \u001b[31m✗ 0 failed\u001b[0m",
-  "",
-  "  \u001b[42;30m READY \u001b[0m \u001b[2mwatching for changes — press\u001b[0m \u001b[1mq\u001b[0m \u001b[2mto quit\u001b[0m",
-  "",
-  SHOWCASE_TERMINAL_PROMPT,
-].join("\r\n");
+export const SHOWCASE_TERMINAL_BUFFER = INFINITUS_SHOWCASE
+  ? INFINITUS_TERMINAL_BUFFER
+  : [
+      `${SHOWCASE_TERMINAL_PROMPT}vpr dev`,
+      "",
+      "  \u001b[1;32mVITE\u001b[0m \u001b[32mv7.1.1\u001b[0m  \u001b[2mready in\u001b[0m \u001b[1m1.24s\u001b[0m",
+      "",
+      "  \u001b[32m→\u001b[0m  \u001b[2mLocal:\u001b[0m    \u001b[4;36mhttp://127.0.0.1:5173/\u001b[0m",
+      "  \u001b[32m→\u001b[0m  \u001b[2mNetwork:\u001b[0m  \u001b[4;36mhttp://192.168.1.24:5173/\u001b[0m",
+      `  \u001b[32m→\u001b[0m  \u001b[2mProject:\u001b[0m  \u001b[1m${BRAND_SLUG}\u001b[0m \u001b[2m— ~/Code/${BRAND_SLUG}\u001b[0m`,
+      "",
+      "  \u001b[32m✓ 612 passed\u001b[0m   \u001b[33m△ 2 warnings\u001b[0m   \u001b[31m✗ 0 failed\u001b[0m",
+      "",
+      "  \u001b[42;30m READY \u001b[0m \u001b[2mwatching for changes — press\u001b[0m \u001b[1mq\u001b[0m \u001b[2mto quit\u001b[0m",
+      "",
+      SHOWCASE_TERMINAL_PROMPT,
+    ].join("\r\n");
 
 const BASE_ENVIRONMENT_PRESENCE = `export function environmentLabel(count: number): string {
   return \`${"${count}"} environments\`;
@@ -139,41 +155,49 @@ export const SHOWCASE_PROJECTS = [
     repositoryUrl: BRAND_REPOSITORY_URL,
     favicon: INFINITUS_SHOWCASE ? PROJECT_FAVICONS.infinitus : PROJECT_FAVICONS.t3code,
   },
-  {
-    id: "react",
-    title: "React",
-    directory: "react",
-    repositoryUrl: "https://github.com/facebook/react.git",
-    favicon: PROJECT_FAVICONS.react,
-  },
-  {
-    id: "linux",
-    title: "Linux",
-    directory: "linux",
-    repositoryUrl: "https://github.com/torvalds/linux.git",
-    favicon: PROJECT_FAVICONS.linux,
-  },
+  INFINITUS_SHOWCASE
+    ? { id: "react", ...INFINITUS_PROJECT_TITLES.react, favicon: INFINITUS_PROJECT_FAVICONS.react }
+    : {
+        id: "react",
+        title: "React",
+        directory: "react",
+        repositoryUrl: "https://github.com/facebook/react.git",
+        favicon: PROJECT_FAVICONS.react,
+      },
+  INFINITUS_SHOWCASE
+    ? { id: "linux", ...INFINITUS_PROJECT_TITLES.linux, favicon: INFINITUS_PROJECT_FAVICONS.linux }
+    : {
+        id: "linux",
+        title: "Linux",
+        directory: "linux",
+        repositoryUrl: "https://github.com/torvalds/linux.git",
+        favicon: PROJECT_FAVICONS.linux,
+      },
 ] as const;
 
 export const SHOWCASE_ENVIRONMENTS = [
   {
     id: "moonbase-terminal",
-    label: "Moonbase Terminal",
+    label: INFINITUS_SHOWCASE
+      ? INFINITUS_ENVIRONMENT_LABELS["moonbase-terminal"]
+      : "Moonbase Terminal",
     projectIds: ["t3code"],
   },
   {
     id: "suspense-station",
-    label: "Suspense Station",
+    label: INFINITUS_SHOWCASE
+      ? INFINITUS_ENVIRONMENT_LABELS["suspense-station"]
+      : "Suspense Station",
     projectIds: ["react"],
   },
   {
     id: "kernel-cabin",
-    label: "Kernel Cabin",
+    label: INFINITUS_SHOWCASE ? INFINITUS_ENVIRONMENT_LABELS["kernel-cabin"] : "Kernel Cabin",
     projectIds: ["linux"],
   },
 ] as const;
 
-export const SHOWCASE_THREADS = [
+const UPSTREAM_THREADS = [
   {
     id: SHOWCASE_THREAD_ID,
     projectId: "t3code",
@@ -279,6 +303,10 @@ export const SHOWCASE_THREADS = [
   },
 ] as const;
 
+export const SHOWCASE_THREADS: ReadonlyArray<
+  (typeof UPSTREAM_THREADS)[number] | (typeof INFINITUS_THREADS)[number]
+> = INFINITUS_SHOWCASE ? INFINITUS_THREADS : UPSTREAM_THREADS;
+
 function minutesBefore(now: number, minutes: number): string {
   return new Date(now - minutes * 60_000).toISOString();
 }
@@ -307,7 +335,38 @@ async function initializeRepository(input: {
   await runGit(input.workspaceRoot, ["commit", "-m", input.commitMessage]);
 }
 
+async function writeWorkspaceFiles(
+  workspaceRoot: string,
+  files: Readonly<Record<string, string>>,
+): Promise<void> {
+  for (const [relativePath, content] of Object.entries(files)) {
+    const target = NodePath.join(workspaceRoot, relativePath);
+    await NodeFSP.mkdir(NodePath.dirname(target), { recursive: true });
+    await NodeFSP.writeFile(target, content);
+  }
+}
+
 async function seedT3CodeWorkspace(workspaceRoot: string): Promise<void> {
+  if (INFINITUS_SHOWCASE) {
+    await NodeFSP.mkdir(workspaceRoot, { recursive: true });
+    await NodeFSP.writeFile(
+      NodePath.join(workspaceRoot, "package.json"),
+      `${JSON.stringify({ name: BRAND_SLUG, private: true, scripts: { test: "vp test" } }, null, 2)}\n`,
+    );
+    await NodeFSP.writeFile(
+      NodePath.join(workspaceRoot, "favicon.svg"),
+      PROJECT_FAVICONS.infinitus,
+    );
+    await writeWorkspaceFiles(workspaceRoot, INFINITUS_WORKSPACE_FILES.base);
+    await initializeRepository({
+      workspaceRoot,
+      repositoryUrl: BRAND_REPOSITORY_URL,
+      commitMessage: "Show the account forecast",
+    });
+    await runGit(workspaceRoot, ["checkout", "-b", INFINITUS_STORY_BRANCH]);
+    await writeWorkspaceFiles(workspaceRoot, INFINITUS_WORKSPACE_FILES.updated);
+    return;
+  }
   await NodeFSP.mkdir(NodePath.join(workspaceRoot, "apps/mobile/src/features/home"), {
     recursive: true,
   });
@@ -580,48 +639,84 @@ function seedDatabase(
         activity_id, thread_id, turn_id, tone, kind, summary, payload_json, sequence, created_at
       ) VALUES (?, ?, ?, 'tool', 'tool.completed', ?, ?, ?, ?)`,
     );
-    insertActivity.run(
-      "trace-remote-handoff",
-      SHOWCASE_THREAD_ID,
-      turnId,
-      "Traced the remote handoff path",
-      JSON.stringify({
-        itemType: "command_execution",
-        title: "Traced the remote handoff path",
-        detail: "Three environments, one continuous workspace",
-        status: "completed",
-      }),
-      1,
-      minutesBefore(now, 8),
-    );
-    insertActivity.run(
-      "sync-command-center",
-      SHOWCASE_THREAD_ID,
-      turnId,
-      "Synced the command center",
-      JSON.stringify({
-        itemType: "file_change",
-        title: "Synced the command center",
-        detail: "2 files changed · instant handoffs · calm reconnects",
-        status: "completed",
-      }),
-      2,
-      minutesBefore(now, 6),
-    );
-    insertActivity.run(
-      "run-changed-suite",
-      SHOWCASE_THREAD_ID,
-      turnId,
-      "Ran the changed workspace",
-      JSON.stringify({
-        itemType: "command_execution",
-        title: "Ran the changed workspace",
-        detail: "612 tests passed · 3 environments online",
-        status: "completed",
-      }),
-      3,
-      minutesBefore(now, 4),
-    );
+    if (INFINITUS_SHOWCASE) {
+      for (const [index, activity] of INFINITUS_ACTIVITIES.entries()) {
+        insertActivity.run(
+          activity.id,
+          SHOWCASE_THREAD_ID,
+          turnId,
+          activity.title,
+          JSON.stringify({
+            itemType: activity.itemType,
+            title: activity.title,
+            detail: activity.detail,
+            status: "completed",
+          }),
+          index + 1,
+          minutesBefore(now, activity.minutesAgo),
+        );
+      }
+      // The held row lands after the turn started, so the thread reads as
+      // held (`threadHold` in client-runtime) and the scene shows the card.
+      database
+        .prepare(
+          `INSERT INTO projection_thread_activities (
+            activity_id, thread_id, turn_id, tone, kind, summary, payload_json, sequence, created_at
+          ) VALUES (?, ?, NULL, 'info', ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          INFINITUS_HOLD_MARKER.id,
+          SHOWCASE_THREAD_ID,
+          INFINITUS_HOLD_MARKER.kind,
+          INFINITUS_HOLD_MARKER.summary,
+          JSON.stringify({ fleet: "claude:default", provider: "claude" }),
+          INFINITUS_ACTIVITIES.length + 1,
+          minutesBefore(now, INFINITUS_HOLD_MARKER.minutesAgo),
+        );
+    } else {
+      insertActivity.run(
+        "trace-remote-handoff",
+        SHOWCASE_THREAD_ID,
+        turnId,
+        "Traced the remote handoff path",
+        JSON.stringify({
+          itemType: "command_execution",
+          title: "Traced the remote handoff path",
+          detail: "Three environments, one continuous workspace",
+          status: "completed",
+        }),
+        1,
+        minutesBefore(now, 8),
+      );
+      insertActivity.run(
+        "sync-command-center",
+        SHOWCASE_THREAD_ID,
+        turnId,
+        "Synced the command center",
+        JSON.stringify({
+          itemType: "file_change",
+          title: "Synced the command center",
+          detail: "2 files changed · instant handoffs · calm reconnects",
+          status: "completed",
+        }),
+        2,
+        minutesBefore(now, 6),
+      );
+      insertActivity.run(
+        "run-changed-suite",
+        SHOWCASE_THREAD_ID,
+        turnId,
+        "Ran the changed workspace",
+        JSON.stringify({
+          itemType: "command_execution",
+          title: "Ran the changed workspace",
+          detail: "612 tests passed · 3 environments online",
+          status: "completed",
+        }),
+        3,
+        minutesBefore(now, 4),
+      );
+    }
 
     for (const [index, projector] of PROJECTOR_NAMES.entries()) {
       database
