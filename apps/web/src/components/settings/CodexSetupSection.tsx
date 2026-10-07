@@ -1,3 +1,5 @@
+import { AuthProvidersManageScope } from "@infinitus/contracts";
+import { useEnvironmentScope } from "../../state/session";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -168,6 +170,7 @@ export function AddManagedCodexAccountDialog({
     | ((instanceId: ProviderInstanceId, displayName: string) => void)
     | undefined;
 }) {
+  const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   return (
     <AddCodexAccountDialog
       environmentId={environmentId}
@@ -181,6 +184,7 @@ export function AddManagedCodexAccountDialog({
           provider={provider}
           mode="managed"
           enabled
+          readOnly={!canManageProviders}
           autoStart
           onAutoStartConsumed={noop}
           onModeChange={noop}

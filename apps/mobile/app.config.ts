@@ -288,7 +288,7 @@ const config: ExpoConfig = {
   slug: "t3-code",
   platforms: ["ios", "android"],
   scheme: variant.scheme,
-  version: "1.4.0",
+  version: "2.0.0",
   runtimeVersion: {
     // Development manifests resolve on every launch, so avoid fingerprint's
     // expensive native-project calculation there. Preview and production stay
@@ -327,8 +327,17 @@ const config: ExpoConfig = {
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
       },
+<<<<<<< HEAD
       NSLocalNetworkUsageDescription: `Allow ${variant.appName} to connect to ${variant.appName} servers on your local network or tailnet.`,
       NSPhotoLibraryAddUsageDescription: `Allow ${variant.appName} to save images to your photo library.`,
+=======
+      NSLocalNetworkUsageDescription:
+        "Allow T3 Code to connect to T3 Code servers on your local network or tailnet.",
+      NSPhotoLibraryAddUsageDescription: "Allow T3 Code to save images to your photo library.",
+      // "Audio, AirPlay, and Picture in Picture": the browser screen's system
+      // picture in picture needs it to start and to stay up outside the app.
+      UIBackgroundModes: ["audio"],
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
       ITSAppUsesNonExemptEncryption: false,
       // The App Store screenshot harness rotates the iPad interface from
       // inside the app (CI denies osascript the Accessibility access that
@@ -365,6 +374,7 @@ const config: ExpoConfig = {
     // JS back handling survives it via react-native's Android 16 shim plus
     // withAndroidPredictiveBackCompat on Android 13-15.
     predictiveBackGestureEnabled: true,
+<<<<<<< HEAD
     ...("universalLinkHost" in variant
       ? {
           // Fork (#1313): a team invite, infinitus.run/join#<code>, opens the
@@ -379,6 +389,10 @@ const config: ExpoConfig = {
           ],
         }
       : {}),
+=======
+    // expo-sensors declares this for its pedometer, which the app does not use.
+    blockedPermissions: ["android.permission.ACTIVITY_RECOGNITION"],
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
   },
   web: {
     favicon: variant.assets.appIcon,
@@ -491,7 +505,16 @@ const config: ExpoConfig = {
           minSdkVersion: 24,
           // kotlinx-io uses Kotlin 2.3's return-value checker annotation, while
           // SDK 58 builds with Kotlin 2.2. It has no runtime behavior.
-          extraProguardRules: "-dontwarn kotlin.MustUseReturnValues",
+          //
+          // WorkManager 2.9 keeps InputMerger classes but not their constructors,
+          // and R8 full mode no longer keeps a default constructor implicitly.
+          // Without it no work request can start, so the Glance session behind
+          // the widget never renders and it stays on "Loading widget". WorkManager
+          // 2.10 ships this rule itself; drop it once the resolved version gets there.
+          extraProguardRules: [
+            "-dontwarn kotlin.MustUseReturnValues",
+            "-keep class * extends androidx.work.InputMerger { <init>(); }",
+          ].join("\n"),
         },
         ios: {
           deploymentTarget: "18.0",
@@ -504,6 +527,9 @@ const config: ExpoConfig = {
       },
     ],
     "./plugins/withIosCocoaPodsUuidCache.cjs",
+    // Only the accelerometer is used (device viewer shake). Compile out the
+    // pedometer so iOS needs no motion purpose string.
+    ["expo-sensors", { motionPermission: false }],
     // Must be listed BEFORE expo-widgets: same-type mods run last-registered-
     // first, so registering earlier makes this plugin's mods run AFTER
     // expo-widgets' — its dangerous mod wipes ios/ExpoWidgetsTarget/ (which

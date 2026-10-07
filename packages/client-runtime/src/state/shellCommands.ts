@@ -1,5 +1,5 @@
 import { WS_METHODS } from "@infinitus/contracts";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { createEnvironmentRpcCommand } from "./runtime.ts";
 import type { EnvironmentRegistry } from "../connection/registry.ts";

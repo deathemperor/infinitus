@@ -97,6 +97,7 @@ export class DesktopEnvironment extends Context.Service<
     readonly linuxWmClass: string;
     readonly linuxApplicationsDir: string;
     readonly appImagePath: Option.Option<string>;
+<<<<<<< HEAD
     readonly userDataDirName: string;
     readonly legacyUserDataDirName: string;
     /**
@@ -105,6 +106,8 @@ export class DesktopEnvironment extends Context.Service<
      * state, lock included (see @infinitus/shared/desktopIdentity).
      */
     readonly adoptsLegacyUserDataDir: boolean;
+=======
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
     readonly defaultDesktopSettings: DesktopAppSettings.DesktopSettings;
     readonly runtimeInfo: DesktopRuntimeInfo;
     readonly resolvePickFolderDefaultPath: (rawOptions: unknown) => Option.Option<string>;
@@ -211,10 +214,13 @@ const make = Effect.fn("desktop.environment.make")(function* (
     joinPath: path.join,
     t3Home: config.t3Home,
   });
+<<<<<<< HEAD
   const userDataDirName = isDevelopment
     ? DESKTOP_DEV_USER_DATA_DIR_NAME
     : DESKTOP_USER_DATA_DIR_NAME;
   const legacyUserDataDirName = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
+=======
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
   const linuxApplicationsDir = path.join(
     Option.getOrElse(config.xdgDataHome, () => path.join(homeDirectory, ".local", "share")),
     "applications",
@@ -271,9 +277,12 @@ const make = Effect.fn("desktop.environment.make")(function* (
     linuxWmClass: isDevelopment ? "t3code-dev" : "t3code",
     linuxApplicationsDir,
     appImagePath: config.appImagePath,
+<<<<<<< HEAD
     userDataDirName,
     legacyUserDataDirName,
     adoptsLegacyUserDataDir: adoptsLegacyDesktopUserDataDir(legacyUserDataDirName),
+=======
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
     defaultDesktopSettings: DesktopAppSettings.resolveDefaultDesktopSettings(input.appVersion),
     runtimeInfo: resolveDesktopRuntimeInfo({
       platform: input.platform,

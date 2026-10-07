@@ -12,7 +12,11 @@ import {
 import {
   connectionCatalogAlternateHosts,
   connectionCatalogDisplayUrl,
+<<<<<<< HEAD
   connectionCatalogRoamedHost,
+=======
+  environmentMcpUrl,
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
   connectionStatusText,
   connectionStatusTitle,
   presentEnvironmentConnection,
@@ -73,16 +77,24 @@ describe("connection presentation", () => {
     expect(connectionCatalogDisplayUrl(ENTRY)).toBe("https://environment.example.test");
   });
 
+<<<<<<< HEAD
   it("names the other hosts and where the last connect landed (fork #663)", () => {
     expect(connectionCatalogAlternateHosts(ENTRY)).toEqual([]);
     expect(connectionCatalogRoamedHost(ENTRY)).toBeNull();
     const roamed: ConnectionCatalogEntry = {
       target: TARGET,
+=======
+  it("offers an MCP address only where an MCP client can sign in", () => {
+    expect(environmentMcpUrl({ entry: ENTRY })).toBe("https://environment.example.test/mcp");
+    const withBase = (httpBaseUrl: string): ConnectionCatalogEntry => ({
+      ...ENTRY,
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
       profile: Option.some(
         new BearerConnectionProfile({
           connectionId: TARGET.connectionId,
           environmentId: TARGET.environmentId,
           label: TARGET.label,
+<<<<<<< HEAD
           httpBaseUrl: "https://environment.example.test",
           wsBaseUrl: "wss://environment.example.test",
           alternateHttpBaseUrls: ["https://code.infinitus.run", "https://environment.example.test"],
@@ -109,6 +121,18 @@ describe("connection presentation", () => {
       enabled: true,
     };
     expect(connectionCatalogRoamedHost(home)).toBeNull();
+=======
+          httpBaseUrl,
+          wsBaseUrl: httpBaseUrl.replace(/^http/, "ws"),
+        }),
+      ),
+    });
+    expect(environmentMcpUrl({ entry: withBase("http://127.0.0.1:3773/") })).toBe(
+      "http://127.0.0.1:3773/mcp",
+    );
+    // A plain-http LAN or tailnet address is refused by MCP clients' token checks.
+    expect(environmentMcpUrl({ entry: withBase("http://100.81.102.68:3773") })).toBeNull();
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
   });
 
   it("distinguishes initial connection, reconnect, and retry errors", () => {

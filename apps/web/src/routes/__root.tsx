@@ -1,6 +1,6 @@
+import { PermissionUpdateNotice } from "../components/PermissionUpdateNotice";
 import { type ServerLifecycleWelcomePayload } from "@infinitus/contracts";
 import { scopedProjectKey, scopeProjectRef } from "@infinitus/client-runtime/environment";
-import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import {
   Outlet,
   Link,
@@ -11,7 +11,7 @@ import {
   useNavigate,
   useRouter,
 } from "@tanstack/react-router";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { Check, Copy } from "lucide";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL, APP_VERSION } from "../branding";
@@ -20,6 +20,7 @@ import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
 import { CustomSnoozeDialogHost } from "../components/CustomSnoozeDialog";
 import { ConfirmDialogHost } from "../components/ConfirmDialogHost";
+import { KeybindingsConfigWarning } from "../components/KeybindingsConfigWarning";
 import { FirstRunGate } from "../components/onboarding/FirstRunGate";
 import { ConnectOnboardingDialog } from "../components/cloud/ConnectOnboardingDialog";
 import { RelayClientInstallDialog } from "../components/cloud/RelayClientInstallDialog";
@@ -36,8 +37,10 @@ import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAw
 import { NotificationModeMigration } from "../components/desktop/NotificationModeMigration";
 import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
+import { NightlyMobileBetaNotice } from "../components/NightlyMobileBeta";
+import { LegacyThreadMigrationToast } from "../components/LegacyThreadMigrationToast";
 import { ThreadNotificationCoordinator } from "../components/ThreadNotificationCoordinator";
-import { QueuedMessageSender } from "../components/QueuedMessageSender";
+import { ReopenClosedViewShortcut } from "../components/ReopenClosedViewShortcut";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { SlowRpcRequestToastCoordinator } from "../components/SlowRpcRequestToastCoordinator";
 import { ChatGptWelcomeCoordinator } from "../components/settings/ChatGptWelcomeCoordinator";
@@ -47,6 +50,7 @@ import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useDefaultThemeAdoption } from "../hooks/useDefaultTheme";
 import { useEnvironmentThemeSync } from "../hooks/useEnvironmentTheme";
 import { Button } from "../components/ui/button";
+import { MorphIcon } from "~/components/MorphIcon";
 import { StandalonePage, StandalonePageHeader } from "../components/ui/standalone-page";
 import {
   AnchoredToastProvider,
@@ -54,12 +58,11 @@ import {
   ToastProvider,
   toastManager,
 } from "../components/ui/toast";
-import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { isElectron } from "../env";
+import { cn } from "../lib/utils";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
 import { useClientSettings } from "../hooks/useSettings";
-import { PlanAgentSelectionHeal } from "../planAgentSelectionHeal";
 import {
   deriveLogicalProjectKeyFromSettings,
   derivePhysicalProjectKeyFromPath,
@@ -71,9 +74,7 @@ import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
 import { hasHostedPairingRequest, isHostedStaticApp } from "../hostedPairing";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
-import { shellEnvironment } from "../state/shell";
 import { useAtomValue } from "@effect/atom-react";
-import { useAtomCommand } from "../state/use-atom-command";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import {
   primaryServerConfigAtom,
@@ -166,7 +167,7 @@ function RootRouteView() {
     };
   }, [pathname]);
 
-  if (pathname === "/pair" || pathname === "/connect") {
+  if (pathname === "/pair" || pathname === "/connect" || pathname === "/connect-agent") {
     return (
       <>
         <DocumentTitleSync />
@@ -246,20 +247,26 @@ function RootRouteView() {
           {primaryEnvironmentAuthenticated ? <DesktopKeepAwakeCoordinator /> : null}
           <CaptureGestureCoordinator />
           <ThreadNotificationCoordinator />
-          <QueuedMessageSender />
+          <ReopenClosedViewShortcut />
           <ConfirmDialogHost />
           <CustomSnoozeDialogHost />
           <SlowRpcRequestToastCoordinator />
+<<<<<<< HEAD
           {primaryEnvironmentAuthenticated ? <InfinitusEventToasts /> : null}
           {primaryEnvironmentAuthenticated && isElectron ? <InfinitusPeerFleets /> : null}
           {primaryEnvironmentAuthenticated && isElectron ? <InfinitusSettingsSync /> : null}
+=======
+          <PermissionUpdateNotice />
+          {primaryEnvironmentAuthenticated ? <LegacyThreadMigrationToast /> : null}
+>>>>>>> upstream-sync-079e4bccd-upstream-renamed
           <ProjectCloneToastCoordinator />
           <HostedStaticEnvironmentBootstrap />
           {primaryEnvironmentAuthenticated ? (
             <EventRouter skipInitialBootstrapNavigation={returningFromWelcomeRef.current} />
           ) : null}
-          {primaryEnvironmentAuthenticated ? <PlanAgentSelectionHeal /> : null}
           {primaryEnvironmentAuthenticated ? <ProviderUpdateLaunchNotification /> : null}
+          {/* Hosted Nightly is "hosted-static", not authenticated, and needs it too. */}
+          <NightlyMobileBetaNotice />
           {appShell}
           {/* Above the router: a theme draft is judged by walking the app, so the
               editor has to survive navigation away from settings. */}
@@ -433,7 +440,7 @@ function CopyErrorButton({ report }: { report: string }) {
 
   return (
     <Button size="sm" variant="outline" onClick={() => copyToClipboard(report)}>
-      {isCopied ? <CheckIcon className="text-success" /> : <CopyIcon />}
+      <MorphIcon className={cn(isCopied && "text-success")} icon={isCopied ? Check : Copy} />
       {isCopied ? "Copied" : "Copy error"}
     </Button>
   );
@@ -507,9 +514,6 @@ function EventRouter({
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
   const primaryEnvironment = usePrimaryEnvironment();
-  const openInEditor = useAtomCommand(shellEnvironment.openInEditor, {
-    reportFailure: false,
-  });
   const serverConfig = useAtomValue(primaryServerConfigAtom);
   const serverConfigEvent = useAtomValue(primaryServerConfigEventAtom);
   const serverWelcome = useAtomValue(primaryServerWelcomeAtom);
@@ -586,42 +590,14 @@ function EventRouter({
       stackedThreadToast({
         type: "warning",
         title: "Invalid keybindings configuration",
-        description: decision.message,
-        actionVariant: "outline",
-        actionProps: {
-          children: "Open keybindings.json",
-          onClick: () => {
-            if (!serverConfig || !primaryEnvironment) {
-              return;
-            }
-
-            const editor = resolveAndPersistPreferredEditor(serverConfig.availableEditors);
-            if (!editor) {
-              return;
-            }
-            void (async () => {
-              const result = await openInEditor({
-                environmentId: primaryEnvironment.environmentId,
-                input: {
-                  cwd: serverConfig.keybindingsConfigPath,
-                  editor,
-                },
-              });
-              if (result._tag === "Success") {
-                return;
-              }
-              const error = squashAtomCommandFailure(result);
-              toastManager.add(
-                stackedThreadToast({
-                  type: "error",
-                  title: "Unable to open keybindings file",
-                  description:
-                    error instanceof Error ? error.message : "Unknown error opening file.",
-                }),
-              );
-            })();
-          },
-        },
+        description: (
+          <KeybindingsConfigWarning
+            message={decision.message}
+            environmentId={primaryEnvironment?.environmentId ?? null}
+            configPath={serverConfig?.keybindingsConfigPath ?? null}
+            availableEditors={serverConfig?.availableEditors ?? []}
+          />
+        ),
       }),
     );
   });
