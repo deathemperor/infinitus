@@ -2,7 +2,7 @@ import { DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER } from "@infinitus/contracts"
 import type { DesktopPreviewRecordingArtifact, ScopedThreadRef } from "@infinitus/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { previewBridge } from "~/components/preview/previewBridge";
 import { ensureClientSettingsHydrated, getClientSettings } from "~/hooks/useSettings";
