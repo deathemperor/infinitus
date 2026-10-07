@@ -427,6 +427,13 @@ echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVers
 "$CTL" signin-status nope 2>&1 | grep -q "no sign-in nope" || fail "signin-status did not refuse an unknown flow"
 "$CTL" signin-begin no/such 2>&1 | grep -q "usage: signin-begin" || fail "signin-begin did not refuse an unknown fleet"
 "$CTL" crash-report --body '{nope' >/dev/null 2>&1 && fail "crash-report accepted a broken body"
+# A request line far past one socket read (~840 KB, like a desktop's
+# `peer-sync` with several machines' fleets) arrives whole: the socket
+# once handed the first chunk to the decoder and answered "bad request"
+# (user 2026-09-25: the popup lost every other machine).
+python3 -c "import json; print(json.dumps({'machines':[{'id':'e2e-peer','label':'e2e','connected':True,'fleets':[{'key':'swapd/claude','engineID':'swapd','provider':'claude','capabilities':[],'accounts':[{'number':n,'email':'e2e%d@example.com'%n,'active':False,'alias':'x'*60} for n in range(1,6001)]}]}],'results':[]}))" \
+    | "$CTL" peer-sync | expect "d['commands']==[]" || fail "peer-sync with a body past one socket read"
+"$CTL" peer-sync --body '{"machines":[],"results":[]}' | expect "d['commands']==[]" || fail "peer-sync clearing the e2e peer"
 echo "body verbs: ok"
 
 # --- scenarios: all-dead (no candidate, then recovers) -------------------
