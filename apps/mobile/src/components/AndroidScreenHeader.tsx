@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { AppSymbolName } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
@@ -14,6 +14,7 @@ export interface AndroidHeaderAction {
   readonly icon: AppSymbolName;
   readonly onPress: () => void;
   readonly disabled?: boolean;
+  readonly loading?: boolean;
   readonly selected?: boolean;
   /** Infinitus (fork, #269 F): an action whose tap opens an anchored menu of
       these choices instead of running `onPress` — the Android form of an
@@ -92,6 +93,7 @@ export function AndroidScreenHeader(props: {
         </View>
 
         {visibleActions.map((action) =>
+<<<<<<< HEAD
           action.menu ? (
             <AndroidAnchoredMenu
               key={action.accessibilityLabel}
@@ -109,6 +111,16 @@ export function AndroidScreenHeader(props: {
                 />
               )}
             </AndroidAnchoredMenu>
+=======
+          action.loading ? (
+            <View
+              key={action.accessibilityLabel}
+              accessibilityLabel={action.accessibilityLabel}
+              className="size-12 items-center justify-center"
+            >
+              <ActivityIndicator colorClassName="accent-header-foreground" />
+            </View>
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
           ) : (
             <AndroidHeaderIconButton
               key={action.accessibilityLabel}

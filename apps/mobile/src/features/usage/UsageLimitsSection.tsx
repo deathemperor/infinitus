@@ -1,12 +1,13 @@
 import { useAtomValue } from "@effect/atom-react";
-import type {
-  EnvironmentId,
-  ProviderConsumeResetCreditOutcome,
-  ProviderConsumeResetCreditInput,
-  ServerProvider,
-  ServerProviderResetCredits,
-  ServerProviderUsageWindow,
-  UsageProviderKind,
+import {
+  AuthProvidersManageScope,
+  type EnvironmentId,
+  type ProviderConsumeResetCreditOutcome,
+  type ProviderConsumeResetCreditInput,
+  type ServerProvider,
+  type ServerProviderResetCredits,
+  type ServerProviderUsageWindow,
+  type UsageProviderKind,
 } from "@infinitus/contracts";
 import {
   elapsedShare,
@@ -24,6 +25,7 @@ import { AppText as Text } from "../../components/AppText";
 import { ProviderIcon } from "../../components/ProviderIcon";
 import { environmentPresentations } from "../../state/presentation";
 import { serverEnvironment } from "../../state/server";
+import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useProviderColors } from "./usageProviders";
 
@@ -223,6 +225,7 @@ export function ResetCredits(props: {
   readonly dense?: boolean;
 }) {
   const { environmentId, input, credits, now, dense = false } = props;
+  const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const consume = useAtomCommand(serverEnvironment.consumeResetCredit, {
     reportFailure: false,
   });
@@ -244,6 +247,7 @@ export function ResetCredits(props: {
   const hold = resetHoldText(credits, now);
 
   const redeem = async () => {
+    if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     setBusy(true);
     setStatus(null);
     const result = await consume({ environmentId, input });
@@ -260,6 +264,7 @@ export function ResetCredits(props: {
   };
 
   const confirm = () => {
+    if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     Alert.alert(
       "Use a reset credit?",
       "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
@@ -276,13 +281,18 @@ export function ResetCredits(props: {
       {credits.availableCount > 0 ? (
         <Pressable
           accessibilityRole="button"
+<<<<<<< HEAD
           accessibilityState={{ disabled: busy || hold !== null }}
           disabled={busy || hold !== null}
+=======
+          accessibilityState={{ disabled: busy || !canManageProviders }}
+          disabled={busy || !canManageProviders}
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
           onPress={confirm}
           className={
             dense
-              ? "rounded-full bg-subtle-strong px-2.5 py-1"
-              : "min-h-[44px] justify-center rounded-full bg-subtle-strong px-3 py-1.5"
+              ? "rounded-full bg-subtle-strong px-2.5 py-1 disabled:opacity-[0.45]"
+              : "min-h-[44px] justify-center rounded-full bg-subtle-strong px-3 py-1.5 disabled:opacity-[0.45]"
           }
         >
           <Text
@@ -297,7 +307,15 @@ export function ResetCredits(props: {
           </Text>
         </Pressable>
       ) : null}
+<<<<<<< HEAD
       {hold ? <Text className="text-xs text-foreground-tertiary">{hold}</Text> : null}
+=======
+      {!canManageProviders ? (
+        <Text className="text-xs text-foreground-tertiary">
+          This connection cannot manage provider accounts.
+        </Text>
+      ) : null}
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
       {status ? <Text className="text-sm text-foreground">{status}</Text> : null}
       {credits.label && credits.availableCount > 0 ? (
         <Text className="basis-full text-xs text-foreground-tertiary" numberOfLines={1}>

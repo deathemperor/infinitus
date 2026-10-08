@@ -1,23 +1,10 @@
 /**
- * Native-provider subagent observability: a tolerant fold over persisted
- * task.* / tool.* thread activities into orchestration-v2-shaped subagent
- * state, plus the source-neutral panel model every client renders.
- *
- * This module is deliberately legacy-bridge code. When orchestration-v2's
- * subagent projection is available for a thread, deriveAgentPanelModel
- * prefers it (see the v2Projection parameter) and the fold is skipped; when
- * the v1 orchestrator is retired this file is deleted. Field names and
- * transition semantics copy the v2 stack (#4779) exactly so that swap is
- * mechanical.
- *
- * Invariants encoded here trace to shipped bugs in the prior PRs (#4220,
- * #3650, #4662): reusable identity vs one-shot activations, idle as a real
- * nonterminal state, provider-specific usage merges, first-write terminal
- * timestamps, reactivation clearing terminal detail, and order-robust
- * folding (completion can create an agent; a late start only fills
- * metadata).
+ * Subagent status helpers shared by web and mobile, and the runtime shape the
+ * web agent rows render.
  */
-import type { OrchestrationThreadActivity } from "@infinitus/contracts";
+import * as DateTime from "effect/DateTime";
+import type { OrchestrationV2Subagent, OrchestrationV2TurnItem } from "@infinitus/contracts";
+import { isOrchestrationV2WorkActive } from "@infinitus/contracts";
 
 export type RuntimeSubagentStatus =
   | "pending"
@@ -103,94 +90,15 @@ export function isTerminalSubagentStatus(status: RuntimeSubagentStatus): boolean
 /** Active = the user may still need to care while it runs. Idle is settled-ish
  * but resumable; waiting counts as active because it needs the user. */
 export function isActiveSubagentStatus(status: RuntimeSubagentStatus): boolean {
-  return status === "pending" || status === "running" || status === "waiting";
-}
-
-const RECENT_ACTIVITY_LIMIT = 6;
-const SUMMARY_CHAR_LIMIT = 180;
-const ROSTER_LIMIT = 100;
-
-/**
- * True when this activity's payload does NOT belong on the Agents surface.
- * Classification happens exactly once, server-side at ingestion
- * (classifyTaskAgentKind → the persisted agentKind stamp); the client only
- * reads it. Rows without a stamp — legacy threads, pre-stamp servers — are
- * background by definition: they render in the ordinary work log, exactly
- * as they did before this feature existed.
- */
-export function isBackgroundTaskActivity(payload: Record<string, unknown>): boolean {
-  return payload.agentKind !== "agent";
-}
-
-function bounded(value: string): string {
-  return value.length <= SUMMARY_CHAR_LIMIT ? value : `${value.slice(0, SUMMARY_CHAR_LIMIT - 1)}…`;
-}
-
-/** Appends to the ring buffer, deduping consecutive identical summaries. */
-function appendActivity(
-  entries: ReadonlyArray<SubagentActivityEntry>,
-  at: string,
-  summary: string,
-): ReadonlyArray<SubagentActivityEntry> {
-  const boundedSummary = bounded(summary);
-  if (entries.length > 0 && entries[entries.length - 1]?.summary === boundedSummary) {
-    return entries;
-  }
-  const next = [...entries, { at, summary: boundedSummary }];
-  return next.length > RECENT_ACTIVITY_LIMIT ? next.slice(-RECENT_ACTIVITY_LIMIT) : next;
-}
-
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-function asCount(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
-}
-
-function asUsage(value: unknown): SubagentUsage | undefined {
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-  const record = value as Record<string, unknown>;
-  const totalTokens = asCount(record.totalTokens);
-  if (totalTokens === undefined) {
-    return undefined;
-  }
-  const usage: {
-    totalTokens: number;
-    inputTokens?: number;
-    cachedInputTokens?: number;
-    outputTokens?: number;
-    reasoningOutputTokens?: number;
-    toolUses?: number;
-    durationMs?: number;
-  } = { totalTokens };
-  const inputTokens = asCount(record.inputTokens);
-  if (inputTokens !== undefined) usage.inputTokens = inputTokens;
-  const cachedInputTokens = asCount(record.cachedInputTokens);
-  if (cachedInputTokens !== undefined) usage.cachedInputTokens = cachedInputTokens;
-  const outputTokens = asCount(record.outputTokens);
-  if (outputTokens !== undefined) usage.outputTokens = outputTokens;
-  const reasoningOutputTokens = asCount(record.reasoningOutputTokens);
-  if (reasoningOutputTokens !== undefined) usage.reasoningOutputTokens = reasoningOutputTokens;
-  const toolUses = asCount(record.toolUses);
-  if (toolUses !== undefined) usage.toolUses = toolUses;
-  const durationMs = asCount(record.durationMs);
-  if (durationMs !== undefined) usage.durationMs = durationMs;
-  return usage;
+  return isOrchestrationV2WorkActive(status);
 }
 
 /**
- * Provider-specific usage merge (#4779 semantics, verbatim):
- * - max-merge (Codex-style cumulative frames): field-wise maximum, idempotent
- *   under duplicate or late frames. Cumulative totals never shrink.
- * - accumulate (Claude-style activation deltas): not needed at this layer —
- *   Claude's task_progress usage is itself cumulative per task, so the fold
- *   also max-merges. The distinction matters when v2 sums activations.
- * Field-wise: a terminal payload carrying only totalTokens must not wipe a
- * known breakdown.
+ * A subagent card whose child is still working. The card outlives its
+ * launching turn: once that turn settles, the waiting footer counts the child,
+ * so the card stays out of the turn's fold until the child finishes.
  */
+<<<<<<< HEAD
 function mergeUsageMax(
   current: SubagentUsage | null,
   incoming: SubagentUsage | undefined,
@@ -451,23 +359,31 @@ function asRuntimeStatus(value: unknown): RuntimeSubagentStatus | undefined {
   return typeof value === "string" && KNOWN_STATUSES.has(value)
     ? (value as RuntimeSubagentStatus)
     : undefined;
+=======
+export function isLiveSubagentTurnItem(item: OrchestrationV2TurnItem): boolean {
+  return item.type === "subagent" && isOrchestrationV2WorkActive(item.status);
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
 }
 
 /**
- * Folds a thread's persisted activities into subagent state. Tolerant by
- * construction: malformed rows are skipped individually; unknown kinds are
- * ignored. Pure — memoize by activity-list identity at the atom layer.
- *
- * sessionLive=false derives interruption: background tasks die with their
- * provider session, so agents whose terminal rows were lost (server
- * restart, crash) must not read as running forever (review finding: a dead
- * session left a panel full of "Working" agents while the sidebar showed
- * nothing). Idle is preserved — a resumable Codex child stays resumable.
+ * Projects orchestration-v2 subagent entities into the runtime shape the web
+ * agent rows render.
  */
-export function foldSubagentActivities(
-  activities: ReadonlyArray<OrchestrationThreadActivity>,
-  options?: { readonly sessionLive?: boolean },
+export function projectedSubagentsToRuntime(
+  subagents: ReadonlyArray<{
+    readonly id: string;
+    readonly title: string | null;
+    readonly prompt: string;
+    readonly model: string | null;
+    readonly status: OrchestrationV2Subagent["status"];
+    readonly progress?: string | undefined;
+    readonly result: string | null;
+    readonly startedAt: DateTime.Utc | null;
+    readonly completedAt: DateTime.Utc | null;
+    readonly updatedAt: DateTime.Utc;
+  }>,
 ): ReadonlyArray<RuntimeSubagent> {
+<<<<<<< HEAD
   const agents = new Map<string, MutableAgent>();
 
   for (const activity of activities) {
@@ -830,69 +746,41 @@ export function deriveAgentPanelModel({
       .sort((a, b) => (a.agentIndex ?? 0) - (b.agentIndex ?? 0));
 
     return { workflow, phases, unphasedMembers };
+=======
+  return subagents.map((subagent) => {
+    const updatedAt = DateTime.formatIso(subagent.updatedAt);
+    const startedAt = subagent.startedAt === null ? null : DateTime.formatIso(subagent.startedAt);
+    return {
+      id: subagent.id,
+      kind: "subagent" as const,
+      title:
+        subagent.title ??
+        (subagent.prompt.length > 80 ? `${subagent.prompt.slice(0, 77)}...` : subagent.prompt),
+      role: null,
+      model: subagent.model,
+      effort: null,
+      status: subagent.status,
+      activationCount: 1,
+      usage: null,
+      progress: subagent.progress ?? null,
+      lastToolName: null,
+      result: subagent.result,
+      error: subagent.status === "failed" ? (subagent.result ?? null) : null,
+      outputFile: null,
+      parentAgentId: null,
+      agentIndex: null,
+      phaseIndex: null,
+      phaseTitle: null,
+      attempt: null,
+      workflowName: null,
+      phases: [],
+      runHandles: null,
+      recentActivity: [],
+      firstSeenAt: startedAt ?? updatedAt,
+      startedAt,
+      completedAt: subagent.completedAt === null ? null : DateTime.formatIso(subagent.completedAt),
+      updatedAt,
+    } satisfies RuntimeSubagent;
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
   });
-
-  let runningCount = 0;
-  let waitingCount = 0;
-  let idleCount = 0;
-  let settledCount = 0;
-  let totalTokens = 0;
-  for (const agent of source) {
-    // A workflow coordinator with members is a container for those members, not
-    // work of its own: it reports running for the whole run and aggregates their
-    // usage upstream in some providers. Counting it would report one more agent
-    // working than there are, and double count tokens.
-    if (agent.kind === "workflow" && (members.get(agent.id) ?? []).length > 0) continue;
-    if (agent.status === "running" || agent.status === "pending") runningCount += 1;
-    else if (agent.status === "waiting") waitingCount += 1;
-    else if (agent.status === "idle") idleCount += 1;
-    else settledCount += 1;
-    totalTokens += agent.usage?.totalTokens ?? 0;
-  }
-
-  return {
-    workflows: workflowGroups,
-    // Updates and the >100-agent retention ranking must never reshuffle rows
-    // that remain visible.
-    directAgents: direct
-      .slice()
-      .sort((a, b) => a.firstSeenAt.localeCompare(b.firstSeenAt) || a.id.localeCompare(b.id)),
-    runningCount,
-    waitingCount,
-    idleCount,
-    settledCount,
-    totalTokens,
-    hasAgents: true,
-    liveCount: runningCount + waitingCount,
-  };
-}
-
-/**
- * Compact model chip text: strips vendor prefixes/date-or-context suffixes
- * ("claude-sonnet-5[1m]" → "sonnet-5[1m]", "claude-opus-4-20250514" →
- * "opus-4"). Unknown ids pass through untouched; effort appends as "· high".
- */
-export function formatSubagentModelLabel(
-  model: string | null,
-  effort: string | null,
-): string | null {
-  if (!model) {
-    return null;
-  }
-  const compact = model
-    .replace(/^claude-/, "")
-    .replace(/-\d{8}$/, "")
-    .replace(/-latest$/, "");
-  return effort ? `${compact} · ${effort}` : compact;
-}
-
-export function formatSubagentTokenCount(totalTokens: number): string {
-  if (totalTokens < 1000) {
-    return `${totalTokens}`;
-  }
-  if (totalTokens < 1_000_000) {
-    const value = totalTokens / 1000;
-    return `${value >= 100 ? Math.round(value) : value.toFixed(1)}k`;
-  }
-  return `${(totalTokens / 1_000_000).toFixed(1)}M`;
 }

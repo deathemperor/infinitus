@@ -3,9 +3,9 @@ import * as NodeOS from "node:os";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { QrCode } from "@infinitus/shared/qrCode";
 import * as Effect from "effect/Effect";
-import { HttpServer } from "effect/unstable/http";
+import { HttpServer } from "effect/http";
 
-import { ServerConfig } from "./config.ts";
+import * as ServerConfig from "./config.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 
 export interface HeadlessServeAccessInfo {
@@ -132,7 +132,7 @@ export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): 
   ].join("\n");
 
 export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessInfo")(function* () {
-  const serverConfig = yield* ServerConfig;
+  const serverConfig = yield* ServerConfig.ServerConfig;
   const httpServer = yield* HttpServer.HttpServer;
   const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
   const connectionString = resolveHeadlessConnectionString(

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { ProviderDriverKind } from "@infinitus/contracts";
 import {
   AntigravityIcon,
@@ -22,6 +23,8 @@ export const PROVIDER_ICON_BY_PROVIDER: Partial<Record<ProviderDriverKind, Icon>
   [ProviderDriverKind.make("pi")]: PiIcon,
 };
 
+=======
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
 export type ModelEsque = {
   slug: string;
   name: string;

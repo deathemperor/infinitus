@@ -21,6 +21,7 @@ function renderPendingActions(isRunning: boolean) {
   return renderToStaticMarkup(
     createElement(ComposerPrimaryActions, {
       compact: true,
+      canOperateThread: true,
       pendingAction: {
         questionIndex: 0,
         isLastQuestion: true,
@@ -29,6 +30,7 @@ function renderPendingActions(isRunning: boolean) {
         isComplete: true,
       },
       isRunning,
+      canInterrupt: isRunning,
       showPlanFollowUpPrompt: false,
       promptHasText: false,
       isSendBusy: false,
@@ -44,6 +46,7 @@ function renderPendingActions(isRunning: boolean) {
   );
 }
 
+<<<<<<< HEAD
 function renderRunningActions(hasSendableContent: boolean, runningSendMode?: "queue" | "steer") {
   return renderToStaticMarkup(
     createElement(ComposerPrimaryActions, {
@@ -66,12 +69,16 @@ function renderRunningActions(hasSendableContent: boolean, runningSendMode?: "qu
   );
 }
 
+=======
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
 function renderSendButton(sendDisabledReason: string | null = null) {
   return renderToStaticMarkup(
     createElement(ComposerPrimaryActions, {
       compact: true,
+      canOperateThread: true,
       pendingAction: null,
       isRunning: false,
+      canInterrupt: false,
       showPlanFollowUpPrompt: false,
       promptHasText: true,
       isSendBusy: false,
@@ -124,6 +131,7 @@ describe("ComposerPrimaryActions", () => {
 
     expect(markup).not.toContain("stage-nightly");
   });
+<<<<<<< HEAD
 
   it("renders a queue action alongside stop while running with a sendable draft", () => {
     const markup = renderRunningActions(true);
@@ -145,4 +153,6 @@ describe("ComposerPrimaryActions", () => {
     expect(markup).toContain('aria-label="Stop generation"');
     expect(markup).not.toContain('aria-label="Queue message"');
   });
+=======
+>>>>>>> upstream-sync-30cc78897-upstream-renamed
 });
