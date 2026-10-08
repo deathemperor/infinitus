@@ -5,6 +5,7 @@ import {
   normalizeMarkdownLinkDestination,
   parseMarkdownFileLink,
 } from "@infinitus/client-runtime/markdown-links";
+import { parseThreadLinkHref } from "@infinitus/shared/threadLinks";
 import { videoMimeType } from "@infinitus/shared/video";
 
 import type { MARKDOWN_FILE_ICON_SOURCES } from "./markdownFileIcons.generated";
@@ -293,7 +294,11 @@ export function resolveMarkdownLinkPresentation(href: string): MarkdownLinkPrese
 
   return {
     kind: "link",
-    href: /^(?:mailto|tel):/i.test(normalized) ? normalized : null,
+    // A thread link keeps its href so a press reaches the feed, which opens the thread.
+    href:
+      /^(?:mailto|tel):/i.test(normalized) || parseThreadLinkHref(normalized) !== null
+        ? normalized
+        : null,
   };
 }
 
