@@ -2,17 +2,26 @@ import { EnvironmentId } from "@infinitus/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 
-import { BearerConnectionProfile, type ConnectionCatalogEntry } from "./catalog.ts";
+import {
+  BearerConnectionProfile,
+  type ConnectionCatalogEntry,
+  type ConnectionRoute,
+} from "./catalog.ts";
 import {
   BearerConnectionTarget,
   ConnectionBlockedError,
   ConnectionTransientError,
+  RelayConnectionTarget,
   type SupervisorConnectionState,
 } from "./model.ts";
 import {
   connectionCatalogAlternateHosts,
   connectionCatalogDisplayUrl,
+<<<<<<< HEAD
   connectionCatalogRoamedHost,
+=======
+  environmentMcpUrl,
+>>>>>>> upstream-sync-a4c9494b0-upstream-renamed
   connectionStatusText,
   connectionStatusTitle,
   presentEnvironmentConnection,
@@ -73,6 +82,7 @@ describe("connection presentation", () => {
     expect(connectionCatalogDisplayUrl(ENTRY)).toBe("https://environment.example.test");
   });
 
+<<<<<<< HEAD
   it("names the other hosts and where the last connect landed (fork #663)", () => {
     expect(connectionCatalogAlternateHosts(ENTRY)).toEqual([]);
     expect(connectionCatalogRoamedHost(ENTRY)).toBeNull();
@@ -109,6 +119,64 @@ describe("connection presentation", () => {
       enabled: true,
     };
     expect(connectionCatalogRoamedHost(home)).toBeNull();
+=======
+  it("copies the MCP address of the route this device is connected over", () => {
+    const route = (connectionId: string, httpBaseUrl: string): ConnectionRoute => {
+      const target = new BearerConnectionTarget({ ...TARGET, connectionId });
+      return {
+        target,
+        profile: Option.some(
+          new BearerConnectionProfile({
+            connectionId,
+            environmentId: TARGET.environmentId,
+            label: TARGET.label,
+            httpBaseUrl,
+            wsBaseUrl: httpBaseUrl.replace(/^http/, "ws"),
+          }),
+        ),
+      };
+    };
+    const lan = route("lan", "http://192.168.4.53:3773/");
+    const tailnet = route("tailnet", "http://100.115.1.44:3773/");
+    const serve = route("serve", "https://machine.tailnet.ts.net/");
+    const entry: ConnectionCatalogEntry = {
+      ...ENTRY,
+      target: lan.target,
+      profile: lan.profile,
+      alternateRoutes: [tailnet, serve],
+    };
+
+    expect(environmentMcpUrl({ entry, connectedTarget: tailnet.target })).toBe(
+      "http://100.115.1.44:3773/mcp",
+    );
+    // Not connected: the preferred route, plain http or not.
+    expect(environmentMcpUrl({ entry })).toBe("http://192.168.4.53:3773/mcp");
+  });
+
+  it("passes over routes without an address of their own", () => {
+    const relay = new RelayConnectionTarget({
+      environmentId: TARGET.environmentId,
+      label: TARGET.label,
+    });
+    const entry: ConnectionCatalogEntry = {
+      ...ENTRY,
+      target: relay,
+      profile: Option.none(),
+      alternateRoutes: [{ target: ENTRY.target, profile: ENTRY.profile }],
+    };
+
+    // Relay discovery has not reported the tunnel address yet.
+    expect(environmentMcpUrl({ entry, connectedTarget: relay })).toBe(
+      "https://environment.example.test/mcp",
+    );
+    expect(
+      environmentMcpUrl({
+        entry,
+        connectedTarget: relay,
+        relayHttpBaseUrl: "https://tunnel.example.test",
+      }),
+    ).toBe("https://tunnel.example.test/mcp");
+>>>>>>> upstream-sync-a4c9494b0-upstream-renamed
   });
 
   it("distinguishes initial connection, reconnect, and retry errors", () => {
