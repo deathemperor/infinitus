@@ -427,6 +427,12 @@ echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVers
 "$CTL" signin-status nope 2>&1 | grep -q "no sign-in nope" || fail "signin-status did not refuse an unknown flow"
 "$CTL" signin-begin no/such 2>&1 | grep -q "usage: signin-begin" || fail "signin-begin did not refuse an unknown fleet"
 "$CTL" crash-report --body '{nope' >/dev/null 2>&1 && fail "crash-report accepted a broken body"
+# A body past one socket read: the desktop's `peer-sync` push of another
+# machine's fleets is 25 KB and up, and the app once answered its first
+# chunk alone ("bad request", then a closed connection), so the popup never
+# showed the other machines.
+PAD="$(head -c 40000 /dev/zero | tr '\0' x)"
+"$CTL" peer-sync --body "{\"machines\":[],\"results\":[{\"id\":\"pad\",\"ok\":true,\"error\":\"$PAD\"}]}" | expect "d['commands']==[]" || fail "a 40 KB request line must be read whole"
 echo "body verbs: ok"
 
 # --- scenarios: all-dead (no candidate, then recovers) -------------------
