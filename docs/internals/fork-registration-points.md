@@ -740,3 +740,4 @@ background`). Riding along, all
   is done by hand.
 - `apps/mobile/src/dependency-graph.test.ts` — the upward-import ceilings (`state`/`components` → `features`) are the fork's counts: `features/infinitus` (pin-at-creation) is reached from `state/`, so upstream's numbers fail here. On a sync keep the fork's ceilings, and when the test prints a higher count set it to that.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
+- `apps/server/src/provider/acp/AcpSessionRuntime.processTree.test.ts` — the "rotates more than 64 live parents" fixture puts its fake parents above pid_max (#1642): the termination skips the current process's group, and a CI worker pid inside upstream's 1000–1129 range left that parent and child behind.
