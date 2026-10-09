@@ -77,7 +77,7 @@ describe("T3 browser developer instructions", () => {
   it("prefers the product-native preview tools in both collaboration modes", () => {
     {
       const instructions = toolInstructions(runtime, true);
-      NodeAssert.match(instructions, /t3-code/);
+      NodeAssert.match(instructions, /infinitus/);
       NodeAssert.match(instructions, /preview_status/);
       NodeAssert.match(instructions, /preview_open/);
       NodeAssert.match(instructions, /Do not switch to global browser skills/);
