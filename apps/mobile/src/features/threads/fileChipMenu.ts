@@ -1,4 +1,4 @@
-import { fileBasename } from "@infinitus/client-runtime/markdown-links";
+import { fileBasename } from "@infinitus/shared/path";
 import type { ThreadId } from "@infinitus/contracts";
 import { resolveMarkdownLinkPresentation } from "@infinitus/mobile-markdown-text/links";
 import type { MarkdownFileContextMenu } from "@infinitus/mobile-markdown-text/types";

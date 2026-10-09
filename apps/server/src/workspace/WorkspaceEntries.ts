@@ -23,7 +23,7 @@ import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { isExplicitRelativePath, isWindowsAbsolutePath } from "@infinitus/shared/path";
 import { normalizeSearchQuery } from "@infinitus/shared/searchRanking";
 
-import { expandHomePathWith } from "../pathExpansion.ts";
+import { expandHomePathWith } from "@infinitus/provider-core/server/pathExpansion";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as WorkspacePaths from "./WorkspacePaths.ts";
 import * as WorkspaceSearchIndex from "./WorkspaceSearchIndex.ts";

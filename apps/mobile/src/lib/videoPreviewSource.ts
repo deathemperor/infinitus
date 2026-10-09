@@ -2,7 +2,7 @@ import type { AssetResource, ChatFileAttachment, EnvironmentId } from "@infinitu
 import { videoMimeType } from "@infinitus/shared/video";
 
 import type { DraftComposerFileAttachment } from "./composerImages";
-import type { MediaActionsSource } from "./mediaActions";
+import type { MediaActionsSource } from "./mediaActionsSource";
 
 export type MediaVideoPreviewSource = {
   readonly type: "media";

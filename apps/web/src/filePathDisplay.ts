@@ -1,10 +1,9 @@
 import {
   fileBasename,
-  formatFilePathPosition,
-  splitFilePathPosition,
   stripSlashPrefixedWindowsDrive,
-} from "@infinitus/client-runtime/markdown-links";
-import { isWindowsAbsolutePath } from "@infinitus/shared/path";
+  isWindowsAbsolutePath,
+} from "@infinitus/shared/path";
+import { formatFilePathPosition, splitFilePathPosition } from "@infinitus/shared/fileLinks";
 
 function normalizePathSeparators(path: string): string {
   return path.replaceAll("\\", "/");

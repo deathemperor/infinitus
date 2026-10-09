@@ -6,11 +6,9 @@ import {
   markdownImageSourceFragment,
   type MarkdownImageSource,
 } from "./markdownImages.ts";
-import {
-  fileBasename,
-  splitFilePathPosition,
-  splitMarkdownLinkSearchAndHash,
-} from "./markdownLinks.ts";
+import { fileBasename } from "@infinitus/shared/path";
+import { splitFilePathPosition } from "@infinitus/shared/fileLinks";
+import { splitMarkdownLinkSearchAndHash } from "@infinitus/shared/markdownLinks";
 import {
   mediaFileReference,
   mediaReferenceFileName,

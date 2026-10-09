@@ -1,7 +1,7 @@
+import { formatProviderSkillDisplayName } from "@infinitus/shared/inlineSkills";
 import type { ServerProviderSkill } from "@infinitus/contracts";
 import {
   dedupeProviderSkillsByName,
-  formatProviderSkillDisplayName,
   isProviderSkillUserInvocable,
 } from "@infinitus/client-runtime/providerSkills";
 import {

@@ -1,3 +1,4 @@
+import { resolvePathLinkTarget } from "@infinitus/shared/fileLinks";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -5,7 +6,6 @@ import {
   extractTerminalLinks,
   isTerminalLinkActivation,
   isTerminalUrl,
-  resolvePathLinkTarget,
   type TerminalBufferLineLike,
 } from "./terminal-links";
 
