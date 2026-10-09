@@ -17,7 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import { AsyncResult, Atom, AtomRegistry } from "effect/unstable/reactivity";
+import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
@@ -73,7 +73,11 @@ export type AssetUrlState =
   | {
       readonly _tag: "Success";
       readonly url: string;
+<<<<<<< HEAD
       /** When the signed URL stops working, on the server's clock. */
+=======
+      /** When the signed URL stops working, in epoch milliseconds. */
+>>>>>>> upstream-sync-43f8a8de1-upstream-renamed
       readonly expiresAt: number;
       /** The host path the server chose to serve, when it differs from what was asked for. */
       readonly sourcePath?: string;

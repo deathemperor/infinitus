@@ -1,6 +1,6 @@
 import type { ProviderDriverKind, ProviderInstanceId, ServerProvider } from "@infinitus/contracts";
 import type * as Stream from "effect/Stream";
-import type { ServerProviderShape } from "./Services/ServerProvider.ts";
+import type { ServerProviderShape } from "@infinitus/provider-core/server/snapshot";
 
 export type ProviderSnapshotSource = {
   /**

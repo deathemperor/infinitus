@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 import { withProviderSessionEnvironment } from "../../mcp/McpProviderSession.ts";
+=======
+import { withAgentDeviceEnvironment } from "@infinitus/provider-core/server/mcpSession";
+>>>>>>> upstream-sync-43f8a8de1-upstream-renamed
 import { AntigravitySettings, ProviderDriverKind, ProviderSetupError } from "@infinitus/contracts";
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import { resolveSelfInvocation } from "@infinitus/shared/nodeRuntime";
 import {
   NodeRuntimeUnavailableError,
   nodeRuntimeUnavailableMessage,
@@ -14,18 +19,16 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type { AcpError } from "effect-acp/errors";
 
-import * as BackgroundPolicy from "../../background/BackgroundPolicy.ts";
-import { ServerConfig } from "../../config.ts";
-import { ServerSettingsService } from "../../serverSettings.ts";
+import { ProviderHost } from "@infinitus/provider-core/server/ProviderHost";
 import {
   isAntigravityTextGenerationAvailable,
   makeAntigravityTextGeneration,
 } from "../../textGeneration/AntigravityTextGeneration.ts";
 import { makeAntigravityAuth, type AntigravityAuth } from "../AntigravityAuth.ts";
-import { AntigravityInstallation } from "../AntigravityInstallation.ts";
+import * as AntigravityInstallation from "../AntigravityInstallation.ts";
 import {
   antigravityAuthConfigIssue,
   antigravityAuthLabel,
@@ -40,24 +43,27 @@ import {
   makeAntigravityAcpRuntime,
   type AntigravityAcpRuntimeInput,
 } from "../acp/AntigravityAcpSupport.ts";
-import type { AcpSessionRuntime, AcpSessionRuntimeStartResult } from "../acp/AcpSessionRuntime.ts";
-import type { ServerProviderDraft } from "../providerSnapshot.ts";
+import type * as AcpSessionRuntime from "@infinitus/provider-acp/server/AcpSessionRuntime";
+import type { ServerProviderDraft } from "@infinitus/provider-core/server/snapshotProbe";
 import {
   removeAntigravityRuntimeTempDirs,
   removeAntigravitySessionFiles,
 } from "../acp/AntigravitySessionFiles.ts";
+import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
+import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
+import { makeAntigravityAdapterV2 } from "../../orchestration-v2/Adapters/AntigravityAdapterV2.ts";
+import { makeAcpNativeLoggerFactory } from "@infinitus/provider-acp/server/nativeLogging";
 import { ProviderDriverError } from "../Errors.ts";
-import { makeAntigravityAdapter } from "../Layers/AntigravityAdapter.ts";
-import { makeAntigravityProvider } from "../Layers/AntigravityProvider.ts";
-import { ProviderEventLoggers } from "../Layers/ProviderEventLoggers.ts";
+import { makeAntigravityProvider } from "../AntigravityProvider.ts";
+import * as ProviderEventLoggers from "../ProviderEventLoggers.ts";
 import * as ModelManifest from "../ModelManifest.ts";
 import {
   defaultProviderContinuationIdentity,
   type ProviderDriver,
   type ProviderInstance,
-} from "../ProviderDriver.ts";
-import { mergeProviderInstanceEnvironment } from "../ProviderInstanceEnvironment.ts";
-import { withInstanceIdentity } from "./instanceIdentity.ts";
+} from "@infinitus/provider-core/server/driver";
+import { mergeProviderInstanceEnvironment } from "@infinitus/provider-core/server/instanceEnvironment";
+import { withInstanceIdentity } from "@infinitus/provider-core/server/instanceIdentity";
 import { discoverAntigravitySkills, resolveAntigravityUserHome } from "./AntigravitySkills.ts";
 
 const DRIVER = ProviderDriverKind.make("antigravity");
@@ -65,16 +71,15 @@ const decodeSettings = Schema.decodeSync(AntigravitySettings);
 const isNodeRuntimeUnavailableError = Schema.is(NodeRuntimeUnavailableError);
 
 export type AntigravityDriverEnv =
-  | AntigravityInstallation
-  | BackgroundPolicy.BackgroundPolicy
+  | AntigravityInstallation.AntigravityInstallation
+  | ProviderHost
   | ChildProcessSpawner.ChildProcessSpawner
   | Crypto.Crypto
   | FileSystem.FileSystem
+  | IdAllocator.IdAllocatorV2
   | ModelManifest.ModelManifest
   | Path.Path
-  | ProviderEventLoggers
-  | ServerConfig
-  | ServerSettingsService;
+  | ProviderEventLoggers.ProviderEventLoggers;
 
 /** Each instance owns its Google profile. Executable releases are shared by the environment. */
 export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityDriverEnv> = {
@@ -88,10 +93,13 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const serverConfig = yield* ServerConfig;
-      const installation = yield* AntigravityInstallation;
-      const loggers = yield* ProviderEventLoggers;
+      const host = yield* ProviderHost;
+      const selfInvocation = yield* resolveSelfInvocation();
+      const installation = yield* AntigravityInstallation.AntigravityInstallation;
+      const loggers = yield* ProviderEventLoggers.ProviderEventLoggers;
       const modelManifest = yield* ModelManifest.ModelManifest;
+      const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+      const makeNativeLogger = yield* makeAcpNativeLoggerFactory();
       const settings = { ...config, enabled } satisfies AntigravitySettings;
       const auth: AntigravityAuthConfig = {
         authMethod: settings.authMethod,
@@ -103,7 +111,7 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
       const processEnvironment = mergeProviderInstanceEnvironment(environment);
       const userHome = resolveAntigravityUserHome(yield* HostProcessPlatform, processEnvironment);
       const directories = yield* resolveAntigravityInstanceDirectories(
-        serverConfig.stateDir,
+        host.paths.stateDir,
         instanceId,
       ).pipe(
         Effect.provideService(Crypto.Crypto, crypto),
@@ -141,9 +149,6 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
         accentColor,
         continuationGroupKey: continuationIdentity.continuationKey,
       });
-      // Google returns every model the account can use, including older
-      // Gemini generations. The manifest names the current ones so the picker
-      // folds the rest under its legacy section, as it does for Codex.
       const classifyModels = (draft: ServerProviderDraft) =>
         modelManifest.current.pipe(
           Effect.map((manifest) =>
@@ -154,7 +159,7 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
       const makeRuntime = Effect.fn("AntigravityDriver.makeRuntime")(function* (
         input: Omit<AntigravityAcpRuntimeInput, "spawn" | "childProcessSpawner">,
       ): Effect.fn.Return<
-        AcpSessionRuntime["Service"],
+        AcpSessionRuntime.AcpSessionRuntime["Service"],
         AcpError | ProviderSetupError,
         Scope.Scope
       > {
@@ -299,8 +304,8 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
       });
 
       const publishCatalog = (
-        started: AcpSessionRuntimeStartResult,
-        runtime: Pick<AcpSessionRuntime["Service"], "getEvents" | "drainEvents">,
+        started: AcpSessionRuntime.AcpSessionRuntimeStartResult,
+        runtime: Pick<AcpSessionRuntime.AcpSessionRuntime["Service"], "getEvents" | "drainEvents">,
       ): Effect.Effect<void> =>
         Effect.gen(function* () {
           yield* provider.onSessionStarted(started);
@@ -395,16 +400,28 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
       const defaultModel = modelManifest.current.pipe(
         Effect.map((manifest) => ModelManifest.manifestDefaultModel(manifest, DRIVER)),
       );
-      const adapter = yield* makeAntigravityAdapter(settings, {
+      const orchestrationAdapter = yield* makeAntigravityAdapterV2({
         instanceId,
+        selfInvocation,
         makeRuntime,
         withProcess: authFlow.withProcess,
         defaultModel,
         onSessionStarted: provider.onSessionStarted,
-        onConfigOptionsUpdated: provider.onConfigOptionsUpdated,
-        onAvailableCommands: provider.onAvailableCommands,
-        onAuthRequired: provider.onAuthRequired,
-        ...(loggers.native ? { nativeEventLogger: loggers.native } : {}),
+        onSessionEvent: (event) => {
+          if (event._tag === "ConfigOptionsUpdated") {
+            return provider.onConfigOptionsUpdated(event.configOptions);
+          }
+          return event._tag === "AvailableCommandsUpdated"
+            ? provider.onAvailableCommands(event.availableCommands)
+            : Effect.void;
+        },
+        continuationRequests,
+        nativeLogging: (threadId) =>
+          makeNativeLogger({
+            nativeEventLogger: loggers.native,
+            provider: DRIVER,
+            threadId,
+          }),
       });
       const textGeneration = yield* makeAntigravityTextGeneration({
         profileDirectory,
@@ -490,7 +507,7 @@ export const AntigravityDriver: ProviderDriver<AntigravitySettings, AntigravityD
                     }),
                 ),
               ),
-        adapter,
+        orchestrationAdapter,
         textGeneration,
         auth: authFlow.controller,
         refreshModels,

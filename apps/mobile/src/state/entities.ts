@@ -1,8 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
+import { deriveReportedModelSelection } from "@infinitus/client-runtime/state/thread-execution";
 
 import { appAtomRegistry } from "./atom-registry";
 import type {
   EnvironmentProject,
+  EnvironmentThread,
   EnvironmentThreadShell,
 } from "@infinitus/client-runtime/state/shell";
 import type {
@@ -10,14 +12,20 @@ import type {
   ScopedProjectRef,
   ScopedThreadRef,
   ServerConfig,
+  ThreadId,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { Atom } from "effect/unstable/reactivity";
+=======
+import { hasThreadLinks, relabelThreadLinks } from "@infinitus/shared/threadLinks";
+import { Atom } from "effect/reactivity";
+>>>>>>> upstream-sync-43f8a8de1-upstream-renamed
 import { useMemo } from "react";
 
 import { isSideQuestion, withoutSideQuestions } from "../features/infinitus/sideQuestions";
 import { environmentProjects } from "./projects";
 import { environmentServerConfigsAtom, serverEnvironment } from "./server";
-import { environmentThreadShells } from "./threads";
+import { environmentThreadDetails, environmentThreadShells } from "./threads";
 
 const EMPTY_PROJECT_ATOM = Atom.make<EnvironmentProject | null>(null).pipe(
   Atom.withLabel("mobile-project:empty"),
@@ -28,6 +36,25 @@ const EMPTY_THREAD_SHELL_ATOM = Atom.make<EnvironmentThreadShell | null>(null).p
 const EMPTY_SERVER_CONFIG_ATOM = Atom.make<ServerConfig | null>(null).pipe(
   Atom.withLabel("mobile-server-config:empty"),
 );
+const EMPTY_THREAD_TITLES: ReadonlyMap<ThreadId, string> = new Map();
+const EMPTY_THREAD_TITLES_ATOM = Atom.make(EMPTY_THREAD_TITLES).pipe(
+  Atom.withLabel("mobile-thread-titles:empty"),
+);
+
+/** Thread titles in one environment. Emits when a title changes, not on every shell update. */
+const threadTitlesAtom = Atom.family((environmentId: EnvironmentId) => {
+  let previous = EMPTY_THREAD_TITLES;
+  return Atom.make((get) => {
+    const index = get(environmentThreadShells.environmentThreadIndexAtom(environmentId));
+    const unchanged =
+      index.size === previous.size &&
+      Array.from(index).every(([threadId, shell]) => previous.get(threadId) === shell.title);
+    if (!unchanged) {
+      previous = new Map(Array.from(index, ([threadId, shell]) => [threadId, shell.title]));
+    }
+    return previous;
+  }).pipe(Atom.withLabel(`mobile-thread-titles:${environmentId}`));
+});
 
 /** Resolves when the project event reaches the live client store. */
 export function waitForProject(
@@ -64,6 +91,10 @@ export function useThreadShells(): ReadonlyArray<EnvironmentThreadShell> {
   return useMemo(() => withoutSideQuestions(threads), [threads]);
 }
 
+export function useNavigationThreadShells(): ReadonlyArray<EnvironmentThreadShell> {
+  return useAtomValue(environmentThreadShells.navigationThreadShellsAtom);
+}
+
 export function useProject(ref: ScopedProjectRef | null): EnvironmentProject | null {
   return useAtomValue(ref === null ? EMPTY_PROJECT_ATOM : environmentProjects.projectAtom(ref));
 }
@@ -74,6 +105,20 @@ export function useThreadShell(ref: ScopedThreadRef | null): EnvironmentThreadSh
   );
   // Fork (#269 C): a side question never opens as a page on the phone.
   return thread !== null && isSideQuestion(thread) ? null : thread;
+}
+
+/** `markdown` with each thread link labeled by the thread's current title in `environmentId`. */
+export function useLiveThreadLinkLabels(markdown: string, environmentId: EnvironmentId): string {
+  const titles = useAtomValue(
+    hasThreadLinks(markdown) ? threadTitlesAtom(environmentId) : EMPTY_THREAD_TITLES_ATOM,
+  );
+  return useMemo(
+    () =>
+      titles.size === 0
+        ? markdown
+        : relabelThreadLinks(markdown, (threadId) => titles.get(threadId)),
+    [markdown, titles],
+  );
 }
 
 export function useEnvironmentServerConfig(
@@ -88,4 +133,11 @@ export function useEnvironmentServerConfig(
 
 export function useServerConfigs(): ReadonlyMap<EnvironmentId, ServerConfig> {
   return useAtomValue(environmentServerConfigsAtom);
+}
+
+const selectReportedModelSelection = (thread: EnvironmentThread | null) =>
+  thread === null ? null : deriveReportedModelSelection(thread.projection);
+
+export function useThreadReportedModelSelection(ref: ScopedThreadRef) {
+  return useAtomValue(environmentThreadDetails.threadAtom(ref), selectReportedModelSelection);
 }
