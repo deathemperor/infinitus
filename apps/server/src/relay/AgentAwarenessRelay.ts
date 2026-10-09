@@ -241,13 +241,17 @@ function describeThreadShellForAwareness(
   };
 }
 
-// The relay ages a live row out two hours after its `updatedAt` so a dead
+// The relay ages a working row out two hours after its `updatedAt` so a dead
 // environment cannot inflate the card's count forever. The identity check
 // below never republishes an unchanged thread, so a thread that stays Working
 // for hours (a background fleet, a long turn) would age out while still live.
-// Every live thread is republished on this cadence, stamped with the publish
-// time; a terminal row keeps the thread's own timestamp, which the relay reads
-// as when the work finished.
+// Every working thread is republished on this cadence, stamped with the
+// publish time; a terminal row keeps the thread's own timestamp, which the
+// relay reads as when the work finished. A thread waiting for approval or
+// input is left out: the relay keeps a waiting row a full day, and its
+// notification-only path rings on every publish of an attention state, not on
+// the transition into it, so a republish is one more "Input" banner every
+// half hour.
 const AGENT_AWARENESS_HEARTBEAT_INTERVAL = "30 minutes";
 
 export function resolveAgentAwarenessHeartbeatThreadIds(
@@ -260,7 +264,7 @@ export function resolveAgentAwarenessHeartbeatThreadIds(
     }
     const phase = (JSON.parse(identity) as { readonly phase: RelayAgentActivityState["phase"] })
       .phase;
-    if (phase !== "completed" && phase !== "failed") {
+    if (phase === "running" || phase === "starting" || phase === "monitoring") {
       threadIds.push(threadId);
     }
   }

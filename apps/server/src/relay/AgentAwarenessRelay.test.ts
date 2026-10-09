@@ -376,12 +376,15 @@ describe("signRelayAgentActivityPublishProof", { concurrent: false }, () => {
     expect(snapshot("completed")).toMatchObject({ phase: "completed", updatedAt: now });
   });
 
-  it("heartbeats every published thread that is still live", () => {
+  it("heartbeats only the threads the relay ages out while they work", () => {
     const identity = (phase: RelayAgentActivityState["phase"]) =>
       AgentAwarenessRelay.agentAwarenessPublishIdentity({ ...state, phase });
     const published = new Map<ThreadId, string>([
       ["running" as ThreadId, identity("running")],
-      ["waiting" as ThreadId, identity("waiting_for_input")],
+      ["starting" as ThreadId, identity("starting")],
+      ["monitoring" as ThreadId, identity("monitoring")],
+      ["input" as ThreadId, identity("waiting_for_input")],
+      ["approval" as ThreadId, identity("waiting_for_approval")],
       ["done" as ThreadId, identity("completed")],
       ["failed" as ThreadId, identity("failed")],
       ["gone" as ThreadId, AgentAwarenessRelay.agentAwarenessPublishIdentity(null)],
@@ -389,7 +392,8 @@ describe("signRelayAgentActivityPublishProof", { concurrent: false }, () => {
 
     expect(AgentAwarenessRelay.resolveAgentAwarenessHeartbeatThreadIds(published)).toEqual([
       "running",
-      "waiting",
+      "starting",
+      "monitoring",
     ]);
   });
 
