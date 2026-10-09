@@ -1489,7 +1489,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
                 mcpServers: {
                   // Muse defaults to "required", which fails the whole run when T3's
                   // tools cannot be reached. The agent should still work without them.
-                  "t3-code": {
+                  infinitus: {
                     transport: "streamableHttp",
                     mode: "optional",
                     url: mcpSession.endpoint,

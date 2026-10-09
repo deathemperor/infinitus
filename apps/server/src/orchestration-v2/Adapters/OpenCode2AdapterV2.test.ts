@@ -52,6 +52,7 @@ import {
   t3McpServerName,
 } from "@infinitus/provider-opencode/testing";
 import { openCode2ReplayRuntime } from "./OpenCode2AdapterV2.testkit.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const SESSION = "ses_f148ca2deffeJcwCnRQtb0YFNX";
 const WORK = "/work/opencode2";
@@ -79,8 +80,8 @@ const durable = { durable: { aggregateID: SESSION, seq: 1, version: 1 } };
 
 /** The rules T3 gives every session it runs, with only this thread's own T3 MCP server allowed. */
 const mcpRules = [
-  { action: "t3-code-*", resource: "*", effect: "deny" },
-  { action: "t3-code-thread_opencode2-adapter_*", resource: "*", effect: "allow" },
+  { action: "infinitus-*", resource: "*", effect: "deny" },
+  { action: "infinitus-thread_opencode2-adapter_*", resource: "*", effect: "allow" },
 ];
 const t3Rules = [{ action: "*", resource: "*", effect: "allow" }, ...mcpRules];
 const sessionInfo = (overrides: Record<string, unknown> = {}) => ({
@@ -1751,7 +1752,7 @@ describe("OpenCode2 adapter", () => {
       assert.equal(ended?.status, "failed");
       assert.equal(
         ended?.status === "failed" ? ended.failure.message : undefined,
-        "OpenCode is waiting on a request T3 Code couldn't answer.",
+        `OpenCode is waiting on a request ${PRODUCT_NAME} couldn't answer.`,
       );
     }).pipe(Effect.scoped),
   );
@@ -2697,7 +2698,7 @@ describe("OpenCode2 adapter", () => {
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => McpProviderSession.clearMcpProviderSession(threadId)),
         );
-        const server = "t3-code-thread_opencode2-adapter";
+        const server = "infinitus-thread_opencode2-adapter";
         const { runtime, thread } = yield* resumed([
           // Registered for the session's directory under the thread's own name;
           // the session's rules allow only this name's tools (see `t3Rules`).
@@ -2731,7 +2732,7 @@ describe("OpenCode2 adapter", () => {
       const child = ThreadId.make(
         "thread:delegated-task:command%3Amcp%3A48bef2bf-6d0e-4f7a-9c3b-2e5d8a1f7c40%3Adelegate-task%3Asubproject-b-round1",
       );
-      const server = "t3-code-aa73fa1e03099934";
+      const server = "infinitus-aa73fa1e03099934";
       McpProviderSession.setMcpProviderSession({
         environmentId: EnvironmentId.make("environment:opencode2-adapter"),
         threadId: child,
@@ -2753,7 +2754,7 @@ describe("OpenCode2 adapter", () => {
           sessionInfo({
             permissions: [
               { action: "*", resource: "*", effect: "allow" },
-              { action: "t3-code-*", resource: "*", effect: "deny" },
+              { action: "infinitus-*", resource: "*", effect: "deny" },
               { action: `${server}_*`, resource: "*", effect: "allow" },
             ],
           }),
@@ -2799,13 +2800,13 @@ describe("OpenCode2 adapter", () => {
         "thread:delegated-task:command%3Amcp%3A48bef2bf-6d0e-4f7a-9c3b-2e5d8a1f7c40%3Adelegate-task%3Around2",
       ];
       const names = yield* Effect.forEach(ids, t3McpServerName);
-      for (const name of names) assert.match(name, /^t3-code-[A-Za-z0-9_-]{1,56}$/);
+      for (const name of names) assert.match(name, /^infinitus-[A-Za-z0-9_-]{1,56}$/);
       assert.equal(new Set(names).size, ids.length);
       assert.deepEqual(yield* Effect.forEach(ids, t3McpServerName), names);
       // A digested name is the one the synchronous node:crypto version produced.
-      assert.equal(names[0], "t3-code-63abb5df2b188bdd");
+      assert.equal(names[0], "infinitus-63abb5df2b188bdd");
       // A name that already fits stays readable.
-      assert.equal(yield* t3McpServerName(threadId), "t3-code-thread_opencode2-adapter");
+      assert.equal(yield* t3McpServerName(threadId), "infinitus-thread_opencode2-adapter");
     }).pipe(Effect.provide(NodeCrypto.layer)),
   );
 
@@ -3702,8 +3703,8 @@ describe("OpenCode2 adapter", () => {
           sessionID: FORK,
           permissions: [
             { action: "*", resource: "*", effect: "allow" },
-            { action: "t3-code-*", resource: "*", effect: "deny" },
-            { action: "t3-code-thread_opencode2-adapter_fork_*", resource: "*", effect: "allow" },
+            { action: "infinitus-*", resource: "*", effect: "deny" },
+            { action: "infinitus-thread_opencode2-adapter_fork_*", resource: "*", effect: "allow" },
           ],
         }),
         reply("session.update", null),

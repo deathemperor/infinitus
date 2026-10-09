@@ -35,6 +35,8 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   ],
   // The replay workspaces' git author: the recorded checkpoints were made under it.
   ["packages/provider-testing/src/replayWorkspace.ts", '"T3 Code Test"'],
+  // The temporary OpenCode session's title, which its recorded sessions carry.
+  ["packages/provider-opencode/src/server/v2/textGeneration.ts", "T3 Code ${input.operation}"],
   // The upstream attribution constants themselves: the licenses screens credit
   // the project this fork is built on, so these two must hold the real upstream
   // names. Every surface reads them instead of writing the literal, which is

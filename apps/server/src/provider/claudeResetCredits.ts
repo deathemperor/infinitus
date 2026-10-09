@@ -12,6 +12,7 @@
  *
  * @module provider/claudeResetCredits
  */
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no sha256 digest.
 import * as NodeCrypto from "node:crypto";
 
 import type {

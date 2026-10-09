@@ -250,12 +250,29 @@ new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
   (`provider-core/.../orchestrationInstructions.test.ts`,
   `provider-pi/.../mcpInjection.test.ts`, `provider-muse/.../status.test.ts`).
   `scripts/connect-name.guard.test.ts` scans these roots too.
-- `apps/server/src/orchestration-v2/Adapters/MuseAdapterV2.testkit.ts` —
-  `replayValueMatches` compares strings with upstream's product name mapped
-  to `PRODUCT_NAME` on both sides: the recorded Muse transcripts carry
-  upstream's runtime instructions. `testkit/fixtures/claude_local_bash_task/output.ts`
-  asserts the recorded command without its package scope, which the rename
-  script rewrites in the assertion but not in the transcript.
+- The MCP server the agents see is named `infinitus` (#1368 E): the
+  registration sites are `orchestration-v2/Adapters/ClaudeAdapterV2.ts`
+  (the `mcpServers` key, `CLAUDE_T3_MCP_TOOL_WILDCARD` and the read-only
+  `mcp__infinitus__*` list), `CodexAdapterV2.ts` (the `-c` override key),
+  `packages/provider-acp/src/server/adapter.ts` (the session's `mcpServers`
+  name/serverId and the `clientInfo` name) + `mcpOverAcpBridge.ts` (the
+  serverId it answers), `packages/provider-cursor/src/server/adapter.ts`,
+  `packages/provider-muse/src/server/adapter.ts`,
+  `packages/provider-opencode/src/server/adapter.ts` (1.x) and
+  `v2/adapter.ts` (`infinitus-<thread>`; the instructions entry key stays
+  `t3-code`), and the agent-facing texts in
+  `packages/provider-core/src/server/{runtimeInstructions,orchestrationInstructions}.ts`.
+  Thread history still spells the old names, so the readers accept both:
+  `packages/shared/src/t3McpToolPresentation.ts` and
+  `packages/provider-acp/src/server/runtimeModel.ts` (its title regexes).
+  Pi's extension keeps upstream's `mcp__t3-code__` tool names. The adapter
+  tests assert the new spelling; the Muse and OpenCode replay testkits
+  (`MuseAdapterV2.testkit.ts`, `OpenCodeAdapterV2.testkit.ts`) compare the
+  recordings' `t3-code` (and upstream's product name) under the fork's
+  spelling, since the transcripts were recorded upstream.
+- `testkit/fixtures/claude_local_bash_task/output.ts` asserts the recorded
+  command without its package scope, which the rename script rewrites in
+  the assertion but not in the transcript.
 - `packages/client-runtime/src/connection/outdatedHostUpdate.ts` (+
   `resolver.test.ts`) — the "Update T3 Code on …" messages say `PRODUCT_NAME`.
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`

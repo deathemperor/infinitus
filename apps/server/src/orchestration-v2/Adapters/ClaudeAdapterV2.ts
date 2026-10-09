@@ -927,30 +927,30 @@ export function makeClaudeQueryOptions(input: {
   return input.cwd === null ? withDirectories : { ...withDirectories, cwd: input.cwd };
 }
 
-export const CLAUDE_T3_MCP_TOOL_WILDCARD = "mcp__t3-code__*";
+export const CLAUDE_T3_MCP_TOOL_WILDCARD = "mcp__infinitus__*";
 
 // Must stay in sync with the Tool.Readonly annotations on OrchestratorToolkit;
 // ClaudeAdapterV2.test.ts cross-checks this list against the toolkit.
 export const CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS: ReadonlyArray<string> = [
-  "mcp__t3-code__orchestrator_capabilities",
-  "mcp__t3-code__list_scheduled_tasks",
-  "mcp__t3-code__t3_thread_list",
-  "mcp__t3-code__t3_thread_wait",
-  "mcp__t3-code__t3_pending_request_list",
-  "mcp__t3-code__t3_pending_request_read",
-  "mcp__t3-code__t3_thread_configuration",
-  "mcp__t3-code__t3_thread_transfers",
-  "mcp__t3-code__t3_worktree_status",
-  "mcp__t3-code__t3_worktree_list",
-  "mcp__t3-code__t3_project_list",
-  "mcp__t3-code__t3_project_read",
-  "mcp__t3-code__t3_thread_search",
-  "mcp__t3-code__t3_preview_list",
-  "mcp__t3-code__t3_environment_read",
-  "mcp__t3-code__t3_queue_list",
-  "mcp__t3-code__t3_queue_read",
-  "mcp__t3-code__html_preview",
-  "mcp__t3-code__html_render",
+  "mcp__infinitus__orchestrator_capabilities",
+  "mcp__infinitus__list_scheduled_tasks",
+  "mcp__infinitus__t3_thread_list",
+  "mcp__infinitus__t3_thread_wait",
+  "mcp__infinitus__t3_pending_request_list",
+  "mcp__infinitus__t3_pending_request_read",
+  "mcp__infinitus__t3_thread_configuration",
+  "mcp__infinitus__t3_thread_transfers",
+  "mcp__infinitus__t3_worktree_status",
+  "mcp__infinitus__t3_worktree_list",
+  "mcp__infinitus__t3_project_list",
+  "mcp__infinitus__t3_project_read",
+  "mcp__infinitus__t3_thread_search",
+  "mcp__infinitus__t3_preview_list",
+  "mcp__infinitus__t3_environment_read",
+  "mcp__infinitus__t3_queue_list",
+  "mcp__infinitus__t3_queue_read",
+  "mcp__infinitus__html_preview",
+  "mcp__infinitus__html_render",
 ];
 
 // Claude Code aborts an HTTP MCP call after 60 s ("The operation timed out.")
@@ -992,7 +992,7 @@ export function claudeMcpQueryOverrides(input: {
   return {
     allowedTools: Array.from(new Set([...(input.allowedTools ?? []), ...mcpAllowedTools])),
     mcpServers: {
-      "t3-code": {
+      infinitus: {
         type: "http",
         url: session.endpoint,
         headers: {

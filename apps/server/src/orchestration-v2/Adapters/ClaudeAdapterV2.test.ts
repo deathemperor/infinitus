@@ -474,7 +474,7 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
 
 describe("ClaudeAdapterV2 MCP query overrides", () => {
   const T3_MCP_SERVERS = {
-    "t3-code": {
+    infinitus: {
       type: "http",
       url: "http://127.0.0.1:43123/mcp",
       headers: {
@@ -545,11 +545,11 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
       const overrides = ClaudeAdapterV2.claudeMcpQueryOverrides({
         threadId,
         readOnlySandbox: false,
-        allowedTools: ["Read", "mcp__t3-code__*"],
+        allowedTools: ["Read", "mcp__infinitus__*"],
       });
 
       assert.deepEqual(overrides, {
-        allowedTools: ["Read", "mcp__t3-code__*"],
+        allowedTools: ["Read", "mcp__infinitus__*"],
         mcpServers: T3_MCP_SERVERS,
         mcpEnvironment: T3_MCP_ENVIRONMENT,
       });
@@ -667,7 +667,7 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
       ...Object.values(HtmlToolkit.tools),
     ]
       .filter((tool) => Context.get(tool.annotations, Tool.Readonly))
-      .map((tool) => `mcp__t3-code__${tool.name}`)
+      .map((tool) => `mcp__infinitus__${tool.name}`)
       .sort();
 
     assert.deepEqual(
@@ -697,9 +697,9 @@ describe("ClaudeAdapterV2 native protocol logging", () => {
         allowedTools: ["Read"],
       });
       assert.deepEqual(overrides, {
-        allowedTools: ["Read", "mcp__t3-code__*"],
+        allowedTools: ["Read", "mcp__infinitus__*"],
         mcpServers: {
-          "t3-code": {
+          infinitus: {
             type: "http",
             url: "http://127.0.0.1:43123/mcp",
             headers: {

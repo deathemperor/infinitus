@@ -101,7 +101,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const withProductName = (text: string) => text.replaceAll(UPSTREAM_PRODUCT_NAME, PRODUCT_NAME);
+/**
+ * Upstream's recordings carry its product name in the runtime instructions
+ * and register the MCP server as `t3-code`, which the fork names `infinitus`
+ * (#1368 E); both sides are compared under the fork's spelling.
+ */
+const withForkNames = (text: string) =>
+  text.replaceAll(UPSTREAM_PRODUCT_NAME, PRODUCT_NAME).replaceAll("t3-code", "infinitus");
+
+const withForkKeys = (record: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(record).map(([key, value]) => [withForkNames(key), value]));
 
 function replayValueMatches(expected: unknown, actual: unknown): boolean {
   if (expected === MUSE_REPLAY_ANY) return true;
@@ -114,12 +123,13 @@ function replayValueMatches(expected: unknown, actual: unknown): boolean {
   }
   if (isRecord(expected)) {
     if (!isRecord(actual)) return false;
-    const keys = new Set([...Object.keys(expected), ...Object.keys(actual)]);
-    return [...keys].every((key) => replayValueMatches(expected[key], actual[key]));
+    const left = withForkKeys(expected);
+    const right = withForkKeys(actual);
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+    return [...keys].every((key) => replayValueMatches(left[key], right[key]));
   }
-  // Upstream's recordings carry its product name in the runtime instructions.
   if (typeof expected === "string" && typeof actual === "string") {
-    return withProductName(expected) === withProductName(actual);
+    return withForkNames(expected) === withForkNames(actual);
   }
   return Object.is(expected, actual);
 }

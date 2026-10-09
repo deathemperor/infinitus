@@ -1085,7 +1085,7 @@ function acpMcpFallbackInput(value: string | undefined): Record<string, unknown>
  * T3 tool inventory, so the separator match can stay loose.
  */
 const T3_MCP_TITLE_CALL =
-  /^(?:mcp[-_]{1,2})?t3[-_ ]?code[-_.:/ ]{1,3}(?<tool>[A-Za-z0-9][A-Za-z0-9_.-]*)(?::.*)?$/i;
+  /^(?:mcp[-_]{1,2})?(?:t3[-_ ]?code|infinitus)[-_.:/ ]{1,3}(?<tool>[A-Za-z0-9][A-Za-z0-9_.-]*)(?::.*)?$/i;
 
 /**
  * Gemini CLI titles injected MCP calls "<tool> (<server> MCP Server)" and
@@ -1093,7 +1093,7 @@ const T3_MCP_TITLE_CALL =
  * tool-first as "<tool>_t3-code".
  */
 const T3_MCP_TITLE_SUFFIX_CALL =
-  /^(?<tool>[A-Za-z0-9][A-Za-z0-9_.-]*?)(?: \(t3[-_ ]?code MCP Server\)(?::|$)|[-_.]t3[-_ ]?code$)/i;
+  /^(?<tool>[A-Za-z0-9][A-Za-z0-9_.-]*?)(?: \((?:t3[-_ ]?code|infinitus) MCP Server\)(?::|$)|[-_.](?:t3[-_ ]?code|infinitus)$)/i;
 
 /**
  * glm-acp-agent and Kimi CLI register injected MCP tools under their bare

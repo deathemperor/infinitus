@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no sha256 digest.
 import * as NodeCrypto from "node:crypto";
 import { StatsRequest, StatsSnapshot, type StatsSession } from "@infinitus/contracts";
 import { statsWindow, shiftStatsDay, statsDayFormatter } from "@infinitus/shared/stats";

@@ -87,6 +87,8 @@ export const OpenCodeOrchestratorReplayHarnessError = Schema.Union([
 export type OpenCodeOrchestratorReplayHarnessError =
   typeof OpenCodeOrchestratorReplayHarnessError.Type;
 
+const withForkName = (text: string) => text.replaceAll("t3-code", "infinitus");
+
 function replayValueMatches(expected: unknown, actual: unknown): boolean {
   if (expected === "<any>" || expected === "<workspace>") return true;
   if (Array.isArray(expected)) {
@@ -101,6 +103,12 @@ function replayValueMatches(expected: unknown, actual: unknown): boolean {
     return Object.entries(expected).every(([key, value]) =>
       replayValueMatches(value, (actual as Record<string, unknown>)[key]),
     );
+  }
+  // Upstream's recordings register the MCP server as `t3-code-<thread>`;
+  // the fork names it `infinitus-<thread>` (#1368 E). Both sides are compared
+  // under the fork's spelling: the instructions entry key stays `t3-code`.
+  if (typeof expected === "string" && typeof actual === "string") {
+    return withForkName(expected) === withForkName(actual);
   }
   return Object.is(expected, actual);
 }
