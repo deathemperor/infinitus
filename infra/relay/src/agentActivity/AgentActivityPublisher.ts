@@ -57,6 +57,7 @@ export const make = Effect.gen(function* () {
   const publishForDeliveryUser = Effect.fnUntraced(function* (input: {
     readonly deliveryUser: EnvironmentLinks.AgentAwarenessDeliveryUserRecord;
     readonly state: RelayAgentActivityState | null;
+    readonly publishedThread: ApnsDeliveries.PublishedThreadRef;
     readonly nowMs: number;
   }) {
     const activeStates = input.deliveryUser.liveActivitiesEnabled
@@ -92,6 +93,7 @@ export const make = Effect.gen(function* () {
               target,
               aggregate: liveActivityAggregate,
               nowMs: input.nowMs,
+              publishedThread: input.publishedThread,
             }),
             notificationOnlyAggregate === null
               ? Effect.succeed(null)
@@ -177,6 +179,7 @@ export const make = Effect.gen(function* () {
           publishForDeliveryUser({
             deliveryUser,
             state: input.state,
+            publishedThread: { environmentId: input.environmentId, threadId: input.threadId },
             nowMs: now.epochMilliseconds,
           }),
         { concurrency: 4 },

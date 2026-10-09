@@ -427,6 +427,17 @@ echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVers
 "$CTL" signin-status nope 2>&1 | grep -q "no sign-in nope" || fail "signin-status did not refuse an unknown flow"
 "$CTL" signin-begin no/such 2>&1 | grep -q "usage: signin-begin" || fail "signin-begin did not refuse an unknown fleet"
 "$CTL" crash-report --body '{nope' >/dev/null 2>&1 && fail "crash-report accepted a broken body"
+# A body past one socket read: the desktop's `peer-sync` push of another
+# machine's fleets is 25 KB and up, and the app once answered its first
+# chunk alone ("bad request", then a closed connection), so the popup never
+# showed the other machines.
+# The body is this instance's own `fleets` reply as one peer machine, so a
+# real fleet document round-trips into the app's `PeerFleets.Body` too.
+PEER_BODY="$("$CTL" fleets | python3 -c "import json,sys
+fleets=json.load(sys.stdin); pad='x'*40000
+print(json.dumps({'machines':[{'id':'e2e-peer','label':'E2E Peer','connected':True,'fleets':fleets}],'results':[{'id':'pad','ok':True,'error':pad}]}))")"
+"$CTL" peer-sync --body "$PEER_BODY" | expect "d['commands']==[]" || fail "a 40 KB request line must be read whole"
+"$CTL" peer-sync --body '{"machines":[],"results":[]}' | expect "d['commands']==[]" || fail "peer-sync could not drop the peer"
 echo "body verbs: ok"
 
 # --- scenarios: all-dead (no candidate, then recovers) -------------------
