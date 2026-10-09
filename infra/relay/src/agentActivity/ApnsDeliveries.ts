@@ -201,10 +201,21 @@ function shouldUpdateLiveActivity(input: {
 // Completions replayed long after the fact (server restarts republish every
 // recently-finished thread) must not ring the device again.
 
+/** The thread whose state a publish carries. The alert push has no transition
+    memory, so without a card it must ring for THIS thread's state, not for
+    whichever row sorts to the top of the whole aggregate: a waiting row sorts
+    first, and every other thread's publish (a turn starting, the fork's
+    half-hour heartbeat for a working thread) rang the phone for it again. */
+export interface PublishedThreadRef {
+  readonly environmentId: string;
+  readonly threadId: string;
+}
+
 function notificationForAggregate(input: {
   readonly target: LiveActivities.TargetRow;
   readonly aggregate: RelayAgentActivityAggregateState | null;
   readonly nowMs: number;
+  readonly publishedThread?: PublishedThreadRef | null;
 }): ApnsNotificationPayload | null {
   if (!input.target.push_token || input.aggregate === null) {
     return null;
@@ -213,7 +224,13 @@ function notificationForAggregate(input: {
   if (!preferences?.notificationsEnabled) {
     return null;
   }
-  const activity = input.aggregate.activities[0];
+  const published = input.publishedThread;
+  const activity = published
+    ? input.aggregate.activities.find(
+        (row) =>
+          row.environmentId === published.environmentId && row.threadId === published.threadId,
+      )
+    : input.aggregate.activities[0];
   if (!activity) {
     return null;
   }
@@ -310,6 +327,7 @@ function chooseDelivery(input: {
   readonly aggregate: RelayAgentActivityAggregateState | null;
   readonly nowMs: number;
   readonly replay?: boolean;
+  readonly publishedThread?: PublishedThreadRef | null;
 }): ChosenDelivery | null {
   const liveActivityDelivery = chooseLiveActivityDelivery(input);
   if (liveActivityDelivery === "suppressed") {
@@ -524,6 +542,7 @@ export class ApnsDeliveries extends Context.Service<
       readonly aggregate: RelayAgentActivityAggregateState | null;
       readonly nowMs: number;
       readonly replay?: boolean;
+      readonly publishedThread?: PublishedThreadRef | null;
     }) => Effect.Effect<RelayDeliveryResult | null, ApnsDeliveryError>;
     readonly sendPushNotificationForTarget: (input: {
       readonly target: LiveActivities.TargetRow;
@@ -1131,6 +1150,7 @@ export const make = Effect.gen(function* () {
         aggregate: input.aggregate,
         nowMs: input.nowMs,
         replay: input.replay ?? false,
+        publishedThread: input.publishedThread ?? null,
       });
       if (!delivery) {
         return null;
@@ -1152,6 +1172,7 @@ export const make = Effect.gen(function* () {
             target: input.target,
             aggregate: input.aggregate,
             nowMs: input.nowMs,
+            publishedThread: input.publishedThread ?? null,
           });
       // The end event doubles as the "task finished" moment. When a companion
       // push notification is about to ring the device (below), the activity end
