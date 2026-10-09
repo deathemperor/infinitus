@@ -431,8 +431,13 @@ echo '{"id":"e2e-crash","platform":"ios","device":"e2e","appVersion":"0","osVers
 # machine's fleets is 25 KB and up, and the app once answered its first
 # chunk alone ("bad request", then a closed connection), so the popup never
 # showed the other machines.
-PAD="$(head -c 40000 /dev/zero | tr '\0' x)"
-"$CTL" peer-sync --body "{\"machines\":[],\"results\":[{\"id\":\"pad\",\"ok\":true,\"error\":\"$PAD\"}]}" | expect "d['commands']==[]" || fail "a 40 KB request line must be read whole"
+# The body is this instance's own `fleets` reply as one peer machine, so a
+# real fleet document round-trips into the app's `PeerFleets.Body` too.
+PEER_BODY="$("$CTL" fleets | python3 -c "import json,sys
+fleets=json.load(sys.stdin); pad='x'*40000
+print(json.dumps({'machines':[{'id':'e2e-peer','label':'E2E Peer','connected':True,'fleets':fleets}],'results':[{'id':'pad','ok':True,'error':pad}]}))")"
+"$CTL" peer-sync --body "$PEER_BODY" | expect "d['commands']==[]" || fail "a 40 KB request line must be read whole"
+"$CTL" peer-sync --body '{"machines":[],"results":[]}' | expect "d['commands']==[]" || fail "peer-sync could not drop the peer"
 echo "body verbs: ok"
 
 # --- scenarios: all-dead (no candidate, then recovers) -------------------
