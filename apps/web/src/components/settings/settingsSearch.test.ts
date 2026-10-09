@@ -161,6 +161,7 @@ describe("searchSettings", () => {
       "source-control-writer-model",
       "source-control-writing-style",
       "t3-connect",
+      "hold-webhooks-while-offline",
       "tailscale-https",
       "wsl-backend",
       "auto-settle-inactive-threads",
@@ -169,7 +170,6 @@ describe("searchSettings", () => {
       "infinitus-preferences",
       "infinitus-themes",
       "infinitus-animations",
-      "infinitus-sessions",
       "infinitus-team",
       "infinitus-push",
       "infinitus-devices",
@@ -200,6 +200,25 @@ describe("searchSettings", () => {
     // Browsers without access:write still render CloudLinkRow for their host.
     const browser = filterAvailableSettingsSearchItems(availability).map((item) => item.id);
     expect(browser).toContain("publish-agent-activity");
+  });
+
+  it("offers webhook holding only while the managed tunnel is on, like its row", () => {
+    const availability = {
+      hasCloudPublicConfig: true,
+      hasEnvironment: true,
+      hasProviderSettingsEnvironment: true,
+      hasMacProviderSettingsEnvironment: false,
+      canManageLocalBackend: true,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: false,
+      hasInfinitusEnvironment: false,
+    };
+    const itemIds = (managedTunnelActive: boolean) =>
+      filterAvailableSettingsSearchItems({ ...availability, managedTunnelActive }).map(
+        (item) => item.id,
+      );
+    expect(itemIds(false)).not.toContain("hold-webhooks-while-offline");
+    expect(itemIds(true)).toContain("hold-webhooks-while-offline");
   });
 
   it("shows automatic settlement settings when the server supports them", () => {
@@ -237,7 +256,6 @@ describe("searchSettings", () => {
       "infinitus-preferences",
       "infinitus-themes",
       "infinitus-animations",
-      "infinitus-sessions",
       "infinitus-team",
       "infinitus-push",
       "infinitus-devices",
@@ -248,28 +266,6 @@ describe("searchSettings", () => {
       "worktree-submodules",
       "project-actions",
     ]);
-  });
-
-  it("finds the priority page by what it holds back — threads (#1069)", () => {
-    const available = filterAvailableSettingsSearchItems({
-      hasCloudPublicConfig: false,
-      hasEnvironment: false,
-      hasProviderSettingsEnvironment: false,
-      hasMacProviderSettingsEnvironment: false,
-      canManageLocalBackend: false,
-      isWslSettingsRowVisible: false,
-      hasThreadAutoSettlement: false,
-      hasInfinitusEnvironment: true,
-    });
-
-    expect(searchSettings("thread priority", available).map((item) => item.id)).toContain(
-      "infinitus-sessions",
-    );
-    // The row reads "Thread priority" since #1069; "session" stays a search
-    // term so anyone who knew it by its old name still lands on the page.
-    expect(searchSettings("session priority", available).map((item) => item.id)).toContain(
-      "infinitus-sessions",
-    );
   });
 
   it("sends the retired pushes and Live Activity nowhere (#1041)", () => {
@@ -360,6 +356,10 @@ describe("searchSettings", () => {
     });
     expect(searchSettings("word wrap")[0]).toMatchObject({
       id: "word-wrap",
+      to: "/settings/appearance",
+    });
+    expect(searchSettings("composer context")[0]).toMatchObject({
+      id: "composer-context",
       to: "/settings/appearance",
     });
     expect(searchSettings("environment identification")[0]).toMatchObject({

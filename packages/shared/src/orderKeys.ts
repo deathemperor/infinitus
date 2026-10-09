@@ -8,7 +8,7 @@
  */
 const ORDER_KEY_DIGITS = "abcdefghijklmnopqrstuvwxyz";
 
-export function isValidOrderKey(key: string): boolean {
+function isValidOrderKey(key: string): boolean {
   if (key.length === 0) return false;
   for (const char of key) {
     if (!ORDER_KEY_DIGITS.includes(char)) return false;

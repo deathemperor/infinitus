@@ -1,5 +1,5 @@
 import type { ClientSettings } from "@infinitus/contracts/settings";
-import type { AssistantCitation, ComposerSendMode } from "@infinitus/contracts";
+import type { AssistantCitation, ResolvedKeybindingsConfig } from "@infinitus/contracts";
 import {
   serializeAssistantCitation,
   withAssistantCitationComment,
@@ -9,22 +9,11 @@ import {
   type ComposerPromptSegment,
 } from "./composer-editor-mentions";
 
+import { resolveShortcutCommand, type ShortcutEventLike } from "./keybindings";
+
 export type ComposerTriggerKind = "path" | "pull-request" | "slash-command" | "skill";
 export type ComposerSlashCommand = "model" | "plan" | "default";
-/** `queue` (#806): the message waits on the server for the running turn to finish. */
-// Fork (#270 F, #806, #1318): `queue` and `steer` hand the message to the
-// server's queue while a turn runs; a `steer` row is due at the turn's next
-// finished tool call, a `queue` row when the thread is idle. Upstream's
-// `alternate` (#11964) is its own form of the same ⌘↩ flip: it stays in the
-// union so upstream's `composerSubmissionIntentForEnter` and its tests hold,
-// but on a server thread `submitComposer` replaces it with the fork's send
-// mode, and every other consumer reads it as a plain foreground send.
-export type ComposerSubmissionIntent =
-  | "foreground"
-  | "background"
-  | "queue"
-  | "steer"
-  | "alternate";
+export type ComposerSubmissionIntent = "foreground" | "background" | "alternate";
 
 export interface ComposerTrigger {
   kind: ComposerTriggerKind;
@@ -37,38 +26,48 @@ export function formatAssistantCitationForComposer(citation: AssistantCitation, 
   return `${serializeAssistantCitation(withAssistantCitationComment(citation, comment))} `;
 }
 
-export function composerSubmissionIntentForEnter(input: {
+function composerRequiresModifier(
+  sendShortcut: ClientSettings["sendShortcut"] | undefined,
+  prompt: string,
+) {
+  return (
+    sendShortcut === "mod-enter" ||
+    (sendShortcut === "mod-enter-multiline" && /[\r\n]/.test(prompt))
+  );
+}
+
+export function composerSubmissionIntentForKey(input: {
+  event: ShortcutEventLike & { isComposing?: boolean; keyCode?: number; repeat?: boolean };
+  keybindings: ResolvedKeybindingsConfig;
+  platform?: string;
   isMobileViewport: boolean;
-  shiftKey: boolean;
-  modifierKey: boolean;
   isDraftThread: boolean;
   isRunning?: boolean;
   sendShortcut?: ClientSettings["sendShortcut"];
   prompt?: string;
 }): ComposerSubmissionIntent | null {
-  const requiresModifier =
-    input.sendShortcut === "mod-enter" ||
-    (input.sendShortcut === "mod-enter-multiline" && /[\r\n]/.test(input.prompt ?? ""));
-  if (input.isMobileViewport || (requiresModifier && !input.modifierKey)) return null;
-  if (input.shiftKey && !(requiresModifier && input.modifierKey && input.isRunning)) return null;
-  if (input.isRunning && input.modifierKey && (!requiresModifier || input.shiftKey)) {
-    return "alternate";
-  }
-  return input.modifierKey && input.isDraftThread ? "background" : "foreground";
-}
-
-/**
- * Fork (#270 F): the modifier on Enter flips the running-turn send mode. A
- * draft thread has no running turn and already spends ⌘↩ on "start in the
- * background", so it keeps the setting as is.
- */
-export function composerSendModeForEnter(input: {
-  sendMode: ComposerSendMode;
-  modifierKey: boolean;
-  isDraftThread: boolean;
-}): ComposerSendMode {
-  if (!input.modifierKey || input.isDraftThread) return input.sendMode;
-  return input.sendMode === "queue" ? "steer" : "queue";
+  const { event } = input;
+  if (input.isMobileViewport || event.isComposing || event.keyCode === 229 || event.repeat)
+    return null;
+  const command = resolveShortcutCommand(event, input.keybindings, {
+    ...(input.platform === undefined ? {} : { platform: input.platform }),
+    context: {
+      composerFocus: true,
+      draftThreadRoute: input.isDraftThread,
+      turnRunning: input.isRunning === true,
+    },
+  });
+  if (command === "composer.sendAlternate" && input.isRunning) return "alternate";
+  if (command === "composer.sendBackground" && input.isDraftThread) return "background";
+  if (command === "composer.sendAndNewThread" && !input.isDraftThread) return "background";
+  if (command !== null || event.key !== "Enter" || event.shiftKey || event.altKey) return null;
+  if (
+    composerRequiresModifier(input.sendShortcut, input.prompt ?? "") &&
+    !event.metaKey &&
+    !event.ctrlKey
+  )
+    return null;
+  return "foreground";
 }
 
 const isInlineTokenSegment = (segment: ComposerPromptSegment): boolean => segment.type !== "text";
@@ -90,7 +89,12 @@ function tokenStartForCursor(text: string, cursor: number): number {
   return index + 1;
 }
 
-export function expandCollapsedComposerCursor(text: string, cursorInput: number): number {
+export function expandCollapsedComposerCursor(
+  text: string,
+  cursorInput: number,
+  literalText = false,
+): number {
+  if (literalText) return clampCursor(text, cursorInput);
   const collapsedCursor = clampCursor(text, cursorInput);
   const segments = splitPromptIntoComposerSegments(text);
   if (segments.length === 0) {
@@ -156,14 +160,24 @@ function clampCollapsedComposerCursorForSegments(
   return Math.max(0, Math.min(collapsedLength, Math.floor(cursorInput)));
 }
 
-export function clampCollapsedComposerCursor(text: string, cursorInput: number): number {
+export function clampCollapsedComposerCursor(
+  text: string,
+  cursorInput: number,
+  literalText = false,
+): number {
+  if (literalText) return clampCursor(text, cursorInput);
   return clampCollapsedComposerCursorForSegments(
     splitPromptIntoComposerSegments(text),
     cursorInput,
   );
 }
 
-export function collapseExpandedComposerCursor(text: string, cursorInput: number): number {
+export function collapseExpandedComposerCursor(
+  text: string,
+  cursorInput: number,
+  literalText = false,
+): number {
+  if (literalText) return clampCursor(text, cursorInput);
   const expandedCursor = clampCursor(text, cursorInput);
   const segments = splitPromptIntoComposerSegments(text);
   if (segments.length === 0) {
@@ -293,14 +307,19 @@ export function detectComposerTrigger(text: string, cursorInput: number): Compos
 }
 
 /** Caret and trigger after replacing composer text and continuing at the end. */
-export function composerStateAtPromptEnd(text: string): {
+export function composerStateAtPromptEnd(
+  text: string,
+  literalText = false,
+): {
   cursor: number;
   trigger: ComposerTrigger | null;
 } {
-  const cursor = collapseExpandedComposerCursor(text, text.length);
+  const cursor = collapseExpandedComposerCursor(text, text.length, literalText);
   return {
     cursor,
-    trigger: detectComposerTrigger(text, expandCollapsedComposerCursor(text, cursor)),
+    trigger: literalText
+      ? null
+      : detectComposerTrigger(text, expandCollapsedComposerCursor(text, cursor)),
   };
 }
 

@@ -1,4 +1,5 @@
 import type {
+  BranchNamingOptions,
   VcsRef,
   SourceControlProviderInfo,
   VcsStatusLocalResult,
@@ -14,13 +15,18 @@ import { detectSourceControlProviderFromRemoteUrl } from "./sourceControl.ts";
 // `t3code/…` is still recognised so threads created before the rename keep
 // their temporary-branch behaviour (regeneration, cleanup prompts).
 export const WORKTREE_BRANCH_PREFIX = "infinitus";
-export const LEGACY_WORKTREE_BRANCH_PREFIX = "t3code";
-// Canonical form is `infinitus/<8 hex>`. Older mobile builds generated `t3code/<uuid>`
-// via Crypto.randomUUID() (always RFC 4122 v4), so the matcher also accepts exactly
-// that shape — version nibble `4`, variant nibble `[89ab]` — to keep those threads
-// eligible for branch regeneration without loosening beyond what was ever generated.
+const LEGACY_WORKTREE_BRANCH_PREFIX = "t3code";
+// Canonical form is `infinitus/<8 hex>`. `infinitus-<8 hex>` is the fallback when a
+// plain `infinitus` branch blocks the namespace. The matcher also accepts every
+// legacy shape, so existing threads stay eligible for branch regeneration:
+// `t3code/<8 hex>` and `t3code-<8 hex>` from before the rename, and `t3code/<uuid>`
+// from older mobile builds that used Crypto.randomUUID() (always RFC 4122 v4, so
+// version nibble `4` and variant nibble `[89ab]`). Nothing looser than what was generated.
+const TEMP_WORKTREE_HEX_TOKEN = "[0-9a-f]{8}";
+const TEMP_WORKTREE_UUID_V4_TOKEN =
+  "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const TEMP_WORKTREE_BRANCH_PATTERN = new RegExp(
-  `^(?:${WORKTREE_BRANCH_PREFIX}|${LEGACY_WORKTREE_BRANCH_PREFIX})\\/(?:[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`,
+  `^(?:${WORKTREE_BRANCH_PREFIX}[-/]${TEMP_WORKTREE_HEX_TOKEN}|${LEGACY_WORKTREE_BRANCH_PREFIX}(?:[-/]${TEMP_WORKTREE_HEX_TOKEN}|\\/${TEMP_WORKTREE_UUID_V4_TOKEN}))$`,
 );
 
 /**
@@ -43,6 +49,24 @@ export function sanitizeBranchFragment(raw: string): string {
     .replace(/[./_-]+$/g, "");
 
   return branchFragment.length > 0 ? branchFragment : "update";
+}
+
+/** Custom naming preserves the model's complete ref; Git validates it on rename. */
+export function formatGeneratedBranchName(raw: string, naming?: BranchNamingOptions): string {
+  if (naming?.mode === "custom") return raw.trim();
+  const branch = sanitizeBranchFragment(raw);
+  if (naming?.mode !== "static") return branch;
+  const prefix = naming.prefix
+    .split("/")
+    .map((part) =>
+      part
+        .replace(/[^a-zA-Z0-9_-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, ""),
+    )
+    .filter(Boolean)
+    .join("/");
+  return prefix ? `${prefix}/${branch}` : branch;
 }
 
 /**
@@ -106,6 +130,18 @@ export function buildTemporaryWorktreeBranchName(
     .replace(/[^0-9a-f]/g, "")
     .slice(0, 8);
   return `${WORKTREE_BRANCH_PREFIX}/${token}`;
+}
+
+/**
+ * Git stores refs as paths, so a plain `infinitus` branch makes every `infinitus/<hex>`
+ * ref impossible. This moves a temporary name to the flat `infinitus-<hex>` sibling.
+ */
+export function flattenTemporaryWorktreeBranchName(refName: string): string {
+  // Keep only the canonical 8-hex token so legacy `t3code/` and UUID names map cleanly.
+  const normalized = refName.trim().toLowerCase();
+  const tokenStart = normalized.search(/[-/]/) + 1;
+  const token = normalized.slice(tokenStart, tokenStart + 8);
+  return `${WORKTREE_BRANCH_PREFIX}-${token}`;
 }
 
 export function isTemporaryWorktreeBranch(refName: string): boolean {
@@ -358,6 +394,7 @@ function toLocalStatusPart(status: VcsStatusResult): VcsStatusLocalResult {
     refName: status.refName,
     hasWorkingTreeChanges: status.hasWorkingTreeChanges,
     workingTree: status.workingTree,
+    ...(status.branchChanges ? { branchChanges: status.branchChanges } : {}),
   };
 }
 

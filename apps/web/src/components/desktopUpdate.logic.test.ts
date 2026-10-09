@@ -1,18 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  type DesktopUpdateActionResult,
-  type DesktopUpdateState,
-  EnvironmentId,
-  TurnId,
-} from "@infinitus/contracts";
+import type { DesktopUpdateActionResult, DesktopUpdateState } from "@infinitus/contracts";
 
 import {
   canCheckForUpdate,
-  countRunningLocalTurns,
-  getDesktopUpdateArmedTooltip,
-  getDesktopUpdateArmedDialog,
-  getDesktopUpdateRunningTurnsDialog,
-  resolveInstallWhenIdleStep,
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
   getDesktopUpdateButtonTooltip,
@@ -356,86 +346,5 @@ describe("getDesktopUpdateButtonTooltip", () => {
     expect(getDesktopUpdateButtonTooltip({ ...baseState, status: "up-to-date" })).toBe(
       "Up to date",
     );
-  });
-});
-
-describe("running local turns before a desktop install (#829)", () => {
-  const local = EnvironmentId.make("env-local");
-  const remote = EnvironmentId.make("env-remote");
-  const shells = [
-    { environmentId: local, session: { activeTurnId: TurnId.make("turn-1") } },
-    { environmentId: local, session: { activeTurnId: null } },
-    { environmentId: local, session: null },
-    { environmentId: remote, session: { activeTurnId: TurnId.make("turn-2") } },
-  ];
-
-  it("counts active turns on local backends only, whatever the session status", () => {
-    expect(countRunningLocalTurns(shells, (id) => id === local)).toBe(1);
-    expect(countRunningLocalTurns(shells, () => true)).toBe(2);
-    expect(countRunningLocalTurns([], () => true)).toBe(0);
-  });
-
-  it("words the dialog by count and offers only an immediate install for an unknown count", () => {
-    const state = { availableVersion: "0.5.0-alpha.4", downloadedVersion: "0.5.0-alpha.4" };
-    expect(getDesktopUpdateRunningTurnsDialog(1, state)).toEqual({
-      title: "Install update 0.5.0-alpha.4 and restart Infinitus?",
-      description:
-        "1 running thread would be interrupted. Install when it finishes, or install now and cut it off.",
-    });
-    expect(getDesktopUpdateRunningTurnsDialog(3, state).description).toBe(
-      "3 running threads would be interrupted. Install when they finish, or install now and cut them off.",
-    );
-    expect(getDesktopUpdateRunningTurnsDialog(null, state).title).toBe(
-      "Could not confirm no threads are running",
-    );
-    expect(getDesktopUpdateArmedDialog(1).title).toBe("Installing when 1 running thread finishes");
-    expect(getDesktopUpdateArmedDialog(2).title).toBe("Installing when 2 running threads finish");
-    expect(getDesktopUpdateArmedTooltip(1)).toBe(
-      "Installs when 1 running thread finishes. Click to cancel.",
-    );
-    expect(getDesktopUpdateArmedTooltip(2)).toBe(
-      "Installs when 2 running threads finish. Click to cancel.",
-    );
-  });
-
-  it("keeps the armed wait through a newer release and fires once it is downloaded", () => {
-    // #1037: the wait was armed on 1.2.4 with a thread running; 1.2.5 arrives.
-    const downloaded = {
-      ...baseState,
-      status: "downloaded" as const,
-      availableVersion: "1.2.4",
-      downloadedVersion: "1.2.4",
-    };
-    expect(resolveInstallWhenIdleStep(downloaded, "install", 1)).toBe("wait");
-    const superseded = {
-      ...downloaded,
-      status: "available" as const,
-      availableVersion: "1.2.5",
-      downloadedVersion: null,
-    };
-    expect(resolveInstallWhenIdleStep(superseded, "download", 1)).toBe("wait");
-    const downloading = { ...superseded, status: "downloading" as const };
-    expect(resolveInstallWhenIdleStep(downloading, "none", 0)).toBe("wait");
-    const newer = { ...superseded, status: "downloaded" as const, downloadedVersion: "1.2.5" };
-    expect(resolveInstallWhenIdleStep(newer, "install", 1)).toBe("wait");
-    expect(resolveInstallWhenIdleStep(newer, "install", 0)).toBe("install");
-  });
-
-  it("drops the armed wait only when nothing is left to install", () => {
-    const upToDate = {
-      ...baseState,
-      status: "up-to-date" as const,
-      availableVersion: null,
-      downloadedVersion: null,
-    };
-    expect(resolveInstallWhenIdleStep(upToDate, "none", 0)).toBe("disarm");
-    expect(resolveInstallWhenIdleStep(null, "none", 0)).toBe("disarm");
-    const checking = {
-      ...baseState,
-      status: "checking" as const,
-      availableVersion: "1.2.4",
-      downloadedVersion: "1.2.4",
-    };
-    expect(resolveInstallWhenIdleStep(checking, "none", 0)).toBe("wait");
   });
 });

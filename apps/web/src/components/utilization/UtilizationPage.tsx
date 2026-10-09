@@ -25,7 +25,7 @@ import {
   type HistoryLine,
   type WasteRow,
 } from "@infinitus/client-runtime/state/infinitusUtilization";
-import type { InfinitusLiveTokenRate, InfinitusUtilization } from "@infinitus/contracts/infinitus";
+import type { InfinitusUtilization } from "@infinitus/contracts/infinitus";
 import type { TimestampFormat } from "@infinitus/contracts/settings";
 import * as Schema from "effect/Schema";
 import { useMemo, useState, type ReactNode } from "react";
@@ -107,12 +107,6 @@ export function UtilizationPage() {
   const utilization = useMemo(
     () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
     [utilizationQuery.data],
-  );
-  // This server's own live rate (#1127), folded from the turns it recorded.
-  // No Mac verb behind it, so it survives the session sweep that empties the
-  // Mac's own `liveRate`; a failed read simply leaves the line out.
-  const liveTokenRateQuery = useEnvironmentQuery(
-    ready ? infinitusEnvironment.liveTokenRate({ environmentId, input: {} }) : null,
   );
   // The alias a fleet shows for an account, keyed by the email the history carries.
   const labels = useMemo(() => {
@@ -214,10 +208,7 @@ export function UtilizationPage() {
             <RunRateSection utilization={utilization} />
           </>
         )}
-        {/* Outside the verb gate above: this server's own turns are readable
-            whatever the Mac answers, so the line survives a build with no
-            `utilization` verb and a reply that could not be read. */}
-        <LiveRateLine liveTokenRate={liveTokenRateQuery.data} utilization={utilization} />
+        <LiveRateLine utilization={utilization} />
       </div>
     );
   }
@@ -682,19 +673,11 @@ function RunRateSection({ utilization }: { readonly utilization: InfinitusUtiliz
 }
 
 /**
- * The live output rate (#1127), drawn outside the run-rate section because it
- * is not from the same place: the table is the Mac's transcript scan, this is
- * the turns this server recorded. It stays on screen on a build whose Mac has
- * no `utilization` verb, where the whole section above is missing.
+ * The Mac's live output rate (#1127), drawn outside the run-rate section
+ * because it is not from the same place: the table is the transcript scan.
  */
-function LiveRateLine({
-  liveTokenRate,
-  utilization,
-}: {
-  readonly liveTokenRate: InfinitusLiveTokenRate | null;
-  readonly utilization: InfinitusUtilization | null;
-}) {
-  const live = liveRateText(liveTokenRate, utilization);
+function LiveRateLine({ utilization }: { readonly utilization: InfinitusUtilization | null }) {
+  const live = liveRateText(utilization);
   if (live === null) return null;
   return (
     <p className="text-muted-foreground text-xs" data-testid="utilization-live-rate">

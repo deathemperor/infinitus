@@ -5,14 +5,14 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 
 import { ServerConfig } from "../../config.ts";
 import { forkParked } from "../../serverActivation.ts";
-import { collectUint8StreamText } from "../../stream/collectUint8StreamText.ts";
+import { collectUint8StreamText } from "@infinitus/provider-core/server/collectStreamText";
 import {
   InfinitusCompanion,
   type InfinitusCompanionShape,

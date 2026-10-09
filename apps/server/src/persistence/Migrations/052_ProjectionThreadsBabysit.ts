@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as SqlClient from "effect/unstable/sql/SqlClient";
+import * as SqlClient from "effect/sql/SqlClient";
 
 /** Fork (#269 A): the babysit state of a thread, as JSON (`ThreadBabysit`). */
 export default Effect.gen(function* () {

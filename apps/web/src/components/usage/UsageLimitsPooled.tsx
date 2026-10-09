@@ -21,7 +21,7 @@ import { usePrimarySettings } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { getDriverOption } from "../settings/providerDriverMeta";
+import { providerClients } from "../settings/providerDriverMeta";
 import { RedactedSensitiveText } from "../settings/RedactedSensitiveText";
 import { Button } from "../ui/button";
 import { OpenAI } from "../Icons";
@@ -82,7 +82,9 @@ function AccountAvatar({
       <ProviderInstanceIcon
         driverKind={account.driver}
         displayName={
-          account.displayName ?? getDriverOption(account.driver)?.label ?? String(account.driver)
+          account.displayName ??
+          providerClients.get(account.driver)?.label ??
+          String(account.driver)
         }
         accentColor={account.accentColor}
         showBadge={Boolean(account.displayName)}
@@ -117,7 +119,7 @@ function AccountName({
   }
   return (
     <span className={className}>
-      {getDriverOption(account.driver)?.label ?? String(account.driver)}
+      {providerClients.get(account.driver)?.label ?? String(account.driver)}
     </span>
   );
 }
@@ -161,14 +163,13 @@ function SegmentPopover({
       : account.sourceLabel;
   const credits =
     redeem && account.limits.resetCredits?.availableCount ? account.limits.resetCredits : null;
-  const hold = credits ? resetHoldText(credits, now) : null;
   return (
     <div className="flex w-72 max-w-[calc(100vw-3rem)] flex-col gap-2.5 text-xs">
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
           <AccountAvatar account={account} />
           <span className="truncate">
-            {account.displayName ?? getDriverOption(account.driver)?.label ?? account.driver}
+            {account.displayName ?? providerClients.get(account.driver)?.label ?? account.driver}
           </span>
         </span>
         {account.email ? (
@@ -200,21 +201,19 @@ function SegmentPopover({
         ) : null}
       </div>
       {credits && redeem ? (
-        <div className="flex flex-col gap-1 border-t border-border/60 pt-2.5 text-muted-foreground">
+        <div className="border-t border-border/60 pt-2.5 text-muted-foreground">
           <span className="flex items-center gap-3">
             <span className="tabular-nums">{resetCreditsSummary(credits, now, true)}</span>
             <Button
               size="xs"
               variant="outline"
-              disabled={redeem.busy || hold !== null}
+              disabled={redeem.busy || !redeem.canManageProviders}
               className="ms-auto"
               onClick={onRedeem}
             >
               {redeem.busy ? "Using…" : "Use reset"}
             </Button>
           </span>
-          {credits.label ? <span className="truncate">{credits.label}</span> : null}
-          {hold ? <span>{hold}</span> : null}
         </div>
       ) : null}
     </div>
@@ -433,6 +432,7 @@ function RedeemableSegmentPopup({
         open={redeem.confirming}
         onOpenChange={redeem.setConfirming}
         onConfirm={() => void redeem.redeem()}
+        disabled={!redeem.canManageProviders}
       />
       {/* The popover closed before the confirm, so the outcome needs a home outside it. */}
       {redeem.status ? (
@@ -534,7 +534,7 @@ function PoolWindowCard({
 
 function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: number }) {
   const color = barColor(pool.driver);
-  const label = getDriverOption(pool.driver)?.label ?? String(pool.driver);
+  const label = providerClients.get(pool.driver)?.label ?? String(pool.driver);
   const windows = displayLimitWindows(pool);
   return (
     <section className="flex flex-col gap-3">

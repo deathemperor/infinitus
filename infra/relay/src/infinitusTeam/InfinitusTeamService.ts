@@ -29,7 +29,7 @@ import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
@@ -290,7 +290,7 @@ export const make = Effect.gen(function* () {
   const hashToken = (token: string) =>
     crypto
       .digest("SHA-256", new TextEncoder().encode(token))
-      .pipe(Effect.map(Encoding.encodeBase64Url), Effect.orDie);
+      .pipe(Effect.map(Base64Url.encode), Effect.orDie);
 
   const requireTeam = (teamId: string) =>
     store
@@ -540,7 +540,7 @@ export const make = Effect.gen(function* () {
       const team = yield* requireTeam(input.teamId);
       if (team.policyRequests === "off") return yield* refuse("This team is not taking requests.");
       const now = yield* nowIso;
-      const token = Encoding.encodeBase64Url(yield* crypto.randomBytes(32).pipe(Effect.orDie));
+      const token = Base64Url.encode(yield* crypto.randomBytes(32).pipe(Effect.orDie));
       const inviteId = yield* uuid;
       const expiresAt = plusSeconds(now, input.days * 86_400);
       yield* store.createInvite({

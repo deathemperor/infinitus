@@ -4,7 +4,7 @@ import type {
   InfinitusFleet,
   InfinitusSnapshot,
 } from "@infinitus/contracts/infinitus";
-import type { Atom } from "effect/unstable/reactivity";
+import type { Atom } from "effect/reactivity";
 
 import {
   createEnvironmentRpcCommand,
@@ -87,20 +87,6 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       label: "environment-data:infinitus:launch",
       tag: WS_METHODS.infinitusLaunch,
     }),
-    // "Run now" for a held thread (#616): the released marker row and the
-    // session starting show through the thread's own subscription.
-    /** The threads held for headroom (#741): whole lists, so the atom's
-        value is the latest one. Same idle grace as the snapshot. */
-    holds: createEnvironmentSubscriptionAtomFamily(runtime, {
-      label: "environment-data:infinitus:holds",
-      idleTtlMs: INFINITUS_SNAPSHOT_IDLE_TTL_MS,
-      subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.subscribeInfinitusHolds>) =>
-        subscribe(WS_METHODS.subscribeInfinitusHolds, input),
-    }),
-    releaseThread: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:infinitus:releaseThread",
-      tag: WS_METHODS.infinitusReleaseThread,
-    }),
     // A read verb as a query: the same forward as `command`, held and re-read
     // only while a page subscribes. Keyed by its whole input, so each period
     // is its own atom.
@@ -120,17 +106,6 @@ export function createInfinitusEnvironmentAtoms<R, E>(
     utilization: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:infinitus:utilization",
       tag: WS_METHODS.infinitusCommand,
-      staleTimeMs: INFINITUS_UTILIZATION_STALE_MS,
-      refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
-      idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
-    }),
-    // The server's own live output rate (#1127). Not a Mac verb: it folds the
-    // turns this server recorded, so it answers even where no Infinitus app
-    // runs. Re-read on the Utilization page's own cadence, and only while that
-    // page holds it.
-    liveTokenRate: createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:infinitus:liveTokenRate",
-      tag: WS_METHODS.infinitusLiveTokenRate,
       staleTimeMs: INFINITUS_UTILIZATION_STALE_MS,
       refreshIntervalMs: INFINITUS_UTILIZATION_REFRESH_MS,
       idleTtlMs: INFINITUS_UTILIZATION_IDLE_TTL_MS,
@@ -161,12 +136,6 @@ export function createInfinitusEnvironmentAtoms<R, E>(
     secret: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:infinitus:secret",
       tag: WS_METHODS.infinitusSecret,
-    }),
-    // Fork a thread at a turn (#270 E2); the new thread arrives through the
-    // orchestration stream like any other, so nothing to invalidate here.
-    forkThread: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:infinitus:fork-thread",
-      tag: WS_METHODS.infinitusForkThread,
     }),
   };
 }

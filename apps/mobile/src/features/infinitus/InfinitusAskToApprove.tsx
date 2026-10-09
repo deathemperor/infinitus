@@ -5,7 +5,7 @@ import { ActivityIndicator, Platform, View } from "react-native";
 import { AppText as Text } from "../../components/AppText";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { randomHex } from "../../lib/uuid";
-import { ConnectionSheetButton } from "../connection/ConnectionSheetButton";
+import { InfinitusSheetButton } from "./InfinitusSheetButton";
 import { askForApproval, waitForDecision } from "./pairingApproval";
 import { approvalOrigin, deviceLabel, outcomeMessage } from "./pairingApproval.logic";
 
@@ -102,7 +102,7 @@ export function InfinitusAskToApprove(props: {
         >
           {phase.matchCode}
         </Text>
-        <ConnectionSheetButton
+        <InfinitusSheetButton
           icon="xmark"
           label="Cancel"
           tone="secondary"
@@ -115,7 +115,7 @@ export function InfinitusAskToApprove(props: {
 
   return (
     <View collapsable={false} className="gap-2">
-      <ConnectionSheetButton
+      <InfinitusSheetButton
         icon="checkmark.shield"
         label={phase.kind === "asking" ? "Asking the Mac…" : "Ask this Mac to approve"}
         disabled={props.disabled === true || phase.kind === "asking" || host.trim() === ""}

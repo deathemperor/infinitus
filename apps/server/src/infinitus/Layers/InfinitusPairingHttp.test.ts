@@ -15,7 +15,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
-import { HttpApiTest } from "effect/unstable/httpapi";
+import { HttpApiTest } from "effect/http-api";
 import { describe, expect } from "vite-plus/test";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";

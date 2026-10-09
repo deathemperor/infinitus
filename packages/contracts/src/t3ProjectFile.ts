@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import { ThreadEnvMode, WorktreeSubmodules } from "./environment.ts";
-import { ProjectScriptIcon } from "./orchestration.ts";
+import { ProjectScriptIcon } from "./project.ts";
 import { PRODUCT_NAME } from "./productName.ts";
 import type { ProjectScopedServerSettingKey, ServerSettings } from "./settings.ts";
 
@@ -51,6 +51,12 @@ export const T3ProjectFileScript = Schema.Struct({
     Schema.Boolean.annotate({
       description:
         "When true, the script runs automatically after a worktree is created for a new thread.",
+    }),
+  ),
+  runOnSettle: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description:
+        "When true, the script runs in the thread's worktree each time the thread settles, for example to delete build output. Threads without their own worktree skip it.",
     }),
   ),
   async: Schema.optionalKey(

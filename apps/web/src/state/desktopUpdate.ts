@@ -4,8 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { Atom } from "effect/unstable/reactivity";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import { Atom } from "effect/reactivity";
 
 type DesktopUpdateBridge = Pick<DesktopBridge, "getUpdateState" | "onUpdateState">;
 
@@ -80,14 +80,6 @@ export function createDesktopUpdateStateAtom(getBridge: () => DesktopUpdateBridg
 }
 
 const desktopUpdateStateAtom = createDesktopUpdateStateAtom(getDesktopUpdateBridge);
-
-/** #829: the update button was told to install once every running turn on
-    a local backend has finished. Cleared by the button itself when the
-    install fires, when it is clicked again, or when no install is pending. */
-export const desktopInstallWhenIdleAtom = Atom.make(false).pipe(
-  Atom.keepAlive,
-  Atom.withLabel("desktop:install-when-idle"),
-);
 
 export function useDesktopUpdateState(): DesktopUpdateState | null {
   return AsyncResult.getOrElse(useAtomValue(desktopUpdateStateAtom), () => null);

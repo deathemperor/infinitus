@@ -1,6 +1,6 @@
 import type { EnvironmentId, StatsRequest, StatsSnapshot } from "@infinitus/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import type { createEnvironmentPresentationAtoms } from "./presentation.ts";
 import type { createServerEnvironmentAtoms } from "./server.ts";
 

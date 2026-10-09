@@ -1,6 +1,5 @@
 import {
   InfinitusUtilization,
-  type InfinitusLiveTokenRate,
   InfinitusUtilizationFiveHourWindow,
   InfinitusUtilizationGeneration,
   InfinitusUtilizationReplay,
@@ -316,23 +315,8 @@ export function formatCount(value: number): string {
  * Mac's field is always null and only this one is left. A server rate with no
  * turns in the window is not zero but unknown, so it stands aside and lets a
  * Mac that still reports one speak.
- *
- * The server's rate is the first argument and the Mac's reply the second,
- * nullable one, because the line no longer belongs to the run-rate table: a
- * server with turns says its piece on a build whose Mac has never answered
- * `utilization` at all.
  */
-export function liveRateText(
-  server: InfinitusLiveTokenRate | null | undefined,
-  u: InfinitusUtilization | null,
-): string | null {
-  if (server !== undefined && server !== null && server.turns > 0) {
-    const turns = server.turns === 1 ? "1 turn" : `${formatCount(server.turns)} turns`;
-    // "≈" is the #834 rule for every usage figure on screen, and this one is a
-    // five-minute extrapolation, so it earns the mark more than most. The turn
-    // count rides along: it is what makes a small number readable.
-    return `Live: ≈ ${compactTokens(server.outputPerMinute)} output tokens/min over the last ${server.windowMinutes} minutes, across ${turns} on this server.`;
-  }
+export function liveRateText(u: InfinitusUtilization | null): string | null {
   const live = u === null ? null : u.liveRate;
   if (live === undefined || live === null) return null;
   const peak =

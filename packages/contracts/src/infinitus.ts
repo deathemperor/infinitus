@@ -378,28 +378,6 @@ export const InfinitusUtilization = Schema.Struct({
 });
 export type InfinitusUtilization = typeof InfinitusUtilization.Type;
 
-/**
- * Fork (#1127): this server's own live output rate, folded from the turns it
- * recorded (`projection_turn_usage`) rather than read off the Mac. It replaces
- * `InfinitusUtilization.liveRate`, which the Mac tails out of terminal
- * transcripts — a source the session sweep (#1041) retires, after which that
- * field is always null.
- *
- * `turns` counts only the completed turns in the window whose provider
- * reported usage: a `usageUnavailable` row carries zero tokens for "not
- * reported", and counting it would read as a turn that burned nothing. Zero
- * turns means nothing ran and the page draws no line. Estimates, like every
- * usage figure here — never billing truth.
- */
-export const InfinitusLiveTokenRate = Schema.Struct({
-  windowMinutes: Schema.Finite,
-  turns: Schema.Finite,
-  outputPerMinute: Schema.Finite,
-  /** Input included, and input already counts cache reads and writes. */
-  totalPerMinute: Schema.Finite,
-});
-export type InfinitusLiveTokenRate = typeof InfinitusLiveTokenRate.Type;
-
 /** The value type a preference holds, which is what `default` and `value`
     carry: `bool` a boolean, `int`/`double` a number, `string` a string. */
 export const InfinitusPrefKind = Schema.Literals(["bool", "int", "double", "string"]);
@@ -583,62 +561,6 @@ export const InfinitusLaunchResult = Schema.Struct({
   installed: Schema.optionalKey(Schema.Boolean),
 });
 export type InfinitusLaunchResult = typeof InfinitusLaunchResult.Type;
-
-/** Fork (#616): "Run now" for a thread whose start session priority mode is
-    holding. `released` when a held start ran; otherwise the one-line reason
-    (nothing was held for that thread). Never an error. */
-/** One thread whose turn start the server holds for headroom (#616, #741):
-    when the hold began and the held row's line, for the sidebar. */
-export const InfinitusHeldThread = Schema.Struct({
-  threadId: ThreadId,
-  since: Schema.String,
-  summary: Schema.String,
-  /** `held` (absent on older servers): a start waits for headroom. `limited`
-      (#270 I): the thread's turn stopped on its account's usage limit and
-      resume-on-limit waits for a swap; the summary names the account. */
-  kind: Schema.optionalKey(Schema.Literals(["held", "limited"])),
-  /** `limited` only: when the window that rejected the turn resets (ISO),
-      as the SDK reported it; absent when the stop named none. */
-  resetsAt: Schema.optionalKey(Schema.String),
-});
-export type InfinitusHeldThread = typeof InfinitusHeldThread.Type;
-
-export const InfinitusReleaseThreadInput = Schema.Struct({ threadId: ThreadId });
-export type InfinitusReleaseThreadInput = typeof InfinitusReleaseThreadInput.Type;
-export const InfinitusReleaseThreadResult = Schema.Struct({
-  released: Schema.Boolean,
-  reason: Schema.optionalKey(Schema.String),
-});
-export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.Type;
-
-/** Fork a thread at a turn (#270 E2): a new thread on the same branch and
-    worktree whose Claude session continues from that turn; the source is not
-    touched. `turnCount` is the checkpoint turn count shown on the message. */
-export const InfinitusThreadForkInput = Schema.Struct({
-  threadId: ThreadId,
-  /** A checkpoint's turn number; absent, the session's latest completed
-      turn (#269 C) — a checkpoint needs a git repository, an anchor only a
-      completed turn. */
-  turnCount: Schema.optional(Schema.Int),
-  /** Fork (#269 C): a side question — read-only (plan mode), marked `sideOf`
-      the source, so it opens in a drawer instead of the thread list. */
-  side: Schema.optional(Schema.Literal(true)),
-});
-export type InfinitusThreadForkInput = typeof InfinitusThreadForkInput.Type;
-export const InfinitusThreadForkResult = Schema.Struct({ threadId: ThreadId });
-export type InfinitusThreadForkResult = typeof InfinitusThreadForkResult.Type;
-/** Why a fork did not happen: not a Claude session, no anchor for that turn,
-    nothing to fork. The reason is shown to the user as is. */
-export class InfinitusThreadForkRefused extends Schema.TaggedError<InfinitusThreadForkRefused>()(
-  "InfinitusThreadForkRefused",
-  { reason: Schema.String },
-) {
-  // The clients show `error.message`; without this the alert has a title and
-  // an empty body (#941 walk: "Could not open a side question", nothing under it).
-  override get message(): string {
-    return this.reason;
-  }
-}
 
 /** The desktop shell's own Infinitus knobs (one-app feel, #654), kept by the
     shell rather than the server because they describe this window.

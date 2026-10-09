@@ -18,25 +18,11 @@ export function useThreadHeaderOptions(props: {
   readonly usesNativeHeaderGlass: boolean;
   readonly gitControls: Parameters<typeof ThreadGitControls>[0];
   readonly onReturnToThread?: () => void;
-  /** Infinitus (#941): the thread menu button, leading the git controls in both layouts. */
-  readonly infinitusHeaderItem?: Record<string, unknown> | null;
 }) {
   const navigation = useNavigation();
   const { layout, panes, togglePrimarySidebar } = useAdaptiveWorkspaceLayout();
-  const gitCenterHeaderItems = useThreadGitCenterHeaderItems(props.gitControls);
-  const gitRightHeaderItems = useThreadGitRightHeaderItems(props.gitControls);
-  const infinitusHeaderItems = useMemo<NativeHeaderItems>(
-    () => (props.infinitusHeaderItem ? [props.infinitusHeaderItem] : []),
-    [props.infinitusHeaderItem],
-  );
-  const threadCenterHeaderItems = useMemo<NativeHeaderItems>(
-    () => [...infinitusHeaderItems, ...gitCenterHeaderItems],
-    [gitCenterHeaderItems, infinitusHeaderItems],
-  );
-  const compactRightHeaderItems = useMemo<NativeHeaderItems>(
-    () => [...infinitusHeaderItems, ...gitRightHeaderItems],
-    [gitRightHeaderItems, infinitusHeaderItems],
-  );
+  const threadCenterHeaderItems = useThreadGitCenterHeaderItems(props.gitControls);
+  const compactRightHeaderItems = useThreadGitRightHeaderItems(props.gitControls);
   const splitLeftHeaderItems = useMemo<NativeHeaderItems>(
     () => [
       {
@@ -122,8 +108,21 @@ export function useThreadHeaderOptions(props: {
     unstable_headerSubtitle: props.usesNativeHeaderGlass ? props.subtitle : undefined,
     contentStyle: undefined,
   };
+  const { environmentId, threadId, gitStatus } = props.gitControls;
   return {
     options,
+    // Header item factories are stabilized, so the native header only re-reads them when
+    // this version changes. Keying on the items keeps the Git menu status live; the menu
+    // callbacks also read state the items do not display (a "Push" item runs `push` or
+    // `commit_push` depending on the default ref), so that state is keyed too.
+    optionsVersion: [
+      layout.usesSplitView ? threadCenterHeaderItems : compactRightHeaderItems,
+      environmentId,
+      threadId,
+      gitStatus?.isDefaultRef,
+      gitStatus?.refName,
+      gitStatus?.pr?.url,
+    ],
     sidebar: false,
     fallback:
       !layout.usesSplitView && !props.usesNativeHeaderGlass ? (

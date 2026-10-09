@@ -3,9 +3,7 @@ import {
   type ServerSelfUpdateCapability,
   type ServerSelfUpdateInput,
   type ServerSelfUpdateProgressStage,
-  type ServerRunningTurn,
   type ServerSelfUpdateResult,
-  type ServerUpdateRunningTurnsPolicy,
   type ThreadId,
 } from "@infinitus/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
@@ -21,7 +19,7 @@ import * as Ref from "effect/Ref";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
-import { HttpClient } from "effect/unstable/http";
+import { HttpClient } from "effect/http";
 
 import { CLI_RELEASE_BASE_URL_ENV } from "@infinitus/shared/cliRelease";
 
@@ -55,7 +53,6 @@ export class ServerSelfUpdate extends Context.Service<
       input: ServerSelfUpdateInput,
       reportProgress?: (
         stage: ServerSelfUpdateProgressStage,
-        runningTurns?: number,
       ) => Effect.Effect<void, ServerSelfUpdateError>,
       onHandoffAccepted?: () => Effect.Effect<void>,
     ) => Effect.Effect<ServerSelfUpdateResult, ServerSelfUpdateError>;
@@ -66,13 +63,6 @@ export class ServerSelfUpdate extends Context.Service<
   }
 >()("t3/cloud/selfUpdate/ServerSelfUpdate") {}
 
-/** How often a `wait` update re-reads the running turns (#829). */
-export const RUNNING_TURNS_POLL = Duration.seconds(5);
-
-function runningTurnsRefusal(count: number): string {
-  return `${count} ${count === 1 ? "thread is" : "threads are"} running; updating now would interrupt ${count === 1 ? "it" : "them"}. Update when they finish, or stop them first.`;
-}
-
 export const withRunningThreadContinuation = Effect.fn(
   "cloud.server_self_update.withRunningThreadContinuation",
 )(function* (input: {
@@ -82,50 +72,8 @@ export const withRunningThreadContinuation = Effect.fn(
   readonly clear: (
     threadIds: ReadonlyArray<ThreadId>,
   ) => Effect.Effect<void, ServerSelfUpdateError>;
-  /** The server's own running turns (#829), read at the request and again
-      right before the install, since a turn may start in between. */
-  readonly runningTurns: Effect.Effect<ReadonlyArray<ServerRunningTurn>>;
 }) {
   const desktopContinuationTokens = yield* Ref.make(HashSet.empty<string>());
-  // The policy a desktop preparation was made under, keyed by its token: the
-  // quit happens at the commit, so the gate applies there too.
-  const desktopPolicies = new Map<string, ServerUpdateRunningTurnsPolicy>();
-
-  /** The gate (#829): `interrupt` passes, `refuse` fails naming the turns,
-      `wait` polls until none runs, reporting each change of count. An
-      update refuses at its entry (nothing downloaded for nothing) and waits
-      at the install hook, after the download; in desktop mode the install
-      is the commit, which `commitDesktopUpdate` gates under the same policy
-      (the desktop app's own update run is bounded by a timeout, so no wait
-      happens inside it). */
-  const awaitIdle = (
-    policy: ServerUpdateRunningTurnsPolicy,
-    reportProgress: (
-      stage: ServerSelfUpdateProgressStage,
-      runningTurns?: number,
-    ) => Effect.Effect<void, ServerSelfUpdateError>,
-  ): Effect.Effect<void, ServerSelfUpdateError> =>
-    Effect.gen(function* () {
-      if (policy === "interrupt") return;
-      let announced = -1;
-      while (true) {
-        const running = yield* input.runningTurns;
-        if (running.length === 0) return;
-        if (policy === "refuse") {
-          return yield* Effect.fail(
-            new ServerSelfUpdateError({
-              reason: runningTurnsRefusal(running.length),
-              runningTurns: running,
-            }),
-          );
-        }
-        if (running.length !== announced) {
-          announced = running.length;
-          yield* reportProgress("waiting", running.length);
-        }
-        yield* Effect.sleep(RUNNING_TURNS_POLL);
-      }
-    });
   const clearOnError = <A>(
     effect: Effect.Effect<A, ServerSelfUpdateError>,
     threadIds: () => ReadonlyArray<ThreadId>,
@@ -144,54 +92,46 @@ export const withRunningThreadContinuation = Effect.fn(
     request,
     reportProgress = () => Effect.void,
   ) => {
-    const policy = request.runningTurns ?? "refuse";
     let prepared = false;
     let handoffAccepted = false;
     let continuationThreadIds: ReadonlyArray<ThreadId> = [];
     return clearOnError(
-      (policy === "refuse" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
-        Effect.andThen(
-          input.selfUpdate.update(
-            request,
-            (stage) =>
-              (stage === "installing" && input.mode !== "desktop"
-                ? awaitIdle(policy, reportProgress)
-                : Effect.void
-              ).pipe(
-                Effect.andThen(
-                  request.continueRunningThreads === true &&
-                    input.mode !== "desktop" &&
-                    stage === "installing" &&
-                    !prepared
-                    ? input.prepare.pipe(
-                        Effect.tap((threadIds) =>
-                          Effect.sync(() => {
-                            prepared = true;
-                            continuationThreadIds = threadIds;
-                          }),
-                        ),
-                        Effect.asVoid,
-                      )
-                    : Effect.void,
-                ),
-                Effect.andThen(reportProgress(stage)),
-              ),
-            () =>
-              Effect.sync(() => {
-                handoffAccepted = true;
-              }),
-          ),
-        ),
-        Effect.tap((result) => {
-          if (result.method === "desktop-app" && result.desktopUpdateToken !== undefined) {
-            desktopPolicies.set(result.desktopUpdateToken, policy);
-            if (request.continueRunningThreads === true) {
+      input.selfUpdate
+        .update(
+          request,
+          (stage) =>
+            (request.continueRunningThreads === true &&
+            input.mode !== "desktop" &&
+            stage === "installing" &&
+            !prepared
+              ? input.prepare.pipe(
+                  Effect.tap((threadIds) =>
+                    Effect.sync(() => {
+                      prepared = true;
+                      continuationThreadIds = threadIds;
+                    }),
+                  ),
+                  Effect.asVoid,
+                )
+              : Effect.void
+            ).pipe(Effect.andThen(reportProgress(stage))),
+          () =>
+            Effect.sync(() => {
+              handoffAccepted = true;
+            }),
+        )
+        .pipe(
+          Effect.tap((result) => {
+            if (
+              result.method === "desktop-app" &&
+              result.desktopUpdateToken !== undefined &&
+              request.continueRunningThreads === true
+            ) {
               return Ref.update(desktopContinuationTokens, HashSet.add(result.desktopUpdateToken));
             }
-          }
-          return Effect.void;
-        }),
-      ),
+            return Effect.void;
+          }),
+        ),
       () => continuationThreadIds,
       () => handoffAccepted,
     );
@@ -209,10 +149,6 @@ export const withRunningThreadContinuation = Effect.fn(
         let continuationThreadIds: ReadonlyArray<ThreadId> = [];
         return yield* clearOnError(
           Effect.gen(function* () {
-            // The gate again (#829): this is the quit. A token this server
-            // did not prepare is treated as `refuse`.
-            yield* awaitIdle(desktopPolicies.get(requestId) ?? "refuse", () => Effect.void);
-            desktopPolicies.delete(requestId);
             continuationThreadIds = shouldContinue ? yield* input.prepare : [];
             return yield* input.selfUpdate.commitDesktopUpdate(requestId, () =>
               Effect.sync(() => {
@@ -274,13 +210,13 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
     }
     if (capability === null) {
       return yield* failWith(
-        `Remote updates require the ${PRODUCT_NAME} background service. Run \`infinitus service install\` on the server machine.`,
+        `Remote updates require the ${PRODUCT_NAME} background service. Run \`t3 service install\` on the server machine.`,
       );
     }
 
     const targetVersion = input.targetVersion.trim();
     if (!isExactServiceVersion(targetVersion)) {
-      return yield* failWith(`'${targetVersion}' is not an exact Infinitus version.`);
+      return yield* failWith(`'${targetVersion}' is not an exact t3 version.`);
     }
     if (yield* Ref.getAndSet(inFlight, true)) {
       return yield* failWith("A server update is already in progress.");
@@ -371,7 +307,7 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
         Effect.mapError((error) =>
           error._tag === "PinnedRuntimePreflightBlockedError"
             ? failWith(error.reason, error)
-            : failWith(`Could not prepare infinitus ${targetVersion}.`, error),
+            : failWith(`Could not prepare t3@${targetVersion}.`, error),
         ),
       );
 

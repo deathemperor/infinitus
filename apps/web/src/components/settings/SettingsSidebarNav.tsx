@@ -16,14 +16,14 @@ import {
   BotIcon,
   CpuIcon,
   createLucideIcon,
-  GaugeIcon,
+  CalendarClockIcon,
   GitBranchIcon,
   HardDriveIcon,
   InfinityIcon,
+  PanelsTopLeftIcon,
   KeyboardIcon,
   Link2Icon,
   PaletteIcon,
-  PanelsTopLeftIcon,
   SearchIcon,
   Settings2Icon,
   SmartphoneIcon,
@@ -32,7 +32,6 @@ import {
   XIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-
 import { useEnvironments } from "~/state/environments";
 
 import { Button } from "../ui/button";
@@ -93,12 +92,12 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/snap-shot": SnapShotIcon,
   "/settings/providers": BotIcon,
   "/settings/integrations": BlocksIcon,
+  "/settings/scheduled-tasks": CalendarClockIcon,
   "/settings/source-control": GitBranchIcon,
   "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
   "/settings/menu-bar": InfinityIcon,
   "/settings/animations": SparklesIcon,
-  "/settings/priority": GaugeIcon,
   "/settings/team": UsersIcon,
   "/settings/notifications": BellIcon,
   "/settings/devices": SmartphoneIcon,
@@ -110,7 +109,6 @@ const SETTINGS_SECTION_ICONS: Readonly<
 const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>([
   "/settings/menu-bar",
   "/settings/animations",
-  "/settings/priority",
   "/settings/team",
   "/settings/notifications",
   "/settings/devices",

@@ -150,6 +150,8 @@ function harness(input?: {
         Layer.succeed(EnvironmentLinks.EnvironmentLinks, {
           upsert: () => Effect.die("unused upsert"),
           listDeliveryUsersForEnvironment: () => Effect.succeed(users),
+          findActiveManagedForEnvironment: () => Effect.succeed([]),
+          setHoldWebhooksWhileOffline: () => Effect.void,
           listForUser: () => Effect.die("unused listForUser"),
           getForUser: () => Effect.die("unused getForUser"),
           revokeForUser: () => Effect.die("unused revokeForUser"),

@@ -10,9 +10,11 @@ import { assert, describe, it } from "@effect/vitest";
  * is either on this list, with its reason, or a regression.
  */
 const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
-  // The installed upstream app's real userData directories, which the fork
-  // must recognise and never adopt.
-  ["app/DesktopEnvironment.ts", '"T3 Code (Dev)" : "T3 Code (Alpha)"'],
+  // A PowerShell type namespace inside the broadcast script, not a product noun.
+  ["app/DesktopCliCommand.ts", "Add-Type -Namespace T3"],
+  ["app/DesktopCliCommand.ts", "[T3.Env]"],
+  // Upstream's pre-rename profile directories: names on disk, never shown.
+  ["app/DesktopLegacyLocalStorage.ts", 'V1_PROFILE_NAMES = ["T3 Code (Alpha)", "t3code"]'],
 ];
 
 /** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.

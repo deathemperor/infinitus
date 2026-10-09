@@ -11,10 +11,10 @@ import {
 import { TEAM_USER_HEADER } from "@infinitus/contracts/relayInfinitusTeam";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as HttpServer from "effect/unstable/http/HttpServer";
-import * as HttpRouter from "effect/unstable/http/HttpRouter";
-import * as HttpApi from "effect/unstable/httpapi/HttpApi";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpServer from "effect/http/HttpServer";
+import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpApi from "effect/http-api/HttpApi";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import * as EnvironmentLinks from "../environments/EnvironmentLinks.ts";
 import { infinitusTeamApi } from "./InfinitusTeamApi.ts";
@@ -34,6 +34,8 @@ function harness() {
   const links = Layer.succeed(EnvironmentLinks.EnvironmentLinks, {
     upsert: () => Effect.die("unused"),
     listDeliveryUsersForEnvironment: () => Effect.die("unused"),
+    findActiveManagedForEnvironment: () => Effect.succeed([]),
+    setHoldWebhooksWhileOffline: () => Effect.void,
     listForUser: () => Effect.succeed([]),
     getForUser: (input) =>
       Effect.succeed(

@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 
 import type { AppSymbolName } from "./AppSymbol";
 import { AppText as Text } from "./AppText";
 import { cn } from "../lib/cn";
 import { MaterialIconButton } from "./MaterialIconButton";
-import { AndroidAnchoredMenu, type AndroidAnchoredMenuProps } from "./AndroidAnchoredMenu";
+import { AndroidAnchoredMenu } from "./AndroidAnchoredMenu";
 import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
 import { useMaterialToolbarLayout } from "./useMaterialToolbarLayout";
 
@@ -14,14 +14,8 @@ export interface AndroidHeaderAction {
   readonly icon: AppSymbolName;
   readonly onPress: () => void;
   readonly disabled?: boolean;
+  readonly loading?: boolean;
   readonly selected?: boolean;
-  /** Infinitus (fork, #269 F): an action whose tap opens an anchored menu of
-      these choices instead of running `onPress` — the Android form of an
-      iOS header menu item, with no cap on the number of choices (an
-      `Alert` shows at most three buttons). Such an action folds into the
-      overflow menu as a submenu, never as a flat row whose tap would run
-      the no-op `onPress` these call sites pass. */
-  readonly menu?: Pick<AndroidAnchoredMenuProps, "actions" | "title" | "onPressAction">;
 }
 
 export function AndroidHeaderIconButton(props: {
@@ -92,23 +86,14 @@ export function AndroidScreenHeader(props: {
         </View>
 
         {visibleActions.map((action) =>
-          action.menu ? (
-            <AndroidAnchoredMenu
+          action.loading ? (
+            <View
               key={action.accessibilityLabel}
-              actions={action.menu.actions}
-              title={action.menu.title}
-              onPressAction={action.menu.onPressAction}
+              accessibilityLabel={action.accessibilityLabel}
+              className="size-12 items-center justify-center"
             >
-              {(open) => (
-                <AndroidHeaderIconButton
-                  accessibilityLabel={action.accessibilityLabel}
-                  disabled={action.disabled}
-                  selected={action.selected}
-                  icon={action.icon}
-                  onPress={open}
-                />
-              )}
-            </AndroidAnchoredMenu>
+              <ActivityIndicator colorClassName="accent-header-foreground" />
+            </View>
           ) : (
             <AndroidHeaderIconButton
               key={action.accessibilityLabel}
@@ -129,21 +114,10 @@ export function AndroidScreenHeader(props: {
                 disabled: Boolean(action.disabled),
                 state: action.selected ? "on" : undefined,
               },
-              ...(action.menu === undefined ? {} : { subactions: [...action.menu.actions] }),
             }))}
-            onPressAction={(event) => {
-              // A submenu row reports its own id, not the parent's index, so
-              // the owning action's handler gets the event before the
-              // index lookup a flat row needs.
-              const owner = overflowActions.find((action) =>
-                action.menu?.actions.some((item) => item.id === event.nativeEvent.event),
-              );
-              if (owner?.menu?.onPressAction) {
-                owner.menu.onPressAction(event);
-                return;
-              }
-              overflowActions[Number(event.nativeEvent.event)]?.onPress();
-            }}
+            onPressAction={({ nativeEvent }) =>
+              overflowActions[Number(nativeEvent.event)]?.onPress()
+            }
           >
             {(open) => (
               <MaterialIconButton

@@ -19,8 +19,8 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Predicate from "effect/Predicate";
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
-import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
 
 import { findErrorTraceId } from "../errors/errorTrace.ts";
 

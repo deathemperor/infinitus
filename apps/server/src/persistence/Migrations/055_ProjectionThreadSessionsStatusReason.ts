@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import * as SqlClient from "effect/unstable/sql/SqlClient";
+import * as SqlClient from "effect/sql/SqlClient";
 
 /** Fork (#832): the provider's reason behind a running session (`reconnecting:n/max`). */
 export default Effect.gen(function* () {

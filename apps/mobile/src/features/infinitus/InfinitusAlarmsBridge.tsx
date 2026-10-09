@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import * as Notifications from "expo-notifications";
 import { useEffect, useMemo, useRef } from "react";
 import { Linking, Platform } from "react-native";

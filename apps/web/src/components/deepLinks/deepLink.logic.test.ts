@@ -46,6 +46,6 @@ describe("settingsDeepLinkTarget", () => {
   it("lands an older menu bar app's retired Infinitus group on the page's new route", () => {
     expect(settingsDeepLinkTarget("/settings/infinitus")).toBe("/settings/menu-bar");
     expect(settingsDeepLinkTarget("/settings/infinitus/engines")).toBe("/settings/engines");
-    expect(settingsDeepLinkTarget("/settings/infinitus/sessions")).toBe("/settings/priority");
+    expect(settingsDeepLinkTarget("/settings/infinitus/sessions")).toBe("/settings/menu-bar");
   });
 });

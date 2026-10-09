@@ -22,7 +22,7 @@ import { ErrorBanner } from "../../components/ErrorBanner";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { useNowMinute } from "../accounts/useNowMinute";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
-import { ConnectionSheetButton } from "../connection/ConnectionSheetButton";
+import { InfinitusSheetButton } from "../infinitus/InfinitusSheetButton";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { teamErrorMessage, teamMemberName, teamRoleLabel } from "./team.logic";
 import { useInfinitusTeamClient } from "./useInfinitusTeamClient";
@@ -281,7 +281,7 @@ function TeamPane(props: { readonly code: string }) {
                       {`asked ${relativeTime(request.at, nowMs)}`}
                     </Text>
                     <View className="flex-row gap-2">
-                      <ConnectionSheetButton
+                      <InfinitusSheetButton
                         icon="checkmark"
                         label="Approve"
                         tone="primary"
@@ -291,7 +291,7 @@ function TeamPane(props: { readonly code: string }) {
                           void apply("approve", () => client.approveRequest(id, request.userId))
                         }
                       />
-                      <ConnectionSheetButton
+                      <InfinitusSheetButton
                         icon="xmark"
                         label="Decline"
                         tone="danger"
@@ -324,7 +324,7 @@ function TeamPane(props: { readonly code: string }) {
                     {pendingSummary(pending, nowMs)}
                   </Text>
                   <View className="flex-row gap-2">
-                    <ConnectionSheetButton
+                    <InfinitusSheetButton
                       icon="checkmark"
                       label="Allow"
                       tone="primary"
@@ -336,7 +336,7 @@ function TeamPane(props: { readonly code: string }) {
                         )
                       }
                     />
-                    <ConnectionSheetButton
+                    <InfinitusSheetButton
                       icon="xmark"
                       label="Deny"
                       tone="danger"
@@ -354,7 +354,7 @@ function TeamPane(props: { readonly code: string }) {
             </SettingsSection>
           ) : null}
 
-          <ConnectionSheetButton
+          <InfinitusSheetButton
             icon="arrow.clockwise"
             label={busy === "refresh" ? "Refreshing…" : "Refresh"}
             disabled={busy !== null}
@@ -446,7 +446,7 @@ function JoinSection(props: {
           className={INPUT}
         />
         {error ? <ErrorBanner message={error} /> : null}
-        <ConnectionSheetButton
+        <InfinitusSheetButton
           icon="link"
           label={props.busy === "join" ? "Joining…" : "Join"}
           tone="primary"

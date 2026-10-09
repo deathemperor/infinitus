@@ -11,7 +11,7 @@ import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Encoding from "effect/Encoding";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
@@ -179,7 +179,7 @@ export const make = Effect.gen(function* () {
         ),
       )
       .pipe(
-        Effect.map((digest) => `infinitus-alert:${Encoding.encodeBase64Url(digest)}`),
+        Effect.map((digest) => `infinitus-alert:${Base64Url.encode(digest)}`),
         Effect.mapError(
           (cause) =>
             new InfinitusAlertPublishFailed({

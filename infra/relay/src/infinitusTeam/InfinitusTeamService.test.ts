@@ -24,6 +24,8 @@ function harness() {
   const links = Layer.succeed(EnvironmentLinks.EnvironmentLinks, {
     upsert: () => Effect.die("unused"),
     listDeliveryUsersForEnvironment: () => Effect.die("unused"),
+    findActiveManagedForEnvironment: () => Effect.succeed([]),
+    setHoldWebhooksWhileOffline: () => Effect.void,
     listForUser: ({ userId }) =>
       Effect.succeed(
         (LINKS[userId] ?? []).map((l) => ({

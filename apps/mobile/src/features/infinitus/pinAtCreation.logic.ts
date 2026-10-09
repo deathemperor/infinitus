@@ -1,4 +1,4 @@
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 /** Whether this phone pins new tasks as they are created (#742, the web's
     "Pin on create" of #753): the loaded preference, off by default and off
