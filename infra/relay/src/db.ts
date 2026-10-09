@@ -83,6 +83,8 @@ export const RelayHyperdrive = Effect.gen(function* () {
     caching: {
       disabled: true,
     },
-    originConnectionLimit: 40,
+    // Infinitus: this account's Hyperdrive accepts 5-20; upstream's 40 is
+    // sized for their PlanetScale cluster and comes back on every sync.
+    originConnectionLimit: 20,
   });
 });
