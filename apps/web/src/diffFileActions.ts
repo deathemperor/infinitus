@@ -2,7 +2,7 @@ import type { ScopedThreadRef } from "@infinitus/contracts";
 import { isWindowsAbsolutePath, normalizeProjectPathForComparison } from "@infinitus/shared/path";
 
 import { useRightPanelStore } from "./rightPanelStore";
-import { resolvePathLinkTarget } from "./terminal-links";
+import { resolvePathLinkTarget } from "@infinitus/shared/fileLinks";
 
 interface OpenDiffFilePrimaryActionInput {
   readonly threadRef: ScopedThreadRef | null;

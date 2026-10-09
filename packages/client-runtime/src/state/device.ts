@@ -1,5 +1,5 @@
 import { type DeviceToolVersions, WS_METHODS } from "@infinitus/contracts";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import {
