@@ -9,7 +9,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
-import { writeFileStringAtomically } from "../atomicWrite.ts";
+import { writeFileStringAtomically } from "@infinitus/shared/atomicWrite";
 
 const decodeProviderStatusCache = Schema.decodeUnknownEffect(
   Schema.fromJsonString(ServerProviderSchema),
@@ -38,10 +38,8 @@ const BUILT_IN_DRIVER_ORDER: ReadonlyArray<string> = [
   "claudeAgent",
   "cursor",
   "grok",
-  "omp",
   "opencode",
   "antigravity",
-  "pi",
 ];
 
 const driverRank = (driver: string): number => {

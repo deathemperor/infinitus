@@ -1,6 +1,6 @@
 import { it, expect } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { ProcessRunner } from "../processRunner.ts";
 import { makeStatsRepositoryScanner } from "./statsRepositories.ts";
 

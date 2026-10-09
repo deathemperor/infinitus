@@ -20,15 +20,19 @@
  *
  * @module provider/builtInDrivers
  */
+import {
+  AcpRegistryDriver,
+  type AcpRegistryDriverEnv,
+} from "@infinitus/provider-acp-registry/server";
+import { AntigravityDriver, type AntigravityDriverEnv } from "./Drivers/AntigravityDriver.ts";
 import { ClaudeDriver, type ClaudeDriverEnv } from "./Drivers/ClaudeDriver.ts";
 import { CodexDriver, type CodexDriverEnv } from "./Drivers/CodexDriver.ts";
-import { CursorDriver, type CursorDriverEnv } from "./Drivers/CursorDriver.ts";
-import { GrokDriver, type GrokDriverEnv } from "./Drivers/GrokDriver.ts";
-import { OmpDriver, type OmpDriverEnv } from "./Drivers/OmpDriver.ts";
-import { OpenCodeDriver, type OpenCodeDriverEnv } from "./Drivers/OpenCodeDriver.ts";
-import { AntigravityDriver, type AntigravityDriverEnv } from "./Drivers/AntigravityDriver.ts";
-import { PiDriver, type PiDriverEnv } from "./Drivers/PiDriver.ts";
-import type { AnyProviderDriver } from "./ProviderDriver.ts";
+import { CursorDriver, type CursorDriverEnv } from "@infinitus/provider-cursor/server";
+import { GrokDriver, type GrokDriverEnv } from "@infinitus/provider-grok/server";
+import { OpenCodeDriver, type OpenCodeDriverEnv } from "@infinitus/provider-opencode/server";
+import { MuseDriver, type MuseDriverEnv } from "@infinitus/provider-muse/server";
+import { PiDriver, type PiDriverEnv } from "@infinitus/provider-pi/server";
+import type { AnyProviderDriver } from "@infinitus/provider-core/server/driver";
 
 /**
  * Union of infrastructure services required to construct any built-in
@@ -36,14 +40,15 @@ import type { AnyProviderDriver } from "./ProviderDriver.ts";
  * layer must provide every service in this union.
  */
 export type BuiltInDriversEnv =
+  | AcpRegistryDriverEnv
+  | AntigravityDriverEnv
   | ClaudeDriverEnv
   | CodexDriverEnv
   | CursorDriverEnv
   | GrokDriverEnv
-  | OmpDriverEnv
   | OpenCodeDriverEnv
-  | AntigravityDriverEnv
-  | PiDriverEnv;
+  | PiDriverEnv
+  | MuseDriverEnv;
 
 /**
  * Ordered list of built-in drivers. Order matters only for tie-breaking in
@@ -55,8 +60,9 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
   ClaudeDriver,
   CursorDriver,
   GrokDriver,
-  OmpDriver,
   OpenCodeDriver,
   AntigravityDriver,
   PiDriver,
+  MuseDriver,
+  AcpRegistryDriver,
 ];

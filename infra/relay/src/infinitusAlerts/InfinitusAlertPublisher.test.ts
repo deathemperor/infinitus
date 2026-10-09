@@ -1,3 +1,4 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no generateKeyPairSync.
 import * as NodeCrypto from "node:crypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { RelayDeliveryResult } from "@infinitus/contracts/relay";
@@ -150,6 +151,8 @@ function harness(input?: {
         Layer.succeed(EnvironmentLinks.EnvironmentLinks, {
           upsert: () => Effect.die("unused upsert"),
           listDeliveryUsersForEnvironment: () => Effect.succeed(users),
+          findActiveManagedForEnvironment: () => Effect.succeed([]),
+          setHoldWebhooksWhileOffline: () => Effect.void,
           listForUser: () => Effect.die("unused listForUser"),
           getForUser: () => Effect.die("unused getForUser"),
           revokeForUser: () => Effect.die("unused revokeForUser"),

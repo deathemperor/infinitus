@@ -15,6 +15,7 @@ import * as DesktopAssets from "./DesktopAssets.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+import * as DesktopUserData from "./DesktopUserData.ts";
 
 const defaultEnvironmentInput = {
   dirname: "/repo/apps/desktop/dist-electron",
@@ -38,7 +39,7 @@ interface ElectronAppCalls {
   readonly setName: string[];
 }
 
-const makeElectronAppLayer = (calls: ElectronAppCalls) =>
+const layerElectronApp = (calls: ElectronAppCalls) =>
   Layer.succeed(ElectronApp.ElectronApp, {
     metadata: Effect.die("unexpected metadata read"),
     name: Effect.succeed("T3 Code"),
@@ -70,7 +71,7 @@ const makeElectronAppLayer = (calls: ElectronAppCalls) =>
     on: () => Effect.void,
   } satisfies ElectronApp.ElectronApp["Service"]);
 
-const makeAssetsLayer = (png: Option.Option<string>) =>
+const layerAssets = (png: Option.Option<string>) =>
   Layer.succeed(DesktopAssets.DesktopAssets, {
     iconPaths: Effect.succeed({
       ico: Option.none(),
@@ -80,9 +81,9 @@ const makeAssetsLayer = (png: Option.Option<string>) =>
     resolveResourcePath: () => Effect.succeedNone,
   } satisfies DesktopAssets.DesktopAssets["Service"]);
 
-const makeEnvironmentLayer = (overrides: TestEnvironmentInput = {}, adoptsLegacy = false) => {
+const layerEnvironment = (overrides: TestEnvironmentInput = {}) => {
   const { env, ...environmentOverrides } = overrides;
-  const layer = DesktopEnvironment.layer({
+  return DesktopEnvironment.layer({
     ...defaultEnvironmentInput,
     ...environmentOverrides,
   }).pipe(
@@ -96,19 +97,6 @@ const makeEnvironmentLayer = (overrides: TestEnvironmentInput = {}, adoptsLegacy
       ),
     ),
   );
-  if (!adoptsLegacy) return layer;
-  // The fork adopts no legacy directory, so only a patched environment can
-  // still exercise upstream's adoption branch.
-  return Layer.effect(
-    DesktopEnvironment.DesktopEnvironment,
-    Effect.gen(function* () {
-      const environment = yield* DesktopEnvironment.DesktopEnvironment;
-      return DesktopEnvironment.DesktopEnvironment.of({
-        ...environment,
-        adoptsLegacyUserDataDir: true,
-      });
-    }),
-  ).pipe(Layer.provide(layer));
 };
 
 const withIdentity = <A, E, R>(
@@ -123,7 +111,6 @@ const withIdentity = <A, E, R>(
   input: {
     readonly calls?: ElectronAppCalls;
     readonly environment?: TestEnvironmentInput;
-    readonly adoptsLegacyUserDataDir?: boolean;
     readonly legacyPathExists?: boolean;
     readonly legacyPathProbeError?: PlatformError.PlatformError;
     readonly packageJson?: string;
@@ -139,23 +126,22 @@ const withIdentity = <A, E, R>(
   return effect.pipe(
     Effect.provide(
       DesktopAppIdentity.layer.pipe(
+        Layer.provide(NodePath.layerPosix),
         Layer.provideMerge(
           FileSystem.layerNoop({
             exists: (path) =>
               input.legacyPathProbeError
                 ? Effect.fail(input.legacyPathProbeError)
                 : Effect.succeed(
-                    input.legacyPathExists === true && path.includes("T3 Code (Alpha)"),
+                    input.legacyPathExists === true && /T3 Code \((Alpha|Dev)\)/.test(path),
                   ),
             readFileString: () =>
               Effect.succeed(input.packageJson ?? '{"t3codeCommitHash":"abcdef1234567890"}'),
           }),
         ),
-        Layer.provideMerge(makeAssetsLayer(input.pngIconPath ?? Option.none())),
-        Layer.provideMerge(makeElectronAppLayer(calls)),
-        Layer.provideMerge(
-          makeEnvironmentLayer(input.environment, input.adoptsLegacyUserDataDir === true),
-        ),
+        Layer.provideMerge(layerAssets(input.pngIconPath ?? Option.none())),
+        Layer.provideMerge(layerElectronApp(calls)),
+        Layer.provideMerge(layerEnvironment(input.environment)),
       ),
     ),
   );
@@ -180,58 +166,17 @@ describe("DesktopAppIdentity", () => {
     withIdentity(
       Effect.gen(function* () {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
-        const userDataPath = yield* identity.resolveUserDataPath;
-
         assert.equal(
-          userDataPath,
+          yield* identity.resolveUserDataPath,
           "/Users/alice/Library/Application Support/infinitus-desktop-dev",
         );
       }),
       {
-        environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
         legacyPathExists: true,
+        environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
       },
     ),
   );
-
-  it.effect("still adopts a legacy directory a build does claim", () =>
-    withIdentity(
-      Effect.gen(function* () {
-        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
-        const userDataPath = yield* identity.resolveUserDataPath;
-
-        assert.equal(userDataPath, "/Users/alice/Library/Application Support/T3 Code (Alpha)");
-      }),
-      { adoptsLegacyUserDataDir: true, legacyPathExists: true },
-    ),
-  );
-
-  it.effect("preserves failures while inspecting the legacy userData path", () => {
-    const legacyPath = "/Users/alice/Library/Application Support/T3 Code (Alpha)";
-    const cause = PlatformError.systemError({
-      _tag: "PermissionDenied",
-      module: "FileSystem",
-      method: "exists",
-      description: "permission denied",
-      pathOrDescriptor: legacyPath,
-    });
-
-    return withIdentity(
-      Effect.gen(function* () {
-        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
-        const error = yield* identity.resolveUserDataPath.pipe(Effect.flip);
-
-        assert.instanceOf(error, DesktopAppIdentity.DesktopUserDataPathResolutionError);
-        assert.equal(error.legacyPath, legacyPath);
-        assert.strictEqual(error.cause, cause);
-        assert.equal(
-          error.message,
-          `Failed to inspect legacy desktop user-data path at "${legacyPath}".`,
-        );
-      }),
-      { adoptsLegacyUserDataDir: true, legacyPathProbeError: cause },
-    );
-  });
 
   it.effect("configures app identity from the environment commit override", () => {
     const calls: ElectronAppCalls = {
@@ -246,7 +191,7 @@ describe("DesktopAppIdentity", () => {
         yield* identity.configure;
 
         // A packaged build of this repo is titled plainly (#823 layer 3).
-        assert.deepEqual(calls.setName, [PRODUCT_NAME]);
+        assert.deepEqual(calls.setName, [`${PRODUCT_NAME} Alpha`]);
         assert.equal(calls.setAboutPanelOptions[0]?.applicationName, PRODUCT_NAME);
         assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
         assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
@@ -265,6 +210,46 @@ describe("DesktopAppIdentity", () => {
       },
     );
   });
+
+  it.effect.each([
+    // A fork release carries no stage in its title (#823 layer 3); upstream's
+    // nightly and a dev run keep theirs.
+    { stage: "Alpha", environment: {}, applicationName: PRODUCT_NAME },
+    {
+      stage: "Nightly",
+      environment: { appVersion: "0.0.43-nightly.20260929.2428" },
+      applicationName: `${PRODUCT_NAME} (Nightly)`,
+    },
+    {
+      stage: "Dev",
+      environment: { env: { VITE_DEV_SERVER_URL: "http://localhost:5173" } },
+      applicationName: `${PRODUCT_NAME} (Dev)`,
+    },
+  ])(
+    "uses a valid native User-Agent product name for $stage",
+    ({ stage, environment, applicationName }) => {
+      const calls: ElectronAppCalls = {
+        setAboutPanelOptions: [],
+        setDockIcon: [],
+        setName: [],
+      };
+
+      return withIdentity(
+        Effect.gen(function* () {
+          const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+          yield* identity.configure;
+
+          const runtimeName = calls.setName[0];
+          assert.isDefined(runtimeName);
+          assert.equal(runtimeName, `${PRODUCT_NAME} ${stage}`);
+          // RFC 9110's token grammar, after Electron removes ASCII spaces.
+          assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
+          assert.equal(calls.setAboutPanelOptions[0]?.applicationName, applicationName);
+        }),
+        { calls, environment },
+      );
+    },
+  );
 
   it.effect("sets the dock icon only when running unpackaged", () => {
     const calls: ElectronAppCalls = {

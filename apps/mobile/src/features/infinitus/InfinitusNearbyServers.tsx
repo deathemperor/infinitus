@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";
-import { ConnectionSheetButton } from "../connection/ConnectionSheetButton";
+import { InfinitusSheetButton } from "./InfinitusSheetButton";
 import { discoverNearbyServers } from "./lanDiscovery";
 import {
   type NearbyServer,
@@ -104,7 +104,7 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
 
   return (
     <View collapsable={false} className="gap-2">
-      <ConnectionSheetButton
+      <InfinitusSheetButton
         icon="magnifyingglass"
         label={phase === "scanning" ? "Looking on this network…" : "Find Macs on this network"}
         disabled={phase === "scanning"}

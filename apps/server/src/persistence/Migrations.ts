@@ -8,8 +8,9 @@
  * schema is always up to date before the application starts.
  */
 
-import * as Migrator from "effect/unstable/sql/Migrator";
+import * as Migrator from "effect/sql/Migrator";
 import * as Effect from "effect/Effect";
+import * as SqlClient from "effect/sql/SqlClient";
 
 // Import all migrations statically
 import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
@@ -76,6 +77,12 @@ import Migration0061 from "./Migrations/061_ProjectionThreadTitleState.ts";
 import Migration0062 from "./Migrations/062_ProjectionThreadQueuedTurnsSendAt.ts";
 import Migration0063 from "./Migrations/063_PullRequestFilesViewed.ts";
 import Migration0064 from "./Migrations/064_ProjectionThreadsAutoSettleDisabledAt.ts";
+import Migration0065 from "./Migrations/065_OrchestrationV2.ts";
+import Migration0066 from "./Migrations/066_RemoveRedundantProjectionIndexes.ts";
+import Migration0067 from "./Migrations/067_ScheduledTaskWebhooks.ts";
+import Migration0068 from "./Migrations/068_WebhookRelayDeliveries.ts";
+import Migration0069 from "./Migrations/069_McpAppModelContext.ts";
+import Migration0070 from "./Migrations/070_ThreadSnapshotWindowIndexes.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -87,7 +94,7 @@ import Migration0064 from "./Migrations/064_ProjectionThreadsAutoSettleDisabledA
  * Uses Migrator.fromRecord which parses the key format and
  * returns migrations sorted by ID.
  */
-const migrationEntries = [
+export const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
   [2, "OrchestrationCommandReceipts", Migration0002],
   [3, "CheckpointDiffBlobs", Migration0003],
@@ -152,6 +159,16 @@ const migrationEntries = [
   [62, "ProjectionThreadQueuedTurnsSendAt", Migration0062],
   [63, "PullRequestFilesViewed", Migration0063],
   [64, "ProjectionThreadsAutoSettleDisabledAt", Migration0064],
+  // Upstream's 55-60, renumbered after the fork's own 51-64 (INFINITUS.md). Upstream's
+  // reconcileV2PreviewMigration (OrchestrationV2 released as 53 and 54 in its previews)
+  // is not carried: no fork database ever recorded those, and 53 and 54 are taken here.
+  // Preserve this migration's schema. Future V2 schema changes need new migrations.
+  [65, "OrchestrationV2", Migration0065],
+  [66, "RemoveRedundantProjectionIndexes", Migration0066],
+  [67, "ScheduledTaskWebhooks", Migration0067],
+  [68, "WebhookRelayDeliveries", Migration0068],
+  [69, "McpAppModelContext", Migration0069],
+  [70, "ThreadSnapshotWindowIndexes", Migration0070],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -193,5 +210,30 @@ export const runMigrations = Effect.fn("runMigrations")(function* ({
   yield* migrations.length === 0
     ? Effect.logDebug("Database schema is current")
     : Effect.log("Migrations ran successfully").pipe(Effect.annotateLogs({ migrations }));
+
+  // The migrator keys on migration_id: a database that recorded a different
+  // migration under a shared id (local or fork builds) keeps that id and
+  // silently skips this build's migration at it. Surface the divergence so the
+  // skipped schema change is diagnosable.
+  const sql = yield* SqlClient.SqlClient;
+  const recorded = yield* sql<{
+    readonly migration_id: number;
+    readonly name: string;
+  }>`SELECT migration_id, name FROM effect_sql_migrations`;
+  const manifestNames = new Map<number, string>(migrationEntries.map(([id, name]) => [id, name]));
+  const divergent = recorded.flatMap((row) => {
+    const expected = manifestNames.get(row.migration_id);
+    if (expected === undefined) {
+      return [`${row.migration_id}:${row.name} (unknown to this build)`];
+    }
+    return expected === row.name
+      ? []
+      : [`${row.migration_id}:${row.name} (this build: ${expected})`];
+  });
+  if (divergent.length > 0) {
+    yield* Effect.logWarning(
+      "Database migration history diverges from this build; recorded migration ids are skipped, not reconciled by name.",
+    ).pipe(Effect.annotateLogs({ divergent }));
+  }
   return executedMigrations;
 });

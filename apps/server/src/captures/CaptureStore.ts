@@ -31,7 +31,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 
-import { writeFileStringAtomically } from "../atomicWrite.ts";
+import { writeFileStringAtomically } from "@infinitus/shared/atomicWrite";
 import * as ServerConfig from "../config.ts";
 
 export interface CaptureStoreShape {

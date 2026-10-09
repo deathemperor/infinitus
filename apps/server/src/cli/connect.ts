@@ -21,14 +21,9 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as References from "effect/References";
 import * as Schema from "effect/Schema";
-import { Command, Flag, GlobalFlag, Prompt } from "effect/unstable/cli";
-import {
-  FetchHttpClient,
-  HttpClient,
-  HttpClientRequest,
-  HttpClientResponse,
-} from "effect/unstable/http";
-import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
+import { Command, Flag, GlobalFlag, Prompt } from "effect/cli";
+import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -43,18 +38,15 @@ import {
   RELAY_URL_SECRET,
 } from "../cloud/config.ts";
 import { relayUrlConfig } from "../cloud/publicConfig.ts";
-import { headlessRelayClientTracingLayer } from "../cloud/relayTracing.ts";
+import * as RelayTracing from "../cloud/relayTracing.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ExternalLauncher from "../process/externalLauncher.ts";
 import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import { resolveCliCommand } from "./invocation.ts";
-import {
-  bootServiceLayer,
-  offerServiceDuringOnboarding,
-  recoverServiceOnboardingOffer,
-} from "./service.ts";
+import { offerServiceDuringOnboarding, recoverServiceOnboardingOffer } from "./service.ts";
+import * as CliService from "./service.ts";
 
 const jsonFlag = Flag.Boolean("json").pipe(
   Flag.withDescription("Emit JSON instead of human-readable output."),
@@ -114,11 +106,12 @@ const authorizeCli = Effect.fn("cloud.cli.authorize")(function* (options: {
   // A stored credential whose refresh fails (revoked, expired grant) must
   // fall through to a fresh device authorization, not dead-end the command.
   const existing = yield* tokens.getExisting.pipe(
-    Effect.catchTag("CloudCliCredentialRefreshError", () =>
-      Console.log(
-        `The stored ${CONNECT_NAME} credential could not be refreshed; signing in again.`,
-      ).pipe(Effect.as(Option.none())),
-    ),
+    Effect.catchTags({
+      CloudCliCredentialRefreshError: () =>
+        Console.log(
+          `The stored ${CONNECT_NAME} credential could not be refreshed; signing in again.`,
+        ).pipe(Effect.as(Option.none())),
+    }),
   );
   if (Option.isSome(existing)) {
     return existing.value.identity ?? null;
@@ -190,9 +183,9 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
       ? "pending server startup"
       : "not provisioned";
   const nextStep = !status.authenticated
-    ? `Run \`infinitus connect link\` to authorize and enable ${CONNECT_NAME}.`
+    ? `Run \`t3 connect link\` to authorize and enable ${CONNECT_NAME}.`
     : !status.desired
-      ? `Run \`infinitus connect link\` to enable ${CONNECT_NAME}.`
+      ? `Run \`t3 connect link\` to enable ${CONNECT_NAME}.`
       : !status.linked
         ? `Start ${PRODUCT_NAME} to provision the environment link and launch its managed tunnel.`
         : undefined;
@@ -206,7 +199,7 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
     `  Publish agent activity: ${status.publishAgentActivity ? "enabled" : "disabled"}`,
     ...formatRelayClientStatus(status.relayClient),
     "",
-    "This is saved setup, not a live connection check. Check the background service with `infinitus service status`.",
+    "This is saved setup, not a live connection check. Check the background service with `t3 service status`.",
     ...(nextStep ? ["", `Next: ${nextStep}`] : []),
   ].join("\n");
 }
@@ -382,7 +375,7 @@ export const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconne
       yield* Console.warn(
         input.clearAuthorization
           ? "Could not revoke the relay-side environment record before signing out.\nThe stored CLI authorization was still removed locally."
-          : "Could not revoke the relay-side environment record yet.\nRun `infinitus connect unlink` again when the relay is reachable.",
+          : "Could not revoke the relay-side environment record yet.\nRun `t3 connect unlink` again when the relay is reachable.",
       );
     } else if (input.relayResult.value.status === "revoked") {
       yield* Console.log("Revoked the relay-side environment record.");
@@ -411,7 +404,7 @@ const disconnectCloud = Effect.fn("cloud.cli.disconnect")(function* (options: {
 
   if (options.clearAuthorization) {
     yield* Console.log(
-      `Signed out of ${CONNECT_NAME} locally.\nThe background service is managed separately with \`infinitus service\`.`,
+      `Signed out of ${CONNECT_NAME} locally.\nThe background service is managed separately with \`t3 service\`.`,
     );
   }
 });
@@ -440,22 +433,22 @@ const runCloudCommand = Effect.fn("cloud.cli.run_cloud_command")(function* <A, E
   const logLevel = yield* GlobalFlag.LogLevel;
   const config = yield* resolveCliAuthConfig(flags, logLevel);
   const minimumLogLevel = options?.quietLogs ? "Error" : config.logLevel;
-  const runtimeLayer = Layer.mergeAll(
+  const layerRuntime = Layer.mergeAll(
     ServerSecretStore.layer,
     CliTokenManager.layer.pipe(
       Layer.provide(ServerSecretStore.layer),
       Layer.provide(ExternalLauncher.layer),
     ),
     RelayClient.layerCloudflared({ baseDir: config.baseDir }),
-    EnvironmentAuth.runtimeLayer,
-    bootServiceLayer(config),
-    headlessRelayClientTracingLayer,
+    EnvironmentAuth.layerRuntime,
+    CliService.layer(config),
+    RelayTracing.layerHeadlessRelayClient,
   ).pipe(
     Layer.provideMerge(FetchHttpClient.layer),
     Layer.provideMerge(ServerConfig.layer(config)),
     Layer.provide(Layer.succeed(References.MinimumLogLevel, minimumLogLevel)),
   );
-  return yield* run.pipe(Effect.provide(runtimeLayer));
+  return yield* run.pipe(Effect.provide(layerRuntime));
 });
 
 const connectedAs = (identity: string | null): string => (identity ? ` as ${identity}` : "");
@@ -630,11 +623,11 @@ const connectPublishCommand = Command.make("publish", {
         // out of band without T3 Connect.
         if (!(yield* tokens.hasCredential)) {
           yield* Console.log(
-            "Run `infinitus connect login` first so this environment can be authorized to publish.",
+            "Run `t3 connect login` first so this environment can be authorized to publish.",
           );
           return;
         }
-        // A link may already be desired (e.g. `infinitus connect link` before the
+        // A link may already be desired (e.g. `t3 connect link` before the
         // server's first start). Never downgrade it: a desired managed link
         // also covers publishing, so only request a publish-only link when no
         // link is pending at all.

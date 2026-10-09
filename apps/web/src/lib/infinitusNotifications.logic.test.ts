@@ -12,7 +12,6 @@ describe("attentionNotificationTitle (#1032)", () => {
   it("names the states that wait on the user, upstream's and the fork's", () => {
     expect(attentionNotificationTitle("approval")).toBe("Approval needed");
     expect(attentionNotificationTitle("input")).toBe("Input needed");
-    expect(attentionNotificationTitle("held")).toBe("Held for headroom");
     expect(attentionNotificationTitle("failed")).toBe("Thread failed");
   });
 
@@ -57,12 +56,7 @@ describe("legacyNotificationMode", () => {
 describe("attentionCount", () => {
   it("counts the threads waiting on the user", () => {
     expect(
-      attentionCount([
-        { status: "approval" },
-        { status: "input" },
-        { status: "held" },
-        { status: "working" },
-      ]),
+      attentionCount([{ status: "approval" }, { status: "input" }, { status: "working" }]),
     ).toBe(2);
   });
 });

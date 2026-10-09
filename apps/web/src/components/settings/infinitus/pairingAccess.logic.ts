@@ -1,6 +1,6 @@
 import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 import * as Cause from "effect/Cause";
-import type { AsyncResult } from "effect/unstable/reactivity";
+import type { AsyncResult } from "effect/reactivity";
 
 /**
  * What the pairing-requests stream tells this client (#730). Only an

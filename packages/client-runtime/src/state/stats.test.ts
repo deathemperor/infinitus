@@ -1,5 +1,5 @@
 import { it, expect } from "vite-plus/test";
-import { Atom, AtomRegistry, AsyncResult } from "effect/unstable/reactivity";
+import { Atom, AtomRegistry, AsyncResult } from "effect/reactivity";
 import {
   EnvironmentId,
   UsageDay,

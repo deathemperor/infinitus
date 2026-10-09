@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { WS_METHODS } from "@infinitus/contracts";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { appAtomRegistry } from "./atomRegistry";
 
@@ -29,7 +29,6 @@ interface PendingRpcAckRequest {
 
 const pendingRpcAckRequests = new Map<string, PendingRpcAckRequest>();
 const untrackedRpcAckMethods = new Set<string>([
-  WS_METHODS.previewAutomationConnect,
   WS_METHODS.serverGetUsageSummary,
   WS_METHODS.serverGetStats,
 ]);

@@ -80,17 +80,6 @@ export const DESCRIPTOR_PRESETS_BY_KIND: Partial<
     },
     { id: "fastMode", label: "Fast Mode", type: "boolean" },
     { id: "thinking", label: "Thinking", type: "boolean" },
-    {
-      // The ids are the manifest's own: the Claude catalog maps them to token
-      // counts, and only those two mean anything to the adapter.
-      id: "contextWindow",
-      label: "Context Window",
-      type: "select",
-      choices: [
-        { id: "200k", label: "200k", isDefault: true },
-        { id: "1m", label: "1M" },
-      ],
-    },
   ],
   [ProviderDriverKind.make("cursor")]: [
     { id: "reasoning", label: "Reasoning", type: "select", choices: EFFORT_CHOICES },
@@ -100,18 +89,16 @@ export const DESCRIPTOR_PRESETS_BY_KIND: Partial<
   [ProviderDriverKind.make("grok")]: [
     { id: "reasoningEffort", label: "Reasoning", type: "select", choices: EFFORT_CHOICES },
   ],
-  [ProviderDriverKind.make("omp")]: [
+  [ProviderDriverKind.make("pi")]: [
     {
       id: "thinking",
       label: "Thinking",
       type: "select",
       choices: [
         { id: "off", label: "Off" },
-        // Oh My Pi offers Auto alongside Off and the model's own levels.
-        { id: "auto", label: "Auto" },
         { id: "minimal", label: "Minimal" },
         { id: "low", label: "Low" },
-        { id: "medium", label: "Medium" },
+        { id: "medium", label: "Medium", isDefault: true },
         { id: "high", label: "High" },
         { id: "xhigh", label: "Extra High" },
         { id: "max", label: "Max" },
@@ -207,10 +194,14 @@ export function draftFromDefinition(entry: CustomModelDefinition): CustomModelDr
   };
 }
 
+/** Claude context choices require runtime suffix mappings that custom entries do not carry. */
 export function descriptorsFromCapabilities(
   capabilities: ModelCapabilities | null | undefined,
+  driverKind: ProviderDriverKind | null,
 ): EditorDescriptor[] {
-  return (capabilities?.optionDescriptors ?? []).map(descriptorToEditor);
+  return (capabilities?.optionDescriptors ?? [])
+    .filter((descriptor) => driverKind !== "claudeAgent" || descriptor.id !== "contextWindow")
+    .map(descriptorToEditor);
 }
 
 /**

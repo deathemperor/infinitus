@@ -1,7 +1,7 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { MenuAction } from "@react-native-menu/menu";
 import * as Effect from "effect/Effect";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { useMemo, type ComponentProps } from "react";
 import { Platform } from "react-native";
 
@@ -10,11 +10,6 @@ import { ControlPillMenu } from "../../components/ControlPill";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
 import { environmentServerConfigsAtom } from "../../state/server";
-import {
-  COMPOSER_SEND_MODE_LABELS,
-  outboxQueueMode,
-  type OutboxQueueMode,
-} from "../../state/threadOutboxQueue.logic";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
 import { SettingsRow } from "./components/SettingsRow";
@@ -109,40 +104,6 @@ export function InfinitusAlarmsRow() {
         if (value)
           void Effect.runPromise(requestAgentNotificationPermission).catch(() => undefined);
       }}
-    />
-  );
-}
-
-/** Sending while a turn runs (#807, the desktop's `composerSendMode`). */
-export function InfinitusSendModeRow() {
-  const preferences = useAtomValue(mobilePreferencesAtom);
-  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
-  const present = useInfinitusMacPresent();
-  const loaded = AsyncResult.isSuccess(preferences);
-  const sendMode = outboxQueueMode(preferences);
-  const sendModeActions = useMemo<MenuAction[]>(
-    () =>
-      (["queue", "steer"] as const).map((mode) => ({
-        id: mode,
-        title: COMPOSER_SEND_MODE_LABELS[mode],
-        state: mode === sendMode ? "on" : "off",
-      })),
-    [sendMode],
-  );
-  if (!present) return null;
-  return (
-    <PickerRow
-      title="Sending while a turn runs"
-      actions={sendModeActions}
-      onPressAction={({ nativeEvent }) => {
-        const mode = nativeEvent.event as OutboxQueueMode;
-        if (mode === "queue" || mode === "steer")
-          savePreferences({ infinitusComposerSendMode: mode });
-      }}
-      icon="tray.and.arrow.up"
-      label="Sending while a turn runs"
-      value={COMPOSER_SEND_MODE_LABELS[sendMode]}
-      disabled={!loaded}
     />
   );
 }

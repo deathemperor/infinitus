@@ -8,8 +8,8 @@ import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
-import * as ChildProcess from "effect/unstable/process/ChildProcess";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopShellEnvironment from "./DesktopShellEnvironment.ts";
@@ -74,7 +74,7 @@ function runShellEnvironment(input: {
   readonly existingPaths?: ReadonlyArray<string>;
 }) {
   const existingPaths = new Set(input.existingPaths ?? []);
-  const fileSystemLayer = FileSystem.layerNoop({
+  const layerFileSystem = FileSystem.layerNoop({
     exists: (path) => Effect.succeed(existingPaths.has(path)),
     readDirectory: (path) =>
       Effect.succeed(
@@ -84,13 +84,13 @@ function runShellEnvironment(input: {
           .filter((entry, index, all) => entry.length > 0 && all.indexOf(entry) === index),
       ),
   });
-  const environmentLayer = Layer.succeed(
+  const layerEnvironment = Layer.succeed(
     DesktopEnvironment.DesktopEnvironment,
     DesktopEnvironment.DesktopEnvironment.of({
       platform: input.platform,
     } as DesktopEnvironment.DesktopEnvironment["Service"]),
   );
-  const spawnerLayer = Layer.succeed(
+  const layerSpawner = Layer.succeed(
     ChildProcessSpawner.ChildProcessSpawner,
     ChildProcessSpawner.make((command) =>
       input.failure === undefined
@@ -106,7 +106,7 @@ function runShellEnvironment(input: {
     Effect.provide(
       DesktopShellEnvironment.layer.pipe(
         Layer.provide(
-          Layer.mergeAll(environmentLayer, NodeServices.layer, spawnerLayer, fileSystemLayer),
+          Layer.mergeAll(layerEnvironment, NodeServices.layer, layerSpawner, layerFileSystem),
         ),
       ),
     ),
@@ -284,11 +284,13 @@ describe("DesktopShellEnvironment", () => {
           envOutput({
             PATH: "/home/linuxbrew/.linuxbrew/bin:/usr/bin",
             SSH_AUTH_SOCK: "/tmp/secretive.sock",
+            T3CODE_TELEMETRY_ENABLED: "false",
           }),
       });
 
       assert.equal(env.PATH, "/home/linuxbrew/.linuxbrew/bin:/usr/bin");
       assert.equal(env.SSH_AUTH_SOCK, "/tmp/secretive.sock");
+      assert.equal(env.T3CODE_TELEMETRY_ENABLED, "false");
     }),
   );
 

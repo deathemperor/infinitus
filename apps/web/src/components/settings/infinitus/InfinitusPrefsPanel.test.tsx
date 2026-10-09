@@ -15,6 +15,7 @@ const { fake } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../state/environments", () => ({
+  usePrimaryEnvironmentId: () => "env-1",
   usePrimaryEnvironment: () => ({
     environmentId: "env-1",
     serverConfig: {

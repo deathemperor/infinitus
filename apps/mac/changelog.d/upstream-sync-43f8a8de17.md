@@ -1,0 +1,3 @@
+Desktop: the engine is rebuilt on the new orchestrator — threads, turns, checkpoints and provider sessions run on the upstream v2 engine, with its message queue, steering, pull request watching, scheduled tasks and ACP providers.
+Desktop: features bound to the old engine are gone for now — Best of N, babysitting, side questions, rewind and fork from a message, thread usage and live rate, holds and priority mode, the Slack bridge, resume on limit and the built-in Pi and Oh My Pi providers (#1627).
+Phone: the queue, hold banner, reconnecting notice, Best of card and thread usage sheet left with the old engine; everything else follows the desktop.

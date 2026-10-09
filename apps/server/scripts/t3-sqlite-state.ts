@@ -12,8 +12,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import * as SqlClient from "effect/unstable/sql/SqlClient";
-import { Argument, Command, Flag } from "effect/unstable/cli";
+import * as SqlClient from "effect/sql/SqlClient";
+import { Argument, Command, Flag } from "effect/cli";
 
 import * as NodeSqliteClient from "@infinitus/shared/nodeSqliteClient";
 
@@ -54,7 +54,7 @@ export class SqliteStateDatabaseMissingError extends Schema.TaggedError<SqliteSt
   },
 ) {
   override get message(): string {
-    return `Database does not exist at '${this.databasePath}'. Start T3 once to run migrations.`;
+    return `Database does not exist at '${this.databasePath}'. Start Infinitus once to run migrations.`;
   }
 }
 
@@ -185,7 +185,7 @@ export const runSqliteState = Effect.fn("runSqliteState")(function* (
   const sharedHome = path.resolve(
     options.sharedHome ?? path.join(NodeOS.homedir(), DEFAULT_HOME_DIR_NAME),
   );
-  const databasePath = path.join(baseDir, "userdata", "state.sqlite");
+  const databasePath = path.join(baseDir, "userdata", "statev2.sqlite");
   const source = yield* resolveSqlSource(input.sql, input.file);
 
   if (!(yield* fs.exists(databasePath))) {
@@ -255,7 +255,7 @@ const t3SqliteStateCommand = Command.make(
       Argument.withDescription("Run a read-only query or a backed-up fixture mutation."),
     ),
     baseDir: Flag.String("base-dir").pipe(
-      Flag.withDescription("Explicit T3 base directory containing userdata/state.sqlite."),
+      Flag.withDescription("Explicit Infinitus base directory containing userdata/statev2.sqlite."),
     ),
     sql: Flag.String("sql").pipe(
       Flag.optional,
@@ -275,7 +275,7 @@ const t3SqliteStateCommand = Command.make(
     }).pipe(Effect.flatMap(encodeSqliteStateResult), Effect.flatMap(Console.log)),
 ).pipe(
   Command.withDescription(
-    "Inspect or seed an isolated T3 SQLite database with automatic backups for writes.",
+    "Inspect or seed an isolated Infinitus SQLite database with automatic backups for writes.",
   ),
 );
 

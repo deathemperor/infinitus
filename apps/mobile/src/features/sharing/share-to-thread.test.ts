@@ -2,7 +2,7 @@ import type {
   EnvironmentProject,
   EnvironmentThreadShell,
 } from "@infinitus/client-runtime/state/shell";
-import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@infinitus/contracts";
+import { EnvironmentId, ProjectId, ThreadId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { selectShareTargetThreads } from "./share-to-thread";
@@ -13,28 +13,14 @@ const PROJECT = ProjectId.make("project-1");
 function makeThread(
   input: Partial<EnvironmentThreadShell> & Pick<EnvironmentThreadShell, "id" | "title">,
 ): EnvironmentThreadShell {
+  // Only the fields the selector reads; the rest of the shell is not consulted.
   return {
     environmentId: ENV,
     projectId: PROJECT,
-    modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
-    runtimeMode: "full-access",
-    interactionMode: "default",
-    branch: null,
-    worktreePath: null,
-    pullRequests: [],
-    latestTurn: null,
-    createdAt: "2026-06-01T00:00:00.000Z",
     updatedAt: "2026-06-01T00:00:00.000Z",
     archivedAt: null,
-    session: null,
-    latestUserMessageAt: null,
-    hasPendingApprovals: false,
-    hasPendingUserInput: false,
-    hasActionableProposedPlan: false,
-    settledOverride: null,
-    settledAt: null,
     ...input,
-  };
+  } as EnvironmentThreadShell;
 }
 
 const projects: ReadonlyArray<EnvironmentProject> = [

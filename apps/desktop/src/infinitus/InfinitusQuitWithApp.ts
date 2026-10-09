@@ -44,7 +44,7 @@ export const quitInfinitusIfListed = Effect.fn("infinitus.quitIfListed")(functio
     yield* request({ command: QUIT_COMMAND });
     return "sent" as const;
   }).pipe(
-    Effect.catchTag("InfinitusUnavailable", () => Effect.succeed("unavailable" as const)),
+    Effect.catchTags({ InfinitusUnavailable: () => Effect.succeed("unavailable" as const) }),
     Effect.catch(() => Effect.succeed("failed" as const)),
   );
 });

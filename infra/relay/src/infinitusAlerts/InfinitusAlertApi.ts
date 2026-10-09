@@ -7,7 +7,7 @@ import {
   RelayInternalError,
 } from "@infinitus/contracts/relay";
 import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import * as InfinitusAlertPublisher from "./InfinitusAlertPublisher.ts";
 

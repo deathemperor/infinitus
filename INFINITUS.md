@@ -47,11 +47,12 @@ contributor shorthand for this TypeScript tree and the Swift app.
   answers `latest` here)
   are re-flipped to `infinitus` after each merge, never the rule.
   An upstream migration whose number collides with the fork's own
-  (`051`–`057`, `059`, `061` and `062`, #806 onward) is renumbered after them in the merge
-  (`Migrations.ts` and the file; upstream's `051_ProjectionThreadMessageContext`
-  is the fork's `058`, its `052_ProjectionThreadTitleState` the fork's
-  `061`, its `053_PullRequestFilesViewed` the fork's `063`, its
-  `054_ProjectionThreadsAutoSettleDisabledAt` the fork's `064`), so an existing fork database never skips it. Upstream commits
+  (`051`–`064`, #806 onward) is renumbered after them in the merge
+  (`Migrations.ts` and the file; upstream's `051`–`054` are the fork's
+  `058`, `061`, `063` and `064`, its `055_OrchestrationV2`–`060` the fork's
+  `065`–`070`), so an existing fork database never skips it. Upstream's
+  `reconcileV2PreviewMigration` (a repair for its own preview builds) is not
+  carried: no fork database ran a preview. Upstream commits
   `.pnpm-store/v11/index.db` (#11265) and rewrites it on every install; the
   fork ignores the file and drops it from the merge (`git rm --cached`), so
   each sync meets it as a modify/delete conflict resolved the same way.

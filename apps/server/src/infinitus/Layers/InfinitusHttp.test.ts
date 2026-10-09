@@ -6,54 +6,26 @@ import {
   EnvironmentAuthenticatedAuth,
   EnvironmentAuthenticatedPrincipal,
   EnvironmentHttpApi,
-  type InfinitusHoldRow,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
-  ThreadId,
-  TurnId,
 } from "@infinitus/contracts";
-import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import type * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Stream from "effect/Stream";
-import { HttpApiTest } from "effect/unstable/httpapi";
+import { HttpApiTest } from "effect/http-api";
 import { describe, expect } from "vite-plus/test";
 
-import { ProjectionSnapshotQuery } from "../../orchestration/Services/ProjectionSnapshotQuery.ts";
+import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import {
   InfinitusAlertRelay,
   InfinitusAlertRelayUnlinked,
 } from "../Services/InfinitusAlertRelay.ts";
-import { InfinitusLimitStops } from "../Services/InfinitusLimitStops.ts";
-import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
-import { InfinitusSessionHold } from "../Services/InfinitusSessionHold.ts";
-import { InfinitusSessionInterrupt } from "../Services/InfinitusSessionInterrupt.ts";
 import { infinitusHttpApiLayer } from "./InfinitusHttp.ts";
-
-/** A WS-stream row (`held` / `limited`); the paused row exists only on the HTTP read. */
-const row = (
-  threadId: string,
-  kind: NonNullable<InfinitusHeldThread["kind"]>,
-): InfinitusHeldThread => ({
-  threadId: ThreadId.make(threadId),
-  since: "2026-09-12T00:00:00.000Z",
-  summary: `${kind} for the test`,
-  kind,
-});
-
-const pausedRow = (threadId: string): InfinitusHoldRow => ({
-  ...row(threadId, "held"),
-  kind: "paused",
-});
-
-const HELD = ThreadId.make("t-held");
-const PAUSED = ThreadId.make("t-paused");
 
 const CLAUDE = ProviderInstanceId.make("claudeAgent");
 const CODEX = ProviderInstanceId.make("codex");
@@ -80,8 +52,8 @@ const settingsWith = (defaultModelSelection: typeof ENV_DEFAULT | null) =>
         projectSettingsOverrides: { [P_OVERRIDE]: { defaultModelSelection: OVERRIDE } },
       }),
     }),
-    Layer.mock(ProjectionSnapshotQuery)({
-      getProjectShellById: (projectId) =>
+    Layer.mock(ProjectStore.ProjectStoreV2)({
+      getShell: (projectId) =>
         Effect.succeed(
           projectId === P_ROW
             ? Option.some({
@@ -109,24 +81,6 @@ const services = Layer.mergeAll(
             alerts.push(input);
             return { deliveries: 2 };
           }),
-  }),
-  Layer.mock(InfinitusSessionHold)({
-    held: Stream.succeed([row("t-held", "held")]),
-    release: (threadId) =>
-      Effect.succeed(
-        threadId === HELD ? { released: true } : { released: false, reason: "nothing is held" },
-      ),
-  }),
-  Layer.mock(InfinitusLimitStops)({ stopped: Stream.succeed([row("t-limited", "limited")]) }),
-  Layer.mock(InfinitusRunningTurns)({
-    list: Effect.succeed([{ threadId: ThreadId.make("t-running"), turnId: TurnId.make("turn-1") }]),
-  }),
-  Layer.mock(InfinitusSessionInterrupt)({
-    paused: Effect.succeed([pausedRow("t-paused")]),
-    resume: (threadId) =>
-      Effect.succeed(
-        threadId === PAUSED ? { released: true } : { released: false, reason: "nothing is paused" },
-      ),
   }),
 );
 
@@ -197,16 +151,6 @@ describe("infinitusHttpApiLayer (#822)", () => {
       ),
   );
 
-  effectIt.effect("lists the running turns an update would cut off (#829)", () =>
-    withClient(["orchestration:read"], (client) =>
-      Effect.gen(function* () {
-        expect(yield* client.infinitus.runningTurns({ headers: {} })).toEqual([
-          { threadId: "t-running", turnId: "turn-1" },
-        ]);
-      }),
-    ),
-  );
-
   effectIt.effect(
     "thread defaults resolve the project's override, the row's default, then the environment's (#1315)",
     () =>
@@ -231,54 +175,5 @@ describe("infinitusHttpApiLayer (#822)", () => {
           defaultModelSelection: null,
         });
       }),
-  );
-
-  effectIt.effect("one read lists the held, limit-stopped and paused threads", () =>
-    withClient(OPERATE, (client) =>
-      Effect.gen(function* () {
-        const holds = yield* client.infinitus.holds({ headers: {} });
-        expect(holds.map((entry) => [entry.threadId, entry.kind])).toEqual([
-          ["t-held", "held"],
-          ["t-limited", "limited"],
-          ["t-paused", "paused"],
-        ]);
-      }),
-    ),
-  );
-
-  effectIt.effect("release runs a held start, else continues a paused turn, else says so", () =>
-    withClient(OPERATE, (client) =>
-      Effect.gen(function* () {
-        expect(
-          yield* client.infinitus.releaseThread({ headers: {}, payload: { threadId: HELD } }),
-        ).toEqual({
-          released: true,
-        });
-        expect(
-          yield* client.infinitus.releaseThread({ headers: {}, payload: { threadId: PAUSED } }),
-        ).toEqual({
-          released: true,
-        });
-        expect(
-          yield* client.infinitus.releaseThread({
-            headers: {},
-            payload: { threadId: ThreadId.make("t-idle") },
-          }),
-        ).toEqual({ released: false, reason: "nothing is held or paused" });
-      }),
-    ),
-  );
-
-  effectIt.effect("a session without the operate scope is refused", () =>
-    withClient(["orchestration:read"], (client) =>
-      Effect.gen(function* () {
-        const refused = yield* client.infinitus.holds({ headers: {} }).pipe(Effect.flip);
-        expect(refused).toMatchObject({ _tag: "EnvironmentScopeRequiredError" });
-        const refusedRelease = yield* client.infinitus
-          .releaseThread({ headers: {}, payload: { threadId: HELD } })
-          .pipe(Effect.flip);
-        expect(refusedRelease).toMatchObject({ _tag: "EnvironmentScopeRequiredError" });
-      }),
-    ),
   );
 });

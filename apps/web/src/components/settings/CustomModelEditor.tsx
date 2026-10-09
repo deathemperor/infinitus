@@ -131,7 +131,7 @@ export function CustomModelEditor({
     setError(null);
     setDraft((current) => ({
       ...current,
-      descriptors: descriptorsFromCapabilities(model.capabilities),
+      descriptors: descriptorsFromCapabilities(model.capabilities, driverKind),
     }));
   };
 

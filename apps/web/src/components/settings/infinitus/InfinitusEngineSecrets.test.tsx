@@ -15,6 +15,7 @@ const { fake } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../state/environments", () => ({
+  usePrimaryEnvironmentId: () => "env-1",
   usePrimaryEnvironment: () => ({
     environmentId: "env-1",
     serverConfig: { environment: { capabilities: { infinitus: fake.capability } } },
@@ -44,6 +45,18 @@ vi.mock("../../../state/use-atom-command", () => ({
 vi.mock("../../../hooks/useSettings", () => ({
   PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE: "Connect to an environment",
   usePrimarySettingsAvailable: () => true,
+}));
+// Upstream's SettingsRow hides a server-scoped control without the write scope.
+vi.mock("../../../state/session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../state/session")>()),
+  useEnvironmentScope: () => true,
+  useEnvironmentsWithScope: (targets: ReadonlyArray<{ environmentId: string }>) =>
+    new Set(targets.map((target) => target.environmentId)),
+}));
+vi.mock("../../ui/tooltip", () => ({
+  Tooltip: ({ children }: { children: ReactNode }) => children,
+  TooltipTrigger: ({ render }: { render?: ReactNode }) => render ?? null,
+  TooltipPopup: () => null,
 }));
 vi.mock("../settingsLayout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../settingsLayout")>()),

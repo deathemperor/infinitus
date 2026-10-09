@@ -12,10 +12,9 @@ import type { SidebarThreadStatus } from "../components/Sidebar.logic";
 const ATTENTION_TITLES: Partial<Record<SidebarThreadStatus, string>> = {
   approval: "Approval needed",
   input: "Input needed",
-  held: "Held for headroom",
   // Upstream's word since #11372, adopted here so the fork carries no second
   // vocabulary for the same banner: a thread is the product's noun, a session
-  // is the provider's. `held` and `limited` stay ours — upstream has neither.
+  // is the provider's. `limited` stays ours — upstream has none.
   failed: "Thread failed",
 };
 

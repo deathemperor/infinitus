@@ -35,7 +35,6 @@ const CATALOG_PAGES: Readonly<Record<string, ReadonlyArray<string>>> = {
   "infinitus-preferences": ["display", "themes", "about"],
   "infinitus-themes": ["display", "themes", "about"],
   "infinitus-animations": ["animations"],
-  "infinitus-sessions": ["priority", "sessions"],
   "infinitus-push": ["push"],
   "infinitus-devices": ["devices"],
 };
@@ -53,11 +52,6 @@ const ALIASES: Readonly<Record<string, ReadonlyArray<string>>> = {
   // What people call a theme list when they are looking for one.
   "infinitus-themes": ["picker", "look"],
   "infinitus-animations": ["motion"],
-  // The row's old name, kept searchable for anyone who knew it as "session
-  // priority": the Mac's section read "Sessions" until #1069 renamed it, and
-  // the row itself is still there — this is a rename's synonym, not a term a
-  // retired key left behind.
-  "infinitus-sessions": ["session"],
   // Where these notifications land: the Mac posts them to the phone (#702).
   // The rows name the account event, never the device.
   "infinitus-push": ["phone"],

@@ -50,6 +50,8 @@ const environment = (id: string, accounts: UsageSummary["accounts"]) => ({
   environmentId: EnvironmentId.make(id),
   label: id,
   isPending: false,
+  canReadDiagnostics: true,
+  isConnected: true,
   error: null,
   needsCursorKeychainAccess: false,
   summary: summary(accounts),

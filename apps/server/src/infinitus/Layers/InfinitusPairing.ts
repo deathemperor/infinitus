@@ -17,6 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no constant-time compare or sha256 digest.
 import * as NodeCrypto from "node:crypto";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";

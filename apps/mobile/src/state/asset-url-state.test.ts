@@ -5,7 +5,7 @@ import { deriveAssetUrlState } from "./asset-url-state";
 const SUCCESS = {
   _tag: "Success" as const,
   url: "https://environment.example/api/assets/abc",
-  expiresAt: 4_000_000_000_000,
+  expiresAt: Number.MAX_SAFE_INTEGER,
 };
 
 describe("deriveAssetUrlState", () => {

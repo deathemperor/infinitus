@@ -5,7 +5,6 @@
 const RENAMED: Readonly<Record<string, string>> = {
   "": "/settings/menu-bar",
   animations: "/settings/animations",
-  sessions: "/settings/priority",
   team: "/settings/team",
   notifications: "/settings/notifications",
   devices: "/settings/devices",

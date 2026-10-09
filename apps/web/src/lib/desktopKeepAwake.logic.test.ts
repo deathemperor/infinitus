@@ -1,13 +1,13 @@
-import type { EnvironmentId, OrchestrationSessionStatus } from "@infinitus/contracts";
+import type { EnvironmentId, OrchestrationV2RunStatus } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { keepAwakeWanted } from "./desktopKeepAwake.logic";
 
 const local = "env-local" as EnvironmentId;
 const remote = "env-remote" as EnvironmentId;
-const shell = (environmentId: EnvironmentId, status: OrchestrationSessionStatus | null) => ({
+const shell = (environmentId: EnvironmentId, status: OrchestrationV2RunStatus | "idle" | null) => ({
   environmentId,
-  session: status === null ? null : { status },
+  runtime: status === null ? null : { status },
 });
 
 describe("keepAwakeWanted", () => {
@@ -16,7 +16,7 @@ describe("keepAwakeWanted", () => {
       keepAwakeWanted({
         enabled: true,
         primaryEnvironmentId: local,
-        shells: [shell(local, "ready"), shell(local, "running")],
+        shells: [shell(local, "idle"), shell(local, "running")],
       }),
     ).toBe(true);
     expect(
@@ -34,9 +34,9 @@ describe("keepAwakeWanted", () => {
         enabled: true,
         primaryEnvironmentId: local,
         shells: [
-          shell(local, "ready"),
-          shell(local, "error"),
-          shell(local, "stopped"),
+          shell(local, "idle"),
+          shell(local, "failed"),
+          shell(local, "completed"),
           shell(local, null),
         ],
       }),

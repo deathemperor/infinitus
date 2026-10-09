@@ -11,23 +11,17 @@ const config = {
 } as unknown as ServerConfig;
 
 describe("threadProviderSnapshot", () => {
-  it("prefers the running session's instance over the model selection", () => {
+  it("finds the thread's provider instance in its environment's config", () => {
+    expect(threadProviderSnapshot(config, { providerInstanceId: "codex-1" } as never)?.driver).toBe(
+      "codex",
+    );
     expect(
-      threadProviderSnapshot(config, {
-        session: { providerInstanceId: "codex-1" },
-        modelSelection: { instanceId: "claude-1" },
-      } as never)?.driver,
-    ).toBe("codex");
-    expect(
-      threadProviderSnapshot(config, {
-        session: null,
-        modelSelection: { instanceId: "claude-1" },
-      } as never)?.driver,
+      threadProviderSnapshot(config, { providerInstanceId: "claude-1" } as never)?.driver,
     ).toBe("claudeAgent");
   });
 
   it("is null without a config or a matching instance", () => {
-    const thread = { session: null, modelSelection: { instanceId: "gone" } } as never;
+    const thread = { providerInstanceId: "gone" } as never;
     expect(threadProviderSnapshot(null, thread)).toBeNull();
     expect(threadProviderSnapshot(config, thread)).toBeNull();
   });

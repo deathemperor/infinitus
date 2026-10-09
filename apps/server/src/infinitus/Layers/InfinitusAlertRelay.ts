@@ -9,8 +9,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient";
-import { HttpClient, HttpClientRequest } from "effect/unstable/http";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
+import { HttpClient, HttpClientRequest } from "effect/http";
 
 import * as ServerSecretStore from "../../auth/ServerSecretStore.ts";
 import {
@@ -29,9 +29,6 @@ import {
 /** Where a tapped alert lands on the phone: Settings › Accounts. The relay
     forwards the path; the phone validates it against its own routes. */
 export const INFINITUS_ALERT_DEEP_LINK = "/settings/accounts";
-/** The home screen, where the sign-in cards are (#1076): a lapsed sign-in's
-    alert says "sign in from this phone", so its tap lands on them. */
-export const INFINITUS_HOME_DEEP_LINK = "/";
 
 /**
  * The server half of an account alert (#1375): the Mac posts one line to

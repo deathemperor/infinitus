@@ -5,7 +5,7 @@ import type {
 } from "@infinitus/contracts";
 import { WS_METHODS } from "@infinitus/contracts";
 import * as Stream from "effect/Stream";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import { subscribe } from "../rpc/client.ts";

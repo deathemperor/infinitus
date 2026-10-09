@@ -1,4 +1,4 @@
-import type { InfinitusLiveTokenRate, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
+import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   utilization: null as { result: unknown } | null,
-  liveTokenRate: null as InfinitusLiveTokenRate | null,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -20,7 +19,6 @@ vi.mock("../../state/infinitus", () => ({
   infinitusEnvironment: {
     snapshot: () => ({ label: "snapshot-atom" }),
     utilization: () => ({ label: "utilization-atom" }),
-    liveTokenRate: () => ({ label: "live-token-rate-atom" }),
   },
 }));
 vi.mock("../../hooks/useLocalStorage", () => ({
@@ -33,9 +31,7 @@ vi.mock("../../state/query", () => ({
         ? null
         : atom.label === "utilization-atom"
           ? testState.utilization
-          : atom.label === "live-token-rate-atom"
-            ? testState.liveTokenRate
-            : testState.snapshot;
+          : testState.snapshot;
     return {
       data,
       error: null,
@@ -247,48 +243,8 @@ describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
-    testState.liveTokenRate = null;
     testState.capability = true;
     testState.refresh.mockReset();
-  });
-
-  it("shows this server's own live rate in place of the Mac's transcript tail (#1127)", () => {
-    testState.liveTokenRate = {
-      windowMinutes: 5,
-      turns: 3,
-      outputPerMinute: 900,
-      totalPerMinute: 4200,
-    };
-
-    const markup = renderToStaticMarkup(<UtilizationPage />);
-
-    expect(markup).toContain("Live: ≈ 900 output tokens/min over the last 5 minutes");
-    expect(markup).toContain("across 3 turns on this server");
-    expect(markup).not.toContain("Live: 1.5k output tokens/min");
-  });
-
-  it("keeps the live rate on a build whose Mac has no utilization verb (#1127)", () => {
-    testState.snapshot = { ...readySnapshot, commands: [forecastVerb] };
-    testState.utilization = null;
-    testState.liveTokenRate = {
-      windowMinutes: 5,
-      turns: 3,
-      outputPerMinute: 900,
-      totalPerMinute: 4200,
-    };
-
-    const markup = renderToStaticMarkup(<UtilizationPage />);
-
-    // The whole run-rate section is gone with the verb; this server's own
-    // turns are readable without it, so the line stays.
-    expect(markup).toContain("need a newer Infinitus app");
-    expect(markup).not.toContain("Run rate");
-    expect(markup).toContain("Live: ≈ 900 output tokens/min over the last 5 minutes");
-
-    // A reply the page could not read is the same case.
-    testState.snapshot = readySnapshot;
-    testState.utilization = { result: { nonsense: true } };
-    expect(renderToStaticMarkup(<UtilizationPage />)).toContain("Live: ≈ 900 output tokens/min");
   });
 
   it("charts every account's window over the range and tables the run rate (#747)", () => {

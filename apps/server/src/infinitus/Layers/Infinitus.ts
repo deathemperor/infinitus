@@ -205,9 +205,10 @@ const makeInfinitus = Effect.gen(function* () {
     client.request(options === undefined ? { command } : { command, options }).pipe(
       Effect.flatMap(decode),
       Effect.map((value): Fetched<A> => ({ kind: "value", value })),
-      Effect.catchTag("InfinitusUnavailable", (error) =>
-        Effect.succeed<Fetched<A>>({ kind: "unavailable", reason: error.cause }),
-      ),
+      Effect.catchTags({
+        InfinitusUnavailable: (error) =>
+          Effect.succeed<Fetched<A>>({ kind: "unavailable", reason: error.cause }),
+      }),
       // A protocol error, a refused command, an undecodable reply: the app is
       // there and answering, so the poll goes on with that one field missing.
       Effect.catch((error) =>

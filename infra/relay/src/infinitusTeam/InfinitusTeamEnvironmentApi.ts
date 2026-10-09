@@ -5,7 +5,7 @@ import {
 } from "@infinitus/contracts/relay";
 import { TEAM_USER_HEADER } from "@infinitus/contracts/relayInfinitusTeam";
 import * as Effect from "effect/Effect";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import { InfinitusTeamService } from "./InfinitusTeamService.ts";
 import { mapTeamErrors } from "./teamApiErrors.ts";

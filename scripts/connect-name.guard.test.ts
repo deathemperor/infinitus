@@ -20,6 +20,23 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // Byte-identical to upstream's `.github/triage/PLAYBOOK.md` (its test), which
   // upstream's own triage workflow reads; it names upstream's issue tracker.
   ["apps/server/src/cli/triagePrompt.ts", "T3 Code"],
+  // Recorded provider fixtures and replay assertions: upstream's transcripts, never shown.
+  // The restart note is replayed verbatim against one of them, so it keeps upstream's words.
+  ["apps/server/src/orchestration-v2/RestartBackgroundNote.ts", "T3"],
+  ["apps/server/src/orchestration-v2/testkit/fixtures/shared.ts", "T3"],
+  ["apps/server/src/orchestration-v2/testkit/fixtures/grok_auto_blocked_command/output.ts", "T3"],
+  [
+    "apps/server/src/orchestration-v2/testkit/fixtures/tool_call_read_only_on_request/output.ts",
+    "T3",
+  ],
+  [
+    "apps/server/src/textGeneration/OpenCode2TextGeneration.fixture.ts",
+    "T3 Code generateThreadTitle",
+  ],
+  // The replay workspaces' git author: the recorded checkpoints were made under it.
+  ["packages/provider-testing/src/replayWorkspace.ts", '"T3 Code Test"'],
+  // The temporary OpenCode session's title, which its recorded sessions carry.
+  ["packages/provider-opencode/src/server/v2/textGeneration.ts", "T3 Code ${input.operation}"],
   // The upstream attribution constants themselves: the licenses screens credit
   // the project this fork is built on, so these two must hold the real upstream
   // names. Every surface reads them instead of writing the literal, which is
@@ -35,6 +52,15 @@ const ROOTS = [
   "packages/shared/src",
   "packages/client-runtime/src",
   "packages/ssh/src",
+  "packages/provider-acp/src",
+  "packages/provider-acp-registry/src",
+  "packages/provider-core/src",
+  "packages/provider-cursor/src",
+  "packages/provider-grok/src",
+  "packages/provider-muse/src",
+  "packages/provider-opencode/src",
+  "packages/provider-pi/src",
+  "packages/provider-testing/src",
   "infra/relay/src",
 ];
 

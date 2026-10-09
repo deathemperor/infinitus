@@ -16,12 +16,12 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import { Command, Flag, GlobalFlag, Prompt } from "effect/unstable/cli";
+import { Command, Flag, GlobalFlag, Prompt } from "effect/cli";
 
 import * as BootService from "../cloud/bootService.ts";
 import { pinnedRuntimeVersionsDir } from "../cloud/pinnedRuntime.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
-import { bootServiceLayer } from "./service.ts";
+import * as CliService from "./service.ts";
 import { findWindowsShim, launcherOwnsVersionsDir, resolveLauncherPath } from "./update.ts";
 
 export class CliUninstallError extends Schema.TaggedError<CliUninstallError>()(
@@ -34,13 +34,13 @@ export class CliUninstallError extends Schema.TaggedError<CliUninstallError>()(
 }
 
 /**
- * What `infinitus uninstall` would remove for one T3 home. Computed before anything
+ * What `t3 uninstall` would remove for one T3 home. Computed before anything
  * is touched so the user sees the whole plan in one place.
  */
 export interface UninstallPlan {
   /** The background service serves this home and will be stopped and removed. */
   readonly service: boolean;
-  /** The `infinitus` launcher (symlink or `.cmd` shim) that points into this home's runtime tree. */
+  /** The `t3` launcher (symlink or `.cmd` shim) that points into this home's runtime tree. */
   readonly launcher: string | undefined;
   /** `<home>/runtime`, holding every downloaded version, when it exists. */
   readonly runtimeDir: string | undefined;
@@ -118,7 +118,7 @@ export const uninstallCommand = Command.make("uninstall", {
       const logLevel = yield* GlobalFlag.LogLevel;
       const config = yield* resolveCliAuthConfig(flags, logLevel);
       return yield* runUninstall({ baseDir: config.baseDir, assumeYes: flags.yes }).pipe(
-        Effect.provide(bootServiceLayer(config)),
+        Effect.provide(CliService.layer(config)),
       );
     }),
   ),
@@ -135,10 +135,10 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
   const plan = yield* planUninstall({ baseDir: input.baseDir });
 
   if (!plan.service && plan.launcher === undefined && plan.runtimeDir === undefined) {
-    yield* Console.log(`Nothing to remove: infinitus is not installed for ${input.baseDir}.`);
+    yield* Console.log(`Nothing to remove: t3 is not installed for ${input.baseDir}.`);
     if (!(yield* HostProcessIsExecutable)) {
       yield* Console.log(
-        "  This infinitus runs from a Node script, so it was installed by npm or built from source. Remove it the same way (`npm uninstall -g t3`, or delete the checkout).",
+        "  This t3 runs from a Node script, so it was installed by npm or built from source. Remove it the same way (`npm uninstall -g t3`, or delete the checkout).",
       );
     }
     return;
@@ -163,7 +163,7 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
     }
     const confirmed = yield* Prompt.run(
       Prompt.Confirm({ message: "Remove infinitus from this machine?", initial: false }),
-    ).pipe(Effect.catchTag("QuitError", () => Effect.succeed(false)));
+    ).pipe(Effect.catchTags({ QuitError: () => Effect.succeed(false) }));
     if (!confirmed) {
       yield* Console.log("Left as is.");
       return;
@@ -206,7 +206,7 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
             reason: `Could not schedule removal of ${runtimeDir}. Delete it yourself once this window is closed.`,
           }),
       });
-      yield* Console.log(`${runtimeDir} will be removed once infinitus exits.`);
+      yield* Console.log(`${runtimeDir} will be removed once t3 exits.`);
     } else {
       yield* fs
         .remove(plan.runtimeDir, { recursive: true, force: true })

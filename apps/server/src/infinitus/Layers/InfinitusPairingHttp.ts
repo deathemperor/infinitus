@@ -1,7 +1,7 @@
 import { EnvironmentHttpApi } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
-import { HttpServerRequest } from "effect/unstable/http";
-import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import { HttpServerRequest } from "effect/http";
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import { annotateEnvironmentRequest } from "../../auth/http.ts";
 import { deriveAuthClientMetadata } from "../../auth/utils.ts";

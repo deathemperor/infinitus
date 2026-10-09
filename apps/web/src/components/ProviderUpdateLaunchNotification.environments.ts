@@ -18,7 +18,7 @@ import {
  * loopback with a bearer token and carries a `local:<backendInstanceId>`
  * connection id. SSH, relay, and other remote targets are excluded.
  */
-export function isLocalConnectionTarget(target: ConnectionCatalogEntry["target"]): boolean {
+function isLocalConnectionTarget(target: ConnectionCatalogEntry["target"]): boolean {
   return target._tag === "PrimaryConnectionTarget" || isDesktopLocalConnectionTarget(target);
 }
 

@@ -8,7 +8,7 @@ import { useComposerDraftStore } from "../../composerDraftStore";
 import { resolveShortcutCommand } from "../../keybindings";
 import { getTerminalFocusOwner } from "../../lib/terminalFocus";
 import { captures } from "../../state/captures";
-import { useThread } from "../../state/entities";
+import { useThreadShell } from "../../state/entities";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { toastManager } from "../ui/toast";
@@ -40,7 +40,9 @@ export function useActiveProjectRef(): ActiveProjectRef | null {
     () => resolveThreadRouteTarget({ environmentId, threadId, draftId }),
     [draftId, environmentId, threadId],
   );
-  const activeThread = useThread(routeTarget?.kind === "server" ? routeTarget.threadRef : null);
+  const activeThread = useThreadShell(
+    routeTarget?.kind === "server" ? routeTarget.threadRef : null,
+  );
   const draftThread = useComposerDraftStore((store) =>
     routeTarget === null
       ? null

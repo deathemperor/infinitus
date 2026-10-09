@@ -1,7 +1,5 @@
 import type { ProjectEntry } from "@infinitus/contracts";
-import { isWindowsAbsolutePath } from "@infinitus/shared/path";
-
-import { isAbsolutePath } from "~/terminal-links";
+import { isWindowsAbsolutePath, isAbsolutePath } from "@infinitus/shared/path";
 
 export interface FileBreadcrumb {
   label: string;

@@ -1,11 +1,12 @@
-import type { Discovery } from "@infinitus/client-runtime/relay";
+import { RELAY_TUNNEL_RELEASED_MESSAGE, type Discovery } from "@infinitus/client-runtime/relay";
 import type { AtomCommandResult } from "@infinitus/client-runtime/state/runtime";
 import { EnvironmentId, ORCHESTRATION_PROTOCOL_VERSION } from "@infinitus/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { act, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 type DiscoveredEnvironments = Discovery.RelayEnvironmentDiscoveryState["environments"];
 
@@ -150,6 +151,40 @@ afterEach(async () => {
   await act(async () => renderer?.unmount());
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe("cloud environment offline reasons", () => {
+  it("tells the user to update a computer whose idle tunnel was removed", async () => {
+    const base = linkedMachines.get(newMachineId)!;
+    const offlineEntry = (offlineReason?: "tunnel_released") => ({
+      ...base,
+      availability: "offline" as const,
+      status: Option.some({
+        environmentId: newMachineId,
+        endpoint: base.environment.endpoint,
+        status: "offline" as const,
+        checkedAt: "2026-09-15T00:00:00Z",
+        error: "Managed endpoint health request failed.",
+        ...(offlineReason ? { offlineReason } : {}),
+      }),
+    });
+    const rowText = () =>
+      renderer!.root.findAllByType("p").flatMap((paragraph) => paragraph.children);
+
+    discovery.listEnvironments.mockResolvedValue(new Map([[newMachineId, offlineEntry()]]));
+    await mount();
+    expect(rowText()).toContain(`${CONNECT_NAME} · Not added · Relay offline`);
+
+    await act(async () => {
+      publish({
+        environments: new Map([[newMachineId, offlineEntry("tunnel_released")]]),
+        refreshing: false,
+        offline: false,
+        error: Option.none(),
+      });
+    });
+    expect(rowText()).toContain(RELAY_TUNNEL_RELEASED_MESSAGE);
+  });
 });
 
 describe("cloud onboarding discovery", () => {
@@ -327,6 +362,7 @@ describe("cloud onboarding discovery", () => {
             {
               environmentId: newMachineId,
               connection: { phase: "connected", error: null, traceId: null },
+              relayManaged: true,
             },
           ]}
           showSavedEnvironments

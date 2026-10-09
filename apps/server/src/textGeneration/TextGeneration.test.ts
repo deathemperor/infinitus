@@ -8,12 +8,12 @@ import { describe, expect } from "vite-plus/test";
 import { ProviderInstanceId } from "@infinitus/contracts";
 import { createModelSelection } from "@infinitus/shared/model";
 
-import type { ProviderInstance } from "../provider/ProviderDriver.ts";
-import * as ProviderInstanceRegistry from "../provider/Services/ProviderInstanceRegistry.ts";
+import type { ProviderInstance } from "@infinitus/provider-core/server/driver";
+import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.ts";
 import * as TextGeneration from "./TextGeneration.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import * as Layer from "effect/Layer";
-import { buildThreadTitlePrompt } from "./TextGenerationPrompts.ts";
+import { buildThreadTitlePrompt } from "@infinitus/provider-core/server/textGenerationPrompts";
 
 const makeStubTextGeneration = (
   overrides: Partial<TextGeneration.TextGeneration["Service"]>,
@@ -41,7 +41,7 @@ const makeStubInstance = (
     displayName: undefined,
     enabled: true,
     snapshot: {} as ProviderInstance["snapshot"],
-    adapter: {} as ProviderInstance["adapter"],
+    orchestrationAdapter: {} as ProviderInstance["orchestrationAdapter"],
     textGeneration,
   }) satisfies ProviderInstance;
 

@@ -11,7 +11,7 @@ describe("redirectedInfinitusSettingsPath", () => {
 
   it("maps every old page, the renamed Priority slug and the nested Activity", () => {
     expect(redirectedInfinitusSettingsPath("engines/")).toBe("/settings/engines");
-    expect(redirectedInfinitusSettingsPath("sessions")).toBe("/settings/priority");
+    expect(redirectedInfinitusSettingsPath("sessions")).toBe("/settings/menu-bar");
     expect(redirectedInfinitusSettingsPath("engines/activity")).toBe("/settings/engines/activity");
   });
 

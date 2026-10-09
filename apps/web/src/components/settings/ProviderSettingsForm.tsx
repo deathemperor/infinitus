@@ -1,23 +1,24 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import type {
-  ProviderSettingsFormCustomOption,
   ProviderSettingsFormAnnotation,
   ProviderSettingsFormControl,
   ProviderSettingsFormOption,
   ProviderSettingsFormSchemaAnnotation,
 } from "@infinitus/contracts";
+import { PlusIcon, XIcon } from "lucide-react";
 
 import { cn } from "../../lib/utils";
+import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
-import type { ProviderClientDefinition } from "./providerDriverMeta";
+import type { ProviderClientDefinition } from "@infinitus/provider-core/client";
 import { SettingsRow } from "./settingsLayout";
 
 export interface ProviderSettingsFieldModel {
@@ -30,8 +31,6 @@ export interface ProviderSettingsFieldModel {
   readonly defaultBooleanValue?: boolean | undefined;
   /** Choices for a `select` control. The first entry is the default. */
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
-  /** A `select` that also takes a typed value (#1232). */
-  readonly customOption?: ProviderSettingsFormCustomOption | undefined;
 }
 
 function titleizeFieldKey(key: string): string {
@@ -79,7 +78,11 @@ function readFieldBooleanDefault(
 
 export function deriveProviderSettingsFields(
   definition: ProviderClientDefinition,
+  value?: unknown,
 ): ReadonlyArray<ProviderSettingsFieldModel> {
+  const isLocalAcp =
+    definition.driverKind === "acpRegistry" &&
+    readProviderConfigString(value, "source") === "local";
   const schemaAnnotation = readProviderSettingsFormSchemaAnnotation(definition);
   const orderedKeys = new Map(
     (schemaAnnotation.order ?? []).map((key, index) => [key, index] as const),
@@ -98,6 +101,7 @@ export function deriveProviderSettingsFields(
       const fieldSchema = definition.settingsSchema.fields[key]!;
       const formAnnotation = readProviderSettingsFormAnnotation(fieldSchema);
       if (formAnnotation.hidden) return [];
+      if (isLocalAcp && key !== "source" && key !== "commandPath") return [];
 
       const annotatedTitle = readFieldAnnotationString(fieldSchema, "title");
       const annotatedDescription = readFieldAnnotationString(fieldSchema, "description");
@@ -105,11 +109,20 @@ export function deriveProviderSettingsFields(
         {
           key,
           control: formAnnotation.control ?? "text",
-          label: annotatedTitle ?? titleizeFieldKey(key),
-          ...(annotatedDescription !== undefined ? { description: annotatedDescription } : {}),
-          ...(formAnnotation.placeholder !== undefined
-            ? { placeholder: formAnnotation.placeholder }
-            : {}),
+          label:
+            isLocalAcp && key === "commandPath"
+              ? "Executable"
+              : (annotatedTitle ?? titleizeFieldKey(key)),
+          ...(isLocalAcp && key === "commandPath"
+            ? { description: "Executable name or path on this environment." }
+            : annotatedDescription !== undefined
+              ? { description: annotatedDescription }
+              : {}),
+          ...(isLocalAcp && key === "commandPath"
+            ? { placeholder: "e.g. dsh" }
+            : formAnnotation.placeholder !== undefined
+              ? { placeholder: formAnnotation.placeholder }
+              : {}),
           clearWhenEmpty: formAnnotation.clearWhenEmpty ?? "omit",
           ...(formAnnotation.control === "switch"
             ? { defaultBooleanValue: readFieldBooleanDefault(fieldSchema) }
@@ -117,12 +130,115 @@ export function deriveProviderSettingsFields(
           ...(formAnnotation.control === "select" && formAnnotation.options
             ? { options: formAnnotation.options }
             : {}),
-          ...(formAnnotation.control === "select" && formAnnotation.customOption
-            ? { customOption: formAnnotation.customOption }
-            : {}),
         } satisfies ProviderSettingsFieldModel,
       ];
     });
+}
+
+let commandArgumentDraftId = 0;
+const makeCommandArgumentDraftRow = (value: string) => ({
+  id: `provider-argument-${commandArgumentDraftId++}`,
+  value,
+});
+
+function commandArgumentsEqual(left: ReadonlyArray<string>, right: ReadonlyArray<string>) {
+  return left.length === right.length && left.every((argument, index) => argument === right[index]);
+}
+
+function ProviderCommandArguments({
+  value,
+  onChange,
+}: Pick<ProviderSettingsFormProps, "value" | "onChange">) {
+  const args = useMemo(() => {
+    const configured =
+      value !== null && typeof value === "object"
+        ? (value as Record<string, unknown>).commandArgs
+        : undefined;
+    return Array.isArray(configured)
+      ? configured.filter((argument): argument is string => typeof argument === "string")
+      : [];
+  }, [value]);
+  const [rows, setRows] = useState(() => args.map(makeCommandArgumentDraftRow));
+  const rowsRef = useRef(rows);
+  const previousArgsRef = useRef(args);
+  const lastPublishedArgsRef = useRef<ReadonlyArray<string> | undefined>(undefined);
+
+  useEffect(() => {
+    const previousArgs = previousArgsRef.current;
+    const lastPublishedArgs = lastPublishedArgsRef.current;
+    previousArgsRef.current = args;
+    lastPublishedArgsRef.current = undefined;
+    if (
+      commandArgumentsEqual(previousArgs, args) ||
+      (lastPublishedArgs !== undefined && commandArgumentsEqual(lastPublishedArgs, args))
+    )
+      return;
+    const nextRows = args.map(makeCommandArgumentDraftRow);
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+  }, [args]);
+
+  const updateArguments = (nextRows: typeof rows) => {
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+    const next = nextRows.map((row) => row.value);
+    lastPublishedArgsRef.current = next;
+    const config =
+      value !== null && typeof value === "object" ? { ...(value as Record<string, unknown>) } : {};
+    onChange({ ...config, commandArgs: next });
+  };
+
+  return (
+    <SettingsRow
+      title="Arguments"
+      description="One literal argument per row, in launch order."
+      control={
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => updateArguments([...rowsRef.current, makeCommandArgumentDraftRow("")])}
+        >
+          <PlusIcon />
+          Add argument
+        </Button>
+      }
+    >
+      {rows.length > 0 ? (
+        <div className="mt-3 min-w-0 space-y-2 pb-2">
+          {rows.map((argument, index) => (
+            <div key={argument.id} className="flex min-w-0 items-center gap-1.5">
+              <DraftInput
+                size="sm"
+                font="mono"
+                value={argument.value}
+                onCommit={(next) =>
+                  updateArguments(
+                    rowsRef.current.map((current) =>
+                      current.id === argument.id ? { ...current, value: next } : current,
+                    ),
+                  )
+                }
+                aria-label={`Argument ${index + 1}`}
+                spellCheck={false}
+              />
+              <Button
+                type="button"
+                size="icon-micro"
+                variant="ghost-destructive"
+                onClick={() =>
+                  updateArguments(rowsRef.current.filter((current) => current.id !== argument.id))
+                }
+                aria-label={`Remove argument ${index + 1}`}
+              >
+                <XIcon />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </SettingsRow>
+  );
 }
 
 function readProviderConfigString(config: unknown, key: string): string {
@@ -176,14 +292,7 @@ interface ProviderSettingsFormProps {
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
 }
 
-const CUSTOM_OPTION_VALUE = "__custom__";
-
-/**
- * Stores the default choice as an omitted key so unchanged configs stay small.
- * With `customOption` the list ends in a choice that opens an input: a stored
- * value none of the options carry is shown there, and picking it with nothing
- * typed yet keeps the input open without touching the config (#1232).
- */
+/** Stores the default choice as an omitted key so unchanged configs stay small. */
 function ProviderSettingsSelect({
   field,
   value,
@@ -201,54 +310,27 @@ function ProviderSettingsSelect({
 }) {
   const options = field.options ?? [];
   const fallback = options[0]?.value ?? "";
-  const stored = readProviderConfigString(value, field.key);
-  const [customPicked, setCustomPicked] = useState(false);
-  const custom =
-    field.customOption !== undefined &&
-    (customPicked || (stored !== "" && !options.some((option) => option.value === stored)));
-  const current = custom ? CUSTOM_OPTION_VALUE : stored || fallback;
-  const label = custom
-    ? field.customOption?.label
-    : (options.find((option) => option.value === current)?.label ?? current);
+  const current = readProviderConfigString(value, field.key) || fallback;
+  const label = options.find((option) => option.value === current)?.label ?? current;
   return (
-    <div className={cn("grid gap-1.5", className)}>
-      <Select
-        value={current}
-        onValueChange={(next) => {
-          if (typeof next !== "string") return;
-          if (next === CUSTOM_OPTION_VALUE) {
-            setCustomPicked(true);
-            return;
-          }
-          setCustomPicked(false);
-          onChange(nextProviderConfigWithFieldValue(value, field, next === fallback ? "" : next));
-        }}
-      >
-        <SelectTrigger id={inputId} size={size} aria-label={field.label}>
-          <SelectValue>{label}</SelectValue>
-        </SelectTrigger>
-        <SelectPopup align="start" alignItemWithTrigger={false}>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-          {field.customOption ? (
-            <SelectItem value={CUSTOM_OPTION_VALUE}>{field.customOption.label}</SelectItem>
-          ) : null}
-        </SelectPopup>
-      </Select>
-      {custom ? (
-        <DraftInput
-          size="sm"
-          aria-label={`${field.label}, custom value`}
-          value={stored}
-          onCommit={(next) => onChange(nextProviderConfigWithFieldValue(value, field, next))}
-          placeholder={field.customOption?.placeholder}
-          spellCheck={false}
-        />
-      ) : null}
-    </div>
+    <Select
+      value={current}
+      onValueChange={(next) => {
+        if (typeof next !== "string") return;
+        onChange(nextProviderConfigWithFieldValue(value, field, next === fallback ? "" : next));
+      }}
+    >
+      <SelectTrigger id={inputId} size={size} className={className} aria-label={field.label}>
+        <SelectValue>{label}</SelectValue>
+      </SelectTrigger>
+      <SelectPopup align="start" alignItemWithTrigger={false}>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
   );
 }
 
@@ -451,7 +533,13 @@ export function ProviderSettingsForm({
   variant,
   onChange,
 }: ProviderSettingsFormProps) {
-  const fields = useMemo(() => deriveProviderSettingsFields(definition), [definition]);
+  const fields = useMemo(
+    () => deriveProviderSettingsFields(definition, value),
+    [definition, value],
+  );
+  const isLocalAcp =
+    definition.driverKind === "acpRegistry" &&
+    readProviderConfigString(value, "source") === "local";
 
   if (fields.length === 0) {
     return null;
@@ -469,6 +557,7 @@ export function ProviderSettingsForm({
           onChange={onChange}
         />
       ))}
+      {isLocalAcp ? <ProviderCommandArguments value={value} onChange={onChange} /> : null}
     </>
   );
 }
