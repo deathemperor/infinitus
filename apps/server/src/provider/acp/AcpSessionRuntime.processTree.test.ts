@@ -655,8 +655,12 @@ describe("terminatePosixOwnedProcessTree", () => {
 
   it.live("rotates more than 64 live parents without scanning retained tombstones", () =>
     Effect.gen(function* () {
+      // Infinitus (fork, #1642): above Linux's pid_max. The fake parents are
+      // their own process groups, and terminatePosixOwnedProcessTree keeps any
+      // group that matches the current process's, so a CI worker whose real
+      // pid fell in 1000-1129 left its parent and child behind.
       const parents = Array.from({ length: 130 }, (_, index) =>
-        identity(1_000 + index, 100, 1_000 + index, 1_000 + index),
+        identity(5_000_000 + index, 100, 5_000_000 + index, 5_000_000 + index),
       );
       let childListReads = 0;
       let identityCalls = 0;
