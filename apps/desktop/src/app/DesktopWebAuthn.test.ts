@@ -35,21 +35,19 @@ describe("DesktopWebAuthn", () => {
     assert.isNull(group);
   });
 
-  for (const [label, contents] of [
+  it.each([
     ["an unsigned package without the field", JSON.stringify({ name: "infinitus-desktop" })],
     ["a blank field", JSON.stringify({ webauthnKeychainAccessGroup: "  " })],
     ["a non-string field", JSON.stringify({ webauthnKeychainAccessGroup: 7 })],
     ["unreadable metadata", "{not json"],
-  ] as const) {
-    it(`configures nothing for ${label}`, () => {
-      const group = resolveEarlyWebAuthnKeychainAccessGroup({
-        isPackaged: true,
-        appPath: "/app",
-        joinPath,
-        readFileString: () => contents,
-      });
-
-      assert.isNull(group);
+  ] as const)("configures nothing for %s", (_label, contents) => {
+    const group = resolveEarlyWebAuthnKeychainAccessGroup({
+      isPackaged: true,
+      appPath: "/app",
+      joinPath,
+      readFileString: () => contents,
     });
-  }
+
+    assert.isNull(group);
+  });
 });

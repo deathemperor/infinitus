@@ -9,6 +9,7 @@
  * `@earendil-works/pi-coding-agent` and `typebox` from the user's pi install.
  */
 import { T3_CODE_ORCHESTRATION_INSTRUCTIONS } from "@infinitus/provider-core/server/orchestrationInstructions";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const PI_T3_MCP_EXTENSION_FILENAME = "pi-t3-mcp-extension.ts";
 
@@ -288,7 +289,7 @@ export default async function t3McpExtension(pi: ExtensionAPI) {
       toolInputSummary(event.input),
     );
     if (!approved) {
-      return { block: true, reason: \`\${event.toolName} was declined in T3 Code.\` };
+      return { block: true, reason: \`\${event.toolName} was declined in ${PRODUCT_NAME}.\` };
     }
   });
 

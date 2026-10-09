@@ -59,13 +59,12 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
         Effect.fn("environment.infinitus.alert")(function* (args) {
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthOrchestrationOperateScope);
-          return yield* alerts
-            .publish(args.payload)
-            .pipe(
-              Effect.catchTag("InfinitusAlertRelayFailed", (error) =>
+          return yield* alerts.publish(args.payload).pipe(
+            Effect.catchTags({
+              InfinitusAlertRelayFailed: (error) =>
                 failEnvironmentInternal("internal_error", error),
-              ),
-            );
+            }),
+          );
         }),
       );
   }),

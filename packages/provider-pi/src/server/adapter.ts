@@ -93,6 +93,7 @@ import {
   resolvePiLaunchArgs,
 } from "./mcpInjection.ts";
 import { PI_FILE_CHANGE_TOOLS } from "./mcpExtensionSource.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const PI_PROVIDER = ProviderDriverKind.make("pi");
 const PI_DRIVER_KIND = PI_PROVIDER;
@@ -109,8 +110,7 @@ const STREAM_FLUSH_MS = 50;
 const PI_REQUEST_TIMEOUT_MS = 15_000;
 // Session lifecycle hooks reload extensions, MCP servers and language servers.
 const PI_SESSION_TIMEOUT_MS = 60_000;
-const PI_UNSOLICITED_ACTIVITY_ERROR =
-  "Pi started agent work outside an active T3 turn. The session was stopped to prevent invisible tool execution.";
+const PI_UNSOLICITED_ACTIVITY_ERROR = `Pi started agent work outside an active ${PRODUCT_NAME} turn. The session was stopped to prevent invisible tool execution.`;
 const SETTLE_PROBE_MAX_ATTEMPTS = 3;
 const SETTLE_PROBE_RETRY_DELAY = Duration.millis(100);
 

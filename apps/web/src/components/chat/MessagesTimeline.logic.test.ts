@@ -46,6 +46,7 @@ import {
   workEntryIsVisibleInGroup,
 } from "./MessagesTimeline.logic";
 import type { WorkLogEntry } from "../../session-logic";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 describe("expanded tool group scrolling", () => {
   const entries = [{ id: "first" }, { id: "second" }];
@@ -317,20 +318,6 @@ describe("work entry labels", () => {
     expect(liveWorkEntryLabel(commandEntry, undefined, true)).toBe("Running vp");
     expect(liveWorkEntryLabel(commandEntry, undefined, false)).toBe("Ran vp");
     expect(workEntryDisplayLabel(commandEntry, undefined)).toBe("vp test run");
-  });
-
-  it("labels a described Bash call by its description in every view (#1231)", () => {
-    const described = {
-      ...entry,
-      command: "vp test run",
-      commandDescription: "Run the web tests",
-      detail: "All tests passed",
-    };
-    expect(workEntryDisplayLabel(described, undefined)).toBe("Run the web tests");
-    expect(liveWorkEntryLabel(described, undefined, true)).toBe("Run the web tests");
-    expect(liveWorkEntryLabel(described, undefined, false)).toBe("Run the web tests");
-    const { commandDescription: _omitted, ...plain } = described;
-    expect(workEntryDisplayLabel(plain, undefined)).toBe("vp test run");
   });
 
   it("summarizes the program inside a shell wrapper while preserving the expanded command", () => {
@@ -3590,14 +3577,14 @@ describe("computeStableMessagesTimelineRows", () => {
 describe("resolveTimelineToolPresentation", () => {
   it("pretty prints Claude and Cursor T3 MCP tool names", () => {
     expect(resolveTimelineToolPresentation("mcp__t3-code__t3_thread_read")).toEqual({
-      displayName: "Read a T3 thread",
+      displayName: `Read an ${PRODUCT_NAME} thread`,
       logo: "t3-code",
     });
   });
 
   it("pretty prints Codex T3 MCP tool names", () => {
     expect(resolveTimelineToolPresentation("t3-code.create_threads")).toEqual({
-      displayName: "Create T3 threads",
+      displayName: `Create ${PRODUCT_NAME} threads`,
       logo: "t3-code",
     });
   });

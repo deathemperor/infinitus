@@ -10,6 +10,7 @@ import { writeFakeCli } from "@infinitus/provider-testing/fakeCli";
 import type { MuseSdkHost } from "./sdk.ts";
 import { COMPACT_SLASH_COMMAND } from "@infinitus/provider-core/server/snapshotProbe";
 import { checkMuseProviderStatus } from "./status.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const settings = Schema.decodeSync(MuseSettings);
 const makeHost = (catalog: Record<string, unknown>) => {
@@ -72,7 +73,7 @@ it.layer(NodeServices.layer)("Muse status", (it) => {
       expect(snapshot.installed).toBe(false);
       expect(snapshot.status).toBe("error");
       expect(snapshot.message).toContain("muse login");
-      expect(snapshot.message).toContain("this T3 server host");
+      expect(snapshot.message).toContain(`this ${PRODUCT_NAME} server host`);
     }),
   );
 

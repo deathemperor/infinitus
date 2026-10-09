@@ -834,7 +834,7 @@ describe("ApnsDeliveries", () => {
           },
         ]);
         expect(attempts).toEqual([]);
-      }).pipe(Effect.provide(makeLayer({ attempts, queuedJobs })));
+      }).pipe(Effect.provide(layerFor({ attempts, queuedJobs })));
     },
   );
 

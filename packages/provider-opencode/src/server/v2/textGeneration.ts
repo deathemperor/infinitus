@@ -18,6 +18,7 @@ import * as ProviderHost from "@infinitus/provider-core/server/ProviderHost";
 import * as OpenCode2Server from "./OpenCode2Server.ts";
 import * as OpenCodeRuntime from "../OpenCodeRuntime.ts";
 import * as TextGenerationOperations from "@infinitus/provider-core/server/textGenerationOperations";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const isTextGenerationError = Schema.is(TextGenerationError);
 
@@ -127,7 +128,7 @@ const runOnServer = (
       Effect.forkScoped,
     );
     const session = yield* client.session.create({
-      title: `T3 Code ${input.operation}`,
+      title: `${PRODUCT_NAME} ${input.operation}`,
       location: Location.PublicRef.make({ directory: AbsolutePath.make(input.cwd) }),
       model: Model.Ref.make({
         providerID: Provider.ID.make(parsed.providerID),

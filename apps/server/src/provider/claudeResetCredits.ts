@@ -339,9 +339,10 @@ export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(fu
   if (!token) return yield* new ClaudeResetCreditError({ reason: "signedOut" });
   const organization = yield* readOrganization(token, input.version).pipe(
     Effect.timeout(READ_TIMEOUT),
-    Effect.catchTag("TimeoutError", (cause) =>
-      Effect.fail(new ClaudeResetCreditError({ reason: "requestFailed", cause })),
-    ),
+    Effect.catchTags({
+      TimeoutError: (cause) =>
+        Effect.fail(new ClaudeResetCreditError({ reason: "requestFailed", cause })),
+    }),
   );
   if (!organization) return yield* new ClaudeResetCreditError({ reason: "signedOut" });
   const client = yield* HttpClient.HttpClient;

@@ -162,11 +162,12 @@ export const publishServerPort = Effect.fn("Infinitus.publishServerPort")(functi
     if (takesDesktopCredential(manifest)) yield* publishDesktopCredential(port);
     return true;
   }).pipe(
-    Effect.catchTag("InfinitusUnavailable", (error) =>
-      Effect.logInfo("infinitus.server-port.skipped", { port, reason: error.cause }).pipe(
-        Effect.as(false),
-      ),
-    ),
+    Effect.catchTags({
+      InfinitusUnavailable: (error) =>
+        Effect.logInfo("infinitus.server-port.skipped", { port, reason: error.cause }).pipe(
+          Effect.as(false),
+        ),
+    }),
     Effect.catch((error) =>
       Effect.logWarning("infinitus.server-port.failed", { port, error }).pipe(Effect.as(true)),
     ),

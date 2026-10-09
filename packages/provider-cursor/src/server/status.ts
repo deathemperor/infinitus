@@ -22,6 +22,7 @@ import {
   type ServerProviderDraft,
 } from "@infinitus/provider-core/server/snapshotProbe";
 import * as CursorSdkCatalog from "./CursorSdkCatalog.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const CURSOR_PRESENTATION = {
   displayName: "Cursor",
@@ -52,7 +53,7 @@ export function buildInitialCursorProviderSnapshot(
           version: null,
           status: "warning",
           auth: { status: "unknown" },
-          message: "Cursor is disabled in T3 Code settings.",
+          message: `Cursor is disabled in ${PRODUCT_NAME} settings.`,
         },
       });
     }
@@ -265,7 +266,7 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Cursor is disabled in T3 Code settings.",
+        message: `Cursor is disabled in ${PRODUCT_NAME} settings.`,
       },
     });
   }

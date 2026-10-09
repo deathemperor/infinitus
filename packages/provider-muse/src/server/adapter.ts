@@ -78,6 +78,7 @@ import type * as ProviderContinuationRequests from "@infinitus/provider-core/ser
 import { makeProviderFailure } from "@infinitus/provider-core/server/failure";
 import { turnScopedSelectionTransition } from "@infinitus/provider-core/server/selectionTransition";
 import { museItemStatus, museToolPresentation } from "./itemPresentation.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const MUSE_PROVIDER = ProviderDriverKind.make("muse");
 const isOpenSessionError = Schema.is(ProviderAdapter.ProviderAdapterOpenSessionError);
@@ -1501,7 +1502,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
           const result = yield* request(
             requestedId ? "session/resume" : "session/start",
             requestedId
-              ? // T3 already has the transcript; skip Muse's history payload.
+              ? // The server already has the transcript; skip Muse's history payload.
                 { excludeItems: true, ...(config ? { config } : {}) }
               : {
                   workspaceRoot: cwd,
@@ -2016,7 +2017,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
               driver: MUSE_PROVIDER,
               providerThreadId: args.providerThread.id,
               checkpointId: args.target.checkpointId,
-              cause: "Muse Code does not support conversation rollback in T3 Code.",
+              cause: `Muse Code does not support conversation rollback in ${PRODUCT_NAME}.`,
             }),
           ),
         forkThread: (args) =>
@@ -2024,7 +2025,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
             new ProviderAdapter.ProviderAdapterForkThreadError({
               driver: MUSE_PROVIDER,
               providerThreadId: args.sourceProviderThread.id,
-              cause: "Muse Code does not support native forks in T3 Code.",
+              cause: `Muse Code does not support native forks in ${PRODUCT_NAME}.`,
             }),
           ),
       };

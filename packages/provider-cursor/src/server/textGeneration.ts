@@ -13,6 +13,7 @@ import type { CursorSettings } from "../settings.ts";
 import * as TextGenerationOperations from "@infinitus/provider-core/server/textGenerationOperations";
 import { cursorSdkModelSelection } from "./sdkModel.ts";
 import type { CursorAuth } from "./auth.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const CURSOR_TIMEOUT_MS = 180_000;
 
@@ -65,7 +66,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       if (!cursorSettings.enabled) {
         return yield* new TextGenerationError({
           operation,
-          detail: "Cursor is disabled in T3 Code settings.",
+          detail: `Cursor is disabled in ${PRODUCT_NAME} settings.`,
         });
       }
 

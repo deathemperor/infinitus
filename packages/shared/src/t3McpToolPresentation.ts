@@ -80,7 +80,7 @@ function tool(
   return { displayName, labels, icon, summaryAction };
 }
 
-const T3_MCP_SERVER_ALIASES = new Set(["t3-code", "t3_code", "t3code"]);
+const T3_MCP_SERVER_ALIASES = new Set(["infinitus", "t3-code", "t3_code", "t3code"]);
 
 // Cards, activity rows, summaries, and provider identity recovery share this inventory.
 const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
@@ -138,18 +138,18 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     "thread-create",
   ),
   t3_thread_start: tool(
-    ["Start", "Starting", "Started", `a ${PRODUCT_NAME} thread`],
+    ["Start", "Starting", "Started", `an ${PRODUCT_NAME} thread`],
     "thread-create",
   ),
   t3_thread_list: tool(["List", "Listing", "Listed", `${PRODUCT_NAME} threads`], "thread-list"),
-  t3_thread_read: tool(["Read", "Reading", "Read", `a ${PRODUCT_NAME} thread`], "thread-read"),
-  t3_thread_send: tool(["Send", "Sending", "Sent", `to a ${PRODUCT_NAME} thread`], "thread-send"),
+  t3_thread_read: tool(["Read", "Reading", "Read", `an ${PRODUCT_NAME} thread`], "thread-read"),
+  t3_thread_send: tool(["Send", "Sending", "Sent", `to an ${PRODUCT_NAME} thread`], "thread-send"),
   t3_thread_wait: tool(
-    ["Wait", "Waiting", "Waited", `for a ${PRODUCT_NAME} thread`],
+    ["Wait", "Waiting", "Waited", `for an ${PRODUCT_NAME} thread`],
     "thread-wait",
   ),
   t3_thread_interrupt: tool(
-    ["Interrupt", "Interrupting", "Requested an interrupt of", `a ${PRODUCT_NAME} thread`],
+    ["Interrupt", "Interrupting", "Requested an interrupt of", `an ${PRODUCT_NAME} thread`],
     "thread-interrupt",
   ),
   t3_worktree_handoff: tool(
@@ -359,9 +359,8 @@ function resolveT3McpToolName(value: string): string | null {
       : null;
   }
 
-  const namespaceMatch = /^(?<server>t3-code|t3_code|t3code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
-    label,
-  );
+  const namespaceMatch =
+    /^(?<server>infinitus|t3-code|t3_code|t3code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(label);
   if (namespaceMatch?.groups) {
     return namespaceMatch.groups.tool ?? null;
   }

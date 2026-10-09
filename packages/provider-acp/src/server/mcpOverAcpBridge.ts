@@ -6,6 +6,7 @@ import * as Stream from "effect/Stream";
 import type * as AcpSchema from "effect-acp/compat";
 
 import { responsePayloads } from "@infinitus/shared/mcpResponsePayloads";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const MAX_CONNECTIONS = 16;
 const MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
@@ -130,7 +131,9 @@ export const makeAcpMcpOverAcpBridge = Effect.fn("AcpMcpOverAcpBridge.make")(fun
             () => response.body?.cancel().catch(() => undefined) ?? Promise.resolve(),
           );
           return yield* Effect.fail(
-            new AcpMcpOverAcpError(`T3 Code MCP endpoint responded with HTTP ${response.status}.`),
+            new AcpMcpOverAcpError(
+              `${PRODUCT_NAME} MCP endpoint responded with HTTP ${response.status}.`,
+            ),
           );
         }
         const payloads = [...(yield* Stream.runCollect(responsePayloads(response, bridgeError)))];
@@ -167,7 +170,7 @@ export const makeAcpMcpOverAcpBridge = Effect.fn("AcpMcpOverAcpBridge.make")(fun
         if (!response.ok && response.status !== 404) {
           return yield* Effect.fail(
             new AcpMcpOverAcpError(
-              `T3 Code MCP endpoint rejected disconnect with HTTP ${response.status}.`,
+              `${PRODUCT_NAME} MCP endpoint rejected disconnect with HTTP ${response.status}.`,
             ),
           );
         }

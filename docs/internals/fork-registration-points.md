@@ -10,13 +10,6 @@ changes or leaves. Fork-owned files are listed in
 pages under `docs/internals/` keep taking narratives out of these bullets.
 
 - `CLAUDE.md` — adds `@INFINITUS.md`.
-- Closed popups stop blocking keys: `apps/web/src/components/RightPanelTabs.tsx`
-  (`LAUNCHER_SHORTCUT_BLOCKING_LAYERS`) qualifies every popup slot with
-  `:is([data-open],[data-ending-style])`, like upstream's dialog entries.
-  Upstream #12453 keeps the chat header's actions menu mounted while
-  closed, which killed the launcher letters. Upstream took the `ChatView.tsx`
-  selector and the Tiptap `focusAt` halves of this fix; drop this one once
-  it takes the rest.
 - Fleet-wide Claude resets (#1554): `packages/contracts/src/infinitus.ts`
   (`InfinitusAccount.resets`, `InfinitusAccountResets`, additive) is
   fork-owned; the upstream edits are the hub section left unmounted —
@@ -245,7 +238,24 @@ new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
   `triagePrompt.ts`, `server.ts` and `relay/AgentAwarenessRelay.ts` (the
   tunnel log lines), `orchestration-v2/PullRequestWatchReactor.ts` (the
   agent-facing notices), `provider/Drivers/AntigravityDriver.ts` (the
-  `clientInfo` names). Re-applied to upstream's new strings on every sync.
+  `clientInfo` names). Re-applied to upstream's new strings on every sync,
+  with the tests that assert them (`provider/ProviderRegistry.test.ts`,
+  `provider/CodexDeveloperInstructions.test.ts`). The one exception is
+  `orchestration-v2/RestartBackgroundNote.ts`: a Claude replay fixture
+  records the note verbatim, so it keeps upstream's words (allowlisted in
+  `scripts/connect-name.guard.test.ts`).
+- `packages/provider-*/src/**` — the same rule for the provider packages
+  (status messages, text-generation errors, the Muse `clientInfo` title, the
+  shared orchestration instructions in `provider-core`), with their tests
+  (`provider-core/.../orchestrationInstructions.test.ts`,
+  `provider-pi/.../mcpInjection.test.ts`, `provider-muse/.../status.test.ts`).
+  `scripts/connect-name.guard.test.ts` scans these roots too.
+- `apps/server/src/orchestration-v2/Adapters/MuseAdapterV2.testkit.ts` —
+  `replayValueMatches` compares strings with upstream's product name mapped
+  to `PRODUCT_NAME` on both sides: the recorded Muse transcripts carry
+  upstream's runtime instructions. `testkit/fixtures/claude_local_bash_task/output.ts`
+  asserts the recorded command without its package scope, which the rename
+  script rewrites in the assertion but not in the transcript.
 - `packages/client-runtime/src/connection/outdatedHostUpdate.ts` (+
   `resolver.test.ts`) — the "Update T3 Code on …" messages say `PRODUCT_NAME`.
 - `packages/client-runtime/src/connection/catalog.ts` — `alternateHttpBaseUrls`
@@ -296,8 +306,17 @@ new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
   `settings/AcpSessionManagementSection.tsx`, `settings/CliCommandSettingsRow.tsx`,
   `settings/ConnectionsSettings.tsx`, `settings/SettingsPanels.tsx`,
   `settings/StorageSettings.tsx`, `ServerUpdateAction.tsx`, `ChatView.tsx`,
-  `RightPanelTabs.tsx`, and the tests `desktopUpdate.logic.test.ts` and
-  `settings/settingsSearch.test.ts`.
+  `RightPanelTabs.tsx`, and the tests `desktopUpdate.logic.test.ts`,
+  `settings/settingsSearch.test.ts`, `chat/MessagesTimeline.logic.test.ts`,
+  `chat/MessagesTimeline.test.tsx` and `cloud/CloudEnvironmentConnectList.test.tsx`
+  (the thread labels read "an Infinitus thread": `packages/shared/src/t3McpToolPresentation.ts`
+  and `chat/MessagesTimeline.logic.ts` carry the article, and
+  `t3McpToolPresentation.ts` also accepts the fork's `infinitus` MCP server
+  name beside upstream's aliases; `packages/client-runtime/src/connection/routes.test.ts`
+  and `packages/shared/src/t3McpToolPresentation.test.ts` assert the same).
+- `apps/web/src/components/settings/ProjectSettingsPanel.test.tsx` — the
+  `useEnvironmentSettings` mock applies the selector, which the mounted
+  `ProjectPromptSnippetsSection` (#270 G) passes.
 - `apps/web/vite.config.ts` — `productNamePlugin` rewrites index.html's
   boot-shell title and splash labels, and `src/lib/bootError.ts`'s copy, to
   `PRODUCT_NAME` (that module is copied standalone by `bundledDev.test.ts`

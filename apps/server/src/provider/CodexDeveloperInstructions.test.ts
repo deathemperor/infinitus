@@ -1,6 +1,7 @@
 import * as NodeAssert from "node:assert/strict";
 
 import { describe, it } from "vite-plus/test";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import {
   buildCodexAdditionalContext,
@@ -18,7 +19,7 @@ describe("buildCodexDeveloperInstructions", () => {
       buildCodexDeveloperInstructions("default"),
       /^<collaboration_mode># Collaboration Mode: Default/,
     );
-    NodeAssert.match(instructions, /T3 Code/);
+    NodeAssert.match(instructions, new RegExp(`running in ${PRODUCT_NAME}`));
     NodeAssert.match(instructions, /Codex harness/);
     NodeAssert.match(instructions, /as gpt-5\.3-codex with high reasoning effort/);
   });

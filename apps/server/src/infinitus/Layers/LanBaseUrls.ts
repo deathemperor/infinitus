@@ -1,8 +1,19 @@
 import * as NodeOS from "node:os";
 
-import { isLoopbackHost, isWildcardHost } from "../../startupAccess.ts";
-
 type NetworkInterfacesMap = ReturnType<typeof NodeOS.networkInterfaces>;
+
+// `startupAccess.ts` has these, but importing it here closes a cycle
+// (startupAccess → EnvironmentAuth → ServerEnvironment → this file) that
+// plain Node ESM rejects when the memory fixtures load the server.
+const isLoopbackHost = (host: string | undefined): boolean =>
+  !host ||
+  host === "localhost" ||
+  host === "127.0.0.1" ||
+  host === "::1" ||
+  host === "[::1]" ||
+  host.startsWith("127.");
+const isWildcardHost = (host: string): boolean =>
+  host === "0.0.0.0" || host === "::" || host === "[::]";
 
 const PRIVATE_IPV4 = /^(10\.\d+|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d+\.\d+$/;
 const LINK_LOCAL_IPV4 = /^169\.254\./;

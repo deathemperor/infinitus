@@ -19,6 +19,7 @@ import {
   spawnAndCollect,
   type ProviderProbeResult,
 } from "@infinitus/provider-core/server/snapshotProbe";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const MUSE_PRESENTATION = {
   displayName: "Muse Code",
@@ -47,7 +48,7 @@ export const makePendingMuseProvider = Effect.fn("makePendingMuseProvider")(func
       auth: { status: "unknown" },
       message: settings.enabled
         ? "Checking Muse Code CLI availability..."
-        : "Muse Code is disabled in T3 Code settings.",
+        : `Muse Code is disabled in ${PRODUCT_NAME} settings.`,
     },
   });
 });
@@ -93,8 +94,8 @@ export const checkMuseProviderStatus = Effect.fn("checkMuseProviderStatus")(func
       status: "error",
       auth: { status: "unknown" },
       message: missing
-        ? "Muse Code CLI (`muse`) was not found. Install Muse Code and run `muse login` on this T3 server host."
-        : "Failed to execute Muse Code CLI. Check its binary path on this T3 server host.",
+        ? `Muse Code CLI (\`muse\`) was not found. Install Muse Code and run \`muse login\` on this ${PRODUCT_NAME} server host.`
+        : `Failed to execute Muse Code CLI. Check its binary path on this ${PRODUCT_NAME} server host.`,
     });
   }
   if (Option.isNone(versionResult.success)) {
@@ -129,8 +130,7 @@ export const checkMuseProviderStatus = Effect.fn("checkMuseProviderStatus")(func
       version,
       status: "error",
       auth: { status: "unknown" },
-      message:
-        "Muse Code SDK could not read the model catalog. Check your Muse installation and run `muse login` on this T3 server host.",
+      message: `Muse Code SDK could not read the model catalog. Check your Muse installation and run \`muse login\` on this ${PRODUCT_NAME} server host.`,
     });
   }
   const models = catalog.success.value;
@@ -145,8 +145,7 @@ export const checkMuseProviderStatus = Effect.fn("checkMuseProviderStatus")(func
         ? { status: "ready" }
         : {
             status: "warning",
-            message:
-              "Muse Code returned no models. Run `muse login` on this T3 server host and refresh its status.",
+            message: `Muse Code returned no models. Run \`muse login\` on this ${PRODUCT_NAME} server host and refresh its status.`,
           }),
     },
     models,

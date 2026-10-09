@@ -13,25 +13,25 @@ layer("065_OrchestrationV2", (it) => {
     Effect.sync(() => {
       assert.deepStrictEqual(
         migrationEntries.map(([id]) => id),
-        Array.from({ length: 60 }, (_, index) => index + 1),
+        Array.from({ length: 70 }, (_, index) => index + 1),
       );
     }),
   );
 
-  it.effect("upgrades released schema 53 through the latest migrations", () =>
+  // The fork's own 51-64 sit before upstream's V2 migrations (INFINITUS.md).
+  it.effect("upgrades released schema 64 through the latest migrations", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* runMigrations({ toMigrationInclusive: 53 });
+      yield* runMigrations({ toMigrationInclusive: 64 });
 
       const executed = yield* runMigrations();
       assert.deepStrictEqual(executed, [
-        [54, "ProjectionThreadsAutoSettleDisabledAt"],
-        [55, "OrchestrationV2"],
-        [56, "RemoveRedundantProjectionIndexes"],
-        [57, "ScheduledTaskWebhooks"],
-        [58, "WebhookRelayDeliveries"],
-        [59, "McpAppModelContext"],
-        [60, "ThreadSnapshotWindowIndexes"],
+        [65, "OrchestrationV2"],
+        [66, "RemoveRedundantProjectionIndexes"],
+        [67, "ScheduledTaskWebhooks"],
+        [68, "WebhookRelayDeliveries"],
+        [69, "McpAppModelContext"],
+        [70, "ThreadSnapshotWindowIndexes"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
 
@@ -48,16 +48,26 @@ layer("065_OrchestrationV2", (it) => {
         { migration_id: 48, name: "ProjectionThreadBranchPullRequest" },
         { migration_id: 49, name: "ProjectionThreadsActiveOrderKey" },
         { migration_id: 50, name: "ProjectionThreadPullRequests" },
-        { migration_id: 51, name: "ProjectionThreadMessageContext" },
-        { migration_id: 52, name: "ProjectionThreadTitleState" },
-        { migration_id: 53, name: "PullRequestFilesViewed" },
-        { migration_id: 54, name: "ProjectionThreadsAutoSettleDisabledAt" },
-        { migration_id: 55, name: "OrchestrationV2" },
-        { migration_id: 56, name: "RemoveRedundantProjectionIndexes" },
-        { migration_id: 57, name: "ScheduledTaskWebhooks" },
-        { migration_id: 58, name: "WebhookRelayDeliveries" },
-        { migration_id: 59, name: "McpAppModelContext" },
-        { migration_id: 60, name: "ThreadSnapshotWindowIndexes" },
+        { migration_id: 51, name: "ProjectionThreadQueuedTurns" },
+        { migration_id: 52, name: "ProjectionThreadsBabysit" },
+        { migration_id: 53, name: "ProjectionThreadsSideOf" },
+        { migration_id: 54, name: "ProjectionThreadsGroupId" },
+        { migration_id: 55, name: "ProjectionThreadSessionsStatusReason" },
+        { migration_id: 56, name: "ProjectionTurnUsage" },
+        { migration_id: 57, name: "ProjectionThreadsUsageBaseline" },
+        { migration_id: 58, name: "ProjectionThreadMessageContext" },
+        { migration_id: 59, name: "ProjectionThreadQueuedTurnsContext" },
+        { migration_id: 60, name: "ProjectionTurnUsageCompletedAtIndex" },
+        { migration_id: 61, name: "ProjectionThreadTitleState" },
+        { migration_id: 62, name: "ProjectionThreadQueuedTurnsSendAt" },
+        { migration_id: 63, name: "PullRequestFilesViewed" },
+        { migration_id: 64, name: "ProjectionThreadsAutoSettleDisabledAt" },
+        { migration_id: 65, name: "OrchestrationV2" },
+        { migration_id: 66, name: "RemoveRedundantProjectionIndexes" },
+        { migration_id: 67, name: "ScheduledTaskWebhooks" },
+        { migration_id: 68, name: "WebhookRelayDeliveries" },
+        { migration_id: 69, name: "McpAppModelContext" },
+        { migration_id: 70, name: "ThreadSnapshotWindowIndexes" },
       ]);
 
       const tables = yield* sql<{ readonly name: string }>`

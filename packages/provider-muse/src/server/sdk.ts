@@ -8,6 +8,7 @@ import {
 } from "@muse-code/sdk";
 import type { RuntimeMode } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export interface MuseSdkHost {
   readonly connection: Pick<
@@ -76,7 +77,7 @@ export function museServeArgs(
 /** What T3 sends in MSP `initialize`; only full hosts ask for session MCP servers. */
 export function museInitializeParams(readOnly = false) {
   return {
-    clientInfo: { name: "t3_code", title: "T3 Code", version: "1" },
+    clientInfo: { name: "t3_code", title: `${PRODUCT_NAME}`, version: "1" },
     capabilities: { requestedCapabilities: readOnly ? [] : ["sessionMcp"] },
   };
 }

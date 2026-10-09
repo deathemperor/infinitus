@@ -99,7 +99,10 @@ vi.mock("~/hooks/useSettings", () => ({
   useClientSettings: () => DEFAULT_CLIENT_SETTINGS,
   useUpdateClientSettings: () => state.updateClientSettings,
   usePrimarySettings: () => DEFAULT_SERVER_SETTINGS,
-  useEnvironmentSettings: () => DEFAULT_SERVER_SETTINGS,
+  useEnvironmentSettings: (
+    _environmentId: unknown,
+    select?: (settings: typeof DEFAULT_SERVER_SETTINGS) => unknown,
+  ) => (select ? select(DEFAULT_SERVER_SETTINGS) : DEFAULT_SERVER_SETTINGS),
 }));
 vi.mock("~/hooks/useT3ProjectFileScripts", () => ({
   useT3ProjectFileState: () => ({

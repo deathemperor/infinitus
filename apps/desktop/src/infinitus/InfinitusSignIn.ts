@@ -142,12 +142,11 @@ export const submitSignInCode = Effect.fn("infinitus.submitSignInCode")(function
   if (code.length === 0) return { ok: false, error: "Paste the code from the sign-in page." };
   return yield* request({ command: CODE_COMMAND, args: [input.flowId], secret: code }).pipe(
     Effect.flatMap(decodeCodeResult),
-    Effect.catchTag("InfinitusCommandFailed", (failure) =>
-      Effect.succeed({ ok: false, error: failure.error }),
-    ),
-    Effect.catchTag("InfinitusUnavailable", () =>
-      Effect.succeed({ ok: false, error: `${PRODUCT_NAME} is not running on this Mac.` }),
-    ),
+    Effect.catchTags({
+      InfinitusCommandFailed: (failure) => Effect.succeed({ ok: false, error: failure.error }),
+      InfinitusUnavailable: () =>
+        Effect.succeed({ ok: false, error: `${PRODUCT_NAME} is not running on this Mac.` }),
+    }),
     Effect.catch(() =>
       Effect.succeed({ ok: false, error: `${PRODUCT_NAME} did not answer the code.` }),
     ),

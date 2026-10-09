@@ -23,6 +23,7 @@ import { create, type ReactTestRenderer } from "react-test-renderer";
 import { shouldUseRestingComposerLayout } from "../composerFooterLayout";
 import { useComposerFocusState } from "./useComposerFocusState";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { LegendListRef } from "@legendapp/list/react";
 
 const activityTestState = vi.hoisted(() => ({
@@ -2361,7 +2362,7 @@ describe("MessagesTimeline", () => {
 
     // The T3 wordmark replaces the generic tool icon for T3 MCP calls.
     expect(markup).toContain('viewBox="15.5309 37 94.3941 56.96"');
-    expect(markup).toContain("Read a T3 thread");
+    expect(markup).toContain(`Read an ${PRODUCT_NAME} thread`);
     expect(markup).not.toContain("mcp__t3-code__t3_thread_read");
   });
 

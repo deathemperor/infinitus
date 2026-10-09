@@ -10,6 +10,7 @@ import { HttpClient, HttpClientRequest } from "effect/http";
 
 import * as OpenCodeRuntime from "./OpenCodeRuntime.ts";
 import { parseGenericCliVersion } from "@infinitus/provider-core/server/snapshotProbe";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export interface ProbedOpenCode {
   readonly generation: "v1" | "v2";
@@ -86,7 +87,7 @@ const probeOpenCodeBinary = Effect.fn("probeOpenCodeBinary")(function* (
   if (result) return result;
   return yield* new OpenCodeRuntime.OpenCodeRuntimeError({
     operation: "probeOpenCodeBinary",
-    detail: `Unable to determine OpenCode version from \`opencode --version\` output. T3 Code requires OpenCode v${OpenCodeRuntime.MINIMUM_OPENCODE_VERSION} or newer.`,
+    detail: `Unable to determine OpenCode version from \`opencode --version\` output. ${PRODUCT_NAME} requires OpenCode v${OpenCodeRuntime.MINIMUM_OPENCODE_VERSION} or newer.`,
   });
 });
 
@@ -158,7 +159,7 @@ const probeOpenCodeServer = Effect.fn("probeOpenCodeServer")(function* (
   }
   return yield* new OpenCodeRuntime.OpenCodeRuntimeError({
     operation: "probeOpenCodeServer",
-    detail: `The server did not identify itself as OpenCode. T3 Code requires OpenCode v${OpenCodeRuntime.MINIMUM_OPENCODE_VERSION} or newer.`,
+    detail: `The server did not identify itself as OpenCode. ${PRODUCT_NAME} requires OpenCode v${OpenCodeRuntime.MINIMUM_OPENCODE_VERSION} or newer.`,
   });
 });
 

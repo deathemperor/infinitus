@@ -48,6 +48,7 @@ import {
   type AcpSessionModeState,
   type AcpToolCallState,
 } from "./runtimeModel.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const MAX_SHOWN_TOOL_CALL_IDS = 256;
 
@@ -940,7 +941,8 @@ export function terminatePosixOwnedProcessTree(input: {
     discover(table);
     const byPid = new Map(table.map((entry) => [entry.pid, entry]));
     const current = input.controller.identity(process.pid);
-    if (current === undefined) throw fail("Cannot identify the current T3 process group");
+    if (current === undefined)
+      throw fail(`Cannot identify the current ${PRODUCT_NAME} process group`);
     const ledgerByPid = new Map(
       [...ledger.values()].map((process) => [process.pid, process] as const),
     );

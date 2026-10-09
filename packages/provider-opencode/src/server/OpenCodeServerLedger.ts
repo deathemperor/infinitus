@@ -10,6 +10,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { writeFileStringAtomically } from "@infinitus/shared/atomicWrite";
 import { signalProcessGroup } from "@infinitus/provider-core/server/processGroup";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const ProcessIdentity = Schema.Struct({ pid: Schema.Int, startTime: Schema.String });
 type ProcessIdentity = typeof ProcessIdentity.Type;
@@ -281,10 +282,13 @@ export const make = Effect.fn("OpenCodeServerLedger.make")(function* (input: {
       ) {
         return;
       }
-      yield* Effect.logInfo("Stopping an OpenCode server left by a previous T3 Code server", {
-        pid: entry.pgid,
-        port: entry.port,
-      });
+      yield* Effect.logInfo(
+        `Stopping an OpenCode server left by a previous ${PRODUCT_NAME} server`,
+        {
+          pid: entry.pgid,
+          port: entry.port,
+        },
+      );
       signalGroup(entry.pgid, "SIGTERM");
       for (let attempt = 0; attempt < STOP_POLL_ATTEMPTS && groupExists(entry.pgid); attempt++) {
         yield* Effect.sleep(STOP_POLL_INTERVAL);

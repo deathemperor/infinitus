@@ -74,6 +74,7 @@ import {
   subagentThreadTitle,
 } from "@infinitus/provider-core/server/subagentProjection";
 import * as CursorAgentSdk from "./CursorAgentSdk.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 export { cursorSdkModelSelection } from "./sdkModel.ts";
 
 export const CURSOR_DRIVER_KIND = CursorAgentSdk.CURSOR_PROVIDER;
@@ -311,7 +312,7 @@ export function makeCursorAgentOptions(input: {
   const mcpServers = cursorMcpServers(input.threadId);
   return {
     model: cursorSdkModelSelection(input.modelSelection),
-    name: `T3 Code ${input.threadId}`,
+    name: `${PRODUCT_NAME} ${input.threadId}`,
     mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
     ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
     local: {

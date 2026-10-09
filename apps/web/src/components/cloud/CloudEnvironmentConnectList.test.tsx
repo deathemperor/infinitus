@@ -6,6 +6,7 @@ import { AsyncResult } from "effect/reactivity";
 import { act, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 type DiscoveredEnvironments = Discovery.RelayEnvironmentDiscoveryState["environments"];
 
@@ -172,7 +173,7 @@ describe("cloud environment offline reasons", () => {
 
     discovery.listEnvironments.mockResolvedValue(new Map([[newMachineId, offlineEntry()]]));
     await mount();
-    expect(rowText()).toContain("T3 Connect · Not added · Relay offline");
+    expect(rowText()).toContain(`${CONNECT_NAME} · Not added · Relay offline`);
 
     await act(async () => {
       publish({

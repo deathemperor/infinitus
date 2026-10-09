@@ -7,7 +7,6 @@ import type {
   OrchestrationV2TurnItem,
 } from "@infinitus/contracts";
 import { runRanAfter } from "@infinitus/shared/orchestrationV2ThreadError";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 type Work = OrchestrationV2RestartCancelledBackgroundWork;
 type Attempt = Pick<OrchestrationV2RunAttempt, "id" | "runId">;
@@ -91,7 +90,7 @@ const MAX_NOTE_ENTRIES = 10;
 export function restartCancelledBackgroundWorkNote(work: ReadonlyArray<Work>): string {
   const omitted = work.length - MAX_NOTE_ENTRIES;
   return [
-    `Note: the ${PRODUCT_NAME} server restarted, and this background work was cancelled before it finished. It will not report back:`,
+    "Note: the T3 server restarted, and this background work was cancelled before it finished. It will not report back:",
     ...work.slice(0, MAX_NOTE_ENTRIES).map((entry) => `- ${entry.kind}: ${entry.label}`),
     ...(omitted > 0 ? [`- and ${omitted} more`] : []),
   ].join("\n");

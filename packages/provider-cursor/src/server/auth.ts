@@ -18,6 +18,7 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 
 import { Cursor, InMemoryCredentialStore } from "./sdk.ts";
 import type { ProviderAuthController } from "@infinitus/provider-core/server/auth";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const AUTH_TIMEOUT_MS = 300_000;
 
@@ -185,7 +186,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
             openBrowser: false,
             store: pendingStore,
             signal,
-            apiKeyName: `T3 Code - ${options.displayName}`,
+            apiKeyName: `${PRODUCT_NAME} - ${options.displayName}`,
             onLoginUrl: (authorizationUrl) => {
               if (active === flow) Queue.offerUnsafe(urls, authorizationUrl);
             },

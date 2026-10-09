@@ -39,6 +39,7 @@ import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
 import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
 import type { OrchestratorV2ProviderReplayHarness } from "../testkit/ProviderReplayHarness.ts";
 import { makeMuseAdapterV2 } from "@infinitus/provider-muse/server";
+import { PRODUCT_NAME, UPSTREAM_PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const MUSE_PROVIDER_KIND = "muse";
 export const MUSE_MSP_REPLAY_PROTOCOL = "muse.msp-jsonl";
@@ -100,6 +101,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const withProductName = (text: string) => text.replaceAll(UPSTREAM_PRODUCT_NAME, PRODUCT_NAME);
+
 function replayValueMatches(expected: unknown, actual: unknown): boolean {
   if (expected === MUSE_REPLAY_ANY) return true;
   if (Array.isArray(expected)) {
@@ -113,6 +116,10 @@ function replayValueMatches(expected: unknown, actual: unknown): boolean {
     if (!isRecord(actual)) return false;
     const keys = new Set([...Object.keys(expected), ...Object.keys(actual)]);
     return [...keys].every((key) => replayValueMatches(expected[key], actual[key]));
+  }
+  // Upstream's recordings carry its product name in the runtime instructions.
+  if (typeof expected === "string" && typeof actual === "string") {
+    return withProductName(expected) === withProductName(actual);
   }
   return Object.is(expected, actual);
 }

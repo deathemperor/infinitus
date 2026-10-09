@@ -15,6 +15,7 @@ import {
   materializePiT3McpExtension,
   resolvePiLaunchArgs,
 } from "./mcpInjection.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const threadId = ThreadId.make("thread-pi-t3-mcp");
 
@@ -130,7 +131,7 @@ describe("pi T3 MCP injection", () => {
     assert.isFalse(launch.hasT3Mcp);
     assert.deepInclude(resolvePiLaunchArgs("--mode text"), {
       ok: false,
-      message: "Pi launch argument '--mode' is controlled by T3 Code and cannot be overridden.",
+      message: `Pi launch argument '--mode' is controlled by ${PRODUCT_NAME} and cannot be overridden.`,
     });
     assert.deepInclude(resolvePiLaunchArgs("--session old.jsonl"), { ok: false });
     assert.deepInclude(resolvePiLaunchArgs("prompt pi immediately"), { ok: false });

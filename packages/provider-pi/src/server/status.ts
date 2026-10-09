@@ -55,6 +55,7 @@ import {
   withPiBuiltinSlashCommands,
   type PiDiscoveredCommands,
 } from "./commands.ts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const PI_PRESENTATION = {
   displayName: "Pi",
@@ -238,7 +239,7 @@ export function buildInitialPiProviderSnapshot(
           version: null,
           status: "warning",
           auth: { status: "unknown" },
-          message: "Pi is disabled in T3 Code settings.",
+          message: `Pi is disabled in ${PRODUCT_NAME} settings.`,
         },
       });
     }
@@ -277,7 +278,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Pi is disabled in T3 Code settings.",
+        message: `Pi is disabled in ${PRODUCT_NAME} settings.`,
       },
     });
   }
@@ -352,7 +353,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version: null,
         status: "error",
         auth: { status: "unknown" },
-        message: `T3 Code could not determine the Pi version. Pi ${MINIMUM_PI_VERSION} or newer is required.`,
+        message: `${PRODUCT_NAME} could not determine the Pi version. Pi ${MINIMUM_PI_VERSION} or newer is required.`,
       },
     });
   }
@@ -410,8 +411,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         version,
         status: "ready",
         auth: { status: "unknown" },
-        message:
-          "Pi is available, but T3 Code could not refresh its models and commands. The live session will retry startup.",
+        message: `Pi is available, but ${PRODUCT_NAME} could not refresh its models and commands. The live session will retry startup.`,
       },
     });
   }

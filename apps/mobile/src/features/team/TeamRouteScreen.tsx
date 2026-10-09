@@ -364,7 +364,7 @@ function TeamPane(props: { readonly code: string }) {
       ) : null}
 
       <JoinSection
-        client={client}
+        teamClient={client}
         code={props.code}
         busy={busy}
         setBusy={setBusy}
@@ -386,7 +386,7 @@ function TeamPane(props: { readonly code: string }) {
 }
 
 function JoinSection(props: {
-  readonly client: InfinitusTeamClient;
+  readonly teamClient: InfinitusTeamClient;
   readonly code: string;
   readonly busy: string | null;
   readonly setBusy: (busy: string | null) => void;
@@ -411,7 +411,7 @@ function JoinSection(props: {
     props.setBusy("join");
     setError(null);
     try {
-      const joined = await props.client.joinTeam({ token: parsed, memberName });
+      const joined = await props.teamClient.joinTeam({ token: parsed, memberName });
       setToken("");
       await props.onJoined(joined);
     } catch (cause) {

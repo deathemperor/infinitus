@@ -64,6 +64,7 @@ import type {
 import * as ProviderInstanceRegistry from "./ProviderInstanceRegistry.ts";
 import * as ProviderRegistry from "./ProviderRegistry.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "@infinitus/provider-core/server/maintenanceResolver";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 const decodeServerSettings = Schema.decodeSync(ServerSettings);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const encodedDefaultServerSettings = encodeServerSettings(DEFAULT_SERVER_SETTINGS);
@@ -3111,7 +3112,7 @@ it.layer(
         assert.strictEqual(status.enabled, false);
         assert.strictEqual(status.status, "disabled");
         assert.strictEqual(status.installed, false);
-        assert.strictEqual(status.message, "Codex is disabled in T3 Code settings.");
+        assert.strictEqual(status.message, `Codex is disabled in ${PRODUCT_NAME} settings.`);
       }),
     );
   });

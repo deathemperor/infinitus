@@ -9,6 +9,7 @@ import {
 } from "./catalog.ts";
 import { gitHubRoutingConnectionKey } from "./githubRoutingPermissions.ts";
 import { BearerConnectionTarget, RelayConnectionTarget } from "./model.ts";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import {
   connectionRouteId,
   connectionRouteKind,
@@ -60,7 +61,7 @@ describe("connection routes", () => {
     expect(connectionRouteKind(direct("lo", "http://127.0.0.1:3773/"))).toBe("loopback");
     expect(connectionRouteKind(direct("ts6", "http://[fd7a:115c:a1e0::1]:3773/"))).toBe("tailnet");
     expect(connectionRouteLabel(TAILNET)).toBe("Tailscale");
-    expect(connectionRouteLabel(RELAY)).toBe("T3 Connect");
+    expect(connectionRouteLabel(RELAY)).toBe(CONNECT_NAME);
   });
 
   it("places a new route after faster kinds and ahead of T3 Connect", () => {

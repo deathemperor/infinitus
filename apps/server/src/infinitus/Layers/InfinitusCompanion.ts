@@ -94,13 +94,14 @@ const probeInfinitus = Effect.fn("Infinitus.probe")(function* () {
   const client = yield* InfinitusControlClient;
   return yield* client.request({ command: "status" }).pipe(
     Effect.map<unknown, Probe>((reply) => ({ state: "answering", reply })),
-    Effect.catchTag("InfinitusUnavailable", (error) =>
-      Effect.succeed<Probe>(
-        error.cause === "ENOENT"
-          ? { state: "gone" }
-          : { state: "refusing", path: error.path, cause: error.cause },
-      ),
-    ),
+    Effect.catchTags({
+      InfinitusUnavailable: (error) =>
+        Effect.succeed<Probe>(
+          error.cause === "ENOENT"
+            ? { state: "gone" }
+            : { state: "refusing", path: error.path, cause: error.cause },
+        ),
+    }),
     Effect.catch(() => Effect.succeed<Probe>({ state: "answering", reply: undefined })),
   );
 });

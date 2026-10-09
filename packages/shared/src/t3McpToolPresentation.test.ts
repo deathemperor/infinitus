@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { T3_MCP_TOOL_NAMES, resolveT3McpToolPresentation } from "./t3McpToolPresentation.ts";
+import { PRODUCT_NAME } from "./productName.ts";
 
 describe("resolveT3McpToolPresentation", () => {
   it("recognizes every T3 tool across provider prefixes and completion suffixes", () => {
@@ -26,21 +27,21 @@ describe("resolveT3McpToolPresentation", () => {
   });
   it("pretty prints Claude and Cursor T3 MCP tool names", () => {
     expect(resolveT3McpToolPresentation("mcp__t3-code__t3_thread_read")).toEqual({
-      displayName: "Read a T3 thread",
+      displayName: `Read an ${PRODUCT_NAME} thread`,
       logo: "t3-code",
     });
   });
 
   it("pretty prints Codex T3 MCP tool names", () => {
     expect(resolveT3McpToolPresentation("t3-code.create_threads")).toEqual({
-      displayName: "Create T3 threads",
+      displayName: `Create ${PRODUCT_NAME} threads`,
       logo: "t3-code",
     });
   });
 
   it("pretty prints thread metadata updates", () => {
     expect(resolveT3McpToolPresentation("mcp__t3-code__t3_thread_update")).toEqual({
-      displayName: "Update T3 thread metadata",
+      displayName: `Update ${PRODUCT_NAME} thread metadata`,
       logo: "t3-code",
     });
   });

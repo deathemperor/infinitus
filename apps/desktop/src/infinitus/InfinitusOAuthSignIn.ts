@@ -133,9 +133,10 @@ const make = Effect.gen(function* () {
     ).pipe(
       Effect.flatMap(decodeBegun),
       Effect.map((reply) => ({ kind: "begun" as const, reply })),
-      Effect.catchTag("InfinitusCommandFailed", (failure) =>
-        Effect.succeed({ kind: "refused" as const, error: failure.error }),
-      ),
+      Effect.catchTags({
+        InfinitusCommandFailed: (failure) =>
+          Effect.succeed({ kind: "refused" as const, error: failure.error }),
+      }),
       Effect.catch(() => Effect.succeed({ kind: "unavailable" as const })),
     );
     if (begun.kind === "unavailable") return null;

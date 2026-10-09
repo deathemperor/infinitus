@@ -116,6 +116,7 @@ import {
   subagentThreadTitle,
 } from "@infinitus/provider-core/server/subagentProjection";
 import * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const ACP_PROTOCOL = "acp.ndjson-jsonrpc" as const;
 
@@ -5534,8 +5535,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               Effect.fail(
                 EffectAcpErrors.AcpRequestError.internalError(
                   disposition === "ask"
-                    ? `The active T3 runtime policy requires approval for ${operation}. Request permission with session/request_permission before retrying.`
-                    : `The active T3 runtime policy does not allow ${operation}.`,
+                    ? `The active ${PRODUCT_NAME} runtime policy requires approval for ${operation}. Request permission with session/request_permission before retrying.`
+                    : `The active ${PRODUCT_NAME} runtime policy does not allow ${operation}.`,
                 ),
               ),
             ),
