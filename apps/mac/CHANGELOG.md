@@ -10,6 +10,20 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.37
+
+### Mac
+- The popup shows the other machines again: a control request longer than one socket read (the desktop's push of their accounts) is now read whole.
+
+### Desktop
+- The engine is rebuilt on the new orchestrator — threads, turns, checkpoints and provider sessions run on the upstream v2 engine, with its message queue, steering, pull request watching, scheduled tasks and ACP providers.
+- Features bound to the old engine are gone for now — Best of N, babysitting, side questions, rewind and fork from a message, thread usage and live rate, holds and priority mode, the Slack bridge, resume on limit and the built-in Pi and Oh My Pi providers.
+
+### Phone
+- A thread waiting for input no longer rings again every half hour; the heartbeat that keeps working threads on the lock-screen card skips threads waiting for input or approval.
+- With no Live Activity on the lock screen, a thread waiting for input no longer rings again every time another thread changes state; the relay now rings for the thread that changed, not for whichever row sorts first.
+- The queue, hold banner, reconnecting notice, Best of card and thread usage sheet left with the old engine; everything else follows the desktop.
+
 ## 0.5.0-alpha.36
 
 ### Mac

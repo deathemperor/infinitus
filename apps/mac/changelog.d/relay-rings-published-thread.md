@@ -1,1 +1,0 @@
-Phone: with no Live Activity on the lock screen, a thread waiting for input no longer rings again every time another thread changes state; the relay now rings for the thread that changed, not for whichever row sorts first.
