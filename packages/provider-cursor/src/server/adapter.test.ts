@@ -868,7 +868,7 @@ describe("CursorAdapterV2", () => {
 
     try {
       assert.deepEqual(cursorMcpServers(threadId), {
-        "t3-code": {
+        infinitus: {
           type: "http",
           url: "http://127.0.0.1:43123/mcp",
           headers: {
