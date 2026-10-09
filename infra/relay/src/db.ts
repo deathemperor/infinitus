@@ -59,6 +59,9 @@ export const NeonDatabase = Effect.gen(function* () {
       ? yield* Neon.Project("RelayNeonProject", {
           name: "infinitus-relay",
           region: "aws-ap-southeast-1",
+          // The plan's maximum (6 h). Left unset, alchemy reconciles the project
+          // to its own 24 h default on every deploy and Neon rejects the update.
+          historyRetentionSeconds: 21600,
           ...(Option.isSome(orgId) ? { orgId: orgId.value } : {}),
           migrations,
         }).pipe(RemovalPolicy.retain())
