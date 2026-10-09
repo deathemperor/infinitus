@@ -146,14 +146,44 @@ final class ControlServer {
         }
     }
 
+    /// A request line longer than this is a caller bug, not a command
+    /// (`PosixControlSocket.requestCap` is the same on Linux); the
+    /// connection drops.
+    private nonisolated static let requestCap = 1 << 20
+
     private func serve(_ conn: NWConnection) {
         conn.start(queue: queue)
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, _, error in
-            guard let self, let data, error == nil else { conn.cancel(); return }
+        Self.receiveLine(on: conn, buffer: Data()) { [weak self] line in
+            guard let self else { conn.cancel(); return }
             Task { @MainActor in
-                let reply = await self.handle(line: data)
+                let reply = await self.handle(line: line)
                 let bytes = (try? ControlCodec.encode(reply)) ?? Data("{\"ok\":false}\n".utf8)
                 conn.send(content: bytes, completion: .contentProcessed { _ in conn.cancel() })
+            }
+        }
+    }
+
+    /// Reads until the request's newline: one `receive` hands over whatever
+    /// the kernel has at that moment, and a `peer-sync` push of another
+    /// machine's fleets (25 KB and up) arrived in pieces — the first was
+    /// answered "bad request" and the rest closed the connection on the
+    /// desktop, so the popup never showed the other machines. A peer that
+    /// closes after a whole line without its terminator still gets an
+    /// answer; an empty or oversized request is dropped.
+    private nonisolated static func receiveLine(on conn: NWConnection, buffer: Data,
+                                                then dispatch: @escaping @Sendable (Data) -> Void) {
+        conn.receive(minimumIncompleteLength: 1, maximumLength: requestCap) { data, _, isComplete, error in
+            guard error == nil else { conn.cancel(); return }
+            var buffer = buffer
+            if let data { buffer.append(data) }
+            if let end = buffer.firstIndex(of: 0x0A) {
+                dispatch(Data(buffer[buffer.startIndex..<end]))
+            } else if buffer.count >= requestCap || (isComplete && buffer.isEmpty) {
+                conn.cancel()
+            } else if isComplete {
+                dispatch(buffer)
+            } else {
+                receiveLine(on: conn, buffer: buffer, then: dispatch)
             }
         }
     }
