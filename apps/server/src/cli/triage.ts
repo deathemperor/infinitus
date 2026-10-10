@@ -14,8 +14,12 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeOS from "node:os";
 import * as NodeReadlinePromises from "node:readline/promises";
 
+<<<<<<< HEAD
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-57b378077-upstream-renamed
 import { isCommandAvailable, resolveSpawnCommand } from "@infinitus/shared/shell";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";
@@ -194,7 +198,7 @@ export const triageCommand = Command.make("triage", {
           releaseTag: /^[^-+]+-(?:nightly|preview)\./.test(version)
             ? `v${version} (prerelease build; if this tag does not exist, clone main)`
             : `v${version}`,
-          os: `${yield* HostProcessPlatform} ${yield* HostProcessArchitecture} (${NodeOS.release()})`,
+          os: `${yield* HostProcess.Platform} ${yield* HostProcess.Architecture} (${NodeOS.release()})`,
           nodeVersion: process.version,
           launchedAs: yield* resolveCliCommand("triage"),
           server: yield* describeServerProcess(paths.serverRuntimeStatePath),

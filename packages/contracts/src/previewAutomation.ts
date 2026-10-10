@@ -926,7 +926,11 @@ export class PreviewAutomationNoAvailableHostError extends Schema.TaggedError<Pr
   },
 ) {
   override get message(): string {
+<<<<<<< HEAD
     return `No preview automation host is available for ${this.operation} in environment ${this.environmentId}. Preview tools run in an ${PRODUCT_NAME} desktop app that is open and connected to this environment; a headless server has no browser of its own. Do not retry. To check a page, use a headless browser from the shell, such as Playwright, or curl, or ask the user to open this thread in the ${PRODUCT_NAME} desktop app.`;
+=======
+    return `No preview automation host is available for ${this.operation} in environment ${this.environmentId}. The server-owned browser may be starting or reconnecting. Retry preview_status, then call preview_open if no tab is available. If it remains unavailable, report the browser connection failure.`;
+>>>>>>> upstream-sync-57b378077-upstream-renamed
   }
 }
 
@@ -1130,7 +1134,7 @@ export class PreviewAutomationRecordingTransferError extends Schema.TaggedError<
   },
 ) {
   override get message(): string {
-    return "Preview recording could not be saved to the agent environment. The saved copy remains on the desktop.";
+    return "Preview recording could not be saved to the agent environment.";
   }
 }
 
@@ -1148,7 +1152,7 @@ export class PreviewAutomationRecordingTooLargeError extends Schema.TaggedError<
   { threadId: ThreadId, cause: Schema.optional(Schema.Defect()) },
 ) {
   override get message(): string {
-    return "The recording exceeds 50 MiB. The saved copy remains on the desktop.";
+    return "The recording exceeds 50 MiB. Make a shorter recording.";
   }
 }
 
@@ -1157,7 +1161,7 @@ export class PreviewAutomationRecordingDeadlineExpiredError extends Schema.Tagge
   { threadId: ThreadId, cause: Schema.optional(Schema.Defect()) },
 ) {
   override get message(): string {
-    return "The recording transfer deadline expired. The saved copy remains on the desktop.";
+    return "The recording transfer deadline expired.";
   }
 }
 

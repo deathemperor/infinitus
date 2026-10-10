@@ -1,8 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import { resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
+<<<<<<< HEAD
 import { priceUsage, type RateTable } from "./usagePricing.ts";
 import type { UsageRecord } from "./usageTranscripts.ts";
+=======
+import type { RateTable } from "./usagePricing.ts";
+import type { UsageRecord } from "@infinitus/provider-core/server/usage";
+>>>>>>> upstream-sync-57b378077-upstream-renamed
 
 const rates: RateTable = new Map([
   [

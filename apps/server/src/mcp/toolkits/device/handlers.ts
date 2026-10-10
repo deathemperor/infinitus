@@ -9,7 +9,7 @@ import {
 } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 import * as Path from "effect/Path";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as ServerConfig from "../../../config.ts";
 import { ensureAgentDeviceShim } from "../../../device/AgentDeviceShim.ts";
 import { nodeRuntimeUnavailableMessage } from "@infinitus/shared/nodeRuntime";
@@ -180,7 +180,7 @@ const handlers = {
       const targetArgs = [...agentDeviceTargetArgs(device), ...agentArgs];
       const config = yield* ServerConfig.ServerConfig;
       const path = yield* Path.Path;
-      const platform = yield* HostProcessPlatform;
+      const platform = yield* HostProcess.Platform;
       const shimDir = yield* ensureAgentDeviceShim({
         entryPath: yield* devices.agentCli,
         stateDir: config.stateDir,

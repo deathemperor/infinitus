@@ -10,11 +10,7 @@
  * Both need root. Without it, the command prints what it would change and the
  * `sudo` line to run. It is safe to run again; it skips what is already done.
  */
-import {
-  HostProcessEnvironment,
-  HostProcessPlatform,
-  HostProcessUserId,
-} from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -62,7 +58,7 @@ const runStep = Effect.fn("browserSetup.runStep")(function* (
  * unspecified home falls back to the invoking user's `~/.t3`.
  */
 const setupBaseDir = Effect.fn("browserSetup.baseDir")(function* (explicit: Option.Option<string>) {
-  const env = yield* HostProcessEnvironment;
+  const env = yield* HostProcess.Environment;
   const raw = Option.getOrUndefined(explicit) ?? env.T3CODE_HOME;
   if (raw !== undefined || env.SUDO_USER === undefined) return yield* resolveBaseDir(raw);
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -110,13 +106,18 @@ const browserSetupCommand = Command.make("setup", { baseDir: baseDirFlag }).pipe
   ),
   Command.withHandler(({ baseDir }) =>
     Effect.gen(function* () {
+<<<<<<< HEAD
       if ((yield* HostProcessPlatform) !== "linux") {
         return yield* Console.log(
           `Nothing to set up: ${PRODUCT_NAME}'s browser runs as is on this system.`,
         );
+=======
+      if ((yield* HostProcess.Platform) !== "linux") {
+        return yield* Console.log("Nothing to set up: T3's browser runs as is on this system.");
+>>>>>>> upstream-sync-57b378077-upstream-renamed
       }
       const fs = yield* FileSystem.FileSystem;
-      const isRoot = (yield* HostProcessUserId) === 0;
+      const isRoot = (yield* HostProcess.UserId) === 0;
       const setupCommand = yield* resolveRootCliCommand(PreviewBrowserHost.SETUP_SUBCOMMAND);
 
       const needsProfile = yield* PreviewBrowserHost.sandboxBlocked;

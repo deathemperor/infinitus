@@ -16,7 +16,10 @@ import {
 } from "@infinitus/contracts";
 
 import type * as PullRequestFilesViewed from "../persistence/PullRequestFilesViewed.ts";
-import type { ProviderFileRevisions, PullRequestProviderError } from "./PullRequestProvider.ts";
+import type {
+  ProviderFileRevisions,
+  PullRequestProviderError,
+} from "@infinitus/source-control-core/server/PullRequestProvider";
 import type { PullRequestError, SupportedProject } from "./PullRequestService.ts";
 
 /**

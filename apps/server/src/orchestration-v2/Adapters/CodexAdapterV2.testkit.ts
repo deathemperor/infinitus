@@ -15,7 +15,7 @@ import * as Schema from "effect/Schema";
 
 import * as ServerConfig from "../../config.ts";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
-import { ProviderAdapterOpenSessionError } from "@infinitus/provider-core/server/ProviderAdapter";
+import * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 import { ProviderAdapterDriverCreateError } from "@infinitus/provider-core/server/adapterDriver";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
 import type { OrchestratorV2ProviderReplayHarness } from "../testkit/ProviderReplayHarness.ts";
@@ -196,7 +196,7 @@ export function layer(input: {
         const context = yield* Layer.build(layerReplay).pipe(
           Effect.mapError(
             (cause) =>
-              new ProviderAdapterOpenSessionError({
+              new ProviderAdapter.ProviderAdapterOpenSessionError({
                 driver: CodexAdapterV2.CODEX_DRIVER_KIND,
                 providerSessionId: openInput.providerSessionId,
                 cause,

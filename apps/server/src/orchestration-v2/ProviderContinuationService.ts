@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
-import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
+import * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import { isUndeliveredMailboxSteer } from "./NotificationMailbox.ts";
 

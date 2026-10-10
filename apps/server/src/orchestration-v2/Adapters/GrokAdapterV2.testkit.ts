@@ -5,15 +5,15 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import { ChildProcessSpawner } from "effect/process";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { resolveSelfInvocation } from "@infinitus/shared/nodeRuntime";
 
-import { layerTestProviderHost } from "@infinitus/provider-testing/host";
+import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
 import { GROK_ACP_CANCEL_META, GROK_ACP_INITIALIZE_META } from "@infinitus/provider-grok/testing";
 import { makeXAiPromptCompletionRuntime } from "@infinitus/provider-grok/testing";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
-import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
+import * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
 import type { ProviderReplayGate } from "@infinitus/provider-testing/replayGate";
 import type { OrchestratorV2ProviderReplayHarness } from "../testkit/ProviderReplayHarness.ts";
@@ -36,14 +36,14 @@ function layerGrokProviderAdapterRegistryReplay(
   transcript: AcpReplayTranscript,
   options: { readonly replayGate?: ProviderReplayGate } = {},
 ) {
-  const layerHost = layerTestProviderHost().pipe(Layer.provide(NodeServices.layer));
+  const layerHost = TestProviderHost.layer().pipe(Layer.provide(NodeServices.layer));
 
   return ProviderAdapterRegistry.layerFromAdaptersEffect(
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const hostPlatform = yield* HostProcessPlatform;
+      const hostPlatform = yield* HostProcess.Platform;
       // Same queue the continuation worker drains when the fixture runs it.
       const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
       const replayGate = options.replayGate;

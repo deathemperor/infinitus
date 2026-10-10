@@ -42,7 +42,8 @@ import {
 } from "@infinitus/contracts";
 import { makeKeyedCoalescingWorker } from "@infinitus/shared/KeyedCoalescingWorker";
 import * as KeyedLock from "@infinitus/shared/KeyedLock";
-import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import { AgentScope } from "@infinitus/shared/AgentScope";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { mergePathEntries } from "@infinitus/shared/shell";
 
 import { acpRegistryManagedBinaryDirectories } from "@infinitus/provider-acp-registry/server";
@@ -1319,6 +1320,7 @@ function createTerminalSpawnEnv(
   baseEnv: NodeJS.ProcessEnv,
   runtimeEnv: Record<string, string> | null | undefined,
   platform: NodeJS.Platform,
+  home: string,
 ): NodeJS.ProcessEnv {
   const spawnEnv: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(baseEnv)) {
@@ -1333,7 +1335,7 @@ function createTerminalSpawnEnv(
           ? Object.keys(spawnEnv).find((candidate) => candidate.toLowerCase() === key.toLowerCase())
           : undefined;
       spawnEnv[existingKey ?? key] =
-        key === "CODEX_HOME" || key === "CLAUDE_CONFIG_DIR" ? expandHomePath(value) : value;
+        key === "CODEX_HOME" || key === "CLAUDE_CONFIG_DIR" ? expandHomePath(value, home) : value;
     }
   }
   // An explicit empty override opts out for terminals started without a client.
@@ -1410,7 +1412,7 @@ export const resolveProviderInstanceTerminalEnvironment = Effect.fn(
     return yield* new TerminalProviderInstanceNotFoundError({ providerInstanceId });
   }
 
-  let resolved = mergeProviderInstanceEnvironment(instance.environment, input.env ?? {});
+  let resolved = yield* mergeProviderInstanceEnvironment(instance.environment, input.env ?? {});
   if (instance.driver === "codex") {
     const config = decodeCodexSettings(instance.config ?? {});
     if (Option.isSome(config)) {
@@ -1479,8 +1481,9 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   const logsDir = options.logsDir;
   const historyLineLimit = options.historyLineLimit ?? DEFAULT_HISTORY_LINE_LIMIT;
   const historyByteLimit = options.historyByteLimit ?? DEFAULT_HISTORY_BYTE_LIMIT;
-  const platform = yield* HostProcessPlatform;
-  const architecture = yield* HostProcessArchitecture;
+  const platform = yield* HostProcess.Platform;
+  const architecture = yield* HostProcess.Architecture;
+  const agentScope = yield* AgentScope;
   // Terminals must inherit the user's full environment (minus the blocklist
   // applied in createTerminalSpawnEnv) — an allowlist here silently strips
   // things like PSModulePath, DISPLAY, proxies, and toolchain variables.
@@ -2185,10 +2188,16 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       );
     }
 
+    const launch = yield* agentScope.wrap({
+      command: candidate.shell,
+      args: candidate.args ?? [],
+      name: "terminal",
+      env: spawnEnv,
+    });
     const attempt = yield* Effect.result(
       options.ptyAdapter.spawn({
-        shell: candidate.shell,
-        ...(candidate.args ? { args: candidate.args } : {}),
+        shell: launch.command,
+        ...(launch.args.length > 0 ? { args: [...launch.args] } : {}),
         cwd: session.cwd,
         cols: session.cols,
         rows: session.rows,
@@ -2250,9 +2259,17 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         Effect.andThen(
           Effect.gen(function* () {
             const shellCandidates = resolveShellCandidates(shellResolver, platform, baseEnv);
+<<<<<<< HEAD
             const terminalEnv = withProviderSessionEnvironment(
               createTerminalSpawnEnv(baseEnv, session.runtimeEnv, platform),
               { threadId: session.threadId, ...(environmentId ? { environmentId } : {}) },
+=======
+            const terminalEnv = createTerminalSpawnEnv(
+              baseEnv,
+              session.runtimeEnv,
+              platform,
+              yield* HostProcess.HomeDirectory,
+>>>>>>> upstream-sync-57b378077-upstream-renamed
             );
             // Append (never prepend) managed ACP agent install directories so
             // `kimi login` and friends resolve by name without shadowing any
@@ -2262,13 +2279,14 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               options.managedBinaryToolsDir !== undefined
             ) {
               const managedDirectories = yield* acpRegistryManagedBinaryDirectories({
-                fileSystem,
-                path,
                 cacheDir: options.managedBinaryCacheDir,
                 toolsDir: options.managedBinaryToolsDir,
                 platform,
                 architecture,
-              });
+              }).pipe(
+                Effect.provideService(FileSystem.FileSystem, fileSystem),
+                Effect.provideService(Path.Path, path),
+              );
               if (managedDirectories.length > 0) {
                 const delimiter = platform === "win32" ? ";" : ":";
                 const pathKey =
