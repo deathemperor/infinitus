@@ -1,14 +1,14 @@
 import { assert, it } from "@effect/vitest";
 
-import * as AzureDevOpsCli from "../sourceControl/AzureDevOpsCli.ts";
-import * as BitbucketApi from "../sourceControl/BitbucketApi.ts";
-import * as GitHubApi from "../sourceControl/GitHubApi.ts";
-import * as SourceControlRateLimit from "../sourceControl/SourceControlRateLimit.ts";
-import * as GitLabCli from "../sourceControl/GitLabCli.ts";
-import { azureDevOpsProviderFailure } from "./AzureDevOpsPullRequestProvider.ts";
-import { bitbucketProviderFailure } from "./BitbucketPullRequestProvider.ts";
-import { gitHubProviderFailure } from "./GitHubPullRequestProvider.ts";
-import { gitLabProviderFailure } from "./GitLabPullRequestProvider.ts";
+import * as AzureDevOpsCli from "@infinitus/source-control-azure-devops/server/AzureDevOpsCli";
+import * as BitbucketApi from "@infinitus/source-control-bitbucket/server/BitbucketApi";
+import * as GitHubApi from "@infinitus/source-control-github/server/GitHubApi";
+import * as SourceControlRateLimit from "@infinitus/source-control-core/server/SourceControlRateLimit";
+import * as GitLabCli from "@infinitus/source-control-gitlab/server/GitLabCli";
+import { azureDevOpsProviderFailure } from "@infinitus/source-control-azure-devops/server/AzureDevOpsPullRequestProvider";
+import { bitbucketProviderFailure } from "@infinitus/source-control-bitbucket/server/BitbucketPullRequestProvider";
+import { gitHubProviderFailure } from "@infinitus/source-control-github/server/GitHubPullRequestProvider";
+import { gitLabProviderFailure } from "@infinitus/source-control-gitlab/server/GitLabPullRequestProvider";
 
 const cause = new Error("redacted provider failure");
 

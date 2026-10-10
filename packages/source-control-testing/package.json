@@ -1,0 +1,23 @@
+{
+  "name": "@infinitus/source-control-testing",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./TestSourceControlHost": {
+      "types": "./src/TestSourceControlHost.ts",
+      "import": "./src/TestSourceControlHost.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@infinitus/contracts": "workspace:*",
+    "@infinitus/shared": "workspace:*",
+    "@infinitus/source-control-core": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}
