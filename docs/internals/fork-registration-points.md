@@ -128,7 +128,11 @@ new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
   (#747) and `InfinitusUsageAttributionLive` (#779) over `InfinitusLive` and
   the control client; `layerUsage` is provided it; the block is merged into
   `layerRuntimeDependencies`, `InfinitusPairingLive` (provided `layerAuth`,
-  #710) after it. `infinitusPairingHttpApiLayer` and `infinitusHttpApiLayer`
+  #710) after it. `InfinitusSignInLapseLive` (#1076, #1627) sits in
+  `layerRuntimeCoreDependenciesBase`'s `Layer.mergeAll` beside upstream's
+  reactors, where the chain hands it `OrchestratorV2` and `ServerEnvironment`;
+  it is provided `layerInfinitus` itself (memoized, one instance), its own
+  control client, `ProcessRunner.layer` and `InfinitusAlertRelayLive`. `infinitusPairingHttpApiLayer` and `infinitusHttpApiLayer`
   (provided `InfinitusAlertRelayLive` over the secret store and
   `FetchHttpClient.layer`, #1375) in `layerMakeRoutes`. `CaptureStore.layer`
   (#433) in the state-dir file services' `Layer.mergeAll` beside
