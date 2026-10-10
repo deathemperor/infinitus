@@ -20,7 +20,7 @@ import type {
   UsageTokenTotals,
 } from "@infinitus/contracts";
 
-import { EMPTY_TOTALS, type UsageRecord } from "./usageTranscripts.ts";
+import { EMPTY_TOTALS, type UsageRecord } from "@infinitus/provider-core/server/usage";
 import { cacheSavingsUsd, priceUsage, type RateTable } from "./usagePricing.ts";
 
 /**

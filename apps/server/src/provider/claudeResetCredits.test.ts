@@ -1,6 +1,11 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
+<<<<<<< HEAD
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+import * as Deferred from "effect/Deferred";
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -184,8 +189,13 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         expect(request.headers["user-agent"]).toBe("claude-cli/2.1.280 (external, cli)");
         return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(USAGE_BODY)));
       });
+<<<<<<< HEAD
       const credits = yield* readClaudeResetCredits(login, "2.1.280").pipe(
         Effect.provideService(HostProcessPlatform, "linux"),
+=======
+      const credits = yield* ClaudeResetCredits.readClaudeResetCredits(configDir, "2.1.0").pipe(
+        Effect.provideService(HostProcess.Platform, "linux"),
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
         Effect.provideService(HttpClient.HttpClient, client),
         Effect.provide(noSpawns),
       );
@@ -195,6 +205,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
 
   it.effect("reads the macOS login from the keychain item, never the file", () =>
     Effect.gen(function* () {
+<<<<<<< HEAD
       const login = { configDir: "/nowhere", keychainService: "Claude Code-credentials" };
       const credits = yield* readClaudeResetCredits(login, "2.1.280").pipe(
         Effect.provideService(HostProcessPlatform, "darwin"),
@@ -212,9 +223,15 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
       const login = yield* writeLogin;
       const missingItem = yield* readClaudeResetCredits(login, "2.1.280").pipe(
         Effect.provideService(HostProcessPlatform, "darwin"),
+=======
+      const { configDir } = yield* writeLogin;
+      const darwin = yield* ClaudeResetCredits.readClaudeResetCredits(configDir, "2.1.0").pipe(
+        Effect.provideService(HostProcess.Platform, "darwin"),
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
         Effect.provideService(HttpClient.HttpClient, refuseRequests),
         Effect.provide(keychainLayer("", 44)),
       );
+<<<<<<< HEAD
       const lapsed = yield* Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -233,6 +250,10 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         "2.1.280",
       ).pipe(
         Effect.provideService(HostProcessPlatform, "linux"),
+=======
+      const limited = yield* ClaudeResetCredits.readClaudeResetCredits(configDir, "2.1.0").pipe(
+        Effect.provideService(HostProcess.Platform, "linux"),
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
         Effect.provideService(HttpClient.HttpClient, respond(429, {})),
         Effect.provide(noSpawns),
       );
@@ -263,8 +284,17 @@ const claimClient = (
 const consume = (client: HttpClient.HttpClient, ids = { grantId: "grant_a", requestId: "r-1" }) =>
   Effect.gen(function* () {
     const login = yield* writeLogin;
+<<<<<<< HEAD
     return yield* consumeClaudeResetCredit({ login, version: "2.1.280", ...ids }).pipe(
       Effect.provideService(HostProcessPlatform, "linux"),
+=======
+    return yield* ClaudeResetCredits.consumeClaudeResetCredit({
+      ...login,
+      version: "2.1.0",
+      ...ids,
+    }).pipe(
+      Effect.provideService(HostProcess.Platform, "linux"),
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
       Effect.provideService(HttpClient.HttpClient, client),
       Effect.provide(noSpawns),
       Effect.result,
@@ -321,7 +351,46 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
     }),
   );
 
+<<<<<<< HEAD
   it.effect("refuses without a login or an organization, and malformed ids before sending", () =>
+=======
+  it.effect("times out a stalled claim body", () =>
+    Effect.gen(function* () {
+      const login = yield* writeLogin;
+      const readingBody = yield* Deferred.make<void>();
+      const client = HttpClient.make((request) => {
+        const response = HttpClientResponse.fromWeb(request, Response.json({ result: "reset" }));
+        Object.defineProperty(response, "json", {
+          value: Deferred.succeed(readingBody, undefined).pipe(Effect.andThen(Effect.never)),
+        });
+        return Effect.succeed(response);
+      });
+      const claim = yield* ClaudeResetCredits.consumeClaudeResetCredit({
+        ...login,
+        version: "2.1.0",
+        grantId: "grant_a",
+        requestId: "r-1",
+      }).pipe(
+        Effect.provideService(HostProcess.Platform, "linux"),
+        Effect.provideService(HttpClient.HttpClient, client),
+        Effect.result,
+        Effect.forkChild,
+      );
+      yield* Deferred.await(readingBody);
+      yield* TestClock.adjust("26 seconds");
+      expect(yield* Fiber.join(claim)).toMatchObject({
+        _tag: "Failure",
+        failure: {
+          _tag: "ClaudeResetCreditError",
+          reason: "requestFailed",
+          cause: { _tag: "TimeoutError" },
+        },
+      });
+    }).pipe(Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("refuses malformed ids without sending anything", () =>
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
     Effect.gen(function* () {
       for (const ids of [
         { grantId: "Bad Grant", requestId: "r-1" },

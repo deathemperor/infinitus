@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -114,7 +118,7 @@ export const buildSshAskpassHelperDescriptor = Effect.fn(
 )(function* (input: {
   readonly directory: string;
 }): Effect.fn.Return<SshAskpassHelperDescriptor, never, Path.Path> {
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   const path = yield* Path.Path;
   const directory = input.directory;
 
@@ -153,7 +157,7 @@ const ensureSshAskpassHelpers = Effect.fn("ssh/auth.ensureSshAskpassHelpers")(fu
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const descriptor = yield* buildSshAskpassHelperDescriptor(input);
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
 
   yield* fs.makeDirectory(path.dirname(descriptor.launcherPath), { recursive: true });
 
@@ -183,7 +187,7 @@ export const buildSshChildEnvironment = Effect.fn("ssh/auth.buildSshChildEnviron
     return baseEnv;
   }
 
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   const hostDisplay = input.baseEnv
     ? input.baseEnv.DISPLAY
     : yield* Config.String("DISPLAY").pipe(

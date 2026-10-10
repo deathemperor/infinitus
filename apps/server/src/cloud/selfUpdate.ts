@@ -6,8 +6,12 @@ import {
   type ServerSelfUpdateResult,
   type ThreadId,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
@@ -177,8 +181,8 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
   const runner = yield* ProcessRunner.ProcessRunner;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const platform = yield* HostProcessPlatform;
-  const arch = yield* HostProcessArchitecture;
+  const platform = yield* HostProcess.Platform;
+  const arch = yield* HostProcess.Architecture;
   // Archive-distributed targets download from GitHub Releases. The client is
   // optional so callers without one (tests, npm-only hosts) still construct.
   const httpClient = yield* HttpClient.HttpClient;

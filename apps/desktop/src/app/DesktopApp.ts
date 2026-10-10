@@ -17,6 +17,7 @@ import * as DesktopAppIdentity from "./DesktopAppIdentity.ts";
 import * as DesktopClerk from "./DesktopClerk.ts";
 import * as DesktopApplicationMenu from "../window/DesktopApplicationMenu.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
+import * as PreviewPasskeys from "../preview/Passkeys.ts";
 import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopLegacyLocalStorage from "./DesktopLegacyLocalStorage.ts";
@@ -34,7 +35,11 @@ import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopSnapShot from "../snapShot/DesktopSnapShot.ts";
 import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 
 const DEFAULT_DESKTOP_BACKEND_PORT = 3773;
 const MAX_TCP_PORT = 65_535;
@@ -277,13 +282,16 @@ const startup = Effect.gen(function* () {
   const safeStorage = yield* ElectronSafeStorage.ElectronSafeStorage;
   const updates = yield* DesktopUpdates.DesktopUpdates;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
+  const previewPasskeys = yield* PreviewPasskeys.PreviewPasskeys;
 
   yield* shellEnvironment.installIntoProcess;
   const hasCommandLinePasswordStore =
     preReadyElectronOptions.linuxPasswordStoreCommandLine !== null;
   const linuxElectronOptions =
     environment.platform === "linux" && !hasCommandLinePasswordStore
-      ? DesktopPreReadyPlatform.resolveEarlyLinuxElectronOptionsFromProcess()
+      ? DesktopPreReadyPlatform.resolveEarlyLinuxElectronOptionsFromProcess(
+          yield* HostProcess.HomeDirectory,
+        )
       : preReadyElectronOptions.linux;
   if (linuxElectronOptions !== null && !hasCommandLinePasswordStore) {
     if (
@@ -330,6 +338,7 @@ const startup = Effect.gen(function* () {
     });
   }
   yield* appIdentity.configure;
+  yield* previewPasskeys.configure;
   yield* applicationMenu.configure;
   yield* updates.configure;
   yield* DesktopRemoteUpdates.listen;

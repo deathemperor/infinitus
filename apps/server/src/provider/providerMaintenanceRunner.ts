@@ -34,8 +34,8 @@ import {
   makeTargetedProviderUpdateAction,
   resolveLatestProviderVersion,
   type ProviderMaintenanceCommandAction,
-  ProviderVersionCache,
 } from "@infinitus/provider-core/server/maintenanceResolver";
+import * as ProviderLatestVersions from "@infinitus/provider-core/server/ProviderLatestVersions";
 import type { ProviderMaintenanceCapabilities } from "@infinitus/provider-core/server/maintenanceResolver";
 import { collectUint8StreamText } from "@infinitus/provider-core/server/collectStreamText";
 const isServerProviderUpdateError = Schema.is(ServerProviderUpdateError);
@@ -292,7 +292,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
   const manifestService = yield* ModelManifest.ModelManifest;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const httpClient = yield* HttpClient.HttpClient;
-  const versionCache = yield* ProviderVersionCache;
+  const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
   const runMaintenanceCommand = (
     update: ProviderMaintenanceCommandAction,
     onProgress: (line: string) => Effect.Effect<void>,
@@ -357,7 +357,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               maintenanceCapabilities,
             ).pipe(
               Effect.provideService(HttpClient.HttpClient, httpClient),
-              Effect.provideService(ProviderVersionCache, versionCache),
+              Effect.provideService(ProviderLatestVersions.ProviderLatestVersions, latestVersions),
             ),
           {
             concurrency: "unbounded",
@@ -464,7 +464,10 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
               targetVersion ??
               (yield* resolveLatestProviderVersion(fresh).pipe(
                 Effect.provideService(HttpClient.HttpClient, httpClient),
-                Effect.provideService(ProviderVersionCache, versionCache),
+                Effect.provideService(
+                  ProviderLatestVersions.ProviderLatestVersions,
+                  latestVersions,
+                ),
               ));
             const advisory =
               resolveProviderCompatibility(manifest.compatibility, provider, candidateVersion) ??

@@ -33,6 +33,7 @@ export class BearerConnectionProfile extends Schema.TaggedClass<BearerConnection
      * Connect credential instead of a stored bearer token.
      */
     authorization: Schema.optionalKey(Schema.Literal("t3-connect")),
+<<<<<<< HEAD
     /** Fork (#663): the server's other doors (its tunnel), from the descriptor
         at pairing and refreshed on every connect; tried when `httpBaseUrl` is
         unreachable. Optional keys: the catalog document has no version to
@@ -41,6 +42,13 @@ export class BearerConnectionProfile extends Schema.TaggedClass<BearerConnection
     /** The host the last connect landed on; tried first next time, and what
         the environment row shows. Cleared when the paired host is edited. */
     lastGoodHttpBaseUrl: Schema.optionalKey(Schema.String),
+=======
+    /**
+     * "tailscale" on a learned route the server found on its Tailscale
+     * interface. A bare 100.64.0.0/10 address could belong to any VPN.
+     */
+    network: Schema.optionalKey(Schema.Literal("tailscale")),
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
   },
 ) {}
 

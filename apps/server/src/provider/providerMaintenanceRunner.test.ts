@@ -20,15 +20,15 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { SpawnExecutableResolution } from "@infinitus/shared/shell";
 
 import * as ProviderRegistry from "./ProviderRegistry.ts";
 import * as ModelManifest from "./ModelManifest.ts";
 import * as ProviderMaintenanceRunner from "./providerMaintenanceRunner.ts";
+import * as ProviderLatestVersions from "@infinitus/provider-core/server/ProviderLatestVersions";
 import {
   makeProviderMaintenanceCapabilities,
-  ProviderVersionCache,
   type ProviderMaintenanceCapabilities,
 } from "@infinitus/provider-core/server/maintenanceResolver";
 const isServerProviderUpdateError = Schema.is(ServerProviderUpdateError);
@@ -45,7 +45,7 @@ const encoder = new TextEncoder();
 // `{ command, args }` assertions below hold deterministically on any host
 // (including Windows). Windows-specific resolution is covered by the dedicated
 // win32 case at the end of this suite.
-const layerNonWindowsPlatform = Layer.succeed(HostProcessPlatform, "linux");
+const layerNonWindowsPlatform = Layer.succeed(HostProcess.Platform, "linux");
 
 function lifecycleFor(provider: ProviderDriverKind): ProviderMaintenanceCapabilities {
   if (provider === NATIVE_CLI_DRIVER) {
@@ -239,7 +239,7 @@ const makeTestRunner = (
               refreshInBackground: Effect.void,
             }),
             // Fresh per runner so a version cached by one test cannot leak into another.
-            Layer.sync(ProviderVersionCache, () => new Map()),
+            ProviderLatestVersions.layer,
           ),
         ),
       ),
@@ -962,8 +962,8 @@ describe("providerMaintenanceRunner", () => {
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
-          Layer.succeed(HostProcessPlatform, "win32"),
-          Layer.succeed(HostProcessEnvironment, {
+          Layer.succeed(HostProcess.Platform, "win32"),
+          Layer.succeed(HostProcess.Environment, {
             PATH: "C:\\fake\\npm",
             PATHEXT: ".COM;.EXE;.BAT;.CMD",
           }),

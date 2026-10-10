@@ -1,5 +1,5 @@
 import type { ContextMenuItem } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -114,7 +114,7 @@ const normalizePosition = (
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   let destructiveMenuIconCache: Option.Option<Electron.NativeImage> | undefined;
 
   const getDestructiveMenuIcon = (): Option.Option<Electron.NativeImage> => {

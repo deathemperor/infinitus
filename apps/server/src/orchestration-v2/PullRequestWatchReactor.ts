@@ -30,7 +30,7 @@ import type * as Scope from "effect/Scope";
 import {
   type ProviderChangeRequestWatchFingerprint,
   PullRequestProviderError,
-} from "../pullRequest/PullRequestProvider.ts";
+} from "@infinitus/source-control-core/server/PullRequestProvider";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as Orchestrator from "./Orchestrator.ts";

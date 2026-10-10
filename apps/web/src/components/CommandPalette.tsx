@@ -194,7 +194,14 @@ import {
   CommandPaletteVirtualizedResults,
   scrollCommandPaletteRowIntoView,
 } from "./CommandPaletteResults";
-import { AzureDevOpsIcon, BitbucketIcon, GitHubIcon, GitLabIcon, ForgejoIcon } from "./Icons";
+import {
+  AzureDevOpsIcon,
+  BitbucketIcon,
+  GitCafeIcon,
+  GitHubIcon,
+  GitLabIcon,
+  ForgejoIcon,
+} from "./Icons";
 import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
 import { Checkbox } from "./ui/checkbox";
 import { ProjectFavicon } from "./ProjectFavicon";
@@ -259,7 +266,7 @@ interface AddProjectEnvironmentOption {
 
 type AddProjectRemoteProviderKind = Extract<
   SourceControlProviderKind,
-  "github" | "gitlab" | "forgejo" | "bitbucket" | "azure-devops"
+  "github" | "gitlab" | "forgejo" | "bitbucket" | "azure-devops" | "gitcafe"
 >;
 type AddProjectRemoteSource = AddProjectRemoteProviderKind | "url";
 
@@ -285,6 +292,7 @@ const REMOTE_PROJECT_SOURCES: ReadonlyArray<AddProjectRemoteSource> = [
   "forgejo",
   "bitbucket",
   "azure-devops",
+  "gitcafe",
 ];
 const REMOTE_PROJECT_PROVIDER_SOURCES: ReadonlyArray<AddProjectRemoteProviderKind> = [
   "github",
@@ -292,6 +300,7 @@ const REMOTE_PROJECT_PROVIDER_SOURCES: ReadonlyArray<AddProjectRemoteProviderKin
   "forgejo",
   "bitbucket",
   "azure-devops",
+  "gitcafe",
 ];
 
 function remoteProjectSourceLabel(source: AddProjectRemoteSource): string {
@@ -306,6 +315,8 @@ function remoteProjectSourceLabel(source: AddProjectRemoteSource): string {
       return "Bitbucket";
     case "azure-devops":
       return "Azure DevOps";
+    case "gitcafe":
+      return "GitCafe";
     case "url":
       return "Git URL";
   }
@@ -315,6 +326,7 @@ function remoteProjectSourcePathHint(source: AddProjectRemoteSource): string {
   switch (source) {
     case "forgejo":
     case "github":
+    case "gitcafe":
       return "owner/repo";
     case "gitlab":
       return "group/project";
@@ -345,6 +357,8 @@ function remoteProjectSourceIcon(source: AddProjectRemoteSource, className: stri
       return <BitbucketIcon className={className} />;
     case "azure-devops":
       return <AzureDevOpsIcon className={className} />;
+    case "gitcafe":
+      return <GitCafeIcon className={className} />;
     case "url":
       return <LinkIcon className={className} />;
   }
@@ -399,6 +413,7 @@ function buildAddProjectRemoteSourceReadiness(
     forgejo: unavailable,
     bitbucket: unavailable,
     "azure-devops": unavailable,
+    gitcafe: unavailable,
   };
 
   if (!discovery) {
@@ -1941,7 +1956,7 @@ function OpenCommandPaletteDialog(props: {
           </>
         ),
         icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
-        shortcutCommand: "chat.new",
+        shortcutCommand: "chat.newLocal",
         run: async () => {
           await startNewThreadFromContext({
             activeDraftThread,
@@ -2136,6 +2151,7 @@ function OpenCommandPaletteDialog(props: {
       "bitbucket",
       "azure",
       "devops",
+      "gitcafe",
       "url",
       "environment",
     ],
