@@ -1,6 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
+<<<<<<< HEAD
 import { DESKTOP_USER_DATA_DIR_NAME } from "@infinitus/shared/desktopIdentity";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -32,4 +36,22 @@ it.layer(NodeServices.layer)("DesktopPreReadyFileSystem", (it) => {
       assert.isFalse(yield* fileSystem.exists(path.join(userData, "Local State")));
     }),
   );
+<<<<<<< HEAD
+=======
+
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32" || process.getuid?.() === 0)(
+    "fails instead of treating an unreadable profile as missing",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-pre-ready-fs-" });
+        yield* fileSystem.chmod(root, 0o000);
+        yield* Effect.addFinalizer(() => fileSystem.chmod(root, 0o700).pipe(Effect.orDie));
+
+        const exit = yield* Effect.exit(resolveWindowsUserData(root));
+
+        assert.isTrue(Exit.isFailure(exit));
+      }),
+  );
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 });

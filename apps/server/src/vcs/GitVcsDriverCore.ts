@@ -30,9 +30,10 @@ import {
   type VcsRemoveWorktreeInput,
 } from "@infinitus/contracts";
 import { dedupeRemoteBranchesWithLocalMatches, normalizeGitRemoteUrl } from "@infinitus/shared/git";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { compactTraceAttributes } from "@infinitus/shared/observability";
 import { decodeJsonResult } from "@infinitus/shared/schemaJson";
+import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import { resolveProjectFileBackedSetting } from "@infinitus/shared/projectSettings";
 import { gitCommandDuration, gitCommandsTotal, withMetrics } from "../observability/Metrics.ts";
@@ -951,7 +952,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const commandSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const { worktreesDir } = yield* ServerConfig.ServerConfig;
   const crypto = yield* Crypto.Crypto;
-  const hostPlatform = yield* HostProcessPlatform;
+  const hostPlatform = yield* HostProcess.Platform;
 
   const executeRaw: GitVcsDriver.GitVcsDriver["Service"]["execute"] = Effect.fnUntraced(
     function* (input) {
@@ -984,11 +985,16 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           ...input.env,
           ...trace2Monitor.env,
         };
+        const spawnEnv = { ...env, ...windowsLongPathConfigEnv(hostPlatform, env) };
+        const resolved = yield* resolveSpawnCommand("git", [], { env: spawnEnv });
+        // A git.cmd wrapper would need cmd.exe, which cuts multi-line commit
+        // messages at the first newline; leave that case to Node's lookup.
+        const executable = resolved.shell ? "git" : resolved.command;
         const child = yield* commandSpawner
           .spawn(
-            ChildProcess.make("git", commandInput.args, {
+            ChildProcess.make(executable, commandInput.args, {
               cwd: commandInput.cwd,
-              env: { ...env, ...windowsLongPathConfigEnv(hostPlatform, env) },
+              env: spawnEnv,
             }),
           )
           .pipe(
@@ -2664,7 +2670,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       "hash-object",
       "-t",
       "tree",
-      (yield* HostProcessPlatform) === "win32" ? "NUL" : "/dev/null",
+      (yield* HostProcess.Platform) === "win32" ? "NUL" : "/dev/null",
     ]);
     return stdout.trim();
   });
@@ -3439,6 +3445,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         options?.worktreesDirectory ?? "",
         worktreesDir,
         path,
+        yield* HostProcess.HomeDirectory,
       );
       if (parentDir === null) {
         return yield* new GitCommandError({

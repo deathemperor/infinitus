@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -248,7 +252,7 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
   }
   // A LaunchAgent starts at login and dies at logout; there is no
   // enable-linger equivalent on macOS. Do not promise more than that.
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   const wanted = yield* Prompt.run(
     Prompt.Confirm({
       message: installed

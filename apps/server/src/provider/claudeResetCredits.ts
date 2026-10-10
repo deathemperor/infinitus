@@ -12,14 +12,17 @@
  *
  * @module provider/claudeResetCredits
  */
+<<<<<<< HEAD
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no sha256 digest.
 import * as NodeCrypto from "node:crypto";
 
+=======
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 import type {
   ProviderConsumeResetCreditOutcome,
   ServerProviderResetCredits,
 } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -221,6 +224,7 @@ const readKeychainItem = Effect.fn("readKeychainItem")(function* (service: strin
   );
 });
 
+<<<<<<< HEAD
 /**
  * The login's access token, or nothing when there is no login, it is not an
  * OAuth one (API key, Bedrock) or its token has lapsed — refreshing is the
@@ -250,6 +254,15 @@ const readAccessToken = Effect.fn("readClaudeAccessToken")(function* (login: Cla
   if (typeof oauth?.expiresAt === "number" && oauth.expiresAt <= nowMs) return undefined;
   return token;
 });
+=======
+const readAccessToken = (configDir: string) =>
+  Effect.gen(function* () {
+    if ((yield* HostProcess.Platform) === "darwin") return undefined;
+    const path = yield* Path.Path;
+    const credentials = yield* readJson(Credentials, path.join(configDir, ".credentials.json"));
+    return credentials.claudeAiOauth?.accessToken?.trim() || undefined;
+  });
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
 
 /** The headers the CLI sends: its bearer, the OAuth beta and its own user agent. */
 const withClaudeHeaders = (token: string, version: string) =>
@@ -287,6 +300,7 @@ export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
   Effect.catch(() => Effect.succeed(undefined)),
 );
 
+<<<<<<< HEAD
 /**
  * The organization the claim is posted to, from the token's own profile
  * rather than `.claude.json`: an account engine that swaps the live login
@@ -300,6 +314,14 @@ const readOrganization = Effect.fn("readClaudeOrganization")(function* (
   const client = yield* HttpClient.HttpClient;
   const response = yield* client.execute(
     HttpClientRequest.get(`${API_BASE}/api/oauth/profile`).pipe(withClaudeHeaders(token, version)),
+=======
+/** The CLI keeps the account record beside its settings, or in the home directory by default. */
+/** The organization the login is signed in to; one email can belong to several. */
+export const readClaudeOrganizationId = (accountConfigPath: string) =>
+  readJson(Config, accountConfigPath).pipe(
+    Effect.map((config) => config.oauthAccount?.organizationUuid?.trim() || undefined),
+    Effect.orElseSucceed(() => undefined),
+>>>>>>> upstream-sync-c77a7b7ee-upstream-renamed
   );
   if (response.status === 401 || response.status === 403) {
     return yield* new ClaudeResetCreditError({ reason: "signedOut" });
@@ -310,6 +332,15 @@ const readOrganization = Effect.fn("readClaudeOrganization")(function* (
     Effect.mapError((cause) => new ClaudeResetCreditError({ reason: "requestFailed", cause })),
   );
   return profile.organization?.uuid?.trim() || undefined;
+});
+
+export const claudeAccountConfigPath = Effect.fn("claudeAccountConfigPath")(function* (
+  configDir: string | undefined,
+) {
+  const path = yield* Path.Path;
+  return configDir
+    ? path.join(configDir, ".claude.json")
+    : path.join(yield* HostProcess.HomeDirectory, ".claude.json");
 });
 
 const CLAIM_OUTCOMES = {

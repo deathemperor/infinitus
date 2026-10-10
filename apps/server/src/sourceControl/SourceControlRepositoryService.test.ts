@@ -13,9 +13,9 @@ import { GitCommandError, SourceControlProviderError } from "@infinitus/contract
 
 import * as ServerConfig from "../config.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
-import * as BitbucketApi from "./BitbucketApi.ts";
-import * as BitbucketSourceControlProvider from "./BitbucketSourceControlProvider.ts";
-import type * as SourceControlProvider from "./SourceControlProvider.ts";
+import * as BitbucketApi from "@infinitus/source-control-bitbucket/server/BitbucketApi";
+import * as BitbucketSourceControlProvider from "@infinitus/source-control-bitbucket/server/BitbucketSourceControlProvider";
+import type * as SourceControlProvider from "@infinitus/source-control-core/server/SourceControlProvider";
 import * as SourceControlProviderRegistry from "./SourceControlProviderRegistry.ts";
 import * as SourceControlRepositoryService from "./SourceControlRepositoryService.ts";
 
