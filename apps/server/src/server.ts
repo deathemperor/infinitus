@@ -79,6 +79,7 @@ import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
 import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts";
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
+import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
@@ -594,6 +595,23 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
     Layer.provide(PullRequestWatchReactor.layer),
     Layer.provide(layerPullRequestService),
     Layer.provide(ProjectionStoreV2.layer),
+  ),
+  // Fork (#1076, #1627): a lapsed AWS / gcloud sign-in in a shell tool's
+  // output starts the Mac's login and rings the phones. It tails the
+  // orchestrator's domain events and reads `InfinitusService` (the shared
+  // `layerInfinitus`, memoized); its own control client, since
+  // layerInfinitus's is private; `ps` / `kill` for the agent's own login once
+  // the Mac's lands.
+  InfinitusSignInLapseLive.pipe(
+    Layer.provide(layerInfinitus),
+    Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
+    Layer.provide(ProcessRunner.layer),
+    Layer.provide(
+      InfinitusAlertRelayLive.pipe(
+        Layer.provide(ServerSecretStore.layer),
+        Layer.provide(FetchHttpClient.layer),
+      ),
+    ),
   ),
   // Subscribes to `account.rate-limits.updated` so usage bars track live
   // telemetry instead of waiting for the next status probe.
