@@ -10,6 +10,14 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.38
+
+### Desktop
+- An agent's expired AWS or gcloud login is noticed again — the Mac's sign-in starts and the Sign-ins section shows it, as before the orchestrator update.
+
+### Phone
+- Your phone is told again when an agent's AWS or gcloud login expires, with the sign-in card ready.
+
 ## 0.5.0-alpha.37
 
 ### Mac
