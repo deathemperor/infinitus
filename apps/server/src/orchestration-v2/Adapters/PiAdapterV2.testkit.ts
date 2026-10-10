@@ -30,7 +30,7 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { layerTestProviderHost } from "@infinitus/provider-testing/host";
+import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import { ProviderAdapterDriverCreateError } from "@infinitus/provider-core/server/adapterDriver";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
@@ -425,7 +425,7 @@ export function layer<E, R>(input: {
     Layer.provide(input.spawner),
     Layer.provide(
       Layer.mergeAll(
-        layerTestProviderHost().pipe(Layer.provide(NodeServices.layer)),
+        TestProviderHost.layer().pipe(Layer.provide(NodeServices.layer)),
         NodeServices.layer,
         IdAllocator.layer,
       ),

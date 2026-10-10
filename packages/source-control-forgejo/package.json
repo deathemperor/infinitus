@@ -1,0 +1,48 @@
+{
+  "name": "@infinitus/source-control-forgejo",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server/driver": {
+      "types": "./src/server/driver.ts",
+      "import": "./src/server/driver.ts"
+    },
+    "./server/ForgejoCli": {
+      "types": "./src/server/ForgejoCli.ts",
+      "import": "./src/server/ForgejoCli.ts"
+    },
+    "./server/forgejoPullRequestJson": {
+      "types": "./src/server/forgejoPullRequestJson.ts",
+      "import": "./src/server/forgejoPullRequestJson.ts"
+    },
+    "./server/ForgejoPullRequestProvider": {
+      "types": "./src/server/ForgejoPullRequestProvider.ts",
+      "import": "./src/server/ForgejoPullRequestProvider.ts"
+    },
+    "./server/forgejoPullRequests": {
+      "types": "./src/server/forgejoPullRequests.ts",
+      "import": "./src/server/forgejoPullRequests.ts"
+    },
+    "./server/ForgejoSourceControlProvider": {
+      "types": "./src/server/ForgejoSourceControlProvider.ts",
+      "import": "./src/server/ForgejoSourceControlProvider.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "dependencies": {
+    "@infinitus/contracts": "workspace:*",
+    "@infinitus/provider-core": "workspace:*",
+    "@infinitus/shared": "workspace:*",
+    "@infinitus/source-control-core": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@infinitus/source-control-testing": "workspace:*",
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
