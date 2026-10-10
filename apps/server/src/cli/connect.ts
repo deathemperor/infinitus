@@ -5,8 +5,12 @@ import {
   type RelayClientInstallProgressStage,
 } from "@infinitus/contracts";
 import { RelayOkResponse } from "@infinitus/contracts/relay";
+<<<<<<< HEAD
 import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-57b378077-upstream-renamed
 import * as RelayClient from "@infinitus/shared/relayClient";
 import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
 import * as Cause from "effect/Cause";
@@ -687,7 +691,7 @@ export const connectCommand = Command.make("connect", {
         // show how to run the server manually.
         const background = yield* recoverServiceOnboardingOffer(offerServiceDuringOnboarding);
         if (background) {
-          const platform = yield* HostProcessPlatform;
+          const platform = yield* HostProcess.Platform;
           yield* Console.log(
             platform === "darwin"
               ? `\n✓ Background service ready\n\n${PRODUCT_NAME} is set to run while you are logged in to this Mac. The server establishes the ${CONNECT_NAME} link on startup.`

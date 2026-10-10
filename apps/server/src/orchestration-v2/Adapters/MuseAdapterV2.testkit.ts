@@ -27,7 +27,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { layerTestProviderHost } from "@infinitus/provider-testing/host";
+import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
 import {
   museInitializeParams,
   museServeArgs,
@@ -36,7 +36,7 @@ import {
 } from "@infinitus/provider-muse/testing";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
-import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
+import * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
 import type { OrchestratorV2ProviderReplayHarness } from "../testkit/ProviderReplayHarness.ts";
 import { makeMuseAdapterV2 } from "@infinitus/provider-muse/server";
 import { PRODUCT_NAME, UPSTREAM_PRODUCT_NAME } from "@infinitus/shared/productName";
@@ -477,7 +477,7 @@ export function layer(input: {
   ).pipe(
     Layer.provide(
       Layer.mergeAll(
-        layerTestProviderHost().pipe(Layer.provide(NodeServices.layer)),
+        TestProviderHost.layer().pipe(Layer.provide(NodeServices.layer)),
         NodeServices.layer,
         IdAllocator.layer,
       ),

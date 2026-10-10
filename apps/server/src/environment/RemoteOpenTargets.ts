@@ -9,7 +9,7 @@
  * on the tailnet; `<hostname>.local` only on the same LAN).
  */
 import { type RemoteOpenTarget } from "@infinitus/contracts";
-import { HostProcessHostname } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as NetService from "@infinitus/shared/Net";
 import { readTailscaleStatus } from "@infinitus/tailscale";
 import * as Context from "effect/Context";
@@ -58,7 +58,7 @@ export const make = Effect.gen(function* () {
 
     // os.hostname() may already be an FQDN (macOS often reports
     // "Name.local"); mDNS names are always `<first-label>.local`.
-    const hostname = yield* HostProcessHostname;
+    const hostname = yield* HostProcess.Hostname;
     const shortHostname = hostname.split(".")[0]?.trim();
     if (shortHostname !== undefined && shortHostname.length > 0) {
       targets.push({ kind: "mdns", host: `${shortHostname}.local` });
