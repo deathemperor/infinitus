@@ -30,7 +30,7 @@ func usage() -> String {
         if !c.options.isEmpty { out += "  [\(c.options.joined(separator: ", "))]" }
         out += "\n"
     }
-    out += "  environments | projects | threads | thread show|send|new|interrupt|release|rename|title | desktop status|credential\n"
+    out += "  environments | projects | threads | thread show|send|new|interrupt|rename|title | desktop status|credential\n"
     out += "                         Infinitus desktop's projects and threads (`\(programName) thread --help`)\n"
     out += "\nFleet keys come from `infinitusctl fleets` (e.g. swapd/claude, cliproxy/claude).\n"
     out += "proxy-key, 9router-password, aws-login-code, gcloud-login-code, signin-code read their secret from stdin.\n"
