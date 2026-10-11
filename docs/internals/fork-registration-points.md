@@ -36,6 +36,20 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   control's held state on `apps/web/src/components/usage/UsageLimits.tsx`
   (`resetHoldText`), `UsageLimitsPooled.tsx` and
   `apps/mobile/src/features/usage/UsageLimitsSection.tsx`.
+- Update idle gate (#829, back on orchestrator v2 in #1627):
+  `packages/contracts/src/server.ts` (`ServerRunningTurn`,
+  `ServerUpdateRunningTurnsPolicy`, `runningTurns?` on `ServerSelfUpdateInput`
+  and `ServerSelfUpdateError`, the `waiting` progress stage),
+  `apps/server/src/cloud/selfUpdate.ts` (`withUpdateIdleGate`, composed in
+  `layer`; the service's `reportProgress` takes the count), `ws.ts` (the
+  count on the progress stream), `server.ts` (`InfinitusRunningTurnsLive`
+  over `ProjectionStoreV2.layer` provided to `ServerSelfUpdate.layer`);
+  `packages/client-runtime/src/state/server.ts` (the `waiting` stage and
+  `runningTurns?` on the running state),
+  `packages/client-runtime/src/connection/outdatedHostUpdate.ts`
+  (`OutdatedHostUpdateStage` takes `waiting`),
+  `apps/web/src/components/ServerUpdateAction.tsx` (the `waiting` label).
+  Rules and traps: `docs/internals/update-idle-gate.md`.
 - `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
   also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
   in the sidebar's utility row, so their Back returns to the main app (#1601).
