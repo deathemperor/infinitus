@@ -72,6 +72,9 @@ export interface ProviderEventRouteIdentity {
   readonly runId: OrchestrationV2Run["id"];
   readonly attemptId: RunAttemptId;
   readonly providerThreadId: ProviderThreadId;
+  // The run's ordinal, matched against a `turn.terminal`'s `runOrdinal` when
+  // the terminal is for a turn other than the root (#1514).
+  readonly runOrdinal?: number;
 }
 
 export interface InheritedBackgroundTurnItemRoute {
@@ -455,10 +458,20 @@ export function routeProviderEvent(
             state.ownedProviderTurnIds.has(event.runtimeRequest.providerTurnId)),
         state,
       ];
-    case "turn.terminal":
-      return event.providerTurnId === state.rootProviderTurnId
-        ? [true, { ...state, rootTurnEnded: true }]
-        : [false, state];
+    case "turn.terminal": {
+      // A provider can finish under a turn id the run never saw as its root
+      // (#1514). While the root turn is still open, a terminal for this run's
+      // ordinal on its own provider thread is the root's: the provider moved
+      // on, so the old turn is abandoned. The ordinal keeps a late terminal
+      // of a stopped earlier run on the same thread out. The ingest loop logs
+      // the mismatch; `rootProviderTurnId` stays so it can tell.
+      const settlesRoot =
+        event.providerTurnId === state.rootProviderTurnId ||
+        (!state.rootTurnEnded &&
+          event.providerThreadId === input.providerThreadId &&
+          (input.runOrdinal === undefined || event.runOrdinal === input.runOrdinal));
+      return settlesRoot ? [true, { ...state, rootTurnEnded: true }] : [false, state];
+    }
   }
 }
 
@@ -920,6 +933,7 @@ export const layer: Layer.Layer<
             runId: input.run.id,
             attemptId: input.attempt.id,
             providerThreadId: input.providerThread.id,
+            runOrdinal: input.run.ordinal,
           };
           const eventSubscription =
             input.session.subscribeEvents === undefined
@@ -1263,6 +1277,18 @@ export const layer: Layer.Layer<
                   );
                 }
                 if (event.type === "turn.terminal") {
+                  const rootProviderTurnId = (yield* Ref.get(eventRouting)).rootProviderTurnId;
+                  if (event.providerTurnId !== rootProviderTurnId) {
+                    yield* Effect.logWarning(
+                      "orchestration V2 run settled by a terminal for another provider turn",
+                      {
+                        runId: input.run.id,
+                        rootProviderTurnId,
+                        providerTurnId: event.providerTurnId,
+                        status: event.status,
+                      },
+                    );
+                  }
                   yield* Ref.set(terminalEvent, event);
                   yield* Ref.set(rootTerminalSeen, true);
                   yield* finalizeRootRun(event);
