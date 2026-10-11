@@ -13,7 +13,7 @@ import * as Stream from "effect/Stream";
 import { HttpServer } from "effect/http";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
-import { ServerConfig } from "../../config.ts";
+import { type RuntimeMode, ServerConfig } from "../../config.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
@@ -248,9 +248,15 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
  * whose home is a worktree-local `.t3` would otherwise take the tunnel with
  * it, last writer wins (#640). An `INFINITUS_CONTROL_SOCKET` override is an
  * isolated instance by definition (every dev instance runs with one): it
- * neither publishes its port nor opens the installed app.
+ * neither publishes its port nor opens the installed app. Those three name
+ * the usual dev shapes; the fail-safe is the runtime mode (#1487): only the
+ * desktop's own bundled server runs as `desktop`, so a `web` server — a
+ * showcase on a temp home, `dev:server` without Vite, a `--home-dir`
+ * elsewhere — stays quiet whatever its home, instead of rotating the
+ * installed desktop's credential every minute.
  */
 export const serverPortWithheldReason = (input: {
+  readonly mode: RuntimeMode;
   readonly devUrl: URL | undefined;
   readonly baseDir: string;
   readonly worktreeT3Home: string | undefined;
@@ -265,6 +271,7 @@ export const serverPortWithheldReason = (input: {
   if (input.worktreeT3Home !== undefined && input.worktreeT3Home === input.baseDir) {
     return "its home is a worktree-local .t3";
   }
+  if (input.mode !== "desktop") return "only the desktop's bundled server publishes its port";
   return undefined;
 };
 
@@ -280,6 +287,7 @@ export const InfinitusServerPortLive = Layer.effectDiscard(
       const config = yield* ServerConfig;
       const env = yield* HostProcessEnvironment;
       const reason = serverPortWithheldReason({
+        mode: config.mode,
         devUrl: config.devUrl,
         baseDir: config.baseDir,
         worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
