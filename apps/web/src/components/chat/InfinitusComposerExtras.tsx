@@ -35,7 +35,7 @@ import { markedFileName } from "./imageMarkup.logic";
  * called once, unconditionally, before the composer derives its command
  * menu; the components below take its result.
  */
-export interface InfinitusComposerExtras {
+interface InfinitusComposerExtras {
   /** The routed project; null on a draft without one. */
   readonly project: ActiveProjectRef | null;
   readonly promptSnippets: ReturnType<typeof useProjectPromptSnippets>;
