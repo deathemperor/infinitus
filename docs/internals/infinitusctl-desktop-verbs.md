@@ -12,4 +12,4 @@ One HTTP route for a CLI with no WebSocket, behind the read scope: `GET /api/inf
 
 ## Registration points
 
-Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the port layer (which is why that block sits below `AuthLayerLive` in `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. `thread show`, `send`, `interrupt` and `--wait` use routes that already existed, and `new` too but for the thread-defaults read above. The holds list and `release-thread` routes left with the engine (#1627); `thread release` left the Mac's CLI with them, the holds read is still to go.
+Registration points: `InfinitusLayerLive` provides `AuthLayerLive` to the port layer (which is why that block sits below `AuthLayerLive` in `server.ts`), `infinitusHttpApiLayer` in `makeRoutesLayer`. `thread show`, `send`, `interrupt` and `--wait` use routes that already existed, and `new` too but for the thread-defaults read above. The holds list and `release-thread` routes left with the engine (#1627); both reads left the Mac CLI with #1627, and so did `thread release`.

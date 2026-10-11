@@ -8,7 +8,7 @@ import FoundationNetworking
 /// server on its published port with the bearer session the Mac app
 /// keeps for them (DesktopCredential; `desktop-token` hands it over).
 /// Blocking and WebSocket-free: the shell snapshot, one thread's detail,
-/// the holds read and a dispatched client command are all a verb needs.
+/// and a dispatched client command are all a verb needs.
 /// The transport is a closure so tests answer canned bytes on Linux too.
 public struct DesktopAPI {
     public typealias Transport = (_ method: String, _ url: URL, _ headers: [String: String], _ body: Data?) throws -> (Int, Data)
@@ -129,12 +129,6 @@ public struct DesktopAPI {
             thread = keyed.contains(.thread) ? try keyed.decode(Thread.self, forKey: .thread) : try Thread(from: decoder)
         }
     }
-    public struct Hold: Decodable, Equatable {
-        public var threadId: String
-        public var since: String?
-        public var summary: String?
-        public var kind: String?
-    }
 
     // MARK: reads
 
@@ -146,10 +140,6 @@ public struct DesktopAPI {
     public func thread(_ id: String, turnLimit: Int) throws -> Thread {
         let detail: ThreadDetail = try decode(get("/api/orchestration/threads/\(Self.segment(id))?turnLimit=\(max(1, turnLimit))"))
         return detail.thread
-    }
-    /// `GET /api/infinitus/holds`: the threads the desktop holds (#616); a desktop without the route holds nothing.
-    public func holds() throws -> [Hold] {
-        do { return try decode(get("/api/infinitus/holds")) } catch let failure as Failure where failure.status == 404 { return [] }
     }
     /// `GET /api/infinitus/thread-defaults?projectId=` (#1315): the model
     /// the desktop's own composer would create a thread on for that project

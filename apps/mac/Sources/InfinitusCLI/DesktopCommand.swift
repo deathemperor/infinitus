@@ -13,7 +13,7 @@ func desktopUsage() -> String {
     """
     usage: \(programName) environments
            \(programName) projects
-           \(programName) threads [--project <id|name>] [--status running|held|paused|waiting|idle] [--limit <n>]
+           \(programName) threads [--project <id|name>] [--status running|waiting|idle] [--limit <n>]
            \(programName) thread rename [--thread <id>] <title>
            \(programName) thread title [--thread <id>]
            \(programName) thread show <id> [--turns <n>]
@@ -158,7 +158,6 @@ private struct DesktopVerbs {
     private func threads() throws -> Int32 {
         let api = try api()
         let shell = try api.shell()
-        let holds = Dictionary(try api.holds().map { ($0.threadId, $0) }, uniquingKeysWith: { a, _ in a })
         let projects = Dictionary(shell.projects.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var project: DesktopAPI.Project?
         if let wanted = options["project"] {
@@ -174,10 +173,10 @@ private struct DesktopVerbs {
         guard limit > 0 else { throw Refused(message: "usage: threads --limit <n>  (n > 0)", code: 2) }
         let rows = shell.threads
             .filter { $0.archivedAt == nil && (project == nil || $0.projectId == project?.id) }
-            .filter { options["status"] == nil || DesktopRows.status($0, hold: holds[$0.id]) == options["status"] }
+            .filter { options["status"] == nil || DesktopRows.status($0) == options["status"] }
             .sorted { ($0.updatedAt ?? "") > ($1.updatedAt ?? "") }
             .prefix(limit)
-            .map { DesktopRows.threadRow($0, project: projects[$0.projectId], hold: holds[$0.id]) }
+            .map { DesktopRows.threadRow($0, project: projects[$0.projectId]) }
         desktopEmit(.array(rows))
         return 0
     }
@@ -193,24 +192,24 @@ private struct DesktopVerbs {
         case "show":
             let turns = options["turns"].flatMap(Int.init) ?? 5
             guard turns > 0 else { throw Refused(message: "usage: thread show <id> [--turns <n>]  (n > 0)", code: 2) }
-            let (shellThread, project, hold) = try locate(id, api: api)
+            let (shellThread, project) = try locate(id, api: api)
             let detail = try api.thread(id, turnLimit: turns)
-            desktopEmit(.object(["thread": DesktopRows.threadRow(shellThread, project: project, hold: hold),
+            desktopEmit(.object(["thread": DesktopRows.threadRow(shellThread, project: project),
                                  "messages": .array(detail.messages.map(DesktopRows.messageRow))]))
             return 0
 
         case "send":
             let text = try message(positional.dropFirst(2).first, what: "message")
-            var (shellThread, _, hold) = try locate(id, api: api)
-            var status = DesktopRows.status(shellThread, hold: hold)
-            if ["running", "held", "paused"].contains(status), !flags.contains("steer") {
+            var (shellThread, _) = try locate(id, api: api)
+            var status = DesktopRows.status(shellThread)
+            if status == "running", !flags.contains("steer") {
                 guard flags.contains("wait-idle") else {
                     throw Refused(message: "turn running; --steer to fold it in, or --wait-idle to send when it finishes")
                 }
-                while ["running", "held", "paused"].contains(status) {
+                while status == "running" {
                     Thread.sleep(forTimeInterval: 1)
-                    (shellThread, _, hold) = try locate(id, api: api)
-                    status = DesktopRows.status(shellThread, hold: hold)
+                    (shellThread, _) = try locate(id, api: api)
+                    status = DesktopRows.status(shellThread)
                 }
             }
             let steering = status == "running" && flags.contains("steer")
@@ -261,7 +260,7 @@ private struct DesktopVerbs {
                               threadId: threadId, previousTurn: nil, api: api)
 
         case "interrupt":
-            let (shellThread, _, _) = try locate(id, api: api)
+            let (shellThread, _) = try locate(id, api: api)
             let turn = shellThread.latestTurn.flatMap { $0.state == "running" ? $0.turnId : nil }
             let sequence = try api.dispatch(DesktopRows.turnInterrupt(threadId: id, turnId: turn))
             desktopEmit(.object(["ok": .bool(true), "sequence": .number(Double(sequence)), "turnId": turn.map(JSONValue.string) ?? .null]))
@@ -354,11 +353,10 @@ private struct DesktopVerbs {
         return git.terminationStatus == 0 && !branch.isEmpty && branch != "HEAD" ? branch : nil
     }
 
-    private func locate(_ id: String, api: DesktopAPI) throws -> (DesktopAPI.ThreadShell, DesktopAPI.Project?, DesktopAPI.Hold?) {
+    private func locate(_ id: String, api: DesktopAPI) throws -> (DesktopAPI.ThreadShell, DesktopAPI.Project?) {
         let shell = try api.shell()
         guard let thread = shell.threads.first(where: { $0.id == id }) else { throw Refused(message: "no thread \(id) in Infinitus desktop") }
-        let hold = try api.holds().first { $0.threadId == id }
-        return (thread, shell.projects.first { $0.id == thread.projectId }, hold)
+        return (thread, shell.projects.first { $0.id == thread.projectId })
     }
 
     /// Print `out`, or with --wait poll the thread until its turn ends and
