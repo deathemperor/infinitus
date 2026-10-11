@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Demo Infinitus desktop (#822): the slice of the desktop app's HTTP
 server the CLI's environments/projects/threads/thread verbs read and
-write — descriptor, shell snapshot, one thread's detail, holds, dispatch
-(turn start with an optional create-thread bootstrap, interrupt) and
-release-thread — with a fabricated project and two threads. Every
+write — descriptor, shell snapshot, one thread's detail, dispatch
+(turn start with an optional create-thread bootstrap, interrupt) —
+with a fabricated project and two threads. Every
 request must carry the bearer token in argv; anything else is 401.
 No real data; e2e only.  usage: demo-desktop <port> <token>"""
 import json, sys, uuid, datetime
@@ -35,7 +35,6 @@ THREADS = {
 MESSAGES = {"t-running": [{"id": "m-1", "role": "user", "text": "keep going", "turnId": "u-1", "streaming": False, "createdAt": now()}],
             "t-idle": [{"id": "m-0", "role": "user", "text": "hello", "turnId": "u-2", "streaming": False, "createdAt": now()},
                        {"id": "m-2", "role": "assistant", "text": "hi there", "turnId": "u-2", "streaming": False, "createdAt": now()}]}
-HOLDS = [{"threadId": "t-idle", "since": now(), "summary": "at limit until 09:00", "kind": "held"}]
 DISPATCHES = []   # every command received, for the e2e's assertions
 SEQ = [0]
 
@@ -67,8 +66,6 @@ class H(BaseHTTPRequestHandler):
             tid = path.rsplit("/", 1)[1]
             if tid not in THREADS: return self.reply(404, {"error": "no thread " + tid})
             return self.reply(200, dict(THREADS[tid], messages=MESSAGES.get(tid, []), activities=[], proposedPlans=[], checkpoints=[]))
-        if path == "/api/infinitus/holds":
-            return self.reply(200, HOLDS)
         if path == "/api/infinitus/thread-defaults":   # resolved like the composer: override, the row, the environment
             pid = self.path.partition("projectId=")[2]
             row = next((p for p in (PROJECT, BARE) if p["id"] == pid), None)
@@ -112,10 +109,6 @@ class H(BaseHTTPRequestHandler):
                     t["latestTurn"]["state"] = "interrupted"; t["session"] = {"threadId": tid, "status": "interrupted", "activeTurnId": None}
                 return self.reply(200, {"sequence": SEQ[0]})
             return self.reply(400, {"error": "unknown command " + str(kind)})
-        if self.path == "/api/infinitus/release-thread":
-            tid = body.get("threadId")
-            before = len(HOLDS); HOLDS[:] = [h for h in HOLDS if h["threadId"] != tid]
-            return self.reply(200, {"released": len(HOLDS) < before} if len(HOLDS) < before else {"released": False, "reason": "not held"})
         self.reply(404, {"error": "no route " + self.path})
 
 HTTPServer(("127.0.0.1", PORT), H).serve_forever()
