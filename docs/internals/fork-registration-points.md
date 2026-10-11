@@ -55,9 +55,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
   routes (#710), so the typed HTTP clients carry them (the git-store team's
   `InfinitusTeamControlHttpApi` left with #1592); the `infinitus` group's
-  `GET /api/infinitus/thread-defaults` (#1315, the model `infinitusctl thread
-new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
-  alert), both on the operate scope.
+  `GET /api/infinitus/running-turns` (#829, the threads whose run is live,
+  read scope), `GET /api/infinitus/thread-defaults` (#1315, the model
+  `infinitusctl thread new` creates on, read scope) and
+  `POST /api/infinitus/alert` (#1375, the Mac's account alert, operate scope).
 - `packages/contracts/package.json` — the `./infinitus`,
   `./infinitusPairing`, `./captures`,
   `./infinitusAlert`, `./relayInfinitusAlert` (#1375) and
@@ -133,7 +134,8 @@ new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
   reactors, where the chain hands it `OrchestratorV2` and `ServerEnvironment`;
   it is provided `layerInfinitus` itself (memoized, one instance), its own
   control client, `ProcessRunner.layer` and `InfinitusAlertRelayLive`. `infinitusPairingHttpApiLayer` and `infinitusHttpApiLayer`
-  (provided `InfinitusAlertRelayLive` over the secret store and
+  (provided `InfinitusRunningTurnsLive` over `ProjectionStoreV2.layer`, #829,
+  and `InfinitusAlertRelayLive` over the secret store and
   `FetchHttpClient.layer`, #1375) in `layerMakeRoutes`. `CaptureStore.layer`
   (#433) in the state-dir file services' `Layer.mergeAll` beside
   `Keybindings.layer`. The tunnel log lines say `CONNECT_NAME`.
