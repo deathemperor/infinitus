@@ -1810,7 +1810,9 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
         yield* writeTextFile(cwd, "z-last.txt", "last file\n");
         yield* git(cwd, ["add", "."]);
         yield* git(cwd, ["commit", "-m", "large change"]);
-        yield* writeTextFile(cwd, "a-large.txt", largeContents.replaceAll("changed", "updated"));
+        // A different byte length: a same-size rewrite in the same second as the commit can read
+        // as unchanged through the index stat cache and drop out of the working-tree stats (#1517).
+        yield* writeTextFile(cwd, "a-large.txt", largeContents.replaceAll("changed", "edited"));
         yield* writeTextFile(cwd, "z-last.txt", "last file updated\n");
         yield* writeTextFile(cwd, "untracked.txt", largeContents);
 
