@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   nextPromptSnippetId,
   promptSnippetDraft,
+  promptSnippetEdit,
   promptSnippetPreview,
   promptSnippetSlashItems,
   promptSnippetsPatch,
@@ -80,6 +81,15 @@ describe("promptSnippets.logic (#270 G)", () => {
       "prompt:review",
     ]);
     expect(promptSnippetSlashItems([review, tests], "zzz")).toEqual([]);
+  });
+
+  it("replaces the typed `/query` with the body on pick", () => {
+    expect(promptSnippetEdit(review, { rangeStart: 4, rangeEnd: 8 }, "Hi, /rev there")).toEqual({
+      start: 4,
+      end: 8,
+      text: review.text,
+      expectedText: "/rev",
+    });
   });
 
   it("previews the first line, cut with an ellipsis", () => {

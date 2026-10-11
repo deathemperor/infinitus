@@ -530,14 +530,15 @@ background`). Riding along, all
   ignores the initialize frame's `clientInfo.name` and `title` next to
   upstream's `version`: the Codex replay fixtures were recorded under
   upstream's product name and the client sends `PRODUCT_NAME`.
-- `apps/web/src/components/chat/ChatComposer.tsx` — three fork mounts, each
-  additive at an upstream anchor: the Captures badge and popover with
-  `useCapturesShortcuts` (#433; `useActiveProjectRef` is the one route read
-  the project-scoped features share), the Prompts badge and popover plus the
-  project's snippets appended to the `/` menu and applied on select
-  (`prompt-snippet`, #270 G), and the image attachment's "Draw on" button
-  opening `ImageMarkupDialog`, whose save swaps the attachment for the marked
-  PNG under a new id (#875).
+- `apps/web/src/components/chat/ChatComposer.tsx` — one-line registrations
+  of `InfinitusComposerExtras.tsx` (#1565), each additive at an upstream
+  anchor: `useInfinitusComposerExtras(...)` before the command-menu
+  derivation, `...infinitus.slashItems(query)` (+ its memo dep) after the
+  slash commands, the `prompt-snippet` select branch (`promptSnippetEdit`
+  feeds `applyPromptReplacement`, #270 G), `<InfinitusComposerBadges>` after
+  the stash badge, `<InfinitusComposerMenus layer={ComposerCommandMenuLayer}>`
+  after the stash menu (#433, #270 G), and `<InfinitusImageMarkup>` after the
+  image tile's remove button (#875).
 - Upstream tests carrying the renderer origin or the userData directory
   (`DesktopAppIdentity`, `DesktopClerk`, `ElectronProtocol`, `DesktopWindow`,
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`,
