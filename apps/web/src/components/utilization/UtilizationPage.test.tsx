@@ -8,6 +8,7 @@ interface TestStatus {
   readonly environmentId: string;
   readonly label: string;
   readonly isPending: boolean;
+  readonly waiting: boolean;
   readonly snapshot: InfinitusSnapshot | null;
   readonly missing: string | null;
   readonly error: string | null;
@@ -89,12 +90,13 @@ function primaryStatus(): TestStatus {
     environmentId: "test-environment",
     label: "This Mac",
     isPending: false,
+    waiting: false,
     snapshot,
     missing: null,
     error: null,
     utilization: null,
   };
-  if (snapshot === null) return { ...base, isPending: true };
+  if (snapshot === null) return { ...base, isPending: true, waiting: true };
   if (!snapshot.available) return { ...base, missing: "Infinitus is not running on this machine." };
   if (!snapshot.commands.some((command) => command.name === "utilization")) {
     return {
@@ -102,7 +104,7 @@ function primaryStatus(): TestStatus {
       missing: "History and the run rate need a newer Infinitus app (the utilization verb).",
     };
   }
-  if (testState.utilization === null) return { ...base, isPending: true };
+  if (testState.utilization === null) return { ...base, isPending: true, waiting: true };
   const utilization = decodeUtilization(testState.utilization.result);
   return utilization === null
     ? { ...base, error: "The utilization reply could not be read." }
@@ -326,6 +328,25 @@ describe("UtilizationPage", () => {
     expect(markup).toContain("0.50");
     expect(markup).toContain(">15<");
     expect(markup).toContain("Live: 1.5k output tokens/min");
+  });
+
+  it("names a machine that is away on its row, and does not wait on it", () => {
+    testState.statuses = [
+      primaryStatus(),
+      {
+        ...primaryStatus(),
+        environmentId: "laptop",
+        label: "Laptop",
+        utilization: null,
+        missing: "Not connected.",
+      },
+    ];
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain(">Laptop<");
+    expect(markup).toContain("Not connected.");
+    expect(markup).toContain('aria-busy="false"');
+    expect(markup).not.toContain('aria-busy="true"');
+    expect(markup).toContain("6.3k");
   });
 
   it("draws one machine without a Machines section", () => {

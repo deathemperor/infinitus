@@ -20,6 +20,8 @@ export interface EnvironmentUtilizationStatus {
   readonly label: string;
   /** Nothing has answered yet: the snapshot, or the reply it unlocked. */
   readonly isPending: boolean;
+  /** A reply is in flight, first or re-read; what the refresh icon spins on. */
+  readonly waiting: boolean;
   /** The machine's snapshot, for the aliases its fleets show. */
   readonly snapshot: InfinitusSnapshot | null;
   /** Why the machine cannot be asked: the app is not running, or its build
@@ -56,16 +58,25 @@ const utilizationByDaysAtom = Atom.family((days: string) =>
         environmentId,
         label,
         isPending: false,
+        waiting: false,
         snapshot: null,
         missing: null,
         error: null,
         utilization: null,
       };
-      const snapshot = Option.getOrNull(
-        AsyncResult.value(get(infinitusEnvironment.snapshot({ environmentId, input: {} }))),
-      );
+      // A machine that is away never answers: say so rather than read forever.
+      if (presentation.connection.phase !== "connected") {
+        statuses.push({ ...base, missing: "Not connected." });
+        continue;
+      }
+      const snapshotResult = get(infinitusEnvironment.snapshot({ environmentId, input: {} }));
+      const snapshot = Option.getOrNull(AsyncResult.value(snapshotResult));
       if (snapshot === null) {
-        statuses.push({ ...base, isPending: true });
+        statuses.push(
+          snapshotResult._tag === "Failure"
+            ? { ...base, error: formatEnvironmentQueryError(snapshotResult.cause) }
+            : { ...base, isPending: true, waiting: snapshotResult.waiting },
+        );
         continue;
       }
       if (!snapshot.available) {
@@ -85,19 +96,20 @@ const utilizationByDaysAtom = Atom.family((days: string) =>
         infinitusEnvironment.utilization({ environmentId, input: utilizationInput(days) }),
       );
       const reply = Option.getOrNull(AsyncResult.value(result));
+      const asked = { ...base, snapshot, waiting: result.waiting };
       if (result._tag === "Failure") {
-        statuses.push({ ...base, snapshot, error: formatEnvironmentQueryError(result.cause) });
+        statuses.push({ ...asked, error: formatEnvironmentQueryError(result.cause) });
         continue;
       }
       if (reply === null) {
-        statuses.push({ ...base, snapshot, isPending: true });
+        statuses.push({ ...asked, isPending: true });
         continue;
       }
       const utilization = decodeUtilization(reply.result);
       statuses.push(
         utilization === null
-          ? { ...base, snapshot, error: UTILIZATION_UNREADABLE }
-          : { ...base, snapshot, utilization },
+          ? { ...asked, error: UTILIZATION_UNREADABLE }
+          : { ...asked, utilization },
       );
     }
     return statuses;

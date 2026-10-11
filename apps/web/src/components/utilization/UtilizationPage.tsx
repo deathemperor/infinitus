@@ -100,6 +100,7 @@ export function UtilizationPage() {
   // Any machine that can be asked unlocks the range; one away is left out.
   const hasHistoryVerb = statuses.some((status) => status.missing === null);
   const historyPending = statuses.some((status) => status.isPending);
+  const historyWaiting = statuses.some((status) => status.waiting);
   const utilization = useMemo(
     () =>
       mergeUtilization(
@@ -140,12 +141,12 @@ export function UtilizationPage() {
           refreshUtilizations();
         }}
         aria-label="Refresh utilization"
-        aria-busy={snapshotQuery.isPending || historyPending}
+        aria-busy={snapshotQuery.isPending || historyWaiting}
         disabled={!hasVerb}
         size="icon-sm"
         variant="ghost"
       >
-        <RefreshIcon className="size-3.5" refreshing={snapshotQuery.isPending || historyPending} />
+        <RefreshIcon className="size-3.5" refreshing={snapshotQuery.isPending || historyWaiting} />
       </Button>
     </div>
   );
