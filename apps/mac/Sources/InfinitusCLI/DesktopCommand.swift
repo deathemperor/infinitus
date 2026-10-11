@@ -20,7 +20,6 @@ func desktopUsage() -> String {
            \(programName) thread send <id> <message|-> [--steer] [--wait] [--wait-idle]
            \(programName) thread new --project <id|name> <prompt|-> [--model <instanceId>/<model>|<model>] [--worktree <branch>] [--base <branch>] [--wait]
            \(programName) thread interrupt <id>
-           \(programName) thread release <id>
            \(programName) desktop status | credential
 
     Infinitus desktop's projects and threads, over the credential it hands the Mac app.
@@ -267,11 +266,6 @@ private struct DesktopVerbs {
             let sequence = try api.dispatch(DesktopRows.turnInterrupt(threadId: id, turnId: turn))
             desktopEmit(.object(["ok": .bool(true), "sequence": .number(Double(sequence)), "turnId": turn.map(JSONValue.string) ?? .null]))
             return 0
-
-        case "release":
-            let release = try api.releaseThread(id)
-            desktopEmit(.object(["released": .bool(release.released), "reason": release.reason.map(JSONValue.string) ?? .null]))
-            return release.released ? 0 : 1
 
         default:
             throw Refused(message: desktopUsage(), code: 2)

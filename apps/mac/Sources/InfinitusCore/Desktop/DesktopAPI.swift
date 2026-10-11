@@ -135,10 +135,6 @@ public struct DesktopAPI {
         public var summary: String?
         public var kind: String?
     }
-    public struct Release: Decodable, Equatable {
-        public var released: Bool
-        public var reason: String?
-    }
 
     // MARK: reads
 
@@ -185,10 +181,6 @@ public struct DesktopAPI {
         let reply = try decode(post("/api/orchestration/dispatch", body: command)) as [String: JSONValue]
         if case .number(let n)? = reply["sequence"] { return Int(n) }
         return 0
-    }
-    /// `POST /api/infinitus/release-thread`: Run now for a held thread (#616).
-    public func releaseThread(_ id: String) throws -> Release {
-        try decode(post("/api/infinitus/release-thread", body: .object(["threadId": .string(id)])))
     }
     /// `GET /api/infinitus/running-turns` (#829): the provider turns running
     /// now — the Mac's busy-session count since the thread card left (#1375).

@@ -112,14 +112,12 @@ final class DesktopAPITests: XCTestCase {
 
     func testDispatchPostsTheCommandAsJSONAndReadsTheSequence() throws {
         let log = Log()
-        let a = api([(200, "{\"sequence\":42}"), (200, "{\"released\":true}")], log: log)
+        let a = api([(200, "{\"sequence\":42}")], log: log)
         XCTAssertEqual(try a.dispatch(.object(["type": .string("thread.turn.interrupt"), "threadId": .string("t1")])), 42)
         XCTAssertEqual(log.calls[0].method, "POST")
         XCTAssertEqual(log.calls[0].url, "http://127.0.0.1:3773/api/orchestration/dispatch")
         XCTAssertEqual(log.calls[0].headers["Content-Type"], "application/json")
         XCTAssertEqual(log.calls[0].body, "{\"threadId\":\"t1\",\"type\":\"thread.turn.interrupt\"}")
-        XCTAssertEqual(try a.releaseThread("t2"), DesktopAPI.Release(released: true, reason: nil))
-        XCTAssertEqual(log.calls[1].body, "{\"threadId\":\"t2\"}")
     }
 
     func testRunningTurnsAndAlertRideTheInfinitusRoutes() throws {
