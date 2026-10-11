@@ -22,7 +22,6 @@ type LiveActivityEnvironment = Parameters<LiveActivityComponent<AgentActivityPro
 export type AgentActivityPhase =
   | "starting"
   | "running"
-  | "monitoring"
   | "waiting_for_approval"
   | "waiting_for_input"
   | "completed"
@@ -93,7 +92,6 @@ export function AgentActivity(
         return secondaryForeground;
       case "starting":
       case "running":
-      case "monitoring":
       default:
         return isLightScheme ? "#0284c7" : "#7dd3fc"; // sky-600 / sky-300
     }
@@ -104,7 +102,7 @@ export function AgentActivity(
   const phasePriority = (phase: AgentActivityPhase): number => {
     if (phase === "waiting_for_approval" || phase === "waiting_for_input") return 0;
     if (phase === "failed") return 1;
-    if (phase === "running" || phase === "starting" || phase === "monitoring") return 2;
+    if (phase === "running" || phase === "starting") return 2;
     return 3;
   };
   // Past the stale date the system stops vouching for the content, so every
