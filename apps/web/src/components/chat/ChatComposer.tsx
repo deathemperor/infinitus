@@ -10,8 +10,6 @@ import { filterComposerPullRequestMatches } from "@infinitus/shared/composerPull
 import { importPastedComposerText, readPastedComposerContext } from "../composerInlineTokenPaste";
 import { elementContextToPreviewAnnotation } from "../../lib/elementContext";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
-import { ImageMarkupDialog } from "./ImageMarkupDialog";
-import { markedFileName } from "./imageMarkup.logic";
 import {
   questionAttachmentDraftId,
   countQuestionAttachments,
@@ -131,17 +129,13 @@ import {
 } from "../../promptStashStore";
 import { ComposerStashBadge } from "./ComposerStashBadge";
 import { ComposerStashMenu } from "./ComposerStashMenu";
-import { ComposerCapturesBadge } from "../captures/ComposerCapturesBadge";
-import { ComposerCapturesMenu } from "../captures/ComposerCapturesMenu";
-import { useCapturesUiStore } from "../captures/capturesUiStore";
-import { openCaptureCount } from "../captures/captures.logic";
-import { useActiveProjectRef, useCapturesShortcuts } from "../captures/useCaptures";
-import { ComposerPromptsBadge } from "../prompts/ComposerPromptsBadge";
-import { ComposerPromptsMenu } from "../prompts/ComposerPromptsMenu";
-import { usePromptsUiStore } from "../prompts/promptsUiStore";
-import { useProjectPromptSnippets } from "../prompts/useProjectPromptSnippets";
-import { promptSnippetSlashItems } from "../prompts/promptSnippets.logic";
-import { captures as capturesAtoms } from "../../state/captures";
+import {
+  InfinitusComposerBadges,
+  InfinitusComposerMenus,
+  InfinitusImageMarkup,
+  useInfinitusComposerExtras,
+} from "./InfinitusComposerExtras";
+import { promptSnippetEdit } from "../prompts/promptSnippets.logic";
 import { useComposerMenuState } from "./useComposerMenuState";
 import { useComposerTriggerState } from "./useComposerTriggerState";
 import { useComposerFocusState } from "./useComposerFocusState";
@@ -1100,7 +1094,6 @@ import {
   PencilRulerIcon,
   PlayIcon,
   ShieldIcon,
-  PenLineIcon,
   XIcon,
 } from "lucide-react";
 import { proposedPlanTitle } from "@infinitus/shared/proposedPlanText";
@@ -2563,12 +2556,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       prompt,
     ],
   );
-  // Prompts (#270 G, fork): the routed project's saved snippets, for the
-  // Prompts popover and the `/` menu below.
-  // One route read for the fork's project-scoped features; the hook is
-  // identity-stable so the composer can still bail out of no-op updates (#821).
-  const activeProjectRef = useActiveProjectRef();
-  const promptSnippets = useProjectPromptSnippets(activeProjectRef);
+  const infinitus = useInfinitusComposerExtras({
+    keybindings,
+    terminalOpen,
+    modelPickerOpen: isComposerModelPickerOpen,
+  });
   // ------------------------------------------------------------------
   // Derived: composer trigger / menu
   // ------------------------------------------------------------------
@@ -2752,8 +2744,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       );
       return [
         ...searchSlashCommandItems(slashCommandItems, query),
-        // Fork (#270 G): the project's saved prompts, by name, after the commands.
-        ...promptSnippetSlashItems(promptSnippets.snippets, composerTrigger.query),
+        ...infinitus.slashItems(composerTrigger.query),
       ];
     }
     if (composerTrigger.kind === "skill") {
@@ -2829,7 +2820,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     environmentThreadShells,
     exactPullRequestLookup.data,
     planModeUiEnabled,
-    promptSnippets.snippets,
+    infinitus.slashItems,
     pullRequestLookup.data,
     pullRequestProjectId,
     pullRequestRepository,
@@ -4077,16 +4068,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         return;
       }
       if (item.type === "prompt-snippet") {
-        // Fork (#270 G): the body replaces the `/query` where it was typed.
-        const applied = applyPromptReplacement(
-          trigger.rangeStart,
-          trigger.rangeEnd,
-          item.snippet.text,
-          { expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd) },
-        );
-        if (applied) {
+        const edit = promptSnippetEdit(item.snippet, trigger, snapshot.value);
+        if (applyPromptReplacement(edit.start, edit.end, edit.text, edit))
           setComposerHighlightedItemId(null);
-        }
         return;
       }
       if (item.type === "skill") {
@@ -5719,33 +5703,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setIsTasksDrawerOpen(false);
   }, [activeThreadId]);
 
-  // Captures (#433, fork): the popover's open state, the project's open
-  // count for the badge, and the two shortcuts, all fork-owned.
-  const capturesProject = activeProjectRef;
-  const isCapturesMenuOpen = useCapturesUiStore((store) => store.open);
-  const capturesFocusInputKey = useCapturesUiStore((store) => store.focusInputKey);
-  const toggleCapturesMenu = useCapturesUiStore((store) => store.toggle);
-  const closeCapturesMenu = useCapturesUiStore((store) => store.close);
-  const capturesQuery = useEnvironmentQuery(
-    capturesProject === null
-      ? null
-      : capturesAtoms.list({
-          environmentId: capturesProject.environmentId,
-          input: { projectId: capturesProject.projectId },
-        }),
-  );
-  useCapturesShortcuts({
-    keybindings,
-    terminalOpen,
-    modelPickerOpen: isComposerModelPickerOpen,
-    project: activeProjectRef,
-  });
-  // Prompts (#270 G, fork): the popover's open state; its list is read above
-  // the command-menu derivation so the `/` menu can offer the snippets too.
-  const isPromptsMenuOpen = usePromptsUiStore((store) => store.open);
-  const togglePromptsMenu = usePromptsUiStore((store) => store.toggle);
-  const closePromptsMenu = usePromptsUiStore((store) => store.close);
-
   // Close the stash menu whenever the trigger-driven command menu opens so
   // the two popovers never stack in the same layer, and when the user
   // resumes typing (the menu is a transient picker, not a panel).
@@ -6070,24 +6027,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return true;
   };
 
-  // Fork (#875): the image being drawn on, if any. Saving swaps the
-  // attachment for the edited PNG under a new id, so the upload queue (keyed
-  // by id) uploads the copy and the original is released.
-  const [markupImageId, setMarkupImageId] = useState<string | null>(null);
-  const replaceComposerImageWithMarkup = (image: ComposerImageAttachment, blob: Blob) => {
-    const file = new File([blob], markedFileName(image.name), { type: "image/png" });
-    addComposerImage({
-      type: "image",
-      id: randomUUID(),
-      name: file.name,
-      mimeType: file.type,
-      sizeBytes: file.size,
-      previewUrl: URL.createObjectURL(file),
-      file,
-    });
-    removeComposerImageFromDraft(image.id);
-    setMarkupImageId(null);
-  };
   const removeComposerImage = (imageId: string) => {
     const image = composerImagesRef.current.find((candidate) => candidate.id === imageId);
     const referenced = collectInlineContextIds(promptRef.current).includes(
@@ -6971,20 +6910,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             onToggleMenu={toggleStashMenu}
           />
         ) : null}
-        {!isComposerApprovalState && capturesProject !== null ? (
-          <ComposerCapturesBadge
-            openCount={openCaptureCount(capturesQuery.data ?? [])}
-            menuOpen={isCapturesMenuOpen}
-            onToggleMenu={toggleCapturesMenu}
-          />
-        ) : null}
-        {!isComposerApprovalState && capturesProject !== null ? (
-          <ComposerPromptsBadge
-            count={promptSnippets.snippets.length}
-            menuOpen={isPromptsMenuOpen}
-            onToggleMenu={togglePromptsMenu}
-          />
-        ) : null}
+        <InfinitusComposerBadges extras={infinitus} hidden={isComposerApprovalState} />
       </ComposerBanner.Dock>
       <div className="relative">
         <ComposerSurface.Main
@@ -7096,38 +7022,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 </ComposerCommandMenuLayer>
               )}
 
-              {isCapturesMenuOpen &&
-                !isPromptsMenuOpen &&
-                !isStashMenuOpen &&
-                !composerMenuOpen &&
-                !isComposerApprovalState && (
-                  <ComposerCommandMenuLayer anchor={composerMenuAnchor}>
-                    <ComposerCapturesMenu
-                      project={capturesProject}
-                      focusInputKey={capturesFocusInputKey}
-                      onSend={(text) =>
-                        insertComposerTextAtEnd(text, { ensureLeadingBoundary: true })
-                      }
-                      onClose={closeCapturesMenu}
-                    />
-                  </ComposerCommandMenuLayer>
-                )}
-
-              {isPromptsMenuOpen &&
-                !isStashMenuOpen &&
-                !composerMenuOpen &&
-                !isComposerApprovalState && (
-                  <ComposerCommandMenuLayer anchor={composerMenuAnchor}>
-                    <ComposerPromptsMenu
-                      snippets={promptSnippets.snippets}
-                      projectKey={promptSnippets.projectKey}
-                      onInsert={(text) =>
-                        insertComposerTextAtEnd(text, { ensureLeadingBoundary: true })
-                      }
-                      onClose={closePromptsMenu}
-                    />
-                  </ComposerCommandMenuLayer>
-                )}
+              <InfinitusComposerMenus
+                extras={infinitus}
+                layer={ComposerCommandMenuLayer}
+                anchor={composerMenuAnchor}
+                hidden={isStashMenuOpen || composerMenuOpen || isComposerApprovalState}
+                insertText={insertComposerTextAtEnd}
+              />
 
               <div role="status" aria-atomic="true" className="sr-only">
                 {composerSuggestionsVisible && composerMenuItems.length === 0
@@ -7342,25 +7243,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                 <XIcon />
                               </Button>
                             </span>
-                            <span className="absolute right-7 top-1 flex opacity-0 transition-opacity pointer-coarse:opacity-100 focus-within:opacity-100 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100">
-                              <Button
-                                variant="media-close"
-                                size="icon-xs"
-                                onClick={() => setMarkupImageId(image.id)}
-                                aria-label={`Draw on ${image.name}`}
-                              >
-                                <PenLineIcon />
-                              </Button>
-                            </span>
-                            {markupImageId === image.id ? (
-                              <ImageMarkupDialog
-                                open
-                                imageName={image.name}
-                                previewUrl={image.previewUrl}
-                                onCancel={() => setMarkupImageId(null)}
-                                onSave={(blob) => replaceComposerImageWithMarkup(image, blob)}
-                              />
-                            ) : null}
+                            <InfinitusImageMarkup
+                              image={image}
+                              addImage={addComposerImage}
+                              removeImage={removeComposerImageFromDraft}
+                            />
                           </SnapShotAttachmentFrame>
                         );
                       })
