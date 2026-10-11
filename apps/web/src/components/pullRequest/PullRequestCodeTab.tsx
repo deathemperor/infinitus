@@ -33,7 +33,7 @@ import { useClientSettings, useUpdateClientSettings } from "~/hooks/useSettings"
 import { useTheme } from "~/hooks/useTheme";
 import { areAllDiffFilesCollapsed } from "~/lib/diffCollapse";
 import { pullRequestFindingKey, type PullRequestFinding } from "./pullRequestDetail.logic";
-import { canEditPullRequestComment } from "./pullRequestEditing.logic";
+import { canEditPullRequestComment, canResolvePullRequestThread } from "./pullRequestEditing.logic";
 import { orderDiffFiles } from "./pullRequestFileOrder.logic";
 import {
   buildFileDiffRenderKey,
@@ -196,6 +196,7 @@ function getReviewPositionAnchor(position: PullRequestReviewPosition): {
  * drafted rather than being posted as it is typed.
  */
 function PullRequestCodeTab({
+  scrollerRef,
   environmentId,
   reference,
   detail,
@@ -208,6 +209,7 @@ function PullRequestCodeTab({
   onRefresh,
   refreshToken = 0,
 }: {
+  scrollerRef: (node: HTMLDivElement | null) => void;
   environmentId: EnvironmentId;
   reference: PullRequestRef;
   detail: PullRequestDetailView;
@@ -934,7 +936,7 @@ function PullRequestCodeTab({
         thread={thread}
         workspaceRoot={detail.workspaceRoot}
         canReply={review.reply}
-        canResolve={review.resolve}
+        canResolve={review.resolve && canResolvePullRequestThread(detail, thread)}
         canReact={detail.capabilities.reactions === true}
         environmentId={environmentId}
         reference={reference}
@@ -966,7 +968,11 @@ function PullRequestCodeTab({
         }
         // A conversation on a line is made of review comments, whatever the host filed them as.
         canEditComment={(comment) =>
-          canEditPullRequestComment(detail, { author: comment.author, kind: "review-comment" })
+          canEditPullRequestComment(detail, {
+            author: comment.author,
+            kind: "review-comment",
+            canEdit: comment.canEdit,
+          })
         }
         onEditComment={(commentId, body) =>
           runThreadCommand("The comment could not be saved", () =>
@@ -1390,7 +1396,9 @@ function PullRequestCodeTab({
   const withToolbar = (body: ReactNode) => (
     <div className="flex h-full min-h-0 flex-col">
       {toolbar}
-      <div className="min-h-0 flex-1 overflow-auto">{body}</div>
+      <div ref={scrollerRef} className="min-h-0 flex-1 overflow-auto">
+        {body}
+      </div>
     </div>
   );
 
@@ -1570,6 +1578,7 @@ function PullRequestCodeTab({
             // interaction, but its native host outline clips and competes with the focus
             // indicators on its actual controls.
             className="@container h-full overflow-auto [scrollbar-gutter:stable]"
+            containerRef={scrollerRef}
             viewerRef={setViewer}
             items={items}
             selectedLines={selectedLines}

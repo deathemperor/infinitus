@@ -10,7 +10,10 @@ import * as Option from "effect/Option";
 
 import * as ServerConfig from "../config.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
-import { detailFromCause, firstNonEmptyLine } from "./SourceControlProviderDiscovery.ts";
+import {
+  detailFromCause,
+  firstNonEmptyLine,
+} from "@infinitus/source-control-core/server/discovery";
 import * as SourceControlProviderRegistry from "./SourceControlProviderRegistry.ts";
 
 interface DiscoveryProbe {

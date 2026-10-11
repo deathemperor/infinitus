@@ -1,3 +1,4 @@
+import { SourceControlProviderKind } from "@infinitus/contracts";
 import * as Arr from "effect/Array";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
@@ -35,7 +36,6 @@ import {
   ModelSelection,
   type ProjectId,
   SourceControlProviderError,
-  type SourceControlProviderKind,
   type SourceControlWritingStyleSettings,
   type ThreadId,
   type ThreadPullRequestKey,
@@ -55,6 +55,7 @@ import {
   sanitizeFeatureBranchName,
 } from "@infinitus/shared/git";
 import {
+  canonicalRepositoryKey,
   getChangeRequestTerminologyForKind,
   isSshRemoteUrl,
   type ChangeRequestTerminology,
@@ -81,8 +82,8 @@ import { detachStackFrame } from "./detachStackFrame.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import type { GitManagerServiceError } from "@infinitus/contracts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as SourceControlProvider from "@infinitus/source-control-core/server/SourceControlProvider";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
-import { detectPrTemplate } from "../sourceControl/PrTemplateDetection.ts";
 import type { ChangeRequest } from "@infinitus/contracts";
 
 export interface GitActionProgressReporter {
@@ -314,27 +315,20 @@ function resolvePullRequestWorktreeLocalBranchName(
   return `t3code/pr-${pullRequest.number}/${suffix}`;
 }
 
+/** The repository's `owner/name` from a remote URL, as `provider` reads its remote paths. */
 export function parseRepositoryNameWithOwnerFromRemoteUrl(
   url: string | null,
-  providerKind?: ChangeRequest["provider"],
+  provider?: Pick<
+    SourceControlProvider.SourceControlProvider["Service"],
+    "repositoryNameFromRemoteUrl"
+  >,
 ): string | null {
   const trimmed = url?.trim() ?? "";
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  const match =
-    /^(?:[^@/\s]+@[^:/\s]+:|(?:ssh|https?|git):\/\/[^/]+\/)((?:[^/\s]+\/)+[^/\s]+?)(?:\.git)?\/?$/iu.exec(
-      trimmed,
-    );
-  const repositoryNameWithOwner = match?.[1]?.trim() ?? "";
-  // Forgejo HTTP paths can include an installation mount; its API always names owner/repo.
-  if (providerKind === "forgejo" && /^https?:\/\//iu.test(trimmed)) {
-    return repositoryNameWithOwner.length > 0
-      ? repositoryNameWithOwner.split("/").slice(-2).join("/")
-      : null;
-  }
-  return repositoryNameWithOwner.length > 0 ? repositoryNameWithOwner : null;
+  if (trimmed.length === 0) return null;
+  return (
+    provider?.repositoryNameFromRemoteUrl?.(trimmed) ??
+    SourceControlProvider.repositoryPathFromRemoteUrl(trimmed)
+  );
 }
 
 function parseRepositoryOwnerLogin(nameWithOwner: string | null): string | null {
@@ -625,24 +619,18 @@ function parseCustomCommitMessage(raw: string): { subject: string; body: string 
   };
 }
 
-// Without the owner selector, a bare branch name also lists same-named
-// branches on other forks (`main`, `patch-1`), so GitHub probes ask for a full
-// page and let matchesBranchHeadContext pick the right head. gh fetches up to
-// 100 in one request, and GitHub prices a first:100 connection like first:1.
-const GITHUB_HEAD_BRANCH_PROBE_LIMIT = 100;
-
-// `gh pr list --head` filters on the head ref name alone and accepts anything, so an
-// `owner:branch` or `remote:branch` selector silently lists zero pull requests
-// while spending a GraphQL call. Git branch names cannot contain ":", and the
-// bare head branch is always among the selectors, so GitHub probes skip them and
-// leave the owner check to matchesBranchHeadContext.
-function probeableHeadSelectors(
-  providerKind: SourceControlProviderKind,
+/** The selectors and page size `provider` asks about when looking up a branch's change requests. */
+function headBranchProbe(
+  provider: SourceControlProvider.SourceControlProvider["Service"],
   headSelectors: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-  return providerKind === "github"
-    ? headSelectors.filter((selector) => !selector.includes(":"))
-    : headSelectors;
+  state: "open" | "all",
+) {
+  return (
+    provider.headBranchProbe?.({ headSelectors, state }) ?? {
+      headSelectors,
+      limit: state === "open" ? 1 : 20,
+    }
+  );
 }
 
 function appendUnique(values: string[], next: string | null | undefined): void {
@@ -778,7 +766,10 @@ export const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const root = yield* fileSystem.realPath(cwd);
       const instructionPath = yield* fileSystem.realPath(path.join(root, fileName));
-      if (!instructionPath.startsWith(`${root}${path.sep}`)) {
+      // A drive root such as `D:\` already ends with a separator, so compare
+      // with path.relative instead of a `${root}${sep}` prefix.
+      const relative = path.relative(root, instructionPath);
+      if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
         return "";
       }
       const info = yield* fileSystem.stat(instructionPath);
@@ -972,11 +963,45 @@ export const make = Effect.gen(function* () {
       const repositoryNameWithOwner = resolveHeadRepositoryNameWithOwner(pullRequest) ?? "";
 
       if (repositoryNameWithOwner.length === 0) {
-        yield* gitCore.fetchPullRequestBranch({
-          cwd,
-          prNumber: pullRequest.number,
-          branch: localBranch,
-        });
+        yield* gitCore
+          .fetchPullRequestBranch({
+            cwd,
+            prNumber: pullRequest.number,
+            branch: localBranch,
+          })
+          .pipe(
+            // Azure DevOps, GitLab and Bitbucket publish no `refs/pull/<n>/head`. A head in the
+            // same repository is a branch on the primary remote, so it is fetched by name instead,
+            // but only when that remote is the pull request's own repository: Azure finds a pull
+            // request by number anywhere in the organization. Only while it is open, too: the
+            // branch of a closed one may have moved on past the head it was closed with.
+            Effect.catch((cause) =>
+              pullRequest.isCrossRepository === true || pullRequest.state !== "open"
+                ? Effect.fail(cause)
+                : Effect.gen(function* () {
+                    const remoteName = yield* gitCore.resolvePrimaryRemoteName(cwd);
+                    const remoteUrl = yield* gitCore.readConfigValue(
+                      cwd,
+                      `remote.${remoteName}.url`,
+                    );
+                    const pullRequestKey = pullRequestRepositoryKey(pullRequest.url);
+                    if (
+                      remoteUrl === null ||
+                      pullRequestKey === null ||
+                      canonicalRepositoryKey(pullRequestKey) !==
+                        canonicalRepositoryKey(normalizeGitRemoteUrl(remoteUrl))
+                    ) {
+                      return yield* cause;
+                    }
+                    yield* gitCore.fetchRemoteBranch({
+                      cwd,
+                      remoteName,
+                      remoteBranch: pullRequest.headBranch,
+                      localBranch,
+                    });
+                  }),
+            ),
+          );
         return;
       }
 
@@ -1312,8 +1337,21 @@ export const make = Effect.gen(function* () {
         ),
       ),
       Effect.map(({ pr }) => pr),
-      Effect.catch((error) =>
-        Effect.logWarning("PR lookup failed; keeping last known PR state.").pipe(
+      Effect.catch((error) => {
+        // No prior PR means there is no badge to preserve or remote to verify.
+        const fallback = lastKnownPrByBranchKey.get(branchKey)?.pr
+          ? resolveLookupHeadContext(cwd, details).pipe(
+              Effect.map(({ headContext }) =>
+                resolveLastKnownPr(branchKey, {
+                  upstreamRef: details.upstreamRef,
+                  headBranch: headContext.headBranch,
+                  remoteName: headContext.remoteName,
+                  headRemoteUrlKey: headContext.headRemoteUrlKey,
+                }),
+              ),
+            )
+          : Effect.succeed(null);
+        return Effect.logWarning("PR lookup failed.").pipe(
           Effect.annotateLogs({
             operation: "lookupStatusPr",
             branch: details.branch,
@@ -1330,17 +1368,9 @@ export const make = Effect.gen(function* () {
                 }
               : {}),
           }),
-          Effect.andThen(resolveLookupHeadContext(cwd, details)),
-          Effect.map(({ headContext }) =>
-            resolveLastKnownPr(branchKey, {
-              upstreamRef: details.upstreamRef,
-              headBranch: headContext.headBranch,
-              remoteName: headContext.remoteName,
-              headRemoteUrlKey: headContext.headRemoteUrlKey,
-            }),
-          ),
-        ),
-      ),
+          Effect.andThen(fallback),
+        );
+      }),
     );
   });
   const readRemoteStatus = Effect.fn("readRemoteStatus")(function* (
@@ -1430,15 +1460,14 @@ export const make = Effect.gen(function* () {
       /^https?:\/\//iu.test(remoteUrl) &&
       (repositoryNameWithOwner?.split("/").length ?? 0) > 2
     ) {
-      const detected = detectSourceControlProviderFromGitRemoteUrl(remoteUrl);
-      const kind =
-        detected?.kind === "unknown"
-          ? yield* sourceControlProvider(cwd).pipe(
-              Effect.map((provider) => provider.kind),
-              Effect.orElseSucceed(() => undefined),
-            )
-          : detected?.kind;
-      repositoryNameWithOwner = parseRepositoryNameWithOwnerFromRemoteUrl(remoteUrl, kind);
+      const kind = detectSourceControlProviderFromGitRemoteUrl(remoteUrl)?.kind;
+      const provider =
+        kind === undefined
+          ? undefined
+          : yield* (
+              kind === "unknown" ? sourceControlProvider(cwd) : sourceControlProviders.get(kind)
+            ).pipe(Effect.orElseSucceed(() => undefined));
+      repositoryNameWithOwner = parseRepositoryNameWithOwnerFromRemoteUrl(remoteUrl, provider);
     }
     return {
       remoteUrlKey: remoteUrl ? normalizeGitRemoteUrl(remoteUrl) : null,
@@ -1591,7 +1620,94 @@ export const make = Effect.gen(function* () {
       }
       if (matching.includes("origin")) return "origin";
       return matching[0] ?? null;
-    }).pipe(Effect.orElseSucceed(() => null));
+    });
+  });
+
+  // A no-upstream branch may have local commits after its last push. Prefer a
+  // unique exact ref, then a unique remote tip in its history; never break a
+  // fork tie by remote order.
+  const findPublishedBranchRemote = Effect.fn("findPublishedBranchRemote")(function* (
+    cwd: string,
+    branch: string,
+  ) {
+    const localRef = `refs/heads/${branch}`;
+    const remoteNames = (yield* gitCore.execute({
+      operation: "GitManager.findPublishedBranchRemote.remotes",
+      cwd,
+      args: ["remote"],
+      timeoutMs: 5_000,
+    })).stdout
+      .split("\n")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    if (remoteNames.length === 0) return null;
+
+    const refs = yield* gitCore.execute({
+      operation: "GitManager.findPublishedBranchRemote",
+      cwd,
+      args: [
+        "for-each-ref",
+        "--format=%(refname)%00%(objectname)",
+        localRef,
+        ...remoteNames.map((name) => `refs/remotes/${name}/${branch}`),
+      ],
+      timeoutMs: 5_000,
+    });
+    const oidByRef = new Map(
+      refs.stdout
+        .split("\n")
+        .map((line) => line.trim().split("\u0000"))
+        .filter((entry): entry is [string, string] => entry.length === 2),
+    );
+    const localOid = oidByRef.get(localRef);
+    if (!localOid) return null;
+
+    const remoteRefs = remoteNames.flatMap((name) => {
+      const oid = oidByRef.get(`refs/remotes/${name}/${branch}`);
+      return oid ? [{ name, oid }] : [];
+    });
+    const exactRemotes = remoteRefs.filter((remote) => remote.oid === localOid);
+    if (exactRemotes.length > 1) return null;
+    let remoteName = exactRemotes[0]?.name;
+    if (remoteName === undefined) {
+      const ancestorRemotes = yield* Effect.forEach(
+        remoteRefs,
+        (remote) =>
+          gitCore
+            .execute({
+              operation: "GitManager.findPublishedBranchRemote.ancestor",
+              cwd,
+              args: ["merge-base", "--is-ancestor", remote.oid, localOid],
+              allowNonZeroExit: true,
+              timeoutMs: 5_000,
+            })
+            .pipe(
+              Effect.flatMap((result) => {
+                // `merge-base --is-ancestor` reports 0 for ancestor and 1
+                // for not-ancestor; any other non-zero exit is a failed
+                // probe, not a negative result. A failed probe rejects the
+                // whole inference instead of letting a surviving probe win
+                // by default and attach the wrong fork's PR.
+                if (result.exitCode === 0) return Effect.succeed(remote.name);
+                if (result.exitCode === 1) return Effect.succeed(null);
+                return new GitCommandError({
+                  operation: "GitManager.findPublishedBranchRemote.ancestor",
+                  command: "git merge-base --is-ancestor",
+                  cwd,
+                  exitCode: result.exitCode,
+                  detail: "Ancestry probe failed; rejecting ancestry inference.",
+                });
+              }),
+            ),
+        { concurrency: "unbounded" },
+      );
+      const matches = ancestorRemotes.filter((name) => name !== null);
+      if (matches.length !== 1) return null;
+      remoteName = matches[0];
+    }
+    if (remoteName === undefined) return null;
+    const remoteUrl = yield* readConfigValueNullable(cwd, `remote.${remoteName}.url`);
+    return remoteUrl === null ? null : remoteName;
   });
 
   // `git worktree add -b feature origin/main` makes the new local branch track
@@ -1616,6 +1732,17 @@ export const make = Effect.gen(function* () {
     },
   ) {
     const headContext = yield* resolveBranchHeadContext(cwd, details);
+    if (details.upstreamRef === null) {
+      const remoteName = yield* findPublishedBranchRemote(cwd, details.branch).pipe(
+        Effect.orElseSucceed(() => null),
+      );
+      if (remoteName !== null && remoteName !== headContext.remoteName) {
+        return {
+          headContext: yield* resolveBranchHeadContext(cwd, { ...details, remoteName }),
+          lookup: true,
+        };
+      }
+    }
     const upstreamHeadIsDefault =
       headContext.headBranch === details.defaultBranch ||
       (details.defaultBranch === null &&
@@ -1627,7 +1754,11 @@ export const make = Effect.gen(function* () {
     ) {
       return { headContext, lookup: true };
     }
-    const remoteName = yield* findRemoteTrackingRemote(cwd, details.branch, headContext.remoteName);
+    const remoteName = yield* findRemoteTrackingRemote(
+      cwd,
+      details.branch,
+      headContext.remoteName,
+    ).pipe(Effect.orElseSucceed(() => null));
     if (remoteName === null) {
       return { headContext, lookup: false };
     }
@@ -1647,7 +1778,7 @@ export const make = Effect.gen(function* () {
    * terminal and agent pushes land), and configured upstream metadata survives
    * when a merged change request's remote branch is deleted. Together they
    * distinguish branches known to have reached a host from genuinely local
-   * branches. The ref glob spans every remote so a fork branch still counts. A
+   * branches. The remote ref check includes names containing slashes. A
    * repository that tracks no remotes at all cannot answer the question,
    * because then every branch looks unpublished; it, and any failed probe,
    * keeps the lookup.
@@ -1681,11 +1812,11 @@ export const make = Effect.gen(function* () {
         return false;
       }
 
-      const [tracksAnyRemote, tracksThisBranch] = yield* Effect.all(
-        [matchesRef("refs/remotes"), matchesRef(`refs/remotes/*/${headContext.headBranch}`)],
+      const [tracksAnyRemote, trackedRemote] = yield* Effect.all(
+        [matchesRef("refs/remotes"), findRemoteTrackingRemote(cwd, headContext.headBranch, null)],
         { concurrency: "unbounded" },
       );
-      return tracksAnyRemote && !tracksThisBranch;
+      return tracksAnyRemote && trackedRemote === null;
     }).pipe(Effect.orElseSucceed(() => false));
   });
 
@@ -1701,13 +1832,13 @@ export const make = Effect.gen(function* () {
     >,
   ) {
     const provider = yield* sourceControlProvider(cwd);
-    const headSelectors = probeableHeadSelectors(provider.kind, headContext.headSelectors);
-    for (const headSelector of headSelectors) {
+    const probe = headBranchProbe(provider, headContext.headSelectors, "open");
+    for (const headSelector of probe.headSelectors) {
       const pullRequests = yield* provider.listChangeRequests({
         cwd,
         headSelector,
         state: "open",
-        limit: provider.kind === "github" ? GITHUB_HEAD_BRANCH_PROBE_LIMIT : 1,
+        limit: probe.limit,
       });
       const normalizedPullRequests = pullRequests.map(toPullRequestInfo);
 
@@ -1733,12 +1864,13 @@ export const make = Effect.gen(function* () {
     const parsedByNumber = new Map<number, PullRequestInfo>();
 
     const provider = yield* sourceControlProvider(cwd);
-    for (const headSelector of probeableHeadSelectors(provider.kind, headContext.headSelectors)) {
+    const probe = headBranchProbe(provider, headContext.headSelectors, "all");
+    for (const headSelector of probe.headSelectors) {
       const pullRequests = yield* provider.listChangeRequests({
         cwd,
         headSelector,
         state: "all",
-        limit: provider.kind === "github" ? GITHUB_HEAD_BRANCH_PROBE_LIMIT : 20,
+        limit: probe.limit,
       });
 
       for (const pr of pullRequests.map(toPullRequestInfo)) {
@@ -1763,7 +1895,9 @@ export const make = Effect.gen(function* () {
   ) {
     const terms = yield* sourceControlProvider(cwd).pipe(
       Effect.map((provider) => getChangeRequestTerminologyForKind(provider.kind)),
-      Effect.orElseSucceed(() => getChangeRequestTerminologyForKind("unknown")),
+      Effect.orElseSucceed(() =>
+        getChangeRequestTerminologyForKind(SourceControlProviderKind.make("unknown")),
+      ),
     );
     const summary = summarizeGitActionResult(result, terms);
     let latestOpenPr: PullRequestInfo | null = null;
@@ -2129,8 +2263,10 @@ export const make = Effect.gen(function* () {
     const rangeContext = yield* gitCore.readRangeContext(cwd, baseRangeRef);
     const policy = yield* resolveStylePolicy(cwd, settings);
     const changeRequestTemplate =
-      settings.style.followChangeRequestTemplates && provider.kind === "github"
-        ? Option.getOrUndefined(yield* detectPrTemplate(cwd, baseRangeRef, gitCore.execute))
+      settings.style.followChangeRequestTemplates && provider.readChangeRequestTemplate
+        ? Option.getOrUndefined(
+            yield* provider.readChangeRequestTemplate({ cwd, treeish: baseRangeRef }),
+          )
         : undefined;
 
     const generated = yield* textGeneration.generatePrContent({
@@ -2742,14 +2878,6 @@ export const make = Effect.gen(function* () {
             detail: "Feature-branch checkout is only supported for commit actions.",
           });
         }
-        if (input.action === "create_pr" && initialStatus.hasWorkingTreeChanges) {
-          return yield* new GitManagerError({
-            operation: "runStackedAction",
-            cwd: input.cwd,
-            detail: "Commit local changes before creating a PR.",
-          });
-        }
-
         const phases: GitActionProgressPhase[] = [
           ...(input.featureBranch ? (["branch"] as const) : []),
           ...(wantsCommit ? (["commit"] as const) : []),
@@ -2835,7 +2963,9 @@ export const make = Effect.gen(function* () {
         const changeRequestTerms = wantsPr
           ? yield* sourceControlProvider(input.cwd).pipe(
               Effect.map((provider) => getChangeRequestTerminologyForKind(provider.kind)),
-              Effect.orElseSucceed(() => getChangeRequestTerminologyForKind("unknown")),
+              Effect.orElseSucceed(() =>
+                getChangeRequestTerminologyForKind(SourceControlProviderKind.make("unknown")),
+              ),
             )
           : null;
 

@@ -18,6 +18,7 @@ import {
   type OrchestrationV2AppThread,
   type OrchestrationV2ProviderThread,
 } from "@infinitus/contracts";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { MuseSettings } from "../settings.ts";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -30,19 +31,20 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-import { layerTestProviderHost } from "@infinitus/provider-testing/host";
-import * as McpProviderSession from "@infinitus/provider-core/server/mcpSession";
+import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
+import * as McpProviderSessions from "@infinitus/provider-core/server/McpProviderSessions";
 import type { MuseItem } from "./protocol.ts";
 import type { MuseSdkHost } from "./sdk.ts";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
-import type { ProviderContinuationRequest } from "@infinitus/provider-core/server/continuationRequests";
+import type * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
 import { makeMuseAdapterV2, type MuseAdapterV2Options } from "./adapter.ts";
 
 const testLayer = Layer.mergeAll(
   NodeServices.layer,
   IdAllocator.layer,
-  layerTestProviderHost().pipe(Layer.provide(NodeServices.layer)),
+  McpProviderSessions.layer,
+  TestProviderHost.layer().pipe(Layer.provide(NodeServices.layer)),
 );
 const MUSE_PROVIDER = ProviderDriverKind.make("muse");
 const INSTANCE_ID = ProviderInstanceId.make("muse_work");
@@ -351,10 +353,7 @@ const approval = (turnId: string) => ({
 describe("MuseAdapterV2", () => {
   it.effect("connects the thread's MCP credential on native start and resume", () =>
     Effect.gen(function* () {
-      yield* Effect.addFinalizer(() =>
-        Effect.sync(() => McpProviderSession.clearMcpProviderSession(THREAD_ID)),
-      );
-      McpProviderSession.setMcpProviderSession({
+      yield* (yield* McpProviderSessions.McpProviderSessions).set({
         environmentId: EnvironmentId.make("test-environment"),
         threadId: THREAD_ID,
         providerSessionId: "test-session",
@@ -384,10 +383,7 @@ describe("MuseAdapterV2", () => {
 
   it.effect("rejects a host without session MCP support before opening a native session", () =>
     Effect.gen(function* () {
-      yield* Effect.addFinalizer(() =>
-        Effect.sync(() => McpProviderSession.clearMcpProviderSession(THREAD_ID)),
-      );
-      McpProviderSession.setMcpProviderSession({
+      yield* (yield* McpProviderSessions.McpProviderSessions).set({
         environmentId: EnvironmentId.make("test-environment"),
         threadId: THREAD_ID,
         providerSessionId: "test-session",
@@ -502,6 +498,41 @@ describe("MuseAdapterV2", () => {
       assert.strictEqual(fake.closeCount(), 0);
       yield* startConversation(harness, fake);
     }).pipe(Effect.scoped, Effect.provide(testLayer)),
+  );
+
+  it.effect("pins Windows turns to Muse's verbatim root and starts Muse in the plain path", () =>
+    Effect.gen(function* () {
+      const fake = yield* makeFakeMuse();
+      let hostCwd: string | undefined;
+      const policy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        ...runtimePolicy,
+        cwd: "C:\\work\\repo",
+      });
+      const harness = yield* makeHarness(
+        fake,
+        INSTANCE_ID,
+        undefined,
+        undefined,
+        undefined,
+        policy,
+        {
+          createHost: async (options) => {
+            hostCwd = options.cwd;
+            return fake.host;
+          },
+        },
+      );
+      yield* startConversation(harness, fake);
+      const turnStart = fake.calls.find((call) => call.method === "turn/start");
+      // Muse 1.4.3 rejects any other form: "expected a canonical path (resolves to \\?\C:\…)".
+      assert.deepStrictEqual(turnStart?.params.workspaceRoots, ["\\\\?\\C:\\work\\repo"]);
+      // The muse.cmd launcher runs under cmd.exe, which cannot start in a verbatim directory.
+      assert.strictEqual(hostCwd, "C:\\work\\repo");
+    }).pipe(
+      Effect.provideService(HostProcess.Platform, "win32"),
+      Effect.scoped,
+      Effect.provide(testLayer),
+    ),
   );
 
   it.effect("skips an unreadable usage notification without ending the turn", () =>
@@ -766,7 +797,7 @@ describe("MuseAdapterV2", () => {
   it.effect("lets a user turn take a held Muse report turn, approvals included", () =>
     Effect.gen(function* () {
       const fake = yield* makeFakeMuse();
-      const offers: Array<ProviderContinuationRequest> = [];
+      const offers: Array<ProviderContinuationRequests.ProviderContinuationRequest> = [];
       const harness = yield* makeHarness(
         fake,
         INSTANCE_ID,

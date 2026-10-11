@@ -1,6 +1,6 @@
 import * as NodeOS from "node:os";
 import type { HostResourcesSnapshot } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -40,7 +40,7 @@ function darwinAvailableMemory(output: string): number | null {
 
 const make = Effect.fn("makeHostResources")(function* () {
   const fs = yield* FileSystem.FileSystem;
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
   const sample = Effect.fn("HostResources.sample")(function* () {

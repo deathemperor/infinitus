@@ -12,7 +12,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { type ProviderReplayEntry } from "@infinitus/contracts";
 import { GrokSettings } from "@infinitus/provider-grok/settings";
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { resolveSelfInvocation } from "@infinitus/shared/nodeRuntime";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
@@ -21,10 +21,9 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import { ChildProcessSpawner } from "effect/process";
 import type * as EffectAcpProtocol from "effect-acp/protocol";
 
-import { layerTestProviderHost } from "@infinitus/provider-testing/host";
+import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
 import {
   GROK_DEFAULT_INSTANCE_ID,
   GROK_PROVIDER,
@@ -33,8 +32,8 @@ import {
 } from "@infinitus/provider-grok/testing";
 import { ACP_PROTOCOL } from "@infinitus/provider-acp/server/adapter";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
-import type { ProviderAdapterV2SessionRuntime } from "@infinitus/provider-core/server/ProviderAdapter";
-import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
+import type * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
+import * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
 import * as ProviderAdapterRegistry from "../src/orchestration-v2/ProviderAdapterRegistry.ts";
 import { provideDeterministicTestRuntime } from "../src/orchestration-v2/testkit/DeterministicRuntime.ts";
 import { ORCHESTRATOR_REPLAY_FIXTURES } from "../src/orchestration-v2/testkit/fixtures/index.ts";
@@ -443,13 +442,12 @@ const recordScenario = Effect.fn("recordGrokScenario")(function* (fixtureName: s
   const settings = { ...DEFAULT_GROK_SETTINGS, binaryPath: process.env.T3_GROK_BIN ?? "grok" };
   const layerRegistry = ProviderAdapterRegistry.layerFromAdaptersEffect(
     Effect.gen(function* () {
-      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const environment = yield* HostProcessEnvironment;
+      const environment = yield* HostProcess.Environment;
       const adapter = yield* makeGrokAdapterV2({
         instanceId: GROK_DEFAULT_INSTANCE_ID,
         settings,
         environment,
-        hostPlatform: yield* HostProcessPlatform,
+        hostPlatform: yield* HostProcess.Platform,
         selfInvocation: yield* resolveSelfInvocation(),
         continuationRequests: yield* ProviderContinuationRequests.ProviderContinuationRequests,
         // Production's runtime factory, with the protocol logger teeing raw lines.
@@ -460,7 +458,6 @@ const recordScenario = Effect.fn("recordGrokScenario")(function* (fixtureName: s
             interruptPromptOnCancel: input.interruptPromptOnCancel ?? false,
             grokSettings: settings,
             environment,
-            childProcessSpawner,
             runtimeMode: grokLaunchRuntimeMode(runtimePolicy),
           }),
       });
@@ -474,7 +471,7 @@ const recordScenario = Effect.fn("recordGrokScenario")(function* (fixtureName: s
           ...adapter,
           openSession: (input) =>
             adapter.openSession(input).pipe(
-              Effect.map((session): ProviderAdapterV2SessionRuntime => ({
+              Effect.map((session): ProviderAdapter.ProviderAdapterV2SessionRuntime => ({
                 ...session,
                 startTurn: (turnInput) => onWallClock(session.startTurn(turnInput)),
                 steerTurn: (turnInput) => onWallClock(session.steerTurn(turnInput)),
@@ -490,7 +487,7 @@ const recordScenario = Effect.fn("recordGrokScenario")(function* (fixtureName: s
   ).pipe(
     Layer.provide(
       Layer.mergeAll(
-        layerTestProviderHost().pipe(Layer.provide(NodeServices.layer)),
+        TestProviderHost.layer().pipe(Layer.provide(NodeServices.layer)),
         NodeServices.layer,
         IdAllocator.layer,
       ),

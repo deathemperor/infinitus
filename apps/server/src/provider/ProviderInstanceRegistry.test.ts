@@ -35,9 +35,11 @@ import {
   type ProviderInstanceConfigMap,
   ProviderInstanceId,
 } from "@infinitus/contracts";
+import * as ProviderLatestVersions from "@infinitus/provider-core/server/ProviderLatestVersions";
+import * as McpProviderSessions from "@infinitus/provider-core/server/McpProviderSessions";
 import type { GrokSettings } from "@infinitus/provider-grok/settings";
 import type { CursorSettings } from "@infinitus/provider-cursor/settings";
-import { HostProcessPlatform, isHostWindows } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -49,7 +51,6 @@ import { HttpClient, HttpClientResponse } from "effect/http";
 import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AntigravityInstallation from "./AntigravityInstallation.ts";
 import * as ServerConfig from "../config.ts";
-import { expandHomePath } from "@infinitus/provider-core/server/pathExpansion";
 import * as ServerSettings from "../serverSettings.ts";
 import { ClaudeDriver, type ClaudeDriverEnv } from "./Drivers/ClaudeDriver.ts";
 import { CodexDriver, type CodexDriverEnv } from "./Drivers/CodexDriver.ts";
@@ -61,7 +62,7 @@ import * as ModelManifest from "./ModelManifest.ts";
 import * as OpenCodeRuntime from "@infinitus/provider-opencode/server/OpenCodeRuntime";
 import * as OpenCodeServerLedger from "@infinitus/provider-opencode/server/OpenCodeServerLedger";
 import * as ResetCreditCoordinator from "./resetCreditCoordinator.ts";
-import * as ProviderEventLoggers from "./ProviderEventLoggers.ts";
+import * as ProviderEventLoggers from "@infinitus/provider-core/server/ProviderEventLoggers";
 import { makeProviderInstanceRegistry } from "./ProviderInstanceRegistry.ts";
 import * as ProviderOrchestrationAdapterInfrastructure from "./ProviderOrchestrationAdapterInfrastructure.ts";
 import * as ProviderHostLive from "./ProviderHostLive.ts";
@@ -151,7 +152,7 @@ const makeTildeProviderFixtures = Effect.fn(
 )(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const homePath = expandHomePath("~");
+  const homePath = yield* HostProcess.HomeDirectory;
   const fixtureDir = yield* fileSystem.makeTempDirectoryScoped({
     directory: homePath,
     prefix: ".t3-provider-path-test-",
@@ -228,6 +229,8 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
         ProviderEventLoggers.NoOpProviderEventLoggers,
       ),
     ),
+    Layer.provideMerge(ProviderLatestVersions.layer),
+    Layer.provideMerge(McpProviderSessions.layer),
     Layer.provideMerge(ModelManifest.layerTest),
     Layer.provideMerge(ResetCreditCoordinator.layerTest),
   );
@@ -342,7 +345,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
 
   it.live("reports Codex's answer when a redemption changed nothing", () =>
     Effect.gen(function* () {
-      if (yield* isHostWindows) return;
+      if (yield* HostProcess.isWindows) return;
       const fileSystem = yield* FileSystem.FileSystem;
       const fixtures = yield* makeTildeProviderFixtures();
       yield* fileSystem.writeFileString(
@@ -379,7 +382,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
 
   it.live("runs Codex and Claude readiness probes from configured tilde paths", () =>
     Effect.gen(function* () {
-      if (yield* isHostWindows) return;
+      if (yield* HostProcess.isWindows) return;
 
       const fixtures = yield* makeTildeProviderFixtures();
 
@@ -496,7 +499,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
       return { outcome, after: yield* instance!.snapshot.getSnapshot };
     }).pipe(
       // macOS logins live in the Keychain, where resets are never read.
-      Effect.provideService(HostProcessPlatform, "linux"),
+      Effect.provideService(HostProcess.Platform, "linux"),
       Effect.provide(layerTest),
     );
 
@@ -609,6 +612,8 @@ describe("ProviderInstanceRegistry — all drivers slice", () => {
         ProviderEventLoggers.NoOpProviderEventLoggers,
       ),
     ),
+    Layer.provideMerge(ProviderLatestVersions.layer),
+    Layer.provideMerge(McpProviderSessions.layer),
     Layer.provideMerge(ModelManifest.layerTest),
     Layer.provideMerge(ResetCreditCoordinator.layerTest),
   );
