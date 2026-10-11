@@ -22,7 +22,7 @@ import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as Socket from "effect/socket/Socket";
 
 import { fetchRemoteEnvironmentDescriptor } from "../environment/descriptor.ts";
-import { makeWsRpcProtocolClient } from "../rpc/protocol.ts";
+import { makeWsRpcProtocolClient, PING_TIMEOUT } from "../rpc/protocol.ts";
 import { isLegacyUpdateHandoffLoss, resolveServerUpdateProgressResult } from "../state/server.ts";
 import * as RelayEnvironmentDiscovery from "../relay/discovery.ts";
 import * as ConnectionResolver from "./resolver.ts";
@@ -88,6 +88,7 @@ export const updateOutdatedHost = Effect.fn("clientRuntime.connection.updateOutd
           Layer.effect(
             RpcClient.Protocol,
             RpcClient.makeProtocolSocket({
+              pingTimeout: PING_TIMEOUT,
               retryTransientErrors: false,
               retryPolicy: Schedule.recurs(0),
             }),

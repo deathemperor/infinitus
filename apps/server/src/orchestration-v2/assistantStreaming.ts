@@ -1,5 +1,5 @@
 import type { ResponseStreamingMode } from "@infinitus/contracts";
-import type { ProviderAdapterV2Event } from "@infinitus/provider-core/server/ProviderAdapter";
+import type * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 
 // An opening fence may sit at any indentation, since fences inside list
 // items are indented past the marker. A closing fence may be indented at most
@@ -91,7 +91,10 @@ export function splitBufferedAssistantText(text: string): { ready: string; rest:
 /** Buffer assistant messages and reasoning alike, keeping unfinished markdown out of the read model. */
 export function makeAssistantStreamingFilter(mode: ResponseStreamingMode) {
   const delivered = new Map<string, { text: string; at: number }>();
-  return (event: ProviderAdapterV2Event, now: number): ProviderAdapterV2Event | null => {
+  return (
+    event: ProviderAdapter.ProviderAdapterV2Event,
+    now: number,
+  ): ProviderAdapter.ProviderAdapterV2Event | null => {
     if (
       event.type === "node.updated" &&
       event.node.kind === "assistant_message" &&

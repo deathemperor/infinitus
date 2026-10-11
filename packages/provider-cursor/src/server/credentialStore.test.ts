@@ -6,11 +6,11 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 
 import * as ProviderHost from "@infinitus/provider-core/server/ProviderHost";
-import { layerTestProviderHost } from "@infinitus/provider-testing/host";
+import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
 import * as Layer from "effect/Layer";
 import { makeCursorCredentialStore } from "./credentialStore.ts";
 
-const layerHost = Layer.provideMerge(layerTestProviderHost(), NodeServices.layer);
+const layerHost = Layer.provideMerge(TestProviderHost.layer(), NodeServices.layer);
 
 const legacyCredentials = {
   version: 1 as const,
