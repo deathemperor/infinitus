@@ -1223,7 +1223,8 @@ describe("UsageService", () => {
             return text;
           });
 
-          const summary = yield* (yield* UsageService.make).readSummary(WINDOW);
+          const second = yield* UsageService.make;
+          const summary = yield* second.readSummary(WINDOW);
           // The live rollout re-parses at the ultrafast rate (10 x 6); the
           // deleted one keeps its saved v4 usage at the standard rate (20 x 1).
           assert.strictEqual(totalOutputTokens(summary), 30);
@@ -1236,6 +1237,9 @@ describe("UsageService", () => {
             yield* Effect.promise(() => NodeFSP.readFile(legacyPath, "utf8")),
             legacy,
           );
+          // The state dir goes away with the layer below, before the service's
+          // own shutdown wait; let the background cache write land first.
+          yield* second.awaitPersisted;
         }).pipe(
           Effect.provide(
             layerService({
