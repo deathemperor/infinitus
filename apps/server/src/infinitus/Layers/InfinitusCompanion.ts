@@ -366,14 +366,16 @@ const InfinitusCompanionServiceLive = Layer.effect(
 );
 
 /** The startup launch, for the installed server only: a dev-runner server, a
-    worktree server or an isolated instance (an `INFINITUS_CONTROL_SOCKET`
-    override) says why it stays quiet, exactly like the port publish. */
+    worktree server, an isolated instance (an `INFINITUS_CONTROL_SOCKET`
+    override) or any server not in `desktop` mode says why it stays quiet,
+    exactly like the port publish. */
 const InfinitusCompanionStartupLive = Layer.effectDiscard(
   forkParked(
     Effect.gen(function* () {
       const config = yield* ServerConfig;
       const env = yield* HostProcessEnvironment;
       const reason = serverPortWithheldReason({
+        mode: config.mode,
         devUrl: config.devUrl,
         baseDir: config.baseDir,
         worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
