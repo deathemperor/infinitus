@@ -84,6 +84,7 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusAlertRelayLive } from "./infinitus/Layers/InfinitusAlertRelay.ts";
+import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as CaptureStore from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -745,9 +746,11 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(infinitusPairingHttpApiLayer),
       // Fork (#1375): the Mac's account alerts, signed with the relay link's
-      // key and posted to the relay over fetch.
+      // key and posted to the relay over fetch; (#829) the running turns the
+      // Mac counts, read from the projection's thread shells.
       Layer.provide(
         infinitusHttpApiLayer.pipe(
+          Layer.provide(InfinitusRunningTurnsLive.pipe(Layer.provide(ProjectionStoreV2.layer))),
           Layer.provide(
             InfinitusAlertRelayLive.pipe(
               Layer.provide(ServerSecretStore.layer),
