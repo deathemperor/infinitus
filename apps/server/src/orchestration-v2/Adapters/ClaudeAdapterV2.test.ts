@@ -76,6 +76,7 @@ const DEFAULT_CLAUDE_SETTINGS = Schema.decodeSync(ClaudeSettings)({});
 const AUTO_COMPACT_CLAUDE_SETTINGS = Schema.decodeSync(ClaudeSettings)({
   autoCompactWindow: "300000",
 });
+const ADVISOR_CLAUDE_SETTINGS = Schema.decodeSync(ClaudeSettings)({ advisorModel: "fable" });
 const CLAUDE_TEST_MODEL_SELECTION = {
   instanceId: ProviderInstanceId.make(ClaudeAdapterV2.CLAUDE_PROVIDER),
   model: "claude-sonnet-4-6",
@@ -237,6 +238,26 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
     assert.equal((options.settings as { autoCompactWindow?: number }).autoCompactWindow, 300_000);
     assert.equal(options.onUserDialog, onUserDialog);
     assert.deepEqual(options.supportedDialogKinds, ["resume_return"]);
+  });
+
+  it("passes the instance's advisor model to the SDK, none when unset (#1232)", () => {
+    const named = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-thread-advisor",
+      resume: true,
+      cwd: "/workspace",
+      settings: ADVISOR_CLAUDE_SETTINGS,
+    });
+    assert.equal((named.settings as { advisorModel?: string }).advisorModel, "fable");
+
+    const unset = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-thread-advisor",
+      resume: false,
+      cwd: "/workspace",
+      settings: DEFAULT_CLAUDE_SETTINGS,
+    });
+    assert.notProperty(unset.settings as object, "advisorModel");
   });
 
   it("projects AskUserQuestion input with question text as the answer key", () => {

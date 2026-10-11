@@ -51,6 +51,7 @@ import type {
   ProviderEnvironmentField,
 } from "@infinitus/provider-core/client";
 import { deriveProviderSettingsFields, ProviderSettingsForm } from "./ProviderSettingsForm";
+import { ClaudeAdvisorProxyNote } from "./ClaudeAdvisorProxyNote";
 import { ProviderModelsSection } from "./ProviderModelsSection";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
@@ -1007,13 +1008,16 @@ export function ProviderInstanceCard({
   );
 
   const runtimeFields = driverOption ? (
-    <ProviderSettingsForm
-      definition={driverOption}
-      value={instance.config}
-      idPrefix={`provider-instance-${instanceId}`}
-      variant="settings"
-      onChange={updateConfig}
-    />
+    <>
+      <ProviderSettingsForm
+        definition={driverOption}
+        value={instance.config}
+        idPrefix={`provider-instance-${instanceId}`}
+        variant="settings"
+        onChange={updateConfig}
+      />
+      <ClaudeAdvisorProxyNote instance={instance} />
+    </>
   ) : (
     <SettingsRow
       title="Driver"
