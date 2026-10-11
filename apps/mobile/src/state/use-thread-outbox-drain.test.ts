@@ -111,8 +111,20 @@ vi.mock("./session", () => ({
 
 vi.mock("./use-thread-outbox", async () => {
   const { Atom } = await import("effect/reactivity");
+  const { appAtomRegistry } = await import("./atom-registry");
+  const editingQueuedMessageIdsAtom = Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive);
   return {
-    editingQueuedMessageIdsAtom: Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive),
+    editingQueuedMessageIdsAtom,
+    holdEditingQueuedMessage: (messageId: string) => {
+      appAtomRegistry.set(editingQueuedMessageIdsAtom, {
+        ...appAtomRegistry.get(editingQueuedMessageIdsAtom),
+        [messageId]: true,
+      });
+    },
+    releaseEditingQueuedMessage: (messageId: string) => {
+      const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
+      appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
+    },
     useThreadOutboxMessages: () => ({}),
     useThreadOutboxShellStatuses: () => new Map(),
   };

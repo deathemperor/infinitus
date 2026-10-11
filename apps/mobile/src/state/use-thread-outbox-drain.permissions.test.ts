@@ -21,6 +21,7 @@ const state = vi.hoisted(() => ({
   runtime: vi.fn(),
   interaction: vi.fn(),
   prepare: vi.fn(),
+  storageRemove: vi.fn(async (_message: QueuedThreadMessage) => {}),
   manager: null as unknown as ReturnType<
     typeof import("./thread-outbox-manager").createThreadOutboxManager
   >,
@@ -102,7 +103,7 @@ vi.mock("./thread-outbox", async () => {
     storage: {
       load: async () => ({ messages: [], errors: [] }),
       write: async () => {},
-      remove: async () => {},
+      remove: (message) => state.storageRemove(message),
     },
   });
   return {
@@ -122,8 +123,19 @@ vi.mock("./use-thread-outbox", async () => {
   const { Atom } = await import("effect/reactivity");
   const { appAtomRegistry } = await import("./atom-registry");
   await import("./thread-outbox");
+  const editingQueuedMessageIdsAtom = Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive);
   return {
-    editingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
+    editingQueuedMessageIdsAtom,
+    holdEditingQueuedMessage: (messageId: string) => {
+      appAtomRegistry.set(editingQueuedMessageIdsAtom, {
+        ...appAtomRegistry.get(editingQueuedMessageIdsAtom),
+        [messageId]: true,
+      });
+    },
+    releaseEditingQueuedMessage: (messageId: string) => {
+      const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
+      appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
+    },
     useThreadOutboxMessages: () => appAtomRegistry.get(state.manager.queuedMessagesByThreadKeyAtom),
     useThreadOutboxShellStatuses: () => new Map([["secondary", "live"]]),
   };
@@ -187,6 +199,7 @@ beforeEach(() => {
     draftAttachments: attachments,
     pendingAttachmentIds: [],
   }));
+  state.storageRemove.mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => {
   state.cleanups.splice(0).forEach((cleanup) => cleanup());
@@ -347,6 +360,45 @@ describe("deleting a queued reply while it uploads", () => {
     expect(state.start).not.toHaveBeenCalled();
     expect(remaining()).toEqual([next]);
 
+    await runDrain();
+    expect(state.start).toHaveBeenCalledOnce();
+    expect(state.start.mock.calls[0]?.[0]).toMatchObject({
+      input: { message: { messageId: next.messageId } },
+    });
+    expect(remaining()).toEqual([]);
+  });
+
+  it("never re-dispatches a deleted reply whose removal is still being written", async () => {
+    state.grantedEnvironments.add("secondary");
+    const deleted = message({ messageId: MessageId.make("deleted"), text: "no attachments" });
+    const next = message({ messageId: MessageId.make("next"), text: "goes next" });
+    await state.manager.enqueue(deleted);
+    await state.manager.enqueue(next);
+    // The drain is mid-flight: past the pick, before startTurn.
+    const dispatchReached = Promise.withResolvers<void>();
+    const dispatchBarrier = Promise.withResolvers<void>();
+    state.prepare.mockImplementationOnce(async ({ attachments }) => {
+      dispatchReached.resolve();
+      await dispatchBarrier.promise;
+      return { status: "ready", attachments: [], draftAttachments: attachments, pendingAttachmentIds: [] };
+    });
+    const removalBarrier = Promise.withResolvers<void>();
+    state.storageRemove.mockImplementationOnce(() => removalBarrier.promise);
+
+    const drained = runDrain();
+    await dispatchReached.promise;
+    const deletion = deletePendingThreadMessage(deleted);
+    dispatchBarrier.resolve();
+    await drained;
+    // The abandoned attempt released the drain while the row still sits at
+    // the head of the queue; this pass must leave it alone.
+    expect(remaining()).toEqual([deleted, next]);
+    useThreadOutboxDrain();
+    expect(state.start).not.toHaveBeenCalled();
+
+    removalBarrier.resolve();
+    await expect(deletion).resolves.toBe(true);
+    expect(remaining()).toEqual([next]);
     await runDrain();
     expect(state.start).toHaveBeenCalledOnce();
     expect(state.start.mock.calls[0]?.[0]).toMatchObject({
