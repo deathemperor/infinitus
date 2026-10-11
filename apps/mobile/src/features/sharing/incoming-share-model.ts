@@ -14,6 +14,7 @@ import type { ResolvedSharePayload, SharePayload } from "expo-sharing";
 import { DraftComposerAttachmentSchema } from "../../lib/composer-image-schema";
 import type { DraftComposerAttachment } from "../../lib/composerImages";
 import { estimateBase64ByteSize } from "../../lib/base64";
+import { jpegAttachmentName, originalImagePassthroughMimeType } from "../../lib/image-passthrough";
 
 export interface IncomingShareDraft {
   readonly schemaVersion: 1;
@@ -105,6 +106,13 @@ export interface IncomingShareFileReader {
   readonly removeOwnedFile: (uri: string) => Promise<void> | void;
   readonly persistFile?: (uri: string, name: string) => Promise<string>;
   readonly readSize?: (uri: string) => Promise<number | null>;
+  /**
+   * Renders a shared picture to a bounded JPEG in a cache file the caller
+   * releases. With it, a shared image takes the picker's gate (small stills
+   * pass through, large ones are re-encoded); without it, originals pass
+   * through up to the provider cap.
+   */
+  readonly renderImageAsJpeg?: (uri: string) => Promise<{ base64: string; uri: string }>;
 }
 
 /** Apply the destination server's file support after the user chooses a project. */
@@ -393,33 +401,54 @@ export async function buildIncomingShareDraft(input: {
       await releaseOwnedFiles(input.fileReader, [uri, payload.value]);
       continue;
     }
-    if (
-      resolved?.contentSize !== null &&
-      resolved?.contentSize !== undefined &&
-      resolved.contentSize > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES
-    ) {
-      warnings.push(
-        `'${resolved.originalName ?? fallbackName(uri, index, mimeType)}' exceeds the 10 MB attachment limit.`,
-      );
+    const imageName = resolved?.originalName ?? fallbackName(uri, index, mimeType);
+    const sourceBytes =
+      resolved?.contentSize ?? (await input.fileReader.readSize?.(uri).catch(() => null)) ?? null;
+    const render = input.fileReader.renderImageAsJpeg;
+    // The share sheet is a third way a full-resolution screenshot reaches the
+    // composer, after the picker and the clipboard. The same gate decides it:
+    // past the still-image cap the picture is rendered to a bounded JPEG so it
+    // can finish uploading over a slow relay. Without a renderer the original
+    // goes up as long as it fits the provider cap.
+    const passthroughMimeType = render
+      ? originalImagePassthroughMimeType({ mimeType, sourceBytes })
+      : sourceBytes !== null && sourceBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES
+        ? null
+        : mimeType;
+    if (passthroughMimeType === null && !render) {
+      warnings.push(`'${imageName}' exceeds the 10 MB attachment limit.`);
       await releaseOwnedFiles(input.fileReader, [uri, payload.value]);
       continue;
     }
 
+    let renderedUri: string | undefined;
     try {
-      const base64 = await input.fileReader.readBase64(uri);
-      const sizeBytes = resolved?.contentSize ?? estimateBase64ByteSize(base64);
+      let image: { readonly base64: string; readonly mimeType: string; readonly name: string };
+      if (passthroughMimeType !== null || !render) {
+        image = { base64: await input.fileReader.readBase64(uri), mimeType, name: imageName };
+      } else {
+        const rendered = await render(uri);
+        renderedUri = rendered.uri;
+        image = {
+          base64: rendered.base64,
+          mimeType: "image/jpeg",
+          name: jpegAttachmentName(imageName),
+        };
+      }
+      const sizeBytes =
+        passthroughMimeType !== null && sourceBytes !== null
+          ? sourceBytes
+          : estimateBase64ByteSize(image.base64);
       if (sizeBytes <= 0 || sizeBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
-        warnings.push(
-          `'${resolved?.originalName ?? fallbackName(uri, index, mimeType)}' exceeds the 10 MB attachment limit.`,
-        );
+        warnings.push(`'${imageName}' exceeds the 10 MB attachment limit.`);
         continue;
       }
-      const dataUrl = `data:${mimeType};base64,${base64}`;
+      const dataUrl = `data:${image.mimeType};base64,${image.base64}`;
       attachments.push({
         id: `${input.id}:image:${index}`,
         type: "image",
-        name: resolved?.originalName ?? fallbackName(uri, index, mimeType),
-        mimeType,
+        name: image.name,
+        mimeType: image.mimeType,
         sizeBytes,
         dataUrl,
         // The share provider's file is temporary. A data-backed preview keeps
@@ -429,7 +458,7 @@ export async function buildIncomingShareDraft(input: {
     } catch {
       warnings.push(`Could not read '${fallbackName(uri, index, mimeType)}'.`);
     } finally {
-      await releaseOwnedFiles(input.fileReader, [uri, payload.value]);
+      await releaseOwnedFiles(input.fileReader, [uri, payload.value, renderedUri]);
     }
   }
 
