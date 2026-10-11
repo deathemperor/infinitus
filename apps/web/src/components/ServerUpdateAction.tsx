@@ -35,6 +35,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 // folds it into the download phase; everything after the handoff is the
 // restart the user is actually waiting through.
 const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
+  waiting: "Waiting for running threads…",
   downloading: "Downloading…",
   installing: "Downloading…",
   resuming: "Restarting…",
