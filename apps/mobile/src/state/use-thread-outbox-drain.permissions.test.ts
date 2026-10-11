@@ -124,7 +124,6 @@ vi.mock("./use-thread-outbox", async () => {
   await import("./thread-outbox");
   return {
     editingQueuedMessageIdsAtom: Atom.make({}).pipe(Atom.keepAlive),
-    dispatchingQueuedMessageIdAtom: Atom.make<MessageId | null>(null).pipe(Atom.keepAlive),
     useThreadOutboxMessages: () => appAtomRegistry.get(state.manager.queuedMessagesByThreadKeyAtom),
     useThreadOutboxShellStatuses: () => new Map([["secondary", "live"]]),
   };
@@ -148,7 +147,8 @@ vi.mock("./use-composer-drafts", async () => {
 });
 
 import { appAtomRegistry } from "./atom-registry";
-import { dispatchingQueuedMessageIdAtom } from "./use-thread-outbox";
+import { deletePendingThreadMessage } from "./delete-pending-thread-message";
+import { dispatchingQueuedMessageAtom } from "./queued-message-dispatch";
 import { useThreadOutboxDrain } from "./use-thread-outbox-drain";
 
 const message = (overrides: Partial<QueuedThreadMessage> = {}): QueuedThreadMessage => ({
@@ -166,8 +166,8 @@ const remaining = () =>
 
 function runDrain() {
   const settled = Promise.withResolvers<void>();
-  const release = appAtomRegistry.subscribe(dispatchingQueuedMessageIdAtom, (id) => {
-    if (id === null) settled.resolve();
+  const release = appAtomRegistry.subscribe(dispatchingQueuedMessageAtom, (dispatching) => {
+    if (dispatching === null) settled.resolve();
   });
   useThreadOutboxDrain();
   return settled.promise.finally(release);
@@ -177,7 +177,7 @@ beforeEach(() => {
   state.grantedEnvironments = new Set(["primary"]);
   state.draftText = "Keep this draft separate";
   appAtomRegistry.set(state.manager.queuedMessagesByThreadKeyAtom, {});
-  appAtomRegistry.set(dispatchingQueuedMessageIdAtom, null);
+  appAtomRegistry.set(dispatchingQueuedMessageAtom, null);
   for (const command of [state.start, state.metadata, state.runtime, state.interaction]) {
     command.mockReset().mockResolvedValue(AsyncResult.success(undefined));
   }
@@ -320,4 +320,38 @@ describe("queued task operation access", () => {
       expect(remaining()).toEqual([queued]);
     },
   );
+});
+
+// Infinitus (fork, #1501): deleting a reply mid-upload abandons that attempt
+// and the drain moves on to the next queued message.
+describe("deleting a queued reply while it uploads", () => {
+  it("abandons the upload and sends the next queued message", async () => {
+    state.grantedEnvironments.add("secondary");
+    const stuck = message({ messageId: MessageId.make("stuck"), text: "stuck upload" });
+    const next = message({ messageId: MessageId.make("next"), text: "goes next" });
+    await state.manager.enqueue(stuck);
+    await state.manager.enqueue(next);
+    const uploadStarted = Promise.withResolvers<void>();
+    state.prepare.mockImplementationOnce(async ({ signal }) => {
+      uploadStarted.resolve();
+      await new Promise<void>((resolve) => {
+        signal?.addEventListener("abort", () => resolve(), { once: true });
+      });
+      return { status: "abandoned" };
+    });
+
+    const drained = runDrain();
+    await uploadStarted.promise;
+    await expect(deletePendingThreadMessage(stuck)).resolves.toBe(true);
+    await drained;
+    expect(state.start).not.toHaveBeenCalled();
+    expect(remaining()).toEqual([next]);
+
+    await runDrain();
+    expect(state.start).toHaveBeenCalledOnce();
+    expect(state.start.mock.calls[0]?.[0]).toMatchObject({
+      input: { message: { messageId: next.messageId } },
+    });
+    expect(remaining()).toEqual([]);
+  });
 });
