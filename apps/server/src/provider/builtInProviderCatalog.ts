@@ -1,6 +1,6 @@
 import type { ProviderDriverKind, ProviderInstanceId, ServerProvider } from "@infinitus/contracts";
 import type * as Stream from "effect/Stream";
-import type { ServerProviderShape } from "@infinitus/provider-core/server/snapshot";
+import type { ManagedServerProvider } from "@infinitus/provider-core/server/snapshot";
 
 export type ProviderSnapshotSource = {
   /**
@@ -11,7 +11,7 @@ export type ProviderSnapshotSource = {
   readonly instanceId: ProviderInstanceId;
   /** Driver implementation kind. */
   readonly driverKind: ProviderDriverKind;
-  readonly getSnapshot: ServerProviderShape["getSnapshot"];
-  readonly refresh: ServerProviderShape["refresh"];
+  readonly getSnapshot: ManagedServerProvider["getSnapshot"];
+  readonly refresh: ManagedServerProvider["refresh"];
   readonly streamChanges: Stream.Stream<ServerProvider>;
 };

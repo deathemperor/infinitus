@@ -19,7 +19,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
-import * as ProviderContinuationRequests from "@infinitus/provider-core/server/continuationRequests";
+import * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
 import * as ProviderContinuationService from "./ProviderContinuationService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 
@@ -171,6 +171,25 @@ describe("ProviderContinuationService", () => {
           outcome: "updated",
           summary: "Background activity updated",
         });
+      }).pipe(
+        Effect.provide(
+          layerTest({ dispatched, getThreadRecords: () => Effect.succeed(projection) }),
+        ),
+        Effect.scoped,
+      );
+    });
+  });
+
+  it.effect("dispatches a wake under the message its adapter named", () => {
+    return Effect.gen(function* () {
+      const dispatched = yield* Queue.unbounded<unknown>();
+      const messageId = MessageId.make("message-provider-continuation-adapter-named");
+      yield* Effect.gen(function* () {
+        const requests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+        yield* requests.offer({ ...request(), messageId });
+        const command = (yield* Queue.take(dispatched)) as { readonly messageId: MessageId };
+        // The adapter matches the continuation run's message to the wake it holds.
+        assert.equal(command.messageId, messageId);
       }).pipe(
         Effect.provide(
           layerTest({ dispatched, getThreadRecords: () => Effect.succeed(projection) }),

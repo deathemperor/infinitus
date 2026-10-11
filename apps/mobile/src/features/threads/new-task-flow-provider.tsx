@@ -25,7 +25,7 @@ import {
   ThreadId,
 } from "@infinitus/contracts";
 import { sanitizeNewRefName } from "@infinitus/shared/git";
-import { resolveProjectSettings } from "@infinitus/shared/projectSettings";
+import { resolveNewThreadEnvMode, resolveProjectSettings } from "@infinitus/shared/projectSettings";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
@@ -488,8 +488,13 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const attachments = selectedProjectDraft.attachments;
   // Default mode until the user picks one explicitly — same resolution web
   // uses for new draft threads: per-project setting, then the repo's
+<<<<<<< HEAD
   // checked-in project file, then the server's configured default. Both file
   // names are read in the server's order; whichever answers first decides.
+=======
+  // checked-in t3.json, then the server's configured default (which a new
+  // project with no threads yet replaces with its checkout).
+>>>>>>> upstream-sync-4b6d9a09f-upstream-renamed
   const fileAccessSession = useEnvironmentQuery(
     selectedProject !== null && selectedProject.workspaceRoot !== ""
       ? environmentSession.sessionStateAtom(selectedProject.environmentId)
@@ -551,8 +556,20 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   // A thread without a project runs in a plain folder, so worktree mode
   // would leave it unsendable: it is always local and offers no choice.
   const canChooseWorkspace = !isScratchDraft;
+  const selectedProjectHasThreads =
+    selectedProject !== null &&
+    threads.some(
+      (thread) =>
+        thread.environmentId === selectedProject.environmentId &&
+        thread.projectId === selectedProject.id,
+    );
   const defaultWorkspaceMode: WorkspaceMode = canChooseWorkspace
-    ? projectSettings.settings.defaultThreadEnvMode
+    ? resolveNewThreadEnvMode({
+        projectSettings,
+        workspaceRoot: selectedProject?.workspaceRoot ?? null,
+        newProjectsRoot: selectedEnvironmentServerConfig?.newProjectsRoot,
+        projectHasThreads: selectedProjectHasThreads,
+      })
     : "local";
   // While the file read is pending and nothing above it decided, the
   // resolved default is provisional. Nothing may write it into the draft
@@ -1121,7 +1138,8 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
           selectedEnvironmentServerConfig,
           draft.modelSelection ?? null,
         ) ?? selectedModel;
-      if (text.length === 0 || !draftModelSelection) {
+      // A shared image or file is a task on its own; text is optional.
+      if ((text.length === 0 && draft.attachments.length === 0) || !draftModelSelection) {
         return null;
       }
       // A saved choice from before the project went no-project must not

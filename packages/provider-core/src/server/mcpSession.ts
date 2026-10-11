@@ -40,6 +40,7 @@ export function withAgentDeviceEnvironment(
     ...(shimDir ? { PATH: basePath ? `${shimDir}${separator}${basePath}` : shimDir } : {}),
   };
 }
+<<<<<<< HEAD
 
 /**
  * Fork: the device variables plus the session's identity, which the
@@ -78,3 +79,5 @@ export function clearMcpProviderSession(threadId: ThreadId): void {
 function clearAllMcpProviderSessions(): void {
   sessionsByThread.clear();
 }
+=======
+>>>>>>> upstream-sync-4b6d9a09f-upstream-renamed

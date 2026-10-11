@@ -14,7 +14,7 @@ import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
-import { TestClock } from "effect/testing";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as ProviderHost from "./ProviderHost.ts";
 import { makeManagedServerProvider } from "./managedProvider.ts";
@@ -181,6 +181,31 @@ describe("makeManagedServerProvider", () => {
           assert.strictEqual(yield* Ref.get(checkCalls), 1);
         }),
       ).pipe(Effect.provide(layerAlwaysRunTest)),
+  );
+
+  it.effect("does not enrich a disabled provider's snapshot", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        let enrichmentCalls = 0;
+        const provider = yield* makeManagedServerProvider<TestSettings>({
+          resolveMaintenance: () => Effect.succeed(maintenanceCapabilities),
+          getSettings: Effect.succeed({ enabled: false }),
+          streamSettings: Stream.empty,
+          haveSettingsChanged: (previous, next) => previous.enabled !== next.enabled,
+          refreshOnInterval: false,
+          initialSnapshot: () => Effect.succeed({ ...initialSnapshot, enabled: false }),
+          checkProvider: Effect.succeed({ ...refreshedSnapshot, enabled: false }),
+          enrichSnapshot: () => {
+            enrichmentCalls += 1;
+            return Effect.void;
+          },
+        });
+
+        yield* provider.refresh;
+
+        assert.strictEqual(enrichmentCalls, 0);
+      }),
+    ).pipe(Effect.provide(layerAlwaysRunTest)),
   );
 
   it.effect("skips periodic provider refreshes without foreground provider-status demand", () =>
@@ -591,9 +616,16 @@ describe("makeManagedServerProvider", () => {
           checkProvider: Ref.updateAndGet(refreshCount, (count) => count + 1).pipe(
             Effect.map((count) =>
               count === 1
-                ? { ...refreshedSnapshot, usageLimits: probedLimits }
+                ? {
+                    ...refreshedSnapshot,
+                    auth: { ...refreshedSnapshot.auth, workspaceId: "ws-a" },
+                    usageLimits: probedLimits,
+                  }
                 : {
                     ...refreshedSnapshotSecond,
+                    ...(count === 3
+                      ? { auth: { ...refreshedSnapshotSecond.auth, workspaceId: "ws-b" } }
+                      : {}),
                     usageLimits: {
                       checkedAt: "2026-04-10T00:00:03.000Z",
                       windows: [],
@@ -640,6 +672,13 @@ describe("makeManagedServerProvider", () => {
         const refreshed = yield* provider.refresh;
         assert.strictEqual(refreshed.message, refreshedSnapshotSecond.message);
         assert.deepStrictEqual(refreshed.usageLimits?.windows, [liveWindow]);
+        // ...and the workspace they were read for.
+        assert.strictEqual(refreshed.auth.workspaceId, "ws-a");
+
+        // A failed read for another workspace does not inherit those windows.
+        const switched = yield* provider.refresh;
+        assert.strictEqual(switched.auth.workspaceId, "ws-b");
+        assert.strictEqual(switched.usageLimits?.unavailable?.reason, "probeFailed");
       }),
     ).pipe(Effect.provide(layerAlwaysRunTest)),
   );

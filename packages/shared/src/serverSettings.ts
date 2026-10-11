@@ -1,3 +1,4 @@
+import type { ModelPreferences } from "@infinitus/contracts/settings";
 import {
   isProviderAvailable,
   isUnconfiguredDefaultInstanceEnabled,
@@ -260,6 +261,11 @@ export function applyServerSettingsPatch(
   const patch = translateLegacyProjectOverridePatch(current, rawPatch);
   const selectionPatch = patch.textGenerationModelSelection;
   const {
+    migrateModelPreferences,
+    setModelFavorites,
+    setModelsHidden,
+    setProviderModelOrder,
+    providerModelPreferences,
     automaticGitFetchInterval,
     providerHealthRefreshInterval,
     backgroundActivityProfile,
@@ -267,6 +273,7 @@ export function applyServerSettingsPatch(
     worktreeCleanup: worktreeCleanupPatch,
     // Merged per entry below; its `null` removals must not reach deepMerge.
     usageLimitSources: usageLimitSourcesPatch,
+    sourceControlHosts: sourceControlHostsPatch,
     usagePriceOverrides: usagePriceOverridesPatch,
     usageModelAliases: usageModelAliasesPatch,
     // Entry replacement: deepMerge would keep keys the client meant to clear.
@@ -313,9 +320,57 @@ export function applyServerSettingsPatch(
             },
           }
         : undefined;
+  const initialFavorites =
+    patch.favorites ?? current.favorites ?? migrateModelPreferences?.favorites ?? null;
+  const favorites =
+    setModelFavorites?.reduce((current, change) => {
+      const exists = current.some(
+        (favorite) => favorite.provider === change.provider && favorite.model === change.model,
+      );
+      return change.favorite
+        ? exists
+          ? current
+          : [...current, { provider: change.provider, model: change.model }]
+        : current.filter(
+            (favorite) => favorite.provider !== change.provider || favorite.model !== change.model,
+          );
+    }, initialFavorites ?? []) ?? initialFavorites;
+  const initialModelPreferences =
+    providerModelPreferences ??
+    current.providerModelPreferences ??
+    migrateModelPreferences?.providerModelPreferences ??
+    null;
+  let nextModelPreferences = initialModelPreferences;
+  for (const change of setModelsHidden ?? []) {
+    const preferences = nextModelPreferences?.[change.provider] ?? {
+      hiddenModels: [],
+      modelOrder: [],
+    };
+    const hiddenModels = preferences.hiddenModels.filter((model) => model !== change.model);
+    if (change.hidden) hiddenModels.push(change.model);
+    nextModelPreferences = {
+      ...nextModelPreferences,
+      [change.provider]: { ...preferences, hiddenModels },
+    };
+  }
+  if (setProviderModelOrder) {
+    const preferences = nextModelPreferences?.[setProviderModelOrder.provider] ?? {
+      hiddenModels: [],
+      modelOrder: [],
+    };
+    nextModelPreferences = {
+      ...nextModelPreferences,
+      [setProviderModelOrder.provider]: {
+        ...preferences,
+        modelOrder: [...setProviderModelOrder.modelOrder],
+      },
+    };
+  }
   const next = deepMerge(current, patchForMerge);
   const nextWithReplacementsBase = {
     ...next,
+    favorites,
+    providerModelPreferences: nextModelPreferences,
     ...(worktreeCleanupPatch === undefined
       ? {}
       : {
@@ -324,6 +379,7 @@ export function applyServerSettingsPatch(
               ? {
                   mode: "custom" as const,
                   rules: {
+                    worktreeKeepWhen: next.storageCleanup.worktreeKeepWhen,
                     worktreeAfterDays: next.storageCleanup.worktreeAfterDays,
                     worktreeOnMerge: next.storageCleanup.worktreeOnMerge,
                     worktreeOnDelete: next.storageCleanup.worktreeOnDelete,
@@ -366,9 +422,19 @@ export function applyServerSettingsPatch(
           ],
         }
       : {}),
-    // Host replacement: deepMerge would keep a cleared account pin.
-    ...(patch.github?.hosts !== undefined
-      ? { github: { ...next.github, hosts: patch.github.hosts } }
+    // Per host, a patched field replaces the saved one: deepMerge would keep a cleared account pin.
+    ...(sourceControlHostsPatch !== undefined
+      ? {
+          sourceControlHosts: {
+            ...current.sourceControlHosts,
+            ...Object.fromEntries(
+              Object.entries(sourceControlHostsPatch).map(([kind, fields]) => [
+                kind,
+                { ...current.sourceControlHosts[kind], ...fields },
+              ]),
+            ),
+          },
+        }
       : {}),
     ...(projectSettingsOverridesPatch !== undefined
       ? {
@@ -454,4 +520,40 @@ export function applyServerSettingsPatch(
     ...nextWithReplacements,
     textGenerationModelSelection: createModelSelection(instanceId, model, options),
   };
+}
+
+/** Resolve legacy local preferences only until the environment has a saved value. */
+export function resolveModelPreferences(
+  settings: Pick<ServerSettings, "favorites" | "providerModelPreferences">,
+  legacy: Partial<ModelPreferences> = {},
+): ModelPreferences {
+  return {
+    favorites: settings.favorites ?? legacy.favorites ?? [],
+    providerModelPreferences:
+      settings.providerModelPreferences ?? legacy.providerModelPreferences ?? {},
+  };
+}
+
+/** Empty legacy values do not claim ownership before another client can migrate its saved list. */
+export function modelPreferencesMigrationPatch(
+  settings: Pick<ServerSettings, "favorites" | "providerModelPreferences">,
+  legacy: Partial<ModelPreferences>,
+): ServerSettingsPatch | null {
+  const favorites =
+    settings.favorites === null && (legacy.favorites?.length ?? 0) > 0
+      ? legacy.favorites
+      : undefined;
+  const providerModelPreferences =
+    settings.providerModelPreferences === null &&
+    Object.keys(legacy.providerModelPreferences ?? {}).length > 0
+      ? legacy.providerModelPreferences
+      : undefined;
+  return favorites === undefined && providerModelPreferences === undefined
+    ? null
+    : {
+        migrateModelPreferences: {
+          ...(favorites === undefined ? {} : { favorites }),
+          ...(providerModelPreferences === undefined ? {} : { providerModelPreferences }),
+        },
+      };
 }

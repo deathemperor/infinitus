@@ -383,6 +383,10 @@
       "types": "./src/device/duoControl.ts",
       "default": "./src/device/duoControl.ts"
     },
+    "./diff-count": {
+      "types": "./src/diffCount.ts",
+      "default": "./src/diffCount.ts"
+    },
     "./mcp-apps": {
       "types": "./src/mcpApps/host.ts",
       "default": "./src/mcpApps/host.ts"
@@ -391,6 +395,7 @@
       "types": "./src/state/mcpApps.ts",
       "default": "./src/state/mcpApps.ts"
     },
+<<<<<<< HEAD
     "./relay/infinitusTeam": {
       "types": "./src/relay/infinitusTeam.ts",
       "default": "./src/relay/infinitusTeam.ts"
@@ -434,6 +439,11 @@
     "./state/stats": {
       "types": "./src/state/stats.ts",
       "default": "./src/state/stats.ts"
+=======
+    "./source-control-clients": {
+      "types": "./src/sourceControlClients.ts",
+      "default": "./src/sourceControlClients.ts"
+>>>>>>> upstream-sync-4b6d9a09f-upstream-renamed
     }
   },
   "scripts": {
@@ -443,6 +453,13 @@
   "dependencies": {
     "@infinitus/contracts": "workspace:*",
     "@infinitus/shared": "workspace:*",
+    "@infinitus/source-control-azure-devops": "workspace:*",
+    "@infinitus/source-control-bitbucket": "workspace:*",
+    "@infinitus/source-control-core": "workspace:*",
+    "@infinitus/source-control-forgejo": "workspace:*",
+    "@infinitus/source-control-gitcafe": "workspace:*",
+    "@infinitus/source-control-github": "workspace:*",
+    "@infinitus/source-control-gitlab": "workspace:*",
     "effect": "catalog:",
     "three": "0.180.0"
   },

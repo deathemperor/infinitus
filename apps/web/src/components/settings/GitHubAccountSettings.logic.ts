@@ -1,4 +1,5 @@
-import type { GitHubSettings, SourceControlProviderAuth } from "@infinitus/contracts";
+import type { SourceControlProviderAuth } from "@infinitus/contracts";
+import type { GitHubSettings } from "@infinitus/client-runtime/source-control-clients";
 
 export type GitHubDiscoveredAccount = NonNullable<SourceControlProviderAuth["accounts"]>[number];
 

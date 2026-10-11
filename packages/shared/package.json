@@ -311,9 +311,13 @@
       "types": "./src/nodeRuntime.ts",
       "import": "./src/nodeRuntime.ts"
     },
-    "./hostProcess": {
-      "types": "./src/hostProcess.ts",
-      "import": "./src/hostProcess.ts"
+    "./AgentScope": {
+      "types": "./src/AgentScope.ts",
+      "import": "./src/AgentScope.ts"
+    },
+    "./HostProcess": {
+      "types": "./src/HostProcess.ts",
+      "import": "./src/HostProcess.ts"
     },
     "./testing/longTempDir": {
       "types": "./src/testing/longTempDir.ts",
@@ -354,6 +358,10 @@
     "./thirdPartyLicenses": {
       "types": "./src/thirdPartyLicenses.ts",
       "import": "./src/thirdPartyLicenses.ts"
+    },
+    "./deviceToolVersions": {
+      "types": "./src/deviceToolVersions.ts",
+      "import": "./src/deviceToolVersions.ts"
     },
     "./claudeCompaction": {
       "types": "./src/claudeCompaction.ts",
