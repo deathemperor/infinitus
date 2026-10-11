@@ -172,12 +172,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   one call before the command and the `--literal-pathspecs` / `-- <paths>`
   arguments; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
   the checkpoint author and committer names are `PRODUCT_NAME`.
-- `packages/contracts/src/providerRuntime.ts` — optional fields left from
-  dropped features (#1627): `TaskStartedPayload.prompt` (#1567) and
-  `isBackgrounded` (#952), `TurnCompletedPayload.turnCostUsd` / `turnModels`
-  (#834), `usageLimited` (#648) and `cacheTtlSeconds`. No orchestration-v2
-  adapter fills them and no client reads them; drop with the next sync that
-  touches the file.
+- `packages/contracts/src/providerRuntime.ts` — six fork-owned optional
+  fields: `TaskStartedPayload.prompt` (#1573) and `isBackgrounded` (#974;
+  the one on `TaskUpdatedPayload` is upstream's),
+  `TurnCompletedPayload.turnCostUsd` / `turnModels` (#834) and
+  `usageLimited` (#648), `TurnTokenUsage.cacheTtlSeconds` (#1557). No
+  orchestration-v2 adapter writes them and no client reads them; kept for
+  the #1627 ports of those features (#834, #1557, #648, #974, #1573).
 - `packages/contracts/src/settings.ts` — the `PromptSnippet` schema with its
   caps and `projectPromptSnippets`
   (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on
@@ -434,12 +435,6 @@ background`). Riding along, all
   constant. `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts`
   expects `infinitus/<hash>` where upstream's fixtures say `t3/<hash>`.
   Upstream's own `t3code/…` fixtures in tests stay as legacy data.
-- `apps/mobile/src/widgets/AgentActivity.tsx` and the Android
-  `AgentActivityPresentation.kt` — a `monitoring` awareness phase (tint, sort
-  bucket, `ActivityPhase.MONITORING`) left from the fork's watch-loop phase
-  (#1635): nothing publishes it since the orchestration rewrite and the
-  contracts no longer name it (#1627); drop with the next sync that touches
-  the files.
 - `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); re-flipped after every sync with its two fixtures, `packages/shared/src/cliRelease.test.ts` and `packages/ssh/src/tunnel.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/shared/package.json` — the `./productName`, `./homeDir`,
   `./desktopIdentity`, `./infinitusControl`, `./infinitusControlSocket`,
@@ -774,3 +769,6 @@ background`). Riding along, all
 - `apps/server/src/provider/acp/AcpSessionRuntime.processTree.test.ts` — the "rotates more than 64 live parents" fixture puts its fake parents above pid_max (#1642): the termination skips the current process's group, and a CI worker pid inside upstream's 1000–1129 range left that parent and child behind.
 - `infra/relay/migrations/postgres/<newest upstream migration>/snapshot.json` — rewritten after each sync that brings a relay migration so the snapshot chain has one head that includes the fork's Team tables (today `20261005232034_managed_endpoint_tunnel_released_at`). Procedure: `docs/internals/release-and-updates.md`.
 - `apps/server/src/vcs/GitVcsDriverCore.test.ts` — the "keeps complete stats for files beyond the combined patch limit" fixture rewrites `a-large.txt` to a different byte length (#1517): upstream's same-size rewrite in the same second as its commit intermittently read as unchanged through the index stat cache and dropped the file from the working-tree stats on CI.
+- `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.
+- `apps/server/src/cli/invocation.test.ts` — the "manual server installation ownership" prefix fixtures realpath their temp root (#1661): the resolver reports the realpath'd prefix, which on macOS is `/private/var/…`, not `/var/…`.
+- `apps/server/src/usage/UsageService.test.ts` — the v4-upgrade test waits for the second service's cache write (#1661): the layer's temp state dir is removed before the service's own shutdown wait, and on macOS the write loses that race.
