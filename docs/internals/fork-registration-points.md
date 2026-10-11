@@ -677,9 +677,10 @@ background`). Riding along, all
   so a nested page's nav item is the only one lit, the `desktop-keep-awake`
   item (#1075) and `CONNECT_NAME` as the Connect section's title.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
-- `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all six where no
-  connected server reaches an Infinitus app.
+- `apps/web/src/components/settings/SettingsSidebarNav.tsx` — one import from
+  `infinitus/settingsNav.ts`, `...INFINITUS_SECTION_ICONS` spread into the icon
+  map, `useInfinitusSectionFilter()` chained as a second `.filter` on the nav
+  items, and the `isSettingsSectionActive` call (#1565).
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability

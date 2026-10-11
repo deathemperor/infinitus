@@ -288,23 +288,24 @@ const watch = Effect.fn("watch")(function* () {
 const settle = Effect.repeat(Effect.yieldNow, { times: 20 });
 
 describe("serverPortWithheldReason", () => {
+  const installed = {
+    mode: "desktop" as const,
+    devUrl: undefined,
+    baseDir: "/Users/me/.t3",
+    worktreeT3Home: undefined,
+    controlSocketOverride: undefined,
+  };
+
   it("withholds the pref from a dev-runner or worktree server and publishes for the installed one", () => {
-    const installed = {
-      devUrl: undefined,
-      baseDir: "/Users/me/.t3",
-      worktreeT3Home: undefined,
-      controlSocketOverride: undefined,
-    };
     expect(serverPortWithheldReason(installed)).toBeUndefined();
     expect(
       serverPortWithheldReason({ ...installed, devUrl: new URL("http://localhost:3000") }),
     ).toMatch(/dev-runner/);
     expect(
       serverPortWithheldReason({
-        devUrl: undefined,
+        ...installed,
         baseDir: "/Users/me/wt/.t3",
         worktreeT3Home: "/Users/me/wt/.t3",
-        controlSocketOverride: undefined,
       }),
     ).toMatch(/worktree-local/);
     // An isolated instance (its own control socket) is never the installed
@@ -315,13 +316,35 @@ describe("serverPortWithheldReason", () => {
     expect(serverPortWithheldReason({ ...installed, controlSocketOverride: "" })).toBeUndefined();
     // A worktree checkout run against the shared home is not a worktree server.
     expect(
-      serverPortWithheldReason({
-        devUrl: undefined,
-        baseDir: "/Users/me/.t3",
-        worktreeT3Home: "/Users/me/wt/.t3",
-        controlSocketOverride: undefined,
-      }),
+      serverPortWithheldReason({ ...installed, worktreeT3Home: "/Users/me/wt/.t3" }),
     ).toBeUndefined();
+  });
+
+  it("withholds the pref from every server that is not the desktop's own (#1487)", () => {
+    // A showcase on a temp home, `dev:server` without Vite, a `--home-dir`
+    // elsewhere: none carries a dev URL or a worktree home, all run as `web`.
+    expect(serverPortWithheldReason({ ...installed, mode: "web" })).toMatch(
+      /only the desktop's bundled server/,
+    );
+    expect(
+      serverPortWithheldReason({ ...installed, mode: "web", baseDir: "/tmp/showcase-abc" }),
+    ).toMatch(/only the desktop's bundled server/);
+    // The older reasons come first: a dev-runner server, a worktree server
+    // and an isolated instance keep their own explanation whatever the mode.
+    const web = { ...installed, mode: "web" as const };
+    expect(serverPortWithheldReason({ ...web, devUrl: new URL("http://localhost:3000") })).toMatch(
+      /dev-runner/,
+    );
+    expect(
+      serverPortWithheldReason({
+        ...web,
+        baseDir: "/Users/me/wt/.t3",
+        worktreeT3Home: "/Users/me/wt/.t3",
+      }),
+    ).toMatch(/worktree-local/);
+    expect(serverPortWithheldReason({ ...web, controlSocketOverride: "/tmp/i3.sock" })).toMatch(
+      /INFINITUS_CONTROL_SOCKET override/,
+    );
   });
 });
 
