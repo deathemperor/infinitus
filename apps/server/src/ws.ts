@@ -2367,10 +2367,11 @@ const layerWsRpc = (
         [WS_METHODS.serverUpdateServerWithProgress]: (input) =>
           Stream.callback<ServerSelfUpdateProgressEvent, ServerSelfUpdateError>((queue) =>
             serverSelfUpdate
-              .update(input, (stage) =>
+              .update(input, (stage, runningTurns) =>
                 Queue.offer(queue, {
                   type: "progress",
                   stage,
+                  ...(runningTurns !== undefined ? { runningTurns } : {}),
                 }).pipe(Effect.asVoid),
               )
               .pipe(
