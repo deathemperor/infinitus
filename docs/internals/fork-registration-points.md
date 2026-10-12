@@ -64,17 +64,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/desktop/src/updates/updatesTestHarness.ts` — the `resourcesPath`
   option (#1042); under upstream's no-op file system, reads below it go to
   the real disk so the feed-swap test's own `app-update.yml` is found.
-- `packages/contracts/src/rpc.ts` — `subscribeInfinitus`, `infinitus.command`,
-  `infinitus.launch` and `infinitus.secret` (#747) in `WS_METHODS`, their
-  `Rpc.make`s, all in `WsRpcGroup`; `subscribeInfinitusPairing` /
-  `infinitus.pairingDecide` (approve-on-Mac pairing, #710) the same way,
-  contracts in `infinitusPairing.ts`; `subscribeInfinitusHolds` /
-  `infinitus.releaseThread` (session priority mode, #616 #743, on v2 per
-  #1627) the same way, contracts at the end of `infinitus.ts`; `subscribeCaptures` / `captures.apply`
-  (#433) the same way, contracts in `captures.ts`; `server.getStats` (#659,
-  contracts in `stats.ts`); `subscribeInfinitusLimitStops` (#648 on v2,
-  #1627; `InfinitusLimitStops` in `infinitus.ts`) the same way;
-  `vcs.removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A).
+- `packages/contracts/src/rpc.ts` — `...INFINITUS_WS_METHODS` in `WS_METHODS`
+  and `...INFINITUS_RPCS` in `WsRpcGroup`, both from `infinitusRpc.ts`
+  (`fork-only-files.md`); `vcs.removeWorktree` answers
+  `VcsRemoveWorktreeResult` (#270 A).
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` (+ `apps/web/src/worktreeCleanup.ts`: `branchDeletionPrompt`, `describeSavedWorktreeWork`) — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding; the `removeWorktree` mocks in `apps/server/src/mcp/WorktreeMcpService.test.ts` and `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts` answer that result shape. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
@@ -153,28 +146,17 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `subscribeInfinitusPairing`, `infinitus.pairingDecide`,
   `subscribeInfinitusHolds`, `infinitus.releaseThread`) under `infinitus`,
   `subscribeCaptures` / `captures.apply` under `captures`.
-- `apps/server/src/server.ts` — `layerInfinitus` below `layerAuth`:
-  `InfinitusServerPortLive` (it mints infinitusctl's session, so it needs
-  the auth service, #822, and names its environment to the app, so
-  `layerServerEnvironment` too, #1487), `InfinitusCompanionLive`, `InfinitusSecretLive`
-  (#747) and `InfinitusUsageAttributionLive` (#779) over `InfinitusLive` and
-  the control client; `layerUsage` is provided it; the block is merged into
-  `layerRuntimeDependencies`, `InfinitusPairingLive` (provided `layerAuth`,
-  #710) after it. `InfinitusSignInLapseLive` (#1076, #1627) sits in
+- `apps/server/src/server.ts` — `layerInfinitus =
+makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettings })`
+  (`infinitus/Layers/InfinitusServerLayers.ts`, `fork-only-files.md`) below
+  `layerAuth`, since the port publish mints infinitusctl's session (#822)
+  and names this environment to the app (#1487),
+  and its five reads: `.infinitus` provided to `layerUsage`, `.reactors` in
   `layerRuntimeCoreDependenciesBase`'s `Layer.mergeAll` beside upstream's
-  reactors, where the chain hands it `OrchestratorV2` and `ServerEnvironment`;
-  it is provided `layerInfinitus` itself (memoized, one instance), its own
-  control client, `ProcessRunner.layer` and `InfinitusAlertRelayLive`.
-  `InfinitusResumeOnLimitLive` (#648, #1627) sits in the same `mergeAll`,
-  provided `layerInfinitus`, `InfinitusSwapdProbeLive` over
-  `ProcessRunner.layer`, `ProjectionStoreV2.layer` and `layerServerSettings`;
-  `InfinitusLimitStopsLive` is `provideMerge`d into `layerRuntimeDependencies`
-  after `layerInfinitus`, so the one instance reaches that layer, `ws.ts` and
-  the provider registry's drivers (`ClaudeDriver` reads it through
-  `Effect.serviceOption`). `infinitusPairingHttpApiLayer` and `infinitusHttpApiLayer`
-  (provided `InfinitusRunningTurnsLive` over `ProjectionStoreV2.layer`, #829,
-  and `InfinitusAlertRelayLive` over the secret store and
-  `FetchHttpClient.layer`, #1375) in `layerMakeRoutes`. `CaptureStore.layer`
+  reactors (where the chain hands them `OrchestratorV2` and
+  `ServerEnvironment`), `.runtime` `provideMerge`d into
+  `layerRuntimeDependencies`, `.httpApi` provided in `layerMakeRoutes`,
+  `.runningTurns` provided to `ServerSelfUpdate.layer`. `CaptureStore.layer`
   (#433) in the state-dir file services' `Layer.mergeAll` beside
   `Keybindings.layer`. The tunnel log lines say `CONNECT_NAME`.
 - `apps/server/src/project/RepositoryIdentityResolver.ts` (+ its test) — a
@@ -762,8 +744,8 @@ background`). Riding along, all
   working and below approval and input; the row's pill reads "Held" /
   "Paused". The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
   `thread-list-v2-items.tsx` and `thread-row-emphasis.ts`, through
-  `features/infinitus/useThreadHeldEntry.ts`. `apps/server/src/server.ts`
-  provides `InfinitusSessionHoldsIdle` until the policies land.
+  `features/infinitus/useThreadHeldEntry.ts`. `makeInfinitusServerLayers`
+  (`InfinitusServerLayers.ts`) provides `InfinitusSessionHoldsIdle` until the policies land.
 - `apps/web/src/components/settings/settingsSearch.ts` — three spreads from
   `infinitus/settingsSearchItems.ts` (`InfinitusSettingsPath` in the
   `SettingsPath` union, `INFINITUS_SECTION_LABELS`, `INFINITUS_CATEGORY_SCOPES`
