@@ -71,26 +71,7 @@ import * as PreviewBrowser from "./preview/PreviewBrowser.ts";
 import * as ProcessRunner from "./processRunner.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
-import {
-  InfinitusControlClientConfigLive,
-  InfinitusControlClientLive,
-} from "./infinitus/Layers/InfinitusControlClient.ts";
-import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
-import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts";
-import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
-import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
-import { InfinitusLimitStopsLive } from "./infinitus/Services/InfinitusLimitStops.ts";
-import { InfinitusSwapdProbeLive } from "./infinitus/Services/InfinitusSwapdProbe.ts";
-import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
-import { InfinitusSessionHoldsIdle } from "./infinitus/Services/InfinitusSessionHolds.ts";
-import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
-import { InfinitusToolBoundarySteerLive } from "./infinitus/Layers/InfinitusToolBoundarySteer.ts";
-import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
-import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
-import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
-import { InfinitusAlertRelayLive } from "./infinitus/Layers/InfinitusAlertRelay.ts";
-import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
-import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
+import { makeInfinitusServerLayers } from "./infinitus/Layers/InfinitusServerLayers.ts";
 import * as CaptureStore from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
@@ -449,33 +430,18 @@ const layerAuth = EnvironmentAuth.layer.pipe(
   Layer.provide(ServerSecretStore.layer),
 );
 
-// The client is private to these four: everything else reaches Infinitus
-// through `InfinitusService`, which is the only thing that polls the socket;
-// the port layer writes one pref once the server is listening and again when
-// a watched app comes back; the companion opens the app when the socket stays
-// quiet at startup and on `infinitus.launch`.
-// InfinitusSecretLive (#747) is the one secret-carrying path: a code, a key or
-// a token to a verb the manifest says takes one, on the request line, never
-// kept. It reads the manifest through the same service and socket client.
-// InfinitusUsageAttributionLive (#779) reads the app's `history` verb once per
-// usage scan so `/usage` can split Claude spend by account.
-const layerInfinitus = Layer.mergeAll(
-  // The port publish also mints infinitusctl's session (#822), so it needs
-  // the auth service — which is why this block sits below layerAuth — and
-  // names this environment to the app (#1487), so the identity too.
-  InfinitusServerPortLive.pipe(Layer.provide(layerAuth), Layer.provide(layerServerEnvironment)),
-  InfinitusCompanionLive,
-  InfinitusSecretLive,
-  InfinitusUsageAttributionLive,
-).pipe(
-  Layer.provideMerge(InfinitusLive),
-  Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
-);
+// Fork: below layerAuth because the port publish mints infinitusctl's session
+// (#822) and names this environment to the app (#1487).
+const layerInfinitus = makeInfinitusServerLayers({
+  layerAuth,
+  layerServerEnvironment,
+  layerServerSettings,
+});
 
 const layerUsage = UsageService.layer.pipe(
   Layer.provide(layerServerSettings),
   Layer.provide(CursorUsageReader.layer),
-  Layer.provide(layerInfinitus),
+  Layer.provide(layerInfinitus.infinitus),
 );
 
 const layerCloudManagedEndpointRuntime = Layer.mergeAll(
@@ -608,44 +574,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
     Layer.provide(layerPullRequestService),
     Layer.provide(ProjectionStoreV2.layer),
   ),
-  // Fork (#1076, #1627): a lapsed AWS / gcloud sign-in in a shell tool's
-  // output starts the Mac's login and rings the phones. It tails the
-  // orchestrator's domain events and reads `InfinitusService` (the shared
-  // `layerInfinitus`, memoized); its own control client, since
-  // layerInfinitus's is private; `ps` / `kill` for the agent's own login once
-  // the Mac's lands.
-  InfinitusSignInLapseLive.pipe(
-    Layer.provide(layerInfinitus),
-    Layer.provide(InfinitusControlClientLive.pipe(Layer.provide(InfinitusControlClientConfigLive))),
-    Layer.provide(ProcessRunner.layer),
-    Layer.provide(
-      InfinitusAlertRelayLive.pipe(
-        Layer.provide(ServerSecretStore.layer),
-        Layer.provide(FetchHttpClient.layer),
-      ),
-    ),
-  ),
-  // Fork (#616, #743, #1627): session priority mode's holds stream and "Run
-  // now" (`ws.ts`). Nothing is held until the hold and interrupt policies
-  // land on the queue lane's turn-start gate; this answers the empty list.
-  InfinitusSessionHoldsIdle,
-  // Fork (#648, #1627): resume-on-limit. Tails the orchestrator's domain
-  // events for failed limit runs and `InfinitusLimitStops` for the Claude
-  // adapter's rejected windows (the memoized instance `ws.ts` streams and the
-  // Claude driver reports into, provided in `layerRuntimeDependencies`);
-  // reads the shared `layerInfinitus` snapshot, the swapd probe for the
-  // accounts while the menu bar app is away and for `limit-hit`, and the
-  // server settings for its switch and the proxied instances.
-  InfinitusResumeOnLimitLive.pipe(
-    Layer.provide(layerInfinitus),
-    Layer.provide(InfinitusSwapdProbeLive.pipe(Layer.provide(ProcessRunner.layer))),
-    Layer.provide(ProjectionStoreV2.layer),
-    Layer.provide(layerServerSettings),
-  ),
-  // Fork (#1318, #1627): sends a queued steer into the running turn at its
-  // next finished tool call. Tails the orchestrator's domain events like the
-  // layer above; its reads are the projection store's.
-  InfinitusToolBoundarySteerLive.pipe(Layer.provide(ProjectionStoreV2.layer)),
+  layerInfinitus.reactors,
   // Subscribes to `account.rate-limits.updated` so usage bars track live
   // telemetry instead of waiting for the next status probe.
   ProviderUsageLimitsIngestion.layer,
@@ -745,14 +674,7 @@ const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
   Layer.provideMerge(layerBackground),
   Layer.provideMerge(layerResourceDiagnostics),
   Layer.provideMerge(layerUsage),
-  Layer.provideMerge(layerInfinitus),
-  // Fork (#648): the limit-stop list, one instance for the resume layer, the
-  // Claude driver's refusal hook (read through `Effect.serviceOption` when the
-  // provider registry builds its drivers) and the `ws.ts` stream.
-  Layer.provideMerge(InfinitusLimitStopsLive),
-  // The pairing-approval store (#710) mints through the same auth service the
-  // QR flow uses; the phone reaches it over HTTP, the desktop over WebSocket.
-  Layer.provideMerge(InfinitusPairingLive.pipe(Layer.provide(layerAuth))),
+  Layer.provideMerge(layerInfinitus.runtime),
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(AnalyticsService.layer),
   Layer.provideMerge(ExternalLauncher.layer),
@@ -780,21 +702,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(PullRequestHttp.layer),
       Layer.provide(ProjectHttp.layer),
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
-      Layer.provide(infinitusPairingHttpApiLayer),
-      // Fork (#1375): the Mac's account alerts, signed with the relay link's
-      // key and posted to the relay over fetch; (#829) the running turns the
-      // Mac counts, read from the projection's thread shells.
-      Layer.provide(
-        infinitusHttpApiLayer.pipe(
-          Layer.provide(InfinitusRunningTurnsLive.pipe(Layer.provide(ProjectionStoreV2.layer))),
-          Layer.provide(
-            InfinitusAlertRelayLive.pipe(
-              Layer.provide(ServerSecretStore.layer),
-              Layer.provide(FetchHttpClient.layer),
-            ),
-          ),
-        ),
-      ),
+      Layer.provide(layerInfinitus.httpApi),
       Layer.provide(WebhookRoute.layer.pipe(Layer.provide(RelayDeliveryProof.layer))),
       Layer.provide(AuthHttp.layerAuthenticatedAuth),
     ),
@@ -824,11 +732,10 @@ const layerMakeRoutes = Layer.mergeAll(
   // Server browser tabs and HTML render previews install and run the same headless browser.
   Layer.provide(PreviewBrowser.layer),
   Layer.provide(PreviewAutomationBroker.layer),
-  // Fork (#829): the update idle gate reads the running turns.
   Layer.provide(
     ServerSelfUpdate.layer.pipe(
       Layer.provide(layerDesktopAppUpdate),
-      Layer.provide(InfinitusRunningTurnsLive.pipe(Layer.provide(ProjectionStoreV2.layer))),
+      Layer.provide(layerInfinitus.runningTurns),
     ),
   ),
   Layer.provide(layerCommandReadiness),

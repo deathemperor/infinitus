@@ -76,37 +76,7 @@ import {
   ClientActivityReportInput,
   HostPowerSnapshot,
 } from "./background.ts";
-import {
-  InfinitusCommandFailed,
-  InfinitusCommandInput,
-  InfinitusCommandResult,
-  InfinitusLaunchResult,
-  InfinitusProtocolError,
-  InfinitusSecretInput,
-  InfinitusSecretRefused,
-  InfinitusSecretResult,
-  InfinitusLimitStops,
-  InfinitusHeldThread,
-  InfinitusReleaseThreadInput,
-  InfinitusReleaseThreadResult,
-  InfinitusSnapshot,
-  InfinitusSubscribeInput,
-  InfinitusUnavailable,
-} from "./infinitus.ts";
-import {
-  PairingApprovalDecideInput,
-  PairingApprovalDecideResult,
-  PairingApprovalIssueFailed,
-  PairingApprovalPendingRequests,
-} from "./infinitusPairing.ts";
-import {
-  CaptureList,
-  CaptureListFull,
-  CapturesApplyInput,
-  CapturesApplyResult,
-  CaptureStoreError,
-  CapturesSubscribeInput,
-} from "./captures.ts";
+import { INFINITUS_RPCS, INFINITUS_WS_METHODS } from "./infinitusRpc.ts";
 import {
   FilesystemBrowseInput,
   FilesystemBrowseResult,
@@ -348,7 +318,6 @@ import {
   ProviderConsumeResetCreditInput,
   ProviderConsumeResetCreditResult,
 } from "./providerUsageLimits.ts";
-import { StatsRequest, StatsSnapshot } from "./stats.ts";
 import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
 import { ServerSettings, ServerSettingsError, ServerSettingsPatch } from "./settings.ts";
 import {
@@ -525,7 +494,6 @@ export const WS_METHODS = {
   serverReportClientActivity: "server.reportClientActivity",
   serverReportHostPowerState: "server.reportHostPowerState",
   serverGetBackgroundPolicy: "server.getBackgroundPolicy",
-  serverGetStats: "server.getStats",
   serverGetUsageSummary: "server.getUsageSummary",
   serverRefreshUsageRates: "server.refreshUsageRates",
 
@@ -599,21 +567,7 @@ export const WS_METHODS = {
   subscribeAuthAccess: "subscribeAuthAccess",
   subscribeBackgroundPolicy: "subscribeBackgroundPolicy",
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
-  subscribeInfinitus: "subscribeInfinitus",
-
-  // Infinitus methods
-  infinitusCommand: "infinitus.command",
-  infinitusLaunch: "infinitus.launch",
-  infinitusSecret: "infinitus.secret",
-  subscribeInfinitusPairing: "subscribeInfinitusPairing",
-  infinitusPairingDecide: "infinitus.pairingDecide",
-  // Session priority mode (#616, #743): the server's holds and "Run now".
-  subscribeInfinitusHolds: "subscribeInfinitusHolds",
-  infinitusReleaseThread: "infinitus.releaseThread",
-  subscribeInfinitusLimitStops: "subscribeInfinitusLimitStops",
-  // Captures (#433)
-  subscribeCaptures: "subscribeCaptures",
-  capturesApply: "captures.apply",
+  ...INFINITUS_WS_METHODS,
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -909,12 +863,6 @@ const WsServerRetryResourceTelemetryRpc = Rpc.make(WS_METHODS.serverRetryResourc
   payload: Schema.Struct({}),
   success: ResourceTelemetryRetryResult,
   error: EnvironmentAuthorizationError,
-});
-
-const WsServerGetStatsRpc = Rpc.make(WS_METHODS.serverGetStats, {
-  payload: StatsRequest,
-  success: StatsSnapshot,
-  error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
 });
 
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
@@ -1864,116 +1812,6 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
   { error: EnvironmentAuthorizationError },
 ) {}
 
-/** The whole Infinitus view, seeded with the current snapshot and followed by
-    every change. Unreachability is a snapshot with `available: false`, never a
-    stream failure: the app comes and goes while a client stays subscribed. */
-const WsSubscribeInfinitusRpc = Rpc.make(WS_METHODS.subscribeInfinitus, {
-  payload: InfinitusSubscribeInput,
-  success: InfinitusSnapshot,
-  error: EnvironmentAuthorizationError,
-  stream: true,
-});
-
-/** Asks the server's host to open the Infinitus menu-bar app when its control
-    socket is not answering. Never fails: an unsupported host or a failed
-    `open` is a `launched: false` with the reason. */
-const WsInfinitusLaunchRpc = Rpc.make(WS_METHODS.infinitusLaunch, {
-  payload: Schema.Struct({}),
-  success: InfinitusLaunchResult,
-  error: EnvironmentAuthorizationError,
-});
-
-/** The requests waiting for this desktop's approval (#710): the current list,
-    then the whole list again on every change. Metadata only. */
-const WsSubscribeInfinitusPairingRpc = Rpc.make(WS_METHODS.subscribeInfinitusPairing, {
-  payload: Schema.Struct({}),
-  success: PairingApprovalPendingRequests,
-  error: EnvironmentAuthorizationError,
-  stream: true,
-});
-
-/** Approves or denies one pending request. Approving mints the one-time
-    pairing credential the phone then collects by polling; it never rides
-    this reply. */
-const WsInfinitusPairingDecideRpc = Rpc.make(WS_METHODS.infinitusPairingDecide, {
-  payload: PairingApprovalDecideInput,
-  success: PairingApprovalDecideResult,
-  error: Schema.Union([EnvironmentAuthorizationError, PairingApprovalIssueFailed]),
-});
-
-/** The threads the server holds for headroom (#616, #741) or paused for it
-    (#743): the whole list on subscribe, then again on every change. */
-const WsSubscribeInfinitusHoldsRpc = Rpc.make(WS_METHODS.subscribeInfinitusHolds, {
-  payload: Schema.Struct({}),
-  success: Schema.Array(InfinitusHeldThread),
-  error: EnvironmentAuthorizationError,
-  stream: true,
-});
-
-/** The threads whose turn a Claude usage limit stopped on this server (#648,
-    #1627): the current list, then the whole list again on every change. The
-    sidebar's "Limited" pill for a parked turn reads it; a failed one is on
-    the thread shell too. */
-const WsSubscribeInfinitusLimitStopsRpc = Rpc.make(WS_METHODS.subscribeInfinitusLimitStops, {
-  payload: Schema.Struct({}),
-  success: InfinitusLimitStops,
-  error: EnvironmentAuthorizationError,
-  stream: true,
-});
-
-/** "Run now": runs the thread's held start, or continues its paused turn,
-    whatever the fleet reads. Never fails: `released: false` with the reason. */
-const WsInfinitusReleaseThreadRpc = Rpc.make(WS_METHODS.infinitusReleaseThread, {
-  payload: InfinitusReleaseThreadInput,
-  success: InfinitusReleaseThreadResult,
-  error: EnvironmentAuthorizationError,
-});
-
-/** A project's capture list (#433): the current list, then the whole list
-    again after every change. */
-const WsSubscribeCapturesRpc = Rpc.make(WS_METHODS.subscribeCaptures, {
-  payload: CapturesSubscribeInput,
-  success: CaptureList,
-  error: Schema.Union([CaptureStoreError, EnvironmentAuthorizationError]),
-  stream: true,
-});
-
-/** One change to a project's capture list; the new list rides the
-    subscription. */
-const WsCapturesApplyRpc = Rpc.make(WS_METHODS.capturesApply, {
-  payload: CapturesApplyInput,
-  success: CapturesApplyResult,
-  error: Schema.Union([CaptureListFull, CaptureStoreError, EnvironmentAuthorizationError]),
-});
-
-/** Forwards one command from the manifest to the control socket. */
-const WsInfinitusCommandRpc = Rpc.make(WS_METHODS.infinitusCommand, {
-  payload: InfinitusCommandInput,
-  success: InfinitusCommandResult,
-  error: Schema.Union([
-    InfinitusUnavailable,
-    InfinitusProtocolError,
-    InfinitusCommandFailed,
-    EnvironmentAuthorizationError,
-  ]),
-});
-
-/** The fork's one secret-carrying path (#747): forwards `secret` on the
-    control request line to a verb whose manifest entry says `stdin:
-    "secret"`, and refuses everything else before the socket. Administrative
-    scope; the reply is the verb's own, opaque. */
-const WsInfinitusSecretRpc = Rpc.make(WS_METHODS.infinitusSecret, {
-  payload: InfinitusSecretInput,
-  success: InfinitusSecretResult,
-  error: Schema.Union([
-    InfinitusSecretRefused,
-    InfinitusUnavailable,
-    InfinitusProtocolError,
-    InfinitusCommandFailed,
-    EnvironmentAuthorizationError,
-  ]),
-});
-
 export const WsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
   WsServerGetConfigRpc,
@@ -2019,7 +1857,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetProcessResourceHistoryRpc,
   WsServerGetResourceTelemetryHistoryRpc,
   WsServerRetryResourceTelemetryRpc,
-  WsServerGetStatsRpc,
   WsServerGetUsageSummaryRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
@@ -2147,17 +1984,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeAuthAccessRpc,
   WsSubscribeBackgroundPolicyRpc,
   WsSubscribeResourceTelemetryRpc,
-  WsSubscribeInfinitusRpc,
-  WsInfinitusCommandRpc,
-  WsInfinitusLaunchRpc,
-  WsInfinitusSecretRpc,
-  WsSubscribeInfinitusPairingRpc,
-  WsInfinitusPairingDecideRpc,
-  WsSubscribeInfinitusHoldsRpc,
-  WsInfinitusReleaseThreadRpc,
-  WsSubscribeInfinitusLimitStopsRpc,
-  WsSubscribeCapturesRpc,
-  WsCapturesApplyRpc,
+  ...INFINITUS_RPCS,
   WsOrchestrationV2DispatchCommandRpc,
   WsOrchestrationV2GetWorkflowScriptRpc,
   WsOrchestrationV2GetTurnItemRpc,
