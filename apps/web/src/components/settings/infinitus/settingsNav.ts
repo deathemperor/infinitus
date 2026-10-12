@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import {
   BellIcon,
   CpuIcon,
+  GaugeIcon,
   InfinityIcon,
   SmartphoneIcon,
   SparklesIcon,
@@ -15,6 +16,7 @@ import type { SettingsPath } from "../settingsSearch";
 export const INFINITUS_SECTION_ICONS = {
   "/settings/menu-bar": InfinityIcon,
   "/settings/animations": SparklesIcon,
+  "/settings/priority": GaugeIcon,
   "/settings/team": UsersIcon,
   "/settings/notifications": BellIcon,
   "/settings/devices": SmartphoneIcon,

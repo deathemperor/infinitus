@@ -27,6 +27,7 @@ import { Route as SettingsSnapShotRouteImport } from './routes/settings.snap-sho
 import { Route as SettingsScheduledTasksRouteImport } from './routes/settings.scheduled-tasks'
 import { Route as SettingsProvidersRouteImport } from './routes/settings.providers'
 import { Route as SettingsProjectsRouteImport } from './routes/settings.projects'
+import { Route as SettingsPriorityRouteImport } from './routes/settings.priority'
 import { Route as SettingsOpenSourceLicensesRouteImport } from './routes/settings.open-source-licenses'
 import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SettingsMenuBarRouteImport } from './routes/settings.menu-bar'
@@ -134,6 +135,11 @@ const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
 const SettingsProjectsRoute = SettingsProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsPriorityRoute = SettingsPriorityRouteImport.update({
+  id: '/priority',
+  path: '/priority',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsOpenSourceLicensesRoute =
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/settings/menu-bar': typeof SettingsMenuBarRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof SettingsPriorityRoute
   '/settings/projects': typeof SettingsProjectsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/scheduled-tasks': typeof SettingsScheduledTasksRoute
@@ -297,6 +304,7 @@ export interface FileRoutesByTo {
   '/settings/menu-bar': typeof SettingsMenuBarRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof SettingsPriorityRoute
   '/settings/projects': typeof SettingsProjectsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/scheduled-tasks': typeof SettingsScheduledTasksRoute
@@ -337,6 +345,7 @@ export interface FileRoutesById {
   '/settings/menu-bar': typeof SettingsMenuBarRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/open-source-licenses': typeof SettingsOpenSourceLicensesRoute
+  '/settings/priority': typeof SettingsPriorityRoute
   '/settings/projects': typeof SettingsProjectsRoute
   '/settings/providers': typeof SettingsProvidersRoute
   '/settings/scheduled-tasks': typeof SettingsScheduledTasksRoute
@@ -378,6 +387,7 @@ export interface FileRouteTypes {
     | '/settings/menu-bar'
     | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/scheduled-tasks'
@@ -415,6 +425,7 @@ export interface FileRouteTypes {
     | '/settings/menu-bar'
     | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/scheduled-tasks'
@@ -454,6 +465,7 @@ export interface FileRouteTypes {
     | '/settings/menu-bar'
     | '/settings/notifications'
     | '/settings/open-source-licenses'
+    | '/settings/priority'
     | '/settings/projects'
     | '/settings/providers'
     | '/settings/scheduled-tasks'
@@ -608,6 +620,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/settings/projects'
       preLoaderRoute: typeof SettingsProjectsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/priority': {
+      id: '/settings/priority'
+      path: '/priority'
+      fullPath: '/settings/priority'
+      preLoaderRoute: typeof SettingsPriorityRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/open-source-licenses': {
@@ -776,6 +795,7 @@ interface SettingsRouteChildren {
   SettingsMenuBarRoute: typeof SettingsMenuBarRoute
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsOpenSourceLicensesRoute: typeof SettingsOpenSourceLicensesRoute
+  SettingsPriorityRoute: typeof SettingsPriorityRoute
   SettingsProjectsRoute: typeof SettingsProjectsRoute
   SettingsProvidersRoute: typeof SettingsProvidersRoute
   SettingsScheduledTasksRoute: typeof SettingsScheduledTasksRoute
@@ -801,6 +821,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsMenuBarRoute: SettingsMenuBarRoute,
   SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsOpenSourceLicensesRoute: SettingsOpenSourceLicensesRoute,
+  SettingsPriorityRoute: SettingsPriorityRoute,
   SettingsProjectsRoute: SettingsProjectsRoute,
   SettingsProvidersRoute: SettingsProvidersRoute,
   SettingsScheduledTasksRoute: SettingsScheduledTasksRoute,

@@ -965,3 +965,32 @@ export class InfinitusCommandFailed extends Schema.TaggedError<InfinitusCommandF
     restarting: Schema.Boolean,
   },
 ) {}
+
+/**
+ * Session priority mode (#616, #743, on orchestrator v2 per #1627): one
+ * thread the server is keeping back for headroom, for the sidebar's "Held"
+ * row and the clients' banner. `since` is when the hold began, `summary` the
+ * one-line reason ("Held for headroom on claude, 5h window 84 %").
+ */
+export const InfinitusHeldThread = Schema.Struct({
+  threadId: ThreadId,
+  since: Schema.String,
+  summary: Schema.String,
+  /** `held`: a turn start waits behind the turn-start gate. `paused`: a
+      running turn was interrupted for headroom and waits to continue (#743).
+      Absent on an older server: held. (A turn parked on a usage limit rides
+      `subscribeInfinitusLimitStops`, #648.) */
+  kind: Schema.optionalKey(Schema.Literals(["held", "paused"])),
+});
+export type InfinitusHeldThread = typeof InfinitusHeldThread.Type;
+
+/** "Run now" / "Resume now": runs a held start, else continues a paused turn.
+    `released` when something ran; otherwise the one-line reason. Never an
+    error. */
+export const InfinitusReleaseThreadInput = Schema.Struct({ threadId: ThreadId });
+export type InfinitusReleaseThreadInput = typeof InfinitusReleaseThreadInput.Type;
+export const InfinitusReleaseThreadResult = Schema.Struct({
+  released: Schema.Boolean,
+  reason: Schema.optionalKey(Schema.String),
+});
+export type InfinitusReleaseThreadResult = typeof InfinitusReleaseThreadResult.Type;

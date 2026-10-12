@@ -954,9 +954,16 @@ export function resolveThreadRowClassName(input: {
 // server, do not hold the thread; it reads as ready.
 // Unread completion is tracked separately: it describes whether a ready
 // thread needs attention, not what the thread is currently doing.
+// Held (#741): the server keeps the thread's turn start for headroom
+// (session priority mode, #616). Nothing runs in it, so it reads as a calm
+// background state, not as working. Paused (#743): the running turn was
+// interrupted for headroom and waits to continue. Both come from the holds
+// stream, not the runtime: held outranks working since the start never ran.
 export type SidebarThreadStatus =
   | "approval"
   | "input"
+  | "held"
+  | "paused"
   | "working"
   | "waiting"
   | "failed"
@@ -971,7 +978,13 @@ export function shouldRecedeSidebarThread(input: {
   isSelected: boolean;
 }): boolean {
   if (input.isActive || input.isSelected || input.status === "input") return false;
-  if (input.status === "working" || input.status === "waiting") return true;
+  if (
+    input.status === "working" ||
+    input.status === "waiting" ||
+    input.status === "held" ||
+    input.status === "paused"
+  )
+    return true;
   if (input.status === "ready" || input.status === "approval") {
     return !input.isUnread && !input.isWoke;
   }
@@ -990,6 +1003,10 @@ export function resolveSidebarThreadStatus(
         parked turn is still "running" to the orchestrator; the pill says
         "Limited" until the account swaps and the turn resumes. */
     readonly limitStopped?: boolean;
+    /** What the server's holds stream says about the thread (#741, #743):
+        held for headroom, or paused for it, outrank working since nothing
+        runs; limited (above) outranks both, the turn is parked for an account. */
+    readonly hold?: "held" | "paused" | null;
   },
 ): SidebarThreadStatus {
   if (thread.hasPendingApprovals) {
@@ -1000,6 +1017,9 @@ export function resolveSidebarThreadStatus(
   }
   if (options?.limitStopped === true) {
     return "limited";
+  }
+  if (options?.hold === "held" || options?.hold === "paused") {
+    return options.hold;
   }
   if (
     thread.runtime !== null &&
@@ -1020,8 +1040,10 @@ export type SidebarV2TopStatusKind =
   | "approval"
   | "done"
   | "failed"
+  | "held"
   | "limited"
   | "input"
+  | "paused"
   | "waiting"
   | "woke"
   | "working";
@@ -1034,8 +1056,8 @@ export function resolveSidebarV2TopStatus(input: {
   if (input.status === "working") {
     return "working";
   }
-  if (input.status === "waiting") {
-    return "waiting";
+  if (input.status === "waiting" || input.status === "held" || input.status === "paused") {
+    return input.status;
   }
   if (input.status === "approval") {
     return "approval";
