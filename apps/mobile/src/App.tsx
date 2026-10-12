@@ -9,11 +9,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createStaticNavigation } from "@react-navigation/native";
 
 import { RegistryContext } from "@effect/atom-react";
-import { teamJoinLinkCode, UNIVERSAL_LINK_HOST } from "./features/team/team.logic";
 import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet";
 import { ConfirmDialogHost } from "./components/ConfirmDialogHost";
-import { InfinitusAlarmsBridge } from "./features/infinitus/InfinitusAlarmsBridge";
-import { InfinitusNotificationPresenter } from "./features/infinitus/InfinitusNotificationPresenter";
+import { InfinitusAppMounts } from "./features/infinitus/InfinitusAppMounts";
+import {
+  INFINITUS_LINK_PREFIXES,
+  infinitusLinkingListeners,
+} from "./features/infinitus/appLinking";
 import { CloudAuthProvider } from "./features/cloud/CloudAuthProvider";
 import { prepareNativeShowcaseCapture } from "./features/showcase/nativeShowcaseScene";
 import { IncomingShareProvider } from "./features/sharing/IncomingShareProvider";
@@ -41,31 +43,15 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
   // The native module can be unavailable in non-native test environments.
 });
 
-/** Fork (#1313): a team invite (`https://infinitus.run/join#<code>`) opens
-    Settings › Team with the code; any other URL passes through untouched. */
-const rewriteIncomingUrl = (url: string | null): string | null => {
-  if (url === null) return null;
-  const teamCode = teamJoinLinkCode(url);
-  return teamCode === null ? url : Linking.createURL("team", { queryParams: { code: teamCode } });
-};
-
 const appLinking = {
   prefixes: [
     Linking.createURL("/"),
     "t3code://",
     "t3code-dev://",
     "t3code-preview://",
-    // Fork (#1313): the site's universal link, rewritten above before routing.
-    `https://${UNIVERSAL_LINK_HOST}`,
+    ...INFINITUS_LINK_PREFIXES,
   ],
-  getInitialURL: async () => rewriteIncomingUrl(await Linking.getInitialURL()),
-  subscribe: (listener: (url: string) => void) => {
-    const subscription = Linking.addEventListener("url", ({ url }) => {
-      const rewritten = rewriteIncomingUrl(url);
-      if (rewritten !== null) listener(rewritten);
-    });
-    return () => subscription.remove();
-  },
+  ...infinitusLinkingListeners,
   // Keep the compact thread list available beneath a directly opened thread.
   config: { initialRouteName: "Home" },
   filter: shouldHandleAppLink,
@@ -122,8 +108,7 @@ function AppContent() {
                 </IncomingShareProvider>
                 <ConfirmDialogHost />
                 <ThreadArrangementHost />
-                <InfinitusAlarmsBridge />
-                <InfinitusNotificationPresenter />
+                <InfinitusAppMounts />
               </GlobalVoiceInputControl>
               {/* Anchored-menu overlays render here — in-window, so the
                 keyboard stays up while a dropdown is open. */}

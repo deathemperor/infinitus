@@ -10,7 +10,6 @@ import {
 import { RowPressable } from "../../components/RowPressable";
 import { CustomSnoozeSheet } from "./CustomSnoozeSheet";
 import { appAtomRegistry } from "../../state/atom-registry";
-import { infinitusLimitStopsAtom } from "../../state/infinitus";
 import { threadArrangementOpenAtom } from "../../state/thread-order";
 import type { ThreadMoveDestination } from "./threadOrder";
 import type {
@@ -21,8 +20,7 @@ import type { EnvironmentThreadSearchMatch } from "@infinitus/client-runtime/sta
 import { AuthOrchestrationOperateScope, type EnvironmentMachineKind } from "@infinitus/contracts";
 import { canSnooze, resolveSnoozePresets } from "@infinitus/client-runtime/state/thread-settled";
 import type { MenuAction } from "@react-native-menu/menu";
-import { useAtomValue } from "@effect/atom-react";
-import { limitStopKey, limitStopLine } from "@infinitus/client-runtime/state/infinitusLimitStops";
+import { limitStopDetailLine, useThreadLimitStop } from "../infinitus/threadLimitStop";
 import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { Alert, Pressable, useWindowDimensions, View } from "react-native";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -623,11 +621,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const selected = props.selected === true;
   const rowAppearance = getThreadListV2RowAppearance(theme, sidebarPane, selected);
 
-  // Fork (#648): a turn parked on a Claude usage limit reads "Limited" with
-  // the account on the detail line until it resumes.
-  const limitStop =
-    useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
-    null;
+  const limitStop = useThreadLimitStop(thread);
   const status = resolveThreadListV2Status(thread, { limitStopped: limitStop !== null });
   // "Done" marks a completion the user has not opened yet — same emerald
   // label as the web sidebar, sourced from the server-side visited watermark
@@ -1074,14 +1068,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
             )}
             numberOfLines={1}
           >
-            {limitStop !== null
-              ? limitStopLine(
-                  limitStop,
-                  (iso) =>
-                    new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-                  Date.now(),
-                )
-              : thread.runtime?.lastError}
+            {limitStop !== null ? limitStopDetailLine(limitStop) : thread.runtime?.lastError}
           </Text>
         ) : thread.branch || props.environmentLabel ? (
           /* "branch · machine" share one truncating line. The machine sits

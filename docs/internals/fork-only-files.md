@@ -294,6 +294,7 @@ these bullets.
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
   it as each creation is delivered and pins through `usePinThread`, silently
   on failure.
+- `apps/mobile/src/features/infinitus/appLinking.ts`, `InfinitusAppMounts.tsx`, `stackScreens.ts`, `threadLimitStop.ts`, `useProjectFileRead.ts`, and `apps/mobile/src/features/sharing/discardDismissedShare.ts` — the phone's fork features behind one registration each in upstream's `App.tsx`, `Stack.tsx`, `thread-list-v2-items.tsx` and `new-task-flow-provider.tsx` (#1565): the universal-link rewrite and prefix, the two headless bridges, the Accounts / Team / share-to-thread routes, the row's limit stop (#648), the two-name project file read (#823), and the dismissed-share discard.
 - `apps/mobile/src/features/sharing/ShareToThreadRouteScreen.tsx` (+
   `share-to-thread.ts`, `.test.ts`) — "Add to an existing thread" on the
   share sheet's project picker: the thread list (unarchived, newest first,

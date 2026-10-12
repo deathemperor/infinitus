@@ -18,10 +18,8 @@ import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   DEFAULT_SERVER_SETTINGS,
-  LEGACY_T3_PROJECT_FILE_NAME,
   MessageId,
   repositoryGroupingKeyOf,
-  T3_PROJECT_FILE_NAME,
   ThreadId,
 } from "@infinitus/contracts";
 import { sanitizeNewRefName } from "@infinitus/shared/git";
@@ -50,6 +48,7 @@ import { scopedProjectKey } from "../../lib/scopedEntities";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { projectEnvironment } from "../../state/projects";
 import { useEnvironmentQuery } from "../../state/query";
+import { useProjectFileRead } from "../infinitus/useProjectFileRead";
 import { useAtomCommand } from "../../state/use-atom-command";
 import {
   appendComposerDraftAttachments,
@@ -488,8 +487,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const attachments = selectedProjectDraft.attachments;
   // Default mode until the user picks one explicitly — same resolution web
   // uses for new draft threads: per-project setting, then the repo's
-  // checked-in project file, then the server's configured default. Both file
-  // names are read in the server's order; whichever answers first decides.
+  // checked-in t3.json, then the server's configured default.
   const fileAccessSession = useEnvironmentQuery(
     selectedProject !== null && selectedProject.workspaceRoot !== ""
       ? environmentSession.sessionStateAtom(selectedProject.environmentId)
@@ -505,29 +503,9 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const { canReadFiles } = fileAccess;
   const fileAccessPending =
     selectedProject !== null && selectedProject.workspaceRoot !== "" && fileAccess.isPending;
-  const readsProjectFile =
-    canReadFiles && selectedProject !== null && selectedProject.workspaceRoot !== "";
-  const t3ProjectFileQuery = useEnvironmentQuery(
-    readsProjectFile
-      ? projectEnvironment.readFile({
-          environmentId: selectedProject.environmentId,
-          input: { cwd: selectedProject.workspaceRoot, relativePath: T3_PROJECT_FILE_NAME },
-        })
-      : null,
-  );
-  const legacyProjectFileQuery = useEnvironmentQuery(
-    readsProjectFile
-      ? projectEnvironment.readFile({
-          environmentId: selectedProject.environmentId,
-          input: {
-            cwd: selectedProject.workspaceRoot,
-            relativePath: LEGACY_T3_PROJECT_FILE_NAME,
-          },
-        })
-      : null,
-  );
-  const t3ProjectFileData = (t3ProjectFileQuery.data ??
-    legacyProjectFileQuery.data) as ProjectReadFileResult | null;
+  // Fork (#823): both project file names, `infinitus.json` then `t3.json`.
+  const t3ProjectFileQuery = useProjectFileRead(selectedProject, canReadFiles);
+  const t3ProjectFileData = t3ProjectFileQuery.data as ProjectReadFileResult | null;
   const t3ProjectFile = useMemo(
     () =>
       t3ProjectFileData === null || t3ProjectFileData.truncated
@@ -561,7 +539,7 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const defaultWorkspaceModeSettled =
     selectedProjectDraft.workspaceSelection?.mode !== undefined ||
     projectSettings.sources.defaultThreadEnvMode !== "environment" ||
-    (!t3ProjectFileQuery.isPending && !legacyProjectFileQuery.isPending && !fileAccessPending);
+    (!t3ProjectFileQuery.isPending && !fileAccessPending);
   const workspaceMode = canChooseWorkspace
     ? (selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode)
     : "local";
