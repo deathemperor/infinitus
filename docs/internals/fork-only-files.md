@@ -27,6 +27,17 @@ these bullets.
 - `apps/web/src/components/settings/infinitus/InfinitusResumeOnLimitSetting.tsx` — the swap-based resume switch (#648), a scoped server setting mounted by Settings › General after upstream's reset-time auto-resume row.
 - `apps/web/src/components/sidebar/InfinitusLimitStop.tsx` — the sidebar row's limit stop (#648): `useThreadLimitStop` off `infinitusLimitStopsAtom`, `limitStopTooltip` (`limitStopLine` in the client's timestamp format, only while the row's status is `limited`) and the `InfinitusLimitStopPill` the row renders in place of its plain status span.
 - `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
+- `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx`,
+  `sidebarNeedsAttention.logic.ts` (+ test), `useNextAttentionKey.ts` and
+  `nextAttentionBus.ts` — the "Needs attention" section above the sidebar
+  list (#269 D) and the `thread.nextAttention` key with its palette action
+  (#270 C), on orchestrator v2's run states: both rank through
+  `resolveSidebarThreadStatus` (approval, input, limited — the latter also
+  from the #648 limit stops), so they add no signal of their own. The
+  section owns its collapsed state; the hook installs its own `keydown`
+  listener with the sidebar's shortcut context so `Sidebar.tsx` keeps one
+  call. Held starts (session holds) and a babysit stopped at its cap rejoin
+  the list when their lanes land.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
   which also holds the pairing stream + decide command, #710, and the

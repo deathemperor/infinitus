@@ -137,6 +137,17 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/components/CommandPalette.tsx` — the `accounts.open`
   listener and palette entry; an "Open captures" entry while a thread has
   a project (#433).
+- Next attention (#269 D, #270 C; re-ported onto orchestrator v2 under
+  #1627): `packages/contracts/src/keybindings.ts` carries
+  `thread.nextAttention` in `THREAD_KEYBINDING_COMMANDS` and
+  `packages/shared/src/keybindings.ts` binds it to `mod+shift+u`
+  (`!terminalFocus`; the pre-merge `mod+shift+l` is upstream's
+  `composer.previousWorktree` now); `apps/web/src/components/Sidebar.tsx`
+  mounts `SidebarNeedsAttention` above the list and calls
+  `useNextAttentionKey` beside its own jump-key effect;
+  `CommandPalette.tsx` lists "Jump to next waiting thread" and lets the
+  key through its `handleKeyDown` like the jump keys;
+  `settings/KeybindingsSettings.logic.ts`'s `commandLabel` names it.
 - `apps/server/src/auth/RpcAuthorization.ts` — a scope for each of them; the
   table is `satisfies Record<WsRpcMethod, …>`, so a new RPC without one is a
   type error.

@@ -280,6 +280,8 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { SidebarNeedsAttention } from "./sidebar/SidebarNeedsAttention";
+import { useNextAttentionKey } from "./sidebar/useNextAttentionKey";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { MiddleTruncate } from "./ui/middle-truncate";
@@ -4941,6 +4943,14 @@ export default function Sidebar() {
     routeThreadKey,
     threadByKey,
   ]);
+  // Fork (#270 C): the next-attention key and palette action, beside the jump keys.
+  useNextAttentionKey({
+    orderedThreads,
+    routeThreadKey,
+    routeTerminalOpen,
+    keybindings,
+    navigateToThread,
+  });
 
   // Same predicate as v1: hints show only while the held modifiers exactly
   // match a thread-jump binding. Adding Shift (screenshots) or Alt no
@@ -5169,6 +5179,16 @@ export default function Sidebar() {
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
+          {/* Fork (#269 D): the threads blocked on the user, above the list, across every project. */}
+          {!isSearchingThreads ? (
+            <SidebarNeedsAttention
+              threads={threads}
+              routeThreadKey={routeThreadKey}
+              environmentLabelById={environmentLabelById}
+              projectDisplayNameByKey={projectDisplayNameByKey}
+              onThreadClick={handleThreadClick}
+            />
+          ) : null}
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider
