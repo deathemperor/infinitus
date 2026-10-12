@@ -858,12 +858,20 @@ export function makeClaudeQueryOptions(input: {
       : typeof input.sdkSettings === "object" && input.sdkSettings !== null
         ? ({ ...input.sdkSettings, ...selectionSettings } as ClaudeSdkSettings)
         : selectionSettings;
+  // An empty instance value sets nothing, so the user's own settings.json keeps
+  // deciding (the advisor model, #1232).
+  const instanceSettings: ClaudeSdkSettings = {
+    ...(input.settings?.autoCompactWindow
+      ? { autoCompactWindow: Number(input.settings.autoCompactWindow) }
+      : {}),
+    ...(input.settings?.advisorModel ? { advisorModel: input.settings.advisorModel } : {}),
+  };
   const effectiveQuerySettings =
-    input.settings?.autoCompactWindow === undefined || input.settings.autoCompactWindow.length === 0
+    Object.keys(instanceSettings).length === 0
       ? querySettings
       : ({
           ...(typeof querySettings === "object" && querySettings !== null ? querySettings : {}),
-          autoCompactWindow: Number(input.settings.autoCompactWindow),
+          ...instanceSettings,
         } as ClaudeSdkSettings);
   const options: ClaudeAgentSdkQueryOptions = {
     model: compiledSelection.apiModelId,

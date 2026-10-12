@@ -202,6 +202,19 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   its patch. `packages/shared/src/serverSettings.ts` —
   `applyServerSettingsPatch` merges `projectPromptSnippets` per project key
   like `projectScriptOverrides`, so one project's save leaves the others.
+- `packages/contracts/src/settings.ts` — `advisorModel` on `ClaudeSettings`
+  (#1232: the SDK's `advisorModel` setting, folded into the query's
+  `settings` by `makeClaudeQueryOptions` in
+  `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts` beside
+  `autoCompactWindow` when the instance names one, left to Claude Code's own
+  setting when empty), with the `customOption` hook on
+  `ProviderSettingsFormAnnotation` that
+  `apps/web/src/components/settings/ProviderSettingsForm.tsx`'s select draws
+  as a "Custom model ID…" choice opening an input; `ProviderInstanceCard.tsx`
+  draws `ClaudeAdvisorProxyNote` under the form. Tests:
+  `settings.test.ts`, `ClaudeAdapterV2.test.ts`,
+  `ProviderSettingsForm.test.ts`; `ProviderInstanceRegistry.test.ts`'s
+  Claude fixture carries the key.
 - `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
   `DesktopUpdateChannel` / `DesktopUpdateChannelSchema` (#1042); the fork's
   optional `DesktopBridge` methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),

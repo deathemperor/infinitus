@@ -8,6 +8,11 @@ per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
+- `apps/web/src/components/settings/ClaudeAdvisorProxyNote.tsx` — the one
+  line under a Claude instance's runtime settings when its environment carries
+  `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so
+  a proxied instance's advisor model (#1232) never fires. The add-instance
+  wizard collects no environment for Claude, so only the card draws it.
 - `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
