@@ -40,6 +40,7 @@ import {
   SidebarInput,
 } from "../ui/sidebar";
 import { SidebarUtilityMenu } from "../sidebar/SidebarChrome";
+import { INFINITUS_SECTION_ICONS, useInfinitusSectionFilter } from "./infinitus/settingsNav";
 import { scrollToSettingsTarget } from "./settingsLayout";
 import {
   isSettingsSectionActive,
@@ -51,10 +52,6 @@ import {
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { validateSettingsScopeSearch } from "./settingsScope";
-import {
-  INFINITUS_SETTINGS_SECTION_ICONS,
-  useInfinitusSettingsNavItems,
-} from "./infinitus/settingsNav";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
   [
@@ -93,8 +90,8 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/source-control": GitBranchIcon,
   "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
-  ...INFINITUS_SETTINGS_SECTION_ICONS,
   "/settings/archived": ArchiveIcon,
+  ...INFINITUS_SECTION_ICONS,
 };
 
 const SETTINGS_NAV_ITEMS: ReadonlyArray<{
@@ -117,11 +114,10 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const currentHash = useLocation({ select: (location) => location.hash });
   const currentSearch = useLocation({ select: (location) => location.search });
   const scopeSearch = useMemo(() => validateSettingsScopeSearch(currentSearch), [currentSearch]);
-  const navItems = useInfinitusSettingsNavItems(
-    SETTINGS_NAV_ITEMS.filter(
-      (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
-    ),
-  );
+  const showsInfinitusSection = useInfinitusSectionFilter();
+  const navItems = SETTINGS_NAV_ITEMS.filter(
+    (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
+  ).filter(showsInfinitusSection);
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");

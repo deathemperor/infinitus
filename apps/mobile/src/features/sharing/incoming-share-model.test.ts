@@ -103,6 +103,175 @@ describe("incoming native shares", () => {
     expect(hasIncomingShareContent(result)).toBe(false);
   });
 
+  it("renders a shared full-resolution screenshot to a bounded JPEG", async () => {
+    const image: SharePayload = {
+      shareType: "image",
+      value: "file:///shared/Screenshot.png",
+      mimeType: "image/png",
+    };
+    const readBase64 = vi.fn(async () => "unused");
+    const renderImageAsJpeg = vi.fn(async () => ({
+      base64: "anBlZw==",
+      uri: "file:///cache/rendered.jpg",
+    }));
+    const removeOwnedFile = vi.fn(async (_uri: string) => undefined);
+
+    const result = await buildIncomingShareDraft({
+      id: "share-render",
+      createdAt: "2026-07-15T10:00:00.000Z",
+      payloads: [image],
+      resolvedPayloads: [
+        {
+          ...image,
+          contentUri: image.value,
+          contentType: "image",
+          contentMimeType: "image/png",
+          contentSize: 7_708_008,
+          originalName: "Screenshot.png",
+        },
+      ],
+      fileReader: { readBase64, renderImageAsJpeg, removeOwnedFile },
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.attachments).toEqual([
+      {
+        id: "share-render:image:0",
+        type: "image",
+        name: "Screenshot.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+        dataUrl: "data:image/jpeg;base64,anBlZw==",
+        previewUri: "data:image/jpeg;base64,anBlZw==",
+      },
+    ]);
+    expect(renderImageAsJpeg).toHaveBeenCalledWith(image.value);
+    expect(readBase64).not.toHaveBeenCalled();
+    // Both the sender's temporary file and the rendered cache file are released.
+    expect(removeOwnedFile.mock.calls.map(([uri]) => uri)).toEqual([
+      image.value,
+      "file:///cache/rendered.jpg",
+    ]);
+  });
+
+  it("keeps a small shared still and a large GIF byte for byte", async () => {
+    const still: SharePayload = {
+      shareType: "image",
+      value: "file:///shared/icon.png",
+      mimeType: "image/png",
+    };
+    const gif: SharePayload = {
+      shareType: "image",
+      value: "file:///shared/clip.gif",
+      mimeType: "image/gif",
+    };
+    const renderImageAsJpeg = vi.fn(async () => ({ base64: "unused", uri: "file:///cache/x.jpg" }));
+
+    const result = await buildIncomingShareDraft({
+      id: "share-keep",
+      createdAt: "2026-07-15T10:00:00.000Z",
+      payloads: [still, gif],
+      resolvedPayloads: [
+        {
+          ...still,
+          contentUri: still.value,
+          contentType: "image",
+          contentMimeType: "image/png",
+          contentSize: 3,
+          originalName: "icon.png",
+        },
+        {
+          ...gif,
+          contentUri: gif.value,
+          contentType: "image",
+          contentMimeType: "image/gif",
+          contentSize: 7_708_008,
+          originalName: "clip.gif",
+        },
+      ],
+      fileReader: {
+        readBase64: async () => "YWJj",
+        renderImageAsJpeg,
+        removeOwnedFile: () => undefined,
+      },
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(
+      result.attachments.map(({ name, mimeType, sizeBytes }) => ({ name, mimeType, sizeBytes })),
+    ).toEqual([
+      { name: "icon.png", mimeType: "image/png", sizeBytes: 3 },
+      { name: "clip.gif", mimeType: "image/gif", sizeBytes: 7_708_008 },
+    ]);
+    expect(renderImageAsJpeg).not.toHaveBeenCalled();
+  });
+
+  it("renders a shared picture whose size the sender did not report", async () => {
+    const image: SharePayload = {
+      shareType: "image",
+      value: "file:///shared/unknown.png",
+      mimeType: "image/png",
+    };
+    const renderImageAsJpeg = vi.fn(async () => ({
+      base64: "anBlZw==",
+      uri: "file:///cache/rendered.jpg",
+    }));
+
+    const result = await buildIncomingShareDraft({
+      id: "share-unmeasured",
+      createdAt: "2026-07-15T10:00:00.000Z",
+      payloads: [image],
+      resolvedPayloads: [],
+      fileReader: {
+        readBase64: async () => "unused",
+        renderImageAsJpeg,
+        removeOwnedFile: () => undefined,
+      },
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.attachments.map(({ name, mimeType }) => ({ name, mimeType }))).toEqual([
+      { name: "unknown.jpg", mimeType: "image/jpeg" },
+    ]);
+    expect(renderImageAsJpeg).toHaveBeenCalledWith(image.value);
+  });
+
+  it("warns and releases the file when the renderer cannot decode a shared picture", async () => {
+    const image: SharePayload = {
+      shareType: "image",
+      value: "file:///shared/broken.png",
+      mimeType: "image/png",
+    };
+    const removeOwnedFile = vi.fn(() => Promise.resolve());
+
+    const result = await buildIncomingShareDraft({
+      id: "share-broken",
+      createdAt: "2026-07-15T10:00:00.000Z",
+      payloads: [image],
+      resolvedPayloads: [
+        {
+          ...image,
+          contentUri: image.value,
+          contentType: "image",
+          contentMimeType: "image/png",
+          contentSize: 7_708_008,
+          originalName: "broken.png",
+        },
+      ],
+      fileReader: {
+        readBase64: async () => "unused",
+        renderImageAsJpeg: async () => {
+          throw new Error("decode failed");
+        },
+        removeOwnedFile,
+      },
+    });
+
+    expect(result.attachments).toEqual([]);
+    expect(result.warnings).toEqual(["Could not read 'broken.png'."]);
+    expect(removeOwnedFile).toHaveBeenCalledWith(image.value);
+  });
+
   it("keeps a shared PDF on disk without converting its contents to base64", async () => {
     const file: SharePayload = {
       shareType: "file",

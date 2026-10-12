@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import {
   BellIcon,
   CpuIcon,
@@ -6,45 +7,31 @@ import {
   SparklesIcon,
   UsersIcon,
 } from "lucide-react";
-import type { ComponentType } from "react";
 
-import { useInfinitusSupported } from "~/hooks/useInfinitusSupported";
+import { useEnvironments } from "~/state/environments";
 import type { SettingsPath } from "../settingsSearch";
 
-/** The pages that only exist where a connected server drives an Infinitus app. */
-const INFINITUS_SETTINGS_PATHS = [
-  "/settings/menu-bar",
-  "/settings/animations",
-  "/settings/team",
-  "/settings/notifications",
-  "/settings/devices",
-  "/settings/engines",
-] as const satisfies ReadonlyArray<SettingsPath>;
-
-type InfinitusSettingsPath = (typeof INFINITUS_SETTINGS_PATHS)[number];
-
-/** The settings nav's icon per Infinitus page, spread into upstream's table. */
-export const INFINITUS_SETTINGS_SECTION_ICONS: Readonly<
-  Record<InfinitusSettingsPath, ComponentType<{ className?: string }>>
-> = {
+/** The pages that only exist where a connected server drives an Infinitus app, with their nav icons. */
+export const INFINITUS_SECTION_ICONS = {
   "/settings/menu-bar": InfinityIcon,
   "/settings/animations": SparklesIcon,
   "/settings/team": UsersIcon,
   "/settings/notifications": BellIcon,
   "/settings/devices": SmartphoneIcon,
   "/settings/engines": CpuIcon,
-};
+} as const satisfies Partial<Record<SettingsPath, ComponentType<{ className?: string }>>>;
 
-const INFINITUS_SETTINGS_PATH_SET: ReadonlySet<SettingsPath> = new Set(INFINITUS_SETTINGS_PATHS);
+const INFINITUS_SETTINGS_PATHS: ReadonlySet<string> = new Set(Object.keys(INFINITUS_SECTION_ICONS));
 
 /**
- * Upstream's nav items, minus the menu bar app's pages when no connected
- * environment runs it. Wraps upstream's own filter so the registration in
- * `SettingsSidebarNav.tsx` stays one call.
+ * The nav filter that hides the menu bar app's pages when no connected
+ * environment runs it. One connected Infinitus is enough: the pages read the
+ * primary environment but the nav only decides whether they lead anywhere at all.
  */
-export function useInfinitusSettingsNavItems<T extends { readonly to: SettingsPath }>(
-  items: ReadonlyArray<T>,
-): ReadonlyArray<T> {
-  const supported = useInfinitusSupported();
-  return supported ? items : items.filter((item) => !INFINITUS_SETTINGS_PATH_SET.has(item.to));
+export function useInfinitusSectionFilter(): (item: { readonly to: SettingsPath }) => boolean {
+  const { environments } = useEnvironments();
+  const infinitusSupported = environments.some(
+    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
+  );
+  return (item) => infinitusSupported || !INFINITUS_SETTINGS_PATHS.has(item.to);
 }

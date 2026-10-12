@@ -130,13 +130,12 @@ import {
 import { ComposerStashBadge } from "./ComposerStashBadge";
 import { ComposerStashMenu } from "./ComposerStashMenu";
 import {
-  ComposerImageMarkupControl,
   InfinitusComposerBadges,
   InfinitusComposerMenus,
-  useComposerImageMarkup,
-  useInfinitusComposer,
-} from "./InfinitusComposer";
-import { promptSnippetSlashItems } from "../prompts/promptSnippets.logic";
+  InfinitusImageMarkup,
+  useInfinitusComposerExtras,
+} from "./InfinitusComposerExtras";
+import { promptSnippetEdit } from "../prompts/promptSnippets.logic";
 import { useComposerMenuState } from "./useComposerMenuState";
 import { useComposerTriggerState } from "./useComposerTriggerState";
 import { useComposerFocusState } from "./useComposerFocusState";
@@ -2557,8 +2556,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       prompt,
     ],
   );
-  // Fork: Captures (#433) and Prompts (#270 G); the snippets feed the `/` menu below.
-  const infinitus = useInfinitusComposer({
+  const infinitus = useInfinitusComposerExtras({
     keybindings,
     terminalOpen,
     modelPickerOpen: isComposerModelPickerOpen,
@@ -2746,8 +2744,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       );
       return [
         ...searchSlashCommandItems(slashCommandItems, query),
-        // Fork (#270 G): the project's saved prompts, by name, after the commands.
-        ...promptSnippetSlashItems(infinitus.promptSnippets.snippets, composerTrigger.query),
+        ...infinitus.slashItems(composerTrigger.query),
       ];
     }
     if (composerTrigger.kind === "skill") {
@@ -2823,7 +2820,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     environmentThreadShells,
     exactPullRequestLookup.data,
     planModeUiEnabled,
-    infinitus.promptSnippets.snippets,
+    infinitus.slashItems,
     pullRequestLookup.data,
     pullRequestProjectId,
     pullRequestRepository,
@@ -4071,16 +4068,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         return;
       }
       if (item.type === "prompt-snippet") {
-        // Fork (#270 G): the body replaces the `/query` where it was typed.
-        const applied = applyPromptReplacement(
-          trigger.rangeStart,
-          trigger.rangeEnd,
-          item.snippet.text,
-          { expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd) },
-        );
-        if (applied) {
+        const edit = promptSnippetEdit(item.snippet, trigger, snapshot.value);
+        if (applyPromptReplacement(edit.start, edit.end, edit.text, edit))
           setComposerHighlightedItemId(null);
-        }
         return;
       }
       if (item.type === "skill") {
@@ -6037,11 +6027,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     return true;
   };
 
-  // Fork (#875): drawing on a draft image.
-  const markup = useComposerImageMarkup({
-    addImage: addComposerImage,
-    removeImage: removeComposerImageFromDraft,
-  });
   const removeComposerImage = (imageId: string) => {
     const image = composerImagesRef.current.find((candidate) => candidate.id === imageId);
     const referenced = collectInlineContextIds(promptRef.current).includes(
@@ -6925,7 +6910,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             onToggleMenu={toggleStashMenu}
           />
         ) : null}
-        <InfinitusComposerBadges composer={infinitus} hidden={isComposerApprovalState} />
+        <InfinitusComposerBadges extras={infinitus} hidden={isComposerApprovalState} />
       </ComposerBanner.Dock>
       <div className="relative">
         <ComposerSurface.Main
@@ -7038,11 +7023,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               )}
 
               <InfinitusComposerMenus
-                composer={infinitus}
-                suppressed={isStashMenuOpen || composerMenuOpen || isComposerApprovalState}
-                anchor={composerMenuAnchor}
+                extras={infinitus}
                 layer={ComposerCommandMenuLayer}
-                onInsert={(text) => insertComposerTextAtEnd(text, { ensureLeadingBoundary: true })}
+                anchor={composerMenuAnchor}
+                hidden={isStashMenuOpen || composerMenuOpen || isComposerApprovalState}
+                insertText={insertComposerTextAtEnd}
               />
 
               <div role="status" aria-atomic="true" className="sr-only">
@@ -7258,7 +7243,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                 <XIcon />
                               </Button>
                             </span>
-                            <ComposerImageMarkupControl image={image} markup={markup} />
+                            <InfinitusImageMarkup
+                              image={image}
+                              addImage={addComposerImage}
+                              removeImage={removeComposerImageFromDraft}
+                            />
                           </SnapShotAttachmentFrame>
                         );
                       })

@@ -12,6 +12,15 @@ const clipboard = vi.hoisted(() => ({
 
 vi.mock("expo-clipboard", () => clipboard);
 
+const manipulator = vi.hoisted(() => ({
+  manipulate: vi.fn(),
+}));
+
+vi.mock("expo-image-manipulator", () => ({
+  ImageManipulator: manipulator,
+  SaveFormat: { JPEG: "jpeg" },
+}));
+
 vi.mock("expo-file-system", () => ({
   File: class {
     readonly uri: string;
@@ -48,8 +57,13 @@ vi.mock("expo-file-system", () => ({
       files.set(this.uri, { base64: "", deleted: false });
     }
 
-    write(text: string): void {
-      files.set(this.uri, { base64: "", deleted: false, text });
+    write(text: string, options?: { readonly encoding?: string }): void {
+      files.set(
+        this.uri,
+        options?.encoding === "base64"
+          ? { base64: text, deleted: false }
+          : { base64: "", deleted: false, text },
+      );
     }
 
     moveSync(destination: { readonly uri: string }): void {
@@ -68,7 +82,7 @@ vi.mock("expo-file-system", () => ({
 
     create(): void {}
   },
-  Paths: { document: "file:///documents" },
+  Paths: { document: "file:///documents", cache: "file:///cache" },
 }));
 
 vi.mock("./uuid", () => ({
@@ -79,47 +93,15 @@ import {
   convertPastedImagesToAttachments,
   createPastedTextComposerAttachment,
   isOwnedPastedImageUri,
-  ORIGINAL_STILL_IMAGE_MAX_BYTES,
-  originalImagePassthroughMimeType,
   pasteComposerClipboard,
 } from "./composerImages";
-
-describe("picked image pass-through", () => {
-  it("keeps a small still byte for byte so transparency survives", () => {
-    expect(
-      originalImagePassthroughMimeType({
-        mimeType: "image/png",
-        sourceBytes: ORIGINAL_STILL_IMAGE_MAX_BYTES,
-      }),
-    ).toBe("image/png");
-  });
-
-  it("re-encodes a full-resolution screenshot a slow relay could not finish uploading", () => {
-    expect(
-      originalImagePassthroughMimeType({ mimeType: "image/png", sourceBytes: 7_708_008 }),
-    ).toBeNull();
-  });
-
-  it("keeps a large GIF, because rendering it would drop the animation", () => {
-    expect(
-      originalImagePassthroughMimeType({ mimeType: "image/gif", sourceBytes: 7_708_008 }),
-    ).toBe("image/gif");
-  });
-
-  it("re-encodes what a provider cannot read or what could not be measured", () => {
-    expect(
-      originalImagePassthroughMimeType({ mimeType: "image/heic", sourceBytes: 10 }),
-    ).toBeNull();
-    expect(
-      originalImagePassthroughMimeType({ mimeType: "image/png", sourceBytes: null }),
-    ).toBeNull();
-    expect(originalImagePassthroughMimeType({ mimeType: undefined, sourceBytes: 10 })).toBeNull();
-  });
-});
+import { ORIGINAL_STILL_IMAGE_MAX_BYTES } from "./image-passthrough";
 
 describe("composer clipboard paste", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    files.clear();
+    manipulator.manipulate.mockReset();
     clipboard.hasImageAsync.mockResolvedValue(false);
     clipboard.hasStringAsync.mockResolvedValue(true);
     clipboard.getStringAsync.mockResolvedValue("clipboard text");
@@ -130,11 +112,87 @@ describe("composer clipboard paste", () => {
     clipboard.hasImageAsync.mockResolvedValue(true);
     const result = await pasteComposerClipboard({ existingCount: 0 });
     expect(result).toEqual({
-      images: [expect.objectContaining({ type: "image", name: "pasted-image.png" })],
+      images: [
+        expect.objectContaining({
+          type: "image",
+          name: "pasted-image.png",
+          mimeType: "image/png",
+          dataUrl: "data:image/png;base64,aGVsbG8=",
+        }),
+      ],
       text: null,
       error: null,
     });
     expect(clipboard.getStringAsync).not.toHaveBeenCalled();
+    expect(manipulator.manipulate).not.toHaveBeenCalled();
+  });
+
+  it("renders a pasted full-resolution screenshot to a bounded JPEG", async () => {
+    // Over the still-image gate once decoded, like a screenshot copied from Photos.
+    const oversized = "A".repeat(Math.ceil((ORIGINAL_STILL_IMAGE_MAX_BYTES + 1) / 3) * 4);
+    clipboard.hasImageAsync.mockResolvedValue(true);
+    clipboard.getImageAsync.mockResolvedValue({ data: `data:image/png;base64,${oversized}` });
+    const release = vi.fn();
+    const rendered = {
+      width: 2048,
+      height: 1200,
+      release,
+      saveAsync: vi.fn(async () => {
+        files.set("file:///cache/rendered.jpg", { base64: "anBlZw==", deleted: false });
+        return { base64: "anBlZw==", uri: "file:///cache/rendered.jpg" };
+      }),
+    };
+    manipulator.manipulate.mockImplementation((uri: string) => ({
+      renderAsync: async () => {
+        // The clipboard bytes were staged to a cache file the manipulator can decode.
+        expect(uri.startsWith("file:///cache/t3-paste-")).toBe(true);
+        expect(files.get(uri)).toEqual({ base64: oversized, deleted: false });
+        return rendered;
+      },
+    }));
+
+    const result = await pasteComposerClipboard({ existingCount: 0 });
+
+    expect(result).toEqual({
+      images: [
+        expect.objectContaining({
+          type: "image",
+          name: "pasted-image.jpg",
+          mimeType: "image/jpeg",
+          sizeBytes: 4,
+          dataUrl: "data:image/jpeg;base64,anBlZw==",
+          previewUri: "data:image/jpeg;base64,anBlZw==",
+        }),
+      ],
+      text: null,
+      error: null,
+    });
+    expect(rendered.saveAsync).toHaveBeenCalledWith({
+      format: "jpeg",
+      compress: 0.85,
+      base64: true,
+    });
+    expect(release).toHaveBeenCalled();
+    // Neither the staged PNG nor the rendered file outlives the paste.
+    expect([...files.entries()].filter(([, entry]) => !entry.deleted)).toEqual([]);
+  });
+
+  it("reports a pasted picture the renderer cannot decode instead of sending it whole", async () => {
+    const oversized = "A".repeat(Math.ceil((ORIGINAL_STILL_IMAGE_MAX_BYTES + 1) / 3) * 4);
+    clipboard.hasImageAsync.mockResolvedValue(true);
+    clipboard.getImageAsync.mockResolvedValue({ data: `data:image/png;base64,${oversized}` });
+    manipulator.manipulate.mockImplementation(() => ({
+      renderAsync: async () => {
+        throw new Error("decode failed");
+      },
+    }));
+
+    expect(await pasteComposerClipboard({ existingCount: 0 })).toEqual({
+      images: [],
+      text: null,
+      error: "Clipboard image could not be read.",
+    });
+    expect([...files.entries()].filter(([, entry]) => !entry.deleted)).toEqual([]);
   });
 
   it("does not paste alternate text when the image cannot fit", async () => {

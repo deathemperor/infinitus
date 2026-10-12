@@ -222,6 +222,9 @@ export const RPC_REQUIRED_SCOPES = {
   // Pending pairing requests are pairing metadata, like the pairing-links
   // list; deciding one mints a pairing credential, like creating a link.
   [WS_METHODS.subscribeInfinitusPairing]: AuthAccessReadScope,
+  // The limit-stopped threads (#648): thread ids, accounts and resets — a
+  // read of orchestration state, like the snapshot.
+  [WS_METHODS.subscribeInfinitusLimitStops]: AuthOrchestrationReadScope,
   [WS_METHODS.infinitusPairingDecide]: AuthAccessWriteScope,
   // A project's captures (#433) are the user's own working notes, read and
   // changed by whoever can read and drive its threads — a paired phone too.

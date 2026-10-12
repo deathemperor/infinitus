@@ -9,6 +9,8 @@ import {
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
+  RunId,
+  ThreadId,
 } from "@infinitus/contracts";
 import { it as effectIt } from "@effect/vitest";
 import type * as Context from "effect/Context";
@@ -25,6 +27,7 @@ import {
   InfinitusAlertRelay,
   InfinitusAlertRelayUnlinked,
 } from "../Services/InfinitusAlertRelay.ts";
+import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 import { infinitusHttpApiLayer } from "./InfinitusHttp.ts";
 
 const CLAUDE = ProviderInstanceId.make("claudeAgent");
@@ -70,9 +73,13 @@ const settingsWith = (defaultModelSelection: typeof ENV_DEFAULT | null) =>
     }),
   );
 
-/** #1375: the relay publisher, linked unless the alert body says otherwise. */
+/** #1375: the relay publisher, linked unless the alert body says otherwise;
+    #829: one live run. */
 const alerts: Array<{ title: string; body: string }> = [];
 const services = Layer.mergeAll(
+  Layer.mock(InfinitusRunningTurns)({
+    list: Effect.succeed([{ threadId: ThreadId.make("t-running"), turnId: RunId.make("run-1") }]),
+  }),
   Layer.mock(InfinitusAlertRelay)({
     publish: (input) =>
       input.body === "unlinked"
@@ -122,6 +129,16 @@ const OPERATE: ReadonlyArray<AuthEnvironmentScope> = [
 ];
 
 describe("infinitusHttpApiLayer (#822)", () => {
+  effectIt.effect("lists the threads whose run is live on the read scope (#829)", () =>
+    withClient(["orchestration:read"], (client) =>
+      Effect.gen(function* () {
+        expect(yield* client.infinitus.runningTurns({ headers: {} })).toEqual([
+          { threadId: "t-running", turnId: "run-1" },
+        ]);
+      }),
+    ),
+  );
+
   effectIt.effect(
     "forwards the Mac's account alert to the relay on the operate scope (#1375)",
     () =>
