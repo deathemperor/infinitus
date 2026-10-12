@@ -9,7 +9,6 @@ import {
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import {
   compactTokens,
-  decodeUtilization,
   fiveHourSummary,
   formatCount,
   historyLines,
@@ -37,6 +36,10 @@ import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { infinitusEnvironment } from "../../state/infinitus";
+import {
+  useEnvironmentUtilizations,
+  type EnvironmentUtilizationStatus,
+} from "../../state/infinitusUtilization";
 import { useEnvironmentQuery } from "../../state/query";
 import { primaryServerConfigAtom } from "../../state/server";
 import { formatDayAwareTimestamp, formatUpcomingTimestamp } from "../../timestampFormat";
@@ -49,6 +52,7 @@ import { Skeleton } from "../ui/skeleton";
 import { WorkspaceBreadcrumb, WorkspaceBreadcrumbItem } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { mergeUtilization, utilizationAliases } from "./utilization.logic";
 
 /** Native's `UsageForecast.basisText`, for a build whose reply carries none. */
 const DEFAULT_BASIS =
@@ -61,18 +65,17 @@ const DAYS_LABELS: Record<(typeof DAYS_CHOICES)[number], string> = {
   "7": "7 days",
   "30": "30 days",
 };
-const NEEDS_NEWER_APP =
-  "History and the run rate need a newer Infinitus app (the utilization verb).";
-
 /**
  * `/utilization` (#747): the native Utilization pane in the fork. The
- * forecast section reads off the `forecast` reply the snapshot already
- * carries (every account's projection at its own measured pace); History
- * (every account's percentage of one window over 1 / 7 / 30 days) and Run
- * rate (tokens, API-equivalent $ and messages over the last hour / day /
- * week, plus the live output rate) read `utilization --days n` through the
- * utilization query atom, held and re-read every 5 min only while this page
- * is mounted. Primary environment only, like Stats.
+ * forecast section reads off the `forecast` reply the primary environment's
+ * snapshot already carries (every account's projection at its own measured
+ * pace); History (every account's percentage of one window over 1 / 7 / 30
+ * days), the window telemetry and Run rate (tokens, API-equivalent $ and
+ * messages over the last hour / day / week, plus the live output rate) read
+ * `utilization --days n` from every connected environment that runs
+ * Infinitus (#1581), each held and re-read every 5 min only while this page
+ * is mounted, and add the replies up (`utilization.logic.ts`); with more
+ * than one machine, a Machines section names each and what it answered.
  */
 export function UtilizationPage() {
   const environmentId = usePrimaryEnvironmentId();
@@ -87,37 +90,28 @@ export function UtilizationPage() {
   const hasVerb =
     snapshot?.available === true &&
     snapshot.commands.some((command) => command.name === "forecast");
-  const hasHistoryVerb =
-    snapshot?.available === true &&
-    snapshot.commands.some((command) => command.name === "utilization");
   const forecast = useMemo(() => (snapshot === null ? null : buildForecast(snapshot)), [snapshot]);
   const [days, setDays] = useLocalStorage<(typeof DAYS_CHOICES)[number], string>(
     DAYS_KEY,
     "7",
     Schema.Literals(DAYS_CHOICES),
   );
-  const utilizationQuery = useEnvironmentQuery(
-    ready && hasHistoryVerb
-      ? infinitusEnvironment.utilization({
-          environmentId,
-          input: { command: "utilization", args: [], options: { days } },
-        })
-      : null,
-  );
+  const { statuses, refresh: refreshUtilizations } = useEnvironmentUtilizations(days);
+  // Any machine that can be asked unlocks the range; one away is left out.
+  const hasHistoryVerb = statuses.some((status) => status.missing === null);
+  const historyPending = statuses.some((status) => status.isPending);
+  const historyWaiting = statuses.some((status) => status.waiting);
   const utilization = useMemo(
-    () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
-    [utilizationQuery.data],
+    () =>
+      mergeUtilization(
+        statuses.flatMap((status) => (status.utilization === null ? [] : [status.utilization])),
+      ),
+    [statuses],
   );
-  // The alias a fleet shows for an account, keyed by the email the history carries.
-  const labels = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (const fleet of snapshot?.fleets ?? []) {
-      for (const account of fleet.accounts) {
-        if (account.alias !== undefined && account.alias !== "") out[account.email] = account.alias;
-      }
-    }
-    return out;
-  }, [snapshot?.fleets]);
+  const labels = useMemo(
+    () => utilizationAliases([snapshot, ...statuses.map((status) => status.snapshot)]),
+    [snapshot, statuses],
+  );
 
   const topbarContent = (
     <div className="flex w-full min-w-0 items-center gap-x-3 py-2">
@@ -144,18 +138,15 @@ export function UtilizationPage() {
       <Button
         onClick={() => {
           snapshotQuery.refresh();
-          if (hasHistoryVerb) utilizationQuery.refresh();
+          refreshUtilizations();
         }}
         aria-label="Refresh utilization"
-        aria-busy={snapshotQuery.isPending || utilizationQuery.isPending}
+        aria-busy={snapshotQuery.isPending || historyWaiting}
         disabled={!hasVerb}
         size="icon-sm"
         variant="ghost"
       >
-        <RefreshIcon
-          className="size-3.5"
-          refreshing={snapshotQuery.isPending || utilizationQuery.isPending}
-        />
+        <RefreshIcon className="size-3.5" refreshing={snapshotQuery.isPending || historyWaiting} />
       </Button>
     </div>
   );
@@ -185,29 +176,28 @@ export function UtilizationPage() {
       <p className="text-muted-foreground text-sm">This Infinitus build has no forecast verb.</p>
     );
   } else {
+    // One machine reads as it always did, its reason drawn in place of the
+    // sections; with several, each machine's row says what it answered and
+    // the sections add up those that did.
+    const single = statuses.length === 1 ? statuses[0] : undefined;
     body = (
       <div className="flex flex-col gap-8">
         <ForecastSection forecast={forecast} />
-        {!hasHistoryVerb ? (
-          <p className="text-muted-foreground text-sm">{NEEDS_NEWER_APP}</p>
-        ) : utilizationQuery.error !== null ? (
-          <p className="text-destructive text-sm">{utilizationQuery.error}</p>
-        ) : utilization === null ? (
-          utilizationQuery.data === null ? (
-            <UtilizationSkeleton />
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              The utilization reply could not be read.
-            </p>
-          )
-        ) : (
+        {statuses.length > 1 ? <MachinesSection statuses={statuses} /> : null}
+        {utilization !== null ? (
           <>
             <HistorySection utilization={utilization} labels={labels} />
             <FiveHourSection utilization={utilization} labels={labels} />
             <WasteSection utilization={utilization} labels={labels} />
             <RunRateSection utilization={utilization} />
           </>
-        )}
+        ) : single !== undefined && single.missing !== null ? (
+          <p className="text-muted-foreground text-sm">{single.missing}</p>
+        ) : single !== undefined && single.error !== null ? (
+          <p className="text-destructive text-sm">{single.error}</p>
+        ) : historyPending ? (
+          <UtilizationSkeleton />
+        ) : null}
         <LiveRateLine utilization={utilization} />
       </div>
     );
@@ -327,6 +317,40 @@ function ForecastWindowRow({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/** Each machine the page asked, and what it answered: the sections below
+    add up the ones that did. */
+function MachinesSection({
+  statuses,
+}: {
+  readonly statuses: ReadonlyArray<EnvironmentUtilizationStatus>;
+}) {
+  return (
+    <section className="flex flex-col gap-3" data-testid="utilization-machines">
+      <h2 className="font-medium text-foreground text-sm">Machines</h2>
+      <ul className="flex flex-col gap-1.5">
+        {statuses.map((status) => (
+          <li key={status.environmentId} className="flex items-center gap-3 text-xs">
+            <span className="w-40 shrink-0 truncate text-foreground">{status.label}</span>
+            {status.isPending ? (
+              <span className="text-muted-foreground">Reading…</span>
+            ) : status.missing !== null ? (
+              <span className="text-muted-foreground">{status.missing}</span>
+            ) : status.error !== null ? (
+              <span className="text-destructive">{status.error}</span>
+            ) : (
+              <span className="text-muted-foreground">Counted</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="text-muted-foreground text-xs">
+        History, the windows and the run rate add up every machine marked Counted; one that is away
+        or cannot answer is left out.
+      </p>
+    </section>
   );
 }
 

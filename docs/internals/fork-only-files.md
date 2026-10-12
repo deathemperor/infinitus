@@ -7,7 +7,17 @@ file or directory. Upstream files the fork edits are in
 per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
+- `*.infinitus.test.ts` beside an upstream test file (`apps/server/src/usage/UsageService`, `usageAggregation`, `apps/server/src/orchestration-v2/ProviderEventIngestor` (#834), `apps/server/src/vcs/GitVcsDriverCore`, `apps/server/src/keybindings`, `apps/web/src/keybindings`, `packages/contracts/src/settings`) — the fork's cases for an upstream module, kept out of upstream's test file so a sync never conflicts on appended tests (#1565). Each carries its own copy of the fixture helpers it needs: a test file cannot import another test file's helpers without registering that file's suite too. Add the fork's next case for one of these modules here, not to upstream's file.
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
+- `apps/server/src/orchestration-v2/worktreeCap.logic.ts` (+ test) and
+  `WorktreeCap.ts` — the worktree limit (#269 H): the pure verdict
+  (`worktreeCapRefusal`, one bounded line naming the oldest archived
+  holders), `WorktreeCapRefusalError` and the extractor the transports use,
+  and the `WorktreeCapGate` service whose `reserve` counts launches started
+  together before any of them is in the projection. A failed settings or
+  projection read lets the worktree through rather than blocking launches.
+  Holders are counted as distinct `worktreePath`s of live threads, so forks
+  and subagents sharing a checkout count once; Scratch folders count too.
 - `apps/web/src/components/settings/ClaudeAdvisorProxyNote.tsx` — the one
   line under a Claude instance's runtime settings when its environment carries
   `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so
@@ -108,7 +118,7 @@ these bullets.
   the row line, menu action and confirm in
   `apps/mobile/src/features/accounts/AccountRow.tsx` + `accountsRoute.logic.ts`.
   Rules and traps: `docs/internals/accounts-page.md`.
-- `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Rules and traps: `docs/internals/utilization.md`.
+- `apps/web/src/routes/utilization.tsx`, `apps/web/src/components/utilization/` — the `/utilization` page (#747): forecast off the snapshot (`buildForecast`), history / five-hour windows / weekly waste / run rate off the Mac's `utilization --days n` (`infinitusEnvironment.utilization`, `InfinitusUtilization` in `packages/contracts/src/infinitus.ts`, the fold in `packages/client-runtime/src/state/infinitusUtilization.ts`). Since #1581 the page asks every connected environment that runs Infinitus (`apps/web/src/state/infinitusUtilization.ts`, one derived atom per range like `state/usage.ts`) and adds the replies up in `utilization.logic.ts`, each machine on its own row. Rules and traps: `docs/internals/utilization.md`.
 - `apps/web/src/components/usage/UsageAccounts.tsx` — the "By account" table on `/usage` (#779): `InfinitusUsageAttributionLive` (`apps/server/src/infinitus/Layers/`) reads the app's `history <fleet>` verb once per scan, `infinitusUsageAttribution.logic.ts` gives `accountAt(ms)`, `UsageAggregator`'s `attribute` hook sums the optional `UsageSummary.accounts`. Rules and traps: `docs/internals/usage-attribution.md`.
 - `apps/web/src/components/InfinitusPeerFleets.tsx`, `apps/web/src/hooks/useInfinitusPeerFleets.ts`, `apps/web/src/hooks/peerFleets.logic.ts` (+ test) — the desktop's feed of every other machine's accounts to the menu bar popup over the Mac's `peer-sync` verb, and the relay of the row actions it queues (#1545); contracts `InfinitusPeerSync*` and `InfinitusStatus.peerCommandsPending` in `packages/contracts/src/infinitus.ts`; the Mac side is `apps/mac/Sources/InfinitusCore/PeerFleets.swift`, `Engines/PeerEngine.swift`, `apps/mac/Sources/Infinitus/PeerFleetsModel.swift`. Rules and traps: `docs/internals/peer-fleets.md`.
 - `apps/web/src/components/InfinitusSettingsSync.tsx`, `apps/web/src/hooks/useInfinitusSettingsSync.ts`, `apps/web/src/hooks/settingsSync.logic.ts` (+ test) — display prefs and account names kept the same across machines through the desktop, over the existing `prefs set` and `rename` verbs; the Mac holds only the `sync_settings` / `sync_account_names` switches (Devices). Rules and traps: `docs/internals/settings-sync.md`.

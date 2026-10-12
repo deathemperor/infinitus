@@ -216,7 +216,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `apps/web/src/components/settings/ProviderSettingsForm.tsx`'s select draws
   as a "Custom model ID…" choice opening an input; `ProviderInstanceCard.tsx`
   draws `ClaudeAdvisorProxyNote` under the form. Tests:
-  `settings.test.ts`, `ClaudeAdapterV2.test.ts`,
+  `settings.infinitus.test.ts`, `ClaudeAdapterV2.test.ts`,
   `ProviderSettingsForm.test.ts`; `ProviderInstanceRegistry.test.ts`'s
   Claude fixture carries the key.
 - `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
@@ -595,6 +595,22 @@ background`). Riding along, all
   `DesktopKeepAwakeSettings` after the background-activity row (#1075),
   `InfinitusResumeOnLimitSetting` after the auto-resume row (#648), and
   the restore / dirty-label lists carry `desktopKeepAwake`.
+- Worktree limit (#269 H, re-ported onto orchestrator v2 under #1627):
+  `packages/contracts/src/settings.ts` carries `worktreeMaxCount` (default
+  25, 0 lifts it) on `ServerSettings` and its patch;
+  `apps/server/src/orchestration-v2/ProjectionStore.ts` answers
+  `getWorktreeHolders` in both the SQL and the memory store;
+  `ThreadLaunchService.ts` takes the fork's `WorktreeCapGate`, reserves a
+  slot before `thread.create` for a `worktree` strategy and hands the
+  release to the preparation (`PreparationInput.releaseWorktreeSlot`);
+  `runtimeLayer.ts` provides the gate; `ws.ts`'s `launchThread` and
+  `mcp/toolkits/project/handlers.ts` surface the refusal through
+  `worktreeCapRefusalMessage` where every other launch failure stays
+  generic; `ThreadLaunchService.test.ts`'s harness provides the gate;
+  `apps/web/src/components/settings/SettingsPanels.tsx` mounts the
+  "Worktree limit" row after "Start from origin" and its restore / dirty
+  lists carry the key (`settingsSearch.ts` kept its `worktree-limit` entry
+  through the merge).
 - `apps/server/src/binCli.ts` — the CLI's root command is `infinitus`, not
   `t3` (the archive's binary, `docs/user/install.md`); `cli/pair.test.ts` and
   `cli/app.test.ts` assert that command path.
@@ -627,7 +643,8 @@ background`). Riding along, all
 - `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
   temp directory's real path: the service canonicalises transcript roots,
   and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),
-  so two upstream tests failed on a Mac. Plus the fork's account-attribution cases (#779).
+  so two upstream tests failed on a Mac. The fork's own cases are
+  `UsageService.infinitus.test.ts`.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs`,
   `fork-visual-check.ts`, `fold-changelog.mjs` (+ `.d.mts`),
   `infinitus-rename.ts` and `export-infinitus-splash.ts` as scripts entries
@@ -840,7 +857,7 @@ background`). Riding along, all
 - `packages/contracts/src/orchestrationV2.ts` — turn usage (#834, #1627): `OrchestrationV2ProviderTurn`'s optional `turnCostUsd`, `turnModels` and `toolCalls`; `OrchestrationV2AppThread.usageBaseline` and the same field on the `thread.metadata.update` command (`ThreadUsageRollup`, `threadUsage.ts`). `docs/internals/turn-usage.md`.
 - `apps/server/src/orchestration-v2/Orchestrator.ts` — `thread.metadata.update` copies `usageBaseline` onto the thread when the command carries it (#834).
 - `apps/server/src/orchestration-v2/ProviderEventIngestor.ts` — `withProviderTurnToolCalls`: a terminal `provider_turn.updated` without `toolCalls` gets the count of the turn's distinct tool items (`providerTurnToolCalls.ts`, #834, #927); a failed read logs and keeps the turn.
-- `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `lastResultTotals` on the live query context and, in `finalizeActiveTurn`, `claudeTurnUsageDelta` spreading `turnCostUsd` / `turnModels` onto the provider turn (#834).
+- `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `lastResultTotals` on the live query context and, in `finalizeActiveTurn`, `claudeTurnUsageDelta` spreading `turnCostUsd` / `turnModels` onto the provider turn (#834); its case stays in `ClaudeAdapterV2.test.ts`, whose wake harness is too large to copy into a sibling.
 - `apps/server/src/provider/ClaudeTurnTokenUsage.ts` — `claudeCacheTtlSeconds` and the `cacheTtlSeconds` it adds to the normalized usage (#1557).
 - `apps/web/src/components/ChatView.tsx` — `threadUsage`, folded from `serverProjection` with `threadUsageFromProjection`, handed to `ChatComposer` (#834).
 - `apps/mobile/src/features/threads/ThreadSettingsSheet.tsx` — the optional `threadId` on the settings session, and `<InfinitusThreadUsageRows>` under the options card when it is set (#834); `ThreadComposer.tsx` sets it from the selected thread.

@@ -130,6 +130,13 @@ such as another drive, set **Settings → Storage → Worktree location** to an 
 `D:\worktrees` or `~/worktrees`. The setting is per machine. Existing worktrees stay where they
 are, and cleanup covers both the default folder and the custom one.
 
+## Worktree limit
+
+A server keeps at most 25 worktrees across its threads. Past that, sending in **New worktree**
+mode is refused before the thread is created, and the message names the oldest archived
+threads still holding one: deleting a thread frees its worktree. Change the ceiling in
+**Settings → General → Worktree limit**; 0 lifts it. Threads in the project checkout never count.
+
 ## Storage cleanup
 
 Open **Settings → Storage** to enable automatic cleanup on one machine or all connected
