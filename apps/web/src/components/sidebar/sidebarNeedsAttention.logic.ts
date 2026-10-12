@@ -2,7 +2,11 @@ import type { InfinitusLimitStop } from "@infinitus/contracts/infinitus";
 import { limitStopKey } from "@infinitus/client-runtime/state/infinitusLimitStops";
 
 import type { SidebarThreadSummary } from "../../types";
-import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "../Sidebar.logic";
+import {
+  filterSidebarV2VisibleThreads,
+  resolveSidebarThreadStatus,
+  type SidebarThreadStatus,
+} from "../Sidebar.logic";
 
 /**
  * Fork (#269 D, #270 C; re-ported onto orchestrator v2 under #1627): the
@@ -35,7 +39,9 @@ const STATUS_ORDER: Record<NeedsAttentionStatus, number> = {
  * The blocked threads in the order the user should take them: approvals,
  * then questions, then limits, the longest wait first within each. A thread
  * waiting on an approval or an answer has had no change since the request
- * landed, so its `updatedAt` is when the wait began.
+ * landed, so its `updatedAt` is when the wait began. Takes every shell: the
+ * section ignores the sidebar's project scope and skips archived threads
+ * and subagents itself.
  */
 export function collectNeedsAttention(
   threads: ReadonlyArray<SidebarThreadSummary>,
@@ -43,8 +49,7 @@ export function collectNeedsAttention(
   describeLimitStop: (stop: InfinitusLimitStop) => string,
 ): ReadonlyArray<NeedsAttentionEntry> {
   const entries: NeedsAttentionEntry[] = [];
-  for (const thread of threads) {
-    if (thread.archivedAt !== null) continue;
+  for (const thread of filterSidebarV2VisibleThreads(threads, null)) {
     const stop = limitStops.get(limitStopKey(thread.environmentId, thread.id)) ?? null;
     const status = resolveSidebarThreadStatus(thread, { limitStopped: stop !== null });
     if (status !== "approval" && status !== "input" && status !== "limited") continue;
