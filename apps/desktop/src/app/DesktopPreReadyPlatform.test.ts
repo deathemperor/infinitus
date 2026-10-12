@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -17,6 +17,7 @@ const {
   readFileSyncMock,
   writeFileSyncMock,
   copyFileSyncMock,
+  execFileSyncMock,
 } = vi.hoisted(() => ({
   appendSwitchMock: vi.fn(),
   configureWebAuthnMock: vi.fn(),
@@ -28,6 +29,7 @@ const {
   readFileSyncMock: vi.fn(),
   writeFileSyncMock: vi.fn(),
   copyFileSyncMock: vi.fn(),
+  execFileSyncMock: vi.fn(),
 }));
 
 vi.mock("electron", () => ({
@@ -56,6 +58,10 @@ vi.mock("node:fs", () => ({
   copyFileSync: copyFileSyncMock,
 }));
 
+vi.mock("node:child_process", () => ({
+  execFileSync: execFileSyncMock,
+}));
+
 import * as DesktopPreReadyPlatform from "./DesktopPreReadyPlatform.ts";
 
 describe("DesktopPreReadyPlatform", () => {
@@ -71,6 +77,7 @@ describe("DesktopPreReadyPlatform", () => {
     readFileSyncMock.mockReturnValue("{}");
     writeFileSyncMock.mockReset();
     copyFileSyncMock.mockReset();
+    execFileSyncMock.mockReset();
   });
 
   it.effect("enables the Touch ID authenticator on macOS with the group the build signed", () => {
@@ -127,9 +134,60 @@ describe("DesktopPreReadyPlatform", () => {
     }).pipe(
       Effect.provide(
         DesktopPreReadyPlatform.layer.pipe(
-          Layer.provide(Layer.succeed(HostProcessPlatform, "linux")),
+          Layer.provide(Layer.succeed(HostProcess.Platform, "linux")),
         ),
       ),
+    );
+  });
+
+  it.effect.each([
+    {
+      label: "merges the color-manager fallback into disabled features on Hyprland 0.48.1",
+      switches: { "ozone-platform": "wayland", "disable-features": "Vulkan" },
+      hyprlandVersion: "0.48.1",
+      hyprlandCommit: "29e2e59fdbab8ed2cc23a20e3c6043d5decb5cdc",
+      expected: [["disable-features", "Vulkan,WaylandWpColorManagerV1"]],
+    },
+    {
+      label: "preserves color management on Hyprland 0.51.0",
+      switches: { "ozone-platform": "wayland", "disable-features": "Vulkan" },
+      hyprlandVersion: "0.51.0",
+      hyprlandCommit: "0123456789abcdef0123456789abcdef01234567",
+      expected: [],
+    },
+    {
+      label: "preserves color management when Electron resolved X11",
+      switches: { "ozone-platform": "x11", "disable-features": "Vulkan" },
+      hyprlandVersion: "0.48.1",
+      hyprlandCommit: "29e2e59fdbab8ed2cc23a20e3c6043d5decb5cdc",
+      expected: [],
+    },
+  ])("$label", ({ switches, hyprlandVersion, hyprlandCommit, expected }) => {
+    vi.stubEnv("XDG_CURRENT_DESKTOP", "Hyprland");
+    vi.stubEnv("XDG_SESSION_TYPE", "wayland");
+    const commandLine = new Map<string, string>(Object.entries(switches));
+    hasSwitchMock.mockImplementation((switchName: string) => commandLine.has(switchName));
+    getSwitchValueMock.mockImplementation(
+      (switchName: string) => commandLine.get(switchName) ?? "",
+    );
+    execFileSyncMock.mockReturnValue(
+      JSON.stringify({
+        commit: hyprlandCommit,
+        version: hyprlandVersion,
+        dirty: false,
+        tag: `v${hyprlandVersion}`,
+      }),
+    );
+
+    return DesktopPreReadyPlatform.make.pipe(
+      Effect.provideService(HostProcess.Platform, "linux"),
+      Effect.map(() => {
+        const featureSwitches = appendSwitchMock.mock.calls.filter(([name]) =>
+          ["disable-features", "enable-features", "ozone-platform"].includes(name),
+        );
+        assert.deepEqual(featureSwitches, expected);
+      }),
+      Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())),
     );
   });
 
@@ -163,7 +221,7 @@ describe("DesktopPreReadyPlatform", () => {
         }));
         yield* Layer.build(
           DesktopPreReadyPlatform.layer.pipe(
-            Layer.provide(Layer.succeed(HostProcessPlatform, "linux")),
+            Layer.provide(Layer.succeed(HostProcess.Platform, "linux")),
           ),
         );
         const identity = yield* Effect.promise(() => portalIdentity);
@@ -187,7 +245,7 @@ describe("DesktopPreReadyPlatform", () => {
     });
 
     return DesktopPreReadyPlatform.make.pipe(
-      Effect.provideService(HostProcessPlatform, "linux"),
+      Effect.provideService(HostProcess.Platform, "linux"),
       Effect.asVoid,
     );
   });
@@ -203,7 +261,7 @@ describe("DesktopPreReadyPlatform", () => {
       assert.include(contents, "MimeType=x-scheme-handler/infinitus;");
       assert.include(contents, "Icon=");
       assert.equal(setDesktopNameMock.mock.calls.length, 1);
-    }).pipe(Effect.provideService(HostProcessPlatform, "linux"));
+    }).pipe(Effect.provideService(HostProcess.Platform, "linux"));
   });
 
   it.effect(
@@ -220,7 +278,7 @@ describe("DesktopPreReadyPlatform", () => {
         });
 
         const layerPreReady = DesktopPreReadyPlatform.layer.pipe(
-          Layer.provide(Layer.succeed(HostProcessPlatform, "darwin")),
+          Layer.provide(Layer.succeed(HostProcess.Platform, "darwin")),
         );
 
         const layerClerkShaped = Layer.effect(

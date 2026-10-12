@@ -1,8 +1,9 @@
 import { LegendList } from "@legendapp/list/react-native";
 import type { ProjectEntry } from "@infinitus/contracts";
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { SymbolView } from "../../components/AppSymbol";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, RefreshControl, View } from "react-native";
+import { Platform, Pressable, RefreshControl, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
@@ -53,6 +54,7 @@ const FileTreeRow = memo(function FileTreeRow(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={node.path}
+      accessibilityState={{ selected: props.selected }}
       onPressIn={() => {
         if (node.kind === "file") {
           props.onPreviewFile?.(node.path);
@@ -67,7 +69,7 @@ const FileTreeRow = memo(function FileTreeRow(props: {
       }}
       className={cn(
         "mx-2 min-h-[42px] flex-row items-center gap-2 rounded-[12px] px-2 active:bg-subtle",
-        props.selected && "bg-subtle-strong",
+        props.selected && "bg-thread-selected",
       )}
       style={{ paddingLeft: 8 + depth * 18 }}
     >
@@ -86,7 +88,7 @@ const FileTreeRow = memo(function FileTreeRow(props: {
         className={cn(
           "min-w-0 flex-1 text-sm leading-normal",
           props.selected
-            ? "font-infinitus-bold text-foreground"
+            ? "font-infinitus-bold text-thread-selected-foreground"
             : node.ignored
               ? "font-infinitus-medium text-foreground-tertiary"
               : "font-infinitus-medium text-foreground-secondary",
@@ -96,7 +98,7 @@ const FileTreeRow = memo(function FileTreeRow(props: {
         {node.name}
       </Text>
       {node.kind === "directory" && props.expanded && props.loading ? (
-        <ActivityIndicator size="small" accessibilityLabel={`Loading ${node.name}`} />
+        <AppActivityIndicator size="small" accessibilityLabel={`Loading ${node.name}`} />
       ) : null}
     </Pressable>
   );
@@ -296,7 +298,7 @@ export function FileTreeBrowser(props: {
               </Pressable>
             </>
           ) : props.isPending ? (
-            <ActivityIndicator size="small" />
+            <AppActivityIndicator size="small" />
           ) : (
             <>
               <Text className="text-sm font-infinitus-bold text-foreground">No files found</Text>

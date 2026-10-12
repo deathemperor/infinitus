@@ -90,7 +90,9 @@ type UpdateButtonProps = Pick<ComponentProps<typeof Button>, "variant" | "size" 
   readonly appearance?: "button" | "icon";
 };
 
-function useServerUpdate() {
+/** Updates one server and waits until it is back on the target version.
+    Reports its own success or failure toast; never rejects. */
+export function useServerUpdate() {
   const updateServer = useAtomCommand(serverEnvironment.updateServer, { reportFailure: false });
   const update = async (
     target: ServerUpdateTarget,
@@ -222,7 +224,9 @@ export function ServerUpdatesAction({
   );
 }
 
-function canUpdateServer(result: AsyncResult.AsyncResult<AuthSessionState, unknown>): boolean {
+export function canUpdateServer(
+  result: AsyncResult.AsyncResult<AuthSessionState, unknown>,
+): boolean {
   if (result._tag !== "Success" || !result.value.authenticated) return false;
   return sessionGrantsScope(result.value, AuthEnvironmentMaintainScope);
 }

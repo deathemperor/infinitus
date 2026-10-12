@@ -3,17 +3,16 @@ import type { AssetResource, EnvironmentId } from "@infinitus/contracts";
 import type { FileBackedComposerAttachment } from "../lib/composerImages";
 import type { MediaActionsSource } from "../lib/mediaActionsSource";
 
-export interface ResolvedFilePreviewSource {
+interface FilePreviewMetadata {
   readonly kind: "image" | "pdf" | "document";
   readonly mimeType?: string;
-  readonly uri: string;
   readonly name?: string;
   readonly sourceIdentifier?: string;
   readonly srcFragment?: string;
   readonly actionsSource?: MediaActionsSource;
 }
 
-export type FilePreviewSource = Omit<ResolvedFilePreviewSource, "uri"> &
+export type FilePreviewItem = FilePreviewMetadata &
   (
     | { readonly uri: string }
     | { readonly attachment: FileBackedComposerAttachment }
@@ -24,3 +23,12 @@ export type FilePreviewSource = Omit<ResolvedFilePreviewSource, "uri"> &
         readonly cachedUrl?: { readonly url: string; readonly expiresAt: number };
       }
   );
+
+export type FilePreviewSource = FilePreviewItem & {
+  readonly gallery?: readonly FilePreviewItem[];
+};
+
+export interface ResolvedFilePreviewSource extends FilePreviewMetadata {
+  readonly uri: string;
+  readonly gallery?: readonly (FilePreviewMetadata & { readonly uri: string })[];
+}

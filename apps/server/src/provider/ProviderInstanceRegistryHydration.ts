@@ -25,8 +25,11 @@
  */
 import {
   defaultInstanceIdForDriver,
+  providerInstanceConfigEnabledFlag,
+  resolveProviderInstanceEnabled,
   type ProviderInstanceConfig,
   type ProviderInstanceConfigMap,
+  type ProviderInstanceId,
   ServerSettings,
 } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
@@ -40,7 +43,7 @@ import * as ProviderInstanceRegistryMutator from "./ProviderInstanceRegistryMuta
 import * as ProviderOrchestrationAdapterInfrastructure from "./ProviderOrchestrationAdapterInfrastructure.ts";
 import * as AcpRegistrySupport from "@infinitus/provider-acp-registry/server/AcpRegistrySupport";
 import * as ProviderHostLive from "./ProviderHostLive.ts";
-import type { ProviderHost } from "@infinitus/provider-core/server/ProviderHost";
+import type * as ProviderHost from "@infinitus/provider-core/server/ProviderHost";
 import type * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import type * as ServerConfig from "../config.ts";
 
@@ -49,10 +52,10 @@ type ProviderInstanceRegistryHydrationEnv =
       BuiltInDriversEnv,
       | ProviderOrchestrationAdapterInfrastructure.ProviderOrchestrationAdapterInfrastructure
       | AcpRegistrySupport.AcpRegistryCatalog
-      | ProviderHost
+      | ProviderHost.ProviderHost
     >
   | Settings.ServerSettingsService
-  // Requirements of the `ProviderHost` the drivers receive.
+  // Requirements of the `ProviderHost.ProviderHost` the drivers receive.
   | BackgroundPolicy.BackgroundPolicy
   | ServerConfig.ServerConfig;
 
@@ -71,6 +74,29 @@ export const deriveProviderInstanceConfigMap = (
     const instanceId = defaultInstanceIdForDriver(driver.driverKind);
     if (instanceId in merged) continue;
     merged[instanceId] = { driver: driver.driverKind };
+  }
+
+  // A project that turns an instance on needs it alive and probed even when
+  // the machine itself has it off, or a thread in that project would route
+  // to an instance nobody ever checked in on. Fold every project's
+  // `providerInstances[id].enabled` overrides in: an instance already enabled
+  // is untouched, and one absent from settings entirely (deleted) stays out.
+  for (const overrides of Object.values(settings.projectSettingsOverrides)) {
+    for (const [rawInstanceId, projectOverride] of Object.entries(
+      overrides?.providerInstances ?? {},
+    )) {
+      if (projectOverride.enabled !== true) continue;
+      const instanceId = rawInstanceId as ProviderInstanceId;
+      const existing = merged[instanceId];
+      if (existing === undefined || resolveProviderInstanceEnabled(existing)) continue;
+      merged[instanceId] = {
+        ...existing,
+        enabled: true,
+        ...(providerInstanceConfigEnabledFlag(existing.config) === false
+          ? { config: { ...(existing.config as Record<string, unknown>), enabled: true } }
+          : {}),
+      };
+    }
   }
 
   return merged as ProviderInstanceConfigMap;

@@ -7,10 +7,7 @@ import type * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
 import type { PendingOrchestrationEffectV2 } from "./EffectOutbox.ts";
-import type {
-  IdAllocatorV2,
-  IdAllocatorV2Error,
-} from "@infinitus/provider-core/server/IdAllocator";
+import type * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 
 export interface ThreadDeletionPlan {
   readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
@@ -26,8 +23,8 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
   >;
   readonly attachmentIds: ReadonlyArray<string>;
   readonly now: DateTime.Utc;
-  readonly idAllocator: IdAllocatorV2["Service"];
-}): Effect.fn.Return<ThreadDeletionPlan, IdAllocatorV2Error> {
+  readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
+}): Effect.fn.Return<ThreadDeletionPlan, IdAllocator.IdAllocatorV2Error> {
   const { command, projection, now, idAllocator } = input;
   const events: Array<OrchestrationV2DomainEvent> = [];
   const effects: Array<PendingOrchestrationEffectV2> = [];
