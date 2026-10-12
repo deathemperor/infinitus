@@ -15,7 +15,6 @@ import * as Effect from "effect/Effect";
 import * as FiberHandle from "effect/FiberHandle";
 import * as FiberMap from "effect/FiberMap";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
 import type { ClaudeUsageLimitRefusal } from "../../orchestration-v2/Adapters/ClaudeAdapterV2.ts";
@@ -179,11 +178,12 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       Effect.gen(function* () {
         const known = stops.get(stop.threadId);
         const repeated = known !== undefined && known.runId === stop.runId;
+        // A stop restored at boot names nobody; the first refusal on it may.
         const next: LimitStop = repeated
           ? {
               ...stop,
-              account: known.account,
-              fleetKey: known.fleetKey,
+              account: known.account ?? stop.account,
+              fleetKey: known.fleetKey ?? stop.fleetKey,
               stoppedAt: known.stoppedAt,
               resetsAt: stop.resetsAt ?? known.resetsAt,
               limitType: stop.limitType ?? known.limitType,
@@ -199,7 +199,12 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           proxy: next.proxy !== null,
         });
         if (next.proxy !== null) return;
-        if (!repeated && options.report && next.account !== null && (yield* enabled)) {
+        if (
+          (!repeated || known.account === null) &&
+          options.report &&
+          next.account !== null &&
+          (yield* enabled)
+        ) {
           // Quota reads lag refusals by minutes. Report the refusal directly
           // instead of waiting for the usage endpoint to confirm it.
           yield* swapd.reportLimit(
@@ -278,8 +283,10 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               const refusal = refusals.get(threadId) ?? null;
               const failed = failedStopFromShell(shell, yield* nowMillis, refusal);
               if (failed === null || failed.runId !== run.id) {
-                // A run that failed for another reason moves the thread on.
-                if (known !== undefined && known.runId !== run.id) yield* forget(threadId);
+                // A run that failed for another reason moves the thread on:
+                // the stop's own parked turn ended off the limit, or a later
+                // run took the thread.
+                if (known !== undefined) yield* forget(threadId);
                 return;
               }
               if (known !== undefined && known.runId === run.id) {
@@ -411,7 +418,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         if (![...stops.values()].some((stop) => stop.proxy === null)) return;
         const accounts = yield* withBackgroundAccounts(snapshot);
         const now = yield* nowMillis;
-        for (const stop of [...stops.values()]) {
+        // `forget` deletes the current entry mid-walk; Map iteration tolerates that.
+        for (const stop of stops.values()) {
           const target = resumeTarget(stop, accounts, now);
           if (target === null) continue;
           const last = lastResumeAt.get(stop.threadId);

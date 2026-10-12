@@ -123,7 +123,7 @@ const makeHarness = (input: {
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<OrchestrationV2DomainEvent>();
     const commands = yield* Ref.make<ReadonlyArray<OrchestrationV2ServerCommand>>([]);
-    const reports = yield* Ref.make<ReadonlyArray<[string, string | null]>>([]);
+    const reports = yield* Ref.make<ReadonlyArray<readonly [string, string | null]>>([]);
     const shells = yield* Ref.make(new Map((input.shells ?? []).map((s) => [s.id, s])));
     const snapshots = yield* SubscriptionRef.make(input.snapshot ?? noFleet);
     const stopped = yield* Ref.make<ReadonlyArray<InfinitusLimitStop>>([]);
@@ -164,7 +164,7 @@ const makeHarness = (input: {
           Layer.mock(InfinitusSwapdProbe)({
             snapshot: Effect.succeed({ available: false, fleets: [], commands: [] }),
             reportLimit: (account, resetsAt) =>
-              Ref.update(reports, (list) => [...list, [account, resetsAt]]),
+              Ref.update(reports, (list) => [...list, [account, resetsAt] as const]),
           }),
           Layer.mock(ServerSettingsService.ServerSettingsService)({
             getSettings: Effect.succeed({ ...DEFAULT_SERVER_SETTINGS, ...input.settings }),
@@ -232,20 +232,10 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           ),
         });
         yield* h.refuse(refusal(one, runOne));
-        expect(yield* h.stopped).toEqual([
-          {
-            threadId: one,
-            kind: "parked",
-            since: "1970-01-01T00:00:00.000Z",
-            account: "hiep1",
-            resetsAt: HIEP1_WEEKLY,
-          },
-        ]);
         expect(yield* h.reports).toEqual([["hiep1", HIEP1_WEEKLY]]);
         // The live account has room in the window: the resume replaces the
-        // parked turn, then continues the run once the orchestrator records
-        // the interrupt.
-        yield* h.settle;
+        // parked turn at once (the stop was listed for the moment between),
+        // then continues the run once the orchestrator records the interrupt.
         expect(yield* h.commands).toEqual([{ type: "run.interrupt", threadId: one, runId: runOne }]);
         expect(yield* h.stopped).toEqual([]);
         yield* h.setShell(shell(one, { status: "interrupted", activeRunId: null }));
@@ -304,7 +294,7 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
         usageLimitResetAt: HIEP1_WEEKLY,
       });
       const h = yield* makeHarness({
-        shells: [failed],
+        shells: [shell(one)],
         snapshot: fleet(
           account("hiep1", {
             active: true,
@@ -315,6 +305,7 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
       // The refusal came first (the parked turn), then the CLI gave up: one
       // stop, the window kept, reported once.
       yield* h.refuse(refusal(one, runOne));
+      yield* h.setShell(failed);
       yield* h.emit(runUpdated(one, runOne, "failed"));
       expect(yield* h.stopped).toEqual([
         {
@@ -345,10 +336,11 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
       expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([one, two]);
       yield* h.emit(threadEvent(one, "thread.settled"));
       expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([two]);
+      // The parked turn ended off the limit (a context-window stop, #1107):
+      // the stop ends and nothing new is recorded.
       yield* h.setShell(shell(two, { status: "failed", lastErrorClass: "provider_error" }));
       yield* h.emit(runUpdated(two, runOne, "failed"));
       expect(yield* h.stopped).toEqual([]);
-      // A context-window failure (#1107) never becomes a stop.
       yield* h.emit(runUpdated(two, runTwo, "failed"));
       expect(yield* h.stopped).toEqual([]);
       expect(yield* h.commands).toEqual([]);
@@ -450,12 +442,16 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           }),
           shell(two, { status: "failed", activeRunId: null, lastErrorClass: "provider_error" }),
         ],
-        snapshot: fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })),
+        snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
       });
       expect((yield* h.stopped).map((stop) => [stop.threadId, stop.kind, stop.account])).toEqual([
         [one, "failed", null],
       ]);
-      yield* h.settle;
+      // The stop names nobody, so only a reading with every window under
+      // full says the live account has room.
+      yield* h.probe(fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })));
+      expect(yield* h.commands).toEqual([]);
+      yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
       expect(yield* h.commands).toEqual([
         { type: "message.dispatch", threadId: one, source: runOne, text: "Continue where you left off." },
       ]);

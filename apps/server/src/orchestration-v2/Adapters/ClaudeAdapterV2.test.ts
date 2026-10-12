@@ -3926,14 +3926,16 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             }),
           );
         }
-        const notices = harness.events.filter(
-          (event) => event.type === "turn_item.updated" && event.turnItem.type === "system_notice",
-        );
-        assert.lengthOf(notices, 1);
+        const notice = yield* Queue.take(harness.systemNoticeReceipts);
+        assert.equal(notice.turnItem.type, "system_notice");
+        if (notice.turnItem.type !== "system_notice") return;
+        assert.include(notice.turnItem.message, "Claude usage limit reached");
+        yield* Effect.yieldNow;
+        assert.equal(yield* Queue.size(harness.systemNoticeReceipts), 0);
         assert.isFalse(
           harness.events.some(
             (event) =>
-              event.type === "message.updated" ||
+              (event.type === "message.updated" && event.message.role === "assistant") ||
               (event.type === "turn_item.updated" && event.turnItem.type === "assistant_message"),
           ),
         );

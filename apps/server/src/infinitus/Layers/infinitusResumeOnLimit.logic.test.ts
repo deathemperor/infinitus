@@ -1,5 +1,6 @@
 import { RunId, ThreadId, type OrchestrationV2ThreadShell } from "@infinitus/contracts";
 import type { InfinitusAccount, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
+import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -126,7 +127,9 @@ describe("refusedAccount (#1486)", () => {
         usage: {
           sevenDay: {
             pct: 100,
-            resetsAt: new Date(Date.parse(HIEP1_WEEKLY) + RESET_MATCH_MS - 1).toISOString(),
+            resetsAt: DateTime.formatIso(
+              DateTime.makeUnsafe(Date.parse(HIEP1_WEEKLY) + RESET_MATCH_MS - 1),
+            ),
           },
         },
       }),
@@ -277,7 +280,7 @@ describe("failedStopFromShell", () => {
     expect(failedStopFromShell({ ...shell, status: "running" }, STOPPED_AT, null)).toBeNull();
     expect(failedStopFromShell({ ...shell, settledOverride: "settled" }, STOPPED_AT, null)).toBeNull();
     expect(
-      failedStopFromShell({ ...shell, archivedAt: new Date() as never }, STOPPED_AT, null),
+      failedStopFromShell({ ...shell, archivedAt: DateTime.makeUnsafe(STOPPED_AT) }, STOPPED_AT, null),
     ).toBeNull();
     expect(failedStopFromShell({ ...shell, usageLimitResetAt: null }, STOPPED_AT, null)?.resetsAt).toBeNull();
   });

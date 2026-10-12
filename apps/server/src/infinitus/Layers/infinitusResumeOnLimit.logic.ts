@@ -282,11 +282,11 @@ export interface ResumeTarget {
  * reading that carries the stop's window decides — under 100 % counts, full
  * does not, whichever account it is; without one, a different account
  * counts, and the same account only once the stop's reset has passed. A
- * stop that names neither window nor reset lets the same account count once
- * a probe after the stop reads every window under full (a thread sat two
- * hours past its reset on an account reading 20 %). An engine that reports
- * no probe time gets the weaker test, a different account than the one at
- * the stop.
+ * stop that names no window lets the same account — or any account, for a
+ * stop that names nobody, as one restored at boot does — count once a probe
+ * after the stop reads every window under full (a thread sat two hours past
+ * its reset on an account reading 20 %). An engine that reports no probe
+ * time gets the weaker test, a different account than the one at the stop.
  */
 export function resumeTarget(
   stop: LimitStop,
@@ -313,10 +313,11 @@ export function resumeTarget(
       if (window.pct < 100) return target;
       continue;
     }
-    if (label !== from) return target;
+    if (from !== null && label !== from) return target;
     if (stop.resetsAt !== null && now >= stop.resetsAt) return target;
-    if (stop.limitType === null && stop.resetsAt === null && everyWindowUnderFull(active))
-      return target;
+    // The same account, or a stop naming nobody (restored at boot): only a
+    // reading with every window under full says it has room.
+    if (stop.limitType === null && everyWindowUnderFull(active)) return target;
   }
   return null;
 }

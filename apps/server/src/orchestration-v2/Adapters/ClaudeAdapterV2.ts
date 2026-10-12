@@ -6596,7 +6596,16 @@ export function makeClaudeAdapterV2(
             });
             return;
           }
-          if (assistantText !== null && assistantText.text.length > 0) {
+          // Fork (#1320): the CLI's rate-limit message ("You've reached your …
+          // limit. Switch to another model…") is re-sent on every retry while
+          // the turn is parked, and would land as one assistant row each time.
+          // The window's notice and the turn's failure already say it once,
+          // with the reset wait; the prose is kept off the thread.
+          if (
+            assistantText !== null &&
+            assistantText.text.length > 0 &&
+            !(message.type === "assistant" && message.error === "rate_limit")
+          ) {
             yield* emitAssistantTextArtifacts({
               context,
               nativeItemId: assistantText.nativeItemId,

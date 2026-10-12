@@ -208,7 +208,7 @@ function AutoSettleSettingsRows() {
           />
           {/* Fork (#648): the swap-based resume, beside upstream's reset-time one. */}
           <SettingsSwitchRow
-            icon="arrow.triangle.2.circlepath"
+            icon="arrow.clockwise"
             label="Resume on another account"
             value={uniformMobileSetting(displayTargets, "infinitusResumeOnLimit")}
             disabled={disabled}

@@ -51,9 +51,11 @@ describe("createInfinitusLimitStopsAtom", () => {
 
   it("folds every enabled environment's stops into one map, replaced only on change", () => {
     const catalogAtom = Atom.make(catalog([[mac, true], [linux, false]]));
-    const results = new Map<EnvironmentId, Atom.Writable<AsyncResult.AsyncResult<ReadonlyArray<InfinitusLimitStop>, unknown>>>([
-      [mac, Atom.make(AsyncResult.success<ReadonlyArray<InfinitusLimitStop>, unknown>([stop("a"), stop("b")]))],
-      [linux, Atom.make(AsyncResult.success<ReadonlyArray<InfinitusLimitStop>, unknown>([stop("c")]))],
+    const stopsAtom = (stops: ReadonlyArray<InfinitusLimitStop>) =>
+      Atom.make<AsyncResult.AsyncResult<ReadonlyArray<InfinitusLimitStop>, unknown>>(AsyncResult.success(stops));
+    const results = new Map([
+      [mac, stopsAtom([stop("a"), stop("b")])],
+      [linux, stopsAtom([stop("c")])],
     ]);
     const combined = createInfinitusLimitStopsAtom({
       catalogValueAtom: catalogAtom,
