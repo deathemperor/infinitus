@@ -202,7 +202,7 @@ export interface ThreadDetailScreenProps {
   readonly threadCwd: string | null;
   readonly selectedThreadQueueCount: number;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
-  readonly dispatchingMessageId: MessageId | null;
+  readonly sendingMessageId: MessageId | null;
   readonly serverConfig: T3ServerConfig | null;
   readonly layoutVariant?: LayoutVariant;
   readonly usesAutomaticContentInsets?: boolean;
@@ -1118,7 +1118,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
               worktreeSetup={props.worktreeSetup}
               setupWorkingStartedAt={props.setupWorkingStartedAt}
               queuedMessages={props.queuedMessages}
-              dispatchingMessageId={props.dispatchingMessageId}
+              sendingMessageId={props.sendingMessageId}
               // A native subagent has no composer to edit a pending message in;
               // Cancel on the edit banner would discard it.
               onEditPendingMessage={isProviderSubagent ? null : handleEditPendingMessage}
