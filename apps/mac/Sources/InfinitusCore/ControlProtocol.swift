@@ -348,12 +348,12 @@ public struct ControlCommand: Codable, Sendable, Equatable {
         ControlCommand(name: "push", effect: .write, stdin: "payload",
                        summary: "A thread phase change from Infinitus desktop on stdin ({kind: \"thread.phase\", threadId, title, phase, detail?}): pushed as one line through the Mac's channels — Notification Center, and the phones through the desktop and the Infinitus Connect relay (#1375) — with the Mac's own gating. Title and phase only, never prompt text.",
                        replyShape: "{pushed}"),
-        ControlCommand(name: "desktop-credential", options: ["--origin <http://127.0.0.1:port>", "--expiresAt <iso>"], effect: .write, stdin: "secret",
-                       summary: "Keep the bearer session Infinitus desktop mints for infinitusctl (stdin) in the keychain, with the desktop's origin; empty stdin forgets it. Infinitus desktop sends this itself when it publishes its port.",
-                       replyShape: "{origin, expiresAt, stored}"),
+        ControlCommand(name: "desktop-credential", options: ["--origin <http://127.0.0.1:port>", "--expiresAt <iso>", "--environmentId <id>", "--takeover"], effect: .write, stdin: "secret",
+                       summary: "Keep the bearer session Infinitus desktop mints for infinitusctl (stdin) in the keychain, with the desktop's origin and environment; empty stdin forgets it (hands the slot back). Infinitus desktop sends this itself when it publishes its port; a publish from another environment than the slot's holder is held off while the holder answers, unless it takes over (#1487).",
+                       replyShape: "{origin, expiresAt, environmentId, stored}"),
         ControlCommand(name: "desktop-status", effect: .read,
-                       summary: "Where Infinitus desktop is (origin, the published port) and the CLI credential kept for it, masked.",
-                       replyShape: "{origin, port, credential: <masked>|null, expiresAt, stale}"),
+                       summary: "Where Infinitus desktop is (origin, the published port, the environment holding the slot) and the CLI credential kept for it, masked.",
+                       replyShape: "{origin, port, environmentId, credential: <masked>|null, expiresAt, stale}"),
         // Team on Infinitus Connect (#1592): what the desktop's publisher
         // reads off this Mac, and the private-project list it honours;
         // everything else Team lives on the relay.

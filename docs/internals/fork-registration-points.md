@@ -151,7 +151,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `subscribeCaptures` / `captures.apply` under `captures`.
 - `apps/server/src/server.ts` — `layerInfinitus` below `layerAuth`:
   `InfinitusServerPortLive` (it mints infinitusctl's session, so it needs
-  the auth service, #822), `InfinitusCompanionLive`, `InfinitusSecretLive`
+  the auth service, #822, and names its environment to the app, so
+  `layerServerEnvironment` too, #1487), `InfinitusCompanionLive`, `InfinitusSecretLive`
   (#747) and `InfinitusUsageAttributionLive` (#779) over `InfinitusLive` and
   the control client; `layerUsage` is provided it; the block is merged into
   `layerRuntimeDependencies`, `InfinitusPairingLive` (provided `layerAuth`,
