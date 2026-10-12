@@ -29,7 +29,7 @@ export class WorktreeCapGate extends Context.Service<
      */
     readonly reserve: Effect.Effect<Effect.Effect<void>, WorktreeCapRefusalError>;
   }
->()("infinitus/orchestration-v2/WorktreeCapGate") {}
+>()("t3/orchestration-v2/WorktreeCap/WorktreeCapGate") {}
 
 const make = Effect.gen(function* () {
   const serverSettings = yield* ServerSettings.ServerSettingsService;
