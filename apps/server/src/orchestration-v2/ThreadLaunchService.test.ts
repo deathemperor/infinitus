@@ -58,6 +58,9 @@ import type { ProviderAdapterV2Shape } from "@infinitus/provider-core/server/Pro
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ThreadLaunch from "./ThreadLaunchService.ts";
 import * as ThreadManagement from "./ThreadManagementService.ts";
+import * as ProjectionStore from "./ProjectionStore.ts";
+import * as WorktreeCap from "./WorktreeCap.ts";
+import { worktreeCapRefusalMessage } from "./worktreeCap.logic.ts";
 import * as ThreadTitleRegeneration from "./ThreadTitleRegenerationService.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 
@@ -191,12 +194,22 @@ function makeHarness(options: HarnessOptions = {}) {
         folderForThread: () => Effect.succeed(Option.none()),
       }),
   );
+  // Fork (#269 H): the worktree limit reads the same projection the orchestrator writes.
+  const layerWorktreeCap = WorktreeCap.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        layerExternalServices,
+        ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      ),
+    ),
+  );
   const layerLaunch = ThreadLaunch.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         layerExternalServices,
         layerThreadManagement,
         layerReceipts,
+        layerWorktreeCap,
         IdAllocator.layer,
       ),
     ),
@@ -457,6 +470,110 @@ it.effect("returns a visible preparing message while provisioning is still block
       );
       assert.isEmpty(prematureEffects);
       yield* Deferred.succeed(allowSetup, undefined);
+    }).pipe(Effect.provide(harness.layer));
+  }),
+);
+
+// Fork (#269 H): the worktree limit.
+it.effect("refuses a worktree launch at the limit before the thread exists (#269 H)", () =>
+  Effect.gen(function* () {
+    const harness = makeHarness({ serverSettings: { worktreeMaxCount: 1 } });
+    yield* Effect.gen(function* () {
+      const launches = yield* ThreadLaunch.ThreadLaunchService;
+      const threads = yield* ThreadManagement.ThreadManagementService;
+      const first = yield* launches.launch(
+        launchInput({
+          command: "command:cap:first",
+          thread: "thread:cap:first",
+          message: "Build the feature",
+          workspace: { type: "worktree", baseRef: "main" },
+        }),
+      );
+      yield* waitUntil(() =>
+        threads
+          .getThreadProjection(first.threadId)
+          .pipe(Effect.map((projection) => projection.thread.worktreePath !== null)),
+      );
+      yield* threads.dispatch({
+        type: "thread.archive",
+        commandId: CommandId.make("command:cap:archive"),
+        threadId: first.threadId,
+      });
+
+      const refused = yield* launches
+        .launch(
+          launchInput({
+            command: "command:cap:second",
+            thread: "thread:cap:second",
+            message: "Another feature",
+            workspace: { type: "worktree", baseRef: "main" },
+          }),
+        )
+        .pipe(Effect.flip);
+      assert.equal(refused.operation, "provision-worktree");
+      assert.equal(
+        worktreeCapRefusalMessage(refused),
+        "Worktree limit reached: 1 of 1 worktrees are in use. Delete an archived thread to free its worktree (oldest: “New thread”), or raise the Worktree limit in the server's settings.",
+      );
+      assert.isNull(yield* threads.getThreadShell(ThreadId.make("thread:cap:second")));
+      assert.equal(harness.createWorktree.mock.calls.length, 1);
+
+      // The project checkout is never capped.
+      const local = yield* launches.launch(
+        launchInput({ command: "command:cap:local", thread: "thread:cap:local", message: "Local" }),
+      );
+      assert.equal(local.threadId, ThreadId.make("thread:cap:local"));
+    }).pipe(Effect.provide(harness.layer));
+  }),
+);
+
+it.effect("counts the worktrees launches started together are still creating (#269 H)", () =>
+  Effect.gen(function* () {
+    const allowWorktree = yield* Deferred.make<void>();
+    const entered = yield* Ref.make(0);
+    const harness = makeHarness({
+      serverSettings: { worktreeMaxCount: 2 },
+      createWorktree: (input) =>
+        Ref.update(entered, (count) => count + 1).pipe(
+          Effect.andThen(Deferred.await(allowWorktree)),
+          Effect.as({
+            worktree: { path: "/repo-worktrees/shared", refName: input.newRefName, headSha: "abc" },
+          } as never),
+        ),
+    });
+    yield* Effect.gen(function* () {
+      const launches = yield* ThreadLaunch.ThreadLaunchService;
+      const threads = yield* ThreadManagement.ThreadManagementService;
+      const launch = (name: string) =>
+        launches.launch(
+          launchInput({
+            command: `command:cap:${name}`,
+            thread: `thread:cap:${name}`,
+            message: "Build the feature",
+            workspace: { type: "worktree", baseRef: "main" },
+          }),
+        );
+      const first = yield* launch("one");
+      const second = yield* launch("two");
+      yield* waitUntil(() => Ref.get(entered).pipe(Effect.map((count) => count === 2)));
+      // Neither worktree is in the projection yet; the reservations refuse a third.
+      const refused = yield* launch("three").pipe(Effect.flip);
+      assert.include(worktreeCapRefusalMessage(refused) ?? "", "2 of 2 worktrees are in use");
+      assert.isNull(yield* threads.getThreadShell(ThreadId.make("thread:cap:three")));
+
+      yield* Deferred.succeed(allowWorktree, undefined);
+      yield* waitUntil(() =>
+        Effect.forEach([first.threadId, second.threadId], (threadId) =>
+          threads.getThreadProjection(threadId),
+        ).pipe(
+          Effect.map((projections) =>
+            projections.every((projection) => projection.thread.worktreePath !== null),
+          ),
+        ),
+      );
+      // Both landed on one path, so one worktree is in use and a slot is free again.
+      const third = yield* launch("four");
+      assert.equal(third.threadId, ThreadId.make("thread:cap:four"));
     }).pipe(Effect.provide(harness.layer));
   }),
 );

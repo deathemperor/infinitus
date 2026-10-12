@@ -644,6 +644,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin
         ? ["New worktrees start from origin"]
         : []),
+      ...(settings.worktreeMaxCount !== DEFAULT_UNIFIED_SETTINGS.worktreeMaxCount
+        ? ["Worktree limit"]
+        : []),
       ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
         ? ["Add project base directory"]
         : []),
@@ -693,6 +696,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.addProjectBaseDirectory,
       settings.defaultThreadEnvMode,
       settings.newWorktreesStartFromOrigin,
+      settings.worktreeMaxCount,
       settings.diffFilesCollapsed,
       settings.diffIgnoreWhitespace,
       settings.diffLayout,
@@ -833,6 +837,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       providerHealthRefreshInterval: DEFAULT_UNIFIED_SETTINGS.providerHealthRefreshInterval,
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
+      worktreeMaxCount: DEFAULT_UNIFIED_SETTINGS.worktreeMaxCount,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
@@ -3081,6 +3086,41 @@ export function GeneralSettingsPanel() {
               }
               aria-label="Start new worktrees from origin by default"
             />
+          }
+        />
+        {/* Fork (#269 H): the worktree limit, a server setting. */}
+        <SettingsRow
+          serverScoped
+          settingKeys={["worktreeMaxCount"]}
+          {...searchableSetting("worktree-limit")}
+          description="How many threads may hold a worktree at once. Past it a new worktree is refused until an archived thread is deleted; 0 lifts the limit."
+          resetAction={
+            settings.worktreeMaxCount !== DEFAULT_UNIFIED_SETTINGS.worktreeMaxCount ? (
+              <SettingResetButton
+                label="worktree limit"
+                onClick={() =>
+                  updateSettings({ worktreeMaxCount: DEFAULT_UNIFIED_SETTINGS.worktreeMaxCount })
+                }
+              />
+            ) : null
+          }
+          control={
+            <NumberField
+              value={settings.worktreeMaxCount}
+              min={0}
+              step={1}
+              size="sm"
+              className="w-28"
+              onValueChange={(value) =>
+                updateSettings({ worktreeMaxCount: normalizeIntervalSeconds(value) })
+              }
+            >
+              <NumberFieldGroup>
+                <NumberFieldDecrement aria-label="Decrease worktree limit" />
+                <NumberFieldInput aria-label="Worktree limit" />
+                <NumberFieldIncrement aria-label="Increase worktree limit" />
+              </NumberFieldGroup>
+            </NumberField>
           }
         />
         <SettingsRow

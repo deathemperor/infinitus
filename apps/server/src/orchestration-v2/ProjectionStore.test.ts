@@ -349,6 +349,90 @@ it.effect("memory recovery selection includes unfinished items from missing runs
   }).pipe(Effect.provide(ProjectionStore.layerMemory)),
 );
 
+// Fork (#269 H): distinct worktrees held by live threads, and the oldest archived holders.
+const worktreeHoldersAreCountedDistinctly = Effect.gen(function* () {
+  const store = yield* ProjectionStore.ProjectionStoreV2;
+  const now = yield* DateTime.now;
+  const seed = (
+    suffix: string,
+    thread: {
+      readonly title: string;
+      readonly worktreePath: string | null;
+      readonly archivedAt?: string;
+      readonly deletedAt?: string;
+    },
+  ) => {
+    const threadId = ThreadId.make(`thread:holders:${suffix}`);
+    return store.apply({
+      id: EventId.make(`event:holders:${suffix}`),
+      type: "thread.created",
+      threadId,
+      occurredAt: now,
+      payload: {
+        createdBy: "user",
+        creationSource: "web",
+        id: threadId,
+        projectId: ProjectId.make("project:holders"),
+        title: thread.title,
+        providerInstanceId,
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: thread.worktreePath,
+        activeProviderThreadId: null,
+        lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+        forkedFrom: null,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: thread.archivedAt === undefined ? null : DateTime.makeUnsafe(thread.archivedAt),
+        settledOverride: null,
+        settledAt: null,
+        lastVisitedAt: null,
+        deletedAt: thread.deletedAt === undefined ? null : DateTime.makeUnsafe(thread.deletedAt),
+      },
+    });
+  };
+  yield* seed("live", { title: "Live", worktreePath: "/wt/live" });
+  yield* seed("fork", { title: "Fork of live", worktreePath: "/wt/live" });
+  yield* seed("local", { title: "Local", worktreePath: null });
+  yield* seed("newer", {
+    title: "Newer archive",
+    worktreePath: "/wt/newer",
+    archivedAt: "2026-03-03T00:00:00.000Z",
+  });
+  yield* seed("older", {
+    title: "Older archive",
+    worktreePath: "/wt/older",
+    archivedAt: "2026-03-01T00:00:00.000Z",
+  });
+  yield* seed("gone", {
+    title: "Deleted",
+    worktreePath: "/wt/gone",
+    archivedAt: "2026-02-01T00:00:00.000Z",
+    deletedAt: "2026-02-02T00:00:00.000Z",
+  });
+
+  const one = yield* store.getWorktreeHolders(1);
+  assert.equal(one.count, 3);
+  assert.deepEqual(one.oldestArchived, [
+    { title: "Older archive", archivedAt: "2026-03-01T00:00:00.000Z" },
+  ]);
+  const three = yield* store.getWorktreeHolders(3);
+  assert.deepEqual(
+    three.oldestArchived.map((row) => row.title),
+    ["Older archive", "Newer archive"],
+  );
+});
+
+it.effect("counts distinct worktree holders and names the oldest archived ones (#269 H)", () =>
+  worktreeHoldersAreCountedDistinctly.pipe(Effect.provide(layerTest)),
+);
+
+it.effect("memory projection counts worktree holders the same way (#269 H)", () =>
+  worktreeHoldersAreCountedDistinctly.pipe(Effect.provide(ProjectionStore.layerMemory)),
+);
+
 it.layer(layerTest)("ProjectionStoreV2", (it) => {
   it.effect(
     "keeps restart-cancelled work through a stale run.updated",

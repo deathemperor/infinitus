@@ -8,6 +8,15 @@ per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
+- `apps/server/src/orchestration-v2/worktreeCap.logic.ts` (+ test) and
+  `WorktreeCap.ts` — the worktree limit (#269 H): the pure verdict
+  (`worktreeCapRefusal`, one bounded line naming the oldest archived
+  holders), `WorktreeCapRefusalError` and the extractor the transports use,
+  and the `WorktreeCapGate` service whose `reserve` counts launches started
+  together before any of them is in the projection. A failed settings or
+  projection read lets the worktree through rather than blocking launches.
+  Holders are counted as distinct `worktreePath`s of live threads, so forks
+  and subagents sharing a checkout count once; Scratch folders count too.
 - `apps/web/src/components/settings/ClaudeAdvisorProxyNote.tsx` — the one
   line under a Claude instance's runtime settings when its environment carries
   `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so

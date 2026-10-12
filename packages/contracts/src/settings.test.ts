@@ -889,6 +889,13 @@ describe("provider enabled defaults", () => {
 });
 
 describe("ServerSettings worktree defaults", () => {
+  it("limits worktrees to 25 by default; 0 lifts the limit; negatives and fractions are refused (#269 H)", () => {
+    expect(decodeServerSettings({}).worktreeMaxCount).toBe(25);
+    expect(decodeServerSettingsPatch({ worktreeMaxCount: 0 }).worktreeMaxCount).toBe(0);
+    expect(() => decodeServerSettingsPatch({ worktreeMaxCount: -1 })).toThrow();
+    expect(() => decodeServerSettingsPatch({ worktreeMaxCount: 2.5 })).toThrow();
+  });
+
   it("defaults the thread env mode to inherit and keeps stored values", () => {
     expect(decodeServerSettings({}).defaultThreadEnvMode).toBeNull();
     expect(decodeServerSettings({ defaultThreadEnvMode: "worktree" }).defaultThreadEnvMode).toBe(
