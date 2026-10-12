@@ -2,15 +2,6 @@ import type { SettingsSearchItem, SettingsSearchScope } from "../settingsSearch"
 
 /** The pages that only exist where a connected server drives an Infinitus app. */
 export type InfinitusSettingsPath =
-  | "/settings/animations"
-  | "/settings/priority"
-  | "/settings/team"
-  | "/settings/menu-bar"
-  | "/settings/animations"
-  | "/settings/team"
-  | "/settings/notifications"
-  | "/settings/devices"
-  |export type InfinitusSettingsPath =
   | "/settings/menu-bar"
   | "/settings/animations"
   | "/settings/priority"
