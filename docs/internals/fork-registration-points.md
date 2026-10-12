@@ -746,3 +746,24 @@ background`). Riding along, all
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
 - `apps/server/src/provider/acp/AcpSessionRuntime.processTree.test.ts` — the "rotates more than 64 live parents" fixture puts its fake parents above pid_max (#1642): the termination skips the current process's group, and a CI worker pid inside upstream's 1000–1129 range left that parent and child behind.
 - `infra/relay/migrations/postgres/<newest upstream migration>/snapshot.json` — rewritten after each sync that brings a relay migration so the snapshot chain has one head that includes the fork's Team tables (today `20261005232034_managed_endpoint_tunnel_released_at`). Procedure: `docs/internals/release-and-updates.md`.
+- Turn-start gate and steer at the tool boundary (#1627, the queue lane; rules:
+  `docs/internals/turn-start-gate.md`):
+  `apps/server/src/orchestration-v2/ProviderTurnStartService.ts` requires
+  `TurnStartGate` and hands every `start` to it; `runtimeLayer.ts` leaves the
+  gate a requirement of `layerProduction` (`layer`, for tests, gets the
+  passthrough) and `server.ts` provides `TurnStartGatePassthrough` on
+  `layerOrchestrationV2Runtime` — the line a holding gate replaces — and mounts
+  `InfinitusToolBoundarySteerLive` in `layerRuntimeCoreDependenciesBase`;
+  `ProviderTurnStartService.testkit.ts` and `ProviderTurnStartService.test.ts`
+  provide the passthrough. `Orchestrator.ts` (`message.dispatch`): a
+  `steer_active` that is not a mailbox delivery becomes `queue_after_active`
+  with `sendAt: "tool_boundary"` on the queued run.
+  `packages/contracts/src/orchestrationV2.ts` — `OrchestrationV2Run.sendAt`
+  (optional, additive). Clients: `apps/web/src/components/chat/QueuedRunsControl.tsx`
+  (the "at next step" tag), `ComposerPrimaryActions.tsx` (the running-turn
+  send label), `apps/web/src/components/ChatView.tsx` (a steer while running
+  is drawn as a queued row), `apps/web/src/components/settings/SettingsPanels.tsx`
+  and `apps/mobile/src/features/settings/SettingsFollowUpRouteScreen.tsx`
+  (the follow-up copy), `apps/mobile/src/features/threads/ThreadQueueControl.tsx`
+  (the "Next step" tag); `docs/user/composer.md` says a steer lands at the
+  next step.

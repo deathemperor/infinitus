@@ -4754,6 +4754,22 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         }
       }
+      // Fork (#1318, #1627): a steer from a person or an agent lands at the
+      // running turn's next step, not mid-tool: it is queued with
+      // `sendAt: "tool_boundary"`, and `InfinitusToolBoundarySteer` promotes
+      // it to a steer when the turn's next tool call finishes; the idle drain
+      // takes it as an ordinary row if the turn ends first. Mailbox deliveries
+      // (delegated completions, notifications) keep their immediate steer, and
+      // an explicit restart stays a restart.
+      let sendAt: OrchestrationV2Run["sendAt"];
+      if (
+        dispatchMode.type === "steer_active" &&
+        delegatedCompletion === undefined &&
+        command.notification === undefined
+      ) {
+        dispatchMode = { type: "queue_after_active" };
+        sendAt = "tool_boundary";
+      }
       const dispatchText =
         delegatedCompletion === undefined
           ? command.text
@@ -4957,6 +4973,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           rootNodeId,
           activeAttemptId: attemptId,
           status: "queued",
+          ...(sendAt === undefined ? {} : { sendAt }),
           ...(projection.runs.some(
             (candidate) => candidate.status === "queued" && candidate.queueHeld === true,
           )

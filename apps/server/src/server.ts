@@ -80,6 +80,7 @@ import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
+import { InfinitusToolBoundarySteerLive } from "./infinitus/Layers/InfinitusToolBoundarySteer.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
@@ -172,6 +173,7 @@ import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as CursorUsageReader from "./usage/cursorUsageReader.ts";
 import * as UsageService from "./usage/UsageService.ts";
 import * as RuntimeLayer from "./orchestration-v2/runtimeLayer.ts";
+import * as TurnStartGate from "./orchestration-v2/TurnStartGate.ts";
 import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as ResourceCleanupService from "./orchestration-v2/ResourceCleanupService.ts";
@@ -505,6 +507,10 @@ const layerScheduledTaskWebhookOrigin = Layer.effect(
 );
 
 const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
+  // Fork (#720, #1627): the gate every provider turn start passes. The
+  // passthrough holds nothing; a holding gate (session holds, the worktree
+  // cap) replaces this line. `docs/internals/turn-start-gate.md`.
+  Layer.provide(TurnStartGate.TurnStartGatePassthrough),
   Layer.provide(layerScheduledTaskWebhookOrigin),
   Layer.provide(ProviderEventIngestor.layerAnalytics),
   Layer.provide(layerCheckpointStore),
@@ -613,6 +619,10 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       ),
     ),
   ),
+  // Fork (#1318, #1627): sends a queued steer into the running turn at its
+  // next finished tool call. Tails the orchestrator's domain events like the
+  // layer above; its reads are the projection store's.
+  InfinitusToolBoundarySteerLive.pipe(Layer.provide(ProjectionStoreV2.layer)),
   // Subscribes to `account.rate-limits.updated` so usage bars track live
   // telemetry instead of waiting for the next status probe.
   ProviderUsageLimitsIngestion.layer,

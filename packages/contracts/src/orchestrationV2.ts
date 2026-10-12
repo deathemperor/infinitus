@@ -552,6 +552,13 @@ export const OrchestrationV2Run = Schema.Struct({
   queuePosition: Schema.optional(Schema.NullOr(PositiveInt)),
   /** Restart recovery holds the queue until the user explicitly resumes it. */
   queueHeld: Schema.optional(Schema.Boolean),
+  /**
+   * Fork (#1318, #1627): a queued run that a steer became. It is sent into the
+   * running turn at that turn's next finished tool call, or starts as its own
+   * turn when the thread goes idle first, whichever comes first. Absent means
+   * the row waits for idle. Only `tool_boundary` is ever written.
+   */
+  sendAt: Schema.optional(Schema.Literal("tool_boundary")),
   requestedAt: Schema.DateTimeUtc,
   startedAt: Schema.NullOr(Schema.DateTimeUtc),
   completedAt: Schema.NullOr(Schema.DateTimeUtc),

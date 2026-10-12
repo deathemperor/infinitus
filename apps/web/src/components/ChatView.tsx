@@ -9273,8 +9273,11 @@ export default function ChatView(props: ChatViewProps) {
       !keepFullHistory &&
       messageTextForSend.toLowerCase() !== "/compact";
     const turnDispatchMode = compactBeforeSend ? "queue" : dispatchMode;
+    // Fork (#1318): a steer while a turn runs is queued on the server and sent
+    // at the turn's next step, so it is drawn as a queued row, not a sent turn.
     const shouldQueueBehindActiveRun =
-      compactBeforeSend || (phase === "running" && dispatchMode === "queue");
+      compactBeforeSend ||
+      (phase === "running" && (dispatchMode === "queue" || dispatchMode === "steer"));
     const outgoingMessageText = formatOutgoingPrompt({
       provider: ctxSelectedProvider,
       model: ctxSelectedModel,
@@ -9773,11 +9776,7 @@ export default function ChatView(props: ChatViewProps) {
         createdAt: messageCreatedAt,
         updatedAt: messageCreatedAt,
         streaming: false,
-        ...(shouldQueueBehindActiveRun
-          ? { inputIntent: "queued_turn" as const }
-          : phase === "running" && dispatchMode === "steer"
-            ? { inputIntent: "steer" as const }
-            : {}),
+        ...(shouldQueueBehindActiveRun ? { inputIntent: "queued_turn" as const } : {}),
       },
     ]);
     setThreadError(threadIdForSend, null);
