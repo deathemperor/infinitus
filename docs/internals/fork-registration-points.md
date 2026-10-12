@@ -306,7 +306,9 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   `resolveThreadListV2Status` take `limitStopped`; the web row's reads are
   `sidebar/InfinitusLimitStop.tsx`'s (`useThreadLimitStop`,
   `limitStopTooltip`, the `InfinitusLimitStopPill` branch before upstream's
-  plain status span), the phone's `infinitusLimitStopsAtom` + `limitStopLine`;
+  plain status span), the phone's
+  `apps/mobile/src/features/infinitus/threadLimitStop.ts` (`useThreadLimitStop`,
+  `limitStopDetailLine` over `limitStopLine`);
   `SettingsPanels.tsx` mounts `InfinitusResumeOnLimitSetting` and
   `apps/mobile/src/features/settings/SettingsThreadsRouteScreen.tsx` the
   `infinitusResumeOnLimit` switch, beside upstream's auto-resume row; the
@@ -661,9 +663,12 @@ background`). Riding along, all
   the 3:2 the widget's `renderLogo` frames it at, so the glyph is not
   stretched and upstream's widget file needs no edit. The plugin's ordering
   rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
-- `apps/mobile/src/Stack.tsx` — the `SettingsAccounts` route (Settings ›
-  Accounts, the Infinitus fleet per paired Mac) and the `SettingsTeam` route
-  (Settings › Team, #1313, on the relay since #1592; `team?code=…` is where an invite link lands).
+- `apps/mobile/src/Stack.tsx` — `...INFINITUS_SETTINGS_SCREENS` spread into
+  the settings stack and `...INFINITUS_NEW_TASK_SCREENS` into the new-task
+  sheet (both `features/infinitus/stackScreens.ts`: Settings › Accounts,
+  Settings › Team #1313, the share-to-thread route), one
+  `discardDismissedShare(transition, discardShare)` call in `RootStackLayout`'s
+  share effect, and `PRODUCT_NAME` / `CONNECT_NAME` in two titles.
 - `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
   `SettingsAccounts` and `SettingsTeam` in the settings target union.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the rows of
@@ -702,7 +707,7 @@ background`). Riding along, all
   fork's build fell through to upstream's T3 mark and drew the T3 logo
   beside the Infinitus wordmark on every loading screen. Any new
   variant-keyed asset needs an `infinitus` branch for the same reason.
-- `apps/mobile/src/App.tsx` — `appLinking`'s team invite-link rewrite (`features/team/team.logic.ts`, #1313, #1592: `infinitus.run/join#<token>` → `team?code=`) and the mounted bridges: `InfinitusAlarmsBridge`, `InfinitusNotificationPresenter`. Rules and traps: `docs/internals/phone-app-bridges.md`.
+- `apps/mobile/src/App.tsx` — `...INFINITUS_LINK_PREFIXES` and `...infinitusLinkingListeners` spread into `appLinking` (`features/infinitus/appLinking.ts`: the team invite-link rewrite, #1313, #1592) and one `InfinitusAppMounts` mount for the bridges. Rules and traps: `docs/internals/phone-app-bridges.md`.
 - `apps/mobile/src/persistence/mobile-preferences.ts` — the
   `infinitusAlarmsEnabled` / `infinitusPinAtCreation` (#742) keys (interface
   and sanitizer).
@@ -723,8 +728,8 @@ background`). Riding along, all
 - `packages/client-runtime/package.json` — the fork's `./state/infinitus*` subpath exports (`infinitusAccounts`, `infinitusUtilization`, `infinitusQuotaTimeline` and the rest), one entry per fork-owned model file, and `./relay/infinitusTeam` + `./relay/infinitusTeamLogic` (#1592).
 - `apps/web/src/timestampFormat.ts` — `timestampLocale` exported, so the Accounts page's quota timeline (`QuotaTimeline.tsx`) writes its day labels in the same locale as every other timestamp.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl` (`previewUrlReuse.logic.ts`). The trash beside a queued reply's pencil (`confirmDeletePendingMessage.ts`, #1501); both hide on `sendingMessageId`, the prop that replaced `dispatchingMessageId` here and in `ThreadDetailScreen.tsx` / `ThreadRouteScreen.tsx`, fed by `use-thread-composer-state.ts`'s `sendingQueuedMessageId`.
-- `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` route in the new-task sheet), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`.
-- `apps/mobile/src/Stack.tsx` (`RootStackLayout`'s share effect), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`discardShare`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
+- `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` route, spread in from `features/infinitus/stackScreens.ts`), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`.
+- `apps/mobile/src/Stack.tsx` (`RootStackLayout`'s share effect calls `features/sharing/discardDismissedShare.ts`), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`discardShare`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742; `useProjectPromptSnippets` for the picked project's `/` menu, #270 G), `apps/mobile/src/state/use-thread-outbox-drain.ts` — `usePinAtCreation` after a delivered creation. `use-thread-outbox-drain.permissions.test.ts` mocks that hook: its module reaches `expo`, which wants React Native's `__DEV__`. The drain's dispatch bookkeeping moved to the fork's `queued-message-dispatch.ts` (#1501): `beginDispatchingQueuedMessage` hands back the abort signal that rides through `prepareQueuedMessageAttachments` into `prepareTurnAttachments`, and `markDispatchingQueuedMessageSending` right before each `startTurn` publishes the `sending` phase (or abandons an aborted attempt). `use-thread-outbox.ts` lost `dispatchingQueuedMessageIdAtom` to that module; `edit-pending-thread-message.ts` (+ test) guards with `reclaimQueuedMessageFromDispatch`; `thread-task-permissions.test.ts` and both drain tests follow the atom.
 - `apps/mobile/src/lib/composerImages.ts` (+ test) — `pickComposerMedia` and `pasteComposerClipboard` decide pass-through with the fork's `lib/image-passthrough.ts` (#1500, #1502): a still over 2 MB takes upstream's bounded-JPEG path (`renderPhotoAsJpeg`, exported for the share sheet) instead of passing through up to the 10 MB provider cap; a pasted PNG is staged to a cache file first since the clipboard hands over bytes, not a file. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
 - `apps/mobile/src/features/sharing/incoming-share-model.ts` (+ test), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`renderImageAsJpeg` in the file reader) — a shared image takes the same gate (#1502): the reader's optional `renderImageAsJpeg` renders a large still to a bounded JPEG; without it the model keeps upstream's pass-through up to the provider cap, which is what its upstream tests exercise.
@@ -814,7 +819,7 @@ background`). Riding along, all
   alerts ride Infinitus Connect's Device Notifications and open Settings ›
   Accounts; the Devices page names the Mac and pairs a phone. Upstream's
   text above it says Infinitus Connect (#1368) and is otherwise untouched.
-- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
+- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch, and the Lint job
