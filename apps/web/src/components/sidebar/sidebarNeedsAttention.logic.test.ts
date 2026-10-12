@@ -25,6 +25,7 @@ function thread(
     latestRun: null,
     pullRequests: [],
     latestUserMessageAt: null,
+    lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: ThreadId.make(id) },
     archivedAt: null,
     updatedAt: "2026-09-12T10:00:00.000Z",
     ...overrides,
@@ -54,6 +55,14 @@ describe("collectNeedsAttention (#269 D)", () => {
         thread("failed", { runtime: runtime("failed") }),
         thread("approval", { hasPendingApprovals: true }),
         thread("archived", { hasPendingApprovals: true, archivedAt: "2026-09-12T09:00:00.000Z" }),
+        thread("subagent", {
+          hasPendingApprovals: true,
+          lineage: {
+            parentThreadId: ThreadId.make("approval"),
+            relationshipToParent: "subagent",
+            rootThreadId: ThreadId.make("approval"),
+          },
+        }),
         thread("ready"),
       ],
       new Map([[`${env}:parked`, stop]]),

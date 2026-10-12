@@ -5164,10 +5164,10 @@ export default function Sidebar() {
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
-          {/* Fork (#269 D): the threads blocked on the user, above the list. */}
+          {/* Fork (#269 D): the threads blocked on the user, above the list, across every project. */}
           {!isSearchingThreads ? (
             <SidebarNeedsAttention
-              threads={searchableThreads}
+              threads={threads}
               routeThreadKey={routeThreadKey}
               environmentLabelById={environmentLabelById}
               projectDisplayNameByKey={projectDisplayNameByKey}

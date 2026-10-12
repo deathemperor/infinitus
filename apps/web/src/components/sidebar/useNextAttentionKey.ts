@@ -12,7 +12,11 @@ import { isModelPickerOpen } from "../../modelPickerVisibility";
 import { infinitusLimitStopsAtom } from "../../state/infinitus";
 import type { SidebarThreadSummary } from "../../types";
 import { useUiStateStore } from "../../uiStateStore";
-import { hasUnseenCompletion, resolveSidebarThreadStatus } from "../Sidebar.logic";
+import {
+  hasUnseenCompletion,
+  resolveSidebarThreadStatus,
+  resolveThreadLastVisitedAt,
+} from "../Sidebar.logic";
 import { onNextAttentionThreadRequest } from "./nextAttentionBus";
 import {
   resolveAttentionRank,
@@ -45,7 +49,11 @@ export function useNextAttentionKey(input: {
       const status = resolveSidebarThreadStatus(thread, {
         limitStopped: limitStops.has(limitStopKey(thread.environmentId, thread.id)),
       });
-      const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt: lastVisitedAtById[key] });
+      // Same merge as the row: the server's visit wins where it tracks one.
+      const isUnread = hasUnseenCompletion({
+        ...thread,
+        lastVisitedAt: resolveThreadLastVisitedAt(thread.lastVisitedAt, lastVisitedAtById[key]),
+      });
       return {
         id: key,
         rank: resolveAttentionRank({

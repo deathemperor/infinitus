@@ -23,7 +23,7 @@ const NEEDS_ATTENTION_EXPANDED_KEY = "infinitus:sidebar:needs-attention-expanded
 const STATUS_LABEL: Record<NeedsAttentionStatus, { label: string; className: string }> = {
   approval: { label: "Approval", className: "text-warning-foreground" },
   input: { label: "Input", className: "text-indigo-600 dark:text-indigo-300" },
-  limited: { label: "Limit", className: "text-muted-foreground" },
+  limited: { label: "Limited", className: "text-warning" },
   stopped: { label: "Babysit", className: "text-destructive/80" },
 };
 
