@@ -120,6 +120,16 @@ export function createInfinitusEnvironmentAtoms<R, E>(
       subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.subscribeInfinitusPairing>) =>
         subscribe(WS_METHODS.subscribeInfinitusPairing, input),
     }),
+    // The threads a Claude usage limit stopped on the server (#648, #1627):
+    // the list on subscribe, then whole again on every change. Thread ids,
+    // accounts and resets only; read by the sidebar's "Limited" pill, so it
+    // stays subscribed for as long as the thread list is on screen.
+    limitStops: createEnvironmentSubscriptionAtomFamily(runtime, {
+      label: "environment-data:infinitus:limitStops",
+      idleTtlMs: INFINITUS_SNAPSHOT_IDLE_TTL_MS,
+      subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.subscribeInfinitusLimitStops>) =>
+        subscribe(WS_METHODS.subscribeInfinitusLimitStops, input),
+    }),
     // The decided request leaves the stream, so nothing to invalidate.
     pairingDecide: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:infinitus:pairingDecide",

@@ -47,6 +47,7 @@ import {
   DpopFailureReason,
   AuthSessionId,
   ProjectId,
+  RunId,
   ThreadId,
   TrimmedNonEmptyString,
 } from "./baseSchemas.ts";
@@ -779,9 +780,26 @@ export const InfinitusThreadDefaults = Schema.Struct({
 });
 export type InfinitusThreadDefaults = typeof InfinitusThreadDefaults.Type;
 
+/** #829 on orchestrator v2 (#1627): a thread whose run is live — its
+    highest-ordinal run in `preparing | starting | running | waiting`, the
+    thread shell's `activityRunStatus`. `turnId` is that run's id (the shell
+    carries no provider turn id): `activeRunId` while the run is interruptible,
+    the thread's `latestRunId` while it waits, since the shell names no run for
+    that state. Archived threads are not counted. The Mac counts rows. */
+export const InfinitusRunningTurn = Schema.Struct({ threadId: ThreadId, turnId: RunId });
+export type InfinitusRunningTurn = typeof InfinitusRunningTurn.Type;
+
 /** Infinitus fork (#822): the reads `infinitusctl` has no WebSocket for.
-    Both need the operate scope, like their WS twins. */
+    The reads take the read scope, the alert the operate scope. */
 class InfinitusHttpApi extends HttpApiGroup.make("infinitus")
+  .add(
+    // #829: the turns an update would cut off, the Mac's busy-session count.
+    HttpApiEndpoint.get("runningTurns", "/api/infinitus/running-turns", {
+      headers: OptionalBearerHeaders,
+      success: Schema.Array(InfinitusRunningTurn),
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
   .add(
     // #1315: the model `thread new` creates on, resolved for `?projectId=`.
     HttpApiEndpoint.get("threadDefaults", "/api/infinitus/thread-defaults", {
@@ -812,5 +830,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentWebhooksHttpApi)
   // Infinitus fork: the approve-on-Mac pairing routes (#710).
   .add(InfinitusPairingHttpApi)
-  // Infinitus fork: infinitusctl's thread defaults and the Mac's alert (#822, #1375).
+  // Infinitus fork: infinitusctl's running turns and thread defaults, the Mac's alert (#822, #829, #1375).
   .add(InfinitusHttpApi) {}

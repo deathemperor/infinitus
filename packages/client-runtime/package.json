@@ -407,6 +407,10 @@
       "types": "./src/state/infinitus.ts",
       "default": "./src/state/infinitus.ts"
     },
+    "./state/infinitusLimitStops": {
+      "types": "./src/state/infinitusLimitStops.ts",
+      "default": "./src/state/infinitusLimitStops.ts"
+    },
     "./state/infinitusAccounts": {
       "types": "./src/state/infinitusAccounts.ts",
       "default": "./src/state/infinitusAccounts.ts"

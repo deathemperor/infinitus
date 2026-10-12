@@ -19,7 +19,7 @@ import {
 } from "./incoming-share-model";
 import { createIncomingSharePayloadReader } from "./incoming-share-native";
 import { IncomingShareInbox } from "./incoming-share-inbox";
-import { persistComposerAttachmentFile } from "../../lib/composerImages";
+import { persistComposerAttachmentFile, renderPhotoAsJpeg } from "../../lib/composerImages";
 import { scheduleUnusedComposerAttachmentCleanup } from "../../state/use-composer-drafts";
 import {
   loadIncomingShareDrafts,
@@ -179,6 +179,8 @@ const incomingShareInbox = new IncomingShareInbox({
           return persistedUri;
         },
         readSize: readFileSize,
+        // Infinitus (fork, #1502): a large shared still is rendered to a bounded JPEG, as a picked one is.
+        renderImageAsJpeg: renderPhotoAsJpeg,
         removeOwnedFile: (uri) => {
           cleanupUris.add(uri);
         },

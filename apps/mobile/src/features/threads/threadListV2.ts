@@ -184,12 +184,21 @@ export function threadHasUnseenCompletion(
 
 export function resolveThreadListV2Status(
   thread: Pick<EnvironmentThreadShell, "hasPendingApprovals" | "hasPendingUserInput" | "runtime">,
+  options?: {
+    /** Fork (#648): the server lists the thread among its limit stops. A
+        parked turn is still "running" to the orchestrator; the label says
+        "Limited" until the account swaps and the turn resumes. */
+    readonly limitStopped?: boolean;
+  },
 ): ThreadListV2Status {
   if (thread.hasPendingApprovals) {
     return "approval";
   }
   if (thread.hasPendingUserInput) {
     return "input";
+  }
+  if (options?.limitStopped === true) {
+    return "limited";
   }
   if (
     thread.runtime !== null &&
