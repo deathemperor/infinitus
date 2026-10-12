@@ -299,7 +299,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `apps/mobile/src/features/threads/threadListV2.ts` /
   `thread-list-v2-items.tsx` — `resolveSidebarThreadStatus` /
   `resolveThreadListV2Status` take `limitStopped`, read off
-  `infinitusLimitStopsAtom` per row (the pill's `title` and the phone's detail
+  `infinitusLimitStopsAtom` per row (the pill's tooltip and the phone's detail
   line are `limitStopLine`); `SettingsPanels.tsx` and
   `apps/mobile/src/features/settings/SettingsThreadsRouteScreen.tsx` — the
   `infinitusResumeOnLimit` switch beside upstream's auto-resume row;

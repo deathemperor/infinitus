@@ -1264,7 +1264,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
   // Fork (#648): a turn parked on a Claude usage limit reads "Limited" with
-  // the account and the reset in the pill's title until it resumes.
+  // the account and the reset in the pill's tooltip until it resumes.
   const limitStop =
     useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
     null;
@@ -1353,6 +1353,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       }
                     : null;
   const isWokeStatus = topStatus?.icon === "woke";
+  const limitStopDetail =
+    limitStop !== null && status === "limited"
+      ? limitStopLine(limitStop, (iso) => formatTimestamp(iso, props.timestampFormat), Date.now())
+      : null;
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -2057,17 +2061,25 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           />
                           <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
                         </Tooltip>
+                      ) : limitStopDetail !== null ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1 font-medium",
+                                  topStatus.className,
+                                )}
+                              >
+                                <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
+                                <span role="status">{topStatus.label}</span>
+                              </span>
+                            }
+                          />
+                          <TooltipPopup side="top">{limitStopDetail}</TooltipPopup>
+                        </Tooltip>
                       ) : (
                         <span
-                          title={
-                            limitStop === null
-                              ? undefined
-                              : limitStopLine(
-                                  limitStop,
-                                  (iso) => formatTimestamp(iso, props.timestampFormat),
-                                  Date.now(),
-                                )
-                          }
                           className={cn(
                             "inline-flex items-center gap-1 font-medium",
                             topStatus.className,
