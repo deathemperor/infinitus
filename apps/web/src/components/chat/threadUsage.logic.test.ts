@@ -1,4 +1,5 @@
 import type { ThreadUsageRollup } from "@infinitus/contracts";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   threadUsageBadgeAriaLabel,

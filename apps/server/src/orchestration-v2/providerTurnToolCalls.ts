@@ -13,7 +13,12 @@ export const TOOL_CALL_TURN_ITEM_TYPES: ReadonlySet<OrchestrationV2TurnItem["typ
 >(["command_execution", "file_change", "file_search", "web_search", "dynamic_tool", "subagent"]);
 
 export const TERMINAL_PROVIDER_TURN_STATUSES: ReadonlySet<OrchestrationV2ProviderTurn["status"]> =
-  new Set<OrchestrationV2ProviderTurn["status"]>(["completed", "interrupted", "failed", "cancelled"]);
+  new Set<OrchestrationV2ProviderTurn["status"]>([
+    "completed",
+    "interrupted",
+    "failed",
+    "cancelled",
+  ]);
 
 /** Distinct tool items of the turn, whatever their status. */
 export function countProviderTurnToolCalls(

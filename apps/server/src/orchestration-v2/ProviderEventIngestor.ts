@@ -339,7 +339,7 @@ export const layer: Layer.Layer<
       providerTurn.toolCalls !== undefined
         ? Effect.succeed(providerTurn)
         : projections
-            .getThreadRecords(input.event.threadId ?? input.threadId, ["turnItems"], {
+            .getThreadRecords(input.threadId, ["turnItems"], {
               ...(input.runId === undefined ? {} : { turnItemRunId: input.runId }),
               turnItemTypes: [...TOOL_CALL_TURN_ITEM_TYPES],
             })

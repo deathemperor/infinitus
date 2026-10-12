@@ -43,6 +43,7 @@ import {
   type UsagePricing,
   type UsageSummary,
   type UsageSummaryInput,
+  type UsageTokenTotals,
   UsageReadError,
 } from "@infinitus/contracts";
 import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";

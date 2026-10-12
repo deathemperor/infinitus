@@ -2938,7 +2938,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             ...(command.branch === undefined ? {} : { branch: command.branch }),
             ...(command.worktreePath === undefined ? {} : { worktreePath: command.worktreePath }),
             // Fork (#834): the transcript backfill's baseline, written once.
-            ...(command.usageBaseline === undefined ? {} : { usageBaseline: command.usageBaseline }),
+            ...(command.usageBaseline === undefined
+              ? {}
+              : { usageBaseline: command.usageBaseline }),
             ...(command.linkedPullRequest === undefined
               ? {}
               : {

@@ -296,7 +296,10 @@ describe("threadUsageFromProjection (v2)", () => {
   const attempt = (id: string, runId: string) =>
     ({ id: RunAttemptId.make(id), runId: RunId.make(runId) }) as OrchestrationV2RunAttempt;
   const thread = (baseline?: OrchestrationV2AppThread["usageBaseline"]) =>
-    ({ id: threadId, ...(baseline === undefined ? {} : { usageBaseline: baseline }) }) as OrchestrationV2AppThread;
+    ({
+      id: threadId,
+      ...(baseline === undefined ? {} : { usageBaseline: baseline }),
+    }) as OrchestrationV2AppThread;
 
   it("folds the root provider threads' terminal turns, oldest first, and skips subagents", () => {
     const usage = threadUsageFromProjection({
@@ -327,7 +330,7 @@ describe("threadUsageFromProjection (v2)", () => {
       unreportedTurns: 1,
       inputTokens: 1000,
       costUsd: 0.25,
-      models: ["claude-opus-4-7"],
+      models: ["claude-opus-4-7", "opus"],
       toolCalls: 6,
       durationMs: 100_000,
       lastTurnAt: "2026-09-12T01:00:10.000Z",

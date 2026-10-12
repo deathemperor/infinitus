@@ -6,14 +6,7 @@ import {
 } from "@infinitus/shared/toolActivity";
 import { isWorkspaceImagePreviewPath } from "@infinitus/shared/filePreview";
 import { normalizeClaudeTurnTokenUsage } from "../../provider/ClaudeTurnTokenUsage.ts";
-import {
-  claudeTurnUsageDelta,
-  INITIAL_PROMPT_CACHE_WATCH,
-  promptCacheVerdict,
-  promptCacheWarningText,
-  type ClaudeResultTotals,
-  type PromptCacheWatch,
-} from "./claudeTurnUsage.logic.ts";
+import { claudeTurnUsageDelta, type ClaudeResultTotals } from "./claudeTurnUsage.logic.ts";
 import {
   type CanUseTool,
   forkSession as forkClaudeSession,
@@ -2843,8 +2836,6 @@ interface ClaudeLiveQueryContext {
   // Fork (#834): the last result's cumulative totals, differenced per turn.
   // Per process: a reopened query() starts its totals over.
   lastResultTotals: ClaudeResultTotals | undefined;
-  // Fork (#974): the run of large uncached calls, per process.
-  promptCache: PromptCacheWatch;
 }
 
 interface ActiveClaudeToolCall {
@@ -7504,7 +7495,6 @@ export function makeClaudeAdapterV2(
               ),
             ),
             lastResultTotals: undefined,
-            promptCache: INITIAL_PROMPT_CACHE_WATCH,
           };
           yield* Ref.set(queryContext, context);
           yield* querySession.messages.pipe(

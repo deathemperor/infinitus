@@ -815,7 +815,10 @@ function ThreadSettingsOptionsItem(props: {
         </Animated.View>
       </Animated.View>
       {session.threadId !== undefined && session.environmentId ? (
-        <InfinitusThreadUsageRows environmentId={session.environmentId} threadId={session.threadId} />
+        <InfinitusThreadUsageRows
+          environmentId={session.environmentId}
+          threadId={session.threadId}
+        />
       ) : null}
 
       {Platform.OS !== "ios" && session.hasLegacyModels ? (

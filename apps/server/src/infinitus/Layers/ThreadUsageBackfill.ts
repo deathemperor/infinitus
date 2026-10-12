@@ -47,11 +47,10 @@ interface CandidateRow {
  * thread from one whose turns this server already records; `recorded_usage`
  * says whether any provider turn already carries usage.
  */
-export const listThreadUsageBackfillCandidates = Effect.fn(
-  "ThreadUsageBackfill.listCandidates",
-)(function* (input: { readonly threadId?: ThreadId; readonly limit: number }) {
-  const sql = yield* SqlClient.SqlClient;
-  const rows = yield* sql<CandidateRow>`
+export const listThreadUsageBackfillCandidates = Effect.fn("ThreadUsageBackfill.listCandidates")(
+  function* (input: { readonly threadId?: ThreadId; readonly limit: number }) {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<CandidateRow>`
     SELECT
       t.thread_id,
       v1.usage_json AS v1_usage_json,
@@ -61,7 +60,7 @@ export const listThreadUsageBackfillCandidates = Effect.fn(
           FROM orchestration_v2_projection_provider_threads pt
           WHERE pt.thread_id = t.thread_id
             AND pt.owner_node_id IS NULL
-            AND pt.provider = 'claudeAgent'
+            AND pt.driver = 'claudeAgent'
             AND json_type(pt.payload_json, '$.nativeThreadRef.nativeId') = 'text'
           ORDER BY pt.updated_at DESC
           LIMIT 1
@@ -101,25 +100,26 @@ export const listThreadUsageBackfillCandidates = Effect.fn(
     ORDER BY t.updated_at DESC
     LIMIT ${input.limit}
   `;
-  const candidates: ThreadUsageBackfillCandidate[] = [];
-  for (const row of rows) {
-    const v1Usage =
-      row.v1_usage_json === null
-        ? undefined
-        : Option.getOrUndefined(decodeRollup(row.v1_usage_json));
-    const claudeSessionId = row.claude_session_id;
-    if (v1Usage === undefined && claudeSessionId === null) continue;
-    candidates.push({
-      threadId: ThreadId.make(row.thread_id),
-      v1Usage: v1Usage ?? null,
-      claudeSessionId,
-      turns: Number(row.turns),
-      lastTurnAt: row.last_turn_at,
-      recordedUsage: Number(row.recorded_usage) === 1,
-    });
-  }
-  return candidates;
-});
+    const candidates: ThreadUsageBackfillCandidate[] = [];
+    for (const row of rows) {
+      const v1Usage =
+        row.v1_usage_json === null
+          ? undefined
+          : Option.getOrUndefined(decodeRollup(row.v1_usage_json));
+      const claudeSessionId = row.claude_session_id;
+      if (v1Usage === undefined && claudeSessionId === null) continue;
+      candidates.push({
+        threadId: ThreadId.make(row.thread_id),
+        v1Usage: v1Usage ?? null,
+        claudeSessionId,
+        turns: Number(row.turns),
+        lastTurnAt: row.last_turn_at,
+        recordedUsage: Number(row.recorded_usage) === 1,
+      });
+    }
+    return candidates;
+  },
+);
 
 /**
  * Fork (#834): the usage backfill, on orchestrator v2 (#1627). Threads whose
@@ -151,7 +151,9 @@ export const ThreadUsageBackfillLive = Layer.effectDiscard(
       if (fresh.length === 0) return;
       const sessionIds = fresh
         .filter((candidate) => wantsTranscript(candidate, bootAt))
-        .flatMap((candidate) => (candidate.claudeSessionId === null ? [] : [candidate.claudeSessionId]));
+        .flatMap((candidate) =>
+          candidate.claudeSessionId === null ? [] : [candidate.claudeSessionId],
+        );
       const sessions =
         sessionIds.length === 0
           ? new Map<string, never>()
@@ -201,10 +203,7 @@ export const ThreadUsageBackfillLive = Layer.effectDiscard(
         : attempted.has(input.threadId)
           ? Effect.succeed([])
           : listThreadUsageBackfillCandidates({ threadId: input.threadId, limit: 1 })
-      ).pipe(
-        Effect.flatMap(backfill),
-        Effect.provideService(SqlClient.SqlClient, sql),
-      );
+      ).pipe(Effect.flatMap(backfill), Effect.provideService(SqlClient.SqlClient, sql));
 
     const worker = yield* makeDrainableWorker((input: Input) =>
       onInput(input).pipe(

@@ -108,7 +108,9 @@ export function threadUsageFromProjection(
 ): ThreadUsageRollup | undefined {
   const rootProviderThreadIds = new Set(
     projection.providerThreads
-      .filter((thread) => thread.ownerNodeId === null && thread.appThreadId === projection.thread.id)
+      .filter(
+        (thread) => thread.ownerNodeId === null && thread.appThreadId === projection.thread.id,
+      )
       .map((thread) => thread.id),
   );
   const runById = new Map(projection.runs.map((run) => [run.id, run] as const));
@@ -186,7 +188,9 @@ function cacheExpiry(
   if (latest === undefined) return current === undefined ? {} : { cacheExpiresAt: current };
   if (latest.cacheTtlSeconds === undefined) return {};
   const expiresAtMs = Date.parse(latest.completedAt) + latest.cacheTtlSeconds * 1000;
-  return Number.isFinite(expiresAtMs) ? { cacheExpiresAt: new Date(expiresAtMs).toISOString() } : {};
+  return Number.isFinite(expiresAtMs)
+    ? { cacheExpiresAt: new Date(expiresAtMs).toISOString() }
+    : {};
 }
 
 /**
