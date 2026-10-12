@@ -48,8 +48,16 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `runningTurns?` on the running state),
   `packages/client-runtime/src/connection/outdatedHostUpdate.ts`
   (`OutdatedHostUpdateStage` takes `waiting`),
-  `apps/web/src/components/ServerUpdateAction.tsx` (the `waiting` label).
-  Rules and traps: `docs/internals/update-idle-gate.md`.
+  `apps/web/src/components/ServerUpdateAction.tsx` (the refusal toast with
+  "Update when they finish" / "Update now", the `waiting` label with the
+  count), `chat/ComposerServerUpdateStatus.tsx` (the count along),
+  `desktopUpdate.logic.ts` (+ test; `countRunningLocalTurns`, the dialog
+  copy, `resolveInstallWhenIdleStep`), `sidebar/SidebarUpdatePill.tsx` (the
+  dialog instead of the plain confirm while turns run, the armed wait),
+  `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`),
+  `ProviderUpdateLaunchNotification.environments.ts` (`isLocalConnectionTarget`
+  exported for the count). The dialog itself is fork-owned
+  (`fork-only-files.md`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
   also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
   in the sidebar's utility row, so their Back returns to the main app (#1601).
