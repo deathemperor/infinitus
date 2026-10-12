@@ -43,6 +43,7 @@ import {
   type UsagePricing,
   type UsageSummary,
   type UsageSummaryInput,
+  type UsageTokenTotals,
   UsageReadError,
 } from "@infinitus/contracts";
 import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
@@ -86,7 +87,12 @@ import {
 } from "./cursorAccountCache.ts";
 import * as CursorUsageReader from "./cursorUsageReader.ts";
 import { resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
-import { createOverrideRateTable, parseRateTable, type RateTable } from "./usagePricing.ts";
+import {
+  createOverrideRateTable,
+  parseRateTable,
+  priceUsage,
+  type RateTable,
+} from "./usagePricing.ts";
 import {
   listTranscriptFiles,
   readDirectoryVolumeId,
@@ -102,7 +108,7 @@ import {
   type CachedFile,
   type ScanCache,
 } from "./usageScanCache.ts";
-import type { UsageRecord } from "./usageTranscripts.ts";
+import { EMPTY_TOTALS, type UsageRecord } from "./usageTranscripts.ts";
 
 const LITELLM_RATES_URL =
   "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
@@ -194,8 +200,67 @@ export class UsageService extends Context.Service<
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
     /** Refetches the rate table ahead of its TTL. See `ensureRates`. */
     readonly refreshRates: Effect.Effect<UsagePricing>;
+    /**
+     * Fork (#834): the Claude transcripts named by session id
+     * (`<sessionId>.jsonl` under each configured Claude account's projects
+     * tree), each summed and priced; a session with no transcript or no usage
+     * records is absent.
+     */
+    readonly readSessionUsage: (input: {
+      readonly sessionIds: ReadonlyArray<string>;
+    }) => Effect.Effect<ReadonlyMap<string, SessionUsage>, UsageReadError>;
   }
 >()("t3/usage/UsageService") {}
+
+/**
+ * Fork (#834): one Claude session's transcript summed — the usage
+ * backfill's input. `costUsd` is null when no record could be priced;
+ * `lastAt` is the newest record's time.
+ */
+export interface SessionUsage {
+  readonly totals: UsageTokenTotals;
+  readonly costUsd: number | null;
+  /** Distinct, first seen first. */
+  readonly models: ReadonlyArray<string>;
+  readonly lastAt: string;
+}
+
+/** A session id is a file name here; anything else is not looked for. */
+const SESSION_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** Sums one session's records, dropping repeats by `dedupeKey`, and prices what it can. */
+function foldSessionUsage(
+  records: ReadonlyArray<UsageRecord>,
+  rates: RateTable,
+  overrides: RateTable,
+): SessionUsage | null {
+  const seen = new Set<string>();
+  let totals: UsageTokenTotals = EMPTY_TOTALS;
+  let costUsd: number | null = null;
+  const models: string[] = [];
+  let lastMs = 0;
+  let any = false;
+  for (const record of records) {
+    if (record.dedupeKey !== null) {
+      if (seen.has(record.dedupeKey)) continue;
+      seen.add(record.dedupeKey);
+    }
+    any = true;
+    totals = {
+      uncachedInputTokens: totals.uncachedInputTokens + record.totals.uncachedInputTokens,
+      cachedInputTokens: totals.cachedInputTokens + record.totals.cachedInputTokens,
+      cacheCreationTokens: totals.cacheCreationTokens + record.totals.cacheCreationTokens,
+      outputTokens: totals.outputTokens + record.totals.outputTokens,
+      reasoningTokens: totals.reasoningTokens + record.totals.reasoningTokens,
+    };
+    const priced = priceUsage(rates, record, overrides);
+    if (priced.costSource !== "unpriced") costUsd = (costUsd ?? 0) + priced.costUsd;
+    if (record.model.length > 0 && !models.includes(record.model)) models.push(record.model);
+    if (record.timestampMs > lastMs) lastMs = record.timestampMs;
+  }
+  if (!any) return null;
+  return { totals, costUsd, models, lastAt: DateTime.formatIso(DateTime.makeUnsafe(lastMs)) };
+}
 
 const EMPTY_PRICING: UsagePricing = {
   status: "unavailable",
@@ -235,6 +300,7 @@ const layerTest = Layer.succeed(
         scanDurationMs: 0,
       }),
     refreshRates: Effect.succeed(EMPTY_PRICING),
+    readSessionUsage: () => Effect.succeed(new Map()),
   }),
 );
 export const make = Effect.gen(function* () {
@@ -1598,9 +1664,79 @@ export const make = Effect.gen(function* () {
     return yield* Deferred.await(deferred);
   });
 
+  /**
+   * Fork (#834): the transcripts are found by file name under every Claude
+   * account's projects tree the summary scan walks (one walk each, for every
+   * id asked), parsed through the same per-file cache it keeps, so the usage
+   * page's next scan is warmer for it. Only the wanted files are parsed.
+   */
+  const readSessionUsage = Effect.fn("UsageService.readSessionUsage")(function* (input: {
+    readonly sessionIds: ReadonlyArray<string>;
+  }) {
+    const wanted = new Set(input.sessionIds.filter((id) => SESSION_ID.test(id)));
+    const found = new Map<string, SessionUsage>();
+    if (wanted.size === 0) return found;
+    const settings = yield* readSettings;
+    const retentionCutoffMs =
+      (yield* Clock.currentTimeMillis) - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const dirs = yield* resolveTranscriptDirs(settings, retentionCutoffMs).pipe(
+      Effect.provideService(Path.Path, path),
+    );
+    const claudeDirs: string[] = [];
+    for (const { provider, dir } of dirs) {
+      if (provider !== "claude") continue;
+      const exists = yield* fileSystem
+        .exists(dir)
+        .pipe(Effect.catchCause(() => Effect.succeed(false)));
+      if (exists) claudeDirs.push(dir);
+    }
+    if (claudeDirs.length === 0) return found;
+    yield* ensureScanCacheLoaded;
+    yield* ensureRates(false);
+    const overrides = createOverrideRateTable(settings.usagePriceOverrides);
+    const bySession = new Map<string, UsageRecord[]>();
+    for (const claudeDir of claudeDirs) {
+      const files = yield* Effect.promise(() => listTranscriptFiles(claudeDir, 0));
+      for (const file of files) {
+        const sessionId = path.basename(file.path, ".jsonl");
+        if (!wanted.has(sessionId)) continue;
+        const { records, update } = yield* readFileRecords(
+          file.path,
+          file.size,
+          file.mtimeMs,
+          "claude",
+        );
+        if (update !== undefined) {
+          const current = fileCache.get(file.path);
+          if (
+            current === update.replaces ||
+            current === undefined ||
+            !isLaterRead(current, update.entry)
+          ) {
+            fileCache.set(file.path, update.entry);
+            cacheDirty = true;
+          }
+        }
+        bySession.set(sessionId, [...(bySession.get(sessionId) ?? []), ...records]);
+      }
+    }
+    yield* schedulePersist;
+    for (const [sessionId, records] of bySession) {
+      const session = foldSessionUsage(records, rates, overrides);
+      if (session !== null) found.set(sessionId, session);
+    }
+    return found;
+  });
+
   // `awaitPersisted` is outside the service interface: tests use it to restart
   // against what a previous instance wrote.
-  return { readSummary, refreshRates, awaitPersisted, readStats: readSharedStats } as const;
+  return {
+    readSummary,
+    refreshRates,
+    awaitPersisted,
+    readStats: readSharedStats,
+    readSessionUsage,
+  } as const;
 });
 
 export const layer = Layer.effect(UsageService, make).pipe(Layer.provide(ProcessRunner.layer));

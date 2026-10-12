@@ -27,8 +27,10 @@ import { useResolveClassNames } from "uniwind";
 
 import { AppText as Text } from "./components/AppText";
 import { getCompactBrandHeaderOptions } from "./components/CompactBrandTitle";
-import { AccountsRouteScreen } from "./features/accounts/AccountsRouteScreen";
-import { TeamRouteScreen } from "./features/team/TeamRouteScreen";
+import {
+  INFINITUS_NEW_TASK_SCREENS,
+  INFINITUS_SETTINGS_SCREENS,
+} from "./features/infinitus/stackScreens";
 import {
   RenderErrorBoundary,
   RenderFailureView,
@@ -67,7 +69,7 @@ import { AddProjectNewRoute } from "./features/projects/AddProjectNewRoute";
 import { AddProjectRepositoryRoute } from "./features/projects/AddProjectRepositoryRoute";
 import { AddProjectSourceRoute } from "./features/projects/AddProjectSourceRoute";
 import { NewTaskDraftRouteScreen } from "./features/threads/NewTaskDraftRouteScreen";
-import { ShareToThreadRouteScreen } from "./features/sharing/ShareToThreadRouteScreen";
+import { discardDismissedShare } from "./features/sharing/discardDismissedShare";
 import {
   NewTaskBranchPickerRouteScreen,
   NewTaskEnvironmentPickerRouteScreen,
@@ -400,21 +402,7 @@ const SettingsContentStack = createV5SheetStackNavigator({
         title: "Usage",
       },
     }),
-    SettingsAccounts: createNativeStackScreen({
-      screen: AccountsRouteScreen,
-      linking: "accounts",
-      options: {
-        title: "Accounts",
-      },
-    }),
-    // Fork (#1313): Settings › Team; `team?code=…` is where an invite link lands (App.tsx).
-    SettingsTeam: createNativeStackScreen({
-      screen: TeamRouteScreen,
-      linking: "team",
-      options: {
-        title: "Team",
-      },
-    }),
+    ...INFINITUS_SETTINGS_SCREENS,
   },
 });
 
@@ -487,14 +475,7 @@ const NewTaskSheetStack = createNativeStackNavigator({
         title: "",
       },
     }),
-    // Fork: a native share can land in an existing thread instead of a new task.
-    NewTaskShareThread: createNativeStackScreen({
-      screen: ShareToThreadRouteScreen,
-      linking: "share/thread",
-      options: {
-        title: "Choose thread",
-      },
-    }),
+    ...INFINITUS_NEW_TASK_SCREENS,
     NewTaskEnvironment: createNativeStackScreen({
       screen: NewTaskEnvironmentPickerRouteScreen,
       linking: "draft/environment",
@@ -635,14 +616,7 @@ function RootStackLayout(props: {
       pendingShareId: pendingShare?.id ?? null,
     });
     sharePresentationRef.current = transition.state;
-    if (transition.shareIdToDiscard) {
-      // Fork: the sheet closing over an unimported share declines it. Any
-      // navigation away counts, a notification tap included: nothing else
-      // surfaces the inbox, so keeping the item would only replay the sheet.
-      void discardShare(transition.shareIdToDiscard).catch((error) => {
-        console.warn("[incoming-share] could not discard a dismissed share", error);
-      });
-    }
+    discardDismissedShare(transition, discardShare);
     if (!transition.shareIdToPresent) {
       return;
     }

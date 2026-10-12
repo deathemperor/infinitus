@@ -24,6 +24,7 @@ import { InfinitusServerPortLive } from "./InfinitusServerPort.ts";
 import { InfinitusSignInLapseLive } from "./InfinitusSignInLapse.ts";
 import { InfinitusToolBoundarySteerLive } from "./InfinitusToolBoundarySteer.ts";
 import { InfinitusUsageAttributionLive } from "./InfinitusUsageAttribution.ts";
+import { ThreadUsageBackfillLive } from "./ThreadUsageBackfill.ts";
 
 // Each caller gets its own instance: the control client is private to the
 // Infinitus block, the alert relay and the running-turns reader are read by
@@ -57,6 +58,7 @@ const runningTurns = () => InfinitusRunningTurnsLive.pipe(Layer.provide(Projecti
  *   and resume-on-limit (#648, #1627: failed limit runs and the Claude
  *   adapter's rejected windows, the swapd probe for the accounts while the
  *   menu bar app is away), the idle session-holds layer (#616, #743) and
+ *   the usage backfill (#834, needs `UsageService` from the chain) and
  *   the tool-boundary steer (#1318, #1627: a queued steer goes into the
  *   running turn at its next finished tool call; reads the projection store).
  *   Merged beside upstream's reactors, where the
@@ -104,6 +106,11 @@ export function makeInfinitusServerLayers<
     // nothing is held until the hold and interrupt policies land on the queue
     // lane's turn-start gate; this answers the empty list.
     InfinitusSessionHoldsIdle,
+    // Threads whose turns predate usage recording get a baseline (#834, #1627):
+    // the v1 rollup the import left, or the Claude transcript's total, through
+    // `thread.metadata.update`. `UsageService` comes from the chain (`layerUsage`
+    // is merged above the reactors), like `OrchestratorV2`.
+    ThreadUsageBackfillLive,
     InfinitusResumeOnLimitLive.pipe(
       Layer.provide(infinitus),
       Layer.provide(InfinitusSwapdProbeLive.pipe(Layer.provide(ProcessRunner.layer))),

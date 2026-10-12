@@ -1,0 +1,1 @@
+Desktop: The sidebar's Needs attention section is back on the new engine, listing every thread waiting for an approval, an answer or an account swap across projects and machines, and mod+shift+u jumps to the thread needing you next.

@@ -19,6 +19,9 @@ const legacyReaders = ["orchestration-v2/legacy/", "persistence/Migrations/"] as
 const legacyReaderFiles: Record<string, string> = {
   // Provider history for settings migration reads V1 thread sessions once at load.
   "serverSettings.ts": "one-time provider history for settings migration",
+  // Fork (#834): threads imported before the usage backfill existed keep their
+  // v1 rollup in `projection_threads.usage_json`; the importer cannot be re-run for them.
+  "infinitus/Layers/ThreadUsageBackfill.ts": "the v1 usage rollup of an already-imported thread",
 };
 const retiredPaths = [
   "orchestration",

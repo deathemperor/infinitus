@@ -6,6 +6,7 @@ import type {
   ProviderOptionDescriptor,
   ProviderOptionSelection,
   RuntimeMode,
+  ThreadId,
 } from "@infinitus/contracts";
 import type { LegendListRenderItemProps } from "@legendapp/list/react-native";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
@@ -61,6 +62,7 @@ import {
 } from "../../native/StackHeader";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { ChatGptSharingStatus } from "./ChatGptSharingStatus";
+import { InfinitusThreadUsageRows } from "../infinitus/InfinitusThreadUsageRows";
 import { environmentServerConfigsAtom, serverEnvironment } from "../../state/server";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -241,6 +243,8 @@ type ThreadSettingsSubmenuPage =
 
 type ThreadSettingsSessionProps = {
   readonly environmentId: EnvironmentId | null;
+  // Fork (#834): set by the existing-thread host, so the sheet can read the thread.
+  readonly threadId?: ThreadId;
   readonly providerInstanceId?: ProviderInstanceId;
   readonly providerGroups: ReadonlyArray<ProviderGroup>;
   readonly selectedModel: ModelSelection | null;
@@ -295,6 +299,7 @@ export function useExistingThreadSettingsRoutePresentation() {
 
 type ThreadSettingsSessionValue = {
   readonly environmentId: EnvironmentId | null;
+  readonly threadId?: ThreadId;
   readonly providerInstanceId?: ProviderInstanceId;
   readonly providerGroups: ReadonlyArray<ProviderGroup>;
   readonly favoriteKeys: ReadonlySet<string>;
@@ -472,6 +477,7 @@ function ThreadSettingsSessionProvider(
   const value = useMemo<ThreadSettingsSessionValue>(
     () => ({
       environmentId: props.environmentId,
+      threadId: props.threadId,
       providerInstanceId: props.providerInstanceId,
       providerGroups: props.providerGroups,
       runtimeMode: compatibleRuntimeMode,
@@ -511,6 +517,7 @@ function ThreadSettingsSessionProvider(
       isApplied,
       isDisplayed,
       props.environmentId,
+      props.threadId,
       props.selectedModel,
       props.reportedModelSelection,
       props.providerInstanceId,
@@ -807,6 +814,12 @@ function ThreadSettingsOptionsItem(props: {
           />
         </Animated.View>
       </Animated.View>
+      {session.threadId !== undefined && session.environmentId ? (
+        <InfinitusThreadUsageRows
+          environmentId={session.environmentId}
+          threadId={session.threadId}
+        />
+      ) : null}
 
       {Platform.OS !== "ios" && session.hasLegacyModels ? (
         <>

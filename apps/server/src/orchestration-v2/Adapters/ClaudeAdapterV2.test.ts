@@ -3161,6 +3161,67 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, IdAllocator.layer))),
   );
 
+  // Fork (#834, #1557): the cost, models and cache TTL ride on the provider turn.
+  it.effect("records the turn's cost, models and cache TTL on the completed provider turn", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeWakeHarness;
+      const now = yield* DateTime.now;
+      yield* harness.runtime.startTurn(
+        makeClaudeTestTurnInput({
+          threadId: harness.threadId,
+          providerThread: harness.providerThread,
+          now,
+          attemptId: RunAttemptId.make("attempt-turn-usage"),
+          text: "Price this turn",
+          attachments: [],
+        }),
+      );
+      yield* Queue.offer(
+        harness.sdkMessages,
+        claudeSdkFrame({
+          type: "result",
+          subtype: "success",
+          duration_ms: 10,
+          duration_api_ms: 10,
+          is_error: false,
+          num_turns: 1,
+          result: "Priced.",
+          stop_reason: "end_turn",
+          total_cost_usd: 0.25,
+          usage: {
+            input_tokens: 100,
+            output_tokens: 10,
+            cache_creation_input_tokens: 5,
+            cache_read_input_tokens: 0,
+            cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 5 },
+          },
+          modelUsage: {
+            "claude-opus-4-7": {
+              inputTokens: 100,
+              outputTokens: 10,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 5,
+              costUSD: 0.25,
+            },
+          },
+          permission_denials: [],
+          uuid: "00000000-0000-4000-8000-000000000401",
+          session_id: WAKE_NATIVE_SESSION,
+          terminal_reason: "completed",
+        }),
+      );
+      yield* Queue.take(harness.terminalReceipts);
+      const completed = harness.events.findLast((event) => event.type === "provider_turn.updated");
+      assert.equal(completed?.type, "provider_turn.updated");
+      if (completed?.type === "provider_turn.updated") {
+        assert.equal(completed.providerTurn.status, "completed");
+        assert.equal(completed.providerTurn.turnCostUsd, 0.25);
+        assert.deepEqual(completed.providerTurn.turnModels, ["claude-opus-4-7"]);
+        assert.equal(completed.providerTurn.turnTokenUsage?.cacheTtlSeconds, 3600);
+      }
+    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, IdAllocator.layer))),
+  );
+
   it.effect("titles Claude reads, searches, and skills on tool completion", () =>
     Effect.gen(function* () {
       const harness = yield* makeWakeHarness;
