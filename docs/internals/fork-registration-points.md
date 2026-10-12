@@ -86,9 +86,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (optional) on `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls`
   (optional, #651) beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
-  `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops` and
-  `subscribeCaptures` in `EnvironmentSubscriptionRpcTag`, so the client's
-  `subscribe` accepts them.
+  `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops`,
+  `subscribeInfinitusHolds` and `subscribeCaptures` in
+  `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
 - `apps/server/src/ws.ts` — pulls `InfinitusService`, `InfinitusCompanion`,
   `InfinitusSecret`, `InfinitusPairing`, `InfinitusLimitStops`
   (`subscribeInfinitusLimitStops` → its `stopped` stream, #648) and
@@ -99,7 +99,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   session scopes go along; only the request id reaches the span);
   `subscribeCaptures` / `captures.apply` (#433; the project id and the
   command's type reach the span, a capture's text never); `server.getStats`
-  → `usage.readStats` (#659).
+  → `usage.readStats` (#659); `subscribeInfinitusHolds` /
+  `infinitus.releaseThread` (#616, #743) from `InfinitusSessionHolds`.
 - `packages/client-runtime/src/state/server.ts` — the `serverEnvironment.stats`
   query atom family over `server.getStats` (#659), refreshed with the usage
   prices.
@@ -142,7 +143,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/server/src/observability/RpcInstrumentation.ts` — the fork's RPCs in
   `RPC_AGGREGATES`: `server.getStats` under `server`, the Infinitus methods
   (`subscribeInfinitus`, `infinitus.command` / `.launch` / `.secret`,
-  `subscribeInfinitusPairing`, `infinitus.pairingDecide`) under `infinitus`,
+  `subscribeInfinitusPairing`, `infinitus.pairingDecide`,
+  `subscribeInfinitusHolds`, `infinitus.releaseThread`) under `infinitus`,
   `subscribeCaptures` / `captures.apply` under `captures`.
 - `apps/server/src/server.ts` — `layerInfinitus =
 makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettings })`
@@ -197,7 +199,7 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   `apps/web/src/components/settings/ProviderSettingsForm.tsx`'s select draws
   as a "Custom model ID…" choice opening an input; `ProviderInstanceCard.tsx`
   draws `ClaudeAdvisorProxyNote` under the form. Tests:
-  `settings.test.ts`, `ClaudeAdapterV2.test.ts`,
+  `settings.infinitus.test.ts`, `ClaudeAdapterV2.test.ts`,
   `ProviderSettingsForm.test.ts`; `ProviderInstanceRegistry.test.ts`'s
   Claude fixture carries the key.
 - `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
@@ -237,13 +239,10 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   `knownPosixCliPath` between the login-shell (or launchctl) PATH and the
   process's own, so a `.zshrc` slower than the 5 s probe timeout, or a probe
   PATH with no `claude`, still reaches the usual install dirs.
-- `apps/web/src/routes/__root.tsx` — the fork's mounts: `DeepLinkCoordinator`
-  beside `DesktopAppActivationCoordinator` (#270 D); `NotificationModeMigration`,
-  `DesktopBadgeCoordinator` and `DesktopKeepAwakeCoordinator`
-  (`docs/internals/notifications.md`, `desktop-keep-awake.md`);
-  `CaptureGestureCoordinator` (#433); `InfinitusEventToasts`;
-  `InfinitusPeerFleets` beside it, Electron only (#1545), and
-  `InfinitusSettingsSync` under it (`docs/internals/settings-sync.md`).
+- `apps/web/src/routes/__root.tsx` — one mount, `InfinitusRootMounts`
+  (`apps/web/src/components/InfinitusRootMounts.tsx`, which lists the fork's
+  headless coordinators), beside `DesktopAppActivationCoordinator`, with the
+  authenticated flag.
 - `apps/server/src/serverLogger.ts` — `ServerLoggerLive` adds the fork's file
   logger (`infinitus/serverLogFile.ts`, in `fork-only-files.md`) beside `consolePretty` and
   `tracerLogger` (#1182); `apps/server/src/config.ts` — `serverLogNdjsonPath`
@@ -304,12 +303,14 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   `apps/web/src/components/Sidebar.logic.ts` / `Sidebar.tsx` and
   `apps/mobile/src/features/threads/threadListV2.ts` /
   `thread-list-v2-items.tsx` — `resolveSidebarThreadStatus` /
-  `resolveThreadListV2Status` take `limitStopped`, read off
-  `infinitusLimitStopsAtom` per row (the pill's tooltip and the phone's detail
-  line are `limitStopLine`); `SettingsPanels.tsx` and
-  `apps/mobile/src/features/settings/SettingsThreadsRouteScreen.tsx` — the
-  `infinitusResumeOnLimit` switch beside upstream's auto-resume row;
-  `settingsSearch.ts` — its `infinitus-resume-on-limit` item.
+  `resolveThreadListV2Status` take `limitStopped`; the web row's reads are
+  `sidebar/InfinitusLimitStop.tsx`'s (`useThreadLimitStop`,
+  `limitStopTooltip`, the `InfinitusLimitStopPill` branch before upstream's
+  plain status span), the phone's `infinitusLimitStopsAtom` + `limitStopLine`;
+  `SettingsPanels.tsx` mounts `InfinitusResumeOnLimitSetting` and
+  `apps/mobile/src/features/settings/SettingsThreadsRouteScreen.tsx` the
+  `infinitusResumeOnLimit` switch, beside upstream's auto-resume row; the
+  `infinitus-resume-on-limit` search item is in `settingsSearchItems.ts`.
 - The MCP server the agents see is named `infinitus` (#1368 E): the
   registration sites are `orchestration-v2/Adapters/ClaudeAdapterV2.ts`
   (the `mcpServers` key, `CLAUDE_T3_MCP_TOOL_WILDCARD` and the read-only
@@ -571,8 +572,25 @@ background`). Riding along, all
   (`infinitus`) and Nightly (`infinitus-nightly`, #1042) instead of upstream's
   Stable / Nightly, which would hand it the real T3 Code with no way back;
   the row's `options` drive the select. The General panel also mounts
-  `DesktopKeepAwakeSettings` after the background-activity row (#1075) and
+  `DesktopKeepAwakeSettings` after the background-activity row (#1075),
+  `InfinitusResumeOnLimitSetting` after the auto-resume row (#648), and
   the restore / dirty-label lists carry `desktopKeepAwake`.
+- Worktree limit (#269 H, re-ported onto orchestrator v2 under #1627):
+  `packages/contracts/src/settings.ts` carries `worktreeMaxCount` (default
+  25, 0 lifts it) on `ServerSettings` and its patch;
+  `apps/server/src/orchestration-v2/ProjectionStore.ts` answers
+  `getWorktreeHolders` in both the SQL and the memory store;
+  `ThreadLaunchService.ts` takes the fork's `WorktreeCapGate`, reserves a
+  slot before `thread.create` for a `worktree` strategy and hands the
+  release to the preparation (`PreparationInput.releaseWorktreeSlot`);
+  `runtimeLayer.ts` provides the gate; `ws.ts`'s `launchThread` and
+  `mcp/toolkits/project/handlers.ts` surface the refusal through
+  `worktreeCapRefusalMessage` where every other launch failure stays
+  generic; `ThreadLaunchService.test.ts`'s harness provides the gate;
+  `apps/web/src/components/settings/SettingsPanels.tsx` mounts the
+  "Worktree limit" row after "Start from origin" and its restore / dirty
+  lists carry the key (`settingsSearch.ts` kept its `worktree-limit` entry
+  through the merge).
 - `apps/server/src/binCli.ts` — the CLI's root command is `infinitus`, not
   `t3` (the archive's binary, `docs/user/install.md`); `cli/pair.test.ts` and
   `cli/app.test.ts` assert that command path.
@@ -602,7 +620,8 @@ background`). Riding along, all
 - `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
   temp directory's real path: the service canonicalises transcript roots,
   and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),
-  so two upstream tests failed on a Mac. Plus the fork's account-attribution cases (#779).
+  so two upstream tests failed on a Mac. The fork's own cases are
+  `UsageService.infinitus.test.ts`.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs`,
   `fork-visual-check.ts`, `fold-changelog.mjs` (+ `.d.mts`),
   `infinitus-rename.ts` and `export-infinitus-splash.ts` as scripts entries
@@ -719,13 +738,23 @@ background`). Riding along, all
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
-- `apps/web/src/components/settings/settingsSearch.ts` — the six Infinitus
-  `SettingsPath`s and their labels (Menu bar, Animations since #747 step 1,
-  Team, Notifications, Devices, Engines; the Themes page of #747 step 1
-  folded into the Menu bar page), the `infinitusOnly` search flag with the
+- `apps/web/src/components/Sidebar.logic.ts` and `Sidebar.tsx` — the `held`
+  / `paused` statuses (#741, #743): the resolver takes the holds stream's
+  kind for the thread (from `sidebar/useInfinitusHeldSummary.ts`), above
+  working and below approval and input; the row's pill reads "Held" /
+  "Paused". The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
+  `thread-list-v2-items.tsx` and `thread-row-emphasis.ts`, through
+  `features/infinitus/useThreadHeldEntry.ts`. `makeInfinitusServerLayers`
+  (`InfinitusServerLayers.ts`) provides `InfinitusSessionHoldsIdle` until the policies land.
+- `apps/web/src/components/settings/settingsSearch.ts` — three spreads from
+  `infinitus/settingsSearchItems.ts` (`InfinitusSettingsPath` in the
+  `SettingsPath` union, `INFINITUS_SECTION_LABELS`, `INFINITUS_CATEGORY_SCOPES`
+  and `INFINITUS_SETTINGS_SEARCH_ITEMS`, the last at the Infinitus pages'
+  place in result order), the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, `isSettingsSectionActive`
-  so a nested page's nav item is the only one lit, the `desktop-keep-awake`
-  item (#1075) and `CONNECT_NAME` as the Connect section's title.
+  so a nested page's nav item is the only one lit, `CONNECT_NAME` as the
+  Connect section's title, and search terms naming `infinitus.json` and the
+  fork's providers.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — one import from
   `infinitus/settingsNav.ts`, `...INFINITUS_SECTION_ICONS` spread into the icon
@@ -735,7 +764,7 @@ background`). Riding along, all
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
-- `apps/web/src/routes/settings.{menu-bar,animations,team,notifications,devices,engines}.tsx`
+- `apps/web/src/routes/settings.{menu-bar,animations,priority,team,notifications,devices,engines}.tsx`
   and `settings.infinitus.$.tsx` (new files in upstream's routes
   directory; the pages are top-level since 2026-09-18 — no "Infinitus"
   section, the whole app is Infinitus — and the splat redirects the old
@@ -753,10 +782,15 @@ background`). Riding along, all
   `isSettingsSectionActive` counts a prefix match only for the deepest nav
   item above the path, so Engines' Activity sub screen
   (`/settings/engines/activity`) lights Engines alone.
-- `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts, Stats
-  and Utilization utility items (Accounts behind the `infinitus` capability
-  gate), the header's brand mark as plain `PRODUCT_NAME`, and the backdrop
-  read through `useSidebarStageBackdropVariant` so the theme's scene applies.
+- `apps/web/src/components/sidebar/SidebarChrome.tsx` — one
+  `InfinitusSidebarUtilityItems` mount between Pull Requests and Usage (the
+  menu wraps, `flex-wrap`), the header's brand mark as plain `PRODUCT_NAME`,
+  and the backdrop read through `useSidebarStageBackdropVariant` so the
+  theme's scene applies.
+- `apps/web/src/components/AppSidebarLayout.tsx` — one
+  `useHistoryNavigation(pathname)` call (`hooks/useHistoryNavigation.ts`: the
+  mouse's back and forward buttons and the macOS page-swipe gesture, #840,
+  #1250).
 - `packages/contracts/src/keybindings.ts` — `accounts.open` in
   `STATIC_KEYBINDING_COMMANDS`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and

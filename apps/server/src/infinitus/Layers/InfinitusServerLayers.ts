@@ -5,6 +5,7 @@ import * as ServerSecretStore from "../../auth/ServerSecretStore.ts";
 import * as ProjectionStoreV2 from "../../orchestration-v2/ProjectionStore.ts";
 import * as ProcessRunner from "../../processRunner.ts";
 import { InfinitusLimitStopsLive } from "../Services/InfinitusLimitStops.ts";
+import { InfinitusSessionHoldsIdle } from "../Services/InfinitusSessionHolds.ts";
 import { InfinitusSwapdProbeLive } from "../Services/InfinitusSwapdProbe.ts";
 import { InfinitusLive } from "./Infinitus.ts";
 import { InfinitusAlertRelayLive } from "./InfinitusAlertRelay.ts";
@@ -54,7 +55,8 @@ const runningTurns = () => InfinitusRunningTurnsLive.pipe(Layer.provide(Projecti
  *   phones; its own control client, `ps` / `kill` through `ProcessRunner`)
  *   and resume-on-limit (#648, #1627: failed limit runs and the Claude
  *   adapter's rejected windows, the swapd probe for the accounts while the
- *   menu bar app is away). Merged beside upstream's reactors, where the
+ *   menu bar app is away) and the idle session-holds layer (#616, #743).
+ *   Merged beside upstream's reactors, where the
  *   chain hands them `OrchestratorV2` and `ServerEnvironment`.
  * - `runtime`: `infinitus`, the limit-stop list (#648: one instance for the
  *   resume layer, the Claude driver's refusal hook and the `ws.ts` stream)
@@ -95,6 +97,10 @@ export function makeInfinitusServerLayers<
       Layer.provide(ProcessRunner.layer),
       Layer.provide(alertRelay()),
     ),
+    // Session priority mode's holds stream and "Run now" (#616, #743, #1627):
+    // nothing is held until the hold and interrupt policies land on the queue
+    // lane's turn-start gate; this answers the empty list.
+    InfinitusSessionHoldsIdle,
     InfinitusResumeOnLimitLive.pipe(
       Layer.provide(infinitus),
       Layer.provide(InfinitusSwapdProbeLive.pipe(Layer.provide(ProcessRunner.layer))),

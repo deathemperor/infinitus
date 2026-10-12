@@ -14,9 +14,12 @@ import {
   InfinitusCommandFailed,
   InfinitusCommandInput,
   InfinitusCommandResult,
+  InfinitusHeldThread,
   InfinitusLaunchResult,
   InfinitusLimitStops,
   InfinitusProtocolError,
+  InfinitusReleaseThreadInput,
+  InfinitusReleaseThreadResult,
   InfinitusSecretInput,
   InfinitusSecretRefused,
   InfinitusSecretResult,
@@ -42,6 +45,9 @@ export const INFINITUS_WS_METHODS = {
   infinitusSecret: "infinitus.secret",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
+  // Session priority mode (#616, #743): the server's holds and "Run now".
+  subscribeInfinitusHolds: "subscribeInfinitusHolds",
+  infinitusReleaseThread: "infinitus.releaseThread",
   subscribeInfinitusLimitStops: "subscribeInfinitusLimitStops",
   subscribeCaptures: "subscribeCaptures",
   capturesApply: "captures.apply",
@@ -89,6 +95,23 @@ const WsInfinitusPairingDecideRpc = Rpc.make(INFINITUS_WS_METHODS.infinitusPairi
   payload: PairingApprovalDecideInput,
   success: PairingApprovalDecideResult,
   error: Schema.Union([EnvironmentAuthorizationError, PairingApprovalIssueFailed]),
+});
+
+/** The threads the server holds for headroom (#616, #741) or paused for it
+    (#743): the whole list on subscribe, then again on every change. */
+const WsSubscribeInfinitusHoldsRpc = Rpc.make(INFINITUS_WS_METHODS.subscribeInfinitusHolds, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(InfinitusHeldThread),
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
+/** "Run now": runs the thread's held start, or continues its paused turn,
+    whatever the fleet reads. Never fails: `released: false` with the reason. */
+const WsInfinitusReleaseThreadRpc = Rpc.make(INFINITUS_WS_METHODS.infinitusReleaseThread, {
+  payload: InfinitusReleaseThreadInput,
+  success: InfinitusReleaseThreadResult,
+  error: EnvironmentAuthorizationError,
 });
 
 /** The threads whose turn a Claude usage limit stopped on this server (#648,
@@ -159,6 +182,8 @@ export const INFINITUS_RPCS = [
   WsInfinitusSecretRpc,
   WsSubscribeInfinitusPairingRpc,
   WsInfinitusPairingDecideRpc,
+  WsSubscribeInfinitusHoldsRpc,
+  WsInfinitusReleaseThreadRpc,
   WsSubscribeInfinitusLimitStopsRpc,
   WsSubscribeCapturesRpc,
   WsCapturesApplyRpc,

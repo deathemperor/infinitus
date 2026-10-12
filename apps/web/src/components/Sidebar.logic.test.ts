@@ -1003,6 +1003,38 @@ describe("resolveSidebarThreadStatus", () => {
     expect(resolveSidebarThreadStatus(idle)).toBe("ready");
   });
 
+  it("reads held and paused from the holds stream, below approval, input and a limit stop, above working (#741, #743)", () => {
+    expect(resolveSidebarThreadStatus({ ...idle, runtime }, { hold: "held" })).toBe("held");
+    expect(
+      resolveSidebarThreadStatus(
+        { ...idle, runtime: { ...runtime, status: "starting" } },
+        { hold: "held" },
+      ),
+    ).toBe("held");
+    expect(resolveSidebarThreadStatus(idle, { hold: "paused" })).toBe("paused");
+    expect(
+      resolveSidebarThreadStatus({ ...idle, hasPendingApprovals: true }, { hold: "held" }),
+    ).toBe("approval");
+    expect(
+      resolveSidebarThreadStatus({ ...idle, hasPendingUserInput: true }, { hold: "paused" }),
+    ).toBe("input");
+    expect(
+      resolveSidebarThreadStatus({ ...idle, runtime }, { limitStopped: true, hold: "held" }),
+    ).toBe("limited");
+    expect(resolveSidebarV2TopStatus({ status: "held", isUnread: true, isWoke: false })).toBe(
+      "held",
+    );
+    expect(
+      shouldRecedeSidebarThread({
+        status: "paused",
+        isUnread: false,
+        isWoke: false,
+        isActive: false,
+        isSelected: false,
+      }),
+    ).toBe(true);
+  });
+
   it("keeps a waiting runtime visible ahead of unread and woke presentation", () => {
     expect(resolveSidebarV2TopStatus({ status: "waiting", isUnread: true, isWoke: true })).toBe(
       "waiting",

@@ -13,7 +13,6 @@ import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@infinitus/shared/threadPullRequests";
 import { useAtomValue } from "@effect/atom-react";
-import { limitStopKey, limitStopLine } from "@infinitus/client-runtime/state/infinitusLimitStops";
 import { replaceComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 import * as Schema from "effect/Schema";
 import {
@@ -156,11 +155,16 @@ import {
   useProjects,
   useThreadShells,
 } from "../state/entities";
-import { infinitusLimitStopsAtom } from "../state/infinitus";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
+import {
+  InfinitusLimitStopPill,
+  limitStopTooltip,
+  useThreadLimitStop,
+} from "./sidebar/InfinitusLimitStop";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
 import { useEnvironmentQuery } from "../state/query";
+import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
 import { useThreadSearch } from "../state/queries";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
@@ -169,7 +173,7 @@ import {
   resolveActiveThreadRouteRef,
   resolveThreadRouteTarget,
 } from "../threadRoutes";
-import { formatRelativeTimeLabel, formatTimestamp, parseTimestampDate } from "../timestampFormat";
+import { formatRelativeTimeLabel, parseTimestampDate } from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
 import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
@@ -1263,12 +1267,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // Same semantics as the legacy sidebar (never-visited counts as read):
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  // Fork (#648): a turn parked on a Claude usage limit reads "Limited" with
-  // the account and the reset in the pill's tooltip until it resumes.
-  const limitStop =
-    useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
-    null;
-  const status = resolveSidebarThreadStatus(thread, { limitStopped: limitStop !== null });
+  const limitStop = useThreadLimitStop(thread);
+  // Held / paused for headroom (#741, #743): the server's holds stream, one
+  // subscription per environment shared by every row.
+  const heldEntry = useInfinitusHeldSummary(thread.environmentId, thread.id);
+  const status = resolveSidebarThreadStatus(thread, {
+    limitStopped: limitStop !== null,
+    hold: heldEntry?.kind ?? null,
+  });
   const isInFlight =
     status === "working" || status === "waiting" || status === "approval" || status === "input";
   // A woken thread reappears at its original position (the sort is
@@ -1315,48 +1321,53 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             icon: null,
             className: "text-muted-foreground",
           }
-        : status === "approval"
+        : status === "held" || status === "paused"
           ? {
-              label: "Approval",
-              icon: "approval" as const,
-              className: "text-warning-foreground",
+              // Kept back for headroom (#741, #743): nothing runs, so it
+              // reads as calm as waiting; the tooltip carries the fleet line.
+              label: status === "held" ? "Held" : "Paused",
+              icon: null,
+              className: "text-muted-foreground",
             }
-          : status === "input"
+          : status === "approval"
             ? {
-                label: "Input",
-                icon: "input" as const,
-                className: "text-indigo-600 dark:text-indigo-300",
+                label: "Approval",
+                icon: "approval" as const,
+                className: "text-warning-foreground",
               }
-            : status === "limited"
+            : status === "input"
               ? {
-                  label: "Limited",
-                  icon: "failed" as const,
-                  className: "text-warning",
+                  label: "Input",
+                  icon: "input" as const,
+                  className: "text-indigo-600 dark:text-indigo-300",
                 }
-              : status === "failed"
+              : status === "limited"
                 ? {
-                    label: "Failed",
+                    label: "Limited",
                     icon: "failed" as const,
-                    className: "text-error",
+                    className: "text-warning",
                   }
-                : isWoke
+                : status === "failed"
                   ? {
-                      label: "Woke",
-                      icon: "woke" as const,
-                      className: "text-warning",
+                      label: "Failed",
+                      icon: "failed" as const,
+                      className: "text-error",
                     }
-                  : isUnread
+                  : isWoke
                     ? {
-                        label: "Done",
-                        icon: "done" as const,
-                        className: "text-success",
+                        label: "Woke",
+                        icon: "woke" as const,
+                        className: "text-warning",
                       }
-                    : null;
+                    : isUnread
+                      ? {
+                          label: "Done",
+                          icon: "done" as const,
+                          className: "text-success",
+                        }
+                      : null;
   const isWokeStatus = topStatus?.icon === "woke";
-  const limitStopDetail =
-    limitStop !== null && status === "limited"
-      ? limitStopLine(limitStop, (iso) => formatTimestamp(iso, props.timestampFormat), Date.now())
-      : null;
+  const limitStopDetail = limitStopTooltip(limitStop, status, props.timestampFormat);
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -2062,22 +2073,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
                         </Tooltip>
                       ) : limitStopDetail !== null ? (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1 font-medium",
-                                  topStatus.className,
-                                )}
-                              >
-                                <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
-                                <span role="status">{topStatus.label}</span>
-                              </span>
-                            }
-                          />
-                          <TooltipPopup side="top">{limitStopDetail}</TooltipPopup>
-                        </Tooltip>
+                        <InfinitusLimitStopPill
+                          detail={limitStopDetail}
+                          label={topStatus.label}
+                          className={topStatus.className}
+                        />
                       ) : (
                         <span
                           className={cn(
