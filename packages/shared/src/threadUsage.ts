@@ -287,11 +287,6 @@ export function promptCacheRemainingLabel(remainingMs: number): string {
   return minutes < 1 ? "<1m" : `${minutes}m`;
 }
 
-/** "1-hour" or "5-minute", for the cache a TTL names. */
-export function promptCacheTtlLabel(ttlMs: number): string {
-  return ttlMs >= 60 * 60_000 ? "1-hour" : `${Math.round(ttlMs / 60_000)}-minute`;
-}
-
 /** Milliseconds until the label or the kind can next change: just past the
     next whole minute before expiry (the label rounds down, so on the
     boundary itself it has not changed yet). Null once cold. */
