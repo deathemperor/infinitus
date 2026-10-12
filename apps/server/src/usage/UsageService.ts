@@ -259,7 +259,7 @@ function foldSessionUsage(
     if (record.timestampMs > lastMs) lastMs = record.timestampMs;
   }
   if (!any) return null;
-  return { totals, costUsd, models, lastAt: new Date(lastMs).toISOString() };
+  return { totals, costUsd, models, lastAt: DateTime.formatIso(DateTime.makeUnsafe(lastMs)) };
 }
 
 const EMPTY_PRICING: UsagePricing = {

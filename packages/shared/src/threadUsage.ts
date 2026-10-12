@@ -5,6 +5,7 @@ import type {
   OrchestrationV2ThreadProjection,
   ThreadUsageRollup,
 } from "@infinitus/contracts";
+import * as DateTime from "effect/DateTime";
 
 /**
  * Fork (#834, on orchestrator v2 #1627): one completed turn's usage, read
@@ -189,7 +190,7 @@ function cacheExpiry(
   if (latest.cacheTtlSeconds === undefined) return {};
   const expiresAtMs = Date.parse(latest.completedAt) + latest.cacheTtlSeconds * 1000;
   return Number.isFinite(expiresAtMs)
-    ? { cacheExpiresAt: new Date(expiresAtMs).toISOString() }
+    ? { cacheExpiresAt: DateTime.formatIso(DateTime.makeUnsafe(expiresAtMs)) }
     : {};
 }
 
@@ -308,5 +309,5 @@ function epochOf(instant: OrchestrationV2ProviderTurn["completedAt"] | string): 
 }
 
 function isoOf(instant: NonNullable<OrchestrationV2ProviderTurn["completedAt"]>): string {
-  return new Date(instant.epochMilliseconds).toISOString();
+  return DateTime.formatIso(instant);
 }
