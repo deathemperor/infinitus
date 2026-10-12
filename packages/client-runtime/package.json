@@ -411,6 +411,10 @@
       "types": "./src/state/infinitusLimitStops.ts",
       "default": "./src/state/infinitusLimitStops.ts"
     },
+    "./state/infinitusThreadHold": {
+      "types": "./src/state/infinitusThreadHold.ts",
+      "default": "./src/state/infinitusThreadHold.ts"
+    },
     "./state/infinitusAccounts": {
       "types": "./src/state/infinitusAccounts.ts",
       "default": "./src/state/infinitusAccounts.ts"

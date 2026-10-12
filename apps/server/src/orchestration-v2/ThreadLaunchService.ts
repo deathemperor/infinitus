@@ -48,6 +48,7 @@ import type * as Orchestrator from "./Orchestrator.ts";
 import { makeProviderFailure } from "@infinitus/provider-core/server/failure";
 import { randomUuidV4 } from "@infinitus/provider-core/server/randomUuid";
 import * as ThreadManagement from "./ThreadManagementService.ts";
+import * as WorktreeCap from "./WorktreeCap.ts";
 
 export type ThreadLaunchWorkspaceStrategy =
   | { readonly type: "root"; readonly branch?: string | undefined }
@@ -107,6 +108,8 @@ type PreparationInput = Pick<
    * records the workspace, and a branch rename may still be running.
    */
   readonly reusedWorktree?: { readonly baseRef: string };
+  /** Fork (#269 H): releases the launch's worktree-limit slot; idempotent. */
+  readonly releaseWorktreeSlot?: Effect.Effect<void>;
 };
 
 export interface ThreadLaunchRetryInput {
@@ -185,6 +188,7 @@ const make = Effect.gen(function* () {
   const ids = yield* IdAllocator.IdAllocatorV2;
   const threads = yield* ThreadManagement.ThreadManagementService;
   const managedFolders = yield* ManagedProjectFolders.ManagedProjectFolders;
+  const worktreeCap = yield* WorktreeCap.WorktreeCapGate;
   const preparationScope = yield* Scope.make("sequential");
   const scheduledLaunches = yield* Ref.make<ReadonlySet<CommandId>>(new Set());
   yield* Effect.addFinalizer(() => Scope.close(preparationScope, Exit.void));
@@ -423,6 +427,8 @@ const make = Effect.gen(function* () {
           .pipe(Effect.mapError(mapError(input, "update-thread", threadId)));
       }
       workspaceRecorded = true;
+      // Fork (#269 H): the projection counts the worktree from here on.
+      yield* input.releaseWorktreeSlot ?? Effect.void;
 
       // Rename temporary branches (server-invented above, or sent by clients
       // that name worktrees themselves) in the background so generation latency
@@ -677,6 +683,7 @@ const make = Effect.gen(function* () {
       ),
       Effect.ignoreCause,
       Effect.ensuring(releasePreparation(input.commandId)),
+      Effect.ensuring(input.releaseWorktreeSlot ?? Effect.void),
       Effect.forkIn(preparationScope),
     );
   });
@@ -704,6 +711,9 @@ const make = Effect.gen(function* () {
       }
 
       const launchReceipt = yield* readReceipt(input, input.commandId);
+      // Fork (#269 H): the launch's worktree-limit slot, see below.
+      let releaseWorktreeSlot: Effect.Effect<void> = Effect.void;
+      let worktreeSlotHandedOff = false;
       return yield* Effect.gen(function* () {
         // A retried launch has no client-supplied id to replay against, so
         // recover the thread id its accepted create was recorded under before
@@ -761,6 +771,14 @@ const make = Effect.gen(function* () {
                 },
               )
             : input.workspaceStrategy;
+        // Fork (#269 H): the worktree limit is checked before anything is
+        // created, so an over-limit send costs no thread. The slot is handed
+        // to the preparation that creates the worktree, or released here.
+        if (workspaceStrategy.type === "worktree" && Option.isNone(launchReceipt)) {
+          releaseWorktreeSlot = yield* worktreeCap.reserve.pipe(
+            Effect.mapError(mapError(input, "provision-worktree", candidateThreadId)),
+          );
+        }
         const initialBranch = workspaceStrategy.branch ?? null;
         const initialWorktreePath =
           workspaceStrategy.type === "existing_worktree" ? workspaceStrategy.worktreePath : null;
@@ -885,8 +903,9 @@ const make = Effect.gen(function* () {
                       Effect.mapError(mapError(input, "update-thread", threadId)),
                     );
               if (preparationStillRequired) {
+                worktreeSlotHandedOff = true;
                 yield* schedulePreparation(
-                  { ...input, workspaceStrategy: preparationStrategy },
+                  { ...input, workspaceStrategy: preparationStrategy, releaseWorktreeSlot },
                   threadId,
                   runId,
                 );
@@ -902,7 +921,11 @@ const make = Effect.gen(function* () {
           projection,
           resumed: Option.isSome(launchReceipt) || messageWasAlreadyAccepted,
         };
-      });
+      }).pipe(
+        Effect.ensuring(
+          Effect.suspend(() => (worktreeSlotHandedOff ? Effect.void : releaseWorktreeSlot)),
+        ),
+      );
     },
   );
 

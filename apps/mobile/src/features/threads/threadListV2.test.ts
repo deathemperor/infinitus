@@ -111,6 +111,30 @@ describe("resolveThreadListV2SnoozeMenuSelection", () => {
 });
 
 describe("resolveThreadListV2Status", () => {
+  it("reads held and paused from the Mac's holds stream, below approval, input and a limit stop (#741, #743)", () => {
+    const thread = makeThread({
+      id: ThreadId.make("held"),
+      title: "Held",
+      runtime: {
+        status: "starting",
+        activeRunId: null,
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        providerName: "Codex",
+        lastError: null,
+        updatedAt: NOW,
+      },
+    });
+    expect(resolveThreadListV2Status(thread)).toBe("working");
+    expect(resolveThreadListV2Status(thread, { hold: "held" })).toBe("held");
+    expect(resolveThreadListV2Status({ ...thread, runtime: null }, { hold: "paused" })).toBe(
+      "paused",
+    );
+    expect(
+      resolveThreadListV2Status({ ...thread, hasPendingApprovals: true }, { hold: "held" }),
+    ).toBe("approval");
+    expect(resolveThreadListV2Status(thread, { limitStopped: true, hold: "held" })).toBe("limited");
+  });
+
   it("reads limited for a running turn the server lists among its limit stops (#648)", () => {
     const thread = makeThread({
       id: ThreadId.make("parked"),
