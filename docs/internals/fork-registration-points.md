@@ -181,14 +181,15 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   one call before the command and the `--literal-pathspecs` / `-- <paths>`
   arguments; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
   the checkpoint author and committer names are `PRODUCT_NAME`.
-- `packages/contracts/src/providerRuntime.ts` — five fork-owned optional
+- `packages/contracts/src/providerRuntime.ts` — fork-owned optional
   fields: `TaskStartedPayload.prompt` (#1573) and `isBackgrounded` (#974;
-  the one on `TaskUpdatedPayload` is upstream's),
-  `TurnCompletedPayload.turnCostUsd` / `turnModels` (#834),
-  `TurnTokenUsage.cacheTtlSeconds` (#1557). No orchestration-v2 adapter
-  writes them and no client reads them; kept for the #1627 ports of those
-  features (#834, #1557, #974, #1573). `usageLimited` (#648) left with the
-  v2 port: the failure's `class: "usage_limit"` carries it.
+  the one on `TaskUpdatedPayload` is upstream's), which no orchestration-v2
+  adapter writes yet and no client reads (kept for their #1627 ports), and
+  `TurnTokenUsage.cacheTtlSeconds` (#1557), which `ClaudeTurnTokenUsage.ts`
+  fills from the result's `usage.cache_creation`. `TurnCompletedPayload`'s
+  `turnCostUsd` / `turnModels` (#834) moved onto
+  `OrchestrationV2ProviderTurn` with the v2 port; `usageLimited` (#648)
+  left with it: the failure's `class: "usage_limit"` carries it.
 - `packages/contracts/src/settings.ts` — the `PromptSnippet` schema with its
   caps and `projectPromptSnippets`
   (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on
@@ -276,6 +277,9 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   `apps/server/src/stats/`), the `UsageAttribution` hook (#779), and
   `CACHE_RETENTION_DAYS = 800` (Stats compares calendar years) with
   upstream's 92 kept as `CURSOR_RETENTION_DAYS` for the Cursor history reads.
+  `readSessionUsage` (#834): one Claude session's transcript by file name
+  under the configured Claude homes, through the scan's file cache, deduped
+  and priced, for the usage backfill (`docs/internals/turn-usage.md`).
 - `packages/provider-core/src/server/mcpSession.ts` —
   `withProviderSessionEnvironment`: the device-environment wrapper plus
   `T3_THREAD_ID` / `T3_ENVIRONMENT_ID`, which `infinitusctl` reads inside a
@@ -625,6 +629,9 @@ background`). Riding along, all
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`,
   `build-desktop-artifact.test.ts`, and the web fixtures that stub a desktop
   origin) use the fork's scheme.
+  The `threadUsage` prop (#834) rides `ChatComposerProps` down to
+  `ComposerFooterPrimaryActions`, which mounts `<ComposerThreadUsage>`
+  before the context meter.
 - `scripts/build-desktop-artifact.test.ts` — the cross-architecture Windows
   probe test asserts on the probe's executable, not on `ELECTRON_RUN_AS_NODE`
   in any spawned env: the bundle self-check inherits the host's env, and a
@@ -855,3 +862,11 @@ background`). Riding along, all
 - `apps/server/src/usage/UsageService.test.ts` — the v4-upgrade test waits for the second service's cache write (#1661): the layer's temp state dir is removed before the service's own shutdown wait, and on macOS the write loses that race.
 - `apps/server/src/orchestration-v2/RunExecutionService.ts` — the run's event filter takes a `turn.terminal` for another turn of its own provider thread and run ordinal as the root's while the root turn is open, and the ingest loop logs the mismatch (#1514, `ProviderEventRouteIdentity.runOrdinal`); the "auxiliary or stale provider terminals" test models those as a child provider thread's and another ordinal's.
 - `apps/server/src/orchestration-v2/ProviderSessionManager.ts` — `markIdle` also clears the provider thread's busy turns of earlier run ordinals, so a stopped run's turn no longer holds the idle release (#1514).
+- `packages/contracts/src/orchestrationV2.ts` — turn usage (#834, #1627): `OrchestrationV2ProviderTurn`'s optional `turnCostUsd`, `turnModels` and `toolCalls`; `OrchestrationV2AppThread.usageBaseline` and the same field on the `thread.metadata.update` command (`ThreadUsageRollup`, `threadUsage.ts`). `docs/internals/turn-usage.md`.
+- `apps/server/src/orchestration-v2/Orchestrator.ts` — `thread.metadata.update` copies `usageBaseline` onto the thread when the command carries it (#834).
+- `apps/server/src/orchestration-v2/ProviderEventIngestor.ts` — `withProviderTurnToolCalls`: a terminal `provider_turn.updated` without `toolCalls` gets the count of the turn's distinct tool items (`providerTurnToolCalls.ts`, #834, #927); a failed read logs and keeps the turn.
+- `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `lastResultTotals` on the live query context and, in `finalizeActiveTurn`, `claudeTurnUsageDelta` spreading `turnCostUsd` / `turnModels` onto the provider turn (#834); its case stays in `ClaudeAdapterV2.test.ts`, whose wake harness is too large to copy into a sibling.
+- `apps/server/src/orchestration-v2/V1ImportBoundary.test.ts` — `legacyReaderFiles` names `infinitus/Layers/ThreadUsageBackfill.ts`: the usage backfill reads the fork's v1 rollup (`projection_threads.usage_json`) for threads imported before it existed, which the importer cannot be re-run for (#834).
+- `apps/server/src/provider/ClaudeTurnTokenUsage.ts` — `claudeCacheTtlSeconds` and the `cacheTtlSeconds` it adds to the normalized usage (#1557).
+- `apps/web/src/components/ChatView.tsx` — `threadUsage`, folded from `serverProjection` with `threadUsageFromProjection`, handed to `ChatComposer` (#834).
+- `apps/mobile/src/features/threads/ThreadSettingsSheet.tsx` — the optional `threadId` on the settings session, and `<InfinitusThreadUsageRows>` under the options card when it is set (#834); `ThreadComposer.tsx` sets it from the selected thread.

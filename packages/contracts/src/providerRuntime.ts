@@ -332,8 +332,8 @@ const TurnTokenUsageCommonFields = {
   usageScope: Schema.Literal("main_agent"),
   cachedInputTokens: Schema.optional(NonNegativeInt),
   cacheCreationTokens: Schema.optional(NonNegativeInt),
-  /** How long the prompt cache the turn wrote stays warm without another
-      call, when the provider says (Claude: 300 or 3600). */
+  /** Fork (#1557): how long the prompt cache the turn wrote stays warm
+      without another call, when the provider says (Claude: 300 or 3600). */
   cacheTtlSeconds: Schema.optional(PositiveInt),
   reasoningTokens: Schema.optional(NonNegativeInt),
   hasSubagents: Schema.Boolean,
@@ -360,10 +360,6 @@ const TurnCompletedPayload = Schema.Struct({
   usage: Schema.optional(Schema.Unknown),
   modelUsage: Schema.optional(UnknownRecordSchema),
   totalCostUsd: Schema.optional(Schema.Number),
-  // Fork (#834): the adapter's per-turn differencing of the cumulative
-  // `totalCostUsd` / `modelUsage`; the models are ordered by tokens moved.
-  turnCostUsd: Schema.optional(Schema.Number),
-  turnModels: Schema.optional(Schema.Array(TrimmedNonEmptyStringSchema)),
   errorMessage: Schema.optional(TrimmedNonEmptyStringSchema),
   tokenUsage: Schema.optional(TurnTokenUsage),
 });
