@@ -8,6 +8,11 @@ per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
+- `apps/web/src/components/settings/ClaudeAdvisorProxyNote.tsx` — the one
+  line under a Claude instance's runtime settings when its environment carries
+  `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so
+  a proxied instance's advisor model (#1232) never fires. The add-instance
+  wizard collects no environment for Claude, so only the card draws it.
 - `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
@@ -38,6 +43,7 @@ these bullets.
 - `apps/web/src/components/captures/`, `apps/web/src/state/captures.ts` — the composer's Captures popover (#433, PR B): `ComposerCapturesBadge`, `ComposerCapturesMenu`, `captures.logic`, `capturesUiStore`, `useCaptures`, and `CaptureGestureCoordinator` (+ `captureGesture.logic`), the desktop gesture's landing. Rules and traps: `docs/internals/captures.md`.
 - `apps/web/src/components/prompts/` — per-project prompt snippets (#270 G): `promptSnippets.logic`, `promptsUiStore`, `ComposerPromptsBadge`, `ComposerPromptsMenu`, `useProjectPromptSnippets`, `ProjectPromptSnippetsSection`, `promptSnippetSlashItems`; the phone's half is `apps/mobile/src/features/threads/promptSnippetItems.ts`. Rules and traps: `docs/internals/prompt-snippets.md`.
 - `apps/web/src/components/chat/InfinitusComposerExtras.tsx` — the composer's fork features behind one hook (#1565): `useInfinitusComposerExtras` (the project ref, the snippets, the Captures shortcuts, both popovers' open state, the `/` menu rows), `InfinitusComposerBadges`, `InfinitusComposerMenus` (takes the composer's private `ComposerCommandMenuLayer` as a prop) and `InfinitusImageMarkup`, the image tile's "Draw on" button over `ImageMarkupDialog` + `imageMarkup.logic` (#875). `ChatComposer.tsx` mounts each with one line.
+- `apps/web/src/components/sidebar/DesktopUpdateRunningTurnsDialog.tsx` — the install confirm while turns run (#829, back on orchestrator v2 in #1627): Later / Install now / "Install when they finish", and the armed wait's keep / cancel / skip. Rules and traps: `docs/internals/update-idle-gate.md`.
 - `apps/web/src/components/deepLinks/` — the desktop's deep links landing
   (#270 D): `DeepLinkCoordinator` pulls the shell's latest link once the
   primary environment is connected and on every `onDeepLinkPending` ping;

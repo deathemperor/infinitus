@@ -18,6 +18,7 @@ import * as Duration from "effect/Duration";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { HttpClient } from "effect/http";
@@ -34,6 +35,7 @@ import {
 } from "../../orchestration-v2/Adapters/ClaudeAdapterV2.ts";
 import { ProviderDriverError } from "../Errors.ts";
 import { makeClaudeScopedLimitNames } from "../claudeUsageLimits.ts";
+import { InfinitusLimitStops } from "../../infinitus/Services/InfinitusLimitStops.ts";
 import * as ResetCreditCoordinator from "../resetCreditCoordinator.ts";
 import {
   type ClaudeLoginLocation,
@@ -174,6 +176,10 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
       });
 
       const scopedLimitNames = yield* makeClaudeScopedLimitNames;
+      // Fork (#648, #1627): resume-on-limit reads the adapter's rejected
+      // windows through this service when the server provides it; a registry
+      // built without it (tests, tools) gets an adapter that reports none.
+      const limitStops = yield* Effect.serviceOption(InfinitusLimitStops);
       const orchestrationAdapter = yield* createClaudeAdapterV2(
         {
           instanceId,
@@ -183,7 +189,13 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
           enabled,
           config,
         },
-        { scopedLimitNames, onUsageLimits: (update) => snapshot.applyUsageLimits(update) },
+        {
+          scopedLimitNames,
+          onUsageLimits: (update) => snapshot.applyUsageLimits(update),
+          ...(Option.isSome(limitStops)
+            ? { onUsageLimitRefusal: limitStops.value.reportRefusal }
+            : {}),
+        },
       ).pipe(
         Effect.mapError(
           (cause) =>
