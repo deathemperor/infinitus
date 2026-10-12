@@ -14,7 +14,7 @@ import type {
   UsageTokenTotals,
 } from "@infinitus/contracts";
 
-import type { UsageRecord, UsageSpeed } from "./usageTranscripts.ts";
+import type { UsageRecord, UsageSpeed } from "@infinitus/provider-core/server/usage";
 
 /** Token rates for one billing speed. All values are USD per token. */
 export interface TokenRates {
