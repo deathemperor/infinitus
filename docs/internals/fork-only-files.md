@@ -7,6 +7,7 @@ file or directory. Upstream files the fork edits are in
 per-feature pages under `docs/internals/` keep taking narratives out of
 these bullets.
 
+- `*.infinitus.test.ts` beside an upstream test file (`apps/server/src/usage/UsageService`, `usageAggregation`, `apps/server/src/vcs/GitVcsDriverCore`, `apps/server/src/keybindings`, `apps/web/src/keybindings`, `packages/contracts/src/settings`) — the fork's cases for an upstream module, kept out of upstream's test file so a sync never conflicts on appended tests (#1565). Each carries its own copy of the fixture helpers it needs: a test file cannot import another test file's helpers without registering that file's suite too. Add the fork's next case for one of these modules here, not to upstream's file.
 - `apps/web/src/components/settings/infinitus/` — the Infinitus settings panes and their pure logic: Engines (`InfinitusEngineSecrets` + `engines.logic`, #1177; Routing, #1235), the Devices pane's "Pairing requests" (`InfinitusPairingRequestsCard` + `pairingRequests.logic`, #710) and "Crash reports" (`InfinitusCrashesCard` + `crashes.logic`, the Mac's own store over the `crashes` verb) cards; its "Pair a phone" QR card retired 2026-09-17 in favour of Connections' own pairing link. Rules and traps: `docs/internals/infinitus-settings-panes.md`.
 - `apps/server/src/orchestration-v2/worktreeCap.logic.ts` (+ test) and
   `WorktreeCap.ts` — the worktree limit (#269 H): the pure verdict

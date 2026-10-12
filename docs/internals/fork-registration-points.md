@@ -213,7 +213,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `apps/web/src/components/settings/ProviderSettingsForm.tsx`'s select draws
   as a "Custom model ID…" choice opening an input; `ProviderInstanceCard.tsx`
   draws `ClaudeAdvisorProxyNote` under the form. Tests:
-  `settings.test.ts`, `ClaudeAdapterV2.test.ts`,
+  `settings.infinitus.test.ts`, `ClaudeAdapterV2.test.ts`,
   `ProviderSettingsForm.test.ts`; `ProviderInstanceRegistry.test.ts`'s
   Claude fixture carries the key.
 - `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
@@ -634,7 +634,8 @@ background`). Riding along, all
 - `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
   temp directory's real path: the service canonicalises transcript roots,
   and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),
-  so two upstream tests failed on a Mac. Plus the fork's account-attribution cases (#779).
+  so two upstream tests failed on a Mac. The fork's own cases are
+  `UsageService.infinitus.test.ts`.
 - `knip.jsonc` — `scripts/fork-visual-pass.mjs`, `fork-visual-fixture.mjs`,
   `fork-visual-check.ts`, `fold-changelog.mjs` (+ `.d.mts`),
   `infinitus-rename.ts` and `export-infinitus-splash.ts` as scripts entries
