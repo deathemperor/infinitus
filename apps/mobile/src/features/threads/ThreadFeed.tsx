@@ -203,6 +203,7 @@ import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
 import { usePreparedConnection } from "../../state/session";
 import { useLiveThreadLinkLabels } from "../../state/entities";
 import { useThreadSelection } from "../../state/use-thread-selection";
+import { confirmDeletePendingMessage } from "./confirmDeletePendingMessage";
 import { composerDocumentAttachmentRecord } from "../../lib/composerContext";
 import * as Option from "effect/Option";
 import { appAtomRegistry } from "../../state/atom-registry";
@@ -278,7 +279,7 @@ export interface ThreadFeedProps {
   readonly worktreeSetup?: WorktreeSetupCardProps | null;
   readonly setupWorkingStartedAt?: string | null;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
-  readonly dispatchingMessageId: MessageId | null;
+  readonly sendingMessageId: MessageId | null;
   /** Null where a pending message cannot be edited (no composer to edit it in). */
   readonly onEditPendingMessage: ((message: QueuedThreadMessage) => void) | null;
   readonly environmentId: EnvironmentId;
@@ -1523,7 +1524,7 @@ function renderFeedEntry(
     | "environmentId"
     | "onUseArtifactTemplate"
     | "skills"
-    | "dispatchingMessageId"
+    | "sendingMessageId"
     | "onEditPendingMessage"
     | "threadId"
     | "workspaceRoot"
@@ -1850,7 +1851,7 @@ function renderFeedEntry(
             entry.pendingMessage &&
             !entry.acknowledged &&
             !entry.pendingMessage.creation &&
-            entry.pendingMessage.messageId !== props.dispatchingMessageId ? (
+            entry.pendingMessage.messageId !== props.sendingMessageId ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Edit pending message"
@@ -1863,6 +1864,24 @@ function renderFeedEntry(
                 }}
               >
                 <SymbolView name="pencil" size={14} tintColor={iconSubtleColor} />
+              </Pressable>
+            ) : null}
+            {entry.pendingMessage &&
+            !entry.acknowledged &&
+            !entry.pendingMessage.creation &&
+            entry.pendingMessage.messageId !== props.sendingMessageId ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Delete pending message"
+                hitSlop={8}
+                className="size-7 items-center justify-center"
+                onPress={() => {
+                  if (entry.pendingMessage) {
+                    confirmDeletePendingMessage(entry.pendingMessage);
+                  }
+                }}
+              >
+                <SymbolView name="trash" size={14} tintColor={iconSubtleColor} />
               </Pressable>
             ) : null}
             {presentation.text.trim().length > 0 ? (
@@ -2542,7 +2561,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     () => ({
       worktreeSetup: props.worktreeSetup,
       setupWorkingStartedAt: props.setupWorkingStartedAt,
-      dispatchingMessageId: props.dispatchingMessageId,
+      sendingMessageId: props.sendingMessageId,
       unsettledTurnId,
       copiedRowId,
       expandedWorkGroups,
@@ -2558,7 +2577,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
     [
       props.worktreeSetup,
       props.setupWorkingStartedAt,
-      props.dispatchingMessageId,
+      props.sendingMessageId,
       unsettledTurnId,
       copiedRowId,
       expandedWorkGroups,
@@ -3013,7 +3032,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
         <ThreadMediaVisibility>
           {renderFeedEntry(info, {
             environmentId: props.environmentId,
-            dispatchingMessageId: props.dispatchingMessageId,
+            sendingMessageId: props.sendingMessageId,
             onEditPendingMessage: props.onEditPendingMessage,
             onUseArtifactTemplate: props.onUseArtifactTemplate,
             threadId: props.threadId,
@@ -3061,7 +3080,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       props.setupWorkingStartedAt,
       props.threadId,
       setupAnchorIndex,
-      props.dispatchingMessageId,
+      props.sendingMessageId,
       props.onEditPendingMessage,
       copiedRowId,
       disclosureToggleSettling,

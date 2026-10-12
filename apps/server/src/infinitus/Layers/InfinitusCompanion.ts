@@ -1,5 +1,4 @@
 import type { InfinitusLaunchResult } from "@infinitus/contracts/infinitus";
-import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
 import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -10,7 +9,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 
-import { ServerConfig } from "../../config.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { collectUint8StreamText } from "@infinitus/provider-core/server/collectStreamText";
 import {
@@ -18,7 +16,7 @@ import {
   type InfinitusCompanionShape,
 } from "../Services/InfinitusCompanion.ts";
 import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
-import { serverPortWithheldReason } from "./InfinitusServerPort.ts";
+import { resolveServerPortWithheldReason } from "./InfinitusServerPort.ts";
 
 /** The menu-bar app's bundle id; LaunchServices finds the app by it, so no
     path is ever assumed (the user may keep it anywhere). */
@@ -372,15 +370,7 @@ const InfinitusCompanionServiceLive = Layer.effect(
 const InfinitusCompanionStartupLive = Layer.effectDiscard(
   forkParked(
     Effect.gen(function* () {
-      const config = yield* ServerConfig;
-      const env = yield* HostProcessEnvironment;
-      const reason = serverPortWithheldReason({
-        mode: config.mode,
-        devUrl: config.devUrl,
-        baseDir: config.baseDir,
-        worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
-        controlSocketOverride: env.INFINITUS_CONTROL_SOCKET,
-      });
+      const reason = yield* resolveServerPortWithheldReason;
       if (reason !== undefined) {
         yield* Effect.logInfo("infinitus.companion.withheld", { reason });
         return;

@@ -71,6 +71,9 @@ export const SidebarProjectGroupingMode = Schema.Literals([
 ]);
 export type SidebarProjectGroupingMode = typeof SidebarProjectGroupingMode.Type;
 const DEFAULT_SIDEBAR_PROJECT_GROUPING_MODE: SidebarProjectGroupingMode = "repository";
+/** Fork (#269 H): how many threads may hold a worktree at once; 0 lifts the limit. */
+const DEFAULT_WORKTREE_MAX_COUNT = 25;
+const WorktreeMaxCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 export const MIN_SIDEBAR_THREAD_PREVIEW_COUNT = 1;
 export const MAX_SIDEBAR_THREAD_PREVIEW_COUNT = 15;
 export const SidebarThreadPreviewCount = Schema.Int.check(
@@ -1254,6 +1257,10 @@ export const ServerSettings = Schema.Struct({
   newWorktreesStartFromOrigin: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
+  /** Fork (#269 H): how many threads may hold a worktree at once; 0 lifts the limit. */
+  worktreeMaxCount: WorktreeMaxCount.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_WORKTREE_MAX_COUNT)),
+  ),
   /**
    * Null defers to the repository's t3.json, then to recursive. A value
    * picked on a newer server decodes as null here rather than failing the
@@ -1531,6 +1538,7 @@ export const ServerSettingsPatch = Schema.Struct({
   environmentIcon: Schema.optionalKey(Schema.NullOr(EnvironmentMachineKind)),
   defaultThreadEnvMode: Schema.optionalKey(Schema.NullOr(ThreadEnvMode)),
   newWorktreesStartFromOrigin: Schema.optionalKey(Schema.Boolean),
+  worktreeMaxCount: Schema.optionalKey(WorktreeMaxCount),
   worktreeSubmodules: Schema.optionalKey(Schema.NullOr(WorktreeSubmodules)),
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),
   textGenerationModelSelection: Schema.optionalKey(ModelSelectionPatch),

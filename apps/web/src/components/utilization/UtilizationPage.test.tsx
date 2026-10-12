@@ -1,11 +1,26 @@
+import { decodeUtilization } from "@infinitus/client-runtime/state/infinitusUtilization";
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+interface TestStatus {
+  readonly environmentId: string;
+  readonly label: string;
+  readonly isPending: boolean;
+  readonly waiting: boolean;
+  readonly snapshot: InfinitusSnapshot | null;
+  readonly missing: string | null;
+  readonly error: string | null;
+  readonly utilization: unknown;
+}
+
 const testState = vi.hoisted(() => ({
   snapshot: null as InfinitusSnapshot | null,
   utilization: null as { result: unknown } | null,
+  /** Every machine's answer; null draws the one primary machine off
+      `snapshot` and `utilization` the way the state file would. */
+  statuses: null as ReadonlyArray<TestStatus> | null,
   capability: true as boolean | undefined,
   refresh: vi.fn(),
 }));
@@ -16,22 +31,20 @@ vi.mock("@effect/atom-react", () => ({
 }));
 vi.mock("../../state/environments", () => ({ usePrimaryEnvironmentId: () => "test-environment" }));
 vi.mock("../../state/infinitus", () => ({
-  infinitusEnvironment: {
-    snapshot: () => ({ label: "snapshot-atom" }),
-    utilization: () => ({ label: "utilization-atom" }),
-  },
+  infinitusEnvironment: { snapshot: () => ({ label: "snapshot-atom" }) },
+}));
+vi.mock("../../state/infinitusUtilization", () => ({
+  useEnvironmentUtilizations: () => ({
+    statuses: testState.statuses ?? [primaryStatus()],
+    refresh: testState.refresh,
+  }),
 }));
 vi.mock("../../hooks/useLocalStorage", () => ({
   useLocalStorage: (_key: string, initial: unknown) => [initial, () => {}],
 }));
 vi.mock("../../state/query", () => ({
   useEnvironmentQuery: (atom: { label: string } | null) => {
-    const data =
-      atom === null
-        ? null
-        : atom.label === "utilization-atom"
-          ? testState.utilization
-          : testState.snapshot;
+    const data = atom === null ? null : testState.snapshot;
     return {
       data,
       error: null,
@@ -69,6 +82,34 @@ vi.mock("../accounts/ForecastStrip", () => ({
 }));
 
 import { UtilizationPage } from "./UtilizationPage";
+
+/** The primary machine's status as `state/infinitusUtilization.ts` derives it. */
+function primaryStatus(): TestStatus {
+  const snapshot = testState.snapshot;
+  const base = {
+    environmentId: "test-environment",
+    label: "This Mac",
+    isPending: false,
+    waiting: false,
+    snapshot,
+    missing: null,
+    error: null,
+    utilization: null,
+  };
+  if (snapshot === null) return { ...base, isPending: true, waiting: true };
+  if (!snapshot.available) return { ...base, missing: "Infinitus is not running on this machine." };
+  if (!snapshot.commands.some((command) => command.name === "utilization")) {
+    return {
+      ...base,
+      missing: "History and the run rate need a newer Infinitus app (the utilization verb).",
+    };
+  }
+  if (testState.utilization === null) return { ...base, isPending: true, waiting: true };
+  const utilization = decodeUtilization(testState.utilization.result);
+  return utilization === null
+    ? { ...base, error: "The utilization reply could not be read." }
+    : { ...base, utilization };
+}
 
 const forecastVerb = {
   name: "forecast",
@@ -243,8 +284,73 @@ describe("UtilizationPage", () => {
   beforeEach(() => {
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
+    testState.statuses = null;
     testState.capability = true;
     testState.refresh.mockReset();
+  });
+
+  it("adds up every machine's history and names the one that could not answer (#1581)", () => {
+    const other = {
+      ...utilizationReply.result,
+      samples: [{ t: now - 1800, email: "gamma@example.com", number: 3, fiveHour: { pct: 40 } }],
+      emails: ["gamma@example.com"],
+      generations: [],
+      fiveHourWindows: [],
+      rates: {
+        computedAt: now,
+        lastHour: { input: 500, output: 100, usd: 0.08, messages: 3 },
+        lastDay: { input: 0, usd: 0, messages: 0 },
+        lastWeek: { input: 0, usd: 0, messages: 0 },
+      },
+      liveRate: null,
+    };
+    testState.statuses = [
+      primaryStatus(),
+      { ...primaryStatus(), environmentId: "studio", label: "Studio", utilization: other },
+      {
+        ...primaryStatus(),
+        environmentId: "laptop",
+        label: "Laptop",
+        utilization: null,
+        error: "The environment request failed.",
+      },
+    ];
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+
+    expect(markup).toContain("Machines");
+    expect(markup).toContain(">This Mac<");
+    expect(markup).toContain(">Studio<");
+    expect(markup).toContain(">Laptop<");
+    expect(markup).toContain("The environment request failed.");
+    expect(markup).toContain("gamma@example.com");
+    // Last hour: 6.3k tokens + 600, $0.42 + $0.08, 12 + 3 turns.
+    expect(markup).toContain("6.9k");
+    expect(markup).toContain("0.50");
+    expect(markup).toContain(">15<");
+    expect(markup).toContain("Live: 1.5k output tokens/min");
+  });
+
+  it("names a machine that is away on its row, and does not wait on it", () => {
+    testState.statuses = [
+      primaryStatus(),
+      {
+        ...primaryStatus(),
+        environmentId: "laptop",
+        label: "Laptop",
+        utilization: null,
+        missing: "Not connected.",
+      },
+    ];
+    const markup = renderToStaticMarkup(<UtilizationPage />);
+    expect(markup).toContain(">Laptop<");
+    expect(markup).toContain("Not connected.");
+    expect(markup).toContain('aria-busy="false"');
+    expect(markup).not.toContain('aria-busy="true"');
+    expect(markup).toContain("6.3k");
+  });
+
+  it("draws one machine without a Machines section", () => {
+    expect(renderToStaticMarkup(<UtilizationPage />)).not.toContain("Machines");
   });
 
   it("charts every account's window over the range and tables the run rate (#747)", () => {

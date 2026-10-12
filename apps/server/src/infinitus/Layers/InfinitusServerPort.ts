@@ -1,4 +1,4 @@
-import type { AuthEnvironmentScope } from "@infinitus/contracts";
+import type { AuthEnvironmentScope, AuthSessionId } from "@infinitus/contracts";
 import { InfinitusManifest, InfinitusPrefs } from "@infinitus/contracts/infinitus";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
 import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
@@ -7,6 +7,7 @@ import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
@@ -14,6 +15,7 @@ import { HttpServer } from "effect/http";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
 import { type RuntimeMode, ServerConfig } from "../../config.ts";
+import { ServerEnvironmentIdentity } from "../../environment/ServerEnvironment.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusControlClient } from "../Services/InfinitusControlClient.ts";
@@ -39,6 +41,26 @@ export const DESKTOP_CREDENTIAL_SCOPES: ReadonlyArray<AuthEnvironmentScope> = [
 /** No refresh: past this, or after a revoke, the CLI says to relaunch the
     desktop app, whose next publish mints a new one. */
 export const DESKTOP_CREDENTIAL_TTL = Duration.days(90);
+
+/**
+ * The opt-in (#1487): a server that is not the desktop's bundled one — a dev
+ * runner, a worktree `.t3`, a showcase's temp home — keeps its port to itself
+ * unless this is set, and one that is set takes the app's slot even from a
+ * live installed desktop. Documented in `docs/operations/development.md`.
+ */
+export const PUBLISH_OPT_IN_ENV = "INFINITUS_PUBLISH_SERVER_PORT";
+
+export const publishOptedIn = (value: string | undefined): boolean =>
+  ["1", "true", "yes"].includes((value ?? "").trim().toLowerCase());
+
+/**
+ * How the app answers a publish while another environment's server holds its
+ * slot (#1487): the same words `ForkServerProbe.heldReply` in `apps/mac`
+ * opens with. The installed desktop's heartbeat meets this once a minute for
+ * as long as an opted-in dev server runs, so it is a line of information,
+ * not a warning.
+ */
+export const HELD_REPLY_PREFIX = "held by environment ";
 
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
 type Manifest = typeof InfinitusManifest.Type;
@@ -82,32 +104,85 @@ const takesDesktopCredential = (manifest: Manifest) =>
 const desktopCredentialLabel = () => `infinitusctl on ${NodeOS.hostname().replace(/\.local$/, "")}`;
 
 /**
- * Mints the session `infinitusctl` uses against this server and hands it to
- * the app on the `secret` field (#822), after revoking the previous one so
- * Settings › Devices shows one row. A write the app refuses revokes the new
- * session again — no orphan row — and logs; the token itself reaches no log,
- * no span, no error.
+ * Who is publishing, as both verbs tell the app in their options (#1487): the
+ * environment id lets the app keep a slot for the server that holds it, and
+ * `takeover` — only ever from the opt-in — says this server is the one the
+ * user picked, so the app switches even from a live holder.
+ */
+interface Publisher {
+  readonly environmentId: string;
+  readonly takeover: boolean;
+}
+
+const publisherOptions = (publisher: Publisher): Record<string, string> => ({
+  environmentId: publisher.environmentId,
+  ...(publisher.takeover ? { takeover: "true" } : {}),
+});
+
+/** The session this server last handed the app, kept so a republish can hand
+    over the same one instead of minting a row per publish (#1487). */
+interface HeldCredential {
+  readonly sessionId: AuthSessionId;
+  readonly token: string;
+  readonly expiresAt: DateTime.Utc;
+}
+
+/**
+ * Hands the app the session `infinitusctl` uses against this server, on the
+ * `secret` field (#822). The session this publisher minted before is handed
+ * over again while it is still active — a republish after a port drift
+ * (#1137) must not add a Devices row or rotate a token a CLI holds — and only
+ * when none is (first publish, or the user revoked it in Settings › Devices)
+ * is a new one minted, after revoking any other `infinitusctl` row so Settings
+ * shows one. A write the app refuses revokes a freshly minted session again —
+ * no orphan row — and logs; the token itself reaches no log, no span, no
+ * error.
  */
 const publishDesktopCredential = Effect.fn("Infinitus.publishDesktopCredential")(
-  function* (port: number) {
-    const client = yield* InfinitusControlClient;
-    const auth = yield* EnvironmentAuth.EnvironmentAuth;
-    const previous = yield* auth.listSessions();
-    for (const session of previous) {
-      if (session.subject === DESKTOP_CREDENTIAL_SUBJECT)
-        yield* auth.revokeSession(session.sessionId);
-    }
-    const issued = yield* auth.issueSession({
-      subject: DESKTOP_CREDENTIAL_SUBJECT,
-      scopes: DESKTOP_CREDENTIAL_SCOPES,
-      label: desktopCredentialLabel(),
-      ttl: DESKTOP_CREDENTIAL_TTL,
-    });
+  function* (input: {
+    readonly port: number;
+    readonly publisher: Publisher;
+    readonly credential: Ref.Ref<HeldCredential | undefined>;
+    readonly client: InfinitusControlClient["Service"];
+    readonly auth: EnvironmentAuth.EnvironmentAuth["Service"];
+  }) {
+    const { port, publisher, credential, client, auth } = input;
+    const active = yield* auth.listSessions();
+    const held = yield* Ref.get(credential);
+    const reused =
+      held !== undefined && active.some((session) => session.sessionId === held.sessionId)
+        ? held
+        : undefined;
+    const issued = yield* reused !== undefined
+      ? Effect.succeed(reused)
+      : Effect.gen(function* () {
+          for (const session of active) {
+            if (session.subject === DESKTOP_CREDENTIAL_SUBJECT)
+              yield* auth.revokeSession(session.sessionId);
+          }
+          const fresh = yield* auth.issueSession({
+            subject: DESKTOP_CREDENTIAL_SUBJECT,
+            scopes: DESKTOP_CREDENTIAL_SCOPES,
+            label: desktopCredentialLabel(),
+            ttl: DESKTOP_CREDENTIAL_TTL,
+          });
+          const minted: HeldCredential = {
+            sessionId: fresh.sessionId,
+            token: fresh.token,
+            expiresAt: fresh.expiresAt,
+          };
+          yield* Ref.set(credential, minted);
+          return minted;
+        });
     const expiresAt = DateTime.formatIso(issued.expiresAt);
     yield* client
       .request({
         command: DESKTOP_CREDENTIAL_COMMAND,
-        options: { origin: `http://127.0.0.1:${port}`, expiresAt },
+        options: {
+          origin: `http://127.0.0.1:${port}`,
+          expiresAt,
+          ...publisherOptions(publisher),
+        },
         secret: issued.token,
       })
       .pipe(
@@ -115,11 +190,16 @@ const publishDesktopCredential = Effect.fn("Infinitus.publishDesktopCredential")
           Effect.logInfo("infinitus.desktop-credential.issued", {
             sessionId: issued.sessionId,
             expiresAt,
+            reused: reused !== undefined,
           }),
         ),
         Effect.catch((error) =>
-          auth.revokeSession(issued.sessionId).pipe(
-            Effect.ignore,
+          (reused !== undefined
+            ? Effect.void
+            : auth
+                .revokeSession(issued.sessionId)
+                .pipe(Effect.ignore, Effect.andThen(Ref.set(credential, undefined)))
+          ).pipe(
             Effect.andThen(
               Effect.logWarning("infinitus.desktop-credential.failed", {
                 error: error._tag,
@@ -135,56 +215,88 @@ const publishDesktopCredential = Effect.fn("Infinitus.publishDesktopCredential")
   ),
 );
 
-/**
- * Tells Infinitus which port this server bound, so the tunnel it can run for
- * the pairing QR fronts the right one, and — on an app whose manifest takes
- * it — the credential `infinitusctl` drives this server with (#822). Once,
- * fire-and-forget: no Infinitus, an old manifest, a refused write — each logs
- * at most one line and never fails. Answers whether the app was there to
- * hear it.
- */
-export const publishServerPort = Effect.fn("Infinitus.publishServerPort")(function* (port: number) {
-  const client = yield* InfinitusControlClient;
-  if (client.socketPath === null) return false;
-  return yield* Effect.gen(function* () {
-    const manifest = yield* client
-      .request({ command: "manifest" })
-      .pipe(Effect.flatMap(decodeManifest));
-    if (!manifest.commands.some((command) => command.name === PREFS_COMMAND)) {
-      yield* Effect.logInfo("infinitus.server-port.skipped", {
-        port,
-        reason: "the running Infinitus has no pref catalog",
-      });
-      return true;
-    }
-    yield* client.request({ command: PREFS_COMMAND, args: ["set", PORT_PREF, String(port)] });
-    yield* Effect.logInfo("infinitus.server-port.published", { port });
-    if (takesDesktopCredential(manifest)) yield* publishDesktopCredential(port);
-    return true;
-  }).pipe(
-    Effect.catchTags({
-      InfinitusUnavailable: (error) =>
-        Effect.logInfo("infinitus.server-port.skipped", { port, reason: error.cause }).pipe(
-          Effect.as(false),
-        ),
-    }),
-    Effect.catch((error) =>
-      Effect.logWarning("infinitus.server-port.failed", { port, error }).pipe(Effect.as(true)),
-    ),
-  );
-});
+export interface ServerPortPublisher {
+  /**
+   * Tells Infinitus which port this server bound, so the tunnel it can run
+   * for the pairing QR fronts the right one, and — on an app whose manifest
+   * takes it — the credential `infinitusctl` drives this server with (#822).
+   * Once, fire-and-forget: no Infinitus, an old manifest, a refused write —
+   * each logs at most one line and never fails. Answers whether the app was
+   * there to hear it.
+   */
+  readonly publish: Effect.Effect<boolean>;
+  /**
+   * One heartbeat check (#1137): reads the app's own catalog and republishes
+   * only when the port it names is not ours. A read, not a blind write —
+   * republishing on a timer would hand the credential over every minute.
+   * Never fails: an app that is away, or a reply that will not decode, is
+   * next minute's problem.
+   */
+  readonly republishIfPortDrifted: Effect.Effect<void>;
+}
 
 /**
- * One heartbeat check (#1137): reads the app's own catalog and republishes
- * only when the port it names is not ours. A read, not a blind write —
- * republishing on a timer would re-mint the `infinitusctl` credential every
- * minute, so a CLI holding a token would lose it mid-command. Never fails:
- * an app that is away, or a reply that will not decode, is next minute's
- * problem.
+ * One publisher for one bound port: it carries this environment's id and
+ * the opt-in's `takeover` on every publish, and keeps the session it minted
+ * so a republish hands over the same one (#1487).
  */
-const republishIfPortDrifted = Effect.fn("Infinitus.republishIfPortDrifted")(
-  function* (port: number) {
-    const client = yield* InfinitusControlClient;
+export const makeServerPortPublisher = Effect.fn("Infinitus.makeServerPortPublisher")(function* (
+  port: number,
+) {
+  const client = yield* InfinitusControlClient;
+  const auth = yield* EnvironmentAuth.EnvironmentAuth;
+  const identity = yield* ServerEnvironmentIdentity;
+  const env = yield* HostProcessEnvironment;
+  const publisher: Publisher = {
+    environmentId: yield* identity.getEnvironmentId,
+    takeover: publishOptedIn(env[PUBLISH_OPT_IN_ENV]),
+  };
+  const credential = yield* Ref.make<HeldCredential | undefined>(undefined);
+
+  const publish: Effect.Effect<boolean> = Effect.gen(function* () {
+    if (client.socketPath === null) return false;
+    return yield* Effect.gen(function* () {
+      const manifest = yield* client
+        .request({ command: "manifest" })
+        .pipe(Effect.flatMap(decodeManifest));
+      if (!manifest.commands.some((command) => command.name === PREFS_COMMAND)) {
+        yield* Effect.logInfo("infinitus.server-port.skipped", {
+          port,
+          reason: "the running Infinitus has no pref catalog",
+        });
+        return true;
+      }
+      yield* client.request({
+        command: PREFS_COMMAND,
+        args: ["set", PORT_PREF, String(port)],
+        options: publisherOptions(publisher),
+      });
+      yield* Effect.logInfo("infinitus.server-port.published", { port });
+      if (takesDesktopCredential(manifest))
+        yield* publishDesktopCredential({ port, publisher, credential, client, auth });
+      return true;
+    }).pipe(
+      Effect.catchTags({
+        InfinitusUnavailable: (error) =>
+          Effect.logInfo("infinitus.server-port.skipped", { port, reason: error.cause }).pipe(
+            Effect.as(false),
+          ),
+        // The slot is another environment's while its server answers: the
+        // installed desktop meets this each heartbeat under an opted-in dev
+        // server and takes the slot back the minute that server is gone.
+        InfinitusCommandFailed: (error) =>
+          (error.error.startsWith(HELD_REPLY_PREFIX)
+            ? Effect.logInfo("infinitus.server-port.held", { port, reply: error.error })
+            : Effect.logWarning("infinitus.server-port.failed", { port, error })
+          ).pipe(Effect.as(true)),
+      }),
+      Effect.catch((error) =>
+        Effect.logWarning("infinitus.server-port.failed", { port, error }).pipe(Effect.as(true)),
+      ),
+    );
+  }).pipe(Effect.withSpan("Infinitus.publishServerPort"));
+
+  const republishIfPortDrifted: Effect.Effect<void> = Effect.gen(function* () {
     const prefs = yield* client
       .request({ command: PREFS_COMMAND })
       .pipe(Effect.flatMap(decodePrefs));
@@ -194,12 +306,20 @@ const republishIfPortDrifted = Effect.fn("Infinitus.republishIfPortDrifted")(
     // it, so a fight between two live publishers reads as the same foreign
     // port coming back every minute instead of a silent flip-flop.
     yield* Effect.logInfo("infinitus.server-port.drifted", { port, published });
-    yield* publishServerPort(port);
-  },
-  Effect.catch((error) =>
-    Effect.logDebug("infinitus.server-port.heartbeat-skipped", { error: error._tag }),
-  ),
-);
+    yield* publish;
+  }).pipe(
+    Effect.catch((error) =>
+      Effect.logDebug("infinitus.server-port.heartbeat-skipped", { error: error._tag }),
+    ),
+    Effect.withSpan("Infinitus.republishIfPortDrifted"),
+  );
+
+  return { publish, republishIfPortDrifted } satisfies ServerPortPublisher;
+});
+
+/** One publish from a fresh publisher: the startup shape, and the tests'. */
+export const publishServerPort = (port: number) =>
+  Effect.flatMap(makeServerPortPublisher(port), (publisher) => publisher.publish);
 
 /**
  * The startup publish, then one more each time the app comes back — as seen
@@ -215,12 +335,13 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
   const client = yield* InfinitusControlClient;
   if (client.socketPath === null) return;
   const infinitus = yield* InfinitusService;
-  const heard = yield* publishServerPort(port);
+  const publisher = yield* makeServerPortPublisher(port);
+  const heard = yield* publisher.publish;
   // The came-back edge and the heartbeat are two independent callers of a
-  // publish that is read-modify-write on the credential (revoke all, issue,
-  // hand over). Interleaved, the app can end up holding a token the other
-  // call already revoked, and the heartbeat — seeing the port match — would
-  // never repair it. One permit keeps them in line.
+  // publish that is read-modify-write on the credential (list, mint or
+  // reuse, hand over). Interleaved, the app can end up holding a token the
+  // other call already revoked, and the heartbeat — seeing the port match —
+  // would never repair it. One permit keeps them in line.
   const publishing = yield* Semaphore.make(1);
   const onReturn = infinitus.observed.pipe(
     // Only the edge: an app the startup publish reached is not "back" on the
@@ -230,11 +351,11 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
       (wasAvailable, snapshot) =>
         [snapshot.available, !wasAvailable && snapshot.available ? [port] : []] as const,
     ),
-    Stream.runForEach((returnedPort) => publishing.withPermits(1)(publishServerPort(returnedPort))),
+    Stream.runForEach(() => publishing.withPermits(1)(publisher.publish)),
   );
   const heartbeat = Effect.forever(
     Effect.sleep(HEARTBEAT_INTERVAL).pipe(
-      Effect.andThen(publishing.withPermits(1)(republishIfPortDrifted(port))),
+      Effect.andThen(publishing.withPermits(1)(publisher.republishIfPortDrifted)),
     ),
   );
   yield* Effect.all([onReturn, heartbeat], { concurrency: "unbounded", discard: true });
@@ -254,6 +375,8 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
  * showcase on a temp home, `dev:server` without Vite, a `--home-dir`
  * elsewhere — stays quiet whatever its home, instead of rotating the
  * installed desktop's credential every minute.
+ * `INFINITUS_PUBLISH_SERVER_PORT=1` overrides every reason: that server is the
+ * one the user picked, and it says so to the app (`takeover`).
  */
 export const serverPortWithheldReason = (input: {
   readonly mode: RuntimeMode;
@@ -263,7 +386,10 @@ export const serverPortWithheldReason = (input: {
   /** `INFINITUS_CONTROL_SOCKET` as the process sees it: set means an isolated
       instance pointed at its own (or no) app, never the installed one. */
   readonly controlSocketOverride: string | undefined;
+  /** `INFINITUS_PUBLISH_SERVER_PORT` says so. */
+  readonly publishOptIn: boolean;
 }): string | undefined => {
+  if (input.publishOptIn) return undefined;
   if (input.devUrl !== undefined) return "a dev-runner server serves the web app from a dev URL";
   if (input.controlSocketOverride !== undefined && input.controlSocketOverride !== "") {
     return "its control socket is an INFINITUS_CONTROL_SOCKET override (an isolated instance)";
@@ -275,6 +401,21 @@ export const serverPortWithheldReason = (input: {
   return undefined;
 };
 
+/** `serverPortWithheldReason` for this process: what the port publish and the
+    startup companion launch both ask before touching the installed app. */
+export const resolveServerPortWithheldReason = Effect.gen(function* () {
+  const config = yield* ServerConfig;
+  const env = yield* HostProcessEnvironment;
+  return serverPortWithheldReason({
+    mode: config.mode,
+    devUrl: config.devUrl,
+    baseDir: config.baseDir,
+    worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
+    controlSocketOverride: env.INFINITUS_CONTROL_SOCKET,
+    publishOptIn: publishOptedIn(env[PUBLISH_OPT_IN_ENV]),
+  });
+});
+
 /** Publishes the bound port once the server is listening and activated, and
     again whenever a watched Infinitus comes back — for the installed server
     only; a development one says why it stays quiet and stops. */
@@ -284,15 +425,7 @@ export const InfinitusServerPortLive = Layer.effectDiscard(
       const server = yield* HttpServer.HttpServer;
       const address = server.address;
       if (typeof address === "string" || !("port" in address)) return;
-      const config = yield* ServerConfig;
-      const env = yield* HostProcessEnvironment;
-      const reason = serverPortWithheldReason({
-        mode: config.mode,
-        devUrl: config.devUrl,
-        baseDir: config.baseDir,
-        worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
-        controlSocketOverride: env.INFINITUS_CONTROL_SOCKET,
-      });
+      const reason = yield* resolveServerPortWithheldReason;
       if (reason !== undefined) {
         yield* Effect.logInfo("infinitus.server-port.withheld", { port: address.port, reason });
         return;

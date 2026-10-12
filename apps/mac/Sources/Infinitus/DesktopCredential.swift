@@ -21,6 +21,10 @@ final class DesktopCredential {
     static let account = "infinitusctl"
     static let originKey = "desktop_origin"
     static let expiresKey = "desktop_expires_at"
+    /// Whose the slot is (#1487): the environment id the last accepted
+    /// publish named, which a publish from another environment is held
+    /// against while that server still answers.
+    static let environmentKey = "desktop_environment_id"
 
     /// Set by AppModel so a store or forget lands in the Activity log (kind only, never the value).
     var log: ((String) -> Void)?
@@ -30,6 +34,7 @@ final class DesktopCredential {
 
     var origin: String? { defaults.string(forKey: Self.originKey) }
     var expiresAt: String? { defaults.string(forKey: Self.expiresKey) }
+    var environmentId: String? { defaults.string(forKey: Self.environmentKey) }
     var stored: Bool { Keychain.exists(account: Self.account, service: Self.service) }
     /// The masked tail for `desktop status`; nil when nothing is stored.
     var masked: String? { Keychain.read(account: Self.account, service: Self.service).map(DesktopRows.masked) }
@@ -38,7 +43,7 @@ final class DesktopCredential {
 
     /// Empty forgets. Returns the refusal, nil when stored.
     @discardableResult
-    func store(origin: String, expiresAt: String?, token: String) -> String? {
+    func store(origin: String, expiresAt: String?, environmentId: String? = nil, token: String) -> String? {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { forget(); return nil }
         guard let url = URL(string: origin), let scheme = url.scheme, ["http", "https"].contains(scheme), url.host != nil else {
@@ -49,8 +54,19 @@ final class DesktopCredential {
         }
         defaults.set(origin, forKey: Self.originKey)
         if let expiresAt, !expiresAt.isEmpty { defaults.set(expiresAt, forKey: Self.expiresKey) } else { defaults.removeObject(forKey: Self.expiresKey) }
+        noteEnvironment(environmentId)
         log?("desktop credential stored for \(origin)")
         return nil
+    }
+
+    /// An accepted publish names its environment, or — from a server that
+    /// predates #1487 — none, which leaves the slot nobody's.
+    func noteEnvironment(_ environmentId: String?) {
+        if let environmentId, !environmentId.isEmpty {
+            defaults.set(environmentId, forKey: Self.environmentKey)
+        } else {
+            defaults.removeObject(forKey: Self.environmentKey)
+        }
     }
 
     func forget() {
@@ -58,6 +74,7 @@ final class DesktopCredential {
         Keychain.delete(account: Self.account, service: Self.service)
         defaults.removeObject(forKey: Self.originKey)
         defaults.removeObject(forKey: Self.expiresKey)
+        defaults.removeObject(forKey: Self.environmentKey)
         if had { log?("desktop credential forgotten") }
     }
 }
