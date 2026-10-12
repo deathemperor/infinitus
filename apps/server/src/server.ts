@@ -429,8 +429,13 @@ const layerAuth = EnvironmentAuth.layer.pipe(
   Layer.provide(ServerSecretStore.layer),
 );
 
-// Fork: below layerAuth because the port publish mints infinitusctl's session (#822).
-const layerInfinitus = makeInfinitusServerLayers({ layerAuth, layerServerSettings });
+// Fork: below layerAuth because the port publish mints infinitusctl's session
+// (#822) and names this environment to the app (#1487).
+const layerInfinitus = makeInfinitusServerLayers({
+  layerAuth,
+  layerServerEnvironment,
+  layerServerSettings,
+});
 
 const layerUsage = UsageService.layer.pipe(
   Layer.provide(layerServerSettings),

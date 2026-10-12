@@ -43,7 +43,8 @@ const runningTurns = () => InfinitusRunningTurnsLive.pipe(Layer.provide(Projecti
  * - `infinitus`: `InfinitusLive` with the control client private to it (the
  *   only thing that polls the socket), the port layer (writes one pref once
  *   the server listens and again when a watched app comes back; it also
- *   mints infinitusctl's session, #822, hence `layerAuth`), the companion
+ *   mints infinitusctl's session, #822, hence `layerAuth`, and names this
+ *   environment to the app, #1487, hence `layerServerEnvironment`), the companion
  *   (opens the app when the socket stays quiet and on `infinitus.launch`),
  *   `InfinitusSecretLive` (#747, the one secret-carrying path) and
  *   `InfinitusUsageAttributionLive` (#779, the `history` verb per usage
@@ -67,15 +68,22 @@ export function makeInfinitusServerLayers<
   ROutAuth,
   EAuth,
   RInAuth,
+  ROutEnv,
+  EEnv,
+  RInEnv,
   ROutSettings,
   ESettings,
   RInSettings,
 >(input: {
   readonly layerAuth: Layer.Layer<ROutAuth, EAuth, RInAuth>;
+  readonly layerServerEnvironment: Layer.Layer<ROutEnv, EEnv, RInEnv>;
   readonly layerServerSettings: Layer.Layer<ROutSettings, ESettings, RInSettings>;
 }) {
   const infinitus = Layer.mergeAll(
-    InfinitusServerPortLive.pipe(Layer.provide(input.layerAuth)),
+    InfinitusServerPortLive.pipe(
+      Layer.provide(input.layerAuth),
+      Layer.provide(input.layerServerEnvironment),
+    ),
     InfinitusCompanionLive,
     InfinitusSecretLive,
     InfinitusUsageAttributionLive,
