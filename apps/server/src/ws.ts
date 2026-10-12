@@ -169,6 +169,7 @@ import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as OrchestrationEventStore from "./persistence/OrchestrationEventStore.ts";
 import { userFacingDispatchErrorMessage } from "./orchestration-v2/UserFacingErrors.ts";
+import { worktreeCapRefusalMessage } from "./orchestration-v2/worktreeCap.logic.ts";
 import * as ProviderRegistry from "./provider/ProviderRegistry.ts";
 import * as ProviderInstanceRegistry from "./provider/ProviderInstanceRegistry.ts";
 import * as AcpRegistrySupport from "@infinitus/provider-acp-registry/server/AcpRegistrySupport";
@@ -2029,7 +2030,8 @@ const layerWsRpc = (
                       new OrchestrationV2ThreadLaunchError({
                         commandId: input.commandId,
                         projectId: input.projectId,
-                        message: "Failed to launch thread",
+                        // Fork (#269 H): the worktree-limit refusal is the user's to read.
+                        message: worktreeCapRefusalMessage(cause) ?? "Failed to launch thread",
                         cause,
                       }),
                     ServerRuntimeStartupError: (cause) =>

@@ -108,7 +108,8 @@ import {
 } from "../state/use-thread-detail";
 import { useThreadSelection } from "../state/use-thread-selection";
 import { enqueueThreadOutboxMessage } from "./thread-outbox";
-import { dispatchingQueuedMessageIdAtom, useThreadOutboxMessages } from "./use-thread-outbox";
+import { dispatchingQueuedMessageAtom } from "./queued-message-dispatch";
+import { useThreadOutboxMessages } from "./use-thread-outbox";
 import { threadEnvironment } from "./threads";
 import { useAtomCommand } from "./use-atom-command";
 
@@ -190,7 +191,12 @@ export function useThreadComposerState() {
   const composerDrafts = useAtomValue(composerDraftsAtom);
   const acknowledgedMessages = useAtomValue(acknowledgedThreadMessagesAtom);
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
-  const dispatchingQueuedMessageId = useAtomValue(dispatchingQueuedMessageIdAtom);
+  const dispatchingQueuedMessage = useAtomValue(dispatchingQueuedMessageAtom);
+  const dispatchingQueuedMessageId = dispatchingQueuedMessage?.messageId ?? null;
+  // Infinitus (fork, #1501): the feed hides a queued reply's edit and delete
+  // controls only while its send RPC is in flight, not during its upload.
+  const sendingQueuedMessageId =
+    dispatchingQueuedMessage?.phase === "sending" ? dispatchingQueuedMessage.messageId : null;
   const [feedbackSubmissionsByThreadKey, setFeedbackSubmissionsByThreadKey] = useState<
     Record<string, ReadonlyArray<CodexFeedbackSubmission>>
   >({});
@@ -1060,7 +1066,7 @@ export function useThreadComposerState() {
     selectedThreadActivityRun,
     selectedThreadQueueCount,
     selectedThreadQueuedMessages,
-    dispatchingQueuedMessageId,
+    sendingQueuedMessageId,
     activeWorkStartedAt,
     runlessWorkActive,
     providerSubagentStatus,

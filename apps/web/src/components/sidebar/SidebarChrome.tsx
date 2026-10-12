@@ -1,11 +1,4 @@
-import {
-  ArrowLeftIcon,
-  ChartLineIcon,
-  ChartNoAxesColumnIcon,
-  GaugeIcon,
-  SettingsIcon,
-  UsersIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -13,7 +6,7 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
-import { useEnvironments, usePullRequestsSupported } from "../../state/environments";
+import { usePullRequestsSupported } from "../../state/environments";
 import {
   resolveEnvironmentIdentificationPillLabel,
   SidebarStageBackdrop,
@@ -31,6 +24,7 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
+import { InfinitusSidebarUtilityItems } from "./InfinitusSidebarUtilityItems";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
@@ -166,12 +160,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     select: (location) => isSidebarUtilityPage(location.pathname),
   });
   const pullRequestsSupported = usePullRequestsSupported();
-  const { environments } = useEnvironments();
-  // Any connected server running Infinitus is enough: the page picks the
-  // environment itself, the same way the pull requests page does.
-  const accountsSupported = environments.some(
-    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
-  );
   const closeMobileSidebar = useCallback(() => {
     if (isMobile) {
       setOpenMobile(false);
@@ -187,21 +175,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const handleSettingsClick = useCallback(() => {
     closeMobileSidebar();
     void navigate({ to: "/settings" });
-  }, [closeMobileSidebar, navigate]);
-
-  const handleAccountsClick = useCallback(() => {
-    closeMobileSidebar();
-    void navigate({ to: "/accounts" });
-  }, [closeMobileSidebar, navigate]);
-
-  const handleStatsClick = useCallback(() => {
-    closeMobileSidebar();
-    void navigate({ to: "/stats" });
-  }, [closeMobileSidebar, navigate]);
-
-  const handleUtilizationClick = useCallback(() => {
-    closeMobileSidebar();
-    void navigate({ to: "/utilization" });
   }, [closeMobileSidebar, navigate]);
 
   const handleUsageClick = useCallback(() => {
@@ -239,21 +212,7 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
               onClick={handlePullRequestsClick}
             />
           ) : null}
-          {accountsSupported ? (
-            <SidebarUtilityItem
-              icon={<UsersIcon />}
-              label="Accounts"
-              onClick={handleAccountsClick}
-            />
-          ) : null}
-          <SidebarUtilityItem icon={<ChartLineIcon />} label="Stats" onClick={handleStatsClick} />
-          {accountsSupported ? (
-            <SidebarUtilityItem
-              icon={<GaugeIcon />}
-              label="Utilization"
-              onClick={handleUtilizationClick}
-            />
-          ) : null}
+          <InfinitusSidebarUtilityItems onBeforeNavigate={closeMobileSidebar} />
           <SidebarUtilityItem
             icon={<ChartNoAxesColumnIcon />}
             label="Usage"

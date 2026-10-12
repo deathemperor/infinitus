@@ -15,8 +15,8 @@ import {
   updateComposerDraftSettings,
   waitForComposerDraftsLoaded,
 } from "./use-composer-drafts";
+import { reclaimQueuedMessageFromDispatch } from "./queued-message-dispatch";
 import {
-  dispatchingQueuedMessageIdAtom,
   editingQueuedMessageIdsAtom,
   holdEditingQueuedMessage,
   releaseEditingQueuedMessage,
@@ -26,8 +26,9 @@ import {
 export async function editPendingThreadMessage(message: QueuedThreadMessage): Promise<boolean> {
   if (
     message.creation ||
-    appAtomRegistry.get(dispatchingQueuedMessageIdAtom) === message.messageId ||
-    appAtomRegistry.get(editingQueuedMessageIdsAtom)[message.messageId]
+    appAtomRegistry.get(editingQueuedMessageIdsAtom)[message.messageId] ||
+    // Infinitus (fork, #1501): an upload in flight is aborted; a send refuses.
+    !reclaimQueuedMessageFromDispatch(message.messageId)
   ) {
     return false;
   }

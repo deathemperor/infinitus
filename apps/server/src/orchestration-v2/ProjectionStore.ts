@@ -1,4 +1,5 @@
 import { projectTurnItemForWire } from "./WireProjection.ts";
+import type { WorktreeHolders } from "./worktreeCap.logic.ts";
 import * as Stream from "effect/Stream";
 import { makeThreadFind, findProjectedThreadItems } from "./ThreadFind.ts";
 import type {
@@ -405,6 +406,13 @@ export interface ProjectionStoreV2Shape {
   readonly getThreadsWithPullRequests: (
     threadId?: ThreadId,
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadPullRequests>, ProjectionStoreV2Error>;
+  /**
+   * Fork (#269 H): the distinct worktrees held by live (non-deleted) threads,
+   * archived or not, and up to `limit` archived holders, oldest archive first.
+   */
+  readonly getWorktreeHolders: (
+    limit: number,
+  ) => Effect.Effect<WorktreeHolders, ProjectionStoreV2Error>;
   readonly getTurnStartContext: (
     threadId: ThreadId,
     runId: RunId,
@@ -5563,6 +5571,32 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         );
       }).pipe(Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })));
 
+    const getWorktreeHolders: ProjectionStoreV2Shape["getWorktreeHolders"] = (limit) =>
+      Effect.gen(function* () {
+        const counted = yield* sql<{ readonly count: number }>`
+          SELECT COUNT(DISTINCT json_extract(payload_json, '$.worktreePath')) AS count
+          FROM orchestration_v2_projection_threads
+          WHERE deleted_at IS NULL
+            AND json_extract(payload_json, '$.worktreePath') IS NOT NULL
+        `;
+        const archived = yield* sql<{ readonly title: string; readonly archived_at: string }>`
+          SELECT title, archived_at
+          FROM orchestration_v2_projection_threads
+          WHERE deleted_at IS NULL
+            AND archived_at IS NOT NULL
+            AND json_extract(payload_json, '$.worktreePath') IS NOT NULL
+          ORDER BY archived_at ASC, thread_id ASC
+          LIMIT ${limit}
+        `;
+        return {
+          count: counted[0]?.count ?? 0,
+          oldestArchived: archived.map((row) => ({
+            title: row.title,
+            archivedAt: row.archived_at,
+          })),
+        };
+      }).pipe(Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })));
+
     const shellThreadStateFromRow = (input: {
       readonly row: ShellThreadRow;
       readonly runOrdinalsByThreadId: ReadonlyMap<ThreadId, Map<RunId, number>>;
@@ -5903,6 +5937,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getThread,
       getSettlementCandidates,
       getThreadsWithPullRequests,
+      getWorktreeHolders,
       getThreadProjection,
       getTurnStartContext,
       getTurnStartHistory,
@@ -6070,6 +6105,29 @@ export const layerMemory: Layer.Layer<ProjectionStoreV2> = Layer.effect(
                 pullRequests: thread.pullRequests ?? [],
               })),
           ),
+        ),
+      getWorktreeHolders: (limit) =>
+        Ref.get(replayState).pipe(
+          Effect.map((state) => {
+            const holders = [...state.projections.values()]
+              .map(({ thread }) => thread)
+              .filter((thread) => thread.deletedAt === null && thread.worktreePath !== null);
+            return {
+              count: new Set(holders.map((thread) => thread.worktreePath)).size,
+              oldestArchived: holders
+                .filter((thread) => thread.archivedAt !== null)
+                .toSorted(
+                  (left, right) =>
+                    DateTime.toEpochMillis(left.archivedAt!) -
+                      DateTime.toEpochMillis(right.archivedAt!) || left.id.localeCompare(right.id),
+                )
+                .slice(0, limit)
+                .map((thread) => ({
+                  title: thread.title,
+                  archivedAt: DateTime.formatIso(thread.archivedAt!),
+                })),
+            };
+          }),
         ),
       getLimitRecoveryCandidates: (options) =>
         Ref.get(replayState).pipe(

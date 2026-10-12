@@ -111,8 +111,20 @@ vi.mock("./session", () => ({
 
 vi.mock("./use-thread-outbox", async () => {
   const { Atom } = await import("effect/reactivity");
+  const { appAtomRegistry } = await import("./atom-registry");
+  const editingQueuedMessageIdsAtom = Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive);
   return {
-    editingQueuedMessageIdsAtom: Atom.make<Record<string, boolean>>({}).pipe(Atom.keepAlive),
+    editingQueuedMessageIdsAtom,
+    holdEditingQueuedMessage: (messageId: string) => {
+      appAtomRegistry.set(editingQueuedMessageIdsAtom, {
+        ...appAtomRegistry.get(editingQueuedMessageIdsAtom),
+        [messageId]: true,
+      });
+    },
+    releaseEditingQueuedMessage: (messageId: string) => {
+      const { [messageId]: _released, ...rest } = appAtomRegistry.get(editingQueuedMessageIdsAtom);
+      appAtomRegistry.set(editingQueuedMessageIdsAtom, rest);
+    },
     useThreadOutboxMessages: () => ({}),
     useThreadOutboxShellStatuses: () => new Map(),
   };
@@ -156,6 +168,13 @@ import {
 } from "./thread-composer-error";
 import type { QueuedThreadMessage } from "./thread-outbox-model";
 import * as composerDrafts from "./use-composer-drafts";
+import { deletePendingThreadMessage } from "./delete-pending-thread-message";
+import {
+  beginDispatchingQueuedMessage,
+  dispatchingQueuedMessageAtom,
+  finishDispatchingQueuedMessage,
+  markDispatchingQueuedMessageSending,
+} from "./queued-message-dispatch";
 import { recoverFailedThreadDraft } from "./recover-failed-thread-draft";
 import { editingQueuedMessageIdsAtom } from "./use-thread-outbox";
 import {
@@ -226,6 +245,7 @@ afterEach(() => {
   appAtomRegistry.set(composerDrafts.composerDraftsAtom, {});
   appAtomRegistry.set(composerDrafts.composerCloudDraftsAtom, { accountId: null, signedOut: {} });
   appAtomRegistry.set(editingQueuedMessageIdsAtom, {});
+  appAtomRegistry.set(dispatchingQueuedMessageAtom, null);
   appAtomRegistry.set(pendingThreadCreationOutcomesAtom, {});
   appAtomRegistry.set(threadComposerErrorsAtom, {});
   harness.draftFile.setWriteError(null);
@@ -364,6 +384,66 @@ describe("thread outbox attachment preparation", () => {
     });
     expect(harness.prepareTurnAttachments).not.toHaveBeenCalled();
     expect(remainingMessages()).toEqual([edited]);
+  });
+});
+
+// Infinitus (fork, #1501): a queued reply can be deleted while its attachments
+// upload; only the send RPC itself is off limits.
+describe("queued reply deletion during dispatch", () => {
+  it("aborts the upload, removes the message and its files, and leaves the next one at the head", async () => {
+    const fileUri = "file:///documents/t3-composer-attachments/stuck.pdf";
+    const stuck = queuedMessage({ messageId: "message-stuck-upload", text: "stuck", fileUri });
+    const next = queuedMessage({ messageId: "message-after-stuck", text: "next" });
+    await harness.manager.enqueue(stuck);
+    await harness.manager.enqueue(next);
+    const uploadStarted = Promise.withResolvers<void>();
+    harness.prepareTurnAttachments.mockImplementationOnce(async ({ signal }) => {
+      uploadStarted.resolve();
+      // The real transfer resolves "abandoned" once its signal aborts.
+      await new Promise<void>((resolve) => {
+        signal?.addEventListener("abort", () => resolve(), { once: true });
+      });
+      return { status: "abandoned" };
+    });
+    // The sweep behind this is `thread-outbox-removal.test.ts`'s; here the
+    // removal must hand it the deleted message's files.
+    const releaseFiles = vi
+      .spyOn(composerDrafts, "scheduleUnusedComposerAttachmentCleanup")
+      .mockImplementation(() => {});
+
+    const signal = beginDispatchingQueuedMessage(stuck.messageId);
+    const preparation = prepareQueuedMessageAttachments(stuck, false, signal);
+    await uploadStarted.promise;
+
+    await expect(deletePendingThreadMessage(stuck)).resolves.toBe(true);
+
+    expect(signal.aborted).toBe(true);
+    await expect(preparation).resolves.toEqual({ status: "abandoned" });
+    expect(markDispatchingQueuedMessageSending(stuck.messageId)).toBe(false);
+    expect(harness.removeOutboxMessage).toHaveBeenCalledWith(stuck);
+    expect(remainingMessages()).toEqual([next]);
+    expect(releaseFiles).toHaveBeenCalledWith(stuck.attachments);
+    releaseFiles.mockRestore();
+    // The drain's abandoned attempt releases the lock; the next pass takes `next`.
+    finishDispatchingQueuedMessage(stuck.messageId);
+    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toBeNull();
+  });
+
+  it("refuses the delete once the send RPC is in flight", async () => {
+    const sending = queuedMessage({ messageId: "message-sending", text: "sending" });
+    await harness.manager.enqueue(sending);
+    const signal = beginDispatchingQueuedMessage(sending.messageId);
+    expect(markDispatchingQueuedMessageSending(sending.messageId)).toBe(true);
+
+    await expect(deletePendingThreadMessage(sending)).resolves.toBe(false);
+
+    expect(signal.aborted).toBe(false);
+    expect(harness.removeOutboxMessage).not.toHaveBeenCalled();
+    expect(remainingMessages()).toEqual([sending]);
+    expect(appAtomRegistry.get(dispatchingQueuedMessageAtom)).toEqual({
+      messageId: sending.messageId,
+      phase: "sending",
+    });
   });
 });
 
