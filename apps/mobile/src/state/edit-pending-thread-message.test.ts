@@ -3,7 +3,7 @@ import { CommandId, EnvironmentId, MessageId, ThreadId } from "@infinitus/contra
 import type { QueuedThreadMessage } from "./thread-outbox-model";
 
 const state = vi.hoisted(() => ({
-  dispatching: null as string | null,
+  reclaim: vi.fn((_messageId: string) => true),
   held: {} as Record<string, true>,
   draft: { text: "Existing draft", attachments: [] as { id: string }[] },
   confirm: vi.fn(async () => true),
@@ -12,11 +12,14 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("./atom-registry", () => ({
   appAtomRegistry: {
-    get: (atom: string) => (atom === "dispatching" ? state.dispatching : state.held),
+    get: () => state.held,
   },
 }));
+// Infinitus (fork, #1501): the dispatch phase decides whether the edit may take the message back.
+vi.mock("./queued-message-dispatch", () => ({
+  reclaimQueuedMessageFromDispatch: state.reclaim,
+}));
 vi.mock("./use-thread-outbox", () => ({
-  dispatchingQueuedMessageIdAtom: "dispatching",
   editingQueuedMessageIdsAtom: "editing",
   holdEditingQueuedMessage: (id: string) => {
     state.held[id] = true;
@@ -67,7 +70,7 @@ const message: QueuedThreadMessage = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
-  state.dispatching = null;
+  state.reclaim.mockReturnValue(true);
   state.held = {};
   state.draft = { text: "Existing draft", attachments: [] };
   state.confirm.mockResolvedValue(true);
@@ -89,11 +92,20 @@ describe("editing a pending message", () => {
     expect(await editPendingThreadMessage(message)).toBe(true);
     expect(state.held).toEqual({});
   });
-  it("does not reclaim a message already being dispatched", async () => {
-    state.dispatching = message.messageId;
+  it("does not reclaim a message whose send is in flight", async () => {
+    state.reclaim.mockReturnValueOnce(false);
     expect(await editPendingThreadMessage(message)).toBe(false);
+    expect(state.reclaim).toHaveBeenCalledWith(message.messageId);
     expect(state.confirm).not.toHaveBeenCalled();
     expect(state.draft.text).toBe("Existing draft");
+  });
+  it("takes the message back from its dispatch before touching the queue", async () => {
+    state.confirm.mockImplementationOnce(async () => {
+      expect(state.reclaim).toHaveBeenCalledWith(message.messageId);
+      return true;
+    });
+    expect(await editPendingThreadMessage(message)).toBe(true);
+    expect(state.draft.text).toBe("Existing draft\n\nQueued task");
   });
   it("rolls back the draft if removing the queued message fails", async () => {
     state.remove.mockRejectedValueOnce(new Error("disk error"));

@@ -78,7 +78,12 @@ import {
 } from "./use-composer-drafts";
 import { useAtomCommand } from "./use-atom-command";
 import {
-  dispatchingQueuedMessageIdAtom,
+  beginDispatchingQueuedMessage,
+  dispatchingQueuedMessageAtom,
+  finishDispatchingQueuedMessage,
+  markDispatchingQueuedMessageSending,
+} from "./queued-message-dispatch";
+import {
   editingQueuedMessageIdsAtom,
   useThreadOutboxMessages,
   useThreadOutboxShellStatuses,
@@ -172,15 +177,6 @@ function logThreadOutboxUploadFailure(queuedMessage: QueuedThreadMessage, error:
   }
 }
 
-function beginDispatchingQueuedMessage(queuedMessageId: MessageId): void {
-  appAtomRegistry.set(dispatchingQueuedMessageIdAtom, queuedMessageId);
-}
-
-function finishDispatchingQueuedMessage(queuedMessageId: MessageId): void {
-  const current = appAtomRegistry.get(dispatchingQueuedMessageIdAtom);
-  appAtomRegistry.set(dispatchingQueuedMessageIdAtom, current === queuedMessageId ? null : current);
-}
-
 function findThread(
   threads: ReadonlyArray<EnvironmentThreadShell>,
   message: QueuedThreadMessage,
@@ -217,6 +213,7 @@ function settingsCommandId(message: QueuedThreadMessage, setting: string): Comma
 export async function prepareQueuedMessageAttachments(
   queuedMessage: QueuedThreadMessage,
   supportsImageUploads = false,
+  signal?: AbortSignal,
 ): Promise<
   | {
       readonly status: "ready";
@@ -242,6 +239,7 @@ export async function prepareQueuedMessageAttachments(
     environmentId: queuedMessage.environmentId,
     attachments: queuedMessage.attachments,
     supportsImageUploads,
+    signal,
     persistUploadedReferences: async (draftAttachments) => {
       if (appAtomRegistry.get(editingQueuedMessageIdsAtom)[queuedMessage.messageId]) {
         return "abandon";
@@ -666,7 +664,7 @@ export function useThreadOutboxDrain(): void {
     reportFailure: false,
   });
   const pinNewThread = usePinAtCreation();
-  const dispatchingQueuedMessageId = useAtomValue(dispatchingQueuedMessageIdAtom);
+  const dispatchingQueuedMessage = useAtomValue(dispatchingQueuedMessageAtom);
   const editingQueuedMessageIds = useAtomValue(editingQueuedMessageIdsAtom);
   const queuedMessagesByThreadKey = useThreadOutboxMessages();
   const shellStatuses = useThreadOutboxShellStatuses();
@@ -804,7 +802,11 @@ export function useThreadOutboxDrain(): void {
   }, []);
 
   const sendQueuedMessage = useCallback(
-    async (queuedMessage: QueuedThreadMessage, thread: EnvironmentThreadShell) => {
+    async (
+      queuedMessage: QueuedThreadMessage,
+      thread: EnvironmentThreadShell,
+      signal: AbortSignal,
+    ) => {
       const hasAccess = () =>
         readEnvironmentScope(queuedMessage.environmentId, AuthOrchestrationOperateScope);
       if (!hasAccess()) return true;
@@ -863,6 +865,7 @@ export function useThreadOutboxDrain(): void {
         const preparedResult = await prepareQueuedMessageAttachments(
           queuedMessage,
           serverConfig.environment.capabilities.attachmentUploads === true,
+          signal,
         );
         if (preparedResult.status === "abandoned") {
           return true;
@@ -907,6 +910,9 @@ export function useThreadOutboxDrain(): void {
         currentConfig.providers,
       );
       if (!hasAccess()) return true;
+      // Infinitus (fork, #1501): a delete or edit that aborted the upload
+      // phase wins here; from this line on the send is off limits to both.
+      if (!markDispatchingQueuedMessageSending(queuedMessage.messageId)) return true;
       const deliveryResult = await startTurn({
         environmentId: queuedMessage.environmentId,
         input: {
@@ -971,6 +977,7 @@ export function useThreadOutboxDrain(): void {
       queuedMessage: QueuedThreadMessage,
       creation: QueuedThreadCreation,
       projectCwd: string,
+      signal: AbortSignal,
     ) => {
       const hasAccess = () =>
         readEnvironmentScope(queuedMessage.environmentId, AuthOrchestrationOperateScope);
@@ -1005,6 +1012,7 @@ export function useThreadOutboxDrain(): void {
         const preparedResult = await prepareQueuedMessageAttachments(
           queuedMessage,
           serverConfig.environment.capabilities.attachmentUploads === true,
+          signal,
         );
         if (preparedResult.status === "abandoned") {
           return true;
@@ -1049,6 +1057,9 @@ export function useThreadOutboxDrain(): void {
         currentConfig.providers,
       );
       if (!hasAccess()) return true;
+      // Infinitus (fork, #1501): a delete or edit that aborted the upload
+      // phase wins here; from this line on the send is off limits to both.
+      if (!markDispatchingQueuedMessageSending(queuedMessage.messageId)) return true;
       const deliveryResult = await startTurn({
         environmentId: queuedMessage.environmentId,
         input: buildProjectThreadStartTurnInput({
@@ -1137,7 +1148,7 @@ export function useThreadOutboxDrain(): void {
   }, [creationOutcomes, threads]);
 
   useEffect(() => {
-    if (dispatchingQueuedMessageId !== null) {
+    if (dispatchingQueuedMessage !== null) {
       return;
     }
 
@@ -1289,7 +1300,7 @@ export function useThreadOutboxDrain(): void {
         }
       }
 
-      beginDispatchingQueuedMessage(nextQueuedMessage.messageId);
+      const signal = beginDispatchingQueuedMessage(nextQueuedMessage.messageId);
       const removeQueuedMessage = (warning: string) =>
         removeThreadOutboxMessage(nextQueuedMessage).then(
           () => true,
@@ -1349,10 +1360,10 @@ export function useThreadOutboxDrain(): void {
             : removeQueuedMessage("[thread-outbox] failed to remove message for a missing thread")
           : creation !== undefined
             ? creationProjectCwd !== null
-              ? sendQueuedCreation(nextQueuedMessage, creation, creationProjectCwd)
+              ? sendQueuedCreation(nextQueuedMessage, creation, creationProjectCwd, signal)
               : removeQueuedMessage("[thread-outbox] dropped pending task for a missing project")
             : thread !== undefined
-              ? sendQueuedMessage(nextQueuedMessage, thread)
+              ? sendQueuedMessage(nextQueuedMessage, thread, signal)
               : Promise.resolve(false);
       });
       void delivery
@@ -1377,7 +1388,7 @@ export function useThreadOutboxDrain(): void {
     }
   }, [
     connectedEnvironments,
-    dispatchingQueuedMessageId,
+    dispatchingQueuedMessage,
     editingQueuedMessageIds,
     operableEnvironments,
     projects,

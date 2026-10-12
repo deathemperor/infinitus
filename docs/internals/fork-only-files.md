@@ -244,6 +244,7 @@ these bullets.
   `App.tsx`). Creating, sharing, grants, transcripts and leaving are the
   desktop's.
 - `packages/client-runtime/src/connection/roaming.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on one host, connect on another (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect; public hosts are dialed before private ones (the LAN address). No server fills the list since the Cloudflare tunnels retired (`InfinitusDescriptor.ts` went with them). Rules and traps: `docs/internals/roaming.md`.
+- `apps/mobile/src/state/queued-message-dispatch.ts` (+ test), `apps/mobile/src/state/delete-pending-thread-message.ts`, `apps/mobile/src/features/threads/confirmDeletePendingMessage.ts` — the outbox drain's dispatch state as `{ messageId, phase: "uploading" | "sending" }` with the upload's abort handle, and the delete under a queued reply's bubble that aborts an upload in flight and refuses only during the send RPC (#1501). Edit takes the same gate.
 - `apps/mobile/src/lib/image-passthrough.ts` (+ test) — the one decision for every way a picture enters the phone's composer (picker, clipboard, share sheet; #1500, #1502): which originals pass through byte for byte and which are rendered to a bounded JPEG, plus the rendered attachment's name. Pure, so the share model's tests can import it without Expo.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
