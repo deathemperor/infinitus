@@ -330,7 +330,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "infinitus-resume-on-limit",
     title: "Resume limited threads on another account",
     to: "/settings/general",
-    searchTerms: ["usage quota rate limit swap account infinitus resume continue"],
+    searchTerms: ["usage quota rate limit swap another account resume continue"],
   },
   {
     id: "working-shelf",
