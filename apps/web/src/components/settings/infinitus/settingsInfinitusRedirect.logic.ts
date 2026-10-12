@@ -5,6 +5,9 @@
 const RENAMED: Readonly<Record<string, string>> = {
   "": "/settings/menu-bar",
   animations: "/settings/animations",
+  priority: "/settings/priority",
+  // The catalog section's old slug (#1069).
+  sessions: "/settings/priority",
   team: "/settings/team",
   notifications: "/settings/notifications",
   devices: "/settings/devices",

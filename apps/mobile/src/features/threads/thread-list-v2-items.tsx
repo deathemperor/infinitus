@@ -40,6 +40,7 @@ import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useEnvironmentScope } from "../../state/session";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useThreadPr } from "../../state/use-thread-pr";
+import { useThreadHeldEntry } from "../infinitus/useThreadHeldEntry";
 import { useSwipeRowDormant } from "../home/swipe-row-activation";
 import { ThreadSwipeable } from "../home/thread-swipe-actions";
 import { buildThreadTitleRegenerationMenuItems } from "./thread-title-regeneration-menu";
@@ -86,6 +87,20 @@ const STATUS_LABEL_BY_STATUS: Partial<Record<ThreadListV2Status, StatusLabel>> =
     icon: "questionmark.bubble",
     className: "text-adaptive-indigo-600-300",
     iconTintClassName: "accent-adaptive-indigo-600-300",
+  },
+  // Kept back for headroom (#741, #743): nothing runs, so it reads as calm
+  // as the web's grey Held / Paused pill.
+  held: {
+    label: "Held",
+    icon: "clock",
+    className: "text-muted-foreground",
+    iconTintClassName: "accent-muted-foreground",
+  },
+  paused: {
+    label: "Paused",
+    icon: "clock",
+    className: "text-muted-foreground",
+    iconTintClassName: "accent-muted-foreground",
   },
   working: {
     label: "Working",
@@ -628,7 +643,12 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const limitStop =
     useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
     null;
-  const status = resolveThreadListV2Status(thread, { limitStopped: limitStop !== null });
+  // Held / paused for headroom (#741, #743): the Mac's holds stream.
+  const heldEntry = useThreadHeldEntry(thread.environmentId, thread.id);
+  const status = resolveThreadListV2Status(thread, {
+    limitStopped: limitStop !== null,
+    hold: heldEntry?.kind ?? null,
+  });
   // "Done" marks a completion the user has not opened yet — same emerald
   // label as the web sidebar, sourced from the server-side visited watermark
   // so checking a thread on any device clears it everywhere.

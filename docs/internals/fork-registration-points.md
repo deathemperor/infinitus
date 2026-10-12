@@ -68,7 +68,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `infinitus.launch` and `infinitus.secret` (#747) in `WS_METHODS`, their
   `Rpc.make`s, all in `WsRpcGroup`; `subscribeInfinitusPairing` /
   `infinitus.pairingDecide` (approve-on-Mac pairing, #710) the same way,
-  contracts in `infinitusPairing.ts`; `subscribeCaptures` / `captures.apply`
+  contracts in `infinitusPairing.ts`; `subscribeInfinitusHolds` /
+  `infinitus.releaseThread` (session priority mode, #616 #743, on v2 per
+  #1627) the same way, contracts at the end of `infinitus.ts`; `subscribeCaptures` / `captures.apply`
   (#433) the same way, contracts in `captures.ts`; `server.getStats` (#659,
   contracts in `stats.ts`); `subscribeInfinitusLimitStops` (#648 on v2,
   #1627; `InfinitusLimitStops` in `infinitus.ts`) the same way;
@@ -91,9 +93,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (optional) on `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls`
   (optional, #651) beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
-  `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops` and
-  `subscribeCaptures` in `EnvironmentSubscriptionRpcTag`, so the client's
-  `subscribe` accepts them.
+  `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops`,
+  `subscribeInfinitusHolds` and `subscribeCaptures` in
+  `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
 - `apps/server/src/ws.ts` — pulls `InfinitusService`, `InfinitusCompanion`,
   `InfinitusSecret`, `InfinitusPairing`, `InfinitusLimitStops`
   (`subscribeInfinitusLimitStops` → its `stopped` stream, #648) and
@@ -104,7 +106,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   session scopes go along; only the request id reaches the span);
   `subscribeCaptures` / `captures.apply` (#433; the project id and the
   command's type reach the span, a capture's text never); `server.getStats`
-  → `usage.readStats` (#659).
+  → `usage.readStats` (#659); `subscribeInfinitusHolds` /
+  `infinitus.releaseThread` (#616, #743) from `InfinitusSessionHolds`.
 - `packages/client-runtime/src/state/server.ts` — the `serverEnvironment.stats`
   query atom family over `server.getStats` (#659), refreshed with the usage
   prices.
@@ -147,7 +150,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/server/src/observability/RpcInstrumentation.ts` — the fork's RPCs in
   `RPC_AGGREGATES`: `server.getStats` under `server`, the Infinitus methods
   (`subscribeInfinitus`, `infinitus.command` / `.launch` / `.secret`,
-  `subscribeInfinitusPairing`, `infinitus.pairingDecide`) under `infinitus`,
+  `subscribeInfinitusPairing`, `infinitus.pairingDecide`,
+  `subscribeInfinitusHolds`, `infinitus.releaseThread`) under `infinitus`,
   `subscribeCaptures` / `captures.apply` under `captures`.
 - `apps/server/src/server.ts` — `layerInfinitus` below `layerAuth`:
   `InfinitusServerPortLive` (it mints infinitusctl's session, so it needs
@@ -761,6 +765,14 @@ background`). Riding along, all
   explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
   500 ms default is spent by a cold JavaScript regex engine compiling its
   patterns, which fused the first line into one token on loaded CI (#610).
+- `apps/web/src/components/Sidebar.logic.ts` and `Sidebar.tsx` — the `held`
+  / `paused` statuses (#741, #743): the resolver takes the holds stream's
+  kind for the thread (from `sidebar/useInfinitusHeldSummary.ts`), above
+  working and below approval and input; the row's pill reads "Held" /
+  "Paused". The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
+  `thread-list-v2-items.tsx` and `thread-row-emphasis.ts`, through
+  `features/infinitus/useThreadHeldEntry.ts`. `apps/server/src/server.ts`
+  provides `InfinitusSessionHoldsIdle` until the policies land.
 - `apps/web/src/components/settings/settingsSearch.ts` — three spreads from
   `infinitus/settingsSearchItems.ts` (`InfinitusSettingsPath` in the
   `SettingsPath` union, `INFINITUS_SECTION_LABELS`, `INFINITUS_CATEGORY_SCOPES`
@@ -779,7 +791,7 @@ background`). Riding along, all
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
   records it builds gained that field.
-- `apps/web/src/routes/settings.{menu-bar,animations,team,notifications,devices,engines}.tsx`
+- `apps/web/src/routes/settings.{menu-bar,animations,priority,team,notifications,devices,engines}.tsx`
   and `settings.infinitus.$.tsx` (new files in upstream's routes
   directory; the pages are top-level since 2026-09-18 — no "Infinitus"
   section, the whole app is Infinitus — and the splat redirects the old

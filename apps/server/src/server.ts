@@ -82,6 +82,7 @@ import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOn
 import { InfinitusLimitStopsLive } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { InfinitusSwapdProbeLive } from "./infinitus/Services/InfinitusSwapdProbe.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
+import { InfinitusSessionHoldsIdle } from "./infinitus/Services/InfinitusSessionHolds.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
 import { ThreadUsageBackfillLive } from "./infinitus/Layers/ThreadUsageBackfill.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
@@ -624,6 +625,10 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   // total) through `thread.metadata.update`; it tails the orchestrator's
   // domain events and reads the transcripts through `UsageService`.
   ThreadUsageBackfillLive.pipe(Layer.provide(layerUsage)),
+  // Fork (#616, #743, #1627): session priority mode's holds stream and "Run
+  // now" (`ws.ts`). Nothing is held until the hold and interrupt policies
+  // land on the queue lane's turn-start gate; this answers the empty list.
+  InfinitusSessionHoldsIdle,
   // Fork (#648, #1627): resume-on-limit. Tails the orchestrator's domain
   // events for failed limit runs and `InfinitusLimitStops` for the Claude
   // adapter's rejected windows (the memoized instance `ws.ts` streams and the
