@@ -5,15 +5,13 @@ import Foundation
 /// dispatch. No I/O, so the shapes are unit-tested byte for byte.
 public enum DesktopRows {
     /// `threads --status` vocabulary, derived here — the desktop has none.
-    public static let statuses = ["running", "held", "paused", "waiting", "idle"]
+    public static let statuses = ["running", "waiting", "idle"]
     public static let defaultRuntimeMode = "full-access"
     public static let defaultInteractionMode = "default"
 
-    /// held/paused when the desktop holds it (#616/#743), waiting on an
-    /// approval or a question, running while a turn runs or the session
-    /// starts, idle otherwise.
-    public static func status(_ t: DesktopAPI.ThreadShell, hold: DesktopAPI.Hold?) -> String {
-        if let hold { return hold.kind == "paused" ? "paused" : "held" }
+    /// waiting on an approval or a question, running while a turn runs or
+    /// the session starts, idle otherwise.
+    public static func status(_ t: DesktopAPI.ThreadShell) -> String {
         if t.hasPendingApprovals == true || t.hasPendingUserInput == true { return "waiting" }
         if t.latestTurn?.state == "running" || ["running", "starting"].contains(t.session?.status ?? "") { return "running" }
         return "idle"
@@ -24,19 +22,15 @@ public enum DesktopRows {
                  "model": p.defaultModelSelection ?? .null])
     }
 
-    public static func threadRow(_ t: DesktopAPI.ThreadShell, project: DesktopAPI.Project?, hold: DesktopAPI.Hold?) -> JSONValue {
+    public static func threadRow(_ t: DesktopAPI.ThreadShell, project: DesktopAPI.Project?) -> JSONValue {
         var row: [String: JSONValue] = [
             "id": .string(t.id), "title": .string(t.title), "project": .string(project?.title ?? t.projectId),
-            "projectId": .string(t.projectId), "status": .string(status(t, hold: hold)),
+            "projectId": .string(t.projectId), "status": .string(status(t)),
             "updatedAt": t.updatedAt.map(JSONValue.string) ?? .null,
         ]
         if let turn = t.latestTurn { row["turn"] = .object(["id": .string(turn.turnId), "state": .string(turn.state)]) }
         if let path = t.worktreePath { row["worktree"] = .string(path) }
         if let branch = t.branch { row["branch"] = .string(branch) }
-        if let hold {
-            row["hold"] = .object(["kind": .string(hold.kind ?? "held"), "summary": hold.summary.map(JSONValue.string) ?? .null,
-                                   "since": hold.since.map(JSONValue.string) ?? .null])
-        }
         return .object(row)
     }
 

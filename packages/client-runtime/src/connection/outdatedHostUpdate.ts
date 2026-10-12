@@ -41,7 +41,8 @@ export class OutdatedHostUpdateError extends Schema.TaggedError<OutdatedHostUpda
   },
 ) {}
 
-export type OutdatedHostUpdateStage = "downloading" | "installing" | "resuming";
+/** `waiting` (#829): the host holds the install while its turns run. */
+export type OutdatedHostUpdateStage = "waiting" | "downloading" | "installing" | "resuming";
 
 /**
  * Updates a host whose orchestration protocol is too old for this client.

@@ -806,6 +806,27 @@ export const InfinitusSubscribeInput = Schema.Struct({
 });
 export type InfinitusSubscribeInput = typeof InfinitusSubscribeInput.Type;
 
+/** One thread whose turn a Claude usage limit stopped on this server (#648,
+    #1627), as `subscribeInfinitusLimitStops` lists it until the turn resumes
+    or moves on. `parked`: the SDK holds the turn open and retries it when the
+    window resets; `failed`: the CLI ended the turn with the limit as its
+    error. `account` is the swapd account whose window refused the turn, when
+    the refusal's reset matched one (#1486); `resetsAt` the window's reset as
+    the SDK reported it; `proxy` the proxied instance (#1088) whose own
+    upstream limit it was, which no account on the Mac lifts. */
+export const InfinitusLimitStop = Schema.Struct({
+  threadId: ThreadId,
+  kind: Schema.Literals(["parked", "failed"]),
+  since: Schema.String,
+  account: Schema.NullOr(Schema.String),
+  resetsAt: Schema.NullOr(Schema.String),
+  proxy: Schema.optionalKey(Schema.String),
+});
+export type InfinitusLimitStop = typeof InfinitusLimitStop.Type;
+
+export const InfinitusLimitStops = Schema.Array(InfinitusLimitStop);
+export type InfinitusLimitStops = typeof InfinitusLimitStops.Type;
+
 /** One command call a client asks the server to forward. The same triple the
     control request carries, minus `secret`: material read from stdin never
     crosses the RPC boundary. */

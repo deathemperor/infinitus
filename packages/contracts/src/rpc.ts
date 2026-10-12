@@ -85,6 +85,7 @@ import {
   InfinitusSecretInput,
   InfinitusSecretRefused,
   InfinitusSecretResult,
+  InfinitusLimitStops,
   InfinitusSnapshot,
   InfinitusSubscribeInput,
   InfinitusUnavailable,
@@ -603,6 +604,7 @@ export const WS_METHODS = {
   infinitusSecret: "infinitus.secret",
   subscribeInfinitusPairing: "subscribeInfinitusPairing",
   infinitusPairingDecide: "infinitus.pairingDecide",
+  subscribeInfinitusLimitStops: "subscribeInfinitusLimitStops",
   // Captures (#433)
   subscribeCaptures: "subscribeCaptures",
   capturesApply: "captures.apply",
@@ -1893,6 +1895,17 @@ const WsInfinitusPairingDecideRpc = Rpc.make(WS_METHODS.infinitusPairingDecide, 
   error: Schema.Union([EnvironmentAuthorizationError, PairingApprovalIssueFailed]),
 });
 
+/** The threads whose turn a Claude usage limit stopped on this server (#648,
+    #1627): the current list, then the whole list again on every change. The
+    sidebar's "Limited" pill for a parked turn reads it; a failed one is on
+    the thread shell too. */
+const WsSubscribeInfinitusLimitStopsRpc = Rpc.make(WS_METHODS.subscribeInfinitusLimitStops, {
+  payload: Schema.Struct({}),
+  success: InfinitusLimitStops,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
 /** A project's capture list (#433): the current list, then the whole list
     again after every change. */
 const WsSubscribeCapturesRpc = Rpc.make(WS_METHODS.subscribeCaptures, {
@@ -2117,6 +2130,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsInfinitusSecretRpc,
   WsSubscribeInfinitusPairingRpc,
   WsInfinitusPairingDecideRpc,
+  WsSubscribeInfinitusLimitStopsRpc,
   WsSubscribeCapturesRpc,
   WsCapturesApplyRpc,
   WsOrchestrationV2DispatchCommandRpc,

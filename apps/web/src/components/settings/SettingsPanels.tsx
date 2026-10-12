@@ -2367,6 +2367,23 @@ export function GeneralSettingsPanel() {
             />
           }
         />
+        {/* Fork (#648): the swap-based resume, beside upstream's reset-time one. */}
+        <SettingsRow
+          serverScoped
+          {...searchableSetting("infinitus-resume-on-limit")}
+          description="When the Claude account behind a running thread hits its usage limit and Infinitus swaps, the turn continues on the new account before the window resets."
+          settingKeys={["infinitusResumeOnLimit"]}
+          control={
+            <ScopedSwitch
+              settingKeys={["infinitusResumeOnLimit"]}
+              checked={settings.infinitusResumeOnLimit}
+              onCheckedChange={(checked) =>
+                updateSettings({ infinitusResumeOnLimit: Boolean(checked) })
+              }
+              aria-label="Resume limited threads on another account"
+            />
+          }
+        />
         <SettingsRow
           serverScoped
           {...searchableSetting("snooze-limited-threads")}

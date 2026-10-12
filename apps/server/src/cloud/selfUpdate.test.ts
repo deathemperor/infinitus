@@ -1,6 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
-import { ServerSelfUpdateError, ThreadId } from "@infinitus/contracts";
+import { RunId, ServerSelfUpdateError, ThreadId } from "@infinitus/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as Path from "effect/Path";
+import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
@@ -130,6 +131,133 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
 });
 
 it.layer(NodeServices.layer)("server self update", (it) => {
+  it.effect("refuses an update while a turn runs, naming the turns (#829)", () =>
+    Effect.gen(function* () {
+      const running = [{ threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") }];
+      const { selfUpdate: base, order } = yield* makeHarness();
+      const selfUpdate = ServerSelfUpdate.withUpdateIdleGate({
+        mode: "web",
+        selfUpdate: base,
+        runningTurns: Effect.succeed(running),
+      });
+
+      const error = yield* selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip);
+
+      expect(error).toBeInstanceOf(ServerSelfUpdateError);
+      expect(error.runningTurns).toEqual(running);
+      expect(error.reason).toBe(
+        "1 thread is running; updating now would interrupt it. Update when they finish, or stop them first.",
+      );
+      // Refused at the entry: nothing downloaded for nothing.
+      expect(order).toEqual([]);
+    }),
+  );
+
+  it.effect("interrupt passes the running turns and installs at once (#829)", () =>
+    Effect.gen(function* () {
+      const stages: string[] = [];
+      const { selfUpdate: base, order } = yield* makeHarness();
+      const selfUpdate = ServerSelfUpdate.withUpdateIdleGate({
+        mode: "web",
+        selfUpdate: base,
+        runningTurns: Effect.succeed([
+          { threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") },
+        ]),
+      });
+
+      const result = yield* selfUpdate.update(
+        { targetVersion: "1.1.0", runningTurns: "interrupt" },
+        (stage) => Effect.sync(() => void stages.push(stage)),
+      );
+
+      expect(result.method).toBe("boot-service");
+      expect(stages).toEqual(["downloading", "installing"]);
+      expect(order).toEqual(["download", "extract", "preflight", "accept"]);
+    }),
+  );
+
+  it.effect(
+    "waits for the running turns, reporting each change of count, and gates the install again (#829)",
+    () =>
+      Effect.gen(function* () {
+        const events: string[] = [];
+        let reads = 0;
+        const turn = { threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") };
+        // After the download: two turns, still two, then one, then idle.
+        const runningTurns = Effect.sync(() => {
+          reads += 1;
+          return reads <= 2
+            ? [turn, { ...turn, turnId: RunId.make("run-2") }]
+            : reads === 3
+              ? [turn]
+              : [];
+        });
+        const selfUpdate = ServerSelfUpdate.withUpdateIdleGate({
+          mode: "web",
+          selfUpdate: {
+            update: (_input, reportProgress = () => Effect.void) =>
+              reportProgress("downloading").pipe(
+                Effect.andThen(reportProgress("installing")),
+                Effect.as({ targetVersion: "1.1.0", method: "boot-service" as const }),
+              ),
+            commitDesktopUpdate: () => Effect.never,
+          },
+          runningTurns,
+        });
+
+        const fiber = yield* selfUpdate
+          .update({ targetVersion: "1.1.0", runningTurns: "wait" }, (stage, count) =>
+            Effect.sync(() => void events.push(count === undefined ? stage : `${stage}:${count}`)),
+          )
+          .pipe(Effect.forkChild);
+        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
+        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
+        yield* TestClock.adjust(ServerSelfUpdate.RUNNING_TURNS_POLL);
+        yield* Fiber.join(fiber);
+
+        expect(events).toEqual(["downloading", "waiting:2", "waiting:1", "installing"]);
+      }),
+  );
+
+  it.effect("gates the desktop commit under the policy its preparation used (#829)", () =>
+    Effect.gen(function* () {
+      let running: ReadonlyArray<{ threadId: ThreadId; turnId: RunId }> = [];
+      const committed: string[] = [];
+      const selfUpdate = ServerSelfUpdate.withUpdateIdleGate({
+        mode: "desktop",
+        selfUpdate: {
+          update: () =>
+            Effect.succeed({
+              targetVersion: "1.1.0",
+              method: "desktop-app" as const,
+              desktopUpdateToken: "token-1",
+            }),
+          commitDesktopUpdate: (requestId) =>
+            Effect.sync(() => void committed.push(requestId)).pipe(Effect.andThen(Effect.never)),
+        },
+        runningTurns: Effect.sync(() => running),
+      });
+
+      // The desktop run itself never waits (its own timeout bounds it): a
+      // turn that starts after the download is met at the commit.
+      yield* selfUpdate.update({ targetVersion: "1.1.0" });
+      running = [{ threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") }];
+      const refused = yield* selfUpdate.commitDesktopUpdate("token-1").pipe(Effect.flip);
+      expect(refused.runningTurns).toEqual(running);
+      expect(committed).toEqual([]);
+
+      const unknown = yield* selfUpdate.commitDesktopUpdate("token-unknown").pipe(Effect.flip);
+      expect(unknown.runningTurns).toEqual(running);
+
+      running = [];
+      const fiber = yield* selfUpdate.commitDesktopUpdate("token-1").pipe(Effect.forkChild);
+      yield* Effect.yieldNow;
+      yield* Effect.yieldNow;
+      expect(committed).toEqual(["token-1"]);
+      yield* Fiber.interrupt(fiber);
+    }),
+  );
+
   it.effect("marks running threads at the boot-service handoff", () =>
     Effect.gen(function* () {
       const events: string[] = [];
