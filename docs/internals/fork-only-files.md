@@ -368,3 +368,16 @@ these bullets.
   touched keeps its whole from→to hunks; the base is resolved without
   `GitVcsDriverCore` (its layer needs would leak into `vcsLayer`), so a
   non-`origin` remote falls back to the local base branch.
+- `apps/server/src/orchestration-v2/TurnStartGate.ts` (+ test) — the one seam
+  every provider turn start passes on orchestrator v2 (#720, #1627): the
+  service, the passthrough the server runs by default, and `releaseTurnStart`,
+  the way a holding gate lets a run go. Contract and traps:
+  `docs/internals/turn-start-gate.md`.
+- `apps/server/src/infinitus/Layers/InfinitusToolBoundarySteer.ts` (+
+  `infinitusToolBoundarySteer.logic.ts`, tests),
+  `apps/server/src/orchestration-v2/SteerAtToolBoundary.test.ts` — the
+  running-turn half of steer mode (#1318, #1627): a `turn-item.updated` that
+  ends a tool call promotes the first `sendAt: "tool_boundary"` queued run into
+  that turn through `queued-message.promote-to-steer`, keyed by the item id;
+  the orchestrator test covers the steer-to-queue conversion and the row's
+  reverse states. Rules: `docs/internals/turn-start-gate.md`.

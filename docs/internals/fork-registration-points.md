@@ -870,3 +870,26 @@ background`). Riding along, all
 - `apps/server/src/provider/ClaudeTurnTokenUsage.ts` — `claudeCacheTtlSeconds` and the `cacheTtlSeconds` it adds to the normalized usage (#1557).
 - `apps/web/src/components/ChatView.tsx` — `threadUsage`, folded from `serverProjection` with `threadUsageFromProjection`, handed to `ChatComposer` (#834).
 - `apps/mobile/src/features/threads/ThreadSettingsSheet.tsx` — the optional `threadId` on the settings session, and `<InfinitusThreadUsageRows>` under the options card when it is set (#834); `ThreadComposer.tsx` sets it from the selected thread.
+- Turn-start gate and steer at the tool boundary (#1627, the queue lane; rules:
+  `docs/internals/turn-start-gate.md`):
+  `apps/server/src/orchestration-v2/ProviderTurnStartService.ts` requires
+  `TurnStartGate` and hands every `start` to it; `runtimeLayer.ts` leaves the
+  gate a requirement of `layerProduction` (`layer`, for tests, gets the
+  passthrough) and `server.ts` provides `TurnStartGatePassthrough` on
+  `layerOrchestrationV2Runtime` — the line a holding gate replaces;
+  `InfinitusToolBoundarySteerLive` is a `reactors` entry of the fork's own
+  `InfinitusServerLayers.ts` (#1680);
+  `ProviderTurnStartService.testkit.ts` and `ProviderTurnStartService.test.ts`
+  provide the passthrough. `Orchestrator.ts` (`message.dispatch`): a
+  `deliveryIntent: "steer"` that resolves to `steer_active` and is not a
+  mailbox delivery becomes `queue_after_active` with `sendAt: "tool_boundary"`
+  on the queued run; a targeted `steer_active` and `auto` stay upstream's.
+  `packages/contracts/src/orchestrationV2.ts` — `OrchestrationV2Run.sendAt`
+  (optional, additive). Clients: `apps/web/src/components/chat/QueuedRunsControl.tsx`
+  (the "at next step" tag), `ComposerPrimaryActions.tsx` (the running-turn
+  send label), `apps/web/src/components/ChatView.tsx` (a steer while running
+  is drawn as a queued row), `apps/web/src/components/settings/SettingsPanels.tsx`
+  and `apps/mobile/src/features/settings/SettingsFollowUpRouteScreen.tsx`
+  (the follow-up copy), `apps/mobile/src/features/threads/ThreadQueueControl.tsx`
+  (the "Next step" tag); `docs/user/composer.md` says a steer lands at the
+  next step.

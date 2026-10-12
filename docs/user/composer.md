@@ -53,9 +53,13 @@ See [images and videos](#images-and-videos-in-messages) for previewing and savin
 ## Send while the agent is working
 
 On web and desktop, choose **Settings → General → Follow-up behavior** to queue
-new messages for a later turn or steer the running turn immediately. The setting
-applies to this client; already queued messages keep their place. Queued messages
-are saved on the server and can be edited, reordered, or removed above the composer.
+new messages for a later turn or steer the running turn. A steer is sent at the
+turn's next step: once its next tool call finishes, or when the turn ends if that
+comes first. Until then it waits above the composer marked "at next step", where
+you can still edit it, remove it, or press its Steer button to send it right away.
+The setting applies to this client; already queued messages keep their place.
+Queued messages are saved on the server and can be edited, reordered, or removed
+above the composer.
 `Cmd+Enter` on macOS or `Ctrl+Enter` on Windows and Linux uses the opposite action:
 it steers when your default is Queue and queues when your default is Steer.
 
@@ -172,7 +176,7 @@ transcription or cancellation; only the message text is sent when you submit.
 
 On web and desktop, the composer shows **Interrupt** while the agent is working and the draft is
 empty. Adding text or attachments replaces it with a steer arrow. Click it to send a message into
-the active turn, or press `Enter` on desktop. Hold `Cmd` on macOS or `Ctrl` on Windows and Linux to
+the active turn at its next step, or press `Enter` on desktop. Hold `Cmd` on macOS or `Ctrl` on Windows and Linux to
 switch the button to a queue icon. Click while holding that key, or press `Cmd+Enter` or
 `Ctrl+Enter` on desktop, to queue the message for after the active turn.
 

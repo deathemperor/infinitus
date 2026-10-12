@@ -49,6 +49,7 @@ import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import { makeProviderFailure } from "@infinitus/provider-core/server/failure";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
+import * as TurnStartGate from "./TurnStartGate.ts";
 import {
   isRestartNoteContinuation,
   pendingRestartCancelledBackgroundWork,
@@ -102,10 +103,13 @@ export const layer: Layer.Layer<
   | ProviderSessionManager.ProviderSessionManagerV2
   | RunExecutionService.RunExecutionServiceV2
   | RuntimePolicy.RuntimePolicyV2
+  | TurnStartGate.TurnStartGate
 > = Layer.effect(
   ProviderTurnStartServiceV2,
   Effect.gen(function* () {
     const eventSink = yield* EventSink.EventSinkV2;
+    // Fork (#720, #1627): every start below passes the gate; see TurnStartGate.ts.
+    const turnStartGate = yield* TurnStartGate.TurnStartGate;
     const contextHandoffService = yield* ContextHandoffService.ContextHandoffServiceV2;
     const idAllocator = yield* IdAllocator.IdAllocatorV2;
     const fileSystem = yield* FileSystem.FileSystem;
@@ -1282,13 +1286,19 @@ export const layer: Layer.Layer<
 
     return ProviderTurnStartServiceV2.of({
       start: (input) =>
-        start(input).pipe(
-          Effect.mapError((cause) =>
-            isProviderTurnStartError(cause)
-              ? cause
-              : new ProviderTurnStartError({ runId: input.runId, cause }),
-          ),
-        ),
+        turnStartGate
+          .start({
+            threadId: input.threadId,
+            runId: input.runId,
+            start: start(input).pipe(
+              Effect.mapError((cause) =>
+                isProviderTurnStartError(cause)
+                  ? cause
+                  : new ProviderTurnStartError({ runId: input.runId, cause }),
+              ),
+            ),
+          })
+          .pipe(Effect.asVoid),
     });
   }),
 );

@@ -138,6 +138,8 @@ export function QueuedRunsControl({
       serverIndex,
       text,
       attachments,
+      // Fork (#1318): a steer waiting for the running turn's next finished tool call.
+      atNextStep: run.sendAt === "tool_boundary",
       thumbnails: attachments
         .filter((attachment) => attachment.type === "image")
         .map<QueuedRowThumbnail>((attachment) => ({
@@ -154,6 +156,7 @@ export function QueuedRunsControl({
       serverIndex: null,
       text: message.text,
       attachments: [] as ReadonlyArray<ContractChatAttachment>,
+      atNextStep: false,
       thumbnails: (message.attachments ?? [])
         .filter(isImageAttachment)
         .map<QueuedRowThumbnail>((attachment) => ({
@@ -402,6 +405,9 @@ export function QueuedRunsControl({
                         {previewText}
                       </TooltipPopup>
                     </Tooltip>
+                    {item.atNextStep ? (
+                      <span className="shrink-0 text-xs text-muted-foreground">at next step</span>
+                    ) : null}
                   </ComposerBanner.Content>
                   <ComposerBanner.Actions>
                     {isEditing ? (

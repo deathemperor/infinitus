@@ -25,7 +25,8 @@ const FOLLOW_UP_OPTIONS: ReadonlyArray<{
   {
     behavior: "steer",
     label: "Steer",
-    description: "Your message reaches the agent right away, changing what it is working on.",
+    description:
+      "Your message reaches the agent at its next step, once its current tool call finishes, changing what it works on next.",
   },
 ];
 

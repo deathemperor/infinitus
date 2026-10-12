@@ -285,7 +285,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         : isQueuing
           ? "Queue message"
           : isRunning
-            ? "Steer message"
+            ? "Send at next step"
             : "Submit message";
   const submitStatus = isEnvironmentUnavailable
     ? "Environment disconnected"

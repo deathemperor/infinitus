@@ -22,6 +22,7 @@ import { InfinitusRunningTurnsLive } from "./InfinitusRunningTurns.ts";
 import { InfinitusSecretLive } from "./InfinitusSecret.ts";
 import { InfinitusServerPortLive } from "./InfinitusServerPort.ts";
 import { InfinitusSignInLapseLive } from "./InfinitusSignInLapse.ts";
+import { InfinitusToolBoundarySteerLive } from "./InfinitusToolBoundarySteer.ts";
 import { InfinitusUsageAttributionLive } from "./InfinitusUsageAttribution.ts";
 import { ThreadUsageBackfillLive } from "./ThreadUsageBackfill.ts";
 
@@ -57,7 +58,9 @@ const runningTurns = () => InfinitusRunningTurnsLive.pipe(Layer.provide(Projecti
  *   and resume-on-limit (#648, #1627: failed limit runs and the Claude
  *   adapter's rejected windows, the swapd probe for the accounts while the
  *   menu bar app is away), the idle session-holds layer (#616, #743) and
- *   the usage backfill (#834, needs `UsageService` from the chain).
+ *   the usage backfill (#834, needs `UsageService` from the chain) and
+ *   the tool-boundary steer (#1318, #1627: a queued steer goes into the
+ *   running turn at its next finished tool call; reads the projection store).
  *   Merged beside upstream's reactors, where the
  *   chain hands them `OrchestratorV2` and `ServerEnvironment`.
  * - `runtime`: `infinitus`, the limit-stop list (#648: one instance for the
@@ -114,6 +117,7 @@ export function makeInfinitusServerLayers<
       Layer.provide(ProjectionStoreV2.layer),
       Layer.provide(input.layerServerSettings),
     ),
+    InfinitusToolBoundarySteerLive.pipe(Layer.provide(ProjectionStoreV2.layer)),
   );
   const runtime = Layer.mergeAll(
     infinitus,

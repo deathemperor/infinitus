@@ -385,6 +385,11 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                       <Text className="shrink-0 text-2xs uppercase tracking-wide text-primary">
                         Editing
                       </Text>
+                    ) : run.sendAt === "tool_boundary" ? (
+                      // Fork (#1318): a steer waiting for the turn's next finished tool call.
+                      <Text className="shrink-0 text-2xs uppercase tracking-wide text-foreground-muted">
+                        Next step
+                      </Text>
                     ) : null}
                     {workflow?.canPromoteToSteer ? (
                       <Pressable

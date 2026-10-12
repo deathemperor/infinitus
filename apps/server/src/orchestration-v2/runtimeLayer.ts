@@ -40,6 +40,7 @@ import * as ProviderRuntimeRecoveryService from "./ProviderRuntimeRecoveryServic
 import * as ProviderSwitchService from "./ProviderSwitchService.ts";
 import * as ProviderTurnControlService from "./ProviderTurnControlService.ts";
 import * as ProviderTurnStartService from "./ProviderTurnStartService.ts";
+import * as TurnStartGate from "./TurnStartGate.ts";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
@@ -333,7 +334,10 @@ const layerMcpAppRequestsProvided = McpAppRequests.layer.pipe(
   ),
 );
 
-export const layer = Layer.mergeAll(
+// Fork (#720, #1627): the turn-start gate (`TurnStartGate.ts`) is a
+// requirement of the production layer, chosen in `server.ts`; `layer`
+// (tests and live probes) runs every start at once.
+const layerRequiringTurnStartGate = Layer.mergeAll(
   layerOrchestratorProvided,
   layerMcpAppRequestsProvided,
   layerThreadManagementProvided,
@@ -345,8 +349,12 @@ export const layer = Layer.mergeAll(
   layerLegacyV1ThreadImporterProvided,
 );
 
+export const layer = layerRequiringTurnStartGate.pipe(
+  Layer.provide(TurnStartGate.TurnStartGatePassthrough),
+);
+
 export const layerProduction = Layer.mergeAll(
-  layer.pipe(Layer.provide(layerProjectService)),
+  layerRequiringTurnStartGate.pipe(Layer.provide(layerProjectService)),
   layerProjectService,
   layerManagedProjectFoldersProvided,
   layerThreadLaunchProvided,

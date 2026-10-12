@@ -15,7 +15,7 @@ const [Effect, Layer, FileSystem] = await Promise.all([
 const app = (file) => import(NodeURL.pathToFileURL(root + "/apps/server/src/" + file + ".ts"));
 const providerCore = (file) =>
   import(NodeURL.pathToFileURL(root + "/packages/provider-core/src/server/" + file + ".ts"));
-const [Start, Projection, Run, Sessions, Policy, Id, Sink, Handoff, Git, Project, Auth] =
+const [Start, Projection, Run, Sessions, Policy, Id, Sink, Handoff, Git, Project, Auth, Gate] =
   await Promise.all([
     app("orchestration-v2/ProviderTurnStartService"),
     app("orchestration-v2/ProjectionStore"),
@@ -28,6 +28,8 @@ const [Start, Projection, Run, Sessions, Policy, Id, Sink, Handoff, Git, Project
     app("git/GitWorkflowService"),
     app("project/ProjectService"),
     app("provider/ProviderAuthService"),
+    // Fork (#720, #1627): the turn-start gate the service requires.
+    app("orchestration-v2/TurnStartGate"),
   ]);
 let current;
 let fullReads = 0;
@@ -45,6 +47,7 @@ const session = {
   compactThread: () => Effect.void,
 };
 const dependencies = Layer.mergeAll(
+  Gate.TurnStartGatePassthrough,
   Layer.mock(Handoff.ContextHandoffServiceV2)({}),
   Id.layer,
   FileSystem.layerNoop({}),

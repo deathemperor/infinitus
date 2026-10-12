@@ -159,6 +159,7 @@ import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as CursorUsageReader from "./usage/cursorUsageReader.ts";
 import * as UsageService from "./usage/UsageService.ts";
 import * as RuntimeLayer from "./orchestration-v2/runtimeLayer.ts";
+import * as TurnStartGate from "./orchestration-v2/TurnStartGate.ts";
 import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import * as ThreadSearch from "./orchestration-v2/ThreadSearch.ts";
 import * as ResourceCleanupService from "./orchestration-v2/ResourceCleanupService.ts";
@@ -478,6 +479,10 @@ const layerScheduledTaskWebhookOrigin = Layer.effect(
 );
 
 const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
+  // Fork (#720, #1627): the gate every provider turn start passes. The
+  // passthrough holds nothing; a holding gate (session holds, the worktree
+  // cap) replaces this line. `docs/internals/turn-start-gate.md`.
+  Layer.provide(TurnStartGate.TurnStartGatePassthrough),
   Layer.provide(layerScheduledTaskWebhookOrigin),
   Layer.provide(ProviderEventIngestor.layerAnalytics),
   Layer.provide(layerCheckpointStore),
