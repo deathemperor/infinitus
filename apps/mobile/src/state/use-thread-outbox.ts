@@ -31,11 +31,6 @@ export const editingQueuedMessageIdsAtom = Atom.make<Readonly<Record<MessageId, 
   Atom.withLabel("mobile:thread-outbox:editing-message-ids"),
 );
 
-export const dispatchingQueuedMessageIdAtom = Atom.make<MessageId | null>(null).pipe(
-  Atom.keepAlive,
-  Atom.withLabel("mobile:thread-outbox:dispatching-message-id"),
-);
-
 export function holdEditingQueuedMessage(messageId: MessageId): void {
   const current = appAtomRegistry.get(editingQueuedMessageIdsAtom);
   if (current[messageId]) {

@@ -996,7 +996,7 @@ function ThreadRouteContent(
           threadCwd={selectedThreadCwd}
           selectedThreadQueueCount={composer.selectedThreadQueueCount}
           queuedMessages={composer.selectedThreadQueuedMessages}
-          dispatchingMessageId={composer.dispatchingQueuedMessageId}
+          sendingMessageId={composer.sendingQueuedMessageId}
           layoutVariant={layout.variant}
           usesAutomaticContentInsets={usesNativeHeaderGlass}
           onOpenConnectionEditor={handleOpenConnectionEditor}
