@@ -1330,43 +1330,43 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               icon: null,
               className: "text-muted-foreground",
             }
-        : status === "approval"
-          ? {
-              label: "Approval",
-              icon: "approval" as const,
-              className: "text-warning-foreground",
-            }
-          : status === "input"
+          : status === "approval"
             ? {
-                label: "Input",
-                icon: "input" as const,
-                className: "text-indigo-600 dark:text-indigo-300",
+                label: "Approval",
+                icon: "approval" as const,
+                className: "text-warning-foreground",
               }
-            : status === "limited"
+            : status === "input"
               ? {
-                  label: "Limited",
-                  icon: "failed" as const,
-                  className: "text-warning",
+                  label: "Input",
+                  icon: "input" as const,
+                  className: "text-indigo-600 dark:text-indigo-300",
                 }
-              : status === "failed"
+              : status === "limited"
                 ? {
-                    label: "Failed",
+                    label: "Limited",
                     icon: "failed" as const,
-                    className: "text-error",
+                    className: "text-warning",
                   }
-                : isWoke
+                : status === "failed"
                   ? {
-                      label: "Woke",
-                      icon: "woke" as const,
-                      className: "text-warning",
+                      label: "Failed",
+                      icon: "failed" as const,
+                      className: "text-error",
                     }
-                  : isUnread
+                  : isWoke
                     ? {
-                        label: "Done",
-                        icon: "done" as const,
-                        className: "text-success",
+                        label: "Woke",
+                        icon: "woke" as const,
+                        className: "text-warning",
                       }
-                    : null;
+                    : isUnread
+                      ? {
+                          label: "Done",
+                          icon: "done" as const,
+                          className: "text-success",
+                        }
+                      : null;
   const isWokeStatus = topStatus?.icon === "woke";
   const limitStopDetail =
     limitStop !== null && status === "limited"
