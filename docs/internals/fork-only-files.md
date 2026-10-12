@@ -13,6 +13,9 @@ these bullets.
   `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so
   a proxied instance's advisor model (#1232) never fires. The add-instance
   wizard collects no environment for Claude, so only the card draws it.
+- `apps/web/src/components/settings/infinitus/settingsSearchItems.ts` — the six Infinitus `SettingsPath`s (Menu bar, Animations since #747 step 1, Team, Notifications, Devices, Engines; the Themes page of #747 step 1 folded into the Menu bar page) with their labels and scopes, and the fork's searchable settings in result order: the General rows it adds (resume on limit #648, send mode, worktree limit, keep awake #1075) and one item per Infinitus page. Spread into upstream's `settingsSearch.ts`.
+- `apps/web/src/components/settings/infinitus/InfinitusResumeOnLimitSetting.tsx` — the swap-based resume switch (#648), a scoped server setting mounted by Settings › General after upstream's reset-time auto-resume row.
+- `apps/web/src/components/sidebar/InfinitusLimitStop.tsx` — the sidebar row's limit stop (#648): `useThreadLimitStop` off `infinitusLimitStopsAtom`, `limitStopTooltip` (`limitStopLine` in the client's timestamp format, only while the row's status is `limited`) and the `InfinitusLimitStopPill` the row renders in place of its plain status span.
 - `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
