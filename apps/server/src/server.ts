@@ -78,6 +78,9 @@ import {
 import { InfinitusLive } from "./infinitus/Layers/Infinitus.ts";
 import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts";
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
+import { InfinitusResumeOnLimitLive } from "./infinitus/Layers/InfinitusResumeOnLimit.ts";
+import { InfinitusLimitStopsLive } from "./infinitus/Services/InfinitusLimitStops.ts";
+import { InfinitusSwapdProbeLive } from "./infinitus/Services/InfinitusSwapdProbe.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
@@ -613,6 +616,19 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       ),
     ),
   ),
+  // Fork (#648, #1627): resume-on-limit. Tails the orchestrator's domain
+  // events for failed limit runs and `InfinitusLimitStops` for the Claude
+  // adapter's rejected windows (the memoized instance `ws.ts` streams and the
+  // Claude driver reports into, provided in `layerRuntimeDependencies`);
+  // reads the shared `layerInfinitus` snapshot, the swapd probe for the
+  // accounts while the menu bar app is away and for `limit-hit`, and the
+  // server settings for its switch and the proxied instances.
+  InfinitusResumeOnLimitLive.pipe(
+    Layer.provide(layerInfinitus),
+    Layer.provide(InfinitusSwapdProbeLive.pipe(Layer.provide(ProcessRunner.layer))),
+    Layer.provide(ProjectionStoreV2.layer),
+    Layer.provide(layerServerSettings),
+  ),
   // Subscribes to `account.rate-limits.updated` so usage bars track live
   // telemetry instead of waiting for the next status probe.
   ProviderUsageLimitsIngestion.layer,
@@ -713,6 +729,10 @@ const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(
   Layer.provideMerge(layerResourceDiagnostics),
   Layer.provideMerge(layerUsage),
   Layer.provideMerge(layerInfinitus),
+  // Fork (#648): the limit-stop list, one instance for the resume layer, the
+  // Claude driver's refusal hook (read through `Effect.serviceOption` when the
+  // provider registry builds its drivers) and the `ws.ts` stream.
+  Layer.provideMerge(InfinitusLimitStopsLive),
   // The pairing-approval store (#710) mints through the same auth service the
   // QR flow uses; the phone reaches it over HTTP, the desktop over WebSocket.
   Layer.provideMerge(InfinitusPairingLive.pipe(Layer.provide(layerAuth))),

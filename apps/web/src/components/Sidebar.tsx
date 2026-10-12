@@ -13,6 +13,7 @@ import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@infinitus/shared/threadPullRequests";
 import { useAtomValue } from "@effect/atom-react";
+import { limitStopKey, limitStopLine } from "@infinitus/client-runtime/state/infinitusLimitStops";
 import { replaceComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 import * as Schema from "effect/Schema";
 import {
@@ -155,6 +156,7 @@ import {
   useProjects,
   useThreadShells,
 } from "../state/entities";
+import { infinitusLimitStopsAtom } from "../state/infinitus";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
@@ -167,7 +169,7 @@ import {
   resolveActiveThreadRouteRef,
   resolveThreadRouteTarget,
 } from "../threadRoutes";
-import { formatRelativeTimeLabel, parseTimestampDate } from "../timestampFormat";
+import { formatRelativeTimeLabel, formatTimestamp, parseTimestampDate } from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
 import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
@@ -1261,7 +1263,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // Same semantics as the legacy sidebar (never-visited counts as read):
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  const status = resolveSidebarThreadStatus(thread);
+  // Fork (#648): a turn parked on a Claude usage limit reads "Limited" with
+  // the account and the reset in the pill's title until it resumes.
+  const limitStop =
+    useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
+    null;
+  const status = resolveSidebarThreadStatus(thread, { limitStopped: limitStop !== null });
   const isInFlight =
     status === "working" || status === "waiting" || status === "approval" || status === "input";
   // A woken thread reappears at its original position (the sort is
@@ -2052,6 +2059,15 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                         </Tooltip>
                       ) : (
                         <span
+                          title={
+                            limitStop === null
+                              ? undefined
+                              : limitStopLine(
+                                  limitStop,
+                                  (iso) => formatTimestamp(iso, props.timestampFormat),
+                                  Date.now(),
+                                )
+                          }
                           className={cn(
                             "inline-flex items-center gap-1 font-medium",
                             topStatus.className,

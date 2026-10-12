@@ -44,27 +44,28 @@ import {
   type ModelSelection,
   type OrchestrationV2ConversationMessage,
   type OrchestrationV2ExecutionNode,
+  type OrchestrationV2PendingBackgroundTask,
+  type OrchestrationV2PlanArtifact,
+  type OrchestrationV2PlanStep,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2ProviderFailure,
   OrchestrationV2ProviderGoal,
-  type OrchestrationV2PlanArtifact,
-  type OrchestrationV2PlanStep,
-  type OrchestrationV2PendingBackgroundTask,
   type OrchestrationV2ProviderRetry,
   type OrchestrationV2ProviderSession,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2ProviderTurn,
   type OrchestrationV2RuntimeRequest,
-  type OrchestrationV2UserInputQuestion,
   type OrchestrationV2Subagent,
   type OrchestrationV2TurnItem,
+  type OrchestrationV2UserInputQuestion,
   type OrchestrationV2WebSearchResult,
   type ProviderApprovalDecision,
   ProviderDriverKind,
   type ProviderInstanceId,
   type ProviderRequestKind,
-  type ProviderUserInputAnswers,
   type ProviderThreadId,
+  type ProviderUserInputAnswers,
+  type RunId,
   type ThreadId,
 } from "@infinitus/contracts";
 
@@ -2375,8 +2376,11 @@ function terminalResultError(
       return "Claude could not resume a deferred tool call: the tool is no longer available.";
     case "turn_setup_failed":
       return "Claude could not start the turn.";
+    // Fork (#1107): the CLI's prompt-too-long gate (`tengu_ptl_surfaced_to_user`),
+    // not a usage window: the prompt was over the context window when the
+    // turn was assembled. Worded like its sibling, never classed `usage_limit`.
     case "blocking_limit":
-      return "Claude stopped: a usage limit blocked the request.";
+      return "Claude stopped: the prompt exceeds the model's context window.";
     case "rapid_refill_breaker":
       return "Claude stopped: the context refilled too quickly after compaction.";
     case "prompt_too_long":
@@ -2529,9 +2533,7 @@ function providerFailureFromResult(
   usageLimited = false,
 ): OrchestrationV2ProviderFailure | null {
   const failureClass =
-    message.terminal_reason === "blocking_limit" ||
-    (message.subtype === "success" && message.api_error_status === 429) ||
-    usageLimited
+    (message.subtype === "success" && message.api_error_status === 429) || usageLimited
       ? "usage_limit"
       : "provider_error";
   const listedError = resultUserFacingError(message);
@@ -2813,6 +2815,11 @@ interface ClaudeLiveQueryContext {
   permissionMode: PermissionMode;
   // Stop, rollback or fork is closing this process; its work is ending.
   stopping: boolean;
+  // Fork (#648): a turn on this process ended on a usage limit. The CLI keeps
+  // the login it started with, so once the account engine has swapped, a
+  // prompt sent into it is refused on the old account again: the next prompt
+  // opens a fresh process instead, unless background work pins this one.
+  spentOnLimit: boolean;
   // Registry entries still running when this process opened. Their process
   // is gone and never reports their end; any later task_started replaces the
   // entry, so an entry still in this set runs nowhere.
@@ -3007,6 +3014,16 @@ export function claudeProposedPlan(input: unknown): string | null {
   return typeof plan === "string" && plan.trim().length > 0 ? plan.trim() : null;
 }
 
+/** Fork (#648, #1627): what the SDK's `rate_limit_event` said of a window that
+    rejected a running root turn, as resume-on-limit reads it. `resetsAt` is
+    epoch ms (the SDK's seconds, scaled); null when the event named none. */
+export interface ClaudeUsageLimitRefusal {
+  readonly threadId: ThreadId;
+  readonly runId: RunId;
+  readonly rateLimitType: NonNullable<SDKRateLimitInfo["rateLimitType"]> | null;
+  readonly resetsAt: number | null;
+}
+
 export interface ClaudeAdapterV2Options {
   readonly instanceId: ProviderInstanceId;
   readonly settings: ClaudeSettings;
@@ -3019,6 +3036,9 @@ export interface ClaudeAdapterV2Options {
   readonly queryRunner: ClaudeAgentSdkQueryRunnerShape;
   readonly scopedLimitNames?: Ref.Ref<ClaudeScopedLimitNames>;
   readonly onUsageLimits?: ServerProviderShape["applyUsageLimits"];
+  /** Fork (#648, #1627): a rejected usage window on a running root turn, for
+      the resume-on-limit layer (`InfinitusLimitStops.reportRefusal`). */
+  readonly onUsageLimitRefusal?: (refusal: ClaudeUsageLimitRefusal) => Effect.Effect<void>;
   /** Sink for wake-turn continuation requests; defaults to dropping them. */
   readonly continuationRequests?: {
     readonly offer: (
@@ -5788,12 +5808,22 @@ export function makeClaudeAdapterV2(
             if (blocked) {
               context.rejectedRateLimitTypes.add(limitType);
               const resetMs = (rateLimitInfo.resetsAt ?? NaN) * 1000;
+              const resetKnown = Number.isFinite(resetMs) && resetMs > 0 && resetMs < 8.64e15;
               context.rateLimitResetTimes.set(
                 limitType,
-                Number.isFinite(resetMs) && resetMs > 0 && resetMs < 8.64e15
-                  ? DateTime.formatIso(DateTime.makeUnsafe(resetMs))
-                  : null,
+                resetKnown ? DateTime.formatIso(DateTime.makeUnsafe(resetMs)) : null,
               );
+              // Fork (#648): the structured refusal, never the notice's prose,
+              // is what resume-on-limit reads; a nested subagent's turn has
+              // no root run of its own to park.
+              if (adapterOptions.onUsageLimitRefusal) {
+                yield* adapterOptions.onUsageLimitRefusal({
+                  threadId: context.input.threadId,
+                  runId: context.input.runId,
+                  rateLimitType: rateLimitInfo.rateLimitType ?? null,
+                  resetsAt: resetKnown ? resetMs : null,
+                });
+              }
             } else if (
               rateLimitInfo.status === "allowed" ||
               rateLimitInfo.status === "allowed_warning" ||
@@ -6666,9 +6696,7 @@ export function makeClaudeAdapterV2(
               (message.subtype !== "success" ||
                 message.api_error_status == null ||
                 message.api_error_status === 429) &&
-              (message.terminal_reason == null ||
-                message.terminal_reason === "api_error" ||
-                message.terminal_reason === "blocking_limit");
+              (message.terminal_reason == null || message.terminal_reason === "api_error");
             const failureHint =
               context.authenticationFailureMessage ??
               (usageLimited
@@ -6686,6 +6714,12 @@ export function makeClaudeAdapterV2(
               resultFailure?.class === "usage_limit"
                 ? { ...resultFailure, resetAt }
                 : resultFailure;
+            if (terminalFailure?.class === "usage_limit") {
+              const live = yield* Ref.get(queryContext);
+              if (live !== null && live.nativeThreadId === context.nativeThreadId) {
+                live.spentOnLimit = true;
+              }
+            }
             yield* finalizeActiveTurn({
               context,
               status: interrupted ? "interrupted" : terminalStatusFromResult(message, failureHint),
@@ -7289,7 +7323,8 @@ export function makeClaudeAdapterV2(
             existing !== null &&
             existing.nativeThreadId === nativeThreadId &&
             existing.queryPolicyKey === queryPolicyKey &&
-            existing.selectionKey === compiledSelection.queryIdentity
+            existing.selectionKey === compiledSelection.queryIdentity &&
+            !(existing.spentOnLimit && !(yield* liveProcessRunsBackgroundWork(existing)))
           ) {
             // Claude can switch its own mode mid-session (EnterPlanMode), and
             // a denied ExitPlanMode leaves it there. Put the live process back
@@ -7422,6 +7457,7 @@ export function makeClaudeAdapterV2(
             openedPermissionMode: queryOptions.permissionMode,
             permissionMode: queryOptions.permissionMode,
             stopping: false,
+            spentOnLimit: false,
             subagentsFromEarlierProcesses: new Set(
               [...(yield* Ref.get(sessionSubagentsByTaskId)).values()].filter(
                 (subagent) => subagent.task.status === "running",
@@ -8173,7 +8209,10 @@ export type ClaudeAdapterV2DriverEnv =
 export const createClaudeAdapterV2 = Effect.fn("ClaudeAdapterV2Driver.create")(
   function* (
     input: ProviderAdapterDriverCreateInput<ClaudeSettings>,
-    hooks: Pick<ClaudeAdapterV2Options, "scopedLimitNames" | "onUsageLimits"> = {},
+    hooks: Pick<
+      ClaudeAdapterV2Options,
+      "scopedLimitNames" | "onUsageLimits" | "onUsageLimitRefusal"
+    > = {},
   ) {
     const { instanceId, environment, enabled, config } = input;
     const fileSystem = yield* FileSystem.FileSystem;
