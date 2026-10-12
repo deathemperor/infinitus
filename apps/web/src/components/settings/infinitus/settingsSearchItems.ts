@@ -4,6 +4,7 @@ import type { SettingsSearchItem, SettingsSearchScope } from "../settingsSearch"
 export type InfinitusSettingsPath =
   | "/settings/menu-bar"
   | "/settings/animations"
+  | "/settings/priority"
   | "/settings/team"
   | "/settings/notifications"
   | "/settings/devices"
@@ -14,6 +15,7 @@ export type InfinitusSettingsPath =
 export const INFINITUS_SECTION_LABELS: Readonly<Record<InfinitusSettingsPath, string>> = {
   "/settings/menu-bar": "Menu bar",
   "/settings/animations": "Animations",
+  "/settings/priority": "Priority",
   "/settings/team": "Team",
   "/settings/notifications": "Notifications",
   "/settings/devices": "Devices",
@@ -27,6 +29,7 @@ export const INFINITUS_CATEGORY_SCOPES: Readonly<
 > = {
   "/settings/menu-bar": null,
   "/settings/animations": null,
+  "/settings/priority": null,
   "/settings/team": null,
   "/settings/notifications": null,
   "/settings/devices": null,
@@ -102,6 +105,20 @@ export const INFINITUS_SETTINGS_SEARCH_ITEMS = [
     targetId: "infinitus-animations",
     infinitusOnly: true,
     searchTerms: ["animation intro slide fade zoom burn ember flame speed motion"],
+  },
+  {
+    id: "infinitus-sessions",
+    title: "Infinitus priority",
+    to: "/settings/priority",
+    // The Mac files these keys under `priority` since #1069; a build older than
+    // that still answers `sessions`, and the anchor then only loses its scroll.
+    targetId: "infinitus-priority",
+    infinitusOnly: true,
+    // "session" stays as a search term for anyone who knew the row by its old
+    // name; the row itself reads "Thread priority" (#1069).
+    searchTerms: [
+      "thread session priority mode hold interrupt headroom low abundant pct background",
+    ],
   },
   {
     id: "desktop-badge",

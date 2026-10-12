@@ -226,6 +226,10 @@ export const RPC_REQUIRED_SCOPES = {
   // read of orchestration state, like the snapshot.
   [WS_METHODS.subscribeInfinitusLimitStops]: AuthOrchestrationReadScope,
   [WS_METHODS.infinitusPairingDecide]: AuthAccessWriteScope,
+  // The holds list is thread state like the sidebar's; "Run now" starts a
+  // provider turn, so it takes operate like a send.
+  [WS_METHODS.subscribeInfinitusHolds]: AuthOrchestrationReadScope,
+  [WS_METHODS.infinitusReleaseThread]: AuthOrchestrationOperateScope,
   // A project's captures (#433) are the user's own working notes, read and
   // changed by whoever can read and drive its threads — a paired phone too.
   [WS_METHODS.subscribeCaptures]: AuthOrchestrationReadScope,
