@@ -7,6 +7,21 @@ function finiteNonNegativeInteger(value: unknown): number | undefined {
     : undefined;
 }
 
+/**
+ * Fork (#1557): the prompt-cache TTL a Claude turn's writes bought. The
+ * result's `usage.cache_creation` splits the writes into
+ * `ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; one account's
+ * sessions write both, so never assume a constant. 1 hour wins a mixed turn
+ * (the main thread's writes); undefined when the turn wrote nothing.
+ */
+export function claudeCacheTtlSeconds(value: unknown): number | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const creation = value as Record<string, unknown>;
+  if ((finiteNonNegativeInteger(creation.ephemeral_1h_input_tokens) ?? 0) > 0) return 3600;
+  if ((finiteNonNegativeInteger(creation.ephemeral_5m_input_tokens) ?? 0) > 0) return 300;
+  return undefined;
+}
+
 export function normalizeClaudeTurnTokenUsage(
   result: { readonly subtype: SDKResultMessage["subtype"]; readonly usage?: unknown } | undefined,
   hasSubagents: boolean,
@@ -56,10 +71,12 @@ export function normalizeClaudeTurnTokenUsage(
     };
   }
 
+  const cacheTtlSeconds = claudeCacheTtlSeconds(usage.cache_creation);
   const commonUsage = {
     usageScope: "main_agent",
     ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
     ...(cacheCreationTokens !== undefined ? { cacheCreationTokens } : {}),
+    ...(cacheTtlSeconds !== undefined ? { cacheTtlSeconds } : {}),
     ...(thinkingTokens !== undefined && rawOutputTokens !== undefined
       ? { reasoningTokens: Math.min(rawOutputTokens, thinkingTokens) }
       : {}),

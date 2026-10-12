@@ -37,6 +37,7 @@ import {
   TurnItemId,
 } from "./baseSchemas.ts";
 import { ChatAttachment } from "./chatAttachment.ts";
+import { ThreadUsageRollup } from "./threadUsage.ts";
 import {
   OrchestrationGetFullThreadDiffInput,
   OrchestrationGetFullThreadDiffResult,
@@ -435,6 +436,9 @@ export const OrchestrationV2AppThread = Schema.Struct({
       }),
     ),
   ),
+  /** Fork (#834): usage of turns that predate recording, set once by the
+      transcript backfill; the client fold adds the recorded turns to it. */
+  usageBaseline: Schema.optional(ThreadUsageRollup),
   deletedAt: Schema.NullOr(Schema.DateTimeUtc),
 });
 export type OrchestrationV2AppThread = typeof OrchestrationV2AppThread.Type;
@@ -1000,6 +1004,12 @@ export const OrchestrationV2ProviderTurn = Schema.Struct({
   completedAt: Schema.NullOr(Schema.DateTimeUtc),
   tokenUsage: Schema.optional(OrchestrationV2ProviderTurnTokenUsage),
   turnTokenUsage: Schema.optional(TurnTokenUsage),
+  // Fork (#834): the adapter's per-turn share of the provider's cumulative
+  // cost and the models whose counts moved (Claude), and the tool calls the
+  // ingestor counted on the turn's items. Absent, never zero, when unknown.
+  turnCostUsd: Schema.optional(Schema.Number),
+  turnModels: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
+  toolCalls: Schema.optional(NonNegativeInt),
 });
 export type OrchestrationV2ProviderTurn = typeof OrchestrationV2ProviderTurn.Type;
 
@@ -2751,6 +2761,8 @@ export const OrchestrationV2Command = Schema.Union([
     limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecoveryUpdate)),
     /** Link (object) or unlink (null) a pull request (#8160); absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+    /** Fork (#834): the transcript backfill's one write; server-dispatched only. */
+    usageBaseline: Schema.optional(ThreadUsageRollup),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pull-request.link"),

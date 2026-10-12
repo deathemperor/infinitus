@@ -26,6 +26,7 @@ import { useLoadBalancedEnvironment } from "../hooks/useLoadBalancedEnvironment"
 import { useScratchProject } from "../hooks/useScratchProject";
 import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import { visibleThreadPullRequests } from "@infinitus/shared/threadPullRequests";
+import { threadUsageFromProjection } from "@infinitus/shared/threadUsage";
 import {
   latestExecutedRun,
   latestRootProviderFailure,
@@ -3636,6 +3637,12 @@ export default function ChatView(props: ChatViewProps) {
         ),
       ),
     [activeThreadLiveTokenUsage, serverVisibleTurnItems, serverProjection],
+  );
+  // Fork (#834): the thread's usage, folded from the provider turns the
+  // projection carries whole (the bounded snapshot windows only the items).
+  const threadUsage = useMemo(
+    () => (serverProjection === null ? undefined : threadUsageFromProjection(serverProjection)),
+    [serverProjection],
   );
   const pendingBackgroundTasks = useMemo(() => {
     if (serverProjection === null || serverProjection === undefined) {
@@ -11693,6 +11700,7 @@ export default function ChatView(props: ChatViewProps) {
                               }
                               activeThreadModelSelection={activeThread?.modelSelection}
                               activeContextWindow={activeContextWindow}
+                              threadUsage={threadUsage}
                               activeTasksProgress={activeComposerTasksProgress}
                               activeTaskSteps={activeComposerTaskSteps}
                               compactThreadUnavailable={compactThreadUnavailable}

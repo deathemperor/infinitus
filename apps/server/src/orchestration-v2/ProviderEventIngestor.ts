@@ -20,6 +20,7 @@ import {
   RunId,
   ThreadId,
 } from "@infinitus/contracts";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -34,6 +35,11 @@ import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import { ProviderAdapterV2Event } from "@infinitus/provider-core/server/ProviderAdapter";
 import { makeProviderFailureTurnItem } from "@infinitus/provider-core/server/failure";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
+import {
+  countProviderTurnToolCalls,
+  TERMINAL_PROVIDER_TURN_STATUSES,
+  TOOL_CALL_TURN_ITEM_TYPES,
+} from "./providerTurnToolCalls.ts";
 import { stripUnservedToolOutputImageBytes } from "./toolOutputImageBytes.ts";
 
 export class ProviderEventNormalizeError extends Schema.TaggedError<ProviderEventNormalizeError>()(
@@ -318,6 +324,38 @@ export const layer: Layer.Layer<
     const analytics = yield* ProviderTurnAnalytics;
     const completedTurnAnalytics = new Set<string>();
 
+    /**
+     * Fork (#834, #927): a terminal provider turn is stamped with the tool
+     * calls its items count (`providerTurnToolCalls.ts`), read once from the
+     * run's items. A count the adapter already set stands; a read that fails
+     * leaves the turn uncounted (absent, never zero) rather than failing the
+     * turn's terminal event.
+     */
+    const withProviderTurnToolCalls = (
+      input: ProviderEventIngestInput,
+      providerTurn: OrchestrationV2ProviderTurn,
+    ): Effect.Effect<OrchestrationV2ProviderTurn> =>
+      !TERMINAL_PROVIDER_TURN_STATUSES.has(providerTurn.status) ||
+      providerTurn.toolCalls !== undefined
+        ? Effect.succeed(providerTurn)
+        : projections
+            .getThreadRecords(input.event.threadId ?? input.threadId, ["turnItems"], {
+              ...(input.runId === undefined ? {} : { turnItemRunId: input.runId }),
+              turnItemTypes: [...TOOL_CALL_TURN_ITEM_TYPES],
+            })
+            .pipe(
+              Effect.map((records) => ({
+                ...providerTurn,
+                toolCalls: countProviderTurnToolCalls(records.turnItems, providerTurn.id),
+              })),
+              Effect.catchCause((cause) =>
+                Effect.logWarning("provider-turn.tool-calls.read-failed", {
+                  providerTurnId: providerTurn.id,
+                  cause: Cause.pretty(cause),
+                }).pipe(Effect.as(providerTurn)),
+              ),
+            );
+
     const makeDomainEvent = (
       input: ProviderEventIngestInput,
       payloadInput: {
@@ -567,7 +605,8 @@ export const layer: Layer.Layer<
               yield* makeDomainEvent(input, {
                 type: "provider-turn.updated",
                 ...(input.event.threadId === undefined ? {} : { threadId: input.event.threadId }),
-                payload: input.event.providerTurn,
+                // Fork (#834): a terminal turn carries its tool-call count.
+                payload: yield* withProviderTurnToolCalls(input, input.event.providerTurn),
                 nodeId: input.event.providerTurn.nodeId,
               }),
             ];

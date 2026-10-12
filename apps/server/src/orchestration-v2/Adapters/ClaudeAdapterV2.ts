@@ -7,6 +7,14 @@ import {
 import { isWorkspaceImagePreviewPath } from "@infinitus/shared/filePreview";
 import { normalizeClaudeTurnTokenUsage } from "../../provider/ClaudeTurnTokenUsage.ts";
 import {
+  claudeTurnUsageDelta,
+  INITIAL_PROMPT_CACHE_WATCH,
+  promptCacheVerdict,
+  promptCacheWarningText,
+  type ClaudeResultTotals,
+  type PromptCacheWatch,
+} from "./claudeTurnUsage.logic.ts";
+import {
   type CanUseTool,
   forkSession as forkClaudeSession,
   type ForkSessionOptions,
@@ -2817,6 +2825,11 @@ interface ClaudeLiveQueryContext {
   // is gone and never reports their end; any later task_started replaces the
   // entry, so an entry still in this set runs nowhere.
   readonly subagentsFromEarlierProcesses: ReadonlySet<ActiveClaudeSubagent>;
+  // Fork (#834): the last result's cumulative totals, differenced per turn.
+  // Per process: a reopened query() starts its totals over.
+  lastResultTotals: ClaudeResultTotals | undefined;
+  // Fork (#974): the run of large uncached calls, per process.
+  promptCache: PromptCacheWatch;
 }
 
 interface ActiveClaudeToolCall {
@@ -5133,6 +5146,10 @@ export function makeClaudeAdapterV2(
                   failure: null,
                   threadDisposition,
                 };
+          // Fork (#834): this turn's share of the process's cumulative cost
+          // and the models whose counts moved, on the stored provider turn.
+          const turnUsageDelta = claudeTurnUsageDelta(liveQuery?.lastResultTotals, input.result);
+          if (liveQuery !== null) liveQuery.lastResultTotals = turnUsageDelta.totals;
           yield* Effect.all(
             [
               emitProviderEvent({
@@ -5150,6 +5167,12 @@ export function makeClaudeAdapterV2(
                       input.context.subagentsByToolUseId.size > 0,
                     input.status,
                   ),
+                  ...(turnUsageDelta.turnCostUsd === undefined
+                    ? {}
+                    : { turnCostUsd: turnUsageDelta.turnCostUsd }),
+                  ...(turnUsageDelta.turnModels === undefined
+                    ? {}
+                    : { turnModels: turnUsageDelta.turnModels }),
                 },
               }),
               // Surface this native thread's roster before the root turn
@@ -7427,6 +7450,8 @@ export function makeClaudeAdapterV2(
                 (subagent) => subagent.task.status === "running",
               ),
             ),
+            lastResultTotals: undefined,
+            promptCache: INITIAL_PROMPT_CACHE_WATCH,
           };
           yield* Ref.set(queryContext, context);
           yield* querySession.messages.pipe(

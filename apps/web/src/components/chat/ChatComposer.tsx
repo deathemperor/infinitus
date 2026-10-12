@@ -38,6 +38,7 @@ import type {
   ScopedThreadRef,
   ServerProvider,
   ThreadId,
+  ThreadUsageRollup,
   SnapShotSource,
 } from "@infinitus/contracts";
 import {
@@ -309,6 +310,7 @@ import {
   renderProviderTraitsPicker,
 } from "./composerProviderState";
 import { ContextWindowMeter, ContextWindowMeterPlaceholder } from "./ContextWindowMeter";
+import { ComposerThreadUsage } from "./ComposerThreadUsage";
 import {
   providerSupportsManualCompaction,
   resolveContextWindowModelDisplayName,
@@ -1373,6 +1375,8 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   canOperateThread: boolean;
   activeContextWindow: ContextWindowSnapshot | null;
   reserveContextWindowMeter: boolean;
+  /** Fork (#834): the thread's usage rollup; absent until a turn is recorded. */
+  threadUsage: ThreadUsageRollup | undefined;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
   pendingAction: {
@@ -1410,6 +1414,7 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
 }) {
   return (
     <>
+      {props.threadUsage ? <ComposerThreadUsage usage={props.threadUsage} /> : null}
       {props.activeContextWindow ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}
@@ -1624,6 +1629,8 @@ export interface ChatComposerProps {
 
   // Context window
   activeContextWindow: ContextWindowSnapshot | null;
+  /** Fork (#834): the thread's usage rollup, folded from its projection. */
+  threadUsage?: ThreadUsageRollup | undefined;
   compactThreadUnavailable: boolean;
   compactDisabled: boolean;
   compactDisabledReason: string | null;
@@ -1771,6 +1778,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     activeThreadModelSelection,
     reportedModelSelection,
     activeContextWindow,
+    threadUsage,
     compactThreadUnavailable,
     compactDisabled,
     compactDisabledReason,
@@ -7774,6 +7782,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       settings.contextWindowMeterEnabled ? activeContextWindow : null
                     }
                     reserveContextWindowMeter={reserveContextWindowMeter}
+                    threadUsage={threadUsage}
                     activeThreadModelDisplayName={activeThreadModelDisplayName}
                     pendingAction={pendingPrimaryAction}
                     isRunning={phase === "running"}

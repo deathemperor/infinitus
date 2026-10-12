@@ -80,6 +80,7 @@ import { InfinitusCompanionLive } from "./infinitus/Layers/InfinitusCompanion.ts
 import { InfinitusPairingLive } from "./infinitus/Layers/InfinitusPairing.ts";
 import { InfinitusSecretLive } from "./infinitus/Layers/InfinitusSecret.ts";
 import { InfinitusSignInLapseLive } from "./infinitus/Layers/InfinitusSignInLapse.ts";
+import { ThreadUsageBackfillLive } from "./infinitus/Layers/ThreadUsageBackfill.ts";
 import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsageAttribution.ts";
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
@@ -613,6 +614,11 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       ),
     ),
   ),
+  // Fork (#834, #1627): threads whose turns predate usage recording get a
+  // baseline (the v1 rollup the import left, or the Claude transcript's
+  // total) through `thread.metadata.update`; it tails the orchestrator's
+  // domain events and reads the transcripts through `UsageService`.
+  ThreadUsageBackfillLive.pipe(Layer.provide(layerUsage)),
   // Subscribes to `account.rate-limits.updated` so usage bars track live
   // telemetry instead of waiting for the next status probe.
   ProviderUsageLimitsIngestion.layer,
