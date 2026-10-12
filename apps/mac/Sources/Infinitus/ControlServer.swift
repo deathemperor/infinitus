@@ -789,11 +789,14 @@ final class ControlServer {
                     // #1137: a fork-server port the app cannot reach is not
                     // followed — the tunnel and the CLI credential would both
                     // point at a closed port until the app was relaunched.
-                    if args[1] == "fork_server_port", let port = Int(args[2]),
-                       await !model.acceptsForkServerPublish(port: port) {
-                        throw Fail(ForkServerProbe.refusalReply(port: port))
+                    // #1487: nor one from another environment than the
+                    // slot's holder while that holder answers.
+                    let publisher = Self.publisher(of: r)
+                    if args[1] == "fork_server_port", let port = Int(args[2]) {
+                        try await Self.check(model.forkServerPublishVerdict(port: port, publisher: publisher), port: port, model: model)
                     }
                     let (pref, restarting) = try model.setPref(key: args[1], value: PrefCatalog.parseValue(args[2]))
+                    if args[1] == "fork_server_port" { model.desktopCredential.noteEnvironment(publisher.environmentId) }
                     return ControlReply(ok: true, result: try .of(pref), restarting: restarting)
                 }
                 var keys: [String]? = nil
@@ -990,16 +993,20 @@ final class ControlServer {
             // after an accepted `prefs set` this probes nothing. After a
             // refused one it refuses too, rather than leaving the CLI pointed
             // at a port the tunnel was kept away from. Forgetting (empty
-            // stdin) is never refused — it takes no target anywhere.
-            if !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let port = URL(string: origin)?.port,
-               await !model.acceptsForkServerPublish(port: port) {
-                throw Fail(ForkServerProbe.refusalReply(port: port))
+            // stdin) is never refused — it takes no target anywhere; it is
+            // also how an opted-in dev server's slot is handed back by hand
+            // (`infinitusctl desktop release`, #1487).
+            let publisher = Self.publisher(of: r)
+            if !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let port = URL(string: origin)?.port {
+                try await Self.check(model.forkServerPublishVerdict(port: port, publisher: publisher), port: port, model: model)
             }
-            if let why = model.desktopCredential.store(origin: origin, expiresAt: expiresAt, token: token) { throw Fail(why) }
+            if let why = model.desktopCredential.store(origin: origin, expiresAt: expiresAt, environmentId: publisher.environmentId, token: token) {
+                throw Fail(why)
+            }
             return ControlReply(ok: true, result: .object([
                 "origin": model.desktopCredential.origin.map(JSONValue.string) ?? .null,
                 "expiresAt": model.desktopCredential.expiresAt.map(JSONValue.string) ?? .null,
+                "environmentId": model.desktopCredential.environmentId.map(JSONValue.string) ?? .null,
                 "stored": .bool(model.desktopCredential.stored),
             ]))
 
@@ -1013,6 +1020,7 @@ final class ControlServer {
                 "port": .number(Double(model.forkServerPort)),
                 "credential": credential.masked.map(JSONValue.string) ?? .null,
                 "expiresAt": credential.expiresAt.map(JSONValue.string) ?? .null,
+                "environmentId": credential.environmentId.map(JSONValue.string) ?? .null,
                 "stale": .bool(stale),
             ]))
 
@@ -1047,6 +1055,24 @@ final class ControlServer {
 
         default:
             return .failure("\(r.command) is in the manifest but not implemented")
+        }
+    }
+
+    // MARK: the fork server's publisher (#1487)
+
+    /// Who a publish says it is: `--environmentId <id>` and the bare
+    /// `--takeover` flag (the CLI spells a bare flag "true").
+    private static func publisher(of r: ControlRequest) -> ForkServerProbe.Publisher {
+        let id = r.options["environmentId"].flatMap { $0 == "true" || $0.isEmpty ? nil : $0 }
+        return ForkServerProbe.Publisher(environmentId: id, takeover: r.options["takeover"] == "true")
+    }
+
+    /// A verdict other than accept is the publisher's refusal to read.
+    private static func check(_ verdict: ForkServerProbe.Verdict, port: Int, model: AppModel) throws {
+        switch verdict {
+        case .accept: return
+        case .refuse: throw Fail(ForkServerProbe.refusalReply(port: port))
+        case .held(let holder): throw Fail(ForkServerProbe.heldReply(port: port, holder: holder, currentPort: model.forkServerPort))
         }
     }
 

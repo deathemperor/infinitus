@@ -35,6 +35,20 @@ Read ports from the `[dev-runner]` output. Worktrees derive stable preferences f
 but occupied ports can shift them. `T3CODE_PORT_OFFSET` or `T3CODE_DEV_INSTANCE` can select a
 different preference when needed.
 
+#### Publishing to the Mac app
+
+Only the installed desktop publishes its port and the `infinitusctl` credential to the Mac
+app. A dev-runner server, one whose home is a worktree `.t3`, a showcase's temp home, or any
+other `--home-dir` / `T3CODE_HOME` logs `infinitus.server-port.withheld` and stays out, so
+`infinitusctl threads` and `thread send` keep driving the live install and a sandbox seeded
+from real data never takes a message meant for it.
+
+To drive one dev server from `infinitusctl` instead, start it with
+`INFINITUS_PUBLISH_SERVER_PORT=1`. It then publishes like the installed desktop and takes the
+slot from it even while it runs. Hand the slot back by quitting that server, or with
+`infinitusctl desktop release`; the installed desktop's heartbeat re-takes it within a minute,
+without a restart. `infinitusctl desktop status` names the environment holding the slot.
+
 ### Sharing and remote debugging
 
 `vp run dev --share` publishes the web port over the machine's tailnet and prints a pairing URL

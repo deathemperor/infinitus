@@ -155,6 +155,14 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertNil(DesktopRows.resolveThreadID(explicit: "  ", environment: ["T3_THREAD_ID": "current"]))
     }
 
+    func testEnvironmentContextUsesExplicitIDBeforeTheAgentsAndIsOptional() {
+        // #1487: the guard send, new, interrupt, rename and title share.
+        XCTAssertEqual(DesktopRows.resolveEnvironmentID(explicit: "env-b", environment: ["T3_ENVIRONMENT_ID": "env-a"]), "env-b")
+        XCTAssertEqual(DesktopRows.resolveEnvironmentID(explicit: nil, environment: ["T3_ENVIRONMENT_ID": "env-a"]), "env-a")
+        XCTAssertNil(DesktopRows.resolveEnvironmentID(explicit: nil, environment: [:]))
+        XCTAssertNil(DesktopRows.resolveEnvironmentID(explicit: " ", environment: ["T3_ENVIRONMENT_ID": " "]))
+    }
+
     // MARK: rows
 
     func testStatusVocabularyIsDerivedFromTheTurnTheSessionTheFlagsAndTheHold() throws {

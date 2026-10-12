@@ -135,6 +135,16 @@ public enum DesktopRows {
         return value?.isEmpty == false ? value : nil
     }
 
+    /// The environment a verb must land in — `--env`, else the
+    /// `T3_ENVIRONMENT_ID` an agent runs under — or nil when the caller
+    /// named none and any desktop will do. An agent in a dev sandbox whose
+    /// Mac app points at the installed desktop (or the reverse, #1487) is
+    /// refused rather than driven onto the wrong server.
+    public static func resolveEnvironmentID(explicit: String?, environment: [String: String]) -> String? {
+        let value = (explicit ?? environment["T3_ENVIRONMENT_ID"])?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value?.isEmpty == false ? value : nil
+    }
+
     public static func turnInterrupt(threadId: String, turnId: String?, now: Date = Date(), id: () -> String = newID) -> JSONValue {
         var command: [String: JSONValue] = [
             "type": .string("thread.turn.interrupt"), "commandId": .string(id()), "threadId": .string(threadId),

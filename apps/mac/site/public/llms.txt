@@ -17,7 +17,7 @@
 - All-dead countdown: when every account is limited, the popup, the desktop app and the phone count down to the next recovery.
 - Usage history and utilization estimates (usage-cost figures are estimates, never billing truth).
 - 15 themes (Off, RPG, Cyber, MGS, Sci-fi, Cosmo, Ocean, Earth, Gothic, Hades, Movie, Musical, Agent, SWE, West) each renaming the windows and bringing its own intro, death and revival effects.
-- `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential` drive Infinitus desktop's projects and threads from a shell, over the credential the desktop hands the Mac app.
+- `infinitusctl environments | projects | threads | thread show|send|new|interrupt|release | desktop status|credential|release` drive Infinitus desktop's projects and threads from a shell, over the credential the desktop hands the Mac app; only the installed desktop (or a dev server started with `INFINITUS_PUBLISH_SERVER_PORT=1`) hands one over, and `thread send|new|interrupt` refuse a desktop of another environment than `T3_ENVIRONMENT_ID`.
 
 ## Platforms
 

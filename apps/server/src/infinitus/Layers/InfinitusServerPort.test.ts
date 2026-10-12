@@ -1,9 +1,10 @@
-import { type AuthClientSession, AuthSessionId } from "@infinitus/contracts";
+import { type AuthClientSession, AuthSessionId, EnvironmentId } from "@infinitus/contracts";
 import {
   InfinitusCommandFailed,
   InfinitusUnavailable,
   type InfinitusSnapshot,
 } from "@infinitus/contracts/infinitus";
+import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 import { it as effectIt } from "@effect/vitest";
 import * as NodeOS from "node:os";
 import * as Context from "effect/Context";
@@ -19,9 +20,11 @@ import * as TestClock from "effect/testing/TestClock";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
+import { ServerEnvironmentIdentity } from "../../environment/ServerEnvironment.ts";
 import {
   InfinitusControlClient,
   type InfinitusControlClientShape,
+  type InfinitusControlRequestInput,
 } from "../Services/InfinitusControlClient.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
 import { InfinitusLive } from "./Infinitus.ts";
@@ -30,11 +33,17 @@ import {
   DESKTOP_CREDENTIAL_SCOPES,
   DESKTOP_CREDENTIAL_SUBJECT,
   DESKTOP_CREDENTIAL_TTL,
+  HELD_REPLY_PREFIX,
   keepServerPortPublished,
+  makeServerPortPublisher,
+  PUBLISH_OPT_IN_ENV,
   publishedPort,
+  publishOptedIn,
   publishServerPort,
   serverPortWithheldReason,
 } from "./InfinitusServerPort.ts";
+
+const ENVIRONMENT_ID = "env-this-server";
 
 const STUB_SOCKET = "/tmp/infinitus-stub.sock";
 const FAST = Duration.seconds(5);
@@ -95,9 +104,13 @@ interface SecretCall {
 interface ControlStubShape {
   readonly request: InfinitusControlClientShape["request"];
   readonly calls: Effect.Effect<ReadonlyArray<Call>>;
+  /** Every request as sent, options included, secrets dropped. */
+  readonly requests: Effect.Effect<ReadonlyArray<Omit<InfinitusControlRequestInput, "secret">>>;
   readonly secretCalls: Effect.Effect<ReadonlyArray<SecretCall>>;
   readonly setResult: (command: string, result: unknown) => Effect.Effect<void>;
   readonly removeResult: (command: string) => Effect.Effect<void>;
+  /** The app refuses the command with these words (`ok: false`); null lifts it. */
+  readonly setRefusal: (command: string, error: string | null) => Effect.Effect<void>;
   /** A non-null cause makes every command answer `InfinitusUnavailable`. */
   readonly setUnavailable: (cause: string | null) => Effect.Effect<void>;
 }
@@ -110,8 +123,12 @@ const ControlStubLive = Layer.effect(
   ControlStub,
   Effect.gen(function* () {
     const results = yield* Ref.make<Record<string, unknown>>(pollResults());
+    const refusals = yield* Ref.make<Record<string, string>>({});
     const unavailable = yield* Ref.make<string | null>(null);
     const calls = yield* Ref.make<ReadonlyArray<Call>>([]);
+    const requests = yield* Ref.make<ReadonlyArray<Omit<InfinitusControlRequestInput, "secret">>>(
+      [],
+    );
     const secretCalls = yield* Ref.make<ReadonlyArray<SecretCall>>([]);
     const request: InfinitusControlClientShape["request"] = (input) =>
       Effect.gen(function* () {
@@ -119,6 +136,8 @@ const ControlStubLive = Layer.effect(
           ...previous,
           { command: input.command, args: input.args ?? [] },
         ]);
+        const { secret: _secret, ...sent } = input;
+        yield* Ref.update(requests, (previous) => [...previous, sent]);
         if (input.secret !== undefined) {
           const secret = input.secret;
           yield* Ref.update(secretCalls, (previous) => [
@@ -129,6 +148,14 @@ const ControlStubLive = Layer.effect(
         const cause = yield* Ref.get(unavailable);
         if (cause !== null) {
           return yield* new InfinitusUnavailable({ path: STUB_SOCKET, cause });
+        }
+        const refused = (yield* Ref.get(refusals))[input.command];
+        if (refused !== undefined) {
+          return yield* new InfinitusCommandFailed({
+            command: input.command,
+            error: refused,
+            restarting: false,
+          });
         }
         const scripted = yield* Ref.get(results);
         if (!Object.hasOwn(scripted, input.command)) {
@@ -143,10 +170,15 @@ const ControlStubLive = Layer.effect(
     return {
       request,
       calls: Ref.get(calls),
+      requests: Ref.get(requests),
       secretCalls: Ref.get(secretCalls),
       setResult: (command, result) =>
         Ref.update(results, (previous) => ({ ...previous, [command]: result })),
       removeResult: (command) => Ref.update(results, ({ [command]: _dropped, ...rest }) => rest),
+      setRefusal: (command, error) =>
+        Ref.update(refusals, ({ [command]: _lifted, ...rest }) =>
+          error === null ? rest : { ...rest, [command]: error },
+        ),
       setUnavailable: (cause) => Ref.set(unavailable, cause),
     } satisfies ControlStubShape;
   }),
@@ -194,7 +226,9 @@ const clientSession = (sessionId: string, subject: string): AuthClientSession =>
   current: false,
 });
 
-/** Mints `sess-N` / `tok-N` in order and remembers what was asked and revoked. */
+/** Mints `sess-N` / `tok-N` in order and remembers what was asked and
+    revoked. A minted session is an active row until revoked, as in the real
+    store, so a publisher can see whether the one it holds still stands. */
 const AuthStubLive = Layer.effect(
   AuthStub,
   Effect.gen(function* () {
@@ -223,6 +257,12 @@ const AuthStubLive = Layer.effect(
                 ],
               ] as const,
           ).pipe(
+            Effect.tap((n) =>
+              Ref.update(sessions, (rows) => [
+                ...rows,
+                clientSession(`sess-${n}`, input?.subject ?? "t3"),
+              ]),
+            ),
             Effect.map((n) => ({
               sessionId: AuthSessionId.make(`sess-${n}`),
               token: `tok-${n}`,
@@ -235,7 +275,12 @@ const AuthStubLive = Layer.effect(
           ),
         listSessions: () => Ref.get(sessions),
         revokeSession: (sessionId) =>
-          Ref.update(revoked, (previous) => [...previous, sessionId]).pipe(Effect.as(true)),
+          Ref.update(revoked, (previous) => [...previous, sessionId]).pipe(
+            Effect.andThen(
+              Ref.update(sessions, (rows) => rows.filter((row) => row.sessionId !== sessionId)),
+            ),
+            Effect.as(true),
+          ),
       }),
     };
   }),
@@ -243,13 +288,25 @@ const AuthStubLive = Layer.effect(
 
 const stubAuthLayer = Layer.unwrap(Effect.map(AuthStub, (stub) => stub.auth));
 
+const identityLayer = Layer.succeed(
+  ServerEnvironmentIdentity,
+  ServerEnvironmentIdentity.of({
+    getEnvironmentId: Effect.succeed(EnvironmentId.make(ENVIRONMENT_ID)),
+  }),
+);
+
 const testLayer = (socketPath: string | null = STUB_SOCKET) =>
   InfinitusLive.pipe(
     Layer.provideMerge(stubClientLayer(socketPath)),
     Layer.provideMerge(stubAuthLayer),
+    Layer.provideMerge(identityLayer),
     Layer.provideMerge(ControlStubLive),
     Layer.provideMerge(AuthStubLive),
   );
+
+/** The process environment of a server the user picked (#1487). */
+const optedIn = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.provideService(effect, HostProcessEnvironment, { [PUBLISH_OPT_IN_ENV]: "1" });
 
 /** The `prefs set fork_server_port …` writes, in order. */
 const portWrites = (calls: ReadonlyArray<Call>) =>
@@ -288,23 +345,25 @@ const watch = Effect.fn("watch")(function* () {
 const settle = Effect.repeat(Effect.yieldNow, { times: 20 });
 
 describe("serverPortWithheldReason", () => {
+  const installed = {
+    devUrl: undefined,
+    baseDir: "/Users/me/.infinitus",
+    defaultHome: "/Users/me/.infinitus",
+    worktreeT3Home: undefined,
+    controlSocketOverride: undefined,
+    publishOptIn: false,
+  };
+
   it("withholds the pref from a dev-runner or worktree server and publishes for the installed one", () => {
-    const installed = {
-      devUrl: undefined,
-      baseDir: "/Users/me/.t3",
-      worktreeT3Home: undefined,
-      controlSocketOverride: undefined,
-    };
     expect(serverPortWithheldReason(installed)).toBeUndefined();
     expect(
       serverPortWithheldReason({ ...installed, devUrl: new URL("http://localhost:3000") }),
     ).toMatch(/dev-runner/);
     expect(
       serverPortWithheldReason({
-        devUrl: undefined,
+        ...installed,
         baseDir: "/Users/me/wt/.t3",
         worktreeT3Home: "/Users/me/wt/.t3",
-        controlSocketOverride: undefined,
       }),
     ).toMatch(/worktree-local/);
     // An isolated instance (its own control socket) is never the installed
@@ -315,13 +374,48 @@ describe("serverPortWithheldReason", () => {
     expect(serverPortWithheldReason({ ...installed, controlSocketOverride: "" })).toBeUndefined();
     // A worktree checkout run against the shared home is not a worktree server.
     expect(
+      serverPortWithheldReason({ ...installed, worktreeT3Home: "/Users/me/wt/.t3" }),
+    ).toBeUndefined();
+  });
+
+  it("withholds the pref from any server whose home is not the default one (#1487)", () => {
+    // A showcase's temp dir, a `--home-dir`, a `T3CODE_HOME`: none of them is
+    // the installed desktop, whatever else is true of the process.
+    expect(
+      serverPortWithheldReason({ ...installed, baseDir: "/tmp/t3-mobile-showcase-x1/home" }),
+    ).toMatch(/not the default/);
+    expect(serverPortWithheldReason({ ...installed, baseDir: "/Users/me/elsewhere" })).toMatch(
+      /INFINITUS_PUBLISH_SERVER_PORT=1/,
+    );
+    // Spelling: a trailing separator is the same directory.
+    expect(
+      serverPortWithheldReason({ ...installed, baseDir: "/Users/me/.infinitus/" }),
+    ).toBeUndefined();
+  });
+
+  it("publishes from any server the opt-in names, whatever its home", () => {
+    const optIn = { ...installed, publishOptIn: true };
+    expect(serverPortWithheldReason({ ...optIn, baseDir: "/tmp/showcase" })).toBeUndefined();
+    expect(
       serverPortWithheldReason({
-        devUrl: undefined,
-        baseDir: "/Users/me/.t3",
+        ...optIn,
+        devUrl: new URL("http://localhost:3000"),
+        baseDir: "/Users/me/wt/.t3",
         worktreeT3Home: "/Users/me/wt/.t3",
-        controlSocketOverride: undefined,
       }),
     ).toBeUndefined();
+    expect(
+      serverPortWithheldReason({ ...optIn, controlSocketOverride: "/tmp/i3.sock" }),
+    ).toBeUndefined();
+  });
+
+  it("reads the opt-in as a plain yes, never as merely set", () => {
+    expect(publishOptedIn("1")).toBe(true);
+    expect(publishOptedIn(" true ")).toBe(true);
+    expect(publishOptedIn("YES")).toBe(true);
+    expect(publishOptedIn("0")).toBe(false);
+    expect(publishOptedIn("")).toBe(false);
+    expect(publishOptedIn(undefined)).toBe(false);
   });
 });
 
@@ -401,7 +495,11 @@ describe("publishServerPort: the desktop credential (#822)", () => {
       expect(yield* stub.secretCalls).toEqual([
         {
           command: DESKTOP_CREDENTIAL_COMMAND,
-          options: { origin: "http://127.0.0.1:3774", expiresAt: "2026-12-10T00:00:00.000Z" },
+          options: {
+            origin: "http://127.0.0.1:3774",
+            expiresAt: "2026-12-10T00:00:00.000Z",
+            environmentId: ENVIRONMENT_ID,
+          },
           secret: "tok-1",
         },
       ]);
@@ -470,6 +568,111 @@ describe("publishServerPort: the desktop credential (#822)", () => {
   );
 });
 
+describe("publishServerPort: who is publishing (#1487)", () => {
+  effectIt.effect("names this environment on both verbs, and takes over only when opted in", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      yield* stub.setResult("manifest", manifestWithCredential());
+      yield* stub.setResult(DESKTOP_CREDENTIAL_COMMAND, { stored: true });
+      yield* publishServerPort(3774);
+      expect((yield* stub.requests).slice(1)).toEqual([
+        {
+          command: "prefs",
+          args: ["set", "fork_server_port", "3774"],
+          options: { environmentId: ENVIRONMENT_ID },
+        },
+        {
+          command: DESKTOP_CREDENTIAL_COMMAND,
+          options: {
+            origin: "http://127.0.0.1:3774",
+            expiresAt: "2026-12-10T00:00:00.000Z",
+            environmentId: ENVIRONMENT_ID,
+          },
+        },
+      ]);
+
+      yield* optedIn(publishServerPort(3774));
+      expect((yield* stub.requests).slice(4).map((request) => request.options)).toEqual([
+        { environmentId: ENVIRONMENT_ID, takeover: "true" },
+        {
+          origin: "http://127.0.0.1:3774",
+          expiresAt: "2026-12-10T00:00:00.000Z",
+          environmentId: ENVIRONMENT_ID,
+          takeover: "true",
+        },
+      ]);
+    }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect("a slot another environment holds is left alone: no credential, no failure", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const auth = yield* AuthStub;
+      yield* stub.setResult("manifest", manifestWithCredential());
+      yield* stub.setRefusal("prefs", `${HELD_REPLY_PREFIX}env-dev-sandbox on :3841`);
+      expect(yield* publishServerPort(3774)).toBe(true);
+      expect((yield* stub.calls).map((call) => call.command)).toEqual(["manifest", "prefs"]);
+      expect(yield* auth.issued).toEqual([]);
+    }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect("a republish hands over the session it minted; a revoked one is replaced", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const auth = yield* AuthStub;
+      yield* stub.setResult("manifest", manifestWithCredential());
+      yield* stub.setResult(DESKTOP_CREDENTIAL_COMMAND, { stored: true });
+      const publisher = yield* makeServerPortPublisher(3774);
+      yield* publisher.publish;
+      yield* publisher.publish;
+      // Two hand-overs, one row: the same token both times, nothing revoked.
+      expect((yield* stub.secretCalls).map((call) => call.secret)).toEqual(["tok-1", "tok-1"]);
+      expect((yield* auth.issued).length).toBe(1);
+      expect(yield* auth.revoked).toEqual([]);
+
+      // The user revoked it in Settings › Devices: the next publish mints
+      // anew, revoking nothing (the row is already gone).
+      yield* auth.setSessions([]);
+      yield* publisher.publish;
+      expect((yield* stub.secretCalls).map((call) => call.secret)).toEqual([
+        "tok-1",
+        "tok-1",
+        "tok-2",
+      ]);
+      expect(yield* auth.revoked).toEqual([]);
+
+      // A fresh publisher (a restarted server) knows no session: it replaces
+      // the row the previous one left.
+      yield* publishServerPort(3774);
+      expect(yield* auth.revoked).toEqual(["sess-2"]);
+      expect((yield* auth.issued).length).toBe(3);
+    }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect("a refused hand-over of a reused session keeps it for the next try", () =>
+    Effect.gen(function* () {
+      const stub = yield* ControlStub;
+      const auth = yield* AuthStub;
+      yield* stub.setResult("manifest", manifestWithCredential());
+      yield* stub.setResult(DESKTOP_CREDENTIAL_COMMAND, { stored: true });
+      const publisher = yield* makeServerPortPublisher(3774);
+      yield* publisher.publish;
+      yield* stub.setRefusal(DESKTOP_CREDENTIAL_COMMAND, "the keychain refused the credential");
+      yield* publisher.publish;
+      // Still one row, still held: the session is valid, only the store failed.
+      expect(yield* auth.revoked).toEqual([]);
+      yield* stub.setResult(DESKTOP_CREDENTIAL_COMMAND, { stored: true });
+      yield* stub.setRefusal(DESKTOP_CREDENTIAL_COMMAND, null);
+      yield* publisher.publish;
+      expect((yield* stub.secretCalls).map((call) => call.secret)).toEqual([
+        "tok-1",
+        "tok-1",
+        "tok-1",
+      ]);
+    }).pipe(Effect.provide(testLayer())),
+  );
+});
+
 describe("keepServerPortPublished", () => {
   effectIt.effect("republishes within a minute when another server took the port (#1137)", () =>
     Effect.gen(function* () {
@@ -495,6 +698,29 @@ describe("keepServerPortPublished", () => {
 
       yield* Fiber.interrupt(keeper);
     }).pipe(Effect.provide(testLayer())),
+  );
+
+  effectIt.effect(
+    "a drift republish hands the app the same credential, not a new row (#1487)",
+    () =>
+      Effect.gen(function* () {
+        const stub = yield* ControlStub;
+        const auth = yield* AuthStub;
+        yield* stub.setResult("manifest", manifestWithCredential());
+        yield* stub.setResult(DESKTOP_CREDENTIAL_COMMAND, { stored: true });
+        yield* stub.setResult("prefs", catalogWithPort(3841));
+        const keeper = yield* Effect.forkChild(keepServerPortPublished(3774));
+        yield* settle;
+        yield* TestClock.adjust(Duration.minutes(3));
+        yield* settle;
+        // Three drifts republished; one session, handed over each time.
+        expect((yield* stub.secretCalls).length).toBe(4);
+        expect(new Set((yield* stub.secretCalls).map((call) => call.secret))).toEqual(
+          new Set(["tok-1"]),
+        );
+        expect((yield* auth.issued).length).toBe(1);
+        yield* Fiber.interrupt(keeper);
+      }).pipe(Effect.provide(testLayer())),
   );
 
   effectIt.effect("the heartbeat never re-mints the credential while the port is ours", () =>
