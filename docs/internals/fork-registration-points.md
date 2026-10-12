@@ -200,13 +200,10 @@ new` creates on) and `POST /api/infinitus/alert` (#1375, the Mac's account
   `knownPosixCliPath` between the login-shell (or launchctl) PATH and the
   process's own, so a `.zshrc` slower than the 5 s probe timeout, or a probe
   PATH with no `claude`, still reaches the usual install dirs.
-- `apps/web/src/routes/__root.tsx` — the fork's mounts: `DeepLinkCoordinator`
-  beside `DesktopAppActivationCoordinator` (#270 D); `NotificationModeMigration`,
-  `DesktopBadgeCoordinator` and `DesktopKeepAwakeCoordinator`
-  (`docs/internals/notifications.md`, `desktop-keep-awake.md`);
-  `CaptureGestureCoordinator` (#433); `InfinitusEventToasts`;
-  `InfinitusPeerFleets` beside it, Electron only (#1545), and
-  `InfinitusSettingsSync` under it (`docs/internals/settings-sync.md`).
+- `apps/web/src/routes/__root.tsx` — one mount, `InfinitusRootMounts`
+  (`apps/web/src/components/InfinitusRootMounts.tsx`, which lists the fork's
+  headless coordinators), beside `DesktopAppActivationCoordinator`, with the
+  authenticated flag.
 - `apps/server/src/serverLogger.ts` — `ServerLoggerLive` adds the fork's file
   logger (`infinitus/serverLogFile.ts`, in `fork-only-files.md`) beside `consolePretty` and
   `tracerLogger` (#1182); `apps/server/src/config.ts` — `serverLogNdjsonPath`
@@ -530,14 +527,15 @@ background`). Riding along, all
   ignores the initialize frame's `clientInfo.name` and `title` next to
   upstream's `version`: the Codex replay fixtures were recorded under
   upstream's product name and the client sends `PRODUCT_NAME`.
-- `apps/web/src/components/chat/ChatComposer.tsx` — three fork mounts, each
-  additive at an upstream anchor: the Captures badge and popover with
-  `useCapturesShortcuts` (#433; `useActiveProjectRef` is the one route read
-  the project-scoped features share), the Prompts badge and popover plus the
-  project's snippets appended to the `/` menu and applied on select
-  (`prompt-snippet`, #270 G), and the image attachment's "Draw on" button
-  opening `ImageMarkupDialog`, whose save swaps the attachment for the marked
-  PNG under a new id (#875).
+- `apps/web/src/components/chat/ChatComposer.tsx` — the registrations of
+  `chat/InfinitusComposer.tsx` (fork-only; Captures #433, Prompts #270 G,
+  image markup #875): one `useInfinitusComposer` call ahead of the `/` menu
+  derivation, the snippets appended to that menu and applied on select
+  (`prompt-snippet`), one `useComposerImageMarkup` call, and three JSX
+  slots — `InfinitusComposerBadges` in the banner dock,
+  `InfinitusComposerMenus` in the command-menu layer (handed upstream's
+  private `ComposerCommandMenuLayer`), `ComposerImageMarkupControl` in the
+  image attachment's frame.
 - Upstream tests carrying the renderer origin or the userData directory
   (`DesktopAppIdentity`, `DesktopClerk`, `ElectronProtocol`, `DesktopWindow`,
   `DesktopLinuxUrlHandler`, `DesktopPreReadyPlatform`,
@@ -675,9 +673,12 @@ background`). Riding along, all
   so a nested page's nav item is the only one lit, the `desktop-keep-awake`
   item (#1075) and `CONNECT_NAME` as the Connect section's title.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
-- `apps/web/src/components/settings/SettingsSidebarNav.tsx` — an icon per
-  Infinitus path and the capability filter that hides all six where no
-  connected server reaches an Infinitus app.
+- `apps/web/src/components/settings/SettingsSidebarNav.tsx` —
+  `INFINITUS_SETTINGS_SECTION_ICONS` spread into the icon table and upstream's
+  nav filter wrapped in `useInfinitusSettingsNavItems` (both
+  `settings/infinitus/settingsNav.ts`: the six pages hidden where no connected
+  server reaches an Infinitus app); `isSettingsSectionActive` for the active
+  state.
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
@@ -700,10 +701,15 @@ background`). Riding along, all
   `isSettingsSectionActive` counts a prefix match only for the deepest nav
   item above the path, so Engines' Activity sub screen
   (`/settings/engines/activity`) lights Engines alone.
-- `apps/web/src/components/sidebar/SidebarChrome.tsx` — the Accounts, Stats
-  and Utilization utility items (Accounts behind the `infinitus` capability
-  gate), the header's brand mark as plain `PRODUCT_NAME`, and the backdrop
-  read through `useSidebarStageBackdropVariant` so the theme's scene applies.
+- `apps/web/src/components/sidebar/SidebarChrome.tsx` — one
+  `InfinitusSidebarUtilityItems` mount between Pull Requests and Usage (the
+  menu wraps, `flex-wrap`), the header's brand mark as plain `PRODUCT_NAME`,
+  and the backdrop read through `useSidebarStageBackdropVariant` so the
+  theme's scene applies.
+- `apps/web/src/components/AppSidebarLayout.tsx` — one
+  `useHistoryNavigation(pathname)` call (`hooks/useHistoryNavigation.ts`: the
+  mouse's back and forward buttons and the macOS page-swipe gesture, #840,
+  #1250).
 - `packages/contracts/src/keybindings.ts` — `accounts.open` in
   `STATIC_KEYBINDING_COMMANDS`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and

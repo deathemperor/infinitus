@@ -26,15 +26,8 @@ import { ConnectOnboardingDialog } from "../components/cloud/ConnectOnboardingDi
 import { RelayClientInstallDialog } from "../components/cloud/RelayClientInstallDialog";
 import { SshPasswordPromptDialog } from "../components/desktop/SshPasswordPromptDialog";
 import { SnapShotCoordinator } from "../components/desktop/SnapShotCoordinator";
-import { CaptureGestureCoordinator } from "../components/captures/CaptureGestureCoordinator";
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
-import { DeepLinkCoordinator } from "../components/deepLinks/DeepLinkCoordinator";
-import { InfinitusEventToasts } from "../components/InfinitusEventToasts";
-import { InfinitusPeerFleets } from "../components/InfinitusPeerFleets";
-import { InfinitusSettingsSync } from "../components/InfinitusSettingsSync";
-import { DesktopBadgeCoordinator } from "../components/desktop/DesktopBadgeCoordinator";
-import { DesktopKeepAwakeCoordinator } from "../components/desktop/DesktopKeepAwakeCoordinator";
-import { NotificationModeMigration } from "../components/desktop/NotificationModeMigration";
+import { InfinitusRootMounts } from "../components/InfinitusRootMounts";
 import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
 import { ProviderUpdateLaunchNotification } from "../components/ProviderUpdateLaunchNotification";
 import { NightlyMobileBetaNotice } from "../components/NightlyMobileBeta";
@@ -236,24 +229,17 @@ function RootRouteView() {
         >
           {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
           {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
-          {primaryEnvironmentAuthenticated ? <DeepLinkCoordinator /> : null}
+          <InfinitusRootMounts authenticated={primaryEnvironmentAuthenticated} />
           {isElectron ? <RunningThreadKeepAlive /> : null}
           <RelayClientInstallDialog />
           <ConnectOnboardingDialog />
           <SshPasswordPromptDialog />
           <SnapShotCoordinator />
-          <NotificationModeMigration />
-          {primaryEnvironmentAuthenticated ? <DesktopBadgeCoordinator /> : null}
-          {primaryEnvironmentAuthenticated ? <DesktopKeepAwakeCoordinator /> : null}
-          <CaptureGestureCoordinator />
           <ThreadNotificationCoordinator />
           <ReopenClosedViewShortcut />
           <ConfirmDialogHost />
           <CustomSnoozeDialogHost />
           <SlowRpcRequestToastCoordinator />
-          {primaryEnvironmentAuthenticated ? <InfinitusEventToasts /> : null}
-          {primaryEnvironmentAuthenticated && isElectron ? <InfinitusPeerFleets /> : null}
-          {primaryEnvironmentAuthenticated && isElectron ? <InfinitusSettingsSync /> : null}
           <PermissionUpdateNotice />
           {primaryEnvironmentAuthenticated ? <LegacyThreadMigrationToast /> : null}
           <ProjectCloneToastCoordinator />

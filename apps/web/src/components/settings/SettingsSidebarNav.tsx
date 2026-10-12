@@ -11,28 +11,21 @@ import {
 } from "react";
 import {
   ArchiveIcon,
-  BellIcon,
   BlocksIcon,
   BotIcon,
-  CpuIcon,
   createLucideIcon,
   CalendarClockIcon,
   GitBranchIcon,
   HardDriveIcon,
-  InfinityIcon,
   PanelsTopLeftIcon,
   KeyboardIcon,
   Link2Icon,
   PaletteIcon,
   SearchIcon,
   Settings2Icon,
-  SmartphoneIcon,
-  SparklesIcon,
-  UsersIcon,
   XIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { useEnvironments } from "~/state/environments";
 
 import { Button } from "../ui/button";
 import { Kbd } from "../ui/kbd";
@@ -58,6 +51,10 @@ import {
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { validateSettingsScopeSearch } from "./settingsScope";
+import {
+  INFINITUS_SETTINGS_SECTION_ICONS,
+  useInfinitusSettingsNavItems,
+} from "./infinitus/settingsNav";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
   [
@@ -96,24 +93,9 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/source-control": GitBranchIcon,
   "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
-  "/settings/menu-bar": InfinityIcon,
-  "/settings/animations": SparklesIcon,
-  "/settings/team": UsersIcon,
-  "/settings/notifications": BellIcon,
-  "/settings/devices": SmartphoneIcon,
-  "/settings/engines": CpuIcon,
+  ...INFINITUS_SETTINGS_SECTION_ICONS,
   "/settings/archived": ArchiveIcon,
 };
-
-/** The pages that only exist where a connected server drives an Infinitus app. */
-const INFINITUS_SETTINGS_PATHS: ReadonlySet<SettingsPath> = new Set<SettingsPath>([
-  "/settings/menu-bar",
-  "/settings/animations",
-  "/settings/team",
-  "/settings/notifications",
-  "/settings/devices",
-  "/settings/engines",
-]);
 
 const SETTINGS_NAV_ITEMS: ReadonlyArray<{
   label: string;
@@ -135,28 +117,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const currentHash = useLocation({ select: (location) => location.hash });
   const currentSearch = useLocation({ select: (location) => location.search });
   const scopeSearch = useMemo(() => validateSettingsScopeSearch(currentSearch), [currentSearch]);
+  const navItems = useInfinitusSettingsNavItems(
+    SETTINGS_NAV_ITEMS.filter(
+      (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
+    ),
+  );
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems(scopeSearch);
-  const { environments } = useEnvironments();
-  // One connected Infinitus is enough: the pages read the primary environment
-  // but the nav only decides whether they lead anywhere at all.
-  const infinitusSupported = environments.some(
-    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
-  );
-  // Upstream hides Projects outside the overview scope; the fork hides the
-  // menu bar app's pages when no connected environment runs it.
-  const navItems = useMemo(
-    () =>
-      SETTINGS_NAV_ITEMS.filter(
-        (item) =>
-          (item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch)) &&
-          (infinitusSupported || !INFINITUS_SETTINGS_PATHS.has(item.to)),
-      ),
-    [infinitusSupported, scopeSearch],
-  );
   const results = useMemo(() => searchSettings(query, searchableItems), [query, searchableItems]);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
