@@ -72,7 +72,7 @@ export const SidebarProjectGroupingMode = Schema.Literals([
 export type SidebarProjectGroupingMode = typeof SidebarProjectGroupingMode.Type;
 const DEFAULT_SIDEBAR_PROJECT_GROUPING_MODE: SidebarProjectGroupingMode = "repository";
 /** Fork (#269 H): how many threads may hold a worktree at once; 0 lifts the limit. */
-export const DEFAULT_WORKTREE_MAX_COUNT = 25;
+const DEFAULT_WORKTREE_MAX_COUNT = 25;
 const WorktreeMaxCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 export const MIN_SIDEBAR_THREAD_PREVIEW_COUNT = 1;
 export const MAX_SIDEBAR_THREAD_PREVIEW_COUNT = 15;
