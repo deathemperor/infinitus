@@ -327,6 +327,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["usage quota rate limit reset recover continue"],
   },
   {
+    id: "infinitus-resume-on-limit",
+    title: "Resume limited threads on another account",
+    to: "/settings/general",
+    searchTerms: ["usage quota rate limit swap another account resume continue"],
+  },
+  {
     id: "working-shelf",
     title: "Working section (beta)",
     to: "/settings/general",

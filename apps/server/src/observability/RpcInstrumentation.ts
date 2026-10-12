@@ -207,6 +207,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.infinitusLaunch]: "infinitus",
   [WS_METHODS.infinitusSecret]: "infinitus",
   [WS_METHODS.subscribeInfinitusPairing]: "infinitus",
+  [WS_METHODS.subscribeInfinitusLimitStops]: "infinitus",
   [WS_METHODS.infinitusPairingDecide]: "infinitus",
   [WS_METHODS.subscribeCaptures]: "captures",
   [WS_METHODS.capturesApply]: "captures",

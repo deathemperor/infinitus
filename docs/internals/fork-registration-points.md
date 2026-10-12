@@ -48,8 +48,16 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `runningTurns?` on the running state),
   `packages/client-runtime/src/connection/outdatedHostUpdate.ts`
   (`OutdatedHostUpdateStage` takes `waiting`),
-  `apps/web/src/components/ServerUpdateAction.tsx` (the `waiting` label).
-  Rules and traps: `docs/internals/update-idle-gate.md`.
+  `apps/web/src/components/ServerUpdateAction.tsx` (the refusal toast with
+  "Update when they finish" / "Update now", the `waiting` label with the
+  count), `chat/ComposerServerUpdateStatus.tsx` (the count along),
+  `desktopUpdate.logic.ts` (+ test; `countRunningLocalTurns`, the dialog
+  copy, `resolveInstallWhenIdleStep`), `sidebar/SidebarUpdatePill.tsx` (the
+  dialog instead of the plain confirm while turns run, the armed wait),
+  `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`),
+  `ProviderUpdateLaunchNotification.environments.ts` (`isLocalConnectionTarget`
+  exported for the count). The dialog itself is fork-owned
+  (`fork-only-files.md`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
   also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
   in the sidebar's utility row, so their Back returns to the main app (#1601).
@@ -62,8 +70,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `infinitus.pairingDecide` (approve-on-Mac pairing, #710) the same way,
   contracts in `infinitusPairing.ts`; `subscribeCaptures` / `captures.apply`
   (#433) the same way, contracts in `captures.ts`; `server.getStats` (#659,
-  contracts in `stats.ts`); `vcs.removeWorktree` answers
-  `VcsRemoveWorktreeResult` (#270 A).
+  contracts in `stats.ts`); `subscribeInfinitusLimitStops` (#648 on v2,
+  #1627; `InfinitusLimitStops` in `infinitus.ts`) the same way;
+  `vcs.removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A).
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` (+ `apps/web/src/worktreeCleanup.ts`: `branchDeletionPrompt`, `describeSavedWorktreeWork`) — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding; the `removeWorktree` mocks in `apps/server/src/mcp/WorktreeMcpService.test.ts` and `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts` answer that result shape. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
   `InfinitusPairingHttpApi`: the phone's two unauthenticated pairing-approval
@@ -82,11 +91,14 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (optional) on `ExecutionEnvironmentDescriptor` (#663); `lanHttpBaseUrls`
   (optional, #651) beside it.
 - `packages/client-runtime/src/rpc/client.ts` — `subscribeInfinitus`,
-  `subscribeInfinitusPairing` and `subscribeCaptures` in
-  `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
+  `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops` and
+  `subscribeCaptures` in `EnvironmentSubscriptionRpcTag`, so the client's
+  `subscribe` accepts them.
 - `apps/server/src/ws.ts` — pulls `InfinitusService`, `InfinitusCompanion`,
-  `InfinitusSecret`, `InfinitusPairing` and `CaptureStore` beside the other
-  services and answers the Infinitus methods: `subscribeInfinitus` /
+  `InfinitusSecret`, `InfinitusPairing`, `InfinitusLimitStops`
+  (`subscribeInfinitusLimitStops` → its `stopped` stream, #648) and
+  `CaptureStore` beside the other services and answers the Infinitus
+  methods: `subscribeInfinitus` /
   `infinitus.command`, `infinitus.launch`, `infinitus.secret` (the session's
   id and scopes along), the pairing stream and `decide` (the approver's
   session scopes go along; only the request id reaches the span);
@@ -147,7 +159,14 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `layerRuntimeCoreDependenciesBase`'s `Layer.mergeAll` beside upstream's
   reactors, where the chain hands it `OrchestratorV2` and `ServerEnvironment`;
   it is provided `layerInfinitus` itself (memoized, one instance), its own
-  control client, `ProcessRunner.layer` and `InfinitusAlertRelayLive`. `infinitusPairingHttpApiLayer` and `infinitusHttpApiLayer`
+  control client, `ProcessRunner.layer` and `InfinitusAlertRelayLive`.
+  `InfinitusResumeOnLimitLive` (#648, #1627) sits in the same `mergeAll`,
+  provided `layerInfinitus`, `InfinitusSwapdProbeLive` over
+  `ProcessRunner.layer`, `ProjectionStoreV2.layer` and `layerServerSettings`;
+  `InfinitusLimitStopsLive` is `provideMerge`d into `layerRuntimeDependencies`
+  after `layerInfinitus`, so the one instance reaches that layer, `ws.ts` and
+  the provider registry's drivers (`ClaudeDriver` reads it through
+  `Effect.serviceOption`). `infinitusPairingHttpApiLayer` and `infinitusHttpApiLayer`
   (provided `InfinitusRunningTurnsLive` over `ProjectionStoreV2.layer`, #829,
   and `InfinitusAlertRelayLive` over the secret store and
   `FetchHttpClient.layer`, #1375) in `layerMakeRoutes`. `CaptureStore.layer`
@@ -164,22 +183,38 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   one call before the command and the `--literal-pathspecs` / `-- <paths>`
   arguments; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
   the checkpoint author and committer names are `PRODUCT_NAME`.
-- `packages/contracts/src/providerRuntime.ts` — six fork-owned optional
+- `packages/contracts/src/providerRuntime.ts` — five fork-owned optional
   fields: `TaskStartedPayload.prompt` (#1573) and `isBackgrounded` (#974;
   the one on `TaskUpdatedPayload` is upstream's),
-  `TurnCompletedPayload.turnCostUsd` / `turnModels` (#834) and
-  `usageLimited` (#648), `TurnTokenUsage.cacheTtlSeconds` (#1557). No
-  orchestration-v2 adapter writes them and no client reads them; kept for
-  the #1627 ports of those features (#834, #1557, #648, #974, #1573).
+  `TurnCompletedPayload.turnCostUsd` / `turnModels` (#834),
+  `TurnTokenUsage.cacheTtlSeconds` (#1557). No orchestration-v2 adapter
+  writes them and no client reads them; kept for the #1627 ports of those
+  features (#834, #1557, #974, #1573). `usageLimited` (#648) left with the
+  v2 port: the failure's `class: "usage_limit"` carries it.
 - `packages/contracts/src/settings.ts` — the `PromptSnippet` schema with its
   caps and `projectPromptSnippets`
   (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on
-  `ServerSettings` and `ServerSettingsPatch` (#270 G); `desktopBadgeAttention`
+  `ServerSettings` and `ServerSettingsPatch` (#270 G); `infinitusResumeOnLimit`
+  (#648, default on) beside upstream's `autoResumeLimitedThreads` on both;
+  `desktopBadgeAttention`
   (#270 B), `desktopKeepAwake` (#1075) and the four `desktopNotifyOn*` seeds
   (#1032, read once by `NotificationModeMigration`) on `ClientSettings` and
   its patch. `packages/shared/src/serverSettings.ts` —
   `applyServerSettingsPatch` merges `projectPromptSnippets` per project key
   like `projectScriptOverrides`, so one project's save leaves the others.
+- `packages/contracts/src/settings.ts` — `advisorModel` on `ClaudeSettings`
+  (#1232: the SDK's `advisorModel` setting, folded into the query's
+  `settings` by `makeClaudeQueryOptions` in
+  `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts` beside
+  `autoCompactWindow` when the instance names one, left to Claude Code's own
+  setting when empty), with the `customOption` hook on
+  `ProviderSettingsFormAnnotation` that
+  `apps/web/src/components/settings/ProviderSettingsForm.tsx`'s select draws
+  as a "Custom model ID…" choice opening an input; `ProviderInstanceCard.tsx`
+  draws `ClaudeAdvisorProxyNote` under the form. Tests:
+  `settings.test.ts`, `ClaudeAdapterV2.test.ts`,
+  `ProviderSettingsForm.test.ts`; `ProviderInstanceRegistry.test.ts`'s
+  Claude fixture carries the key.
 - `packages/contracts/src/ipc.ts` — `infinitus-nightly` in
   `DesktopUpdateChannel` / `DesktopUpdateChannelSchema` (#1042); the fork's
   optional `DesktopBridge` methods: `getInfinitusDesktopPrefs` / `setInfinitusQuitWithApp` (#654),
@@ -271,6 +306,25 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (`provider-core/.../orchestrationInstructions.test.ts`,
   `provider-pi/.../mcpInjection.test.ts`, `provider-muse/.../status.test.ts`).
   `scripts/connect-name.guard.test.ts` scans these roots too.
+- Resume-on-limit (#648, #1486, #1107, #1627; `docs/internals/resume-on-limit.md`):
+  `orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `ClaudeUsageLimitRefusal`
+  and the `onUsageLimitRefusal` option (called on a rejected
+  `rate_limit_event` with an active turn, through `createClaudeAdapterV2`'s
+  hooks), `blocking_limit` classed `provider_error` with the context-window
+  wording (#1107; its case in `ClaudeAdapterV2.test.ts` expects that), and
+  `ClaudeLiveQueryContext.spentOnLimit` (set on a `usage_limit` failure, read
+  by `openQuery` so the next prompt replaces the process unless background
+  work pins it); `provider/Drivers/ClaudeDriver.ts` — hands the adapter
+  `InfinitusLimitStops.reportRefusal` when the service is in context;
+  `apps/web/src/components/Sidebar.logic.ts` / `Sidebar.tsx` and
+  `apps/mobile/src/features/threads/threadListV2.ts` /
+  `thread-list-v2-items.tsx` — `resolveSidebarThreadStatus` /
+  `resolveThreadListV2Status` take `limitStopped`, read off
+  `infinitusLimitStopsAtom` per row (the pill's tooltip and the phone's detail
+  line are `limitStopLine`); `SettingsPanels.tsx` and
+  `apps/mobile/src/features/settings/SettingsThreadsRouteScreen.tsx` — the
+  `infinitusResumeOnLimit` switch beside upstream's auto-resume row;
+  `settingsSearch.ts` — its `infinitus-resume-on-limit` item.
 - The MCP server the agents see is named `infinitus` (#1368 E): the
   registration sites are `orchestration-v2/Adapters/ClaudeAdapterV2.ts`
   (the `mcpServers` key, `CLAUDE_T3_MCP_TOOL_WILDCARD` and the read-only
@@ -764,3 +818,5 @@ background`). Riding along, all
 - `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.
 - `apps/server/src/cli/invocation.test.ts` — the "manual server installation ownership" prefix fixtures realpath their temp root (#1661): the resolver reports the realpath'd prefix, which on macOS is `/private/var/…`, not `/var/…`.
 - `apps/server/src/usage/UsageService.test.ts` — the v4-upgrade test waits for the second service's cache write (#1661): the layer's temp state dir is removed before the service's own shutdown wait, and on macOS the write loses that race.
+- `apps/server/src/orchestration-v2/RunExecutionService.ts` — the run's event filter takes a `turn.terminal` for another turn of its own provider thread and run ordinal as the root's while the root turn is open, and the ingest loop logs the mismatch (#1514, `ProviderEventRouteIdentity.runOrdinal`); the "auxiliary or stale provider terminals" test models those as a child provider thread's and another ordinal's.
+- `apps/server/src/orchestration-v2/ProviderSessionManager.ts` — `markIdle` also clears the provider thread's busy turns of earlier run ordinals, so a stopped run's turn no longer holds the idle release (#1514).
