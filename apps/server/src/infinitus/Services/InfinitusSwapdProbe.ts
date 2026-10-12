@@ -11,6 +11,9 @@ const Window = Schema.Struct({
   kind: Schema.String,
   name: Schema.optionalKey(Schema.String),
   pct: Schema.Finite,
+  /** The window's reset as swapd read it (ISO); what tells a refusal's
+      account from the one just swapped to (#1486). */
+  resetsAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 const List = Schema.Struct({
   schemaVersion: Schema.Literal(1),

@@ -2099,6 +2099,8 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     readonly close?: (sdkMessages: Queue.Queue<SDKMessage>) => Effect.Effect<void>;
     readonly interrupt?: Effect.Effect<void>;
     readonly environment?: NodeJS.ProcessEnv;
+    // Fork (#648): the resume-on-limit hook.
+    readonly onUsageLimitRefusal?: ClaudeAdapterV2.ClaudeAdapterV2Options["onUsageLimitRefusal"];
     // A CLI process opened after the first streams from its own queue, so the
     // first one can exit (Queue.shutdown) and a later turn can start another.
     readonly freshQueueOnReopen?: boolean;
@@ -2141,6 +2143,9 @@ describe("ClaudeAdapterV2 background wake turns", () => {
               continuationRequests.push(request);
             }),
         },
+        ...(options?.onUsageLimitRefusal === undefined
+          ? {}
+          : { onUsageLimitRefusal: options.onUsageLimitRefusal }),
         queryRunner: {
           allocateSessionId: Effect.succeed(WAKE_NATIVE_SESSION),
           open: (input) =>
@@ -3614,10 +3619,9 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.equal(terminal.status, "failed");
         if (terminal.status !== "failed") return;
         assert.isNotEmpty(terminal.failure.message);
-        assert.equal(
-          terminal.failure.class,
-          terminalReason === "blocking_limit" ? "usage_limit" : "provider_error",
-        );
+        // Fork (#1107): `blocking_limit` is the CLI's context-window gate, so
+        // it is a provider error like `prompt_too_long`, never a usage limit.
+        assert.equal(terminal.failure.class, "provider_error");
         assert.isFalse(
           harness.events.some(
             (event) =>
@@ -3823,6 +3827,174 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.deepEqual(roster, [
           { taskId: longRunning.taskId, kind: "monitor", description: "Monitor 0" },
         ]);
+      }).pipe(Effect.provide(Layer.merge(IdAllocator.layer, NodeServices.layer))),
+    ),
+  );
+
+  // Fork (#648, #1627): what resume-on-limit reads from the adapter.
+  it.effect("reports a rejected window on the running turn to the resume-on-limit hook", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const refusals: Array<ClaudeAdapterV2.ClaudeUsageLimitRefusal> = [];
+        const harness = yield* makeWakeHarnessWithOptions({
+          onUsageLimitRefusal: (refusal) =>
+            Effect.sync(() => {
+              refusals.push(refusal);
+            }),
+        });
+        const now = yield* DateTime.now;
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now,
+            attemptId: RunAttemptId.make("attempt-claude-refusal-hook"),
+            text: "Continue.",
+            attachments: [],
+          }),
+        );
+        // A warning keeps running: nothing to report.
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "rate_limit_event",
+            rate_limit_info: { status: "allowed_warning", rateLimitType: "five_hour" },
+            uuid: "00000000-0000-4000-8000-000000000700",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+        assert.deepEqual(refusals, []);
+        yield* harness.offerAndWait(
+          claudeSdkFrame({
+            type: "rate_limit_event",
+            rate_limit_info: {
+              status: "rejected",
+              rateLimitType: "seven_day",
+              resetsAt: 1790298600,
+              overageStatus: "rejected",
+            },
+            uuid: "00000000-0000-4000-8000-000000000701",
+            session_id: WAKE_NATIVE_SESSION,
+          }),
+        );
+        assert.deepEqual(refusals, [
+          {
+            threadId: harness.threadId,
+            runId: RunId.make("run-attempt-claude-refusal-hook"),
+            rateLimitType: "seven_day",
+            resetsAt: 1790298600_000,
+          },
+        ]);
+      }).pipe(Effect.provide(Layer.merge(IdAllocator.layer, NodeServices.layer))),
+    ),
+  );
+
+  // Fork (#1320): the CLI re-sends its synthetic limit message on every retry
+  // while the turn is parked; the window's notice says it once.
+  it.effect("a parked turn shows one usage-limit notice and no assistant rows", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarness;
+        const now = yield* DateTime.now;
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now,
+            attemptId: RunAttemptId.make("attempt-claude-parked-notice"),
+            text: "Continue.",
+            attachments: [],
+          }),
+        );
+        for (const index of [0, 1, 2]) {
+          yield* harness.offerAndWait(
+            claudeSdkFrame({
+              type: "rate_limit_event",
+              rate_limit_info: {
+                status: "rejected",
+                rateLimitType: "five_hour",
+                resetsAt: 1790298600,
+                overageStatus: "rejected",
+              },
+              uuid: `00000000-0000-4000-8000-00000000071${index}`,
+              session_id: WAKE_NATIVE_SESSION,
+            }),
+          );
+          yield* harness.offerAndWait(
+            makeAssistantErrorFrame({
+              uuid: `00000000-0000-4000-8000-00000000072${index}`,
+              error: "rate_limit",
+            }),
+          );
+        }
+        const notice = yield* Queue.take(harness.systemNoticeReceipts);
+        assert.equal(notice.turnItem.type, "system_notice");
+        if (notice.turnItem.type !== "system_notice") return;
+        assert.include(notice.turnItem.message, "Claude usage limit reached");
+        yield* Effect.yieldNow;
+        assert.equal(yield* Queue.size(harness.systemNoticeReceipts), 0);
+        assert.isFalse(
+          harness.events.some(
+            (event) =>
+              (event.type === "message.updated" && event.message.role === "assistant") ||
+              (event.type === "turn_item.updated" && event.turnItem.type === "assistant_message"),
+          ),
+        );
+      }).pipe(Effect.provide(Layer.merge(IdAllocator.layer, NodeServices.layer))),
+    ),
+  );
+
+  // Fork (#648): the CLI keeps the login it started with, so a turn that
+  // ended on a usage limit must not be continued in the same process once
+  // the account engine has swapped.
+  it.effect("the next prompt after a usage-limit failure opens a fresh process", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarnessWithOptions({ freshQueueOnReopen: true });
+        const now = yield* DateTime.now;
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now,
+            attemptId: RunAttemptId.make("attempt-claude-spent-1"),
+            text: "Continue.",
+            attachments: [],
+          }),
+        );
+        yield* Queue.offer(
+          harness.sdkMessages,
+          makeAssistantErrorFrame({
+            uuid: "00000000-0000-4000-8000-000000000730",
+            error: "rate_limit",
+          }),
+        );
+        yield* Queue.offer(
+          harness.sdkMessages,
+          makeResultFrame({
+            uuid: "00000000-0000-4000-8000-000000000731",
+            result: "You've hit your session limit",
+            terminalReason: "api_error",
+            isError: true,
+            apiErrorStatus: 429,
+          }),
+        );
+        const terminal = yield* Queue.take(harness.terminalReceipts);
+        assert.equal(terminal.status, "failed");
+        if (terminal.status !== "failed") return;
+        assert.equal(terminal.failure.class, "usage_limit");
+        assert.lengthOf(harness.processQueues, 1);
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: harness.providerThread,
+            now,
+            attemptId: RunAttemptId.make("attempt-claude-spent-2"),
+            text: "Continue where you left off.",
+            attachments: [],
+            providerTurnOrdinal: 2,
+          }),
+        );
+        assert.lengthOf(harness.processQueues, 2, "the continuation must not reuse the spent CLI");
       }).pipe(Effect.provide(Layer.merge(IdAllocator.layer, NodeServices.layer))),
     ),
   );
