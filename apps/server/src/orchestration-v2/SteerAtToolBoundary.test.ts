@@ -126,70 +126,70 @@ it.layer(layerTest)("steer at the tool boundary (#1318, #1627)", (it) => {
           projection.messages.filter((message) => message.runId === active.id).length,
           1,
         );
-        const steerItem = projection.turnItems.find(
-          (item) => item.type === "user_message" && item.messageId === MessageId.make("message:steer-by-mode"),
+        const steerMessage = projection.messages.find(
+          (m) => m.id === MessageId.make("message:steer-by-mode"),
         );
-        assert.strictEqual(steerItem?.type === "user_message" && steerItem.inputIntent, "queued_turn");
-        assert.deepStrictEqual(
-          projection.messages.find((m) => m.id === MessageId.make("message:steer-by-mode"))?.context,
-          { version: 1, records: [] },
-        );
+        assert.strictEqual(steerMessage?.runId, queued[2]?.id);
+        assert.deepStrictEqual(steerMessage?.context, { version: 1, records: [] });
       }),
   );
 
-  it.effect("the waiting steer is an ordinary queued row: it can be edited, reordered and removed", () =>
-    Effect.gen(function* () {
-      const orchestrator = yield* Orchestrator.OrchestratorV2;
-      const before = yield* projectionOf;
-      const steer = before.runs.find((run) => run.sendAt === "tool_boundary")!;
-      yield* orchestrator.dispatch({
-        type: "queued-run.edit",
-        commandId: CommandId.make("edit:steer"),
-        threadId,
-        runId: steer.id,
-        text: "steer, edited",
-      });
-      yield* orchestrator.dispatch({
-        type: "queued-run.reorder",
-        commandId: CommandId.make("reorder:steer"),
-        threadId,
-        runId: steer.id,
-        beforeRunId: before.runs.find((run) => run.status === "queued" && run.sendAt === undefined)!
-          .id,
-      });
-      const edited = yield* projectionOf;
-      const row = edited.runs.find((run) => run.id === steer.id)!;
-      assert.strictEqual(row.sendAt, "tool_boundary");
-      assert.strictEqual(
-        edited.messages.find((m) => m.id === row.userMessageId)?.text,
-        "steer, edited",
-      );
-      assert.strictEqual(
-        edited.runs
-          .filter((run) => run.status === "queued")
-          .toSorted((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))[0]?.id,
-        steer.id,
-      );
-
-      yield* orchestrator.dispatch({
-        type: "queued-run.cancel",
-        commandId: CommandId.make("cancel:steer"),
-        threadId,
-        runId: steer.id,
-      });
-      const after = yield* projectionOf;
-      assert.strictEqual(after.runs.find((run) => run.id === steer.id)?.status, "cancelled");
-      // A boundary that arrives after the row went is refused, not sent twice.
-      const refused = yield* orchestrator
-        .dispatch({
-          type: "queued-message.promote-to-steer",
-          commandId: CommandId.make("command:system:tool-boundary-steer:late"),
+  it.effect(
+    "the waiting steer is an ordinary queued row: it can be edited, reordered and removed",
+    () =>
+      Effect.gen(function* () {
+        const orchestrator = yield* Orchestrator.OrchestratorV2;
+        const before = yield* projectionOf;
+        const steer = before.runs.find((run) => run.sendAt === "tool_boundary")!;
+        yield* orchestrator.dispatch({
+          type: "queued-run.edit",
+          commandId: CommandId.make("edit:steer"),
           threadId,
-          queuedRunId: steer.id,
-          targetRunId: after.runs.find((run) => run.status === "starting")!.id,
-        })
-        .pipe(Effect.flip);
-      assert.strictEqual(refused._tag, "OrchestratorDispatchError");
-    }),
+          runId: steer.id,
+          text: "steer, edited",
+        });
+        yield* orchestrator.dispatch({
+          type: "queued-run.reorder",
+          commandId: CommandId.make("reorder:steer"),
+          threadId,
+          runId: steer.id,
+          beforeRunId: before.runs.find(
+            (run) => run.status === "queued" && run.sendAt === undefined,
+          )!.id,
+        });
+        const edited = yield* projectionOf;
+        const row = edited.runs.find((run) => run.id === steer.id)!;
+        assert.strictEqual(row.sendAt, "tool_boundary");
+        assert.strictEqual(
+          edited.messages.find((m) => m.id === row.userMessageId)?.text,
+          "steer, edited",
+        );
+        assert.strictEqual(
+          edited.runs
+            .filter((run) => run.status === "queued")
+            .toSorted((a, b) => (a.queuePosition ?? 0) - (b.queuePosition ?? 0))[0]?.id,
+          steer.id,
+        );
+
+        yield* orchestrator.dispatch({
+          type: "queued-run.cancel",
+          commandId: CommandId.make("cancel:steer"),
+          threadId,
+          runId: steer.id,
+        });
+        const after = yield* projectionOf;
+        assert.strictEqual(after.runs.find((run) => run.id === steer.id)?.status, "cancelled");
+        // A boundary that arrives after the row went is refused, not sent twice.
+        const refused = yield* orchestrator
+          .dispatch({
+            type: "queued-message.promote-to-steer",
+            commandId: CommandId.make("command:system:tool-boundary-steer:late"),
+            threadId,
+            queuedRunId: steer.id,
+            targetRunId: after.runs.find((run) => run.status === "starting")!.id,
+          })
+          .pipe(Effect.flip);
+        assert.strictEqual(refused._tag, "OrchestratorDispatchError");
+      }),
   );
 });

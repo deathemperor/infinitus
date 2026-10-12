@@ -42,7 +42,8 @@ describe("TurnStartGate (#720, #1627)", () => {
     Effect.gen(function* () {
       const held = yield* Ref.make<ReadonlyArray<RunId>>([]);
       const holdingGate = Layer.succeed(TurnStartGate.TurnStartGate)({
-        start: (input) => Ref.update(held, (list) => [...list, input.runId]).pipe(Effect.as("held")),
+        start: (input) =>
+          Ref.update(held, (list) => [...list, input.runId]).pipe(Effect.as("held")),
       });
       // Every dependency is an empty mock: a start the gate keeps must touch none of them.
       const layer = ProviderTurnStart.layer.pipe(
@@ -73,7 +74,9 @@ describe("TurnStartGate (#720, #1627)", () => {
 
   it.effect("releasing a held run enqueues a fresh provider-turn.start and wakes the workers", () =>
     Effect.gen(function* () {
-      const enqueued = yield* Ref.make<ReadonlyArray<EffectOutbox.PendingOrchestrationEffectV2>>([]);
+      const enqueued = yield* Ref.make<ReadonlyArray<EffectOutbox.PendingOrchestrationEffectV2>>(
+        [],
+      );
       const notified = yield* Ref.make(0);
       yield* TurnStartGate.releaseTurnStart({ threadId, runId, releaseId: "headroom-1" }).pipe(
         Effect.provide(

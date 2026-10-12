@@ -58,7 +58,10 @@ describe("toolBoundarySteerCandidate (#1318)", () => {
   it("sends nothing while the queue is held, or when no steer row waits", () => {
     expect(
       toolBoundarySteerCandidate(
-        [run("run-1", "running"), run("run-2", "queued", { sendAt: "tool_boundary", queueHeld: true })],
+        [
+          run("run-1", "running"),
+          run("run-2", "queued", { sendAt: "tool_boundary", queueHeld: true }),
+        ],
         target,
       ),
     ).toBeUndefined();
