@@ -117,6 +117,7 @@ import * as EnvironmentTheme from "./environmentTheme.ts";
 import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
+import { InfinitusSessionHolds } from "./infinitus/Services/InfinitusSessionHolds.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
 import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
@@ -1261,6 +1262,8 @@ const layerWsRpc = (
       const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
       const infinitusLimitStops = yield* InfinitusLimitStops;
+      // Fork (#616, #743): the holds stream and "Run now".
+      const infinitusSessionHolds = yield* InfinitusSessionHolds;
       const captureStore = yield* CaptureStore;
       const projectSetupScriptRunner = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
       const worktreeSetupTracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
@@ -3150,6 +3153,11 @@ const layerWsRpc = (
         [WS_METHODS.subscribeInfinitusLimitStops]: (_input) => infinitusLimitStops.stopped,
         [WS_METHODS.infinitusPairingDecide]: (input) =>
           infinitusPairing.decide({ ...input, approverScopes: currentSession.scopes }),
+        // Session priority mode (#616, #741, #743): the threads held for
+        // headroom and paused for it, one whole list; "Run now" / "Resume now".
+        [WS_METHODS.subscribeInfinitusHolds]: (_input) => infinitusSessionHolds.held,
+        [WS_METHODS.infinitusReleaseThread]: (input) =>
+          infinitusSessionHolds.release(input.threadId),
         // Captures (#433): one list per project.
         [WS_METHODS.subscribeCaptures]: (input) =>
           Stream.unwrap(captureStore.subscribe(input.projectId)),

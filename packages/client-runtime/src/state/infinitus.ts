@@ -36,6 +36,9 @@ const INFINITUS_UTILIZATION_IDLE_TTL_MS = 60_000;
 const INFINITUS_EVENTS_STALE_MS = 60_000;
 const INFINITUS_EVENTS_IDLE_TTL_MS = 60_000;
 const INFINITUS_PAIRING_IDLE_TTL_MS = 1_000;
+/** The sidebar re-subscribes on every navigation; a short grace keeps one
+    stream per environment across them. */
+const INFINITUS_HOLDS_IDLE_TTL_MS = 30_000;
 
 /** What a fleet row shows for an account: its alias, else the email it signed
     in with, else the number the engine knows it by. */
@@ -134,6 +137,21 @@ export function createInfinitusEnvironmentAtoms<R, E>(
     pairingDecide: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:infinitus:pairingDecide",
       tag: WS_METHODS.infinitusPairingDecide,
+    }),
+    // Session priority mode (#616, #741, #743): the threads the server holds
+    // for headroom or paused for it, the whole list on every change. One
+    // stream per environment, shared by every sidebar row through the family.
+    holds: createEnvironmentSubscriptionAtomFamily(runtime, {
+      label: "environment-data:infinitus:holds",
+      idleTtlMs: INFINITUS_HOLDS_IDLE_TTL_MS,
+      subscribe: (input: EnvironmentRpcInput<typeof WS_METHODS.subscribeInfinitusHolds>) =>
+        subscribe(WS_METHODS.subscribeInfinitusHolds, input),
+    }),
+    // "Run now" / "Resume now": the released thread leaves the holds stream,
+    // so nothing to invalidate.
+    releaseThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:infinitus:releaseThread",
+      tag: WS_METHODS.infinitusReleaseThread,
     }),
     // The fork's one secret-carrying call (#747): a Settings pane hands a
     // `Redacted` value straight through to `infinitus.secret`. The command

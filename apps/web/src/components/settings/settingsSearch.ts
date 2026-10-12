@@ -26,6 +26,7 @@ export type SettingsPath =
   | "/settings/connections"
   | "/settings/menu-bar"
   | "/settings/animations"
+  | "/settings/priority"
   | "/settings/team"
   | "/settings/notifications"
   | "/settings/devices"
@@ -112,6 +113,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   // catalog page is named for what it holds, the menu bar and popup prefs.
   "/settings/menu-bar": "Menu bar",
   "/settings/animations": "Animations",
+  "/settings/priority": "Priority",
   "/settings/team": "Team",
   "/settings/notifications": "Notifications",
   "/settings/devices": "Devices",
@@ -977,6 +979,20 @@ export const SETTINGS_SEARCH_ITEMS = [
     infinitusOnly: true,
     searchTerms: ["animation intro slide fade zoom burn ember flame speed motion"],
   },
+  {
+    id: "infinitus-sessions",
+    title: "Infinitus priority",
+    to: "/settings/priority",
+    // The Mac files these keys under `priority` since #1069; a build older than
+    // that still answers `sessions`, and the anchor then only loses its scroll.
+    targetId: "infinitus-priority",
+    infinitusOnly: true,
+    // "session" stays as a search term for anyone who knew the row by its old
+    // name; the row itself reads "Thread priority" (#1069).
+    searchTerms: [
+      "thread session priority mode hold interrupt headroom low abundant pct background",
+    ],
+  },
   // Fork (#270 B): the Dock badge, above the push toggles; banners are upstream's row (#1032).
   {
     id: "desktop-badge",
@@ -1072,6 +1088,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   // selection scope to render.
   "/settings/menu-bar": null,
   "/settings/animations": null,
+  "/settings/priority": null,
   "/settings/team": null,
   "/settings/notifications": null,
   "/settings/devices": null,

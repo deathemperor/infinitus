@@ -161,6 +161,7 @@ import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../s
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
 import { useEnvironmentQuery } from "../state/query";
+import { useInfinitusHeldSummary } from "./sidebar/useInfinitusHeldSummary";
 import { useThreadSearch } from "../state/queries";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
@@ -1268,7 +1269,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const limitStop =
     useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
     null;
-  const status = resolveSidebarThreadStatus(thread, { limitStopped: limitStop !== null });
+  // Held / paused for headroom (#741, #743): the server's holds stream, one
+  // subscription per environment shared by every row.
+  const heldEntry = useInfinitusHeldSummary(thread.environmentId, thread.id);
+  const status = resolveSidebarThreadStatus(thread, {
+    limitStopped: limitStop !== null,
+    hold: heldEntry?.kind ?? null,
+  });
   const isInFlight =
     status === "working" || status === "waiting" || status === "approval" || status === "input";
   // A woken thread reappears at its original position (the sort is
@@ -1315,6 +1322,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             icon: null,
             className: "text-muted-foreground",
           }
+        : status === "held" || status === "paused"
+          ? {
+              // Kept back for headroom (#741, #743): nothing runs, so it
+              // reads as calm as waiting; the tooltip carries the fleet line.
+              label: status === "held" ? "Held" : "Paused",
+              icon: null,
+              className: "text-muted-foreground",
+            }
         : status === "approval"
           ? {
               label: "Approval",

@@ -79,6 +79,8 @@ export function resolveThreadListV2ProviderDrivers(
 export type ThreadListV2Status =
   | "approval"
   | "input"
+  | "held"
+  | "paused"
   | "working"
   | "waiting"
   | "failed"
@@ -189,6 +191,9 @@ export function resolveThreadListV2Status(
         parked turn is still "running" to the orchestrator; the label says
         "Limited" until the account swaps and the turn resumes. */
     readonly limitStopped?: boolean;
+    /** What the Mac's holds stream says about the thread (#741, #743): held
+        for headroom, or paused for it, outrank working since nothing runs. */
+    readonly hold?: "held" | "paused" | null;
   },
 ): ThreadListV2Status {
   if (thread.hasPendingApprovals) {
@@ -199,6 +204,9 @@ export function resolveThreadListV2Status(
   }
   if (options?.limitStopped === true) {
     return "limited";
+  }
+  if (options?.hold === "held" || options?.hold === "paused") {
+    return options.hold;
   }
   if (
     thread.runtime !== null &&
