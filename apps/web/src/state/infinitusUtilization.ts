@@ -32,7 +32,7 @@ export interface EnvironmentUtilizationStatus {
   readonly utilization: InfinitusUtilization | null;
 }
 
-export const UTILIZATION_NEEDS_NEWER_APP =
+const UTILIZATION_NEEDS_NEWER_APP =
   "History and the run rate need a newer Infinitus app (the utilization verb).";
 const UTILIZATION_UNREADABLE = "The utilization reply could not be read.";
 
