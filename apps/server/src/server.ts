@@ -85,6 +85,7 @@ import { InfinitusUsageAttributionLive } from "./infinitus/Layers/InfinitusUsage
 import { infinitusHttpApiLayer } from "./infinitus/Layers/InfinitusHttp.ts";
 import { infinitusPairingHttpApiLayer } from "./infinitus/Layers/InfinitusPairingHttp.ts";
 import { InfinitusAlertRelayLive } from "./infinitus/Layers/InfinitusAlertRelay.ts";
+import { InfinitusRunningTurnsLive } from "./infinitus/Layers/InfinitusRunningTurns.ts";
 import { InfinitusServerPortLive } from "./infinitus/Layers/InfinitusServerPort.ts";
 import * as CaptureStore from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -755,9 +756,11 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(infinitusPairingHttpApiLayer),
       // Fork (#1375): the Mac's account alerts, signed with the relay link's
-      // key and posted to the relay over fetch.
+      // key and posted to the relay over fetch; (#829) the running turns the
+      // Mac counts, read from the projection's thread shells.
       Layer.provide(
         infinitusHttpApiLayer.pipe(
+          Layer.provide(InfinitusRunningTurnsLive.pipe(Layer.provide(ProjectionStoreV2.layer))),
           Layer.provide(
             InfinitusAlertRelayLive.pipe(
               Layer.provide(ServerSecretStore.layer),
@@ -795,7 +798,13 @@ const layerMakeRoutes = Layer.mergeAll(
   // Server browser tabs and HTML render previews install and run the same headless browser.
   Layer.provide(PreviewBrowser.layer),
   Layer.provide(PreviewAutomationBroker.layer),
-  Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
+  // Fork (#829): the update idle gate reads the running turns.
+  Layer.provide(
+    ServerSelfUpdate.layer.pipe(
+      Layer.provide(layerDesktopAppUpdate),
+      Layer.provide(InfinitusRunningTurnsLive.pipe(Layer.provide(ProjectionStoreV2.layer))),
+    ),
+  ),
   Layer.provide(layerCommandReadiness),
   Layer.provide(ServerHttp.layerBrowserApiCors),
   Layer.provide(ServerHttp.layerHttpCompression),
