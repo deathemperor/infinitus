@@ -74,6 +74,19 @@ in a new thread's model picker to add or remove them. A regular click returns to
 single model. Choose a base branch and send. Each selection starts a separate thread
 and worktree while you stay in the new thread composer. This requires a Git project.
 
+## Needs attention
+
+A **Needs attention** section above the list collects, across every project and
+connected machine, the threads waiting for something only you can give: an approval,
+an answer, or an account swap after a usage limit. Each row shows what it waits for,
+how long it has waited, and where it lives; click it to open the thread. Collapse the
+section with its header and it keeps the count. It disappears when nothing waits.
+
+Press `mod+shift+u` to jump to the thread needing you next: approvals first, then
+questions, limits, failures, and finally unread completions, walking ties in sidebar
+order. The command palette lists it as **Jump to next waiting thread**, and
+**Settings → Keybindings** has it under **Thread: Jump to Next Waiting Thread**.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.

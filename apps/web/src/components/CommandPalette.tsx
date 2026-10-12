@@ -48,6 +48,7 @@ import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import {
   ActivityIcon,
+  BellIcon,
   ArrowLeftIcon,
   ChartLineIcon,
   ChartNoAxesColumnIcon,
@@ -137,6 +138,7 @@ import {
   resolveProjectPathForDispatch,
 } from "../lib/projectPaths";
 import { onOpenCommandPalette } from "../commandPaletteBus";
+import { requestNextAttentionThread } from "./sidebar/nextAttentionBus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import {
@@ -1990,6 +1992,21 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  // Fork (#270 C): the sidebar resolves the target (it holds the rendered
+  // order and statuses); the palette only asks. Always listed, so the key is
+  // discoverable even when nothing waits.
+  actionItems.push({
+    kind: "action",
+    value: "action:next-attention-thread",
+    searchTerms: ["next", "waiting", "attention", "approval", "input", "jump", "needs you"],
+    title: "Jump to next waiting thread",
+    icon: <BellIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "thread.nextAttention",
+    run: async () => {
+      requestNextAttentionThread();
+    },
+  });
+
   if (activeThreadReferenceCopyTarget !== null) {
     actionItems.push({
       kind: "action",
@@ -3199,7 +3216,7 @@ function OpenCommandPaletteDialog(props: {
       platform: navigator.platform,
       context: { modelPickerOpen: false },
     });
-    if (threadJumpIndexFromCommand(command ?? "") !== null) {
+    if (threadJumpIndexFromCommand(command ?? "") !== null || command === "thread.nextAttention") {
       event.preventDefault();
       event.stopPropagation();
       const matchingItem = displayedGroups

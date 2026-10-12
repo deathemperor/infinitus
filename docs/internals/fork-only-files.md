@@ -14,6 +14,17 @@ these bullets.
   a proxied instance's advisor model (#1232) never fires. The add-instance
   wizard collects no environment for Claude, so only the card draws it.
 - `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
+- `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx`,
+  `sidebarNeedsAttention.logic.ts` (+ test), `useNextAttentionKey.ts` and
+  `nextAttentionBus.ts` — the "Needs attention" section above the sidebar
+  list (#269 D) and the `thread.nextAttention` key with its palette action
+  (#270 C), on orchestrator v2's run states: both rank through
+  `resolveSidebarThreadStatus` (approval, input, limited — the latter also
+  from the #648 limit stops), so they add no signal of their own. The
+  section owns its collapsed state; the hook installs its own `keydown`
+  listener with the sidebar's shortcut context so `Sidebar.tsx` keeps one
+  call. Held starts (session holds) and a babysit stopped at its cap rejoin
+  the list when their lanes land.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
   which also holds the pairing stream + decide command, #710, and the
