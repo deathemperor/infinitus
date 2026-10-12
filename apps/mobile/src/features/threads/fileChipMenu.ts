@@ -1,7 +1,7 @@
 import { fileBasename } from "@infinitus/shared/path";
 import type { ThreadId } from "@infinitus/contracts";
-import { resolveMarkdownLinkPresentation } from "@infinitus/mobile-markdown-text/links";
-import type { MarkdownFileContextMenu } from "@infinitus/mobile-markdown-text/types";
+import { resolveMarkdownLinkPresentation } from "../../lib/markdownLinks";
+import type { MarkdownFileContextMenu } from "../../native/SelectableMarkdownText.types";
 import { hostPreviewMimeTypeFromExtension } from "@infinitus/shared/filePreview";
 
 import {

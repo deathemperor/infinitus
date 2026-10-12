@@ -32,7 +32,7 @@ import {
   NATIVE_SOURCE_CONTENT_WIDTH,
   nativeSourceRowId,
 } from "./nativeSourceFileAdapter";
-import { MarkdownTextPrimitive } from "@infinitus/mobile-markdown-text/primitive";
+import { SourceText } from "@infinitus/mobile-source-text";
 
 import { boundedSelectableSourceTokens, prepareSourceFileDocument } from "./source-file-document";
 import { sourceHighlightAtom } from "./sourceHighlightingState";
@@ -289,8 +289,7 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
   // way "select all" takes the file rather than a line, which a `FlatList` row can never do
   // because each row is its own selection scope.
   const selectableBlock = props.selectable ? (
-    <MarkdownTextPrimitive
-      uiTextView
+    <SourceText
       selectable
       selectionColorClassName={Platform.OS === "android" ? "accent-focus/32" : undefined}
       style={{
@@ -306,7 +305,7 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
             const body =
               lineTokens && lineTokens.length > 0
                 ? lineTokens.map((token, tokenIndex) => (
-                    <MarkdownTextPrimitive
+                    <SourceText
                       key={`${index}:${tokenIndex}`}
                       style={{
                         color: token.color ?? foreground,
@@ -319,18 +318,18 @@ function JavaScriptSourceFileSurface(props: SourceFileSurfaceProps) {
                       }}
                     >
                       {token.content}
-                    </MarkdownTextPrimitive>
+                    </SourceText>
                   ))
                 : line;
             return (
-              <MarkdownTextPrimitive key={index}>
+              <SourceText key={index}>
                 {body}
                 {index < lines.length - 1 ? "\n" : ""}
-              </MarkdownTextPrimitive>
+              </SourceText>
             );
           })
         : normalizedContents}
-    </MarkdownTextPrimitive>
+    </SourceText>
   ) : null;
 
   const list = (

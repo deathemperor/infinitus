@@ -76,6 +76,21 @@ describe("chat canvas layout", () => {
     expect(result.chat.left).toBe(48);
     expectClear(result);
   });
+  it.each([900, 1000, 1004])("allows dragging across a %spx chat canvas", (width) => {
+    const start = resolve(width, { ...preview, position: { x: width - 332, y: 200 } }).frame!;
+    const moved = resolve(width, {
+      ...preview,
+      position: { x: start.x - 300, y: start.y },
+      lastInteraction: "drag",
+    });
+    expect(moved.frame).toEqual({ ...start, x: start.x - 300 });
+    const returned = resolve(width, {
+      ...preview,
+      position: { x: start.x, y: start.y },
+      lastInteraction: "drag",
+    });
+    expect(returned.frame).toEqual(start);
+  });
   it("stops leftward dragging before the player can push chat to the right", () => {
     const centered = resolve(1344, null).chat;
     for (const x of [1100, 800, 700, 600, 400, 12, -100]) {
@@ -91,7 +106,7 @@ describe("chat canvas layout", () => {
   it("keeps a dragged player above the composer when no readable lane fits beside it", () => {
     const result = resolve(1000, { ...preview, position: { x: 12, y: 700 } });
     expect(result.chat).toEqual(resolve(1000, null).chat);
-    expect(result.frame!.x).toBe(668);
+    expect(result.frame!.x).toBe(12);
     expect(result.frame!.y + result.frame!.height).toBeLessThanOrEqual(708);
   });
   it("allows message overlap on narrow screens while excluding the composer", () => {
@@ -134,6 +149,46 @@ describe("chat canvas layout", () => {
     expect(result.frame).toEqual({ x: 1260, y: 351, width: 240, height: 365 });
     expect(result.overlapsDetailsCard).toBe(false);
     expect(result.chat).toEqual({ left: 424, width: 736, insetStart: 0, insetEnd: 0 });
+  });
+  it("keeps a dragged or resized preview below the open find bar", () => {
+    const findBar = { left: 1292, right: 1572, bottom: 48 };
+    const layout = (lastInteraction: "drag" | "resize") =>
+      resolveChatCanvasLayout({
+        container: { width: 1584, height: 988 },
+        maxChatWidth: 736,
+        composerHeight: 180,
+        findBar,
+        preview: {
+          ...preview,
+          width: 240,
+          source: { width: 240, height: 365 },
+          position: { x: 1332, y: 12 },
+          lastInteraction,
+        },
+      });
+    for (const lastInteraction of ["drag", "resize"] as const) {
+      const result = layout(lastInteraction);
+      expect(result.frame).toEqual({ x: 1332, y: 60, width: 240, height: 365 });
+      expect(result.overlapsDetailsCard).toBe(false);
+      expect(result.chat).toEqual({ left: 424, width: 736, insetStart: 0, insetEnd: 0 });
+    }
+  });
+  it("keeps a preview clear of a find bar wider than the inline details card", () => {
+    const result = resolveChatCanvasLayout({
+      container: { width: 1800, height: 1000 },
+      findBar: { left: 1362, right: 1782, bottom: 72 },
+      detailsCard: { left: 1508, right: 1788, bottom: 400 },
+      preview: {
+        ...preview,
+        width: 240,
+        source: { width: 240, height: 365 },
+        position: { x: 1200, y: 12 },
+        lastInteraction: "drag",
+      },
+    });
+    const frame = result.frame!;
+    expect(frame.x + frame.width <= 1362 || frame.y >= 84).toBe(true);
+    expect(result.overlapsDetailsCard).toBe(false);
   });
   it("uses space beside the full card if a tall preview cannot fit below it", () => {
     const result = resolveChatCanvasLayout({
@@ -259,7 +314,7 @@ describe("chat canvas layout", () => {
     });
     expect(result.overlapsDetailsCard).toBe(true);
     expect(result.overlapsChat).toBe(true);
-    expect(result.frame).toEqual({ x: 272, y: 396, width: 1300, height: 400 });
+    expect(result.frame).toEqual({ x: 12, y: 396, width: 1300, height: 400 });
   });
 });
 

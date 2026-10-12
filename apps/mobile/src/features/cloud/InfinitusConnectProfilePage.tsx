@@ -7,16 +7,9 @@ import type { MenuAction } from "@react-native-menu/menu";
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { RelayClientEnvironmentRecord } from "@infinitus/contracts/relay";
 import { type ReactNode, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
+import { AppActivityIndicator } from "../../components/AppActivityIndicator";
 import { SymbolView } from "../../components/AppSymbol";
 import { showConfirmDialog } from "../../components/ConfirmDialogHost";
 import { ControlPillMenu } from "../../components/ControlPill";
@@ -167,7 +160,7 @@ export function InfinitusConnectProfilePage() {
         </>
       ) : isInitialLoad ? (
         <View className="flex-row items-center gap-3 px-6 py-4">
-          <ActivityIndicator colorClassName={"accent-clerk-foreground-muted"} size="small" />
+          <AppActivityIndicator colorClassName={"accent-clerk-foreground-muted"} size="small" />
           <Text className="text-base text-clerk-foreground-muted">Loading environments</Text>
         </View>
       ) : environments.length > 0 ? (
@@ -178,7 +171,10 @@ export function InfinitusConnectProfilePage() {
             subtitle={`${linkedAtLabel(environment.linkedAt)} · ${endpointLabel(environment)}`}
             accessory={
               deregisteringEnvironmentId === environment.environmentId ? (
-                <ActivityIndicator colorClassName={"accent-clerk-foreground-muted"} size="small" />
+                <AppActivityIndicator
+                  colorClassName={"accent-clerk-foreground-muted"}
+                  size="small"
+                />
               ) : (
                 <ControlPillMenu
                   actions={ENVIRONMENT_MENU_ACTIONS}
