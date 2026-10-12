@@ -4,6 +4,7 @@ import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { Spinner } from "~/components/ui/spinner";
 import { NotificationSettings } from "./NotificationSettings";
 import { DesktopKeepAwakeSettings } from "./DesktopKeepAwakeSettings";
+import { InfinitusResumeOnLimitSetting } from "./infinitus/InfinitusResumeOnLimitSetting";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { ArchiveIcon, ArchiveX, CheckIcon, ChevronRightIcon, SettingsIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -2362,23 +2363,7 @@ export function GeneralSettingsPanel() {
             />
           }
         />
-        {/* Fork (#648): the swap-based resume, beside upstream's reset-time one. */}
-        <SettingsRow
-          serverScoped
-          {...searchableSetting("infinitus-resume-on-limit")}
-          description="When the Claude account behind a running thread hits its usage limit and Infinitus swaps, the turn continues on the new account before the window resets."
-          settingKeys={["infinitusResumeOnLimit"]}
-          control={
-            <ScopedSwitch
-              settingKeys={["infinitusResumeOnLimit"]}
-              checked={settings.infinitusResumeOnLimit}
-              onCheckedChange={(checked) =>
-                updateSettings({ infinitusResumeOnLimit: Boolean(checked) })
-              }
-              aria-label="Resume limited threads on another account"
-            />
-          }
-        />
+        <InfinitusResumeOnLimitSetting />
         <SettingsRow
           serverScoped
           {...searchableSetting("snooze-limited-threads")}

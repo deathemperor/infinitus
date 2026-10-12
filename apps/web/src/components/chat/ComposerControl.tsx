@@ -111,24 +111,17 @@ export function ComposerSelectControl({
   className,
   children,
   size = "sm",
-  noChevron = false,
   ...props
 }: Omit<SelectPrimitive.Trigger.Props, "className"> & {
   className?: string | undefined;
   size?: ComposerControlSize;
-  /** Fork (#843): no chevron at all — an icon-only control reads as a
-      plain icon, and an invisible chevron would still hold its width
-      (user 2026-09-14: "remove the chevron in all states"). */
-  noChevron?: boolean;
 }) {
   return (
     <SelectPrimitive.Trigger className={composerControlClassName(size, className)} {...props}>
       {children}
-      {noChevron ? null : (
-        <SelectPrimitive.Icon>
-          <ComposerControlChevron size={size} />
-        </SelectPrimitive.Icon>
-      )}
+      <SelectPrimitive.Icon>
+        <ComposerControlChevron size={size} />
+      </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
 }
