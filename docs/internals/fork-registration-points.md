@@ -523,6 +523,22 @@ background`). Riding along, all
   the row's `options` drive the select. The General panel also mounts
   `DesktopKeepAwakeSettings` after the background-activity row (#1075) and
   the restore / dirty-label lists carry `desktopKeepAwake`.
+- Worktree limit (#269 H, re-ported onto orchestrator v2 under #1627):
+  `packages/contracts/src/settings.ts` carries `worktreeMaxCount` (default
+  25, 0 lifts it) on `ServerSettings` and its patch;
+  `apps/server/src/orchestration-v2/ProjectionStore.ts` answers
+  `getWorktreeHolders` in both the SQL and the memory store;
+  `ThreadLaunchService.ts` takes the fork's `WorktreeCapGate`, reserves a
+  slot before `thread.create` for a `worktree` strategy and hands the
+  release to the preparation (`PreparationInput.releaseWorktreeSlot`);
+  `runtimeLayer.ts` provides the gate; `ws.ts`'s `launchThread` and
+  `mcp/toolkits/project/handlers.ts` surface the refusal through
+  `worktreeCapRefusalMessage` where every other launch failure stays
+  generic; `ThreadLaunchService.test.ts`'s harness provides the gate;
+  `apps/web/src/components/settings/SettingsPanels.tsx` mounts the
+  "Worktree limit" row after "Start from origin" and its restore / dirty
+  lists carry the key (`settingsSearch.ts` kept its `worktree-limit` entry
+  through the merge).
 - `apps/server/src/binCli.ts` — the CLI's root command is `infinitus`, not
   `t3` (the archive's binary, `docs/user/install.md`); `cli/pair.test.ts` and
   `cli/app.test.ts` assert that command path.
