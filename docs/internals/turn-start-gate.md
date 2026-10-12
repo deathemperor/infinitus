@@ -58,12 +58,17 @@ and the wait lives on the server so web, phone and MCP agree (option 3 of the
 ruling on #1318; upstream's own client-side parking from #11673 is gone in
 v2). Two halves:
 
-- `Orchestrator.ts`, `message.dispatch`: a dispatch that resolves to
+- `Orchestrator.ts`, `message.dispatch`: a dispatch with `deliveryIntent:
+  "steer"` — the composer's steer mode on web and phone — that resolves to
   `steer_active` and is not a mailbox delivery (no `delegatedCompletion`, no
   `notification`) is queued instead, as a run with `sendAt: "tool_boundary"`.
-  An explicit `queued-message.promote-to-steer` — the row's Steer button, the
-  `thread.steerQueuedMessage` key, `t3_queue_promote_to_steer` — still steers
-  at once, and `restart_active` stays a restart.
+  Everything that names its target keeps upstream's immediate delivery: a
+  `steer_active { targetRunId }` dispatch, `deliveryIntent: "auto"`,
+  `queued-message.promote-to-steer` (the row's Steer button, the
+  `thread.steerQueuedMessage` key, `t3_queue_promote_to_steer`), and
+  `restart_active`. That line is also what keeps upstream's steering tests
+  (`SteeringCompletion.integration.test.ts`, `runtimeLayer.test.ts`) valid
+  unchanged.
 - `InfinitusToolBoundarySteer` tails the orchestrator's domain events. A
   `turn-item.updated` that ends a tool call (`command_execution`,
   `file_change`, `file_search`, `web_search`, `dynamic_tool`, `subagent`;

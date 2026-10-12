@@ -93,16 +93,15 @@ const projectionOf = Effect.gen(function* () {
 
 it.layer(layerTest)("steer at the tool boundary (#1318, #1627)", (it) => {
   it.effect(
-    "a steer while a turn runs is queued to go at the turn's next step, keeping its order and context",
+    "the composer's steer while a turn runs is queued to go at the turn's next step, keeping its order and context",
     () =>
       Effect.gen(function* () {
         yield* createThread;
         yield* send("first", {});
         yield* send("queued", { dispatchMode: { type: "queue_after_active" } });
-        yield* send("steer-by-intent", { deliveryIntent: "steer" });
         const active = (yield* projectionOf).runs.find((run) => run.status === "starting")!;
-        yield* send("steer-by-mode", {
-          dispatchMode: { type: "steer_active", targetRunId: active.id },
+        yield* send("steer-by-intent", {
+          deliveryIntent: "steer",
           context: { version: 1, records: [] },
         });
 
@@ -118,7 +117,6 @@ it.layer(layerTest)("steer at the tool boundary (#1318, #1627)", (it) => {
           [
             ["queued", "idle"],
             ["steer-by-intent", "tool_boundary"],
-            ["steer-by-mode", "tool_boundary"],
           ],
         );
         // Nothing was steered into the running turn: it still holds its one message.
@@ -127,9 +125,9 @@ it.layer(layerTest)("steer at the tool boundary (#1318, #1627)", (it) => {
           1,
         );
         const steerMessage = projection.messages.find(
-          (m) => m.id === MessageId.make("message:steer-by-mode"),
+          (m) => m.id === MessageId.make("message:steer-by-intent"),
         );
-        assert.strictEqual(steerMessage?.runId, queued[2]?.id);
+        assert.strictEqual(steerMessage?.runId, queued[1]?.id);
         assert.deepStrictEqual(steerMessage?.context, { version: 1, records: [] });
       }),
   );

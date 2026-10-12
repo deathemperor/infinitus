@@ -830,8 +830,9 @@ background`). Riding along, all
   `InfinitusToolBoundarySteerLive` in `layerRuntimeCoreDependenciesBase`;
   `ProviderTurnStartService.testkit.ts` and `ProviderTurnStartService.test.ts`
   provide the passthrough. `Orchestrator.ts` (`message.dispatch`): a
-  `steer_active` that is not a mailbox delivery becomes `queue_after_active`
-  with `sendAt: "tool_boundary"` on the queued run.
+  `deliveryIntent: "steer"` that resolves to `steer_active` and is not a
+  mailbox delivery becomes `queue_after_active` with `sendAt: "tool_boundary"`
+  on the queued run; a targeted `steer_active` and `auto` stay upstream's.
   `packages/contracts/src/orchestrationV2.ts` — `OrchestrationV2Run.sendAt`
   (optional, additive). Clients: `apps/web/src/components/chat/QueuedRunsControl.tsx`
   (the "at next step" tag), `ComposerPrimaryActions.tsx` (the running-turn
