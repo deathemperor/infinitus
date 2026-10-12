@@ -17,12 +17,15 @@ import {
 import * as ProjectStore from "../../orchestration-v2/ProjectStore.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
+import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 
 /**
- * Fork: `infinitusctl`'s reads over plain HTTP. `threadDefaults` (#1315) is
- * the composer's own model resolution; `alert` (#1375) is the Mac's account
- * alert on its way to the phones. The holds, running-turns and release reads
- * left with the engine-bound session gates (#1627).
+ * Fork: `infinitusctl`'s reads over plain HTTP. `runningTurns` (#829) is the
+ * Mac's busy-session count, read from the thread shells' activity run on
+ * orchestrator v2; `threadDefaults` (#1315) is the composer's own model
+ * resolution; `alert` (#1375) is the Mac's account alert on its way to the
+ * phones. The holds and release reads left with the engine-bound session
+ * gates (#1627), as did the update idle gate's server half.
  */
 export const infinitusHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
@@ -31,7 +34,16 @@ export const infinitusHttpApiLayer = HttpApiBuilder.group(
     const settings = yield* ServerSettingsService;
     const projects = yield* ProjectStore.ProjectStoreV2;
     const alerts = yield* InfinitusAlertRelay;
+    const runningTurns = yield* InfinitusRunningTurns;
     return handlers
+      .handle(
+        "runningTurns",
+        Effect.fn("environment.infinitus.runningTurns")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          return yield* runningTurns.list;
+        }),
+      )
       .handle(
         "threadDefaults",
         Effect.fn("environment.infinitus.threadDefaults")(function* (args) {

@@ -983,12 +983,23 @@ type SidebarThreadStatusInput = Pick<
   "hasPendingApprovals" | "hasPendingUserInput" | "runtime"
 >;
 
-export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
+export function resolveSidebarThreadStatus(
+  thread: SidebarThreadStatusInput,
+  options?: {
+    /** Fork (#648): the server lists the thread among its limit stops. A
+        parked turn is still "running" to the orchestrator; the pill says
+        "Limited" until the account swaps and the turn resumes. */
+    readonly limitStopped?: boolean;
+  },
+): SidebarThreadStatus {
   if (thread.hasPendingApprovals) {
     return "approval";
   }
   if (thread.hasPendingUserInput) {
     return "input";
+  }
+  if (options?.limitStopped === true) {
+    return "limited";
   }
   if (
     thread.runtime !== null &&

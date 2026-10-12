@@ -3,7 +3,6 @@ import {
   fileAttachmentTooLargeMessage,
 } from "@infinitus/client-runtime/state/attachments";
 import {
-  isProviderSendTurnSupportedImageMimeType,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
@@ -23,6 +22,7 @@ import { videoMimeType } from "@infinitus/shared/video";
 import { beginForegroundHandoff } from "./foreground-handoff";
 import { uuidv4 } from "./uuid";
 import { writeFileAtomically } from "./atomic-file";
+import { jpegAttachmentName, originalImagePassthroughMimeType } from "./image-passthrough";
 
 export interface DraftComposerImageAttachment extends Omit<UploadChatImageAttachment, "dataUrl"> {
   readonly id: string;
@@ -342,37 +342,6 @@ export async function pickComposerFiles(input: {
 }
 
 /**
- * Largest still image sent byte for byte. A full-resolution phone screenshot is a 5-10 MB PNG,
- * which a model reads no better than its 2048px JPEG and which a slow relay cannot finish
- * uploading before it cuts the request.
- */
-export const ORIGINAL_STILL_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-
-/**
- * The mime type to keep when a picked image may pass through unchanged, or null when it must be
- * rendered to a bounded JPEG off the JS thread (HEIC/HEIF, large stills, unmeasurable sources).
- * Small originals pass through so transparency survives. A GIF keeps the provider cap: rendering
- * it would drop its animation.
- */
-export function originalImagePassthroughMimeType(input: {
-  readonly mimeType: string | undefined;
-  readonly sourceBytes: number | null;
-}): string | null {
-  const { mimeType, sourceBytes } = input;
-  if (
-    mimeType === undefined ||
-    !isProviderSendTurnSupportedImageMimeType(mimeType) ||
-    sourceBytes === null ||
-    sourceBytes <= 0
-  ) {
-    return null;
-  }
-  const maxBytes =
-    mimeType === "image/gif" ? PROVIDER_SEND_TURN_MAX_IMAGE_BYTES : ORIGINAL_STILL_IMAGE_MAX_BYTES;
-  return sourceBytes <= maxBytes ? mimeType : null;
-}
-
-/**
  * Longest edge kept when a photo has to be re-encoded. Matches the web composer's
  * MAX_DIMENSION so every client hands providers the same resolution.
  */
@@ -380,11 +349,12 @@ const PHOTO_MAX_EDGE = 2048;
 const PHOTO_JPEG_QUALITY = 0.85;
 
 /**
- * Renders a photo-library pick to a provider-readable JPEG. Decode, downscale, and encode run
- * natively; only the bounded result crosses the bridge. Camera photos are 12-48 MP HEIC files,
- * so a full-size conversion is both slow to transfer and far more than a model can use.
+ * Renders a picked, pasted or shared picture to a provider-readable JPEG. Decode, downscale, and
+ * encode run natively; only the bounded result crosses the bridge. Camera photos are 12-48 MP
+ * HEIC files, so a full-size conversion is both slow to transfer and far more than a model can
+ * use. The returned `uri` is a cache file the caller owns.
  */
-async function renderPhotoAsJpeg(uri: string): Promise<{ base64: string; uri: string }> {
+export async function renderPhotoAsJpeg(uri: string): Promise<{ base64: string; uri: string }> {
   const { ImageManipulator, SaveFormat } = await import("expo-image-manipulator");
   let image = await ImageManipulator.manipulate(uri).renderAsync();
   try {
@@ -562,7 +532,7 @@ export async function pickComposerMedia(input: {
         image = {
           base64: rendered.base64,
           mimeType: "image/jpeg",
-          name: /\.jpe?g$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, "")}.jpg`,
+          name: jpegAttachmentName(name),
           previewUri: rendered.uri,
         };
       }
@@ -592,6 +562,38 @@ export async function pickComposerMedia(input: {
     attachments,
     error,
   };
+}
+
+/**
+ * The clipboard hands over a full-resolution PNG, so a pasted screenshot is as large as a picked
+ * one. The same gate as the picker's applies: a small still keeps its bytes, a large one is
+ * staged to a cache file and rendered to a bounded JPEG, and the staging files are removed.
+ */
+async function boundPastedImage(base64: string): Promise<{ base64: string; mimeType: string }> {
+  const sourceBytes = estimateBase64ByteSize(base64);
+  if (originalImagePassthroughMimeType({ mimeType: "image/png", sourceBytes }) !== null) {
+    return { base64, mimeType: "image/png" };
+  }
+  const { File, Paths } = await import("expo-file-system");
+  const staged = new File(Paths.cache, `t3-paste-${uuidv4()}.png`);
+  let renderedUri: string | null = null;
+  try {
+    staged.create();
+    await staged.write(base64, { encoding: "base64" });
+    const rendered = await renderPhotoAsJpeg(staged.uri);
+    renderedUri = rendered.uri;
+    return { base64: rendered.base64, mimeType: "image/jpeg" };
+  } finally {
+    for (const uri of [staged.uri, renderedUri]) {
+      if (uri === null) continue;
+      try {
+        const file = new File(uri);
+        if (file.exists) file.delete();
+      } catch {
+        // A leftover in the cache directory is the OS's to reclaim.
+      }
+    }
+  }
 }
 
 /** Clipboard images take priority over their alternate text representation. */
@@ -637,8 +639,13 @@ export async function pasteComposerClipboard(input: { readonly existingCount: nu
       };
     }
 
-    const base64 = image.data.split(",")[1] ?? "";
-    const sizeBytes = estimateBase64ByteSize(base64);
+    let pasted: { base64: string; mimeType: string };
+    try {
+      pasted = await boundPastedImage(image.data.split(",")[1] ?? "");
+    } catch {
+      return { images: [], text: null, error: "Clipboard image could not be read." };
+    }
+    const sizeBytes = estimateBase64ByteSize(pasted.base64);
     if (sizeBytes <= 0 || sizeBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
       return {
         images: [],
@@ -647,16 +654,17 @@ export async function pasteComposerClipboard(input: { readonly existingCount: nu
       };
     }
 
+    const dataUrl = `data:${pasted.mimeType};base64,${pasted.base64}`;
     return {
       images: [
         {
           id: uuidv4(),
           type: "image",
-          name: "pasted-image.png",
-          mimeType: "image/png",
+          name: pasted.mimeType === "image/jpeg" ? "pasted-image.jpg" : "pasted-image.png",
+          mimeType: pasted.mimeType,
           sizeBytes,
-          dataUrl: image.data,
-          previewUri: image.data,
+          dataUrl,
+          previewUri: dataUrl,
         },
       ],
       text: null,

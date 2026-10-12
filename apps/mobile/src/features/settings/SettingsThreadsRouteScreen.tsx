@@ -96,6 +96,7 @@ function AutoSettleSettingsRows() {
     patch: Partial<AutoSettleSettings> & {
       autoResumeLimitedThreads?: boolean;
       snoozeLimitedThreads?: boolean;
+      infinitusResumeOnLimit?: boolean;
     },
   ) => {
     if (
@@ -204,6 +205,14 @@ function AutoSettleSettingsRows() {
             value={uniformMobileSetting(displayTargets, "snoozeLimitedThreads")}
             disabled={disabled}
             onValueChange={(value) => writeToAll({ snoozeLimitedThreads: value })}
+          />
+          {/* Fork (#648): the swap-based resume, beside upstream's reset-time one. */}
+          <SettingsSwitchRow
+            icon="arrow.clockwise"
+            label="Resume on another account"
+            value={uniformMobileSetting(displayTargets, "infinitusResumeOnLimit")}
+            disabled={disabled}
+            onValueChange={(value) => writeToAll({ infinitusResumeOnLimit: value })}
           />
         </SettingsSection>
       ) : null}

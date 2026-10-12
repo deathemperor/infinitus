@@ -1428,8 +1428,18 @@ export const layerWithOptions = (
               if (entry === undefined) {
                 return current;
               }
-              const busyTurns = new Set(entry.busyTurns);
-              busyTurns.delete(busyTurnKey(providerThreadId, runOrdinal));
+              // A terminal for this run ordinal also clears the thread's
+              // earlier runs: their turns ended without a terminal the manager
+              // saw (a stopped run the orchestrator settled itself, #1514), and
+              // the provider could not have started a later turn otherwise.
+              const prefix = busyTurnPrefix(providerThreadId);
+              const busyTurns = new Set(
+                [...entry.busyTurns].filter(
+                  (turnKey) =>
+                    !turnKey.startsWith(prefix) ||
+                    Number(turnKey.slice(prefix.length)) > runOrdinal,
+                ),
+              );
               const updated = new Map(current);
               updated.set(key, {
                 ...entry,

@@ -3,7 +3,9 @@ import {
   type ServerSelfUpdateCapability,
   type ServerSelfUpdateInput,
   type ServerSelfUpdateProgressStage,
+  type ServerRunningTurn,
   type ServerSelfUpdateResult,
+  type ServerUpdateRunningTurnsPolicy,
   type ThreadId,
 } from "@infinitus/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
@@ -25,6 +27,7 @@ import { CLI_RELEASE_BASE_URL_ENV } from "@infinitus/shared/cliRelease";
 
 import * as ServerConfig from "../config.ts";
 import * as DesktopAppUpdate from "../desktopUpdate/DesktopAppUpdate.ts";
+import { InfinitusRunningTurns } from "../infinitus/Services/InfinitusRunningTurns.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import {
   ensurePinnedRuntimeInstalled,
@@ -53,6 +56,7 @@ export class ServerSelfUpdate extends Context.Service<
       input: ServerSelfUpdateInput,
       reportProgress?: (
         stage: ServerSelfUpdateProgressStage,
+        runningTurns?: number,
       ) => Effect.Effect<void, ServerSelfUpdateError>,
       onHandoffAccepted?: () => Effect.Effect<void>,
     ) => Effect.Effect<ServerSelfUpdateResult, ServerSelfUpdateError>;
@@ -62,6 +66,94 @@ export class ServerSelfUpdate extends Context.Service<
     ) => Effect.Effect<never, ServerSelfUpdateError>;
   }
 >()("t3/cloud/selfUpdate/ServerSelfUpdate") {}
+
+/** How often a `wait` update re-reads the running turns (#829). */
+export const RUNNING_TURNS_POLL = Duration.seconds(5);
+
+function runningTurnsRefusal(count: number): string {
+  return `${count} ${count === 1 ? "thread is" : "threads are"} running; updating now would interrupt ${count === 1 ? "it" : "them"}. Update when they finish, or stop them first.`;
+}
+
+/**
+ * Fork (#829): the update idle gate, over the service that does the update.
+ * `interrupt` passes, `refuse` fails naming the turns, `wait` polls until
+ * none runs, reporting each change of count. An update refuses at its entry
+ * (nothing downloaded for nothing) and waits at the install hook, after the
+ * download; in desktop mode the install is the commit, which
+ * `commitDesktopUpdate` gates under the policy the preparation used (an
+ * unknown token = `refuse`; the desktop app's own update run is bounded by
+ * a timeout, so no wait happens inside it).
+ */
+export const withUpdateIdleGate = (input: {
+  readonly mode: ServerConfig.RuntimeMode;
+  readonly selfUpdate: ServerSelfUpdate["Service"];
+  /** The server's own running turns, read at the request and again right
+      before the install, since a turn may start in between. */
+  readonly runningTurns: Effect.Effect<ReadonlyArray<ServerRunningTurn>>;
+}): ServerSelfUpdate["Service"] => {
+  const desktopPolicies = new Map<string, ServerUpdateRunningTurnsPolicy>();
+
+  const awaitIdle = (
+    policy: ServerUpdateRunningTurnsPolicy,
+    reportProgress: (
+      stage: ServerSelfUpdateProgressStage,
+      runningTurns?: number,
+    ) => Effect.Effect<void, ServerSelfUpdateError>,
+  ): Effect.Effect<void, ServerSelfUpdateError> =>
+    Effect.gen(function* () {
+      if (policy === "interrupt") return;
+      let announced = -1;
+      while (true) {
+        const running = yield* input.runningTurns;
+        if (running.length === 0) return;
+        if (policy === "refuse") {
+          return yield* Effect.fail(
+            new ServerSelfUpdateError({
+              reason: runningTurnsRefusal(running.length),
+              runningTurns: running,
+            }),
+          );
+        }
+        if (running.length !== announced) {
+          announced = running.length;
+          yield* reportProgress("waiting", running.length);
+        }
+        yield* Effect.sleep(RUNNING_TURNS_POLL);
+      }
+    });
+
+  return ServerSelfUpdate.of({
+    update: (request, reportProgress = () => Effect.void, onHandoffAccepted) => {
+      const policy = request.runningTurns ?? "refuse";
+      return (policy === "refuse" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
+        Effect.andThen(
+          input.selfUpdate.update(
+            request,
+            (stage, runningTurns) =>
+              (stage === "installing" && input.mode !== "desktop"
+                ? awaitIdle(policy, reportProgress)
+                : Effect.void
+              ).pipe(Effect.andThen(reportProgress(stage, runningTurns))),
+            onHandoffAccepted,
+          ),
+        ),
+        Effect.tap((result) =>
+          Effect.sync(() => {
+            if (result.method === "desktop-app" && result.desktopUpdateToken !== undefined) {
+              desktopPolicies.set(result.desktopUpdateToken, policy);
+            }
+          }),
+        ),
+      );
+    },
+    // The gate again: this is the quit.
+    commitDesktopUpdate: (requestId, onHandoffAccepted) =>
+      awaitIdle(desktopPolicies.get(requestId) ?? "refuse", () => Effect.void).pipe(
+        Effect.andThen(Effect.sync(() => desktopPolicies.delete(requestId))),
+        Effect.andThen(input.selfUpdate.commitDesktopUpdate(requestId, onHandoffAccepted)),
+      ),
+  });
+};
 
 export const withRunningThreadContinuation = Effect.fn(
   "cloud.server_self_update.withRunningThreadContinuation",
@@ -342,6 +434,16 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
   });
 });
 
-export const layer = Layer.effect(ServerSelfUpdate, make()).pipe(
-  Layer.provide(ProcessRunner.layer),
-);
+export const layer = Layer.effect(
+  ServerSelfUpdate,
+  Effect.gen(function* () {
+    // Fork (#829): the update refuses or waits while a turn runs.
+    const serverConfig = yield* ServerConfig.ServerConfig;
+    const runningTurns = yield* InfinitusRunningTurns;
+    return withUpdateIdleGate({
+      mode: serverConfig.mode,
+      selfUpdate: yield* make(),
+      runningTurns: runningTurns.list,
+    });
+  }),
+).pipe(Layer.provide(ProcessRunner.layer));

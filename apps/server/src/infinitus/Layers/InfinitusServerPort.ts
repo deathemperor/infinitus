@@ -1,14 +1,12 @@
 import type { AuthEnvironmentScope, AuthSessionId } from "@infinitus/contracts";
 import { InfinitusManifest, InfinitusPrefs } from "@infinitus/contracts/infinitus";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
-import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
 import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
 import * as NodeOS from "node:os";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
@@ -16,7 +14,7 @@ import * as Stream from "effect/Stream";
 import { HttpServer } from "effect/http";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
-import { ServerConfig } from "../../config.ts";
+import { type RuntimeMode, ServerConfig } from "../../config.ts";
 import { ServerEnvironmentIdentity } from "../../environment/ServerEnvironment.ts";
 import { forkParked } from "../../serverActivation.ts";
 import { InfinitusService } from "../Services/Infinitus.ts";
@@ -45,8 +43,8 @@ export const DESKTOP_CREDENTIAL_SCOPES: ReadonlyArray<AuthEnvironmentScope> = [
 export const DESKTOP_CREDENTIAL_TTL = Duration.days(90);
 
 /**
- * The opt-in (#1487): a server whose home is not the default one — a worktree
- * `.t3`, a showcase's temp dir, any `--home-dir` — keeps its port to itself
+ * The opt-in (#1487): a server that is not the desktop's bundled one — a dev
+ * runner, a worktree `.t3`, a showcase's temp home — keeps its port to itself
  * unless this is set, and one that is set takes the app's slot even from a
  * live installed desktop. Documented in `docs/operations/development.md`.
  */
@@ -363,30 +361,27 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
   yield* Effect.all([onReturn, heartbeat], { concurrency: "unbounded", discard: true });
 });
 
-/** Both resolved by the caller; only a trailing separator is forgiven here. */
-const sameDirectory = (left: string, right: string) =>
-  left.replace(/[\\/]+$/, "") === right.replace(/[\\/]+$/, "");
-
 /**
  * Why a server keeps its port to itself, or undefined for the installed one.
- * The pref names the server the phone's tunnel fronts and the one
- * `infinitusctl` drives, and the installed desktop's bundled server is the
- * one that should own it: a dev-runner server (it serves the web app from
- * Vite, so it carries a dev URL), any server whose home is a worktree-local
- * `.t3`, and — #1487 — any server on a home that is not the default one (a
- * showcase's temp dir, a `--home-dir`, a `T3CODE_HOME`) would otherwise take
- * the tunnel and the CLI with it, last writer wins (#640), and a `thread send`
- * meant for the live install would run in a sandbox. An
- * `INFINITUS_CONTROL_SOCKET` override is an isolated instance by definition
- * (every dev instance runs with one): it neither publishes its port nor opens
- * the installed app. The opt-in overrides every reason: that server is the
- * one the user picked.
+ * The pref names the server the phone's tunnel fronts, and the installed
+ * desktop's bundled server is the one that should own it: a dev-runner server
+ * (it serves the web app from Vite, so it carries a dev URL) or any server
+ * whose home is a worktree-local `.t3` would otherwise take the tunnel with
+ * it, last writer wins (#640). An `INFINITUS_CONTROL_SOCKET` override is an
+ * isolated instance by definition (every dev instance runs with one): it
+ * neither publishes its port nor opens the installed app. Those three name
+ * the usual dev shapes; the fail-safe is the runtime mode (#1487): only the
+ * desktop's own bundled server runs as `desktop`, so a `web` server — a
+ * showcase on a temp home, `dev:server` without Vite, a `--home-dir`
+ * elsewhere — stays quiet whatever its home, instead of rotating the
+ * installed desktop's credential every minute.
+ * `INFINITUS_PUBLISH_SERVER_PORT=1` overrides every reason: that server is the
+ * one the user picked, and it says so to the app (`takeover`).
  */
 export const serverPortWithheldReason = (input: {
+  readonly mode: RuntimeMode;
   readonly devUrl: URL | undefined;
   readonly baseDir: string;
-  /** The home a server lands on with nothing configured: `~/.infinitus`. */
-  readonly defaultHome: string;
   readonly worktreeT3Home: string | undefined;
   /** `INFINITUS_CONTROL_SOCKET` as the process sees it: set means an isolated
       instance pointed at its own (or no) app, never the installed one. */
@@ -402,9 +397,7 @@ export const serverPortWithheldReason = (input: {
   if (input.worktreeT3Home !== undefined && input.worktreeT3Home === input.baseDir) {
     return "its home is a worktree-local .t3";
   }
-  if (!sameDirectory(input.baseDir, input.defaultHome)) {
-    return `its home ${input.baseDir} is not the default ${input.defaultHome} (set ${PUBLISH_OPT_IN_ENV}=1 to publish anyway)`;
-  }
+  if (input.mode !== "desktop") return "only the desktop's bundled server publishes its port";
   return undefined;
 };
 
@@ -413,11 +406,10 @@ export const serverPortWithheldReason = (input: {
 export const resolveServerPortWithheldReason = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const env = yield* HostProcessEnvironment;
-  const path = yield* Path.Path;
   return serverPortWithheldReason({
+    mode: config.mode,
     devUrl: config.devUrl,
-    baseDir: path.resolve(config.baseDir),
-    defaultHome: path.resolve(path.join(NodeOS.homedir(), DEFAULT_HOME_DIR_NAME)),
+    baseDir: config.baseDir,
     worktreeT3Home: yield* resolveWorktreeT3Home(config.baseDir),
     controlSocketOverride: env.INFINITUS_CONTROL_SOCKET,
     publishOptIn: publishOptedIn(env[PUBLISH_OPT_IN_ENV]),

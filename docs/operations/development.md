@@ -37,11 +37,11 @@ different preference when needed.
 
 #### Publishing to the Mac app
 
-Only the installed desktop publishes its port and the `infinitusctl` credential to the Mac
-app. A dev-runner server, one whose home is a worktree `.t3`, a showcase's temp home, or any
-other `--home-dir` / `T3CODE_HOME` logs `infinitus.server-port.withheld` and stays out, so
-`infinitusctl threads` and `thread send` keep driving the live install and a sandbox seeded
-from real data never takes a message meant for it.
+Only the installed desktop's bundled server publishes its port and the `infinitusctl`
+credential to the Mac app. Every other server (a dev-runner server, one on a worktree `.t3`,
+a showcase's temp home, any `web`-mode server) logs `infinitus.server-port.withheld` and stays
+out, so `infinitusctl threads` and `thread send` keep driving the live install and a sandbox
+seeded from real data never takes a message meant for it.
 
 To drive one dev server from `infinitusctl` instead, start it with
 `INFINITUS_PUBLISH_SERVER_PORT=1`. It then publishes like the installed desktop and takes the

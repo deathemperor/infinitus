@@ -1,21 +1,36 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { DesktopUpdateState } from "@infinitus/contracts";
 import { TriangleAlertIcon } from "lucide-react";
-import { type ComponentProps, useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import { isElectron } from "../../env";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
-import { useDesktopUpdateState } from "../../state/desktopUpdate";
+import { desktopInstallWhenIdleAtom, useDesktopUpdateState } from "../../state/desktopUpdate";
+import { useAllEnvironmentShellsBootstrapped, useThreadShells } from "../../state/entities";
+import { useEnvironments } from "../../state/environments";
+import { isLocalConnectionTarget } from "../ProviderUpdateLaunchNotification.environments";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   canCheckForUpdate,
+  countRunningLocalTurns,
   getArm64IntelBuildWarningDescription,
   getDesktopUpdateActionError,
+  getDesktopUpdateArmedTooltip,
   getDesktopUpdateButtonTooltip,
   getDesktopUpdateInstallConfirmationMessage,
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
+  resolveInstallWhenIdleStep,
   shouldShowArm64IntelBuildWarning,
   shouldToastDesktopUpdateActionResult,
 } from "../desktopUpdate.logic";
@@ -29,6 +44,10 @@ import {
   shouldContinueDesktopUpdateCheckAnimation,
   shouldShowDesktopUpdateCheckIcon,
 } from "./DesktopUpdateStatusIcon";
+import {
+  DesktopUpdateRunningTurnsDialog,
+  type DesktopUpdateRunningTurnsDialogRequest,
+} from "./DesktopUpdateRunningTurnsDialog";
 import { SidebarUpdateReleaseNotes } from "./SidebarUpdateReleaseNotes";
 
 type SidebarUpdatePopoverChangeDetails = Parameters<
@@ -114,7 +133,24 @@ export function SidebarUpdatePill() {
 
 function SidebarUpdateControl() {
   const state = useDesktopUpdateState();
+  const installWhenIdle = useAtomValue(desktopInstallWhenIdleAtom);
+  const setInstallWhenIdle = useAtomSet(desktopInstallWhenIdleAtom);
+  const shells = useThreadShells();
+  const shellsBootstrapped = useAllEnvironmentShellsBootstrapped();
+  const { presentationById } = useEnvironments();
+  // #829: the turns an install would cut off, read from the thread shells
+  // of the local backends. Null while a backend's shells are still
+  // loading — a count of zero proves nothing then.
+  const runningLocalTurns = useMemo(() => {
+    if (!shellsBootstrapped) return null;
+    return countRunningLocalTurns(shells, (environmentId) => {
+      const presentation = presentationById.get(environmentId);
+      return presentation !== undefined && isLocalConnectionTarget(presentation.entry.target);
+    });
+  }, [presentationById, shells, shellsBootstrapped]);
   const [isActionPending, setIsActionPending] = useState(false);
+  const [runningTurnsDialog, setRunningTurnsDialog] =
+    useState<DesktopUpdateRunningTurnsDialogRequest | null>(null);
   const [checkAnimationKey, setCheckAnimationKey] = useState(0);
   const [isCheckAnimationLatched, setIsCheckAnimationLatched] = useState(false);
   const [releaseNotesPopoverHandle] = useState(() => PopoverCreateHandle());
@@ -144,9 +180,11 @@ function SidebarUpdateControl() {
     showCheckIcon,
   });
   const tooltip = showUpdateDetails
-    ? state
-      ? getDesktopUpdateButtonTooltip(state)
-      : "Update available"
+    ? installWhenIdle && runningLocalTurns !== null
+      ? getDesktopUpdateArmedTooltip(runningLocalTurns)
+      : state
+        ? getDesktopUpdateButtonTooltip(state)
+        : "Update available"
     : showCheckIcon
       ? "Checking for updates…"
       : "Check for updates";
@@ -172,6 +210,48 @@ function SidebarUpdateControl() {
       releaseNotesPopoverHandle.open(releaseNotesTriggerId);
     }
   }, [releaseNotesPopoverHandle, releaseNotesTriggerId, showReleaseNotesPopover]);
+
+  const installNow = useCallback(() => {
+    const bridge = window.desktopBridge;
+    if (!bridge) return;
+    setIsActionPending(true);
+    void bridge
+      .installUpdate()
+      .then((result) => {
+        if (!shouldToastDesktopUpdateActionResult(result)) return;
+        const actionError = getDesktopUpdateActionError(result);
+        if (!actionError) return;
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not install update",
+            description: actionError,
+          }),
+        );
+      })
+      .catch((error) => {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Could not install update",
+            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          }),
+        );
+      })
+      .finally(() => setIsActionPending(false));
+  }, []);
+
+  // #829: "Install when they finish" — fire once the count reaches zero and
+  // the install action is back. The wait survives the 4-minute poll reading
+  // "checking" and a newer release replacing the downloaded one (#1037);
+  // it is dropped only when nothing is left to install.
+  useEffect(() => {
+    if (!installWhenIdle) return;
+    const step = resolveInstallWhenIdleStep(state, action, runningLocalTurns);
+    if (step === "wait") return;
+    setInstallWhenIdle(false);
+    if (step === "install") installNow();
+  }, [action, installNow, installWhenIdle, runningLocalTurns, setInstallWhenIdle, state]);
 
   const handleAction = useCallback(async () => {
     const bridge = window.desktopBridge;
@@ -212,6 +292,19 @@ function SidebarUpdateControl() {
     }
 
     if (action === "install") {
+      if (installWhenIdle) {
+        // The armed button: a click opens the dialog to keep, cancel or skip the wait.
+        setIsActionPending(false);
+        setRunningTurnsDialog({ count: runningLocalTurns ?? 0, armed: true });
+        return;
+      }
+      if (runningLocalTurns !== 0) {
+        // Turns would die with the app (#829): the confirm becomes a dialog
+        // with the ways forward; Later leaves the update for another click.
+        setIsActionPending(false);
+        setRunningTurnsDialog({ count: runningLocalTurns, armed: false });
+        return;
+      }
       let confirmed = false;
       try {
         confirmed = await ensureLocalApi().dialogs.confirm(
@@ -232,30 +325,7 @@ function SidebarUpdateControl() {
         setIsActionPending(false);
         return;
       }
-      void bridge
-        .installUpdate()
-        .then((result) => {
-          if (!shouldToastDesktopUpdateActionResult(result)) return;
-          const actionError = getDesktopUpdateActionError(result);
-          if (!actionError) return;
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "Could not install update",
-              description: actionError,
-            }),
-          );
-        })
-        .catch((error) => {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "Could not install update",
-              description: error instanceof Error ? error.message : "An unexpected error occurred.",
-            }),
-          );
-        })
-        .finally(() => setIsActionPending(false));
+      installNow();
       return;
     }
 
@@ -286,7 +356,15 @@ function SidebarUpdateControl() {
         );
       })
       .finally(() => setIsActionPending(false));
-  }, [action, isInteractionDisabled, prefersReducedMotion, state]);
+  }, [
+    action,
+    installNow,
+    installWhenIdle,
+    isInteractionDisabled,
+    prefersReducedMotion,
+    runningLocalTurns,
+    state,
+  ]);
 
   const handleCheckAnimationIteration = useCallback(() => {
     setIsCheckAnimationLatched(
@@ -349,6 +427,16 @@ function SidebarUpdateControl() {
 
   return (
     <SidebarMenuItem className="ml-auto shrink-0">
+      {state ? (
+        <DesktopUpdateRunningTurnsDialog
+          onCancelArm={() => setInstallWhenIdle(false)}
+          onClose={() => setRunningTurnsDialog(null)}
+          onInstallNow={installNow}
+          onInstallWhenIdle={() => setInstallWhenIdle(true)}
+          request={runningTurnsDialog}
+          state={state}
+        />
+      ) : null}
       <Popover
         handle={releaseNotesPopoverHandle}
         onOpenChange={(open, details) => {

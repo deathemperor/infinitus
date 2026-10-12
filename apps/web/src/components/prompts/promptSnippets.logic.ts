@@ -87,6 +87,29 @@ export interface PromptSnippetSlashItem {
 }
 
 /**
+ * Picking a snippet from the `/` menu: the body replaces the `/query` where
+ * it was typed, no trailing space; `expectedText` guards the composer's
+ * replacement against a value that moved under the menu.
+ */
+export function promptSnippetEdit(
+  snippet: PromptSnippet,
+  trigger: { readonly rangeStart: number; readonly rangeEnd: number },
+  value: string,
+): {
+  readonly start: number;
+  readonly end: number;
+  readonly text: string;
+  readonly expectedText: string;
+} {
+  return {
+    start: trigger.rangeStart,
+    end: trigger.rangeEnd,
+    text: snippet.text,
+    expectedText: value.slice(trigger.rangeStart, trigger.rangeEnd),
+  };
+}
+
+/**
  * The project's snippets that match the `/` menu's query by name (case
  * insensitive, a leading `/` or `prompt:` ignored), as menu rows: the name is
  * the label, the first line of the body the description. Empty query lists

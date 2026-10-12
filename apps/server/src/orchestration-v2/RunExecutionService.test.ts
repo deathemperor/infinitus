@@ -33,6 +33,7 @@ import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
@@ -3418,14 +3419,23 @@ it.effect("does not refresh pull requests for auxiliary or stale provider termin
       shouldFinalizeRun: () => Effect.succeed(true),
       events: (ids) =>
         Stream.fromIterable([
+          // A subagent's terminal arrives on its own provider thread.
           rootTerminalEvent(
-            { ...ids, rootProviderTurnId: ProviderTurnId.make("turn:child") },
+            {
+              ...ids,
+              providerThreadId: ProviderThreadId.make("provider-thread:child"),
+              rootProviderTurnId: ProviderTurnId.make("turn:child"),
+            },
             "completed",
           ),
-          rootTerminalEvent(
-            { ...ids, rootProviderTurnId: ProviderTurnId.make("turn:previous") },
-            "interrupted",
-          ),
+          // A stopped run's late terminal carries that run's ordinal (#1514).
+          {
+            ...rootTerminalEvent(
+              { ...ids, rootProviderTurnId: ProviderTurnId.make("turn:previous") },
+              "interrupted",
+            ),
+            runOrdinal: 2,
+          },
         ]),
     });
     assert.deepEqual(observed, []);
@@ -4156,5 +4166,219 @@ it.effect("releases ingestion after idle subagent rows and items settle", () =>
       "turn_item:idle",
       "root-finalized",
     ]);
+  }),
+);
+
+it("settles the root turn on a terminal for another turn of the run's own provider thread", () => {
+  const identity: RunExecutionService.ProviderEventRouteIdentity = {
+    threadId: ThreadId.make("thread:abandoned-turn"),
+    runId: RunId.make("run:abandoned-turn"),
+    attemptId: RunAttemptId.make("attempt:abandoned-turn"),
+    providerThreadId: ProviderThreadId.make("provider-thread:abandoned-turn"),
+    runOrdinal: 1,
+  };
+  const rootProviderTurnId = ProviderTurnId.make("provider-turn:abandoned-turn:root");
+  const terminal = (input: {
+    readonly providerThreadId?: ProviderThreadId;
+    readonly providerTurnId: ProviderTurnId;
+    readonly runOrdinal?: number;
+  }): ProviderAdapterV2Event => ({
+    type: "turn.terminal",
+    driver,
+    providerThreadId: input.providerThreadId ?? identity.providerThreadId,
+    providerTurnId: input.providerTurnId,
+    runOrdinal: input.runOrdinal ?? 1,
+    status: "completed",
+    failure: null,
+    threadDisposition: "reusable",
+  });
+  const otherTurnId = ProviderTurnId.make("provider-turn:abandoned-turn:other");
+  const initial = RunExecutionService.makeProviderEventRoutingState({
+    identity,
+    providerTurnId: rootProviderTurnId,
+  });
+
+  // Another provider thread's terminal is never this run's.
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(
+      terminal({
+        providerThreadId: ProviderThreadId.make("provider-thread:abandoned-turn:other"),
+        providerTurnId: otherTurnId,
+      }),
+      identity,
+      initial,
+    )[0],
+  );
+  // A stopped earlier run's late terminal carries its own ordinal.
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(
+      terminal({ providerTurnId: otherTurnId, runOrdinal: 2 }),
+      identity,
+      initial,
+    )[0],
+  );
+  const [accepted, ended] = RunExecutionService.routeProviderEvent(
+    terminal({ providerTurnId: otherTurnId }),
+    identity,
+    initial,
+  );
+  assert.isTrue(accepted);
+  assert.isTrue(ended.rootTurnEnded);
+  assert.equal(ended.rootProviderTurnId, rootProviderTurnId);
+  // Once the root ended, a later run's terminal on this thread is not ours.
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(
+      terminal({ providerTurnId: ProviderTurnId.make("provider-turn:abandoned-turn:next") }),
+      identity,
+      ended,
+    )[0],
+  );
+  // A run whose attempt never learned its root turn id settles the same way.
+  assert.isTrue(
+    RunExecutionService.routeProviderEvent(
+      terminal({ providerTurnId: otherTurnId }),
+      identity,
+      RunExecutionService.makeProviderEventRoutingState({ identity, providerTurnId: null }),
+    )[0],
+  );
+});
+
+it.effect("finalizes the run when the provider finishes under another turn id", () =>
+  Effect.gen(function* () {
+    const ids = backgroundScenarioIds("abandoned-turn-finalizes");
+    const otherTurnId = ProviderTurnId.make("provider-turn:abandoned-turn-finalizes:other");
+    const providerInstanceId = ProviderInstanceId.make("codex");
+    const finalized = yield* Ref.make<
+      ReadonlyArray<{ readonly status: string; readonly effects: ReadonlyArray<string> }>
+    >([]);
+    const ingestionDone = yield* Deferred.make<void>();
+    const logs: Array<unknown> = [];
+    const logger = Logger.make(({ message }) => {
+      logs.push(message);
+    });
+    const layerTest = RunExecutionService.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          McpAppModelContext.layerEmpty,
+          Layer.mock(CheckpointService.CheckpointServiceV2)({ captureBaseline: () => Effect.void }),
+          Layer.mock(EventSink.EventSinkV2)({
+            write: () => Effect.succeed([]),
+            writeWithEffects: (input) =>
+              Effect.gen(function* () {
+                for (const event of input.events) {
+                  if (event.type !== "run.updated" || event.runId !== ids.runId) continue;
+                  yield* Ref.update(finalized, (current) => [
+                    ...current,
+                    {
+                      status: event.payload.status,
+                      effects: input.effects.map((effect) => effect.request.type),
+                    },
+                  ]);
+                }
+                return [];
+              }),
+            writeIfRunCurrent: () => Effect.succeed({ committed: true, storedEvents: [] }),
+          }),
+          IdAllocator.layer,
+          Layer.mock(ProviderEventIngestor.ProviderEventIngestorV2)({
+            ingestNormalized: () => Effect.succeed([]),
+          }),
+          ServerSettings.layerTest(),
+        ),
+      ),
+    );
+    const events: ReadonlyArray<ProviderAdapterV2Event> = [
+      {
+        type: "provider_turn.updated",
+        driver,
+        threadId: ids.threadId,
+        providerTurn: {
+          id: ids.rootProviderTurnId,
+          providerThreadId: ids.providerThreadId,
+          nodeId: ids.rootNodeId,
+          runAttemptId: ids.attemptId,
+          status: "running",
+        },
+      } as ProviderAdapterV2Event,
+      {
+        type: "turn.terminal",
+        driver,
+        providerThreadId: ids.providerThreadId,
+        providerTurnId: otherTurnId,
+        runOrdinal: 1,
+        status: "completed",
+        failure: null,
+        threadDisposition: "reusable",
+      },
+    ];
+
+    yield* Effect.gen(function* () {
+      const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
+      yield* runExecution.startRootRun({
+        commandId: CommandId.make("command:abandoned-turn-finalizes"),
+        appThread: { id: ids.threadId } as OrchestrationV2AppThread,
+        providerSessionId: ProviderSessionId.make("session:abandoned-turn-finalizes"),
+        session: {
+          events: Stream.empty,
+          subscribeEvents: Effect.succeed({
+            events: Stream.fromIterable(events),
+            close: Deferred.succeed(ingestionDone, undefined),
+          }),
+          startTurn: () => Effect.void,
+        } as unknown as ProviderAdapterV2SessionRuntime,
+        run: {
+          id: ids.runId,
+          threadId: ids.threadId,
+          ordinal: 1,
+          providerInstanceId,
+        } as OrchestrationV2Run,
+        rootNode: { id: ids.rootNodeId } as OrchestrationV2ExecutionNode,
+        checkpointScope: {
+          id: CheckpointScopeId.make("checkpoint-scope:abandoned-turn-finalizes"),
+        } as OrchestrationV2CheckpointScope,
+        providerThread: { id: ids.providerThreadId, driver } as OrchestrationV2ProviderThread,
+        attempt: { id: ids.attemptId, providerTurnId: null } as OrchestrationV2RunAttempt,
+        attemptId: ids.attemptId,
+        providerTurnOrdinal: 1,
+        message: {
+          messageId: MessageId.make("message:abandoned-turn-finalizes:user"),
+          text: "Finish under another turn id.",
+          attachments: [],
+          createdBy: "user",
+          creationSource: "web",
+        },
+        modelSelection: { instanceId: providerInstanceId, model: "gpt-5.4" },
+        runtimePolicy: {
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          cwd: process.cwd(),
+          approvalPolicy: "never",
+          sandboxPolicy: {
+            type: "readOnly",
+            access: { type: "fullAccess" },
+            networkAccess: false,
+          },
+        },
+      });
+    }).pipe(
+      Effect.provide(Layer.merge(layerTest, Logger.layer([logger], { mergeWithExisting: false }))),
+    );
+
+    const closed = yield* Deferred.await(ingestionDone).pipe(Effect.timeoutOption("2 seconds"));
+    assert.isTrue(Option.isSome(closed), "event ingestion fiber did not finish");
+    assert.deepEqual(yield* Ref.get(finalized), [
+      { status: "waiting", effects: ["checkpoint.capture"] },
+    ]);
+    const warning = logs.find(
+      (message) =>
+        Array.isArray(message) &&
+        message[0] === "orchestration V2 run settled by a terminal for another provider turn",
+    );
+    assert.isDefined(warning);
+    assert.deepInclude((warning as ReadonlyArray<unknown>)[1], {
+      runId: ids.runId,
+      rootProviderTurnId: ids.rootProviderTurnId,
+      providerTurnId: otherTurnId,
+    });
   }),
 );

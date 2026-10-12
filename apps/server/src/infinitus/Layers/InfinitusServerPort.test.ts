@@ -346,9 +346,9 @@ const settle = Effect.repeat(Effect.yieldNow, { times: 20 });
 
 describe("serverPortWithheldReason", () => {
   const installed = {
+    mode: "desktop" as const,
     devUrl: undefined,
-    baseDir: "/Users/me/.infinitus",
-    defaultHome: "/Users/me/.infinitus",
+    baseDir: "/Users/me/.t3",
     worktreeT3Home: undefined,
     controlSocketOverride: undefined,
     publishOptIn: false,
@@ -378,23 +378,8 @@ describe("serverPortWithheldReason", () => {
     ).toBeUndefined();
   });
 
-  it("withholds the pref from any server whose home is not the default one (#1487)", () => {
-    // A showcase's temp dir, a `--home-dir`, a `T3CODE_HOME`: none of them is
-    // the installed desktop, whatever else is true of the process.
-    expect(
-      serverPortWithheldReason({ ...installed, baseDir: "/tmp/t3-mobile-showcase-x1/home" }),
-    ).toMatch(/not the default/);
-    expect(serverPortWithheldReason({ ...installed, baseDir: "/Users/me/elsewhere" })).toMatch(
-      /INFINITUS_PUBLISH_SERVER_PORT=1/,
-    );
-    // Spelling: a trailing separator is the same directory.
-    expect(
-      serverPortWithheldReason({ ...installed, baseDir: "/Users/me/.infinitus/" }),
-    ).toBeUndefined();
-  });
-
-  it("publishes from any server the opt-in names, whatever its home", () => {
-    const optIn = { ...installed, publishOptIn: true };
+  it("publishes from any server the opt-in names, whatever its mode or home", () => {
+    const optIn = { ...installed, publishOptIn: true, mode: "web" as const };
     expect(serverPortWithheldReason({ ...optIn, baseDir: "/tmp/showcase" })).toBeUndefined();
     expect(
       serverPortWithheldReason({
@@ -416,6 +401,33 @@ describe("serverPortWithheldReason", () => {
     expect(publishOptedIn("0")).toBe(false);
     expect(publishOptedIn("")).toBe(false);
     expect(publishOptedIn(undefined)).toBe(false);
+  });
+
+  it("withholds the pref from every server that is not the desktop's own (#1487)", () => {
+    // A showcase on a temp home, `dev:server` without Vite, a `--home-dir`
+    // elsewhere: none carries a dev URL or a worktree home, all run as `web`.
+    expect(serverPortWithheldReason({ ...installed, mode: "web" })).toMatch(
+      /only the desktop's bundled server/,
+    );
+    expect(
+      serverPortWithheldReason({ ...installed, mode: "web", baseDir: "/tmp/showcase-abc" }),
+    ).toMatch(/only the desktop's bundled server/);
+    // The older reasons come first: a dev-runner server, a worktree server
+    // and an isolated instance keep their own explanation whatever the mode.
+    const web = { ...installed, mode: "web" as const };
+    expect(serverPortWithheldReason({ ...web, devUrl: new URL("http://localhost:3000") })).toMatch(
+      /dev-runner/,
+    );
+    expect(
+      serverPortWithheldReason({
+        ...web,
+        baseDir: "/Users/me/wt/.t3",
+        worktreeT3Home: "/Users/me/wt/.t3",
+      }),
+    ).toMatch(/worktree-local/);
+    expect(serverPortWithheldReason({ ...web, controlSocketOverride: "/tmp/i3.sock" })).toMatch(
+      /INFINITUS_CONTROL_SOCKET override/,
+    );
   });
 });
 

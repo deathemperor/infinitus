@@ -118,6 +118,7 @@ import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
 import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
 import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
 import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
+import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
 import { CaptureStore } from "./captures/CaptureStore.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -1259,6 +1260,7 @@ const layerWsRpc = (
       const infinitusCompanion = yield* InfinitusCompanion;
       const infinitusSecret = yield* InfinitusSecret;
       const infinitusPairing = yield* InfinitusPairing;
+      const infinitusLimitStops = yield* InfinitusLimitStops;
       const captureStore = yield* CaptureStore;
       const projectSetupScriptRunner = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
       const worktreeSetupTracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
@@ -2365,10 +2367,11 @@ const layerWsRpc = (
         [WS_METHODS.serverUpdateServerWithProgress]: (input) =>
           Stream.callback<ServerSelfUpdateProgressEvent, ServerSelfUpdateError>((queue) =>
             serverSelfUpdate
-              .update(input, (stage) =>
+              .update(input, (stage, runningTurns) =>
                 Queue.offer(queue, {
                   type: "progress",
                   stage,
+                  ...(runningTurns !== undefined ? { runningTurns } : {}),
                 }).pipe(Effect.asVoid),
               )
               .pipe(
@@ -3142,6 +3145,9 @@ const layerWsRpc = (
             scopes: currentSession.scopes,
           }),
         [WS_METHODS.subscribeInfinitusPairing]: (_input) => infinitusPairing.pending,
+        // The threads a Claude usage limit stopped (#648, #1627): the sidebar's
+        // "Limited" pill for a parked turn. Thread ids, accounts and resets only.
+        [WS_METHODS.subscribeInfinitusLimitStops]: (_input) => infinitusLimitStops.stopped,
         [WS_METHODS.infinitusPairingDecide]: (input) =>
           infinitusPairing.decide({ ...input, approverScopes: currentSession.scopes }),
         // Captures (#433): one list per project.

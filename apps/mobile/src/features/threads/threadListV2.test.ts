@@ -111,6 +111,26 @@ describe("resolveThreadListV2SnoozeMenuSelection", () => {
 });
 
 describe("resolveThreadListV2Status", () => {
+  it("reads limited for a running turn the server lists among its limit stops (#648)", () => {
+    const thread = makeThread({
+      id: ThreadId.make("parked"),
+      title: "Parked",
+      runtime: {
+        status: "running",
+        activeRunId: null,
+        providerInstanceId: ProviderInstanceId.make("claude"),
+        providerName: "Claude",
+        lastError: null,
+        updatedAt: NOW,
+      },
+    });
+    expect(resolveThreadListV2Status(thread, { limitStopped: true })).toBe("limited");
+    expect(resolveThreadListV2Status(thread, { limitStopped: false })).toBe("working");
+    expect(
+      resolveThreadListV2Status({ ...thread, hasPendingApprovals: true }, { limitStopped: true }),
+    ).toBe("approval");
+  });
+
   it("distinguishes usage limits from ordinary failures and clears the label after recovery", () => {
     const thread = makeThread({
       id: ThreadId.make("limited"),

@@ -97,13 +97,10 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertNil(try api([(200, "{\"environmentId\":\"env-1\",\"label\":\"No platform\"}")], log: Log()).descriptor().platform)
     }
 
-    func testHoldsAreEmptyOnADesktopWithoutTheRouteAndSessionAcceptedReadsTheAuthenticatedFlag() throws {
+    func testSessionAcceptedReadsTheAuthenticatedFlag() throws {
         let log = Log()
-        let a = api([(404, "not found"), (200, "[{\"threadId\":\"t2\",\"since\":\"2026-09-12T00:00:00Z\",\"summary\":\"at limit\",\"kind\":\"held\"}]"),
-                     (200, "{\"authenticated\":false,\"auth\":{}}"), (401, "{\"error\":\"Unauthorized\"}"),
+        let a = api([(200, "{\"authenticated\":false,\"auth\":{}}"), (401, "{\"error\":\"Unauthorized\"}"),
                      (200, "{\"authenticated\":true,\"auth\":{},\"scopes\":[\"orchestration:read\"]}")], log: log)
-        XCTAssertEqual(try a.holds(), [])
-        XCTAssertEqual(try a.holds().map(\.threadId), ["t2"])
         XCTAssertFalse(try a.sessionAccepted(), "the route answers everyone; a revoked session is authenticated:false")
         XCTAssertFalse(try a.sessionAccepted(), "a 401 reads as revoked too")
         XCTAssertTrue(try a.sessionAccepted())
@@ -112,14 +109,12 @@ final class DesktopAPITests: XCTestCase {
 
     func testDispatchPostsTheCommandAsJSONAndReadsTheSequence() throws {
         let log = Log()
-        let a = api([(200, "{\"sequence\":42}"), (200, "{\"released\":true}")], log: log)
+        let a = api([(200, "{\"sequence\":42}")], log: log)
         XCTAssertEqual(try a.dispatch(.object(["type": .string("thread.turn.interrupt"), "threadId": .string("t1")])), 42)
         XCTAssertEqual(log.calls[0].method, "POST")
         XCTAssertEqual(log.calls[0].url, "http://127.0.0.1:3773/api/orchestration/dispatch")
         XCTAssertEqual(log.calls[0].headers["Content-Type"], "application/json")
         XCTAssertEqual(log.calls[0].body, "{\"threadId\":\"t1\",\"type\":\"thread.turn.interrupt\"}")
-        XCTAssertEqual(try a.releaseThread("t2"), DesktopAPI.Release(released: true, reason: nil))
-        XCTAssertEqual(log.calls[1].body, "{\"threadId\":\"t2\"}")
     }
 
     func testRunningTurnsAndAlertRideTheInfinitusRoutes() throws {
@@ -165,26 +160,22 @@ final class DesktopAPITests: XCTestCase {
 
     // MARK: rows
 
-    func testStatusVocabularyIsDerivedFromTheTurnTheSessionTheFlagsAndTheHold() throws {
+    func testStatusVocabularyIsDerivedFromTheTurnTheSessionTheFlags() throws {
         let shell = try JSONDecoder().decode(DesktopAPI.Shell.self, from: Data(shellJSON.utf8))
         var running = shell.threads[0], idle = shell.threads[1]
-        XCTAssertEqual(DesktopRows.status(running, hold: nil), "running")
-        XCTAssertEqual(DesktopRows.status(idle, hold: nil), "idle")
+        XCTAssertEqual(DesktopRows.status(running), "running")
+        XCTAssertEqual(DesktopRows.status(idle), "idle")
         idle.session = .init(status: "starting")
-        XCTAssertEqual(DesktopRows.status(idle, hold: nil), "running", "a starting session counts as running")
+        XCTAssertEqual(DesktopRows.status(idle), "running", "a starting session counts as running")
         running.hasPendingApprovals = true
-        XCTAssertEqual(DesktopRows.status(running, hold: nil), "waiting", "an approval outranks the running turn")
-        let hold = DesktopAPI.Hold(threadId: "t1", since: nil, summary: "at limit", kind: nil)
-        XCTAssertEqual(DesktopRows.status(running, hold: hold), "held", "a hold outranks everything")
-        XCTAssertEqual(DesktopRows.status(running, hold: .init(threadId: "t1", since: nil, summary: nil, kind: "paused")), "paused")
-        let row = DesktopRows.threadRow(shell.threads[0], project: shell.projects[0], hold: hold)
+        XCTAssertEqual(DesktopRows.status(running), "waiting", "an approval outranks the running turn")
+        let row = DesktopRows.threadRow(shell.threads[0], project: shell.projects[0])
         XCTAssertEqual(row["project"], .string("Infinitus"))
-        XCTAssertEqual(row["status"], .string("held"))
+        XCTAssertEqual(row["status"], .string("running"))
         XCTAssertEqual(row["worktree"], .string("/w/infinitus/.wt/x"))
-        XCTAssertEqual(row["hold"]?["summary"], .string("at limit"))
         XCTAssertEqual(row["turn"]?["state"], .string("running"))
-        XCTAssertNil(DesktopRows.threadRow(shell.threads[1], project: nil, hold: nil)["worktree"])
-        XCTAssertEqual(DesktopRows.threadRow(shell.threads[1], project: nil, hold: nil)["project"], .string("p1"), "an unknown project prints its id")
+        XCTAssertNil(DesktopRows.threadRow(shell.threads[1], project: nil)["worktree"])
+        XCTAssertEqual(DesktopRows.threadRow(shell.threads[1], project: nil)["project"], .string("p1"), "an unknown project prints its id")
     }
 
     func testTurnStartCarriesTheMessageTheModesAndAnOptionalBootstrap() throws {
@@ -270,6 +261,6 @@ final class DesktopAPITests: XCTestCase {
         XCTAssertEqual(DesktopRows.title(from: String(repeating: "x", count: 100)).count, 80)
         XCTAssertEqual(DesktopRows.masked("tok-secret-1234"), "…1234")
         XCTAssertEqual(DesktopRows.masked("abc"), "…")
-        XCTAssertEqual(DesktopRows.statuses, ["running", "held", "paused", "waiting", "idle"])
+        XCTAssertEqual(DesktopRows.statuses, ["running", "waiting", "idle"])
     }
 }
