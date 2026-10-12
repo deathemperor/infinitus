@@ -137,7 +137,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         name none. */
     const proxyFor = (shell: Pick<OrchestrationV2ThreadShell, "modelSelection">) =>
       settings.getSettings.pipe(
-        Effect.map((current) => proxyInstanceLabel(current.providerInstances, shell.modelSelection)),
+        Effect.map((current) =>
+          proxyInstanceLabel(current.providerInstances, shell.modelSelection),
+        ),
         Effect.catch(() => Effect.succeed(null)),
       );
 
@@ -171,10 +173,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         (the SDK re-announcing a parked turn as its reset moves, or a parked
         turn ending the way the CLI ends it) keeps its account and its start,
         takes the newer window, and is not reported again. */
-    const record = (
-      stop: LimitStop,
-      options: { readonly report: boolean },
-    ): Effect.Effect<void> =>
+    const record = (stop: LimitStop, options: { readonly report: boolean }): Effect.Effect<void> =>
       Effect.gen(function* () {
         const known = stops.get(stop.threadId);
         const repeated = known !== undefined && known.runId === stop.runId;
@@ -209,9 +208,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           // instead of waiting for the usage endpoint to confirm it.
           yield* swapd.reportLimit(
             next.account,
-            next.resetsAt === null
-              ? null
-              : DateTime.formatIso(DateTime.makeUnsafe(next.resetsAt)),
+            next.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(next.resetsAt)),
           );
         }
         yield* startWatching;

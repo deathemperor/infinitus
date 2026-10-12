@@ -117,9 +117,9 @@ describe("refusedAccount (#1486)", () => {
     const noReset = snapshot([active, account("hiep1")]);
     expect(refusedAccount(refusal, noReset)?.account).toBe("loctruongh");
     expect(refusedAccount({ ...refusal, resetsAt: null }, noReset)?.account).toBe("loctruongh");
-    expect(refusedAccount({ rateLimitType: null, resetsAt: refusal.resetsAt }, noReset)?.account).toBe(
-      "loctruongh",
-    );
+    expect(
+      refusedAccount({ rateLimitType: null, resetsAt: refusal.resetsAt }, noReset)?.account,
+    ).toBe("loctruongh");
     // A reading rounded by the engine still matches within the slack.
     const rounded = snapshot([
       account("loctruongh", {
@@ -155,9 +155,16 @@ describe("refusedAccount (#1486)", () => {
   });
 
   it("covers only the engine that writes the CLI's credentials", () => {
-    expect(refusedAccount(refusal, snapshot([account("a", { active: true })], { engineID: "cliproxy" }))).toBeNull();
-    expect(refusedAccount(refusal, snapshot([account("a", { active: true })], { provider: "codex" }))).toBeNull();
-    expect(refusedAccount(refusal, snapshot([]))).toEqual({ fleetKey: "swapd/claude", account: null });
+    expect(
+      refusedAccount(refusal, snapshot([account("a", { active: true })], { engineID: "cliproxy" })),
+    ).toBeNull();
+    expect(
+      refusedAccount(refusal, snapshot([account("a", { active: true })], { provider: "codex" })),
+    ).toBeNull();
+    expect(refusedAccount(refusal, snapshot([]))).toEqual({
+      fleetKey: "swapd/claude",
+      account: null,
+    });
   });
 });
 
@@ -166,7 +173,11 @@ describe("resumeTarget", () => {
 
   it("waits for an active account that reads ok from a probe after the stop with room in the window", () => {
     const stale = snapshot([
-      account("hiep2", { active: true, usageFetchedAt: PROBE_BEFORE, usage: { sevenDay: { pct: 10 } } }),
+      account("hiep2", {
+        active: true,
+        usageFetchedAt: PROBE_BEFORE,
+        usage: { sevenDay: { pct: 10 } },
+      }),
     ]);
     // A different account than the one at the stop counts on an older probe too.
     expect(resumeTarget(stop(), stale, now)).toEqual({
@@ -175,7 +186,11 @@ describe("resumeTarget", () => {
       from: "hiep1",
     });
     const sameStale = snapshot([
-      account("hiep1", { active: true, usageFetchedAt: PROBE_BEFORE, usage: { sevenDay: { pct: 10 } } }),
+      account("hiep1", {
+        active: true,
+        usageFetchedAt: PROBE_BEFORE,
+        usage: { sevenDay: { pct: 10 } },
+      }),
     ]);
     expect(resumeTarget(stop(), sameStale, now)).toBeNull();
     const exhausted = snapshot([account("hiep2", { active: true, usageStatus: "exhausted" })]);
@@ -188,7 +203,9 @@ describe("resumeTarget", () => {
     expect(resumeTarget(stop(), full, Date.parse(HIEP1_WEEKLY) + 1)).toBeNull();
     const room = snapshot([account("hiep1", { active: true, usage: { sevenDay: { pct: 40 } } })]);
     expect(resumeTarget(stop(), room, now)?.account).toBe("hiep1");
-    const noWindow = snapshot([account("hiep1", { active: true, usage: { fiveHour: { pct: 1 } } })]);
+    const noWindow = snapshot([
+      account("hiep1", { active: true, usage: { fiveHour: { pct: 1 } } }),
+    ]);
     expect(resumeTarget(stop(), noWindow, now)).toBeNull();
     expect(resumeTarget(stop(), noWindow, Date.parse(HIEP1_WEEKLY) + 1)?.account).toBe("hiep1");
   });
@@ -210,15 +227,27 @@ describe("resumeTarget", () => {
     const fresh = snapshot([account("hiep1", { active: true, usage: { sevenDay: { pct: 40 } } })]);
     expect(resumeTarget(unnamed, fresh, now)?.account).toBe("hiep1");
     const stale = snapshot([
-      account("hiep1", { active: true, usageFetchedAt: PROBE_BEFORE, usage: { sevenDay: { pct: 40 } } }),
+      account("hiep1", {
+        active: true,
+        usageFetchedAt: PROBE_BEFORE,
+        usage: { sevenDay: { pct: 40 } },
+      }),
     ]);
     expect(resumeTarget(unnamed, stale, now)).toBeNull();
   });
 
   it("a proxied stop (#1088) and another engine's fleet never resume, and the alias is preferred", () => {
-    const alias = snapshot([account("x@y", { active: true, alias: "work", usage: { sevenDay: { pct: 1 } } })]);
+    const alias = snapshot([
+      account("x@y", { active: true, alias: "work", usage: { sevenDay: { pct: 1 } } }),
+    ]);
     expect(resumeTarget(stop({ proxy: "cliproxy" }), alias, now)).toBeNull();
-    expect(resumeTarget(stop(), snapshot([account("x", { active: true })], { engineID: "cliproxy" }), now)).toBeNull();
+    expect(
+      resumeTarget(
+        stop(),
+        snapshot([account("x", { active: true })], { engineID: "cliproxy" }),
+        now,
+      ),
+    ).toBeNull();
     expect(resumeTarget(stop(), alias, now)?.account).toBe("work");
   });
 });
@@ -238,7 +267,9 @@ describe("proxied instances (#1088)", () => {
       },
     } as never;
     expect(proxyInstanceLabel(instances, { instanceId: "plain" as never })).toBeNull();
-    expect(proxyInstanceLabel(instances, { instanceId: "proxied" as never })).toBe("Through cliproxy");
+    expect(proxyInstanceLabel(instances, { instanceId: "proxied" as never })).toBe(
+      "Through cliproxy",
+    );
     expect(proxyInstanceLabel(instances, { instanceId: "blank" as never })).toBeNull();
     expect(proxyInstanceLabel(instances, { instanceId: "missing" as never })).toBeNull();
   });
@@ -266,23 +297,37 @@ describe("failedStopFromShell", () => {
       limitType: null,
     });
     expect(
-      failedStopFromShell(shell, STOPPED_AT, { runId: RunId.make("run-1"), rateLimitType: "seven_day" })
-        ?.limitType,
+      failedStopFromShell(shell, STOPPED_AT, {
+        runId: RunId.make("run-1"),
+        rateLimitType: "seven_day",
+      })?.limitType,
     ).toBe("seven_day");
     expect(
-      failedStopFromShell(shell, STOPPED_AT, { runId: RunId.make("run-0"), rateLimitType: "seven_day" })
-        ?.limitType,
+      failedStopFromShell(shell, STOPPED_AT, {
+        runId: RunId.make("run-0"),
+        rateLimitType: "seven_day",
+      })?.limitType,
     ).toBeNull();
   });
 
   it("is nothing for any other failure, a settled or archived thread, or a thread still running", () => {
-    expect(failedStopFromShell({ ...shell, lastErrorClass: "provider_error" }, STOPPED_AT, null)).toBeNull();
-    expect(failedStopFromShell({ ...shell, status: "running" }, STOPPED_AT, null)).toBeNull();
-    expect(failedStopFromShell({ ...shell, settledOverride: "settled" }, STOPPED_AT, null)).toBeNull();
     expect(
-      failedStopFromShell({ ...shell, archivedAt: DateTime.makeUnsafe(STOPPED_AT) }, STOPPED_AT, null),
+      failedStopFromShell({ ...shell, lastErrorClass: "provider_error" }, STOPPED_AT, null),
     ).toBeNull();
-    expect(failedStopFromShell({ ...shell, usageLimitResetAt: null }, STOPPED_AT, null)?.resetsAt).toBeNull();
+    expect(failedStopFromShell({ ...shell, status: "running" }, STOPPED_AT, null)).toBeNull();
+    expect(
+      failedStopFromShell({ ...shell, settledOverride: "settled" }, STOPPED_AT, null),
+    ).toBeNull();
+    expect(
+      failedStopFromShell(
+        { ...shell, archivedAt: DateTime.makeUnsafe(STOPPED_AT) },
+        STOPPED_AT,
+        null,
+      ),
+    ).toBeNull();
+    expect(
+      failedStopFromShell({ ...shell, usageLimitResetAt: null }, STOPPED_AT, null)?.resetsAt,
+    ).toBeNull();
   });
 });
 
@@ -290,7 +335,9 @@ describe("the stop's line and wire shape", () => {
   it("names the account, the proxy, or nothing", () => {
     expect(limitStopSummary(stop())).toBe("Limit hit on hiep1");
     expect(limitStopSummary(stop({ account: null }))).toBe("Limit hit");
-    expect(limitStopSummary(stop({ proxy: "cliproxy" }))).toBe("Limit hit on the proxy instance cliproxy");
+    expect(limitStopSummary(stop({ proxy: "cliproxy" }))).toBe(
+      "Limit hit on the proxy instance cliproxy",
+    );
     expect(toWireStop(stop({ proxy: "cliproxy" }))).toEqual({
       threadId: ThreadId.make("thread-1"),
       kind: "parked",

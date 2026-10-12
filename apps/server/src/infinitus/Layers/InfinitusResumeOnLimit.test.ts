@@ -236,7 +236,9 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
         // The live account has room in the window: the resume replaces the
         // parked turn at once (the stop was listed for the moment between),
         // then continues the run once the orchestrator records the interrupt.
-        expect(yield* h.commands).toEqual([{ type: "run.interrupt", threadId: one, runId: runOne }]);
+        expect(yield* h.commands).toEqual([
+          { type: "run.interrupt", threadId: one, runId: runOne },
+        ]);
         expect(yield* h.stopped).toEqual([]);
         yield* h.setShell(shell(one, { status: "interrupted", activeRunId: null }));
         yield* h.emit(runUpdated(one, runOne, "interrupted"));
@@ -319,64 +321,75 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
       expect(yield* h.reports).toHaveLength(1);
       yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
       expect(yield* h.commands).toEqual([
-        { type: "message.dispatch", threadId: one, source: runOne, text: "Continue where you left off." },
-      ]);
-      expect(yield* h.stopped).toEqual([]);
-    }),
-  );
-
-  effectIt.effect("a run that failed for another reason, a settle or an archive ends the stop", () =>
-    Effect.gen(function* () {
-      const h = yield* makeHarness({
-        shells: [shell(one), shell(two)],
-        snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
-      });
-      yield* h.refuse(refusal(one, runOne));
-      yield* h.refuse(refusal(two, runOne));
-      expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([one, two]);
-      yield* h.emit(threadEvent(one, "thread.settled"));
-      expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([two]);
-      // The parked turn ended off the limit (a context-window stop, #1107):
-      // the stop ends and nothing new is recorded.
-      yield* h.setShell(shell(two, { status: "failed", lastErrorClass: "provider_error" }));
-      yield* h.emit(runUpdated(two, runOne, "failed"));
-      expect(yield* h.stopped).toEqual([]);
-      yield* h.emit(runUpdated(two, runTwo, "failed"));
-      expect(yield* h.stopped).toEqual([]);
-      expect(yield* h.commands).toEqual([]);
-    }),
-  );
-
-  effectIt.effect("a proxied instance's stop (#1088) names no account, reports nothing, never resumes", () =>
-    Effect.gen(function* () {
-      const h = yield* makeHarness({
-        shells: [shell(one, { modelSelection: { instanceId: "proxied", model: "opus" } as never })],
-        snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 1 } } })),
-        settings: {
-          providerInstances: {
-            proxied: {
-              driver: "claudeAgent",
-              displayName: "Through cliproxy",
-              environment: [{ name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:8317" }],
-            },
-          } as never,
-        },
-      });
-      yield* h.refuse(refusal(one, runOne));
-      expect(yield* h.stopped).toEqual([
         {
+          type: "message.dispatch",
           threadId: one,
-          kind: "parked",
-          since: "1970-01-01T00:00:00.000Z",
-          account: null,
-          resetsAt: HIEP1_WEEKLY,
-          proxy: "Through cliproxy",
+          source: runOne,
+          text: "Continue where you left off.",
         },
       ]);
-      yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
-      expect(yield* h.reports).toEqual([]);
-      expect(yield* h.commands).toEqual([]);
+      expect(yield* h.stopped).toEqual([]);
     }),
+  );
+
+  effectIt.effect(
+    "a run that failed for another reason, a settle or an archive ends the stop",
+    () =>
+      Effect.gen(function* () {
+        const h = yield* makeHarness({
+          shells: [shell(one), shell(two)],
+          snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
+        });
+        yield* h.refuse(refusal(one, runOne));
+        yield* h.refuse(refusal(two, runOne));
+        expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([one, two]);
+        yield* h.emit(threadEvent(one, "thread.settled"));
+        expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([two]);
+        // The parked turn ended off the limit (a context-window stop, #1107):
+        // the stop ends and nothing new is recorded.
+        yield* h.setShell(shell(two, { status: "failed", lastErrorClass: "provider_error" }));
+        yield* h.emit(runUpdated(two, runOne, "failed"));
+        expect(yield* h.stopped).toEqual([]);
+        yield* h.emit(runUpdated(two, runTwo, "failed"));
+        expect(yield* h.stopped).toEqual([]);
+        expect(yield* h.commands).toEqual([]);
+      }),
+  );
+
+  effectIt.effect(
+    "a proxied instance's stop (#1088) names no account, reports nothing, never resumes",
+    () =>
+      Effect.gen(function* () {
+        const h = yield* makeHarness({
+          shells: [
+            shell(one, { modelSelection: { instanceId: "proxied", model: "opus" } as never }),
+          ],
+          snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 1 } } })),
+          settings: {
+            providerInstances: {
+              proxied: {
+                driver: "claudeAgent",
+                displayName: "Through cliproxy",
+                environment: [{ name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:8317" }],
+              },
+            } as never,
+          },
+        });
+        yield* h.refuse(refusal(one, runOne));
+        expect(yield* h.stopped).toEqual([
+          {
+            threadId: one,
+            kind: "parked",
+            since: "1970-01-01T00:00:00.000Z",
+            account: null,
+            resetsAt: HIEP1_WEEKLY,
+            proxy: "Through cliproxy",
+          },
+        ]);
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
+        expect(yield* h.reports).toEqual([]);
+        expect(yield* h.commands).toEqual([]);
+      }),
   );
 
   effectIt.effect("the setting off keeps the pill and drops the report and the resume", () =>
@@ -393,20 +406,22 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
     }),
   );
 
-  effectIt.effect("a settled thread's parked turn records nothing, and a resume stands down once the thread moved on (#1522)", () =>
-    Effect.gen(function* () {
-      const h = yield* makeHarness({
-        shells: [shell(one, { settledOverride: "settled" }), shell(two)],
-        snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
-      });
-      yield* h.refuse(refusal(one, runOne));
-      expect(yield* h.stopped).toEqual([]);
-      yield* h.refuse(refusal(two, runOne));
-      // The user's own send started another run before the probe came back.
-      yield* h.setShell(shell(two, { latestRunId: runTwo, activeRunId: runTwo }));
-      yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
-      expect(yield* h.commands).toEqual([]);
-    }),
+  effectIt.effect(
+    "a settled thread's parked turn records nothing, and a resume stands down once the thread moved on (#1522)",
+    () =>
+      Effect.gen(function* () {
+        const h = yield* makeHarness({
+          shells: [shell(one, { settledOverride: "settled" }), shell(two)],
+          snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
+        });
+        yield* h.refuse(refusal(one, runOne));
+        expect(yield* h.stopped).toEqual([]);
+        yield* h.refuse(refusal(two, runOne));
+        // The user's own send started another run before the probe came back.
+        yield* h.setShell(shell(two, { latestRunId: runTwo, activeRunId: runTwo }));
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
+        expect(yield* h.commands).toEqual([]);
+      }),
   );
 
   effectIt.effect("two resumes of one thread are spaced by the cooldown", () =>
@@ -453,7 +468,12 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
       expect(yield* h.commands).toEqual([]);
       yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 1 } } })));
       expect(yield* h.commands).toEqual([
-        { type: "message.dispatch", threadId: one, source: runOne, text: "Continue where you left off." },
+        {
+          type: "message.dispatch",
+          threadId: one,
+          source: runOne,
+          text: "Continue where you left off.",
+        },
       ]);
     }),
   );

@@ -201,7 +201,9 @@ export function refusedAccount(
     return Math.abs(reading - refusal.resetsAt) <= RESET_MATCH_MS;
   };
   if (matches(active) !== false) return { fleetKey: fleet.key, account: accountLabel(active) };
-  const others = fleet.accounts.filter((account) => account !== active && matches(account) === true);
+  const others = fleet.accounts.filter(
+    (account) => account !== active && matches(account) === true,
+  );
   return { fleetKey: fleet.key, account: others.length === 1 ? accountLabel(others[0]!) : null };
 }
 
@@ -258,7 +260,8 @@ export function failedStopFromShell(
     stoppedAt:
       shell.latestRunCompletedAt == null ? now : DateTime.toEpochMillis(shell.latestRunCompletedAt),
     resetsAt: Number.isFinite(reset) ? reset : null,
-    limitType: refusal !== null && refusal.runId === shell.latestRunId ? refusal.rateLimitType : null,
+    limitType:
+      refusal !== null && refusal.runId === shell.latestRunId ? refusal.rateLimitType : null,
   };
 }
 
@@ -335,7 +338,8 @@ export function toWireStop(stop: LimitStop): InfinitusLimitStop {
     kind: stop.kind,
     since: DateTime.formatIso(DateTime.makeUnsafe(stop.stoppedAt)),
     account: stop.account,
-    resetsAt: stop.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(stop.resetsAt)),
+    resetsAt:
+      stop.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(stop.resetsAt)),
     ...(stop.proxy === null ? {} : { proxy: stop.proxy }),
   };
 }
