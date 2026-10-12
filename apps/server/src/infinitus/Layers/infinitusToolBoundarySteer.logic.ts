@@ -20,7 +20,7 @@ const TOOL_ITEM_TYPES: ReadonlySet<OrchestrationV2TurnItem["type"]> = new Set([
   "subagent",
 ]);
 
-export function isToolBoundaryItem(item: OrchestrationV2TurnItem): boolean {
+function isToolBoundaryItem(item: OrchestrationV2TurnItem): boolean {
   return (
     item.runId !== null &&
     TOOL_ITEM_TYPES.has(item.type) &&
