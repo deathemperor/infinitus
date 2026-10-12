@@ -1400,18 +1400,23 @@ final class AppModel: ObservableObject {
     /// Guards a fork-server publish that would move the target (#1137): the
     /// CLI's credential origin only follows a port that serves
     /// `/.well-known/t3/environment`, and only when the port it would
-    /// leave still does. `ForkServerProbe.verdict` holds the rule; this adds
-    /// the work-log line, so a refusal is on the record rather than inferred.
-    func acceptsForkServerPublish(port: Int) async -> Bool {
+    /// leave still does — and (#1487) not from another environment than the
+    /// one holding the slot while that one still answers, unless the publish
+    /// takes over. `ForkServerProbe.verdict` holds the rule; this adds the
+    /// work-log line, so a refusal is on the record rather than inferred.
+    func forkServerPublishVerdict(port: Int, publisher: ForkServerProbe.Publisher) async -> ForkServerProbe.Verdict {
         // Only a port a publish stored is a target of this instance's (#1199):
         // on the default with no pref, what answers there is another
         // instance's server — the installed app's desktop, on a dev Mac.
         let published = defaults.object(forKey: "fork_server_port") as? Int
-        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: published,
-                                                   using: forkServerProbe)
-        if verdict == .accept { return true }
-        logMirrorInput("⚠️", ForkServerProbe.refusalLine(port: port))
-        return false
+        let verdict = await ForkServerProbe.verdict(newPort: port, currentPort: published, publisher: publisher,
+                                                   holder: desktopCredential.environmentId, using: forkServerProbe)
+        switch verdict {
+        case .accept: break
+        case .refuse: logMirrorInput("⚠️", ForkServerProbe.refusalLine(port: port))
+        case .held(let holder): logMirrorInput("⚠️", ForkServerProbe.heldLine(port: port, holder: holder))
+        }
+        return verdict
     }
 
     /// launchd owns the production engine; fixture overrides stay process-local.

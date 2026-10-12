@@ -20,10 +20,13 @@ func desktopUsage() -> String {
            \(programName) thread send <id> <message|-> [--steer] [--wait] [--wait-idle]
            \(programName) thread new --project <id|name> <prompt|-> [--model <instanceId>/<model>|<model>] [--worktree <branch>] [--base <branch>] [--wait]
            \(programName) thread interrupt <id>
-           \(programName) desktop status | credential
+           \(programName) desktop status | credential | release
 
     Infinitus desktop's projects and threads, over the credential it hands the Mac app.
-    rename/title use T3_THREAD_ID when --thread is omitted. T3_ENVIRONMENT_ID guards the host.
+    rename/title use T3_THREAD_ID when --thread is omitted. T3_ENVIRONMENT_ID (or --env <id>)
+    guards send, new, interrupt, rename and title: a desktop of another environment refuses.
+    `desktop release` hands the Mac app's slot back (forgets the credential) so the installed
+    desktop re-takes it on its next heartbeat.
     `-` reads the message from stdin. `send` queues nothing: a running thread refuses
     unless --steer folds the message into the turn or --wait-idle sends it when the turn ends.
     --wait prints the assistant's answer when the turn ends (exit 1 when it errors or is interrupted).
@@ -110,10 +113,24 @@ private struct DesktopVerbs {
     // MARK: the app's socket (credential) and the desktop's server
 
     private func control(_ command: String) throws -> ControlReply {
-        guard let reply = ControlClient.roundTripRetrying(ControlRequest(command: command), path: socket) else {
+        try control(ControlRequest(command: command))
+    }
+
+    private func control(_ request: ControlRequest) throws -> ControlReply {
+        guard let reply = ControlClient.roundTripRetrying(request, path: socket) else {
             throw Unreachable(message: "Infinitus is not running (no reply at \(socket))")
         }
         return reply
+    }
+
+    /// `--env` or `T3_ENVIRONMENT_ID` names the environment a verb must land
+    /// in (#1487): one the Mac app points elsewhere refuses, so an agent in a
+    /// sandbox never drives the installed desktop, nor the reverse.
+    private func guardEnvironment(_ api: DesktopAPI) throws {
+        guard let expected = DesktopRows.resolveEnvironmentID(explicit: options["env"], environment: ProcessInfo.processInfo.environment) else { return }
+        if try api.descriptor().environmentId != expected {
+            throw Refused(message: "this thread belongs to another environment; run the command on its owning host", code: 2)
+        }
     }
 
     /// The desktop client, or the refusal when the app keeps no credential.
@@ -188,6 +205,7 @@ private struct DesktopVerbs {
             throw Refused(message: desktopUsage(), code: 2)
         }
         let api = try api()
+        if ["send", "new", "interrupt"].contains(sub) { try guardEnvironment(api) }
         switch sub {
         case "show":
             let turns = options["turns"].flatMap(Int.init) ?? 5
@@ -281,10 +299,7 @@ private struct DesktopVerbs {
         }
         let title = rename ? try message(positional[1], what: "title") : nil
         let api = try api()
-        if let expected = options["env"] ?? environment["T3_ENVIRONMENT_ID"],
-           try api.descriptor().environmentId != expected {
-            throw Refused(message: "this thread belongs to another environment; run the command on its owning host", code: 2)
-        }
+        try guardEnvironment(api)
         guard let thread = try api.shell().threads.first(where: { $0.id == id }) else {
             throw Refused(message: "no thread \(id) in Infinitus desktop")
         }
@@ -320,6 +335,17 @@ private struct DesktopVerbs {
             if label != .null, let api = try? api(), let ok = try? api.sessionAccepted() { accepted = .bool(ok) }
             desktopEmit(.object(["stored": .bool(label != .null), "label": label, "accepted": accepted,
                                  "expiresAt": status["expiresAt"] ?? .null]))
+            return 0
+        case "release":
+            // #1487: the hand-back. An empty secret forgets the credential
+            // and whose the slot was; the installed desktop's heartbeat
+            // then re-takes it within the minute.
+            let before = try control("desktop-status")
+            let reply = try control(ControlRequest(command: "desktop-credential", secret: ""))
+            guard reply.ok else { throw Refused(message: reply.error ?? "desktop-credential failed") }
+            desktopEmit(.object(["released": .bool(true),
+                                 "origin": before.result?["origin"] ?? .null,
+                                 "environmentId": before.result?["environmentId"] ?? .null]))
             return 0
         default:
             throw Refused(message: desktopUsage(), code: 2)

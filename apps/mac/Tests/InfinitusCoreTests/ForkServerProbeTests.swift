@@ -2,13 +2,14 @@ import XCTest
 @testable import InfinitusCore
 
 /// #1137: the app must not follow a `fork_server_port` publish onto a port
-/// that serves nothing. These pin the verdict and the wording; the AppModel
-/// guard that calls them is five lines over `answers`.
+/// that serves nothing. #1487: nor one from another environment than the
+/// slot's holder while that holder answers. These pin the verdict and the
+/// wording; the AppModel guard that calls them is a switch over the verdict.
 final class ForkServerProbeTests: XCTestCase {
     private struct Refused: Error {}
 
     private func transport(_ body: @escaping @Sendable (URL) throws -> Int) -> ForkServerProbe.Transport {
-        { url in try body(url) }
+        { url in ForkServerProbe.Answer(status: try body(url)) }
     }
 
     func testItProbesTheWellKnownRouteOnLoopback() async {
@@ -58,13 +59,14 @@ final class ForkServerProbeTests: XCTestCase {
     // MARK: the whole rule
 
     /// Ports that answer, by number; anything else throws like a refused
-    /// connection. `asked` records the probe order.
-    private func fleet(_ alive: Set<Int>, asked: Asked? = nil) -> ForkServerProbe.Transport {
+    /// connection. `asked` records the probe order. `identities` names the
+    /// environment each live port reports (#1487).
+    private func fleet(_ alive: Set<Int>, asked: Asked? = nil, identities: [Int: String] = [:]) -> ForkServerProbe.Transport {
         { url in
             let port = url.port ?? 0
             asked?.ports.append(port)
             guard alive.contains(port) else { throw Refused() }
-            return 200
+            return ForkServerProbe.Answer(status: 200, environmentId: identities[port])
         }
     }
 
@@ -115,6 +117,101 @@ final class ForkServerProbeTests: XCTestCase {
         // same trade the rule exists to stop.
         let guarded = await ForkServerProbe.verdict(newPort: 70000, currentPort: 3773, using: fleet([3773]))
         XCTAssertEqual(guarded, .refuse)
+    }
+
+    // MARK: whose slot it is (#1487)
+
+    private let desktop = ForkServerProbe.Publisher(environmentId: "env-desktop")
+    private let sandbox = ForkServerProbe.Publisher(environmentId: "env-sandbox")
+
+    func testAPublishFromAnotherEnvironmentIsHeldWhileTheHolderAnswersAsItself() async {
+        // The installed desktop (:3773) publishing while an opted-in dev
+        // server (env-sandbox, :3841) holds the slot and is alive.
+        let asked = Asked()
+        let verdict = await ForkServerProbe.verdict(newPort: 3773, currentPort: 3841, publisher: desktop, holder: "env-sandbox",
+                                                   using: fleet([3773, 3841], asked: asked, identities: [3841: "env-sandbox", 3773: "env-desktop"]))
+        XCTAssertEqual(verdict, .held("env-sandbox"))
+        XCTAssertEqual(asked.ports, [3841], "only the holder's port is asked, once")
+    }
+
+    func testTheSlotIsFreeOnceTheHolderIsGone() async {
+        // The dev server quit: the desktop's next heartbeat takes the slot.
+        let verdict = await ForkServerProbe.verdict(newPort: 3773, currentPort: 3841, publisher: desktop, holder: "env-sandbox",
+                                                   using: fleet([3773], identities: [3773: "env-desktop"]))
+        XCTAssertEqual(verdict, .accept)
+    }
+
+    func testAnotherServerOnTheHoldersPortDoesNotKeepTheSlot() async {
+        // The worktree's next dev server lands on the same stable port but
+        // never published: the port answers, the holder does not.
+        let verdict = await ForkServerProbe.verdict(newPort: 3773, currentPort: 3841, publisher: desktop, holder: "env-sandbox",
+                                                   using: fleet([3773, 3841], identities: [3841: "env-other-sandbox", 3773: "env-desktop"]))
+        XCTAssertEqual(verdict, .accept)
+    }
+
+    func testATakeoverIsFollowedOverALiveHolder() async {
+        // The opted-in dev server publishing over the installed desktop.
+        let takeover = ForkServerProbe.Publisher(environmentId: "env-sandbox", takeover: true)
+        let verdict = await ForkServerProbe.verdict(newPort: 3841, currentPort: 3773, publisher: takeover, holder: "env-desktop",
+                                                   using: fleet([3773, 3841], identities: [3773: "env-desktop", 3841: "env-sandbox"]))
+        XCTAssertEqual(verdict, .accept)
+    }
+
+    func testTheHolderItselfMovingPortIsTheOldRule() async {
+        // Same environment, new port (a restart landed elsewhere): no hold,
+        // and #1137's probe of the new port decides.
+        let moved = await ForkServerProbe.verdict(newPort: 3774, currentPort: 3773, publisher: desktop, holder: "env-desktop",
+                                                  using: fleet([3774], identities: [3774: "env-desktop"]))
+        XCTAssertEqual(moved, .accept)
+        let silent = await ForkServerProbe.verdict(newPort: 3774, currentPort: 3773, publisher: desktop, holder: "env-desktop",
+                                                   using: fleet([3773], identities: [3773: "env-desktop"]))
+        XCTAssertEqual(silent, .refuse)
+    }
+
+    func testAPublishWithoutAnIdentityIsHeldLikeAForeignOne() async {
+        // A server that predates the option publishing over a live holder.
+        let anonymous = await ForkServerProbe.verdict(newPort: 3773, currentPort: 3841, publisher: ForkServerProbe.Publisher(), holder: "env-sandbox",
+                                                      using: fleet([3773, 3841], identities: [3841: "env-sandbox"]))
+        XCTAssertEqual(anonymous, .held("env-sandbox"))
+    }
+
+    func testWithNoHolderRecordedThereIsNothingToHold() async {
+        let verdict = await ForkServerProbe.verdict(newPort: 3773, currentPort: 3841, publisher: desktop, holder: nil,
+                                                    using: fleet([3773, 3841], identities: [3841: "env-sandbox"]))
+        XCTAssertEqual(verdict, .accept)
+    }
+
+    func testTheSamePortIsNeverHeld() async {
+        // The pref already names this port: whoever answers there is the
+        // target the credential points at, and refusing would wedge a
+        // desktop whose home was wiped (a new environment id, same port).
+        let asked = Asked()
+        let verdict = await ForkServerProbe.verdict(newPort: 3773, currentPort: 3773, publisher: desktop, holder: "env-old-desktop",
+                                                    using: fleet([3773], asked: asked))
+        XCTAssertEqual(verdict, .accept)
+        XCTAssertEqual(asked.ports, [])
+    }
+
+    func testTheBodyYieldsTheEnvironmentId() async {
+        let body = Data(#"{"environmentId":"env-desktop","serverVersion":"0.5.0"}"#.utf8)
+        XCTAssertEqual(ForkServerProbe.environmentId(in: body), "env-desktop")
+        XCTAssertNil(ForkServerProbe.environmentId(in: Data("not json".utf8)))
+        XCTAssertNil(ForkServerProbe.environmentId(in: Data(#"{"environmentId":""}"#.utf8)))
+        let identity = await ForkServerProbe.identity(port: 3773, using: { _ in ForkServerProbe.Answer(status: 200, environmentId: "env-desktop") })
+        XCTAssertEqual(identity, "env-desktop")
+        // Something else answering with a body is not an Infinitus server.
+        let notAServer = await ForkServerProbe.identity(port: 3773, using: { _ in ForkServerProbe.Answer(status: 404, environmentId: "env-desktop") })
+        XCTAssertNil(notAServer)
+    }
+
+    func testTheHeldReplyOpensWithTheWordsTheServerMatches() {
+        let reply = ForkServerProbe.heldReply(port: 3773, holder: "env-sandbox", currentPort: 3841)
+        // `HELD_REPLY_PREFIX` in apps/server/src/infinitus/Layers/InfinitusServerPort.ts.
+        XCTAssertTrue(reply.hasPrefix("held by environment env-sandbox"))
+        XCTAssertTrue(reply.contains("3841"))
+        XCTAssertTrue(reply.contains("INFINITUS_PUBLISH_SERVER_PORT=1"))
+        XCTAssertEqual(ForkServerProbe.heldLine(port: 3773, holder: "env-sandbox"),
+                       "fork server: publish from :3773 held off — environment env-sandbox holds the slot")
     }
 
     func testTheRefusalNamesThePortAndTheReason() {
