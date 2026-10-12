@@ -2,7 +2,7 @@ import {
   pullRequestHostOf,
   type PullRequestRef,
   type RepositoryIdentity,
-  type SourceControlProviderKind,
+  SourceControlProviderKind,
   type ThreadPullRequestKey,
 } from "@infinitus/contracts";
 import { sourceControlRepositorySelector } from "@infinitus/shared/sourceControl";
@@ -18,7 +18,8 @@ export function pullRequestSyncKey(
       reference.repository.toLowerCase() !==
         sourceControlRepositorySelector(identity)?.toLowerCase() ||
       (reference.host !== undefined &&
-        reference.host.toLowerCase() !== pullRequestHostOf(identity, "azure-devops"))
+        reference.host.toLowerCase() !==
+          pullRequestHostOf(identity, SourceControlProviderKind.make("azure-devops")))
     )
       return null;
     const [host, ...repository] = identity.canonicalKey.split("/");

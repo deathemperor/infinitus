@@ -21,14 +21,14 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc-rs --noEmit",
     "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
     "@infinitus/contracts": "workspace:*",
     "@infinitus/provider-core": "workspace:*",
     "@infinitus/shared": "workspace:*",
-    "@muse-code/sdk": "1.4.2",
+    "@muse-code/sdk": "1.4.6",
     "effect": "catalog:"
   },
   "devDependencies": {

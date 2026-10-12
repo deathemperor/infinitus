@@ -42,8 +42,12 @@ import { Route as SettingsAppearanceRouteImport } from './routes/settings.appear
 import { Route as SettingsAnimationsRouteImport } from './routes/settings.animations'
 import { Route as ProjectsProjectKeyRouteImport } from './routes/projects.$projectKey'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
+<<<<<<< HEAD
 import { Route as SettingsInfinitusSplatRouteImport } from './routes/settings.infinitus.$'
 import { Route as SettingsEnginesActivityRouteImport } from './routes/settings.engines_.activity'
+=======
+import { Route as ChatNewRouteImport } from './routes/_chat.new'
+>>>>>>> upstream-sync-8f25cf9ed-upstream-renamed
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
 
@@ -212,6 +216,7 @@ const ChatPullRequestsRoute = ChatPullRequestsRouteImport.update({
   path: '/pull-requests',
   getParentRoute: () => ChatRoute,
 } as any)
+<<<<<<< HEAD
 const SettingsInfinitusSplatRoute = SettingsInfinitusSplatRouteImport.update({
   id: '/infinitus/$',
   path: '/infinitus/$',
@@ -221,6 +226,12 @@ const SettingsEnginesActivityRoute = SettingsEnginesActivityRouteImport.update({
   id: '/engines_/activity',
   path: '/engines/activity',
   getParentRoute: () => SettingsRoute,
+=======
+const ChatNewRoute = ChatNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => ChatRoute,
+>>>>>>> upstream-sync-8f25cf9ed-upstream-renamed
 } as any)
 const ChatDraftDraftIdRoute = ChatDraftDraftIdRouteImport.update({
   id: '/draft/$draftId',
@@ -245,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/usage': typeof UsageRoute
   '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
+  '/new': typeof ChatNewRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/settings/animations': typeof SettingsAnimationsRoute
@@ -282,6 +294,7 @@ export interface FileRoutesByTo {
   '/usage': typeof UsageRoute
   '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
+  '/new': typeof ChatNewRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/settings/animations': typeof SettingsAnimationsRoute
@@ -322,6 +335,7 @@ export interface FileRoutesById {
   '/usage': typeof UsageRoute
   '/utilization': typeof UtilizationRoute
   '/welcome': typeof WelcomeRoute
+  '/_chat/new': typeof ChatNewRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/settings/animations': typeof SettingsAnimationsRoute
@@ -363,6 +377,7 @@ export interface FileRouteTypes {
     | '/usage'
     | '/utilization'
     | '/welcome'
+    | '/new'
     | '/pull-requests'
     | '/projects/$projectKey'
     | '/settings/animations'
@@ -400,6 +415,7 @@ export interface FileRouteTypes {
     | '/usage'
     | '/utilization'
     | '/welcome'
+    | '/new'
     | '/pull-requests'
     | '/projects/$projectKey'
     | '/settings/animations'
@@ -439,6 +455,7 @@ export interface FileRouteTypes {
     | '/usage'
     | '/utilization'
     | '/welcome'
+    | '/_chat/new'
     | '/_chat/pull-requests'
     | '/projects/$projectKey'
     | '/settings/animations'
@@ -715,6 +732,7 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatPullRequestsRouteImport
       parentRoute: typeof ChatRoute
     }
+<<<<<<< HEAD
     '/settings/infinitus/$': {
       id: '/settings/infinitus/$'
       path: '/infinitus/$'
@@ -728,6 +746,14 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/engines/activity'
       preLoaderRoute: typeof SettingsEnginesActivityRouteImport
       parentRoute: typeof SettingsRoute
+=======
+    '/_chat/new': {
+      id: '/_chat/new'
+      path: '/new'
+      fullPath: '/new'
+      preLoaderRoute: typeof ChatNewRouteImport
+      parentRoute: typeof ChatRoute
+>>>>>>> upstream-sync-8f25cf9ed-upstream-renamed
     }
     '/_chat/draft/$draftId': {
       id: '/_chat/draft/$draftId'
@@ -747,6 +773,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface ChatRouteChildren {
+  ChatNewRoute: typeof ChatNewRoute
   ChatPullRequestsRoute: typeof ChatPullRequestsRoute
   ChatIndexRoute: typeof ChatIndexRoute
   ChatEnvironmentIdThreadIdRoute: typeof ChatEnvironmentIdThreadIdRoute
@@ -754,6 +781,7 @@ interface ChatRouteChildren {
 }
 
 const ChatRouteChildren: ChatRouteChildren = {
+  ChatNewRoute: ChatNewRoute,
   ChatPullRequestsRoute: ChatPullRequestsRoute,
   ChatIndexRoute: ChatIndexRoute,
   ChatEnvironmentIdThreadIdRoute: ChatEnvironmentIdThreadIdRoute,

@@ -1,7 +1,12 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
+<<<<<<< HEAD
 import { RunId, ServerSelfUpdateError, ThreadId } from "@infinitus/contracts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+=======
+import { ServerSelfUpdateError, ThreadId } from "@infinitus/contracts";
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-8f25cf9ed-upstream-renamed
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -123,8 +128,8 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
       },
     ),
     Effect.provideService(HttpClient.HttpClient, releaseHttpClient(order)),
-    Effect.provideService(HostProcessPlatform, "linux"),
-    Effect.provideService(HostProcessArchitecture, "x64"),
+    Effect.provideService(HostProcess.Platform, "linux"),
+    Effect.provideService(HostProcess.Architecture, "x64"),
     Effect.provide(ServerConfig.layer({ ...config, mode: options.mode ?? "web" })),
   );
   return { selfUpdate, order };

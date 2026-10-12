@@ -55,15 +55,15 @@ function ConfiguredConnectOnboardingRouteScreen() {
     cloudEnvironments: null,
   });
 
-  // Pull-to-refresh tracks its own spinner instead of discovery's refreshing
-  // flag, so background refreshes (e.g. the sign-in one) don't yank the
-  // content down.
-  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-  const handlePullRefresh = useCallback(() => {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = useCallback(() => {
     void (async () => {
-      setIsPullRefreshing(true);
-      await refreshRelayEnvironments();
-      setIsPullRefreshing(false);
+      setIsRefreshing(true);
+      try {
+        await refreshRelayEnvironments();
+      } finally {
+        setIsRefreshing(false);
+      }
     })();
   }, [refreshRelayEnvironments]);
 
@@ -87,8 +87,22 @@ function ConfiguredConnectOnboardingRouteScreen() {
     <View collapsable={false} className="flex-1 bg-sheet">
       {Platform.OS === "android" ? (
         <AndroidSheetHeader
+<<<<<<< HEAD
           title={`Set up ${CONNECT_NAME}`}
           actions={[{ accessibilityLabel: "Close", icon: "xmark", onPress: handleClose }]}
+=======
+          title="Set up T3 Connect"
+          actions={[
+            {
+              accessibilityLabel: "Refresh environments",
+              disabled: isRefreshing,
+              icon: "arrow.clockwise",
+              loading: isRefreshing,
+              onPress: handleRefresh,
+            },
+            { accessibilityLabel: "Close", icon: "xmark", onPress: handleClose },
+          ]}
+>>>>>>> upstream-sync-8f25cf9ed-upstream-renamed
         />
       ) : (
         <NativeHeaderToolbar placement="right">
@@ -96,6 +110,7 @@ function ConfiguredConnectOnboardingRouteScreen() {
         </NativeHeaderToolbar>
       )}
       <ScrollView
+        nestedScrollEnabled
         alwaysBounceVertical
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -107,7 +122,9 @@ function ConfiguredConnectOnboardingRouteScreen() {
           paddingTop: 16,
         }}
         refreshControl={
-          <RefreshControl refreshing={isPullRefreshing} onRefresh={handlePullRefresh} />
+          Platform.OS === "ios" ? (
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+          ) : undefined
         }
       >
         {isSignedIn ? (

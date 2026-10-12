@@ -236,6 +236,7 @@ export function ConnectionsNewRouteScreen({
       ]}
     >
       <ScrollView
+        nestedScrollEnabled
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

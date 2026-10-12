@@ -31,7 +31,11 @@ import {
   type ImageDimensions,
 } from "@infinitus/shared/imageDimensions";
 import { githubMediaFetchUrl, githubMediaFileName } from "@infinitus/shared/githubMedia";
-import { PROJECT_FAVICON_FALLBACK_MARKER } from "@infinitus/shared/projectFavicon";
+import { MCP_APP_MAX_HTML_BYTES } from "@infinitus/shared/mcpApp";
+import {
+  isProjectFaviconPath,
+  PROJECT_FAVICON_FALLBACK_MARKER,
+} from "@infinitus/shared/projectFavicon";
 import {
   MAX_TOOL_OUTPUT_IMAGE_BASE64_LENGTH,
   toolOutputImages,
@@ -45,6 +49,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
 
 import {
   base64UrlDecodeUtf8,
@@ -56,11 +61,13 @@ import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { parseAttachmentFileExtension, resolveAttachmentPathById } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
-import { expandHomePathWith } from "@infinitus/provider-core/server/pathExpansion";
+import { expandHomePath } from "@infinitus/provider-core/server/pathExpansion";
 import * as ProjectFaviconResolver from "../project/ProjectFaviconResolver.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 import * as NativeAppIconResolver from "./NativeAppIconResolver.ts";
+import { extractIcnsPng } from "./icns.ts";
 import { openMediaFile, readMediaFileHeader, type OpenMediaFile } from "./MediaFile.ts";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 
 export const ASSET_ROUTE_PREFIX = "/api/assets";
 
@@ -68,6 +75,8 @@ const SIGNING_SECRET_NAME = "asset-access-signing-key";
 const ASSET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const PROJECT_FAVICON_TOKEN_BUCKET_MS = 30 * 60 * 1000;
 const PROJECT_FAVICON_VERSION_PREFIX = "v";
+// Clients draw project icons from a 96px thumbnail at most.
+const PROJECT_FAVICON_ICNS_MIN_SIZE = 96;
 const INLINE_VIDEO_MIME_TYPE_PATTERN = /^video\/[\w!#$&^.+-]+$/i;
 // Extensions a document viewer or audio player may request inline. The extension comes from
 // the attachment id the server assigned, never from the client's mime type.
@@ -124,6 +133,7 @@ const AssetClaimsSchema = Schema.Union([
         download filename and Content-Type. */
     fileName: Schema.optionalKey(Schema.String),
     mimeType: Schema.optionalKey(Schema.String),
+    renderIntent: Schema.optionalKey(Schema.Literal("mcp-app")),
     expiresAt: Schema.Number,
   }),
   Schema.Struct({
@@ -176,6 +186,7 @@ export type ResolvedAsset =
       readonly fileName?: string;
       readonly mimeType?: string;
       readonly file?: OpenMediaFile;
+      readonly renderIntent?: "mcp-app";
     }
   | {
       readonly kind: "bytes";
@@ -218,6 +229,24 @@ const optionOnNotFound = <A, R>(
     }),
   );
 
+/** Reads a stored MCP HTML snapshot; null means it exceeds the preview limit. */
+export const readMcpAppHtml = Effect.fn("AssetAccess.readMcpAppHtml")(function* (filePath: string) {
+  const fileSystem = yield* FileSystem.FileSystem;
+  // Stored snapshots also contain a bounded CSP meta tag (up to 32 domains
+  // per directive). Bound the read even if the attachment grows after minting.
+  const limit = MCP_APP_MAX_HTML_BYTES + 128 * 1024;
+  const chunks = yield* Stream.runCollect(fileSystem.stream(filePath, { bytesToRead: limit + 1 }));
+  const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  if (size > limit) return null;
+  const bytes = new Uint8Array(size);
+  let position = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, position);
+    position += chunk.byteLength;
+  }
+  return bytes;
+});
+
 /**
  * Decodes one image a tool returned inline; null when the stored item has no
  * such image, or it is larger than a provider turn accepts.
@@ -234,6 +263,26 @@ const readToolOutputImage = Effect.fn("AssetAccess.readToolOutputImage")(functio
   return image?.data === undefined || image.data.length > MAX_TOOL_OUTPUT_IMAGE_BASE64_LENGTH
     ? null
     : { mimeType: image.mimeType, bytes: Buffer.from(image.data, "base64") };
+});
+
+/** Serves an `.icns` favicon as its embedded PNG, since browsers cannot draw it. */
+const projectFaviconAsset = Effect.fn("AssetAccess.projectFaviconAsset")(function* (
+  filePath: string,
+) {
+  if (!filePath.toLowerCase().endsWith(".icns")) {
+    return { kind: "file", path: filePath } satisfies ResolvedAsset;
+  }
+  const fileSystem = yield* FileSystem.FileSystem;
+  const bytes = yield* fileSystem.readFile(filePath).pipe(
+    Effect.tapError((cause) =>
+      Effect.logError("Failed to read project icon image.", { filePath, cause }),
+    ),
+    Effect.orElseSucceed(() => null),
+  );
+  const png = bytes ? extractIcnsPng(bytes, PROJECT_FAVICON_ICNS_MIN_SIZE) : null;
+  return png
+    ? ({ kind: "bytes", bytes: png, mimeType: "image/png" } satisfies ResolvedAsset)
+    : null;
 });
 
 const resolveCanonicalFile = Effect.fn("AssetAccess.resolveCanonicalFile")(function* (
@@ -472,7 +521,7 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
 
   switch (input.resource._tag) {
     case "media-file": {
-      let requestedPath = expandHomePathWith(input.resource.path, path);
+      let requestedPath = expandHomePath(input.resource.path, yield* HostProcess.HomeDirectory);
       if (!path.isAbsolute(requestedPath)) {
         if (!input.workspaceRoot) {
           return yield* new AssetWorkspaceContextNotFoundError({ resource: input.resource });
@@ -598,6 +647,9 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
           : input.resource.mimeType !== undefined
             ? { mimeType: isVideo ? videoMimeType : input.resource.mimeType }
             : {}),
+        ...(input.resource.renderIntent === "mcp-app" && inlinePreviewMimeType === "text/html"
+          ? { renderIntent: "mcp-app" as const }
+          : {}),
         expiresAt,
       };
       fileName = input.resource.fileName ?? path.basename(attachmentPath);
@@ -636,7 +688,7 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
       const relativePath =
         faviconPath && !isExternalOverride ? path.relative(workspaceRoot, faviconPath) : null;
       const sourceFaviconPath = isExternalOverride ? faviconPath : relativePath;
-      if (sourceFaviconPath && !isWorkspaceImagePreviewPath(sourceFaviconPath)) {
+      if (sourceFaviconPath && !isProjectFaviconPath(sourceFaviconPath)) {
         return yield* new AssetPreviewTypeValidationError({ resource: input.resource });
       }
       sourcePath = sourceFaviconPath ?? undefined;
@@ -829,6 +881,7 @@ export const resolveAsset = Effect.fn("AssetAccess.resolveAsset")(function* (
           ...(claims.download ? { download: true } : {}),
           ...(claims.fileName !== undefined ? { fileName: claims.fileName } : {}),
           ...(claims.mimeType !== undefined ? { mimeType: claims.mimeType } : {}),
+          ...(claims.renderIntent === "mcp-app" ? { renderIntent: "mcp-app" as const } : {}),
         } satisfies ResolvedAsset)
       : null;
   }
@@ -839,7 +892,7 @@ export const resolveAsset = Effect.fn("AssetAccess.resolveAsset")(function* (
       workspaceRoot: claims.workspaceRoot,
       relativePath: claims.relativePath,
     });
-    return faviconPath ? ({ kind: "file", path: faviconPath } satisfies ResolvedAsset) : null;
+    return faviconPath ? yield* projectFaviconAsset(faviconPath) : null;
   }
 
   if (claims.kind === "project-favicon-external") {
@@ -852,9 +905,7 @@ export const resolveAsset = Effect.fn("AssetAccess.resolveAsset")(function* (
       ),
       Effect.orElseSucceed(() => null),
     );
-    return faviconPath === claims.filePath
-      ? ({ kind: "file", path: faviconPath } satisfies ResolvedAsset)
-      : null;
+    return faviconPath === claims.filePath ? yield* projectFaviconAsset(faviconPath) : null;
   }
 
   if (claims.kind === "github-media") {
