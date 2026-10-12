@@ -459,8 +459,9 @@ const layerAuth = EnvironmentAuth.layer.pipe(
 // usage scan so `/usage` can split Claude spend by account.
 const layerInfinitus = Layer.mergeAll(
   // The port publish also mints infinitusctl's session (#822), so it needs
-  // the auth service — which is why this block sits below layerAuth.
-  InfinitusServerPortLive.pipe(Layer.provide(layerAuth)),
+  // the auth service — which is why this block sits below layerAuth — and
+  // names this environment to the app (#1487), so the identity too.
+  InfinitusServerPortLive.pipe(Layer.provide(layerAuth), Layer.provide(layerServerEnvironment)),
   InfinitusCompanionLive,
   InfinitusSecretLive,
   InfinitusUsageAttributionLive,
