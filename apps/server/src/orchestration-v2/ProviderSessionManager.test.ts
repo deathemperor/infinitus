@@ -14,6 +14,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   type ProviderSessionId,
+  ProviderThreadId,
   ThreadId,
 } from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
@@ -4593,5 +4594,110 @@ it.effect(
         projectExists: false,
       });
       assert.isFalse(denied?.capabilities?.has("device"));
+    }),
+);
+
+it.effect(
+  "ProviderSessionManagerV2 clears an earlier run's busy turn when a later run on the thread terminalizes",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        const now = yield* DateTime.now;
+        const threadId = ThreadId.make("thread-provider-session-manager-abandoned-turn");
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        const providerThread = makeProviderThread({
+          idAllocator,
+          threadId,
+          providerSessionId,
+          now,
+        });
+        const runId = idAllocator.derive.run({ threadId, ordinal: 1 });
+        const providerTurnId = idAllocator.derive.providerTurn({
+          driver: CODEX_DRIVER,
+          nativeTurnId: "native-turn-abandoned",
+        });
+        const terminal = (input: {
+          readonly providerThreadId: ProviderThreadId;
+          readonly runOrdinal: number;
+        }): ProviderAdapterV2Event => ({
+          type: "turn.terminal",
+          driver: CODEX_DRIVER,
+          providerThreadId: input.providerThreadId,
+          providerTurnId,
+          runOrdinal: input.runOrdinal,
+          status: "completed",
+          failure: null,
+          threadDisposition: "reusable",
+        });
+
+        yield* eventSink.write({
+          events: [yield* makeThreadCreatedEvent({ idAllocator, threadId, now })],
+        });
+        const runtime = yield* manager.open({
+          threadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        yield* runtime.events.pipe(Stream.runDrain, Effect.forkScoped);
+        yield* runtime.startTurn({
+          appThread: (yield* projectionStore.getThreadProjection(threadId)).thread,
+          threadId,
+          runId,
+          runOrdinal: 1,
+          providerTurnOrdinal: 1,
+          attemptId: idAllocator.derive.runAttempt({ runId, attemptOrdinal: 1 }),
+          rootNodeId: idAllocator.derive.rootNode({ runId }),
+          providerThread,
+          message: {
+            createdBy: "user",
+            creationSource: "web",
+            messageId: yield* idAllocator.allocate.message({ threadId, ordinal: 1 }),
+            text: "hello",
+            attachments: [],
+          },
+          modelSelection,
+          runtimePolicy,
+        });
+        const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId));
+        assert.isDefined(queue);
+
+        // Run 1 never gets its terminal: the session stays busy.
+        yield* TestClock.adjust("2 seconds");
+        yield* Effect.yieldNow;
+        assert.isTrue(Option.isSome(yield* manager.get(providerSessionId)));
+
+        // A later run's terminal on another provider thread leaves it busy.
+        yield* Queue.offer(
+          queue!,
+          terminal({
+            providerThreadId: ProviderThreadId.make("provider-thread:abandoned-turn:other"),
+            runOrdinal: 2,
+          }),
+        );
+        yield* TestClock.adjust("2 seconds");
+        yield* Effect.yieldNow;
+        assert.isTrue(Option.isSome(yield* manager.get(providerSessionId)));
+
+        // A later run's terminal on the same provider thread clears run 1.
+        yield* Queue.offer(
+          queue!,
+          terminal({ providerThreadId: providerThread.id, runOrdinal: 2 }),
+        );
+        yield* TestClock.adjust("2 seconds");
+        yield* Effect.yieldNow;
+        assert.isTrue(Option.isNone(yield* manager.get(providerSessionId)));
+        assert.equal((yield* Ref.get(state)).closeCount, 1);
+      });
+
+      yield* effect.pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 1000 })));
     }),
 );

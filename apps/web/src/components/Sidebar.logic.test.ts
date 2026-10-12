@@ -925,6 +925,21 @@ describe("resolveSidebarThreadStatus", () => {
     ).toBe("approval");
   });
 
+  it("reads limited for a running turn the server lists among its limit stops (#648)", () => {
+    expect(resolveSidebarThreadStatus({ ...idle, runtime }, { limitStopped: true })).toBe(
+      "limited",
+    );
+    expect(resolveSidebarThreadStatus({ ...idle, runtime }, { limitStopped: false })).toBe(
+      "working",
+    );
+    expect(
+      resolveSidebarThreadStatus(
+        { ...idle, hasPendingApprovals: true, runtime },
+        { limitStopped: true },
+      ),
+    ).toBe("approval");
+  });
+
   it("reports working for running and starting runtimes", () => {
     expect(resolveSidebarThreadStatus({ ...idle, runtime })).toBe("working");
     expect(

@@ -230,6 +230,19 @@ describe("ClaudeSettings auto-compaction", () => {
   );
 });
 
+describe("ClaudeSettings advisor model (#1232)", () => {
+  it("is off until an instance names one", () => {
+    expect(decodeClaudeSettings({}).advisorModel).toBe("");
+    expect(decodeClaudeSettings({ advisorModel: " fable " }).advisorModel).toBe("fable");
+  });
+
+  it("takes a full model ID", () => {
+    expect(decodeClaudeSettings({ advisorModel: "claude-fable-5-1" }).advisorModel).toBe(
+      "claude-fable-5-1",
+    );
+  });
+});
+
 describe("ClientSettings notifications", () => {
   it("keeps the fork's old banner toggles as optional inputs the patch never carries (#1032)", () => {
     expect(decodeClientSettings({})).not.toHaveProperty("desktopNotifyOnApproval");
