@@ -380,7 +380,12 @@ describe("deleting a queued reply while it uploads", () => {
     state.prepare.mockImplementationOnce(async ({ attachments }) => {
       dispatchReached.resolve();
       await dispatchBarrier.promise;
-      return { status: "ready", attachments: [], draftAttachments: attachments, pendingAttachmentIds: [] };
+      return {
+        status: "ready",
+        attachments: [],
+        draftAttachments: attachments,
+        pendingAttachmentIds: [],
+      };
     });
     const removalBarrier = Promise.withResolvers<void>();
     state.storageRemove.mockImplementationOnce(() => removalBarrier.promise);
