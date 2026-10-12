@@ -24,6 +24,7 @@ const STATUS_LABEL: Record<NeedsAttentionStatus, { label: string; className: str
   approval: { label: "Approval", className: "text-warning-foreground" },
   input: { label: "Input", className: "text-indigo-600 dark:text-indigo-300" },
   limited: { label: "Limit", className: "text-muted-foreground" },
+  stopped: { label: "Babysit", className: "text-destructive/80" },
 };
 
 /**

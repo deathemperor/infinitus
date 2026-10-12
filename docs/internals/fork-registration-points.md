@@ -599,6 +599,18 @@ background`). Riding along, all
   the row's `options` drive the select. The General panel also mounts
   `DesktopKeepAwakeSettings` after the background-activity row (#1075) and
   the restore / dirty-label lists carry `desktopKeepAwake`.
+- Babysit stopped (#269 A, #1043; re-ported onto orchestrator v2 under
+  #1627): `packages/contracts/src/threadPullRequest.ts` carries
+  `ThreadPullRequestWatchEnd` and the optional `watchEnded` on
+  `ThreadPullRequestLink`; `orchestrationV2.ts`'s
+  `thread.pull-request-watch.sync` takes an optional `ended` reason;
+  `apps/server/src/orchestration-v2/Orchestrator.ts`'s watch case records
+  it when the ended watch is still the link's and clears it when a user or
+  agent starts or stops a watch; `PullRequestWatchReactor.ts`'s `record`
+  passes `comment-limit` and `unreadable`; `runtimeLayer.test.ts` covers
+  the record and the clear. Everything else of babysit is upstream's watch
+  (`watch_pull_request`, the Linked pull requests row menu, the eye in the
+  thread details card).
 - `apps/server/src/binCli.ts` — the CLI's root command is `infinitus`, not
   `t3` (the archive's binary, `docs/user/install.md`); `cli/pair.test.ts` and
   `cli/app.test.ts` assert that command path.

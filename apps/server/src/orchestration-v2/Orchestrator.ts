@@ -3113,11 +3113,29 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                     conflicting: false,
                     wakes: 0,
                   });
-          if (watch === existing.watch && links === linked) return thread;
+          // Fork (#1043): a watch the server ended on its own is remembered on the
+          // link until the user starts or stops one again.
+          const watchEnded =
+            command.type === "thread.pull-request-watch.sync"
+              ? command.ended !== undefined &&
+                command.watch === null &&
+                existing.watch?.startedAt === command.startedAt
+                ? { at: startedAt, reason: command.ended }
+                : existing.watchEnded
+              : undefined;
+          if (watch === existing.watch && watchEnded === existing.watchEnded && links === linked)
+            return thread;
           return {
             ...thread,
             pullRequests: links.map((link) =>
-              link === existing ? withPullRequestWatch(link, watch) : link,
+              link === existing
+                ? withPullRequestWatch(
+                    watchEnded === undefined
+                      ? (({ watchEnded: _ended, ...rest }) => rest)(link)
+                      : { ...link, watchEnded },
+                    watch,
+                  )
+                : link,
             ),
             // A user or agent starting or stopping a watch is activity; recorded progress is not.
             updatedAt: command.type === "thread.pull-request.watch" ? now : thread.updatedAt,

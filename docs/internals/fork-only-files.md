@@ -23,8 +23,9 @@ these bullets.
   from the #648 limit stops), so they add no signal of their own. The
   section owns its collapsed state; the hook installs its own `keydown`
   listener with the sidebar's shortcut context so `Sidebar.tsx` keeps one
-  call. Held starts (session holds) and a babysit stopped at its cap rejoin
-  the list when their lanes land.
+  call. A watch the server ended on its own (`watchEnded` on the link,
+  #1043) lists as "Babysit" until the user's next message. Held starts
+  (session holds) rejoin the list when that lane lands.
 - `apps/web/src/state/infinitus.ts` — the web app's instance of the Infinitus
   snapshot and command atoms (`packages/client-runtime/src/state/infinitus.ts`,
   which also holds the pairing stream + decide command, #710, and the

@@ -23,6 +23,8 @@ function thread(
     hasPendingUserInput: false,
     runtime: null,
     latestRun: null,
+    pullRequests: [],
+    latestUserMessageAt: null,
     archivedAt: null,
     updatedAt: "2026-09-12T10:00:00.000Z",
     ...overrides,
@@ -84,13 +86,61 @@ describe("collectNeedsAttention (#269 D)", () => {
   });
 });
 
+describe("collectNeedsAttention: a watch the server stopped (#1043)", () => {
+  const link = (ended: { at: string; reason: "comment-limit" | "unreadable" } | undefined) =>
+    ({
+      host: "github.com",
+      repository: "o/r",
+      number: 1,
+      url: "https://github.com/o/r/pull/1",
+      source: "manual",
+      linkedAt: "2026-09-12T08:00:00.000Z",
+      snapshot: null,
+      stack: null,
+      ...(ended === undefined ? {} : { watchEnded: ended }),
+    }) as SidebarThreadSummary["pullRequests"][number];
+
+  it("lists the thread as Babysit until the user sends again, after the blocked ones", () => {
+    const ended = { at: "2026-09-12T09:30:00.000Z", reason: "comment-limit" as const };
+    const entries = collectNeedsAttention(
+      [
+        thread("stopped", { pullRequests: [link(ended)], latestUserAuthoredMessageAt: null }),
+        thread("answered", {
+          pullRequests: [link(ended)],
+          latestUserAuthoredMessageAt: "2026-09-12T09:45:00.000Z",
+        }),
+        thread("working", { pullRequests: [link(ended)], runtime: runtime("running") }),
+        thread("dismissed", {
+          pullRequests: [{ ...link(ended), source: "stack-dismissed" }],
+        }),
+        thread("input", { hasPendingUserInput: true, pullRequests: [link(ended)] }),
+        thread("plain", { pullRequests: [link(undefined)] }),
+      ],
+      new Map(),
+      describeStop,
+    );
+    expect(entries.map((entry) => [entry.thread.id, entry.status, entry.since])).toEqual([
+      ["input", "input", "2026-09-12T10:00:00.000Z"],
+      ["stopped", "stopped", "2026-09-12T09:30:00.000Z"],
+    ]);
+    expect(entries[1]?.summary).toContain("10 comment-only updates");
+  });
+
+  it("ranks a stopped watch between a limit and a failure for the key", () => {
+    expect(resolveAttentionRank({ status: "ready", isUnread: false, watchEnded: true })).toBe(3);
+    expect(resolveAttentionRank({ status: "failed", isUnread: false, watchEnded: true })).toBe(3);
+    expect(resolveAttentionRank({ status: "failed", isUnread: false })).toBe(4);
+    expect(resolveAttentionRank({ status: "ready", isUnread: true })).toBe(5);
+  });
+});
+
 describe("resolveAttentionRank (#270 C)", () => {
   it("ranks approval, input, limit, failure, then an unseen completion", () => {
     expect(resolveAttentionRank({ status: "approval", isUnread: false })).toBe(0);
     expect(resolveAttentionRank({ status: "input", isUnread: false })).toBe(1);
     expect(resolveAttentionRank({ status: "limited", isUnread: false })).toBe(2);
-    expect(resolveAttentionRank({ status: "failed", isUnread: false })).toBe(3);
-    expect(resolveAttentionRank({ status: "ready", isUnread: true })).toBe(4);
+    expect(resolveAttentionRank({ status: "failed", isUnread: false })).toBe(4);
+    expect(resolveAttentionRank({ status: "ready", isUnread: true })).toBe(5);
     expect(resolveAttentionRank({ status: "ready", isUnread: false })).toBeNull();
     expect(resolveAttentionRank({ status: "working", isUnread: true })).toBeNull();
     expect(resolveAttentionRank({ status: "waiting", isUnread: true })).toBeNull();
@@ -103,7 +153,7 @@ describe("resolveNextAttentionThreadId (#270 C)", () => {
     { id: "b", rank: null },
     { id: "c", rank: 0 },
     { id: "d", rank: 1 },
-    { id: "e", rank: 4 },
+    { id: "e", rank: 5 },
   ];
 
   it("lands on the lowest rank, wherever it sits", () => {

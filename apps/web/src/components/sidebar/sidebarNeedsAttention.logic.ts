@@ -1,5 +1,7 @@
+import type { ThreadPullRequestWatchEnd } from "@infinitus/contracts";
 import type { InfinitusLimitStop } from "@infinitus/contracts/infinitus";
 import { limitStopKey } from "@infinitus/client-runtime/state/infinitusLimitStops";
+import { visibleThreadPullRequests } from "@infinitus/shared/threadPullRequests";
 
 import type { SidebarThreadSummary } from "../../types";
 import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "../Sidebar.logic";
@@ -9,12 +11,15 @@ import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "../Sidebar
  * threads blocked on the user, across every project and environment, for the
  * section above the sidebar's list and the next-attention key. Blocked means
  * the thread waits for something only the user can give: an approval, an
- * answer, or an account swap (a usage limit, #270 I / #648). A failed or
- * unread thread is not blocked and stays where it is. The statuses are v2's
- * own (`resolveSidebarThreadStatus` over the shell's pending requests and run
- * state), so this file adds no signal, only the cross-project view.
+ * answer, an account swap (a usage limit, #270 I / #648), or a next step
+ * after the server stopped watching its pull request on its own (#269 A,
+ * #1043: the pull request still needs work, and only the user can say what).
+ * A failed or unread thread is not blocked and stays where it is. The
+ * statuses are v2's own (`resolveSidebarThreadStatus` over the shell's
+ * pending requests and run state; `watchEnded` on the link), so this file
+ * adds no signal, only the cross-project view.
  */
-export type NeedsAttentionStatus = "approval" | "input" | "limited";
+export type NeedsAttentionStatus = "approval" | "input" | "limited" | "stopped";
 
 export interface NeedsAttentionEntry {
   readonly thread: SidebarThreadSummary;
@@ -29,7 +34,35 @@ const STATUS_ORDER: Record<NeedsAttentionStatus, number> = {
   approval: 0,
   input: 1,
   limited: 2,
+  stopped: 3,
 };
+
+const WATCH_END_SUMMARY: Record<ThreadPullRequestWatchEnd["reason"], string> = {
+  "comment-limit":
+    "Stopped watching the pull request after 10 comment-only updates; it still needs work",
+  unreadable: "Stopped watching the pull request: it could not be read from the host",
+};
+
+/**
+ * The newest watch the server ended on its own that the user has not
+ * answered with a message yet, across the thread's visible links.
+ */
+export function watchEndedSince(
+  thread: Pick<
+    SidebarThreadSummary,
+    "pullRequests" | "latestUserAuthoredMessageAt" | "latestUserMessageAt"
+  >,
+): ThreadPullRequestWatchEnd | null {
+  const lastSent = thread.latestUserAuthoredMessageAt ?? thread.latestUserMessageAt ?? null;
+  let newest: ThreadPullRequestWatchEnd | null = null;
+  for (const link of visibleThreadPullRequests(thread.pullRequests)) {
+    const ended = link.watchEnded;
+    if (ended === undefined) continue;
+    if (lastSent !== null && lastSent > ended.at) continue;
+    if (newest === null || ended.at > newest.at) newest = ended;
+  }
+  return newest;
+}
 
 /**
  * The blocked threads in the order the user should take them: approvals,
@@ -47,7 +80,18 @@ export function collectNeedsAttention(
     if (thread.archivedAt !== null) continue;
     const stop = limitStops.get(limitStopKey(thread.environmentId, thread.id)) ?? null;
     const status = resolveSidebarThreadStatus(thread, { limitStopped: stop !== null });
-    if (status !== "approval" && status !== "input" && status !== "limited") continue;
+    if (status !== "approval" && status !== "input" && status !== "limited") {
+      const ended = status === "working" || status === "waiting" ? null : watchEndedSince(thread);
+      if (ended !== null) {
+        entries.push({
+          thread,
+          status: "stopped",
+          since: ended.at,
+          summary: WATCH_END_SUMMARY[ended.reason],
+        });
+      }
+      continue;
+    }
     entries.push({
       thread,
       status,
@@ -65,13 +109,15 @@ export function collectNeedsAttention(
 /**
  * Where a thread sits in the "needs you next" order (#270 C): the rank the
  * keybinding minimises, or null when the thread asks nothing of the user.
- * Approval outranks input outranks a limit outranks a failed run (the status
- * resolver's own precedence); an unseen completion trails them all. Working,
- * waiting and read rows never qualify.
+ * Approval outranks input outranks a limit (the status resolver's own
+ * precedence) outranks a watch the server stopped outranks a failed run; an
+ * unseen completion trails them all. Working, waiting and read rows never
+ * qualify.
  */
 export function resolveAttentionRank(input: {
   readonly status: SidebarThreadStatus;
   readonly isUnread: boolean;
+  readonly watchEnded?: boolean;
 }): number | null {
   switch (input.status) {
     case "approval":
@@ -81,9 +127,9 @@ export function resolveAttentionRank(input: {
     case "limited":
       return 2;
     case "failed":
-      return 3;
+      return input.watchEnded ? 3 : 4;
     case "ready":
-      return input.isUnread ? 4 : null;
+      return input.watchEnded ? 3 : input.isUnread ? 5 : null;
     default:
       return null;
   }

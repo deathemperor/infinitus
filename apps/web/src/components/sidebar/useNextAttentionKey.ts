@@ -14,7 +14,11 @@ import type { SidebarThreadSummary } from "../../types";
 import { useUiStateStore } from "../../uiStateStore";
 import { hasUnseenCompletion, resolveSidebarThreadStatus } from "../Sidebar.logic";
 import { onNextAttentionThreadRequest } from "./nextAttentionBus";
-import { resolveAttentionRank, resolveNextAttentionThreadId } from "./sidebarNeedsAttention.logic";
+import {
+  resolveAttentionRank,
+  resolveNextAttentionThreadId,
+  watchEndedSince,
+} from "./sidebarNeedsAttention.logic";
 
 /**
  * Fork (#270 C): the `thread.nextAttention` key and the palette's "Jump to
@@ -42,7 +46,14 @@ export function useNextAttentionKey(input: {
         limitStopped: limitStops.has(limitStopKey(thread.environmentId, thread.id)),
       });
       const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt: lastVisitedAtById[key] });
-      return { id: key, rank: resolveAttentionRank({ status, isUnread }) };
+      return {
+        id: key,
+        rank: resolveAttentionRank({
+          status,
+          isUnread,
+          watchEnded: watchEndedSince(thread) !== null,
+        }),
+      };
     });
     const targetKey = resolveNextAttentionThreadId({ entries, currentThreadId: routeThreadKey });
     const target =

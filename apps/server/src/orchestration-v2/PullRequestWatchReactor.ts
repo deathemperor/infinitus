@@ -8,6 +8,7 @@ import {
   type PullRequestThreadCommentsResult,
   type ThreadPullRequestLink,
   type ThreadPullRequestWatch,
+  type ThreadPullRequestWatchEnd,
 } from "@infinitus/contracts";
 import {
   normalizeThreadPullRequestKey,
@@ -308,6 +309,8 @@ export const make = Effect.gen(function* () {
     target: WatchTarget,
     next: ThreadPullRequestWatch | null,
     wake?: { readonly text: string; readonly notification: OrchestrationV2Notification },
+    // Fork (#1043): an end the reactor decided, kept on the link for the sidebar.
+    ended?: ThreadPullRequestWatchEnd["reason"],
   ) =>
     Effect.gen(function* () {
       const uuid = yield* crypto.randomUUIDv4;
@@ -318,6 +321,7 @@ export const make = Effect.gen(function* () {
         ...identityOf(target.link),
         startedAt: target.watch.startedAt,
         watch: next,
+        ...(ended === undefined ? {} : { ended }),
         ...(wake === undefined
           ? {}
           : { wake: { ...wake, messageId: MessageId.make(`message:pr-watch:${uuid}`) } }),
@@ -327,16 +331,21 @@ export const make = Effect.gen(function* () {
   // A watch that cannot read its pull request ends with a wake saying so, rather than showing
   // "Watching" while it learns nothing.
   const giveUp = (target: WatchTarget) =>
-    record(target, null, {
-      text: `${PRODUCT_NAME} stopped watching pull request #${target.link.number} (${target.link.url}) because it failed to read it from the host ${READ_FAILURE_LIMIT} times in a row. Check it yourself, and call watch_pull_request to watch it again.`,
-      notification: {
-        source: { kind: "monitor" },
-        outcome: "failed",
-        summary: `#${target.link.number}: stopped watching, could not read it`,
+    record(
+      target,
+      null,
+      {
+        text: `${PRODUCT_NAME} stopped watching pull request #${target.link.number} (${target.link.url}) because it failed to read it from the host ${READ_FAILURE_LIMIT} times in a row. Check it yourself, and call watch_pull_request to watch it again.`,
+        notification: {
+          source: { kind: "monitor" },
+          outcome: "failed",
+          summary: `#${target.link.number}: stopped watching, could not read it`,
+        },
       },
-    }).pipe(
+      "unreadable",
+    ).pipe(
       Effect.tap(() => woke(target)),
-      Effect.catch(() => record(target, null)),
+      Effect.catch(() => record(target, null, undefined, "unreadable")),
       Effect.tap(() => ended(target, "unreadable")),
     );
 
@@ -561,6 +570,7 @@ export const make = Effect.gen(function* () {
             headSha: report.next.headSha,
             report,
           }),
+          report.exhausted ? "comment-limit" : undefined,
         ).pipe(
           Effect.tap(() => woke(target)),
           Effect.tap(() => (report.exhausted ? ended(target, "comment-limit") : Effect.void)),

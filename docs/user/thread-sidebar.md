@@ -78,13 +78,14 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 
 A **Needs attention** section above the list collects, across every project and
 connected machine, the threads waiting for something only you can give: an approval,
-an answer, or an account swap after a usage limit. Each row shows what it waits for,
+an answer, an account swap after a usage limit, or a next step after the server stopped
+watching the thread's pull request on its own. Each row shows what it waits for,
 how long it has waited, and where it lives; click it to open the thread. Collapse the
 section with its header and it keeps the count. It disappears when nothing waits.
 
 Press `mod+shift+u` to jump to the thread needing you next: approvals first, then
-questions, limits, failures, and finally unread completions, walking ties in sidebar
-order. The command palette lists it as **Jump to next waiting thread**, and
+questions, limits, stopped watches, failures, and finally unread completions, walking
+ties in sidebar order. The command palette lists it as **Jump to next waiting thread**, and
 **Settings → Keybindings** has it under **Thread: Jump to Next Waiting Thread**.
 
 ## Pin and reorder threads

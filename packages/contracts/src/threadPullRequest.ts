@@ -124,6 +124,18 @@ export const ThreadPullRequestWatch = Schema.Struct({
 });
 export type ThreadPullRequestWatch = typeof ThreadPullRequestWatch.Type;
 
+/**
+ * Fork (#269 A, #1043): why the server ended a watch on its own. Present until
+ * the user starts or stops a watch on the link again; the sidebar lists the
+ * thread under Needs attention while it is newer than the user's last message,
+ * since the pull request still needs work and only the user can say what.
+ */
+export const ThreadPullRequestWatchEnd = Schema.Struct({
+  at: IsoDateTime,
+  reason: Schema.Literals(["comment-limit", "unreadable"]),
+});
+export type ThreadPullRequestWatchEnd = typeof ThreadPullRequestWatchEnd.Type;
+
 export const ThreadPullRequestLink = Schema.Struct({
   ...ThreadPullRequestKey.fields,
   url: TrimmedNonEmptyString,
@@ -132,5 +144,6 @@ export const ThreadPullRequestLink = Schema.Struct({
   snapshot: Schema.NullOr(ThreadPullRequestSnapshot),
   stack: Schema.NullOr(ThreadPullRequestStack),
   watch: Schema.optional(ThreadPullRequestWatch),
+  watchEnded: Schema.optional(ThreadPullRequestWatchEnd),
 });
 export type ThreadPullRequestLink = typeof ThreadPullRequestLink.Type;

@@ -2302,6 +2302,79 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
     }),
   );
 
+  // Fork (#1043): a watch the server ends on its own is remembered on the link.
+  it.effect("remembers a watch that ended at its comment limit until the user acts", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const threadId = ThreadId.make("runtime-pull-request-watch-ended");
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        createdBy: "user",
+        creationSource: "web",
+        commandId: CommandId.make("pr-watch-end-create"),
+        threadId,
+        projectId: ProjectId.make("pr-watch-project"),
+        title: "Watch end",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+      });
+      const key = { host: "github.com", repository: "pingdotgg/t3code", number: 8 };
+      const linkOf = Effect.map(
+        orchestrator.getThreadShell(threadId),
+        (thread) => thread?.pullRequests?.[0],
+      );
+      const start = (commandId: string) =>
+        orchestrator.dispatch({
+          type: "thread.pull-request.watch",
+          commandId: CommandId.make(commandId),
+          threadId,
+          ...key,
+          watching: true,
+          link: { url: "https://github.com/pingdotgg/t3code/pull/8", source: "manual" },
+        });
+      yield* start("pr-watch-end-start");
+      const started = (yield* linkOf)?.watch;
+      assert.isDefined(started);
+      if (started === undefined) return;
+
+      yield* orchestrator.dispatch({
+        type: "thread.pull-request-watch.sync",
+        commandId: CommandId.make("pr-watch-end-exhausted"),
+        threadId,
+        ...key,
+        startedAt: started.startedAt,
+        watch: null,
+        ended: "comment-limit",
+      });
+      const ended = yield* linkOf;
+      assert.isUndefined(ended?.watch);
+      assert.equal(ended?.watchEnded?.reason, "comment-limit");
+
+      // A record for a watch that is no longer the link's leaves the end alone.
+      yield* orchestrator
+        .dispatch({
+          type: "thread.pull-request-watch.sync",
+          commandId: CommandId.make("pr-watch-end-stale"),
+          threadId,
+          ...key,
+          startedAt: started.startedAt,
+          watch: null,
+          ended: "unreadable",
+        })
+        .pipe(Effect.ignore);
+      assert.equal((yield* linkOf)?.watchEnded?.reason, "comment-limit");
+
+      // The user starting a watch again clears it; so does stopping one.
+      yield* start("pr-watch-end-restart");
+      const restarted = yield* linkOf;
+      assert.isDefined(restarted?.watch);
+      assert.isUndefined(restarted?.watchEnded);
+    }),
+  );
+
   it.effect.each(["manual", "automatic"])("settling ends every pull request watch: %s", (mode) =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;

@@ -47,6 +47,7 @@ import { ModelSelection } from "./modelSelection.ts";
 import {
   ThreadLinkedPullRequest,
   ThreadPullRequestLink,
+  ThreadPullRequestWatchEnd,
   ThreadPullRequestKey,
   ThreadPullRequestLinkSource,
   ThreadPullRequestSnapshot,
@@ -3073,6 +3074,8 @@ const OrchestrationV2InternalCommand = Schema.Union([
     startedAt: IsoDateTime,
     /** The watch to record, or null to end it. */
     watch: Schema.NullOr(ThreadPullRequestWatch),
+    /** Fork (#1043): a watch ended on its own, recorded on the link as `watchEnded`. */
+    ended: Schema.optional(ThreadPullRequestWatchEnd.fields.reason),
     wake: Schema.optional(
       Schema.Struct({
         messageId: MessageId,
