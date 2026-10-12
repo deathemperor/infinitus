@@ -13,7 +13,6 @@ import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@infinitus/shared/threadPullRequests";
 import { useAtomValue } from "@effect/atom-react";
-import { limitStopKey, limitStopLine } from "@infinitus/client-runtime/state/infinitusLimitStops";
 import { replaceComposerContextReferences } from "@infinitus/shared/composerContextReferences";
 import * as Schema from "effect/Schema";
 import {
@@ -156,8 +155,12 @@ import {
   useProjects,
   useThreadShells,
 } from "../state/entities";
-import { infinitusLimitStopsAtom } from "../state/infinitus";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
+import {
+  InfinitusLimitStopPill,
+  limitStopTooltip,
+  useThreadLimitStop,
+} from "./sidebar/InfinitusLimitStop";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
 import { useEnvironmentQuery } from "../state/query";
@@ -169,7 +172,7 @@ import {
   resolveActiveThreadRouteRef,
   resolveThreadRouteTarget,
 } from "../threadRoutes";
-import { formatRelativeTimeLabel, formatTimestamp, parseTimestampDate } from "../timestampFormat";
+import { formatRelativeTimeLabel, parseTimestampDate } from "../timestampFormat";
 import type { SidebarThreadSummary } from "../types";
 import { isScratchProject } from "@infinitus/client-runtime/state/projects";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
@@ -1263,11 +1266,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // Same semantics as the legacy sidebar (never-visited counts as read):
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  // Fork (#648): a turn parked on a Claude usage limit reads "Limited" with
-  // the account and the reset in the pill's tooltip until it resumes.
-  const limitStop =
-    useAtomValue(infinitusLimitStopsAtom).get(limitStopKey(thread.environmentId, thread.id)) ??
-    null;
+  const limitStop = useThreadLimitStop(thread);
   const status = resolveSidebarThreadStatus(thread, { limitStopped: limitStop !== null });
   const isInFlight =
     status === "working" || status === "waiting" || status === "approval" || status === "input";
@@ -1353,10 +1352,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       }
                     : null;
   const isWokeStatus = topStatus?.icon === "woke";
-  const limitStopDetail =
-    limitStop !== null && status === "limited"
-      ? limitStopLine(limitStop, (iso) => formatTimestamp(iso, props.timestampFormat), Date.now())
-      : null;
+  const limitStopDetail = limitStopTooltip(limitStop, status, props.timestampFormat);
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
     effectiveEnvMode: thread.worktreePath === null ? "local" : "worktree",
@@ -2062,22 +2058,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
                         </Tooltip>
                       ) : limitStopDetail !== null ? (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1 font-medium",
-                                  topStatus.className,
-                                )}
-                              >
-                                <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
-                                <span role="status">{topStatus.label}</span>
-                              </span>
-                            }
-                          />
-                          <TooltipPopup side="top">{limitStopDetail}</TooltipPopup>
-                        </Tooltip>
+                        <InfinitusLimitStopPill
+                          detail={limitStopDetail}
+                          label={topStatus.label}
+                          className={topStatus.className}
+                        />
                       ) : (
                         <span
                           className={cn(
