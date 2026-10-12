@@ -40,7 +40,7 @@ export interface TurnStartGateShape {
 }
 
 export class TurnStartGate extends Context.Service<TurnStartGate, TurnStartGateShape>()(
-  "infinitus/orchestration-v2/TurnStartGate",
+  "t3/orchestration-v2/TurnStartGate",
 ) {}
 
 /** The gate that holds nothing: every start runs at once. */
