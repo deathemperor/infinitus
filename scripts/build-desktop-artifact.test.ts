@@ -2143,6 +2143,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       T3CODE_CLERK_PASSKEY_RP_DOMAINS:
         " Clerk.Example.com,example.clerk.accounts.dev,clerk.example.com ",
     });
+    assert.ok(configuration);
     const entitlements = renderMacPasskeyEntitlements(configuration, {
       touchIdKeychainAccessGroup: undefined,
       browserPasskeys: false,
