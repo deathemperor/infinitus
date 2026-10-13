@@ -20,7 +20,7 @@ concurrency:
 jobs:
   mirror:
     name: Mirror Play APK
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
