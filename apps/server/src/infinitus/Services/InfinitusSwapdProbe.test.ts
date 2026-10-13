@@ -2,7 +2,7 @@ import { it } from "@effect/vitest";
 import { expect } from "vite-plus/test";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { ProcessRunner, ProcessSpawnError } from "../../processRunner.ts";
 import { InfinitusSwapdProbe, InfinitusSwapdProbeLive } from "./InfinitusSwapdProbe.ts";
 
@@ -65,8 +65,8 @@ const read = (
         ),
       ),
     ),
-    Effect.provideService(HostProcessPlatform, platform),
-    Effect.provideService(HostProcessEnvironment, environment),
+    Effect.provideService(HostProcess.Platform, platform),
+    Effect.provideService(HostProcess.Environment, environment),
   );
 };
 it.effect("reports the refused identity and reset before reading lagging quota", () =>

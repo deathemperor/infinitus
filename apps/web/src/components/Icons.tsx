@@ -693,6 +693,14 @@ export const ForgejoIcon: Icon = (props) => (
   </svg>
 );
 
+// GitCafe's own mark, from https://git.cafe/favicon.svg, inset so the full-bleed square does not
+// read heavier than the round and cut-out marks beside it.
+export const GitCafeIcon: Icon = (props) => (
+  <svg viewBox="0 0 64 64" aria-hidden="true" {...props}>
+    <rect x="4.8" y="4.8" width="54.4" height="54.4" fill="#a78bfa" />
+  </svg>
+);
+
 // macOS System Settings > Privacy & Security pane marks, so the SnapShot setup
 // step points at the same icon the user is about to look for.
 export const MacScreenRecordingIcon: Icon = (props) => {
@@ -747,31 +755,6 @@ export const MacAccessibilityIcon: Icon = (props) => {
         stroke="#fff"
         strokeWidth="1.6"
         strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-};
-
-// Codex's Computer Use app mark, shown on computer-use rows in the work log.
-export const ComputerUseAppIcon: Icon = (props) => {
-  const gradientId = `${useId().replaceAll(":", "")}-computer-use-app-gradient`;
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
-      <defs>
-        <linearGradient id={gradientId} x1="2" y1="2" x2="22" y2="22">
-          <stop offset="0" stopColor="#00dff0" />
-          <stop offset="0.42" stopColor="#3b9cff" />
-          <stop offset="0.72" stopColor="#b044f5" />
-          <stop offset="1" stopColor="#ff78b6" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="22" height="22" rx="5" fill={`url(#${gradientId})`} />
-      <path
-        d="m7.2 6.2 10.5 4.1-4.2 2.1-2 4.7z"
-        fill="white"
-        stroke="#315cff"
-        strokeWidth="1.1"
         strokeLinejoin="round"
       />
     </svg>

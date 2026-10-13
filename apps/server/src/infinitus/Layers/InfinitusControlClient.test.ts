@@ -17,7 +17,7 @@ import {
   type InfinitusControlClientConfigShape,
   type InfinitusControlRequestInput,
 } from "../Services/InfinitusControlClient.ts";
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 
 import {
   InfinitusControlClientConfigLive,
@@ -363,8 +363,8 @@ describe("InfinitusControlClient", () => {
         expect(config.maxReplyBytes).toBe(8 * 1024 * 1024);
       }).pipe(
         Effect.provide(InfinitusControlClientConfigLive),
-        Effect.provideService(HostProcessPlatform, "darwin"),
-        Effect.provideService(HostProcessEnvironment, {
+        Effect.provideService(HostProcess.Platform, "darwin"),
+        Effect.provideService(HostProcess.Environment, {
           INFINITUS_CONTROL_SOCKET: "/tmp/infinitus-test.sock",
         }),
       ),

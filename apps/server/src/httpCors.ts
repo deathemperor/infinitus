@@ -1,4 +1,5 @@
 import { ORCHESTRATION_PROTOCOL_HEADER } from "@infinitus/contracts";
+import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "@infinitus/shared/desktopIdentity";
 
 export const browserApiCorsAllowedMethods = ["GET", "POST", "OPTIONS"] as const;
 export const browserApiCorsAllowedHeaders = [
@@ -8,4 +9,10 @@ export const browserApiCorsAllowedHeaders = [
   "content-type",
   "dpop",
   ORCHESTRATION_PROTOCOL_HEADER,
+] as const;
+
+/** Origins of the Electron renderer, packaged and dev. */
+export const DESKTOP_RENDERER_ORIGINS = [
+  `${DESKTOP_URL_SCHEME}://app`,
+  `${DESKTOP_DEV_URL_SCHEME}://app`,
 ] as const;

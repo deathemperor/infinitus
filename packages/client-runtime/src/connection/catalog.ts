@@ -41,6 +41,11 @@ export class BearerConnectionProfile extends Schema.TaggedClass<BearerConnection
     /** The host the last connect landed on; tried first next time, and what
         the environment row shows. Cleared when the paired host is edited. */
     lastGoodHttpBaseUrl: Schema.optionalKey(Schema.String),
+    /**
+     * "tailscale" on a learned route the server found on its Tailscale
+     * interface. A bare 100.64.0.0/10 address could belong to any VPN.
+     */
+    network: Schema.optionalKey(Schema.Literal("tailscale")),
   },
 ) {}
 

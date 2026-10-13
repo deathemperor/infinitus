@@ -1,5 +1,5 @@
 import type { InfinitusLaunchResult } from "@infinitus/contracts/infinitus";
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -316,7 +316,7 @@ const makeRunOpen = Effect.gen(function* () {
     parses no plist itself). Null when the env is unset (CLI, dev runner),
     the bundle nests nothing, or the read fails (logged). */
 const resolveNestedHelper = Effect.gen(function* () {
-  const env = yield* HostProcessEnvironment;
+  const env = yield* HostProcess.Environment;
   const bundle = env.INFINITUS_DESKTOP_BUNDLE?.trim();
   if (!bundle) return null;
   const path = yield* Path.Path;
@@ -351,7 +351,7 @@ const resolveNestedHelper = Effect.gen(function* () {
 const InfinitusCompanionServiceLive = Layer.effect(
   InfinitusCompanion,
   Effect.gen(function* () {
-    const platform = yield* HostProcessPlatform;
+    const platform = yield* HostProcess.Platform;
     const client = yield* InfinitusControlClient;
     const runOpen = yield* makeRunOpen;
     const nested = yield* resolveNestedHelper;
@@ -375,7 +375,7 @@ const InfinitusCompanionStartupLive = Layer.effectDiscard(
         yield* Effect.logInfo("infinitus.companion.withheld", { reason });
         return;
       }
-      const platform = yield* HostProcessPlatform;
+      const platform = yield* HostProcess.Platform;
       const runOpen = yield* makeRunOpen;
       const nested = yield* resolveNestedHelper;
       yield* launchInfinitusAtStartup({ platform, runOpen, nested });

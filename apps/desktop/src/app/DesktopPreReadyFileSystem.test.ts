@@ -32,4 +32,7 @@ it.layer(NodeServices.layer)("DesktopPreReadyFileSystem", (it) => {
       assert.isFalse(yield* fileSystem.exists(path.join(userData, "Local State")));
     }),
   );
+
+  // Upstream also asserts that an unreadable legacy profile fails the resolve;
+  // the fork never probes one (DesktopUserData.ts), so there is nothing to fail.
 });

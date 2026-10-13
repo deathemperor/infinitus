@@ -60,21 +60,3 @@ export function withProviderSessionEnvironment(
     ? withDevice
     : { ...withDevice, T3_THREAD_ID: config.threadId, T3_ENVIRONMENT_ID: config.environmentId };
 }
-
-const sessionsByThread = new Map<ThreadId, McpProviderSessionConfig>();
-
-export function setMcpProviderSession(config: McpProviderSessionConfig): void {
-  sessionsByThread.set(config.threadId, config);
-}
-
-export function readMcpProviderSession(threadId: ThreadId): McpProviderSessionConfig | undefined {
-  return sessionsByThread.get(threadId);
-}
-
-export function clearMcpProviderSession(threadId: ThreadId): void {
-  sessionsByThread.delete(threadId);
-}
-
-function clearAllMcpProviderSessions(): void {
-  sessionsByThread.clear();
-}

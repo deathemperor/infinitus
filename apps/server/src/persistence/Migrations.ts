@@ -83,6 +83,7 @@ import Migration0067 from "./Migrations/067_ScheduledTaskWebhooks.ts";
 import Migration0068 from "./Migrations/068_WebhookRelayDeliveries.ts";
 import Migration0069 from "./Migrations/069_McpAppModelContext.ts";
 import Migration0070 from "./Migrations/070_ThreadSnapshotWindowIndexes.ts";
+import Migration0071 from "./Migrations/071_PullRequestReviewGuides.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -159,7 +160,7 @@ export const migrationEntries = [
   [62, "ProjectionThreadQueuedTurnsSendAt", Migration0062],
   [63, "PullRequestFilesViewed", Migration0063],
   [64, "ProjectionThreadsAutoSettleDisabledAt", Migration0064],
-  // Upstream's 55-60, renumbered after the fork's own 51-64 (INFINITUS.md). Upstream's
+  // Upstream's 55-61, renumbered after the fork's own 51-64 (INFINITUS.md). Upstream's
   // reconcileV2PreviewMigration (OrchestrationV2 released as 53 and 54 in its previews)
   // is not carried: no fork database ever recorded those, and 53 and 54 are taken here.
   // Preserve this migration's schema. Future V2 schema changes need new migrations.
@@ -169,6 +170,7 @@ export const migrationEntries = [
   [68, "WebhookRelayDeliveries", Migration0068],
   [69, "McpAppModelContext", Migration0069],
   [70, "ThreadSnapshotWindowIndexes", Migration0070],
+  [71, "PullRequestReviewGuides", Migration0071],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -181,6 +183,48 @@ const makeMigrationLoader = (throughId?: number) =>
         .map(([id, name, migration]) => [`${id}_${name}`, migration]),
     ),
   );
+
+// V2's schema migrations start at 55 upstream; the fork's own 51-64 push them to 65 (INFINITUS.md).
+const FIRST_V2_MIGRATION_ID = 65;
+
+/**
+ * Fail before migrating when the migrator would skip one of V2's own
+ * migrations. It skips every id up to the highest recorded one, whatever name
+ * was recorded, so a database that took a V2 id for another migration would
+ * start without V2's schema and fail on first use. Earlier ids keep the
+ * warning below: databases with a site-local migration there still work.
+ */
+const assertV2MigrationsCanRun = Effect.fn("assertV2MigrationsCanRun")(function* (
+  throughId?: number,
+) {
+  const sql = yield* SqlClient.SqlClient;
+  const tables = yield* sql`
+    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'effect_sql_migrations'
+  `;
+  if (tables.length === 0) return;
+  const recorded = yield* sql<{
+    readonly migration_id: number;
+    readonly name: string;
+  }>`SELECT migration_id, name FROM effect_sql_migrations`;
+  const latestRecordedId = Math.max(0, ...recorded.map((row) => row.migration_id));
+  const recordedNames = new Map(recorded.map((row) => [row.migration_id, row.name]));
+  const skipped = migrationEntries.flatMap(([id, name]) => {
+    if (
+      id < FIRST_V2_MIGRATION_ID ||
+      id > latestRecordedId ||
+      (throughId !== undefined && id > throughId)
+    )
+      return [];
+    const recordedName = recordedNames.get(id);
+    if (recordedName === name) return [];
+    return [`${id}_${name} (recorded: ${recordedName ?? "nothing"})`];
+  });
+  if (skipped.length === 0) return;
+  return yield* new Migrator.MigrationError({
+    kind: "BadState",
+    message: `This database's migration history would skip required schema migrations: ${skipped.join(", ")}. The migrator skips every id up to the highest recorded id (${latestRecordedId}), regardless of name. It was probably written by a different build. Start the build that wrote it, or report this migration history so an upgrade path can be added.`,
+  });
+});
 
 /**
  * Migrator run function - no schema dumping needed
@@ -205,6 +249,12 @@ export interface RunMigrationsOptions {
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {
+  // Upstream's reconcileV2PreviewMigration is not carried here (INFINITUS.md).
+  const includesV2 =
+    toMigrationInclusive === undefined || toMigrationInclusive >= FIRST_V2_MIGRATION_ID;
+  if (includesV2) {
+    yield* assertV2MigrationsCanRun(toMigrationInclusive);
+  }
   const executedMigrations = yield* run({ loader: makeMigrationLoader(toMigrationInclusive) });
   const migrations = executedMigrations.map(([id, name]) => `${id}_${name}`);
   yield* migrations.length === 0
