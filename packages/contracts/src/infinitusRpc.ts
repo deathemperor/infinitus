@@ -1,4 +1,5 @@
 import * as Rpc from "effect/rpc/Rpc";
+import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as Schema from "effect/Schema";
 
 import { EnvironmentAuthorizationError } from "./auth.ts";
@@ -173,8 +174,14 @@ const WsInfinitusSecretRpc = Rpc.make(INFINITUS_WS_METHODS.infinitusSecret, {
   ]),
 });
 
-/** The fork's RPCs, spread into upstream's `WsRpcGroup`. */
-export const INFINITUS_RPCS = [
+/**
+ * The fork's RPCs as their own group. `rpc.ts` adds the scope middleware and
+ * merges it into `WsRpcGroup`; the server builds its handlers apart from
+ * upstream's, which keeps upstream's handler object at upstream's size (one
+ * `toLayer` over every RPC exceeds TypeScript's instantiation limit, and the
+ * resulting `any` leaks into `runServer`).
+ */
+export const InfinitusRpcs = RpcGroup.make(
   WsServerGetStatsRpc,
   WsSubscribeInfinitusRpc,
   WsInfinitusCommandRpc,
@@ -187,4 +194,4 @@ export const INFINITUS_RPCS = [
   WsSubscribeInfinitusLimitStopsRpc,
   WsSubscribeCapturesRpc,
   WsCapturesApplyRpc,
-] as const;
+);

@@ -5,8 +5,8 @@ import {
   type RelayClientInstallProgressStage,
 } from "@infinitus/contracts";
 import { RelayOkResponse } from "@infinitus/contracts/relay";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as RelayClient from "@infinitus/shared/relayClient";
 import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
 import * as Cause from "effect/Cause";
@@ -620,7 +620,7 @@ const connectPublishCommand = Command.make("publish", {
         // Publishing needs the relay to know this environment belongs to you.
         // Establish a tunnel-free publish-only link automatically so signing in
         // is all it takes — the mobile client can still reach the environment
-        // out of band without T3 Connect.
+        // out of band without the tunnel.
         if (!(yield* tokens.hasCredential)) {
           yield* Console.log(
             "Run `t3 connect login` first so this environment can be authorized to publish.",
@@ -687,7 +687,7 @@ export const connectCommand = Command.make("connect", {
         // show how to run the server manually.
         const background = yield* recoverServiceOnboardingOffer(offerServiceDuringOnboarding);
         if (background) {
-          const platform = yield* HostProcessPlatform;
+          const platform = yield* HostProcess.Platform;
           yield* Console.log(
             platform === "darwin"
               ? `\n✓ Background service ready\n\n${PRODUCT_NAME} is set to run while you are logged in to this Mac. The server establishes the ${CONNECT_NAME} link on startup.`

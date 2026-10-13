@@ -8,7 +8,8 @@ import type {
 } from "@infinitus/contracts";
 import { addStatsDays, compactStatsDay, statsDayFormatter } from "@infinitus/shared/stats";
 import { cacheSavingsUsd, priceUsage, type RateTable } from "../usage/usagePricing.ts";
-import type { CodexScanState, UsageRecord } from "../usage/usageTranscripts.ts";
+import type { UsageRecord } from "@infinitus/provider-core/server/usage";
+import type { CodexScanState } from "../provider/Drivers/codexUsage.ts";
 
 const ActivityEvent = Schema.Struct({
   at: Schema.Finite,
@@ -72,8 +73,11 @@ export function activityCollector(initial: TranscriptActivity) {
     events.length = 0;
     seen.clear();
   };
-  const line = (raw: string, provider: UsageProviderKind, codex: CodexScanState) => {
+  // `state` is the transcript format's reducer state as of this line; the
+  // formats are keyed by provider, so Codex's is the Codex scan state.
+  const line = (raw: string, provider: UsageProviderKind, state: unknown) => {
     if (provider === "grok") return;
+    const codex = provider === "codex" ? (state as CodexScanState) : undefined;
     if (provider === "claude" && !/"(?:user|assistant|system)"/.test(raw)) return;
     if (
       provider === "codex" &&
@@ -93,7 +97,7 @@ export function activityCollector(initial: TranscriptActivity) {
     const at = Date.parse(text(row.timestamp));
     if (!Number.isFinite(at)) return;
     cwd = text(row.cwd) || text(payload.cwd) || cwd;
-    sessionId = text(row.sessionId) || codex.sessionId || sessionId;
+    sessionId = text(row.sessionId) || codex?.sessionId || sessionId;
     const emit = (kind: ActivityEvent["kind"], extra: Omit<ActivityEvent, "at" | "kind"> = {}) =>
       events.push({ at, kind, ...extra });
     const unique = (key: string) => {
@@ -117,7 +121,7 @@ export function activityCollector(initial: TranscriptActivity) {
         subagent ||= !!object(object(payload.source).subagent).thread_spawn;
         return;
       }
-      if (codex.suppressingForkCopies && at - codex.forkCopyAnchorMs < 1000) return;
+      if (codex?.suppressingForkCopies && at - codex.forkCopyAnchorMs < 1000) return;
       if (row.type === "turn_context") {
         emit("context", { model: text(payload.model), effort: text(payload.effort) || "unset" });
         return;

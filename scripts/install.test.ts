@@ -1,5 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off - Drives the real shell installer through a PTY and a gated HTTP fixture.
-import { HostProcessArchitecture, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFSP from "node:fs/promises";
@@ -13,7 +13,7 @@ import { describe, expect, it } from "vite-plus/test";
 // `t3` archive, executable, launcher and "Installed T3 Code" line. The fork's
 // server archive, binary and launcher are `infinitus`, so every fixture name
 // here is flipped after each sync — the installer itself is upstream's.
-describe.skipIf(HostProcessPlatform.defaultValue() !== "linux")("installer terminal", () => {
+describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer terminal", () => {
   it.each([false, true])(
     "preserves download and install behavior (HTTP failure: %s)",
     async (fail) => {
@@ -21,7 +21,7 @@ describe.skipIf(HostProcessPlatform.defaultValue() !== "linux")("installer termi
         NodePath.join(NodeOS.tmpdir(), "infinitus-install-progress-"),
       );
       const version = "1.2.3";
-      const stem = `infinitus-${version}-linux-${HostProcessArchitecture.defaultValue()}`;
+      const stem = `infinitus-${version}-linux-${HostProcess.Architecture.defaultValue()}`;
       const archiveName = `${stem}.tar.gz`;
       let resumeDownload: (() => void) | undefined;
       let sawPartialProgress = false;

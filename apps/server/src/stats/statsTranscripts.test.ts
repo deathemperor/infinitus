@@ -4,7 +4,7 @@ import {
   emptyTranscriptActivity,
   summarizeStatsSession,
 } from "./statsTranscripts.ts";
-import { initialCodexScanState, parseCodexLine } from "../usage/usageTranscripts.ts";
+import { initialCodexScanState, parseCodexLine } from "../provider/Drivers/codexUsage.ts";
 import { createOverrideRateTable } from "../usage/usagePricing.ts";
 import { parseStatsLog, statsRepositoryIdentity } from "./statsRepositories.ts";
 

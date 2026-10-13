@@ -1,7 +1,7 @@
 import type { AuthEnvironmentScope, AuthSessionId } from "@infinitus/contracts";
 import { InfinitusManifest, InfinitusPrefs } from "@infinitus/contracts/infinitus";
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
-import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as NodeOS from "node:os";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -246,7 +246,7 @@ export const makeServerPortPublisher = Effect.fn("Infinitus.makeServerPortPublis
   const client = yield* InfinitusControlClient;
   const auth = yield* EnvironmentAuth.EnvironmentAuth;
   const identity = yield* ServerEnvironmentIdentity;
-  const env = yield* HostProcessEnvironment;
+  const env = yield* HostProcess.Environment;
   const publisher: Publisher = {
     environmentId: yield* identity.getEnvironmentId,
     takeover: publishOptedIn(env[PUBLISH_OPT_IN_ENV]),
@@ -405,7 +405,7 @@ export const serverPortWithheldReason = (input: {
     startup companion launch both ask before touching the installed app. */
 export const resolveServerPortWithheldReason = Effect.gen(function* () {
   const config = yield* ServerConfig;
-  const env = yield* HostProcessEnvironment;
+  const env = yield* HostProcess.Environment;
   return serverPortWithheldReason({
     mode: config.mode,
     devUrl: config.devUrl,

@@ -4,7 +4,7 @@ import {
   InfinitusUnavailable,
   type InfinitusSnapshot,
 } from "@infinitus/contracts/infinitus";
-import { HostProcessEnvironment } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { it as effectIt } from "@effect/vitest";
 import * as NodeOS from "node:os";
 import * as Context from "effect/Context";
@@ -306,7 +306,7 @@ const testLayer = (socketPath: string | null = STUB_SOCKET) =>
 
 /** The process environment of a server the user picked (#1487). */
 const optedIn = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.provideService(effect, HostProcessEnvironment, { [PUBLISH_OPT_IN_ENV]: "1" });
+  Effect.provideService(effect, HostProcess.Environment, { [PUBLISH_OPT_IN_ENV]: "1" });
 
 /** The `prefs set fork_server_port …` writes, in order. */
 const portWrites = (calls: ReadonlyArray<Call>) =>

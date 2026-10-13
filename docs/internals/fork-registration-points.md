@@ -26,7 +26,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - Claude banked resets (#1553): `apps/server/src/provider/claudeResetCredits.ts`
   (+ test) is the fork's whole module, taken over upstream's #13118 on every
   sync: ours reads the macOS keychain and the token's profile, upstream's
-  skips macOS and reads `.claude.json` (#1601). `Drivers/ClaudeDriver.ts`
+  skips macOS and reads `.claude.json` (#1601). Upstream's later additions
+  are ported into ours as they land: `claudeAccountConfigPath`,
+  `readClaudeOrganizationId` (labels the capabilities' workspace from
+  `.claude.json`; the claim still asks the token's profile),
+  `isSettledClaudeResetCreditFailure`, the `unconfirmed` claim reason and the
+  claim body-read timeout (2026-10-13). `Drivers/ClaudeDriver.ts`
   (the instance's `login` location, a reset-credits cache on the probe's
   TTL, `consumeClaudeResetCredit` with the capabilities cache dropped before
   the re-probe), `ProviderInstanceRegistry.test.ts` (upstream's redeem tests
@@ -65,8 +70,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   option (#1042); under upstream's no-op file system, reads below it go to
   the real disk so the feed-swap test's own `app-update.yml` is found.
 - `packages/contracts/src/rpc.ts` — `...INFINITUS_WS_METHODS` in `WS_METHODS`
-  and `...INFINITUS_RPCS` in `WsRpcGroup`, both from `infinitusRpc.ts`
-  (`fork-only-files.md`); `vcs.removeWorktree` answers
+  from `infinitusRpc.ts` (`fork-only-files.md`); upstream's group is declared
+  as `UpstreamWsRpcGroup`, and `WsRpcGroup` is its merge with
+  `InfinitusWsRpcGroup` (`InfinitusRpcs` under the scope middleware), so the
+  server builds upstream's handlers from upstream's group alone: one handler
+  object over every RPC exceeds TypeScript's instantiation limit, and the
+  `any` it then infers reaches `runServer`; `vcs.removeWorktree` answers
   `VcsRemoveWorktreeResult` (#270 A).
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` (+ `apps/web/src/worktreeCleanup.ts`: `branchDeletionPrompt`, `describeSavedWorktreeWork`) — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding; the `removeWorktree` mocks in `apps/server/src/mcp/WorktreeMcpService.test.ts` and `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts` answer that result shape. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
@@ -89,18 +98,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops`,
   `subscribeInfinitusHolds` and `subscribeCaptures` in
   `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
-- `apps/server/src/ws.ts` — pulls `InfinitusService`, `InfinitusCompanion`,
-  `InfinitusSecret`, `InfinitusPairing`, `InfinitusLimitStops`
-  (`subscribeInfinitusLimitStops` → its `stopped` stream, #648) and
-  `CaptureStore` beside the other services and answers the Infinitus
-  methods: `subscribeInfinitus` /
-  `infinitus.command`, `infinitus.launch`, `infinitus.secret` (the session's
-  id and scopes along), the pairing stream and `decide` (the approver's
-  session scopes go along; only the request id reaches the span);
-  `subscribeCaptures` / `captures.apply` (#433; the project id and the
-  command's type reach the span, a capture's text never); `server.getStats`
-  → `usage.readStats` (#659); `subscribeInfinitusHolds` /
-  `infinitus.releaseThread` (#616, #743) from `InfinitusSessionHolds`.
+- `apps/server/src/ws.ts` — builds upstream's handlers from
+  `UpstreamWsRpcGroup` and routes the merged `WsRpcGroup`
+  (`FullServerWsRpcGroup`); `layerInfinitusWsRpc`
+  (`infinitus/Layers/InfinitusWsRpc.ts`, `fork-only-files.md`) is merged
+  beside `layerWsRpc`, and the Infinitus handlers live there, never in
+  upstream's handler object (see `rpc.ts` above).
 - `packages/client-runtime/src/state/server.ts` — the `serverEnvironment.stats`
   query atom family over `server.getStats` (#659), refreshed with the usage
   prices.
@@ -178,8 +181,8 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   the pull requests page listed upstream's PRs.
 - `apps/server/src/vcs/GitVcsDriver.ts` — `checkpoints.diffCheckpoints`
   restricts its diff to the pathspec from `checkpointDiffPathspec.ts` (#1403):
-  one call before the command and the `--literal-pathspecs` / `-- <paths>`
-  arguments; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
+  one call before the command, intersected with upstream's `input.filePaths`
+  and passed in upstream's `:(top,literal)<path>` form; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
   the checkpoint author and committer names are `PRODUCT_NAME`.
 - `packages/contracts/src/providerRuntime.ts` — fork-owned optional
   fields: `TaskStartedPayload.prompt` (#1573) and `isBackgrounded` (#974;
@@ -268,15 +271,19 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   (queued turns, babysit, side questions, groups, session status reason, turn
   usage, message context, title state, PR files viewed, auto-settle; their
   features left with #1627, but existing fork databases recorded them, so
-  they are schema history, not live code) and upstream's `055`–`060`
-  (OrchestrationV2 onward) are renumbered `065`–`070` on every sync
-  (INFINITUS.md). Upstream's `reconcileV2PreviewMigration` is not carried: no
+  they are schema history, not live code) and upstream's `055`–`061`
+  (OrchestrationV2 onward) are renumbered `065`–`071` on every sync
+  (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
+  carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
+  legacy/V2 boundary ids are the fork's. Upstream's `reconcileV2PreviewMigration` is not carried: no
   fork database recorded its preview numbers, and 53 and 54 are taken here.
 - `apps/server/src/usage/UsageService.ts` — `readStats` (#659, the Stats
   page's fold over the transcript and repository scanners in
   `apps/server/src/stats/`), the `UsageAttribution` hook (#779), and
   `CACHE_RETENTION_DAYS = 800` (Stats compares calendar years) with
-  upstream's 92 kept as `CURSOR_RETENTION_DAYS` for the Cursor history reads.
+  upstream's 92 kept as `SCAN_READER_RETENTION_DAYS`, the floor on the
+  `retentionCutoffMs` handed to the provider packages' `scan` readers
+  (Cursor accounts, Antigravity); only the transcript scans keep 800 days.
   `readSessionUsage` (#834): one Claude session's transcript by file name
   under the configured Claude homes, through the scan's file cache, deduped
   and priced, for the usage backfill (`docs/internals/turn-usage.md`).
@@ -303,8 +310,12 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   (status messages, text-generation errors, the Muse `clientInfo` title, the
   shared orchestration instructions in `provider-core`), with their tests
   (`provider-core/.../orchestrationInstructions.test.ts`,
-  `provider-pi/.../mcpInjection.test.ts`, `provider-muse/.../status.test.ts`).
-  `scripts/connect-name.guard.test.ts` scans these roots too.
+  `provider-pi/.../mcpInjection.test.ts`, `provider-muse/.../status.test.ts`,
+  `provider-cursor/.../accountUsage.test.ts` for the Keychain prompt).
+  `scripts/connect-name.guard.test.ts` scans these roots too, and
+  `packages/shared/src/promptLinks.ts` and
+  `packages/client-runtime/src/relay/errorPresentation.ts` (+
+  `connection/errors.test.ts`) follow the same rule.
 - Resume-on-limit (#648, #1486, #1107, #1627; `docs/internals/resume-on-limit.md`):
   `orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `ClaudeUsageLimitRefusal`
   and the `onUsageLimitRefusal` option (called on a rejected
@@ -504,8 +515,8 @@ background`). Riding along, all
   development schemes come from `@infinitus/shared/desktopIdentity`; everything
   else (CSP, renderer origin, Clerk renderer, the Linux handler) follows
   `getDesktopScheme`.
-- `apps/server/src/http.ts` — `DESKTOP_RENDERER_ORIGINS` built from the same
-  two scheme constants.
+- `apps/server/src/httpCors.ts` — `DESKTOP_RENDERER_ORIGINS` built from the
+  same two scheme constants.
 - `scripts/build-desktop-artifact.ts` — the mac and Linux `protocols` blocks
   (name `Infinitus`, schemes `infinitus` / `infinitus-dev`);
   `resolveDesktopBuildIconAssets` / `resolveDesktopWebAssetBrand` return the
@@ -651,7 +662,6 @@ background`). Riding along, all
   origin; here they come from `desktopIdentity.ts` (`infinitus://`, #624) and
   `connectAuth.ts`'s `DEFAULT_HOSTED_APP_URL`. Their tests build URLs from the same
   constants; `apps/desktop/src/app/DesktopClerk.test.ts` spells the scheme out.
-- `apps/mobile/src/lib/mobileTheme.ts` — settings groups (`--color-grouped-card`) take the tonal fill in every theme whose surface matches its chrome, not only the default one (2026-09-22). Upstream's palette alignment (#12534) gave grove, ocean, ember and iris the same colour for both, so their Settings cards painted invisibly on the phone. Pinned by `mobileTheme.test.ts` ("separates settings groups … in every theme"); drop the bullet once upstream fixes the derivation.
 - `apps/mobile/app.config.ts` — the `infinitus` app variant (bundle id
   `run.infinitus.mobile`, the Infinitus Apple team, the native phone's icon
   and the splash images `scripts/export-infinitus-splash.ts` renders from it;
@@ -854,7 +864,6 @@ background`). Riding along, all
   is done by hand.
 - `apps/mobile/src/dependency-graph.test.ts` — the upward-import ceilings (`state`/`components` → `features`) are the fork's counts: `features/infinitus` (pin-at-creation) is reached from `state/`, so upstream's numbers fail here. On a sync keep the fork's ceilings, and when the test prints a higher count set it to that.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
-- `apps/server/src/provider/acp/AcpSessionRuntime.processTree.test.ts` — the "rotates more than 64 live parents" fixture puts its fake parents above pid_max (#1642): the termination skips the current process's group, and a CI worker pid inside upstream's 1000–1129 range left that parent and child behind.
 - `infra/relay/migrations/postgres/<newest upstream migration>/snapshot.json` — rewritten after each sync that brings a relay migration so the snapshot chain has one head that includes the fork's Team tables (today `20261005232034_managed_endpoint_tunnel_released_at`). Procedure: `docs/internals/release-and-updates.md`.
 - `apps/server/src/vcs/GitVcsDriverCore.test.ts` — the "keeps complete stats for files beyond the combined patch limit" fixture rewrites `a-large.txt` to a different byte length (#1517): upstream's same-size rewrite in the same second as its commit intermittently read as unchanged through the index stat cache and dropped the file from the working-tree stats on CI.
 - `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.

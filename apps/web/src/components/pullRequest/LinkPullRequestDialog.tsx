@@ -1,10 +1,5 @@
-import { changeRequestUrlFor as changeRequestWebUrl } from "@infinitus/shared/changeRequestUrl";
-export { changeRequestUrlFor as changeRequestWebUrl } from "@infinitus/shared/changeRequestUrl";
-import {
-  pullRequestHostOf,
-  type ScopedThreadRef,
-  type SourceControlProviderKind,
-} from "@infinitus/contracts";
+import { pullRequestHostOf, type ScopedThreadRef } from "@infinitus/contracts";
+import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
 import { useAtomValue } from "@effect/atom-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -138,15 +133,19 @@ function LinkPullRequestDialog({
       identity.displayName ??
       (identity.owner && identity.name ? `${identity.owner}/${identity.name}` : null);
     if (repository === null) return null;
-    const kind = identity.provider as SourceControlProviderKind;
-    const host = pullRequestHostOf(identity, kind);
+    const definition = sourceControlClients.get(identity.provider ?? "unknown");
+    const host = pullRequestHostOf(identity, definition.kind);
     return {
       host,
       repository,
       webUrl: (number: number) =>
-        kind === "forgejo" && identity.webUrl
-          ? `${identity.webUrl.replace(/\/+$/, "")}/pulls/${number}`
-          : changeRequestWebUrl(kind, host, repository, number, identity.locator.remoteUrl),
+        definition.changeRequestUrl({
+          host,
+          repository,
+          number,
+          remoteUrl: identity.locator.remoteUrl,
+          webUrl: identity.webUrl,
+        }),
     };
   }, [environmentProjects, projectId]);
   const linking = usePullRequestLinking(threadRef.environmentId);

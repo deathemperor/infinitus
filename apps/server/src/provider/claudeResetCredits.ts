@@ -19,7 +19,7 @@ import type {
   ProviderConsumeResetCreditOutcome,
   ServerProviderResetCredits,
 } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -101,6 +101,15 @@ const decodeCedarEmber = Schema.decodeUnknownOption(CedarEmber);
 const UsageResponse = Schema.Struct({
   cedar_ember: Schema.optional(Schema.NullOr(Schema.Unknown)),
 });
+/** The CLI's account record (`.claude.json`), the organization the login is signed in to. */
+const Config = Schema.Struct({
+  oauthAccount: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({ organizationUuid: Schema.optional(Schema.NullOr(Schema.String)) }),
+    ),
+  ),
+});
+const decodeConfig = Schema.decodeUnknownOption(Schema.fromJsonString(Config));
 const Profile = Schema.Struct({
   organization: Schema.optional(
     Schema.NullOr(Schema.Struct({ uuid: Schema.optional(Schema.NullOr(Schema.String)) })),
@@ -123,6 +132,8 @@ const RESET_CREDIT_FAILURES = {
   signedOut: "Sign in to Claude again to redeem resets.",
   rateLimited: "Claude is rate limiting resets. Try again soon.",
   coolingDown: "Claude resets are cooling down. Try again later.",
+  unconfirmed:
+    "Claude could not confirm the reset. If you are still limited in a moment, try again.",
   requestFailed: "Claude could not redeem the reset.",
 } as const;
 
@@ -139,6 +150,18 @@ export class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCredit
     return RESET_CREDIT_FAILURES[this.reason];
   }
 }
+
+const isClaudeResetCreditError = Schema.is(ClaudeResetCreditError);
+
+/**
+ * Every reset failure except `requestFailed` and `unconfirmed` is final:
+ * Claude answered, or nothing was sent. An unanswered or unconfirmed claim
+ * retries with the same request id.
+ */
+export const isSettledClaudeResetCreditFailure = (error: unknown) =>
+  isClaudeResetCreditError(error) &&
+  error.reason !== "requestFailed" &&
+  error.reason !== "unconfirmed";
 
 const isoFuture = (value: string | null | undefined, nowMs: number): string | undefined => {
   if (!value) return undefined;
@@ -228,7 +251,7 @@ const readKeychainItem = Effect.fn("readKeychainItem")(function* (service: strin
  */
 const readAccessToken = Effect.fn("readClaudeAccessToken")(function* (login: ClaudeLoginLocation) {
   const raw =
-    (yield* HostProcessPlatform) === "darwin"
+    (yield* HostProcess.Platform) === "darwin"
       ? yield* readKeychainItem(login.keychainService)
       : yield* Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;
@@ -312,12 +335,37 @@ const readOrganization = Effect.fn("readClaudeOrganization")(function* (
   return profile.organization?.uuid?.trim() || undefined;
 });
 
+/** The CLI keeps the account record beside its settings, or in the home directory by default. */
+export const claudeAccountConfigPath = Effect.fn("claudeAccountConfigPath")(function* (
+  configDir: string | undefined,
+) {
+  const path = yield* Path.Path;
+  return configDir
+    ? path.join(configDir, ".claude.json")
+    : path.join(yield* HostProcess.HomeDirectory, ".claude.json");
+});
+
+/**
+ * The organization the account record says the login is signed in to; one
+ * email can belong to several. The claim itself asks the token's profile
+ * (`readOrganization`), this read only labels the capabilities' workspace.
+ */
+export const readClaudeOrganizationId = (accountConfigPath: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const text = yield* fs.readFileString(accountConfigPath);
+    return Option.getOrUndefined(
+      Option.flatMap(decodeConfig(text), (config) =>
+        Option.fromNullishOr(config.oauthAccount?.organizationUuid?.trim() || undefined),
+      ),
+    );
+  }).pipe(Effect.orElseSucceed(() => undefined));
+
 const CLAIM_OUTCOMES = {
   reset: "reset",
   not_limited: "nothingToReset",
   already_used: "alreadyRedeemed",
   ineligible: "noCredit",
-  unavailable: "noCredit",
 } as const satisfies Record<string, ProviderConsumeResetCreditOutcome>;
 
 /**
@@ -370,15 +418,18 @@ export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(fu
   if (response.status === 401 || response.status === 403) {
     return yield* new ClaudeResetCreditError({ reason: "signedOut" });
   }
-  const body = yield* HttpClientResponse.schemaBodyJson(ClaimResponse)(
-    yield* HttpClientResponse.filterStatusOk(response).pipe(
-      Effect.mapError((cause) => new ClaudeResetCreditError({ reason: "requestFailed", cause })),
-    ),
-  ).pipe(
+  const body = yield* HttpClientResponse.filterStatusOk(response).pipe(
+    Effect.flatMap(HttpClientResponse.schemaBodyJson(ClaimResponse)),
+    Effect.timeout(CLAIM_TIMEOUT),
     Effect.mapError((cause) => new ClaudeResetCreditError({ reason: "requestFailed", cause })),
   );
   if (body.result === "cooldown") {
     return yield* new ClaudeResetCreditError({ reason: "coolingDown" });
+  }
+  // Claude could not say whether the claim landed, so, like the CLI, keep the
+  // request id and let the retry ask about the same claim.
+  if (body.result === "unavailable") {
+    return yield* new ClaudeResetCreditError({ reason: "unconfirmed" });
   }
   return CLAIM_OUTCOMES[body.result];
 });

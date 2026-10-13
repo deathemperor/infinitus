@@ -1,5 +1,5 @@
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -54,8 +54,8 @@ export const InfinitusSwapdProbeLive = Layer.effect(
   InfinitusSwapdProbe,
   Effect.gen(function* () {
     const runner = yield* ProcessRunner;
-    const platform = yield* HostProcessPlatform;
-    const environment = yield* HostProcessEnvironment;
+    const platform = yield* HostProcess.Platform;
+    const environment = yield* HostProcess.Environment;
     const binary =
       environment.INFINITUS_SWAPD_CLI ??
       `${NodeOS.homedir()}/Library/Application Support/Infinitus/engines/swapd`;

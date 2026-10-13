@@ -39,6 +39,10 @@
       "types": "./src/userMessage.ts",
       "default": "./src/userMessage.ts"
     },
+    "./prompt-links": {
+      "types": "./src/promptLinks.ts",
+      "default": "./src/promptLinks.ts"
+    },
     "./secret-request": {
       "types": "./src/secretRequest.ts",
       "default": "./src/secretRequest.ts"
@@ -383,6 +387,10 @@
       "types": "./src/device/duoControl.ts",
       "default": "./src/device/duoControl.ts"
     },
+    "./diff-count": {
+      "types": "./src/diffCount.ts",
+      "default": "./src/diffCount.ts"
+    },
     "./mcp-apps": {
       "types": "./src/mcpApps/host.ts",
       "default": "./src/mcpApps/host.ts"
@@ -442,15 +450,39 @@
     "./state/stats": {
       "types": "./src/state/stats.ts",
       "default": "./src/state/stats.ts"
+    },
+    "./source-control-clients": {
+      "types": "./src/sourceControlClients.ts",
+      "default": "./src/sourceControlClients.ts"
+    },
+    "./review-guide-tour": {
+      "types": "./src/reviewGuideTour.ts",
+      "default": "./src/reviewGuideTour.ts"
+    },
+    "./state/query-persistence": {
+      "types": "./src/state/queryPersistence.ts",
+      "default": "./src/state/queryPersistence.ts"
+    },
+    "./pull-request-markdown": {
+      "types": "./src/pullRequestMarkdown.ts",
+      "default": "./src/pullRequestMarkdown.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc-rs --noEmit",
     "test": "vp test run"
   },
   "dependencies": {
     "@infinitus/contracts": "workspace:*",
     "@infinitus/shared": "workspace:*",
+    "@infinitus/source-control-azure-devops": "workspace:*",
+    "@infinitus/source-control-bitbucket": "workspace:*",
+    "@infinitus/source-control-core": "workspace:*",
+    "@infinitus/source-control-forgejo": "workspace:*",
+    "@infinitus/source-control-gitcafe": "workspace:*",
+    "@infinitus/source-control-github": "workspace:*",
+    "@infinitus/source-control-gitlab": "workspace:*",
+    "@pierre/diffs": "catalog:",
     "effect": "catalog:",
     "three": "0.180.0"
   },

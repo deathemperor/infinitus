@@ -32,10 +32,27 @@ under `~/.infinitus/runtime` and links `infinitus` into `~/.local/bin`. Then run
 infinitus
 ```
 
-This starts the server and opens the local web app. Run `infinitus --help` for
-command-line options, `infinitus update` for a newer release, and see
-[Running in the background](./background-service.md) to keep it running as a
-service. You can also download an archive from a
+This starts the server and opens the local web app. If your shell reports
+`command not found`, `~/.local/bin` is not on your `PATH` yet; the installer
+prints the line to add. Set `T3CODE_VERSION` to pin an exact release.
+
+| Task                                  | Command                                                          |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| Start the server and open the web app | `infinitus`                                                      |
+| Start the server without a browser    | `infinitus serve`                                                |
+| Keep it running in the background     | `infinitus service install` ([details](./background-service.md)) |
+| Move to the newest release            | `infinitus update`                                               |
+| Remove it again                       | `infinitus uninstall`                                            |
+
+Run `infinitus help` or `infinitus --help` for the full reference. To start in a
+new working directory, use an explicit path such as `infinitus ./my-project`. A
+bare directory name is accepted only if it already exists.
+
+If `infinitus` or `infinitus start` reports an already running server, connect
+to that server instead. Stop it before starting a replacement, or use a
+different `--base-dir` for an independent server.
+
+You can also download an archive from a
 [release](https://github.com/deathemperor/infinitus/releases) yourself and run
 its `./infinitus`.
 
@@ -116,7 +133,7 @@ computer.
 | Grok Build  | Install [Grok Build CLI](https://x.ai/cli), then run `grok login`.                                                                                        |
 | OpenCode    | Install [OpenCode](https://opencode.ai), then run `opencode auth login`.                                                                                  |
 | Antigravity | Install and sign in with Google from Infinitus's provider settings.                                                                                       |
-| Pi          | Install [Pi](https://pi.dev), then run `pi` once to finish its login or API-key setup.                                                                    |
+| Pi          | Install [Pi](./providers-pi.md#set-up-pi) with Node.js 22.19 or newer, then run `pi` and `/login`.                                                        |
 | Muse Code   | Install [Muse Code](https://dev.meta.ai/docs/muse-code) on the server, run `muse login`, then enable it in Settings → Providers.                          |
 
 Provider CLIs must be on the server's `PATH`. If Infinitus cannot find one, set its

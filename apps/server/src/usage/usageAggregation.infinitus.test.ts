@@ -4,7 +4,7 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { UsageAggregator } from "./usageAggregation.ts";
 import { priceUsage, type RateTable } from "./usagePricing.ts";
-import type { UsageRecord } from "./usageTranscripts.ts";
+import type { UsageRecord } from "@infinitus/provider-core/server/usage";
 
 const rates: RateTable = new Map([
   [

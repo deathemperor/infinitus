@@ -1,13 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { ModelCapabilities } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { createModelCapabilities } from "@infinitus/shared/model";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PlatformError from "effect/PlatformError";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import {
   isCommandMissingCause,
@@ -72,6 +73,25 @@ describe("providerModelsFromSettings", () => {
       },
       { slug: "named", name: "Named", isCustom: true, capabilities },
     ]);
+  });
+
+  it("renames a built-in model when a named entry uses its slug", () => {
+    const capabilities = createModelCapabilities({ optionDescriptors: [] });
+    const models = providerModelsFromSettings(
+      [
+        {
+          slug: "gpt-5.5",
+          name: "GPT-5.5",
+          shortName: "5.5",
+          isCustom: false,
+          capabilities,
+        },
+      ],
+      [{ slug: "gpt-5.5", name: "Team GPT" }],
+      capabilities,
+    );
+
+    expect(models).toEqual([{ slug: "gpt-5.5", name: "Team GPT", isCustom: false, capabilities }]);
   });
 
   it("preserves a custom slug that collides with a provider alias", () => {
@@ -157,7 +177,7 @@ describe("ProviderCommandNotFoundError", () => {
         ChildProcess.make("codex", ["--version"]),
       ).pipe(
         Effect.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner)),
-        Effect.provideService(HostProcessPlatform, "win32"),
+        Effect.provideService(HostProcess.Platform, "win32"),
         Effect.flip,
       );
 

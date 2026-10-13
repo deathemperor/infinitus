@@ -1,6 +1,6 @@
 import * as NodeOS from "node:os";
 
-import { HostProcessEnvironment, HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { resolveInfinitusControlSocketPath } from "@infinitus/shared/infinitusControl";
 import {
   INFINITUS_CONTROL_DEFAULT_MAX_REPLY_BYTES,
@@ -56,8 +56,8 @@ export const InfinitusControlClientLive = Layer.effect(
 export const InfinitusControlClientConfigLive = Layer.effect(
   InfinitusControlClientConfig,
   Effect.gen(function* () {
-    const platform = yield* HostProcessPlatform;
-    const env = yield* HostProcessEnvironment;
+    const platform = yield* HostProcess.Platform;
+    const env = yield* HostProcess.Environment;
     return {
       socketPath: resolveInfinitusControlSocketPath({
         platform,

@@ -1,6 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -185,7 +185,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json(USAGE_BODY)));
       });
       const credits = yield* readClaudeResetCredits(login, "2.1.280").pipe(
-        Effect.provideService(HostProcessPlatform, "linux"),
+        Effect.provideService(HostProcess.Platform, "linux"),
         Effect.provideService(HttpClient.HttpClient, client),
         Effect.provide(noSpawns),
       );
@@ -197,7 +197,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
     Effect.gen(function* () {
       const login = { configDir: "/nowhere", keychainService: "Claude Code-credentials" };
       const credits = yield* readClaudeResetCredits(login, "2.1.280").pipe(
-        Effect.provideService(HostProcessPlatform, "darwin"),
+        Effect.provideService(HostProcess.Platform, "darwin"),
         Effect.provideService(HttpClient.HttpClient, respond(200, USAGE_BODY)),
         Effect.provide(keychainLayer('{"claudeAiOauth":{"accessToken":"oauth-token"}}\n')),
       );
@@ -211,7 +211,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
       yield* TestClock.setTime(NOW);
       const login = yield* writeLogin;
       const missingItem = yield* readClaudeResetCredits(login, "2.1.280").pipe(
-        Effect.provideService(HostProcessPlatform, "darwin"),
+        Effect.provideService(HostProcess.Platform, "darwin"),
         Effect.provideService(HttpClient.HttpClient, refuseRequests),
         Effect.provide(keychainLayer("", 44)),
       );
@@ -224,7 +224,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         );
         return yield* readClaudeResetCredits(login, "2.1.280");
       }).pipe(
-        Effect.provideService(HostProcessPlatform, "linux"),
+        Effect.provideService(HostProcess.Platform, "linux"),
         Effect.provideService(HttpClient.HttpClient, refuseRequests),
         Effect.provide(noSpawns),
       );
@@ -232,7 +232,7 @@ effectIt.layer(NodeServices.layer)("readClaudeResetCredits", (it) => {
         { ...login, configDir: "/nowhere" },
         "2.1.280",
       ).pipe(
-        Effect.provideService(HostProcessPlatform, "linux"),
+        Effect.provideService(HostProcess.Platform, "linux"),
         Effect.provideService(HttpClient.HttpClient, respond(429, {})),
         Effect.provide(noSpawns),
       );
@@ -264,7 +264,7 @@ const consume = (client: HttpClient.HttpClient, ids = { grantId: "grant_a", requ
   Effect.gen(function* () {
     const login = yield* writeLogin;
     return yield* consumeClaudeResetCredit({ login, version: "2.1.280", ...ids }).pipe(
-      Effect.provideService(HostProcessPlatform, "linux"),
+      Effect.provideService(HostProcess.Platform, "linux"),
       Effect.provideService(HttpClient.HttpClient, client),
       Effect.provide(noSpawns),
       Effect.result,
@@ -301,7 +301,6 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
         ["not_limited", "nothingToReset"],
         ["already_used", "alreadyRedeemed"],
         ["ineligible", "noCredit"],
-        ["unavailable", "noCredit"],
       ] as const) {
         expect(yield* consume(claimClient(() => Response.json({ result })))).toMatchObject({
           success: outcome,
@@ -309,6 +308,8 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
       }
       for (const [response, reason] of [
         [Response.json({ result: "cooldown" }), "coolingDown"],
+        // Claude could not say whether the claim landed: the retry keeps the request id.
+        [Response.json({ result: "unavailable" }), "unconfirmed"],
         [Response.json({}, { status: 429 }), "rateLimited"],
         [Response.json({}, { status: 401 }), "signedOut"],
         [Response.json({ result: "something-new" }), "requestFailed"],
