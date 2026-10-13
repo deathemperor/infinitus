@@ -85,6 +85,24 @@ it("shows only the structured path in expanded mobile read details", () => {
   expect(withoutPath?.canExpand).toBe(false);
 });
 
+it("expands a T3 Code notice to the prompt the agent got", () => {
+  const item = {
+    ...base("restart-notice", "2026-06-20T00:00:03.000Z", 2),
+    type: "notification",
+    source: { kind: "system" },
+    outcome: "updated",
+    summary: "T3 Code restarted and resumed this turn",
+    detail: "Continue where you left off.",
+  } as OrchestrationV2TurnItem;
+  const [activity] = buildThreadFeed([projected(item, 0)]).flatMap((entry) =>
+    entry.type === "activity-group" ? entry.activities : [],
+  );
+
+  expect(activity?.summary).toBe("T3 Code restarted and resumed this turn");
+  expect(activity?.canExpand).toBe(true);
+  expect(activity?.getFullDetail()).toBe("Continue where you left off.");
+});
+
 it("labels file searches with the adapter title and its search target", () => {
   const item: OrchestrationV2TurnItem = {
     ...base("file-search", "2026-06-20T00:00:03.000Z", 2),
@@ -317,7 +335,7 @@ describe("buildThreadFeed", () => {
     expect(messageEntry).toBeDefined();
     expect(resolveUserMessagePresentation(messageEntry!.message)).toMatchObject({
       text: "Run checks",
-      isAutomation: true,
+      attribution: "automation",
     });
   });
 
@@ -1432,16 +1450,54 @@ describe("buildThreadFeed", () => {
     expect(activity?.getCopyText().split("\n")[0]).toBe("Read a T3 thread");
   });
 
-  it("uses the CUA action title in the mobile feed", () => {
+  it.each(["cua_repl.js", "node_repl.js", "js"])(
+    "uses the %s action title in the mobile feed",
+    (toolName) => {
+      const item: OrchestrationV2TurnItem = {
+        ...base("cua", "2026-09-23T20:20:00.000Z", 1),
+        type: "dynamic_tool",
+        toolName,
+        input: {
+          code: "await game.getAXStateAndScreenshot();",
+          title: "Inspect Saga music screen",
+        },
+      };
+      const feed = buildThreadFeed([projected(item, 0)]);
+      const activity = feed[0]?.type === "activity-group" ? feed[0].activities[0] : null;
+      expect(activity?.summary).toBe("Inspect Saga music screen");
+    },
+  );
+
+  it.each([
+    [
+      "failed",
+      "await sky.type_text({app:'T3 Code (Nightly)',text:'debug(ga.run)'});",
+      "Restrict the breakpoint to Git actions",
+      "computer",
+    ],
+    [
+      "completed",
+      "await fetch('http://127.0.0.1/json/list');",
+      "Discover the live Electron debugging endpoint",
+      "code",
+    ],
+  ] as const)("recovers the retained js title and %s call icon", (status, code, title, icon) => {
     const item: OrchestrationV2TurnItem = {
-      ...base("cua", "2026-09-23T20:20:00.000Z", 1),
+      ...base("retained-js", "2026-09-23T20:20:00.000Z", 1),
       type: "dynamic_tool",
-      toolName: "cua_repl.js",
-      input: { code: "await game.getAXStateAndScreenshot();", title: "Inspect Saga music screen" },
+      status,
+      title: "js",
+      toolName: "node_repl.js",
+      toolSource: { key: "mcp:node_repl", name: "node repl", kind: "integration" },
+      input: { code, title },
     };
     const feed = buildThreadFeed([projected(item, 0)]);
     const activity = feed[0]?.type === "activity-group" ? feed[0].activities[0] : null;
-    expect(activity?.summary).toBe("Inspect Saga music screen");
+    expect(activity?.summary).toBe(title);
+    expect(activity?.icon).toBe(icon);
+    expect(activity?.workEntry.toolSource?.kind).toBe(
+      icon === "computer" ? "computer" : "integration",
+    );
   });
 
   it("uses canonical T3 orchestration summaries in compact work groups", () => {

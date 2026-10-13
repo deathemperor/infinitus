@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { cursorRateModel } from "./cursorUsageReader.ts";
-import type { UsageSpeed } from "./usageTranscripts.ts";
+import { cursorRateModel } from "@infinitus/provider-cursor/server/accountUsage";
+import type { UsageSpeed } from "@infinitus/provider-core/server/usage";
 import {
   cacheSavingsUsd,
   createOverrideRateTable,

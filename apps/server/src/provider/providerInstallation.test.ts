@@ -5,7 +5,7 @@ import {
   ProviderInstanceId,
   type ProviderInstallState,
 } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -215,7 +215,7 @@ describe("provider installation routing", () => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const platform = yield* HostProcessPlatform;
+      const platform = yield* HostProcess.Platform;
       const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-provider-install-route-" });
       const binary = platform === "win32" ? "agy-test.exe" : "agy-test";
       const executable = path.join(directory, binary);
@@ -236,6 +236,27 @@ describe("provider installation routing", () => {
       yield* harness.router.remove({ instanceId });
       assert.include(harness.protectedPaths(), executable);
       assert.deepEqual(harness.calls, ["remove", "refresh"]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("keeps only the configured path when another instance's binary is missing", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-provider-install-route-" });
+      const binaryPath = path.join(directory, "missing");
+      const harness = yield* makeHarness({
+        settings: {
+          providerInstances: {
+            [ProviderInstanceId.make("antigravity-work")]: {
+              driver,
+              config: { binaryPath },
+            },
+          },
+        },
+      });
+      yield* harness.router.remove({ instanceId });
+      assert.deepEqual(harness.protectedPaths(), [binaryPath]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 });

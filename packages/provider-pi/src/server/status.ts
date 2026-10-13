@@ -23,8 +23,9 @@ import * as Stream from "effect/Stream";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
-import { HttpClient } from "effect/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as HttpClient from "effect/http/HttpClient";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import { buildPiRpcLaunch, resolvePiLaunchArgs } from "./mcpInjection.ts";
 import {
@@ -34,6 +35,7 @@ import {
   piRecordField as recordField,
   piRecordString as recordString,
 } from "./rpc.ts";
+import * as ProviderLatestVersions from "@infinitus/provider-core/server/ProviderLatestVersions";
 import {
   buildServerProvider,
   isCommandMissingCause,
@@ -99,12 +101,12 @@ function piModelsFromSettings(
   );
 }
 
-function parseDiscoveredModels(
-  data: unknown,
-  defaultThinkingLevel: unknown,
-): ReadonlyArray<ServerProviderModel> {
+function parseDiscoveredModels(data: unknown, state: unknown): ReadonlyArray<ServerProviderModel> {
   const models = recordField(data, "models");
   if (!Array.isArray(models)) return [];
+  const activeModel = recordField(state, "model");
+  const activeProvider = recordString(activeModel, "provider");
+  const activeModelId = recordString(activeModel, "id");
   const seen = new Set<string>();
   const parsed: Array<ServerProviderModel> = [];
   for (const model of models) {
@@ -119,7 +121,12 @@ function parseDiscoveredModels(
       name: recordString(model, "name") ?? slug,
       subProvider: provider,
       isCustom: false,
-      capabilities: thinkingCapabilitiesForPiModel(model, defaultThinkingLevel),
+      capabilities: thinkingCapabilitiesForPiModel(
+        model,
+        provider === activeProvider && id === activeModelId
+          ? recordString(state, "thinkingLevel")
+          : undefined,
+      ),
     });
   }
   return parsed;
@@ -165,10 +172,7 @@ const discoverPiViaRpc = (
     const commandsData = yield* connection
       .request({ type: "get_commands" })
       .pipe(Effect.orElseSucceed(() => undefined));
-    const discoveredModels = parseDiscoveredModels(
-      modelsData,
-      recordString(stateData, "thinkingLevel"),
-    );
+    const discoveredModels = parseDiscoveredModels(modelsData, stateData);
     const { slashCommands, skills } = parsePiDiscoveredCommands(commandsData);
     return {
       models: discoveredModels,
@@ -301,7 +305,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
-          ? "Pi CLI (`pi`) is not installed or not on PATH. Install with `npm install -g @earendil-works/pi-coding-agent`."
+          ? "Pi CLI (`pi`) is not installed or not on PATH. Install with `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`."
           : "Failed to execute Pi CLI health check.",
       },
     });
@@ -461,13 +465,15 @@ export const enrichPiSnapshot = (input: {
   readonly maintenanceCapabilities: ProviderMaintenanceCapabilities;
   readonly enableProviderUpdateChecks?: boolean;
   readonly publishSnapshot: (snapshot: ServerProvider) => Effect.Effect<void>;
-  readonly httpClient: HttpClient.HttpClient;
-}): Effect.Effect<void> => {
+}): Effect.Effect<
+  void,
+  never,
+  HttpClient.HttpClient | ProviderLatestVersions.ProviderLatestVersions
+> => {
   const { snapshot, publishSnapshot } = input;
   return enrichProviderSnapshotWithVersionAdvisory(snapshot, input.maintenanceCapabilities, {
     enableProviderUpdateChecks: input.enableProviderUpdateChecks,
   }).pipe(
-    Effect.provideService(HttpClient.HttpClient, input.httpClient),
     Effect.flatMap((enrichedSnapshot) => publishSnapshot(enrichedSnapshot)),
     Effect.catchCause((cause) =>
       Effect.logWarning("Pi version advisory enrichment failed", {

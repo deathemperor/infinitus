@@ -394,6 +394,8 @@ export interface ProviderAdapterV2OpenSessionInput {
 
 export interface ProviderAdapterV2EnsureThreadInput {
   readonly threadId: ThreadId;
+  /** The app thread's title, for providers that name their native sessions. */
+  readonly title?: string;
   readonly modelSelection: ModelSelection;
   readonly runtimePolicy: ProviderAdapterV2RuntimePolicy;
   readonly providerSessionId?: ProviderSessionId;
@@ -529,6 +531,13 @@ export interface ProviderAdapterV2McpApps {
   }) => Effect.Effect<{ readonly contents: ReadonlyArray<unknown> }, ProviderAdapterV2Error>;
 }
 
+/** A terminal task outcome observed by the provider, not inferred from a stop timeout. */
+export type ProviderAdapterV2SubagentOutcome = {
+  readonly status: "completed" | "failed" | "cancelled";
+  readonly completedAt: NonNullable<OrchestrationV2Subagent["completedAt"]>;
+  readonly result: OrchestrationV2Subagent["result"];
+};
+
 export interface ProviderAdapterV2SessionRuntime {
   readonly instanceId: ProviderInstanceId;
   readonly driver: ProviderDriverKind;
@@ -593,9 +602,20 @@ export interface ProviderAdapterV2SessionRuntime {
   readonly steerTurn: (
     input: ProviderAdapterV2SteerInput,
   ) => Effect.Effect<void, ProviderAdapterV2Error>;
+  readonly stopTask?: (input: {
+    readonly providerThread: OrchestrationV2ProviderThread;
+    readonly taskId: string;
+  }) => Effect.Effect<void, ProviderAdapterV2Error>;
   readonly interruptTurn: (
     input: ProviderAdapterV2InterruptInput,
   ) => Effect.Effect<void, ProviderAdapterV2Error>;
+  /** Stops one native child through its owning runtime; the owner keeps running. */
+  readonly stopSubagent?: (input: {
+    readonly providerThread: OrchestrationV2ProviderThread;
+    readonly nativeTaskId: string;
+    /** A delayed Stop must not interrupt a task resumed after this request. */
+    readonly requestedAt?: NonNullable<OrchestrationV2Subagent["startedAt"]>;
+  }) => Effect.Effect<void | ProviderAdapterV2SubagentOutcome, ProviderAdapterV2Error>;
   /**
    * Lets a runtime shared by several app threads unload one provider thread's
    * native state (and its MCP servers) when that app thread detaches, while
@@ -632,21 +652,20 @@ export interface ProviderAdapterV2SessionRuntime {
   ) => Effect.Effect<OrchestrationV2ProviderThread, ProviderAdapterV2Error>;
 }
 
-export interface ProviderAdapterV2Shape {
-  readonly instanceId: ProviderInstanceId;
-  readonly driver: ProviderDriverKind;
-  readonly getCapabilities: () => Effect.Effect<
-    OrchestrationV2ProviderCapabilities,
-    ProviderAdapterV2Error
-  >;
-  readonly planSelectionTransition: (
-    input: ProviderSelectionTransitionInput,
-  ) => Effect.Effect<ProviderSelectionTransitionPlan, ProviderAdapterV2Error>;
-  readonly openSession: (
-    input: ProviderAdapterV2OpenSessionInput,
-  ) => Effect.Effect<ProviderAdapterV2SessionRuntime, ProviderAdapterV2Error, Scope.Scope>;
-}
-
-export class ProviderAdapterV2 extends Context.Service<ProviderAdapterV2, ProviderAdapterV2Shape>()(
-  "@infinitus/provider-core/server/ProviderAdapter/ProviderAdapterV2",
-) {}
+export class ProviderAdapterV2 extends Context.Service<
+  ProviderAdapterV2,
+  {
+    readonly instanceId: ProviderInstanceId;
+    readonly driver: ProviderDriverKind;
+    readonly getCapabilities: () => Effect.Effect<
+      OrchestrationV2ProviderCapabilities,
+      ProviderAdapterV2Error
+    >;
+    readonly planSelectionTransition: (
+      input: ProviderSelectionTransitionInput,
+    ) => Effect.Effect<ProviderSelectionTransitionPlan, ProviderAdapterV2Error>;
+    readonly openSession: (
+      input: ProviderAdapterV2OpenSessionInput,
+    ) => Effect.Effect<ProviderAdapterV2SessionRuntime, ProviderAdapterV2Error, Scope.Scope>;
+  }
+>()("@infinitus/provider-core/server/ProviderAdapter/ProviderAdapterV2") {}

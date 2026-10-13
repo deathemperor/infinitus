@@ -253,6 +253,28 @@ describe("summarizeToolGroup", () => {
     ).toBe("Used Chrome integration and ran 1 command");
   });
 
+  it.each([
+    [["Foo", "Foo"], "Used Foo integration and ran 1 command"],
+    [["Foo", "Bar", "Foo"], "Used Foo and Bar integrations and ran 1 command"],
+  ] as const)(
+    "uses the displayed source names for integration plurality: %j",
+    (names, expected) => {
+      expect(
+        summarizeToolGroup([
+          ...names.map((name, index) =>
+            entry(`integration-${index}`, {
+              toolSource: { key: `integration-${index}`, name, kind: "integration" },
+            }),
+          ),
+          entry("command", {
+            itemType: "command_execution",
+            command: "git status",
+          }),
+        ]).summary,
+      ).toBe(expected);
+    },
+  );
+
   it("omits the integration suffix for special browser and computer sources", () => {
     expect(
       summarizeToolGroup([
@@ -266,6 +288,25 @@ describe("summarizeToolGroup", () => {
         }),
       ]).summary,
     ).toBe("Used Browser and Computer Use");
+  });
+
+  it("names Computer Use once when native-app and fallback sources share its label", () => {
+    expect(
+      summarizeToolGroup([
+        entry("inspect-app", {
+          label: "Inspect app",
+          toolSource: {
+            key: "native-app:com.t3tools.t3code",
+            name: "Computer Use",
+            kind: "computer",
+          },
+        }),
+        entry("failed-sky", {
+          label: "Restrict the breakpoint to Git actions",
+          toolSource: { key: "computer-use", name: "Computer Use", kind: "computer" },
+        }),
+      ]).summary,
+    ).toBe("Used Computer Use");
   });
 });
 
@@ -308,6 +349,7 @@ describe("resolveWorkEntryToolPresentation", () => {
     ["t3_thread_fork", "Forking this thread", "Requested a fork of this thread"],
     ["t3_thread_send_attachments", "Sending attachments", "Sent attachments"],
     ["run_scheduled_task_now", "Running a scheduled task", "Requested a run of a scheduled task"],
+    ["t3_workflow_stop", "Stopping a workflow", "Requested a stop for a workflow"],
   ])("labels %s through its lifecycle", (tool, running, completed) => {
     expect(resolveWorkEntryToolPresentation({ label: `T3-code.${tool}` })?.displayName).toBe(
       running,
@@ -318,6 +360,47 @@ describe("resolveWorkEntryToolPresentation", () => {
         toolLifecycleStatus: "completed",
       })?.displayName,
     ).toBe(completed);
+  });
+
+  it("summarizes workflow stop targets separately from their parent thread", () => {
+    const entry = {
+      id: "workflow-stop",
+      createdAt: "2026-10-07T00:00:00.000Z",
+      tone: "tool",
+      label: "Custom title",
+      itemType: "dynamic_tool",
+      toolLifecycleStatus: "completed",
+      toolData: {
+        server: "t3-code",
+        tool: "t3_workflow_stop",
+        arguments: { threadId: "parent", subagentId: "workflow-1" },
+        result: {},
+      },
+    } satisfies WorkLogPresentationEntry;
+    expect(
+      summarizeToolGroup([
+        entry,
+        entry,
+        {
+          ...entry,
+          toolData: {
+            ...entry.toolData,
+            arguments: { threadId: "parent", subagentId: "workflow-2" },
+          },
+        },
+        {
+          ...entry,
+          toolData: {
+            ...entry.toolData,
+            tool: "t3_thread_interrupt",
+            arguments: { threadId: "parent" },
+          },
+        },
+      ]),
+    ).toEqual({
+      summary: "Requested stops for 2 workflows and requested interrupts for 1 thread",
+      hasFailure: false,
+    });
   });
 
   it("summarizes project tools from MCP arguments and results without claiming failed effects", () => {

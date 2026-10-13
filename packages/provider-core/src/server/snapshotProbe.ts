@@ -16,9 +16,10 @@ import * as Effect from "effect/Effect";
 import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { readCustomModelEntries } from "@infinitus/shared/model";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import { createProviderVersionAdvisory } from "./maintenanceResolver.ts";
 import { collectUint8StreamText } from "./collectStreamText.ts";
 
@@ -37,7 +38,7 @@ export const isWindowsCommandNotFound = Effect.fn("isWindowsCommandNotFound")(fu
   code: number | null,
   stderr: string,
 ) {
-  const platform = yield* HostProcessPlatform;
+  const platform = yield* HostProcess.Platform;
   if (platform !== "win32") return false;
   if (code === 9009) return true;
   return WINDOWS_COMMAND_NOT_FOUND_PATTERNS.some((pattern) => pattern.test(stderr));
@@ -145,18 +146,32 @@ export function parseGenericCliVersion(output: string): string | null {
 /**
  * Append the user's custom models after the built-ins. A custom entry that
  * declares its own capabilities keeps them; a bare slug gets the driver's
- * default set. Slugs that collide with a built-in are dropped.
+ * default set. A named entry whose slug matches a built-in renames that
+ * built-in instead (for example `{ "slug": "gpt-5.5", "name": "GPT" }` in
+ * `settings.json`); other fields on such an entry are ignored.
  */
 export function providerModelsFromSettings(
   builtInModels: ReadonlyArray<ServerProviderModel>,
   customModels: ReadonlyArray<CustomModelSetting>,
-  customModelCapabilities: ModelCapabilities,
+  customModelCapabilities: ModelCapabilities | null,
 ): ReadonlyArray<ServerProviderModel> {
-  const resolvedBuiltInModels = [...builtInModels];
+  const entries = readCustomModelEntries(customModels);
+  if (entries.length === 0) return builtInModels;
+
+  const nameOverrides = new Map(
+    entries.filter((entry) => entry.name !== entry.slug).map((entry) => [entry.slug, entry.name]),
+  );
+  const resolvedBuiltInModels = builtInModels.map((model) => {
+    const name = nameOverrides.get(model.slug);
+    if (!name) return model;
+    // The built-in short name would undo the override in compact UI.
+    const { shortName: _shortName, ...rest } = model;
+    return { ...rest, name };
+  });
   const seen = new Set(resolvedBuiltInModels.map((model) => model.slug));
   const customEntries: ServerProviderModel[] = [];
 
-  for (const entry of readCustomModelEntries(customModels)) {
+  for (const entry of entries) {
     if (seen.has(entry.slug)) {
       continue;
     }

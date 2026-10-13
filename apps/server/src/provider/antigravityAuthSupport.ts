@@ -2,7 +2,7 @@
 import * as NodeFSP from "node:fs/promises";
 
 import type { AntigravityAuthMethod, ProviderInstanceId } from "@infinitus/contracts";
-import { HostProcessPlatform } from "@infinitus/shared/hostProcess";
+import * as HostProcess from "@infinitus/shared/HostProcess";
 import {
   resolveNodeExecutable,
   nodeRuntimeUnavailableMessage,
@@ -318,9 +318,14 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const platform = input.platform ?? (yield* HostProcessPlatform);
+  const platform = input.platform ?? (yield* HostProcess.Platform);
   const userHome =
-    input.userHome ?? resolveAntigravityUserHome(platform, input.baseEnv ?? process.env);
+    input.userHome ??
+    resolveAntigravityUserHome(
+      platform,
+      input.baseEnv ?? process.env,
+      yield* HostProcess.HomeDirectory,
+    );
   const runtimeExecutablePath =
     input.runtimeExecutablePath ??
     (yield* resolveNodeExecutable("Antigravity sign-in", input.baseEnv).pipe(
