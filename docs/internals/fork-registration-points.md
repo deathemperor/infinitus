@@ -70,8 +70,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   option (#1042); under upstream's no-op file system, reads below it go to
   the real disk so the feed-swap test's own `app-update.yml` is found.
 - `packages/contracts/src/rpc.ts` — `...INFINITUS_WS_METHODS` in `WS_METHODS`
-  and `...INFINITUS_RPCS` in `WsRpcGroup`, both from `infinitusRpc.ts`
-  (`fork-only-files.md`); `vcs.removeWorktree` answers
+  from `infinitusRpc.ts` (`fork-only-files.md`); upstream's group is declared
+  as `UpstreamWsRpcGroup`, and `WsRpcGroup` is its merge with
+  `InfinitusWsRpcGroup` (`InfinitusRpcs` under the scope middleware), so the
+  server builds upstream's handlers from upstream's group alone: one handler
+  object over every RPC exceeds TypeScript's instantiation limit, and the
+  `any` it then infers reaches `runServer`; `vcs.removeWorktree` answers
   `VcsRemoveWorktreeResult` (#270 A).
 - `packages/contracts/src/git.ts`, `apps/server/src/vcs/GitVcsDriverCore.ts`, `apps/web/src/hooks/useThreadActions.ts` (+ `apps/web/src/worktreeCleanup.ts`: `branchDeletionPrompt`, `describeSavedWorktreeWork`) — worktree cleanup and seeding (#270 A): `VcsRemoveWorktreeInput.keepWork` / `deleteBranch`, `VcsRemoveWorktreeResult`, `createWorktree`'s `.worktreeinclude` seeding; the `removeWorktree` mocks in `apps/server/src/mcp/WorktreeMcpService.test.ts` and `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts` answer that result shape. Rules and traps: `docs/internals/worktree-cleanup.md`.
 - `packages/contracts/src/environmentHttp.ts` — `EnvironmentHttpApi` adds
@@ -94,18 +98,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `subscribeInfinitusPairing`, `subscribeInfinitusLimitStops`,
   `subscribeInfinitusHolds` and `subscribeCaptures` in
   `EnvironmentSubscriptionRpcTag`, so the client's `subscribe` accepts them.
-- `apps/server/src/ws.ts` — pulls `InfinitusService`, `InfinitusCompanion`,
-  `InfinitusSecret`, `InfinitusPairing`, `InfinitusLimitStops`
-  (`subscribeInfinitusLimitStops` → its `stopped` stream, #648) and
-  `CaptureStore` beside the other services and answers the Infinitus
-  methods: `subscribeInfinitus` /
-  `infinitus.command`, `infinitus.launch`, `infinitus.secret` (the session's
-  id and scopes along), the pairing stream and `decide` (the approver's
-  session scopes go along; only the request id reaches the span);
-  `subscribeCaptures` / `captures.apply` (#433; the project id and the
-  command's type reach the span, a capture's text never); `server.getStats`
-  → `usage.readStats` (#659); `subscribeInfinitusHolds` /
-  `infinitus.releaseThread` (#616, #743) from `InfinitusSessionHolds`.
+- `apps/server/src/ws.ts` — builds upstream's handlers from
+  `UpstreamWsRpcGroup` and routes the merged `WsRpcGroup`
+  (`FullServerWsRpcGroup`); `layerInfinitusWsRpc`
+  (`infinitus/Layers/InfinitusWsRpc.ts`, `fork-only-files.md`) is merged
+  beside `layerWsRpc`, and the Infinitus handlers live there, never in
+  upstream's handler object (see `rpc.ts` above).
 - `packages/client-runtime/src/state/server.ts` — the `serverEnvironment.stats`
   query atom family over `server.getStats` (#659), refreshed with the usage
   prices.

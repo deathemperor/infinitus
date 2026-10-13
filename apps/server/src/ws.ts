@@ -100,6 +100,7 @@ import {
   type TerminalMetadataStreamEvent,
   type PullRequestRef,
   WS_METHODS,
+  UpstreamWsRpcGroup,
   WsRpcGroup,
 } from "@infinitus/contracts";
 import { resolveServerBackgroundActivitySettings } from "@infinitus/shared/backgroundActivitySettings";
@@ -114,13 +115,7 @@ import { RpcSerialization, RpcServer } from "effect/rpc";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
-import { InfinitusService } from "./infinitus/Services/Infinitus.ts";
-import { InfinitusCompanion } from "./infinitus/Services/InfinitusCompanion.ts";
-import { InfinitusSecret } from "./infinitus/Services/InfinitusSecret.ts";
-import { InfinitusSessionHolds } from "./infinitus/Services/InfinitusSessionHolds.ts";
-import { InfinitusPairing } from "./infinitus/Services/InfinitusPairing.ts";
-import { InfinitusLimitStops } from "./infinitus/Services/InfinitusLimitStops.ts";
-import { CaptureStore } from "./captures/CaptureStore.ts";
+import { layerInfinitusWsRpc } from "./infinitus/Layers/InfinitusWsRpc.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ThreadManagementService from "./orchestration-v2/ThreadManagementService.ts";
@@ -557,7 +552,10 @@ function projectFileFailureContext(
 const PROVIDER_STATUS_DEBOUNCE_MS = 200;
 
 // Middleware added later wraps middleware added earlier, so instrumentation wraps authorization.
-const ServerWsRpcGroup = WsRpcGroup.middleware(RpcInstrumentation);
+// Fork: upstream's handlers come from upstream's group alone (`InfinitusWsRpc.ts`
+// answers the fork's); the server routes the merged group.
+const ServerWsRpcGroup = UpstreamWsRpcGroup.middleware(RpcInstrumentation);
+const FullServerWsRpcGroup = WsRpcGroup.middleware(RpcInstrumentation);
 // When a resuming client's cursor is more than this many events behind the
 // current head, skip the per-event catch-up replay and send a fresh shell
 // snapshot instead. Replaying each intervening event costs a shell refetch;
@@ -1266,14 +1264,6 @@ const layerWsRpc = (
             );
       const usage = yield* UsageService.UsageService;
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
-      const infinitus = yield* InfinitusService;
-      const infinitusCompanion = yield* InfinitusCompanion;
-      const infinitusSecret = yield* InfinitusSecret;
-      const infinitusPairing = yield* InfinitusPairing;
-      const infinitusLimitStops = yield* InfinitusLimitStops;
-      // Fork (#616, #743): the holds stream and "Run now".
-      const infinitusSessionHolds = yield* InfinitusSessionHolds;
-      const captureStore = yield* CaptureStore;
       const projectSetupScriptRunner = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
       const worktreeSetupTracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
       const projectCloneTracker = yield* ProjectCloneTracker.ProjectCloneTracker;
@@ -2452,7 +2442,6 @@ const layerWsRpc = (
           processResourceMonitor.readHistory(input),
         [WS_METHODS.serverGetResourceTelemetryHistory]: (input) =>
           resourceTelemetry.readHistory(input),
-        [WS_METHODS.serverGetStats]: (input) => usage.readStats(input),
         [WS_METHODS.serverGetUsageSummary]: (input) => usage.readSummary(input),
         [WS_METHODS.serverRefreshUsageRates]: (_input) => usage.refreshRates,
         [WS_METHODS.serverRetryResourceTelemetry]: (_input) => resourceTelemetry.retry,
@@ -3160,38 +3149,6 @@ const layerWsRpc = (
               Stream.concat(Stream.make(latest), changes),
             ),
           ),
-        // The stream itself is what makes the server poll the control socket,
-        // so this must stay the only way a client reads Infinitus.
-        [WS_METHODS.subscribeInfinitus]: (input) => infinitus.changes(input),
-        [WS_METHODS.infinitusCommand]: (input) =>
-          infinitus
-            .command(input)
-            // `result` is an optional key: a command that answers with no
-            // payload sends no key rather than an explicit undefined.
-            .pipe(Effect.map((result) => (result === undefined ? {} : { result }))),
-        [WS_METHODS.infinitusLaunch]: (_input) => infinitusCompanion.launch,
-        [WS_METHODS.infinitusSecret]: (input) =>
-          infinitusSecret.forward({
-            ...input,
-            sessionId: currentSession.sessionId,
-            scopes: currentSession.scopes,
-          }),
-        [WS_METHODS.subscribeInfinitusPairing]: (_input) => infinitusPairing.pending,
-        // The threads a Claude usage limit stopped (#648, #1627): the sidebar's
-        // "Limited" pill for a parked turn. Thread ids, accounts and resets only.
-        [WS_METHODS.subscribeInfinitusLimitStops]: (_input) => infinitusLimitStops.stopped,
-        [WS_METHODS.infinitusPairingDecide]: (input) =>
-          infinitusPairing.decide({ ...input, approverScopes: currentSession.scopes }),
-        // Session priority mode (#616, #741, #743): the threads held for
-        // headroom and paused for it, one whole list; "Run now" / "Resume now".
-        [WS_METHODS.subscribeInfinitusHolds]: (_input) => infinitusSessionHolds.held,
-        [WS_METHODS.infinitusReleaseThread]: (input) =>
-          infinitusSessionHolds.release(input.threadId),
-        // Captures (#433): one list per project.
-        [WS_METHODS.subscribeCaptures]: (input) =>
-          Stream.unwrap(captureStore.subscribe(input.projectId)),
-        [WS_METHODS.capturesApply]: (input) =>
-          captureStore.apply(input.projectId, input.command).pipe(Effect.as({})),
       });
       return handlers;
     }),
@@ -3249,7 +3206,7 @@ export const layer = Layer.unwrap(
         yield* analytics.record("client.connected", clientAnalyticsProps);
         const rpcWebSocketHttpEffect = yield* Effect.gen(function* () {
           const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket;
-          yield* RpcServer.make(ServerWsRpcGroup, WS_RPC_SERVER_OPTIONS).pipe(
+          yield* RpcServer.make(FullServerWsRpcGroup, WS_RPC_SERVER_OPTIONS).pipe(
             Effect.provideService(RpcServer.Protocol, withTerminalOutputWindow(protocol)),
             Effect.provide(
               Layer.merge(RpcAuthorization.layer(session.scopes), rpcInstrumentationLayer),
@@ -3260,12 +3217,16 @@ export const layer = Layer.unwrap(
           return httpEffect;
         }).pipe(
           Effect.provide(
-            layerWsRpc(
-              session,
-              clientOrigin,
-              clientAnalyticsProps,
-              previewAutomationBroker,
-              serverBrowser,
+            Layer.merge(
+              layerWsRpc(
+                session,
+                clientOrigin,
+                clientAnalyticsProps,
+                previewAutomationBroker,
+                serverBrowser,
+              ),
+              // Fork: the Infinitus handlers, beside upstream's.
+              layerInfinitusWsRpc(session),
             ).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
               // Request fibers run in the handlers' context, so this reporter sees

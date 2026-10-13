@@ -76,7 +76,7 @@ import {
   ClientActivityReportInput,
   HostPowerSnapshot,
 } from "./background.ts";
-import { INFINITUS_RPCS, INFINITUS_WS_METHODS } from "./infinitusRpc.ts";
+import { INFINITUS_WS_METHODS, InfinitusRpcs } from "./infinitusRpc.ts";
 import {
   FilesystemGetMetadataInput,
   FilesystemGetMetadataResult,
@@ -1879,7 +1879,7 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
   { error: EnvironmentAuthorizationError },
 ) {}
 
-export const WsRpcGroup = RpcGroup.make(
+export const UpstreamWsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,
@@ -2058,7 +2058,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeAuthAccessRpc,
   WsSubscribeBackgroundPolicyRpc,
   WsSubscribeResourceTelemetryRpc,
-  ...INFINITUS_RPCS,
   WsOrchestrationV2DispatchCommandRpc,
   WsOrchestrationV2GetWorkflowScriptRpc,
   WsOrchestrationV2StopWorkflowRpc,
@@ -2075,3 +2074,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeShellRpc,
   WsOrchestrationV2SubscribeThreadRpc,
 ).middleware(RpcScopeAuthorization);
+
+// Fork: the Infinitus RPCs join as their own group (`infinitusRpc.ts`), so the
+// server builds upstream's handlers from `UpstreamWsRpcGroup` alone.
+export const InfinitusWsRpcGroup = InfinitusRpcs.middleware(RpcScopeAuthorization);
+export const WsRpcGroup = UpstreamWsRpcGroup.merge(InfinitusWsRpcGroup);
