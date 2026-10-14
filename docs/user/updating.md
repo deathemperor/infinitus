@@ -16,9 +16,13 @@ installs the latest release from its own channel. Hover the button to see what
 it will update.
 
 Server updates appear only after that version is published to npm. Remote
-desktop apps do not wait for npm. Servers that need
-a manual update are not included. Use the notice or **Settings → Connections**
-for those.
+desktop apps do not wait for npm. The confirmation lists each machine it skips
+and why, such as a machine that is offline or needs a manual update. Use the
+notice or **Settings → Connections** for those.
+
+If a desktop app restarts on its old version, Infinitus tells you the update did
+not apply. It does not install that version again on its own, even when another
+device asks. Use the update button on that machine to retry.
 
 The confirmation counts the running threads that the restarts will interrupt,
 and how many can resume afterwards. See **Continue threads after restarts**
@@ -37,6 +41,9 @@ different value, use **Apply to all** in Settings after it connects.
 Infinitus must start again on that machine;
 the setting does not enable automatic startup. Terminal commands may still be
 interrupted, and threads without saved provider resume state need a new message.
+A thread that finished its turn to wait on a monitor, subagent, or background task
+is woken and told that this work stopped. A background shell, such as a dev server,
+does not wake it; the thread learns about it with your next message.
 A thread is not resumed while it waits for your approval, answer, or secret, or
 while it is archived, snoozed, or settled. After three automatic resumes in a row,
 the thread waits for your next message.
@@ -92,6 +99,10 @@ update can roll back to the previous version. If the update still fails:
 2. Check that you updated the server's machine, not only the device you are using.
 3. For a command-line server, stop it and relaunch the exact version shown in the notice.
 
+Only one server can use an Infinitus home directory at a time. If startup reports that
+another server owns it, stop that server before retrying, or use a separate home
+directory and pair with the running server.
+
 ## Update providers
 
 **Settings → Providers** shows provider updates for the selected environment.
@@ -111,7 +122,9 @@ The same page lets you refresh provider status and update supported providers.
 These controls require a connected environment and permission to operate it.
 Provider update checks and restart continuation preferences are in
 **Settings → Maintenance**. If provider update checks are disabled, enable them
-there before refreshing to find newer versions.
+there before refreshing to find newer versions. The same setting controls whether
+Infinitus downloads model catalog updates, so with it off new models may not appear
+until you enable it and refresh provider status.
 
 Install App Store or Google Play releases as usual. The mobile app can also
 download updates in the background and apply them when you next leave the app.
