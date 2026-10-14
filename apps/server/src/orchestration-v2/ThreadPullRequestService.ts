@@ -275,7 +275,10 @@ export const make = Effect.gen(function* () {
           if (updates.length === 0) return;
 
           if (detected !== null && first.branch !== null) {
-            const current = yield* git.branchPullRequest({ cwd, branch: first.branch });
+            const current = yield* git.branchPullRequest(
+              { cwd, branch: first.branch },
+              { freshGitState: true },
+            );
             const currentIdentity = yield* repositoryIdentities.resolve(project.workspaceRoot, {
               refresh: true,
             });
@@ -305,7 +308,7 @@ export const make = Effect.gen(function* () {
                 if (!projectWorkspaceMatchesSnapshot(currentProject, project.workspaceRoot)) {
                   return failBackfill([thread]);
                 }
-                const uuid = yield* crypto.randomUUIDv4;
+                const uuid = yield* crypto.randomUUIDv4();
                 yield* orchestrator.dispatch({
                   type: "thread.pull-request.sync",
                   commandId: CommandId.make(`server:thread-pull-request:${thread.id}:${uuid}`),
