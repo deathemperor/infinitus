@@ -98,6 +98,7 @@ export function shouldPublishAgentAwarenessEvent(
     case "thread.unarchived":
     case "thread.deleted":
     case "thread.metadata-updated":
+    case "thread.pull-request-link-updated":
     case "thread.pull-request-synced":
     case "thread.model-selection-updated":
     case "thread.provider-switched":
@@ -490,7 +491,7 @@ export const make = Effect.gen(function* () {
           environmentId,
           threadId,
           state: input.state,
-          jti: yield* crypto.randomUUIDv4,
+          jti: yield* crypto.randomUUIDv4(),
         });
 
         yield* Effect.logInfo("publishing agent activity for thread", {
