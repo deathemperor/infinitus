@@ -19,11 +19,16 @@ const APP_DISPLAY_NAME = isDevelopment ? "Infinitus (Dev)" : "Infinitus";
 const APP_BUNDLE_ID = isDevelopment
   ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
   : "com.t3tools.t3code";
+<<<<<<< HEAD
 // Mirrors DESKTOP_URL_SCHEME / DESKTOP_DEV_URL_SCHEME in
 // packages/shared/src/desktopIdentity.ts — a plain node script cannot import
 // the workspace's TypeScript. Keep the two in step.
 const APP_PROTOCOL_SCHEMES = isDevelopment ? ["infinitus-dev"] : ["infinitus"];
 const LAUNCHER_VERSION = 19;
+=======
+const APP_PROTOCOL_SCHEMES = isDevelopment ? ["t3code-dev"] : ["t3code"];
+const LAUNCHER_VERSION = 20;
+>>>>>>> upstream-sync-9fb4ddb2d-upstream-renamed
 const developmentMacIconPngPath = NodePath.join(
   repoRoot,
   "assets",
@@ -283,6 +288,8 @@ function patchMainBundleInfoPlist(appBundlePath, iconPath, executableName) {
   for (const [key, value] of Object.entries(resolveMacBundleInfoPlistStrings(executableName))) {
     setPlistString(infoPlistPath, key, value);
   }
+  // macOS 26 offers Messages/Mail codes in every text field unless opted out.
+  setPlistJson(infoPlistPath, "NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac", true);
   setPlistJson(infoPlistPath, "CFBundleURLTypes", [
     {
       CFBundleURLName: APP_BUNDLE_ID,

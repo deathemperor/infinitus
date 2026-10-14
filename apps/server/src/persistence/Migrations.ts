@@ -63,6 +63,7 @@ import Migration0047 from "./Migrations/047_ProjectionProjectIcon.ts";
 import Migration0048 from "./Migrations/048_ProjectionThreadBranchPullRequest.ts";
 import Migration0049 from "./Migrations/049_ProjectionThreadsActiveOrderKey.ts";
 import Migration0050 from "./Migrations/050_ProjectionThreadPullRequests.ts";
+<<<<<<< HEAD
 import Migration0051 from "./Migrations/051_ProjectionThreadQueuedTurns.ts";
 import Migration0052 from "./Migrations/052_ProjectionThreadsBabysit.ts";
 import Migration0053 from "./Migrations/053_ProjectionThreadsSideOf.ts";
@@ -84,6 +85,20 @@ import Migration0068 from "./Migrations/068_WebhookRelayDeliveries.ts";
 import Migration0069 from "./Migrations/069_McpAppModelContext.ts";
 import Migration0070 from "./Migrations/070_ThreadSnapshotWindowIndexes.ts";
 import Migration0071 from "./Migrations/071_PullRequestReviewGuides.ts";
+=======
+import Migration0051 from "./Migrations/051_ProjectionThreadMessageContext.ts";
+import Migration0052 from "./Migrations/052_ProjectionThreadTitleState.ts";
+import Migration0053 from "./Migrations/053_PullRequestFilesViewed.ts";
+import Migration0054 from "./Migrations/054_ProjectionThreadsAutoSettleDisabledAt.ts";
+import Migration0055 from "./Migrations/055_OrchestrationV2.ts";
+import Migration0056 from "./Migrations/056_RemoveRedundantProjectionIndexes.ts";
+import Migration0057 from "./Migrations/057_ScheduledTaskWebhooks.ts";
+import Migration0058 from "./Migrations/058_WebhookRelayDeliveries.ts";
+import Migration0059 from "./Migrations/059_McpAppModelContext.ts";
+import Migration0060 from "./Migrations/060_ThreadSnapshotWindowIndexes.ts";
+import Migration0061 from "./Migrations/061_PullRequestReviewGuides.ts";
+import Migration0062 from "./Migrations/062_ThreadFailureLookupIndex.ts";
+>>>>>>> upstream-sync-9fb4ddb2d-upstream-renamed
 
 /**
  * Migration loader with all migrations defined inline.
@@ -164,6 +179,7 @@ export const migrationEntries = [
   // reconcileV2PreviewMigration (OrchestrationV2 released as 53 and 54 in its previews)
   // is not carried: no fork database ever recorded those, and 53 and 54 are taken here.
   // Preserve this migration's schema. Future V2 schema changes need new migrations.
+<<<<<<< HEAD
   [65, "OrchestrationV2", Migration0065],
   [66, "RemoveRedundantProjectionIndexes", Migration0066],
   [67, "ScheduledTaskWebhooks", Migration0067],
@@ -171,6 +187,16 @@ export const migrationEntries = [
   [69, "McpAppModelContext", Migration0069],
   [70, "ThreadSnapshotWindowIndexes", Migration0070],
   [71, "PullRequestReviewGuides", Migration0071],
+=======
+  [55, "OrchestrationV2", Migration0055],
+  [56, "RemoveRedundantProjectionIndexes", Migration0056],
+  [57, "ScheduledTaskWebhooks", Migration0057],
+  [58, "WebhookRelayDeliveries", Migration0058],
+  [59, "McpAppModelContext", Migration0059],
+  [60, "ThreadSnapshotWindowIndexes", Migration0060],
+  [61, "PullRequestReviewGuides", Migration0061],
+  [62, "ThreadFailureLookupIndex", Migration0062],
+>>>>>>> upstream-sync-9fb4ddb2d-upstream-renamed
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
