@@ -2202,6 +2202,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       args: candidate.args ?? [],
       name: "terminal",
       env: spawnEnv,
+      survivesRestart: true,
     });
     const attempt = yield* Effect.result(
       options.ptyAdapter.spawn({

@@ -146,11 +146,17 @@ export function resolveThreadListV2SwipeActions(input: {
 export function resolveThreadListV2SnoozeGateExpiryMs(
   thread: Pick<
     EnvironmentThreadShell,
-    "hasPendingApprovals" | "hasPendingUserInput" | "latestRun" | "latestUserMessageAt" | "runtime"
+    | "hasPendingApprovals"
+    | "hasPendingUserInput"
+    | "pendingSubagentRequest"
+    | "latestRun"
+    | "latestUserMessageAt"
+    | "runtime"
   >,
   options: { readonly now: string },
 ): number | null {
   if (thread.hasPendingApprovals || thread.hasPendingUserInput) return null;
+  if (thread.pendingSubagentRequest != null) return null;
   if (!hasQueuedTurnStart(thread, options)) return null;
   const messageAtMs = Date.parse(thread.latestUserMessageAt ?? "");
   if (Number.isNaN(messageAtMs)) return null;
@@ -185,6 +191,7 @@ export function threadHasUnseenCompletion(
 }
 
 export function resolveThreadListV2Status(
+<<<<<<< HEAD
   thread: Pick<EnvironmentThreadShell, "hasPendingApprovals" | "hasPendingUserInput" | "runtime">,
   options?: {
     /** Fork (#648): the server lists the thread among its limit stops. A
@@ -195,11 +202,17 @@ export function resolveThreadListV2Status(
         for headroom, or paused for it, outrank working since nothing runs. */
     readonly hold?: "held" | "paused" | null;
   },
+=======
+  thread: Pick<
+    EnvironmentThreadShell,
+    "hasPendingApprovals" | "hasPendingUserInput" | "pendingSubagentRequest" | "runtime"
+  >,
+>>>>>>> upstream-sync-339179f50-upstream-renamed
 ): ThreadListV2Status {
-  if (thread.hasPendingApprovals) {
+  if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
     return "approval";
   }
-  if (thread.hasPendingUserInput) {
+  if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
     return "input";
   }
   if (options?.limitStopped === true) {

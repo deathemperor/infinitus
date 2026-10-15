@@ -19,6 +19,7 @@ import { claudeTurnUsageDelta, type ClaudeResultTotals } from "./claudeTurnUsage
 import {
   type CanUseTool,
   forkSession as forkClaudeSession,
+  type EffortLevel,
   type ForkSessionOptions,
   type ForkSessionResult,
   getSubagentMessages,
@@ -29,6 +30,8 @@ import {
   type PermissionUpdate,
   type Query as ClaudeQuery,
   type Settings as ClaudeSdkSettings,
+  type SpawnOptions as ClaudeSpawnOptions,
+  type SpawnedProcess as ClaudeSpawnedProcess,
   type SDKAssistantMessage,
   type SDKAPIRetryMessage,
   type SDKMessage,
@@ -40,6 +43,8 @@ import type {
   AskUserQuestionInput,
   WebSearchOutput,
 } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- the SDK takes a Node ChildProcess for the CLI.
+import * as NodeChildProcess from "node:child_process";
 import { parseCliArgs } from "@infinitus/shared/cliArgs";
 import { AgentScope } from "@infinitus/shared/AgentScope";
 import * as HostProcess from "@infinitus/shared/HostProcess";
@@ -106,9 +111,13 @@ import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { resolveClaudeSdkExecutablePath } from "../../provider/Drivers/ClaudeExecutable.ts";
 import { planClaudeSkillDispatch } from "../../provider/Drivers/ClaudeSkillDispatch.ts";
 import { discoverClaudeSkills } from "../../provider/Drivers/ClaudeSkills.ts";
-import { compileClaudeModelSelection } from "../../claudeModelOptions.ts";
+import {
+  compileClaudeModelSelection,
+  type CompiledClaudeModelSelection,
+} from "../../claudeModelOptions.ts";
 import * as ServerConfig from "../../config.ts";
 import { expandHomePath } from "@infinitus/provider-core/server/pathExpansion";
+import { signalProcessGroup } from "@infinitus/provider-core/server/processGroup";
 import {
   claudeSignedOutMessage,
   makeClaudeEnvironment,
@@ -225,6 +234,37 @@ const CLAUDE_SCRIPT_EXTENSIONS = [".js", ".mjs", ".tsx", ".ts", ".jsx"];
 // The SDK puts no deadline on control requests. The CLI answers
 // mcp_set_servers once each server connected or hit its own 30 s timeout.
 const CLAUDE_MCP_REGISTRATION_TIMEOUT = "90 seconds";
+
+/**
+ * Starts the Claude CLI as the leader of its own process group. When the CLI
+ * exits it stops the MCP servers it started, but not their children: a
+ * plugin's `bun run start` wrapper dies and its `bun server.ts` keeps running,
+ * writing to a pipe nobody reads (#3089). Those stay in the CLI's group, so
+ * the rest of the group gets SIGKILL once the CLI exits for any reason.
+ * Commands the agent runs through its Bash tool start their own groups, so
+ * background jobs it launched are not part of this.
+ *
+ * The SDK reads stderr only from its own spawn, where it redacts credentials
+ * before adding the tail to exit errors. Here stderr is dropped instead, so
+ * exit errors carry only the code or signal.
+ */
+function spawnClaudeProcessGroup(options: ClaudeSpawnOptions): ClaudeSpawnedProcess {
+  const child = NodeChildProcess.spawn(options.command, options.args, {
+    cwd: options.cwd,
+    env: options.env,
+    signal: options.signal,
+    stdio: ["pipe", "pipe", "ignore"],
+    detached: true,
+  });
+  child.once("exit", () => {
+    try {
+      signalProcessGroup(child.pid ?? 0, "SIGKILL");
+    } catch {
+      // The group is already empty.
+    }
+  });
+  return child;
+}
 
 export const ClaudeProviderCapabilitiesV2 = {
   sessions: {
@@ -379,6 +419,9 @@ export interface ClaudeAgentSdkQuerySession {
   readonly messages: Stream.Stream<SDKMessage, ClaudeAgentSdkQueryRunnerError>;
   readonly offer: (message: SDKUserMessage) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly setModel: (model: string) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
+  readonly applyFlagSettings: (
+    settings: ClaudeFlagSettings,
+  ) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
   readonly setPermissionMode: (
     mode: PermissionMode,
   ) => Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
@@ -526,6 +569,14 @@ export type ClaudeAgentSdkProtocolLogEvent =
       readonly direction: "outgoing";
       readonly stage: "decoded";
       readonly payload: {
+        readonly type: "query.apply_flag_settings";
+        readonly settings: ClaudeFlagSettings;
+      };
+    }
+  | {
+      readonly direction: "outgoing";
+      readonly stage: "decoded";
+      readonly payload: {
         readonly type: "query.set_permission_mode";
         readonly mode: PermissionMode;
       };
@@ -662,11 +713,12 @@ export const layerQueryRunner: Layer.Layer<
     const crypto = yield* Crypto.Crypto;
     const { native: nativeEventLogger } = yield* ProviderEventLoggers.ProviderEventLoggers;
     const agentScope = yield* AgentScope;
+    const platform = yield* HostProcess.Platform;
 
     return ClaudeAgentSdkQueryRunner.of({
-      allocateSessionId: crypto.randomUUIDv4.pipe(
-        Effect.mapError((cause) => queryRunnerError(cause, "allocateSessionId")),
-      ),
+      allocateSessionId: crypto
+        .randomUUIDv4()
+        .pipe(Effect.mapError((cause) => queryRunnerError(cause, "allocateSessionId"))),
       open: Effect.fn("ClaudeAgentSdkQueryRunner.open")(function* (
         input: ClaudeAgentSdkQueryOpenInput,
       ) {
@@ -690,9 +742,8 @@ export const layerQueryRunner: Layer.Layer<
         // of the environment every command the agent runs inherits.
         const { mcpServers, ...queryOptions } = input.options;
         // The SDK spawns a native binary as `path ...executableArgs ...sdkArgs`,
-        // which lets the agent scope wrapper go in front of the CLI while the
-        // SDK keeps its own stderr capture and exit reporting. The SDK runs a
-        // script entry through node instead, so those launch unwrapped.
+        // which lets the agent scope wrapper go in front of the CLI. The SDK
+        // runs a script entry through node instead, so those launch unwrapped.
         const binaryPath = queryOptions.pathToClaudeCodeExecutable;
         const launch =
           binaryPath === undefined ||
@@ -713,11 +764,23 @@ export const layerQueryRunner: Layer.Layer<
                 pathToClaudeCodeExecutable: launch.command,
                 executableArgs: [...launch.args, ...(queryOptions.executableArgs ?? [])],
               };
+        // A spawner the caller passed keeps its process. Windows has no process
+        // groups, so there the SDK spawns the CLI itself.
+        const spawnClaudeCodeProcess =
+          options.spawnClaudeCodeProcess ??
+          (platform === "win32" ? undefined : spawnClaudeProcessGroup);
         // The CLI is running once query() returns, so it is closed if anything
         // before the session is handed out fails or is interrupted.
         const queryRuntime = yield* Effect.uninterruptibleMask((restore) =>
           Effect.try({
-            try: () => query({ prompt, options }),
+            try: () =>
+              query({
+                prompt,
+                options:
+                  spawnClaudeCodeProcess === undefined
+                    ? options
+                    : { ...options, spawnClaudeCodeProcess },
+              }),
             catch: (cause) => queryRunnerError(cause, "query"),
           }).pipe(
             Effect.tap((queryRuntime) =>
@@ -810,6 +873,22 @@ export const layerQueryRunner: Layer.Layer<
                   payload: {
                     type: "query.set_model",
                     model,
+                  },
+                }),
+              ),
+            ),
+          applyFlagSettings: (settings) =>
+            Effect.tryPromise({
+              try: () => queryRuntime.applyFlagSettings(settings),
+              catch: (cause) => queryRunnerError(cause, "applyFlagSettings"),
+            }).pipe(
+              Effect.tap(() =>
+                logProtocolEvent({
+                  direction: "outgoing",
+                  stage: "decoded",
+                  payload: {
+                    type: "query.apply_flag_settings",
+                    settings,
                   },
                 }),
               ),
@@ -945,6 +1024,37 @@ export const layerQueryRunner: Layer.Layer<
     });
   }),
 );
+
+type ClaudeFlagSettings = Parameters<ClaudeQuery["applyFlagSettings"]>[0];
+
+/**
+ * Thinking is a launch flag (`--thinking`), so only a new process can change
+ * it. Clearing an explicit effort also needs one: the live reset goes to the
+ * model default, while a new process reads the user's settings files.
+ */
+function canApplyClaudeSelectionLive(
+  live: CompiledClaudeModelSelection,
+  next: CompiledClaudeModelSelection,
+): boolean {
+  return (
+    live.settings.alwaysThinkingEnabled === next.settings.alwaysThinkingEnabled &&
+    (next.effort !== undefined || live.effort === undefined)
+  );
+}
+
+/**
+ * Flag settings that move a live process to `selection`. `null` clears a key
+ * a new process for `selection` would not set.
+ */
+function claudeLiveSelectionFlagSettings(
+  selection: CompiledClaudeModelSelection,
+): ClaudeFlagSettings {
+  return {
+    ...(selection.effort === undefined ? {} : { effortLevel: selection.effort as EffortLevel }),
+    fastMode: selection.settings.fastMode ?? null,
+    ultracode: selection.settings.ultracode ?? null,
+  };
+}
 
 export function makeClaudeQueryOptions(input: {
   readonly modelSelection: ModelSelection;
@@ -1175,7 +1285,9 @@ function textFromClaudeContent(content: SDKAssistantMessage["message"]["content"
 }
 
 // Claude 5.1 and later return the text written ahead of a tool call as a
-// thinking block, at most one per call, instead of a text block.
+// thinking block, at most one per call, instead of a text block. Summarized
+// display makes it look like reasoning, so only the second of two thinking
+// blocks right before a tool call is treated as that text.
 function claudeWritesUpdatesAsThinking(model: string): boolean {
   const match = /claude-[a-z]+-(\d+)(?:-(\d{1,2}))?(?!\d)/u.exec(model);
   if (match === null) return false;
@@ -2930,6 +3042,7 @@ interface ActiveClaudeTurnContext {
       readonly messageId: string;
       readonly itemId: string;
       readonly text: string;
+      readonly followsThinking: boolean;
     } | null;
     readonly blocks: Map<
       string,
@@ -2943,6 +3056,9 @@ interface ActiveClaudeTurnContext {
   readonly rejectedRateLimitTypes: Set<string>;
   readonly rateLimitResetTimes: Map<string, string | null>;
   latestAssistantRateLimited: boolean;
+  // Usage of the results that steers ended, oldest first. The final result's
+  // usage covers only its own segment, so the turn bills these as well.
+  readonly steeredSegmentUsage: Array<SDKResultMessage["usage"]>;
   readonly subagentsByTaskId: Map<string, ActiveClaudeSubagent>;
   readonly subagentsByToolUseId: Map<string, ActiveClaudeSubagent>;
   readonly subagentNodesByTaskId: Map<string, OrchestrationV2ExecutionNode["id"]>;
@@ -3001,7 +3117,8 @@ interface ClaudeLiveQueryContext {
   readonly nativeThreadId: string;
   readonly query: ClaudeAgentSdkQuerySession;
   readonly queryPolicyKey: string;
-  readonly selectionKey: string;
+  // The selection this process runs now. Live changes update it.
+  selection: CompiledClaudeModelSelection;
   readonly closed: Deferred.Deferred<void, never>;
   // Retained for process-exit cleanup even when its last turn failed.
   lastTurn: ActiveClaudeTurnContext | null;
@@ -5972,6 +6089,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     input.context.subagentsByTaskId.size > 0 ||
                       input.context.subagentsByToolUseId.size > 0,
                     input.status,
+                    input.context.steeredSegmentUsage,
                   ),
                   ...(turnUsageDelta.turnCostUsd === undefined
                     ? {}
@@ -6918,7 +7036,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 context.reasoning.lastThinking = null;
                 if (
                   block.type === "tool_use" &&
-                  update?.messageId === message.message.id &&
+                  update !== null &&
+                  update.messageId === message.message.id &&
+                  update.followsThinking &&
                   claudeWritesUpdatesAsThinking(message.message.model)
                 ) {
                   // Same item ID, so the update replaces the Thought in place.
@@ -6935,14 +7055,20 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               const itemId = `${message.message.id}:thinking:${index}`;
               yield* ensureReasoningBlock(context, itemId);
               const finalText = block.thinking || context.reasoning.blocks.get(itemId)?.text;
-              yield* reasoningDeltas.complete({
+              const completedText = yield* reasoningDeltas.complete({
                 turnId: context.nativeTurnId,
                 itemId,
                 ...(finalText ? { finalText } : {}),
                 emitEmpty: false,
               });
-              context.reasoning.lastThinking = finalText
-                ? { messageId: message.message.id, itemId, text: finalText }
+              const previous = context.reasoning.lastThinking;
+              context.reasoning.lastThinking = completedText.trim()
+                ? {
+                    messageId: message.message.id,
+                    itemId,
+                    text: completedText,
+                    followsThinking: previous !== null && previous.messageId === message.message.id,
+                  }
                 : null;
             }
           }
@@ -7754,6 +7880,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             const interrupted = (yield* Ref.get(interruptedTurns)).has(context.providerTurnId);
             const wasSteered = (yield* Ref.get(steeredTurns)).has(context.providerTurnId);
             if (!interrupted && wasSteered && isClaudeActiveSteeringAbortResult(message)) {
+              context.steeredSegmentUsage.push(message.usage);
               return;
             }
             yield* Ref.update(steeredTurns, (current) => {
@@ -7767,12 +7894,28 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               (message.subtype !== "success" ||
                 message.api_error_status == null ||
                 message.api_error_status === 429) &&
+<<<<<<< HEAD
               (message.terminal_reason == null || message.terminal_reason === "api_error");
             const failureHint =
               context.authenticationFailureMessage ??
               (usageLimited
                 ? "Claude usage limit reached. Send the message again once the limit resets."
                 : undefined);
+=======
+              (message.terminal_reason == null ||
+                message.terminal_reason === "api_error" ||
+                message.terminal_reason === "blocking_limit");
+            // The CLI also labels a 403 authentication_failed. Logging in again
+            // can't grant a permission, so show the CLI's own text instead.
+            const permissionDenied =
+              message.subtype === "success" && message.api_error_status === 403;
+            const failureHint = permissionDenied
+              ? message.result
+              : (context.authenticationFailureMessage ??
+                (usageLimited
+                  ? "Claude usage limit reached. Send the message again once the limit resets."
+                  : undefined));
+>>>>>>> upstream-sync-339179f50-upstream-renamed
             const resetTimes = Array.from(context.rateLimitResetTimes.values());
             const resetAt =
               resetTimes.length > 0 && resetTimes.every((time) => time !== null)
@@ -8391,12 +8534,41 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           ) {
             return existing;
           }
+          // Model, effort, ultracode and fast mode change on the live process.
+          // A restart would kill its background agents and shells.
           if (
             existing !== null &&
             existing.nativeThreadId === nativeThreadId &&
             existing.queryPolicyKey === queryPolicyKey &&
+<<<<<<< HEAD
             existing.selectionKey === compiledSelection.queryIdentity &&
             !(existing.spentOnLimit && !(yield* liveProcessRunsBackgroundWork(existing)))
+=======
+            !existing.stopping &&
+            existing.selection.queryIdentity !== compiledSelection.queryIdentity &&
+            canApplyClaudeSelectionLive(existing.selection, compiledSelection)
+          ) {
+            const live = existing;
+            yield* live.query.setModel(compiledSelection.apiModelId).pipe(
+              Effect.andThen(
+                live.query.applyFlagSettings(claudeLiveSelectionFlagSettings(compiledSelection)),
+              ),
+              // A partial change leaves the process state unknown. A blank
+              // identity matches no selection, so the next turn sends both again.
+              Effect.tapError(() =>
+                Effect.sync(() => {
+                  live.selection = { ...live.selection, queryIdentity: "" };
+                }),
+              ),
+            );
+            live.selection = compiledSelection;
+          }
+          if (
+            existing !== null &&
+            existing.nativeThreadId === nativeThreadId &&
+            existing.queryPolicyKey === queryPolicyKey &&
+            existing.selection.queryIdentity === compiledSelection.queryIdentity
+>>>>>>> upstream-sync-339179f50-upstream-renamed
           ) {
             // Claude can switch its own mode mid-session (EnterPlanMode), and
             // a denied ExitPlanMode leaves it there. Put the live process back
@@ -8523,7 +8695,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             nativeThreadId,
             query: querySession,
             queryPolicyKey,
-            selectionKey: compiledSelection.queryIdentity,
+            selection: compiledSelection,
             closed,
             lastTurn: null,
             promptEchoMode: "unknown",
@@ -8600,7 +8772,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             // a uuid derived from run ids can repeat.
             const promptUuid = isClaudeProviderContinuationTurn(turnInput)
               ? null
-              : yield* crypto.randomUUIDv4.pipe(
+              : yield* crypto.randomUUIDv4().pipe(
                   Effect.filterOrFail(isClaudePromptUuid),
                   Effect.mapError(
                     (cause) =>
@@ -8665,6 +8837,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               rejectedRateLimitTypes: new Set(),
               rateLimitResetTimes: new Map(),
               latestAssistantRateLimited: false,
+              steeredSegmentUsage: [],
               subagentsByTaskId: new Map(),
               subagentsByToolUseId: new Map(),
               subagentNodesByTaskId: new Map(),
@@ -9020,6 +9193,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           getModelContextWindow: (selection) =>
             resolveClaudeCatalogContextWindowTokens(BUNDLED_CLAUDE_MODEL_CATALOG, selection),
           events: Stream.fromEffectRepeat(Queue.take(events)),
+          // Background shells, agents, monitors, and workflows end with the CLI.
+          backgroundTasksEndWithProcess: true,
           hasPendingBackgroundWork: Effect.gen(function* () {
             // Session capability: any native thread with pending work pins idle.
             for (const roster of (yield* Ref.get(pendingBackgroundTasksByNativeThread)).values()) {

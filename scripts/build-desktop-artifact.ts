@@ -2957,8 +2957,17 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
       extendInfo: {
+<<<<<<< HEAD
         NSLocalNetworkUsageDescription: `${DESKTOP_PRODUCT_NAME} connects to devices on your local network for remote environments and commands run by terminals and coding agents.`,
         NSScreenCaptureUsageDescription: `${DESKTOP_PRODUCT_NAME} captures the active window when you use the window capture shortcut.`,
+=======
+        // macOS 26 offers Messages/Mail codes in every text field unless opted out.
+        NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true,
+        NSLocalNetworkUsageDescription:
+          "T3 Code connects to devices on your local network for remote environments and commands run by terminals and coding agents.",
+        NSScreenCaptureUsageDescription:
+          "T3 Code captures the active window when you use the window capture shortcut.",
+>>>>>>> upstream-sync-339179f50-upstream-renamed
         // macOS lists an app under Default web browser only when it opens web
         // pages as documents as well as http and https links (see protocols).
         CFBundleDocumentTypes: [
