@@ -11,8 +11,6 @@ import { resolveThemeHalf, themeStageArtScene, type StageArtScene } from "../the
 export type SidebarStageBackdropVariant = StageArtScene;
 export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly" | "Alpha";
 
-// A wide viewBox keeps the 96-unit art height at a fixed scale while sidebar resizing reveals
-// more horizontal canvas instead of zooming the scene.
 const STAGE_BACKDROP_VIEW_BOX = "0 0 8192 96";
 
 /**
@@ -70,7 +68,6 @@ export function useSidebarStageBackdropVariant(enabled = true): SidebarStageBack
   return resolveSidebarStageBackdropVariant(stageLabel, enabled, themeScene);
 }
 
-/** Stage-channel header art; palettes mirror the per-channel app icons in `assets/`. */
 export function SidebarStageBackdrop({ variant }: { variant: SidebarStageBackdropVariant }) {
   return (
     <div

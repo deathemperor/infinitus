@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 // This file mostly exists because we want dev mode to say "Infinitus (Dev)" instead of "electron"
 
+=======
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeModule from "node:module";
@@ -15,6 +18,7 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
+<<<<<<< HEAD
 const APP_DISPLAY_NAME = isDevelopment ? "Infinitus (Dev)" : "Infinitus";
 const APP_BUNDLE_ID = isDevelopment
   ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
@@ -24,6 +28,14 @@ const APP_BUNDLE_ID = isDevelopment
 // the workspace's TypeScript. Keep the two in step.
 const APP_PROTOCOL_SCHEMES = isDevelopment ? ["infinitus-dev"] : ["infinitus"];
 const LAUNCHER_VERSION = 19;
+=======
+const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Beta)";
+const APP_BUNDLE_ID = isDevelopment
+  ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
+  : "com.t3tools.t3code";
+const APP_PROTOCOL_SCHEMES = isDevelopment ? ["t3code-dev"] : ["t3code"];
+const LAUNCHER_VERSION = 20;
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
 const developmentMacIconPngPath = NodePath.join(
   repoRoot,
   "assets",
@@ -283,6 +295,8 @@ function patchMainBundleInfoPlist(appBundlePath, iconPath, executableName) {
   for (const [key, value] of Object.entries(resolveMacBundleInfoPlistStrings(executableName))) {
     setPlistString(infoPlistPath, key, value);
   }
+  // macOS 26 offers Messages/Mail codes in every text field unless opted out.
+  setPlistJson(infoPlistPath, "NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac", true);
   setPlistJson(infoPlistPath, "CFBundleURLTypes", [
     {
       CFBundleURLName: APP_BUNDLE_ID,
@@ -403,11 +417,18 @@ function buildMacLauncher(electronBinaryPath) {
   );
   patchHelperBundleInfoPlists(targetAppBundlePath);
   if (isDevelopment) {
+<<<<<<< HEAD
     // Keep Electron's native executable inside the branded bundle. Launching the
     // node_modules copy makes macOS associate the process (and Dock label) with
     // Electron.app even though this bundle's Info.plist has the Infinitus name.
     // Its conventional executable name also keeps Electron's default-app runtime
     // in development mode instead of making app.isPackaged report true.
+=======
+    // Launching the node_modules copy makes macOS associate the process (and Dock label) with
+    // Electron.app even though this bundle's Info.plist has the T3 Code name. Its conventional
+    // executable name also keeps Electron's default-app runtime in development mode instead of
+    // making app.isPackaged report true.
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
     writeDevelopmentEnvironmentScript();
     writeDevelopmentLauncherScript(launcherBinaryPath, runtimeElectronBinaryPath);
   }

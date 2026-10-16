@@ -12,6 +12,7 @@ import {
   type LocalEnvironmentUpdateGroup,
 } from "./ProviderUpdateLaunchNotification.logic";
 
+<<<<<<< HEAD
 /**
  * A local environment is either the same-origin primary backend or a
  * desktop-local secondary (the parallel WSL backend), which connects over
@@ -19,6 +20,9 @@ import {
  * connection id. SSH, relay, and other remote targets are excluded.
  */
 export function isLocalConnectionTarget(target: ConnectionCatalogEntry["target"]): boolean {
+=======
+function isLocalConnectionTarget(target: ConnectionCatalogEntry["target"]): boolean {
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
   return target._tag === "PrimaryConnectionTarget" || isDesktopLocalConnectionTarget(target);
 }
 
@@ -35,19 +39,10 @@ function normalizeConnectionState(phase: string | undefined): EnvironmentUpdateC
     case "offline":
       return "disconnected";
     default:
-      // "available" (or anything not yet observed) — the backend has not
-      // confirmed it is serving yet, so treat it as still settling so the
-      // popover waits for it.
       return "connecting";
   }
 }
 
-/**
- * Reactively enumerate the enabled local environments (the primary plus any
- * desktop-local secondary such as WSL) with each one's full provider list and a
- * flag for whether any is still connecting. Drives the launch popover's gating
- * and its per-environment update triggers.
- */
 export function useLocalEnvironmentUpdateGroups(): {
   readonly groups: LocalEnvironmentUpdateGroup[];
   readonly isAnySettling: boolean;
@@ -68,9 +63,6 @@ export function useLocalEnvironmentUpdateGroups(): {
 
       inputs.push({
         environmentId: environment.environmentId,
-        // Secondaries carry a meaningful label straight from the platform source
-        // (e.g. "WSL (Ubuntu)"). The primary's catalog label can be the account
-        // name, so fall back to its platform OS so the row reads "Windows"/"Linux".
         label: isPrimary
           ? deriveEnvironmentDisplayLabel({
               isWsl: false,
@@ -80,9 +72,6 @@ export function useLocalEnvironmentUpdateGroups(): {
             })
           : environment.label,
         isPrimary,
-        // The primary is the backend serving this renderer, so it is ready
-        // whenever its providers are available; secondaries report their live
-        // connection phase.
         connectionState: isPrimary
           ? "ready"
           : normalizeConnectionState(environment.connection.phase),
@@ -90,7 +79,6 @@ export function useLocalEnvironmentUpdateGroups(): {
       });
     }
 
-    // Primary first, then the rest in catalog order.
     inputs.sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
 
     return buildLocalEnvironmentUpdateGroups(inputs);

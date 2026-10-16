@@ -57,9 +57,6 @@ export {
 } from "./agentActivityAlerts.ts";
 
 const MIN_LIVE_ACTIVITY_UPDATE_INTERVAL_MS = 15_000;
-// How long a just-armed card may sit with an empty aggregate before an end is
-// warranted; covers the gap between arming on send and the environment's
-// first publish reaching the relay.
 const FRESHLY_ARMED_GRACE_MS = 2 * 60 * 1_000;
 const PERMANENT_APNS_TOKEN_REASONS = new Set([
   "BadDeviceToken",
@@ -258,18 +255,9 @@ function chooseLiveActivityDelivery(input: {
         }
       : null;
   }
-  // Activities are started by the app in the foreground, never remotely.
-  // Without a registered token there is nothing addressable; attention
-  // transitions fall back to the push notification channel until the user
-  // next arms the card from the app.
   if (!input.target.activity_push_token) {
     return null;
   }
-  // An armed card always shows content: live agents, or recently finished
-  // ones (the publisher keeps Done/Failed rows in the aggregate for a
-  // while). A null aggregate means there is truly nothing left to show, so
-  // the card ends — arming is cheap now that the app re-arms on any open
-  // with content.
   if (input.aggregate === null) {
     // Except right after arming: the app arms the card the moment the user
     // starts work, and the token registration's replay can land before the
@@ -615,9 +603,6 @@ export const make = Effect.gen(function* () {
             current.phase === input.phase &&
             current.updatedAt === input.updatedAt,
         ),
-        // A transient persistence failure must not permanently discard a
-        // legitimate alert. Fail open and let the signed job's retry/dedupe
-        // protections handle transport failures as usual.
         Effect.catchCause((cause) =>
           Effect.logWarning("agent-activity state recheck failed; allowing queued delivery", {
             cause,
@@ -662,6 +647,7 @@ export const make = Effect.gen(function* () {
     readonly userId: string;
     readonly notification: ApnsNotificationPayload;
   }) {
+<<<<<<< HEAD
     // Jobs from older relay versions do not carry a state identity. Preserve
     // backwards compatibility and only revalidate newly queued jobs.
     if (
@@ -669,6 +655,9 @@ export const make = Effect.gen(function* () {
       input.notification.updatedAt === undefined ||
       input.notification.threadId === undefined
     ) {
+=======
+    if (input.notification.phase === undefined || input.notification.updatedAt === undefined) {
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
       return true;
     }
     return yield* stateIdentityIsCurrent({
