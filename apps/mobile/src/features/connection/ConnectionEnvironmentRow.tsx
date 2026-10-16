@@ -1,6 +1,5 @@
 import { ConnectionTraceId } from "./ConnectionTraceId";
 import { SymbolView } from "../../components/AppSymbol";
-import { connectionStatusText } from "@infinitus/client-runtime/connection";
 import type { AtomCommandResult } from "@infinitus/client-runtime/state/runtime";
 import { type EnvironmentId, resolveEnvironmentMachineKind } from "@infinitus/contracts";
 import { useAtomValue } from "@effect/atom-react";
@@ -22,13 +21,17 @@ import type { ConnectedEnvironmentSummary } from "../../state/remote-runtime-typ
 import { serverEnvironment } from "../../state/server";
 import { ConnectionFormField } from "./ConnectionFormField";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+=======
+import { environmentStatusText } from "./environmentStatusText";
+>>>>>>> upstream-sync-339179f50-upstream-renamed
 
 function connectionStatusLabel(environment: ConnectedEnvironmentSummary): string | null {
   if (!environment.isEnabled && environment.connectionState !== "unsupported") {
     return "Off";
   }
-  return connectionStatusText({
+  return environmentStatusText({
     phase: environment.connectionState,
     error: environment.connectionError,
     traceId: environment.connectionErrorTraceId,

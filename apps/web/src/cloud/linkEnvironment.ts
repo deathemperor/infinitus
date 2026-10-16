@@ -22,7 +22,7 @@ import {
 import { EnvironmentRegistry } from "@infinitus/client-runtime/connection";
 import { request, runStream } from "@infinitus/client-runtime/rpc";
 import { makeEnvironmentHttpApiClient } from "@infinitus/client-runtime/rpc";
-import { ManagedRelay, relayProtectedErrorMessage } from "@infinitus/client-runtime/relay";
+import { ManagedRelay, relayRequestFailureDetail } from "@infinitus/client-runtime/relay";
 
 import * as PrimaryEnvironmentHttpLayer from "../environments/primary/httpLayer";
 import { resolveCloudPublicConfig } from "./publicConfig";
@@ -116,10 +116,9 @@ const isEnvironmentCloudApiError = Schema.is(
 
 function decodedRelayClientError(message: string) {
   return (cause: ManagedRelay.ManagedRelayClientError) => {
-    const relayError =
-      cause._tag === "ManagedRelayRequestFailedError" ? cause.relayError : undefined;
-    const traceId = cause._tag === "ManagedRelayRequestFailedError" ? cause.traceId : undefined;
-    const detail = relayError ? relayProtectedErrorMessage(relayError) : null;
+    const failed = cause._tag === "ManagedRelayRequestFailedError" ? cause : undefined;
+    const traceId = failed?.traceId;
+    const detail = failed ? relayRequestFailureDetail(failed) : null;
     return new CloudEnvironmentLinkError({
       message: detail ? `${message}: ${detail}` : message,
       cause,

@@ -133,7 +133,11 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const { cwd } = yield* ServerConfig.ServerConfig;
+      // Instance-level probes are not tied to a project, so they run in the
+      // server's own state dir. The server cwd is $HOME in packaged desktop
+      // builds, and `claude` wrappers that scope themselves to their cwd refuse
+      // to run there. Workspace probes use the thread cwd via `snapshotForCwd`.
+      const { stateDir } = yield* ServerConfig.ServerConfig;
       const httpClient = yield* HttpClient.HttpClient;
       const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
       const resetCreditCoordinator = yield* ResetCreditCoordinator.ResetCreditCoordinator;
@@ -235,8 +239,13 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
         timeToLive: CAPABILITIES_PROBE_TTL,
         lookup: () =>
           Effect.all([
+<<<<<<< HEAD
             probeClaudeCapabilities(effectiveConfig, processEnv, cwd),
             readClaudeOrganizationId(accountConfigPath),
+=======
+            probeClaudeCapabilities(effectiveConfig, processEnv, stateDir),
+            ClaudeResetCredits.readClaudeOrganizationId(accountConfigPath),
+>>>>>>> upstream-sync-339179f50-upstream-renamed
           ]).pipe(
             Effect.map(([capabilities, workspaceId]) =>
               capabilities && workspaceId ? { ...capabilities, workspaceId } : capabilities,
@@ -247,7 +256,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       });
       const capabilitiesCacheKey = yield* makeClaudeCapabilitiesCacheKey(
         effectiveConfig,
-        cwd,
+        stateDir,
         processEnv,
       );
       // The grants ride the same TTL as the capabilities they attach to: the
@@ -279,7 +288,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
                 effectiveConfig,
                 () => Cache.get(capabilitiesProbeCache, capabilitiesCacheKey),
                 processEnv,
-                cwd,
+                stateDir,
                 catalog,
                 scopedLimitNames,
                 (version) => Cache.get(resetCreditsCache, version),

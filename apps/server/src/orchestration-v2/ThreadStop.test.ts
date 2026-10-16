@@ -9,6 +9,7 @@ import {
   ProviderInstanceId,
   ProviderSessionId,
   ProviderTurnId,
+  RuntimeRequestId,
   ThreadId,
   TurnItemId,
 } from "@infinitus/contracts";
@@ -223,6 +224,62 @@ it.effect("Stop ends watches, holds queues, and stops the delegated tasks under 
     yield* threads.stopDelegatedTasks({ threadId: parentThreadId, commandId: stopCommandId });
     assert.deepEqual((yield* threadState(childThreadId)).runs, ["interrupted", "queued:held"]);
   }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect.each(["thread.stop", "run.interrupt"] as const)(
+  "%s cancels buffered wakes and preserves durable queued messages",
+  (type) =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const threadId = ThreadId.make(`thread:stop-buffered:${type}`);
+      yield* createWatchingThread(threadId, 5);
+      yield* send(threadId, "active", "start_immediately");
+      yield* send(threadId, "user follow-up", "queue_after_active");
+      for (const creationSource of ["provider", "server"] as const) {
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make(`notification:${type}:${creationSource}`),
+          threadId,
+          messageId: MessageId.make(`notification:${type}:${creationSource}`),
+          text: "Background activity updated",
+          attachments: [],
+          createdBy: "agent",
+          creationSource,
+          notification: {
+            source: { kind: "background_task" },
+            outcome: "updated",
+            summary: "Background activity updated",
+          },
+          dispatchMode: { type: "queue_after_active" },
+        });
+      }
+      const before = yield* orchestrator.getThreadProjection(threadId);
+      const buffered = before.runs.find((run) =>
+        before.messages.some(
+          (message) => message.id === run.userMessageId && message.creationSource === "provider",
+        ),
+      )!;
+      const stop = { commandId: CommandId.make(`stop:${type}`), threadId };
+      yield* orchestrator.dispatch(
+        type === "run.interrupt"
+          ? { ...stop, type, runId: before.runs[0]!.id, holdQueue: true }
+          : { ...stop, type },
+      );
+      const stopped = yield* orchestrator.getThreadProjection(threadId);
+      assert.equal(stopped.runs.find((run) => run.id === buffered.id)?.status, "cancelled");
+      assert.equal(
+        stopped.attempts.find((attempt) => attempt.runId === buffered.id)?.status,
+        "cancelled",
+      );
+      assert.equal(
+        stopped.nodes.find((node) => node.id === buffered.rootNodeId)?.status,
+        "cancelled",
+      );
+      assert.deepEqual(
+        stopped.runs.filter((run) => run.status === "queued").map((run) => run.queueHeld),
+        [true, true],
+      );
+    }).pipe(Effect.provide(layerTest)),
 );
 
 it.effect(
@@ -481,6 +538,78 @@ it.effect.each(["thread.stop", "run.interrupt"] as const)(
         watched: [],
       });
     }).pipe(Effect.provide(layerTest.pipe(Layer.provideMerge(TestClock.layer())))),
+);
+
+it.effect.each([
+  { ending: "cancelled", question: "resolved" },
+  { ending: "interrupted", question: "resolved" },
+  { ending: "completed", question: "pending" },
+  { ending: "failed", question: "pending" },
+] as const)(
+  "a $ending delegated task leaves its async question $question",
+  ({ ending, question }) =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const parentThreadId = ThreadId.make(`thread:stop-question-parent:${ending}`);
+      yield* createWatchingThread(parentThreadId, 20);
+      yield* send(parentThreadId, "first", "start_immediately");
+      const childThreadId = yield* delegate(parentThreadId, `question task ${ending}`);
+      const childRun = (yield* orchestrator.getThreadProjection(childThreadId)).runs[0]!;
+      assert.equal(
+        (yield* orchestrator.getThreadProjection(childThreadId)).nodes.find(
+          (node) => node.id === childRun.rootNodeId,
+        )?.runId,
+        childRun.id,
+      );
+      const now = yield* DateTime.now;
+      yield* projections.apply({
+        id: EventId.make("event:stop-question:request"),
+        type: "runtime-request.updated",
+        threadId: childThreadId,
+        runId: childRun.id,
+        occurredAt: now,
+        payload: {
+          id: RuntimeRequestId.make("request:stop-question"),
+          nodeId: childRun.rootNodeId!,
+          providerTurnId: null,
+          nativeRequestRef: null,
+          kind: "user_input",
+          status: "pending",
+          responseCapability: { type: "message" },
+          createdAt: now,
+          resolvedAt: null,
+        },
+      });
+      const request = Effect.map(
+        orchestrator.getThreadProjection(childThreadId),
+        (projection) => projection.runtimeRequests[0],
+      );
+
+      // While the task runs, its question stays open.
+      yield* orchestrator.recoverDelegatedTask(childThreadId, childRun.id);
+      assert.equal((yield* request)?.status, "pending");
+      if (ending === "interrupted") {
+        // What task_cancel dispatches.
+        yield* orchestrator.dispatch({
+          type: "thread.stop",
+          commandId: CommandId.make("stop-question-child"),
+          threadId: childThreadId,
+        });
+      } else {
+        yield* projections.apply({
+          id: EventId.make(`event:stop-question:${ending}`),
+          type: "run.updated",
+          threadId: childThreadId,
+          runId: childRun.id,
+          occurredAt: now,
+          payload: { ...childRun, status: ending, startedAt: now, completedAt: now },
+        });
+      }
+      yield* orchestrator.recoverDelegatedTask(childThreadId, childRun.id);
+      assert.equal((yield* request)?.status, question);
+      assert.equal((yield* request)?.decision, question === "resolved" ? "cancel" : undefined);
+    }).pipe(Effect.provide(layerTest)),
 );
 
 it.effect("a delegated task that cannot be stopped fails the walk after its siblings stop", () =>

@@ -9,6 +9,7 @@ import {
   makeCopilotSubagentRouting,
 } from "./copilotAcp.ts";
 import { defaultInstanceIdForDriver, ProviderDriverKind } from "@infinitus/contracts";
+import { readCustomModelEntries } from "@infinitus/shared/model";
 import { AcpRegistrySettings } from "../settings.ts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { resolveSelfInvocation, type SelfInvocation } from "@infinitus/shared/nodeRuntime";
@@ -168,6 +169,9 @@ function makeAcpRegistryRuntime(
                   env: { ...resolved.spawn.env, ...processEnvironment },
                 },
           ...(options.settings.authMethodId ? { authMethodId: options.settings.authMethodId } : {}),
+          customModels: readCustomModelEntries(options.settings.customModels).map(
+            (entry) => entry.slug,
+          ),
         }),
       );
       return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(
