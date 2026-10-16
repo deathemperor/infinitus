@@ -50,7 +50,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import { constVoid } from "effect/Function";
+import { constUndefined, constVoid } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -684,14 +684,16 @@ const make = Effect.gen(function* () {
   /** Whether the preview session for a tab still exists. */
   const sessionOpen = (tab: ServerTab) => !closedSessions.has(tabKey(tab.threadId, tab.tabId));
 
-  const dropTab = (tab: ServerTab, closeSession: boolean) => {
+  /** `handOff` keeps viewers for a session that moves to another page, such as the desktop's. */
+  const dropTab = (tab: ServerTab, closeSession: boolean, handOff = false) => {
     const key = tabKey(tab.threadId, tab.tabId);
     if (tabs.get(key) !== tab) return;
     tabs.delete(key);
     tab.closing = true;
     clearAbortedNavigation(tab);
     // A desktop page outlives the connection unless its session closed with it.
-    const end = tab.desktop && !closeSession && sessionOpen(tab) ? "reconnect" : "gone";
+    const end =
+      (tab.desktop || handOff) && !closeSession && sessionOpen(tab) ? "reconnect" : "gone";
     for (const viewer of tab.viewers) viewer.push({ _tag: end });
     void tab.control.close().catch(constVoid);
     // The desktop owns its page; letting go only ends this connection.
@@ -2408,18 +2410,30 @@ const make = Effect.gen(function* () {
   );
   // The page came back, for example after its DevTools closed. Reconnect now
   // rather than on the next viewer or agent, or the tab's URL and title stop
-  // reaching every client in the meantime.
+  // reaching every client in the meantime. A tab no desktop panel showed in
+  // time started headless with its own storage; once the desktop mounts it,
+  // the session moves onto the desktop's page so agents drive what the person
+  // sees, with their sign-ins.
   yield* desktopChannel.attached.pipe(
-    Stream.runForEach((key) =>
-      Effect.gen(function* () {
-        if (tabs.has(tabKey(key.threadId, key.tabId))) return;
-        const { sessions } = yield* manager.list({ threadId: ThreadId.make(key.threadId) });
-        const snapshot = sessions.find(
-          (session) => session.tabId === key.tabId && session.runtime === "server",
-        );
-        if (snapshot) yield* Effect.promise(() => ensureTab(snapshot).catch(constVoid));
-      }).pipe(Effect.ignore),
+    Stream.mapEffect(
+      (key) =>
+        Effect.gen(function* () {
+          const id = tabKey(key.threadId, key.tabId);
+          const tab = yield* Effect.promise(
+            async () => tabs.get(id) ?? (await pendingTabs.get(id)?.catch(constUndefined)),
+          );
+          if (tab?.desktop) return;
+          if (tab) dropTab(tab, false, true);
+          const { sessions } = yield* manager.list({ threadId: ThreadId.make(key.threadId) });
+          const snapshot = sessions.find(
+            (session) => session.tabId === key.tabId && session.runtime === "server",
+          );
+          if (snapshot) yield* Effect.promise(() => ensureTab(snapshot).catch(constVoid));
+        }).pipe(Effect.ignore),
+      // Waiting out one tab's headless launch must not hold up another tab's attach.
+      { concurrency: "unbounded" },
     ),
+    Stream.runDrain,
     Effect.forkScoped,
   );
   yield* Effect.sync(closeIdleAgentTabs).pipe(
