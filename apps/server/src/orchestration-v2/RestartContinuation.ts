@@ -16,6 +16,10 @@ import * as ServerSettings from "../serverSettings.ts";
 import { isNativeMaintenanceCommand } from "./Orchestrator.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import {
+  cancelledRosterTaskWork,
+  cancelledTurnItemWork,
+  isAwaitedWork,
+  isRestartContinuationSource,
   isRestartNoteSource,
   restartCancelledBackgroundWorkNote,
   restartContinuationNote,
@@ -23,14 +27,8 @@ import {
 
 const CONTINUE_PROMPT = "Continue where you left off.";
 
-/** Consecutive automatic continuations allowed before a person has to step in. */
 const MAX_CONTINUATION_CHAIN = 3;
 
-/**
- * Whether a restart must leave this run for the user: the thread is put away,
- * the provider turn already ended, or the user owes an answer. Checked when
- * intent is recorded and again when the continuation is delivered.
- */
 function restartContinuationBlocked(
   projection: Pick<
     ProjectionRuntimeRecoveryState,
@@ -38,6 +36,7 @@ function restartContinuationBlocked(
   >,
   source: OrchestrationV2Run,
   now: DateTime.Utc,
+  settled: boolean,
 ): boolean {
   const { thread } = projection;
   if (
@@ -49,19 +48,17 @@ function restartContinuationBlocked(
     return true;
   const turn = latestProviderTurnForAttempt(projection.providerTurns, source.activeAttemptId);
   if (
+    !settled &&
     turn !== undefined &&
     (turn.status === "completed" || turn.status === "failed" || turn.status === "interrupted")
   )
     return true;
   const waitingRequest = projection.runtimeRequests.some(
     (request) =>
-      // Tool calls and auth refreshes do not wait on a person, and a
-      // message-capable question stays answerable after the restart.
       request.kind !== "dynamic_tool_call" &&
       request.kind !== "auth_refresh" &&
       request.responseCapability.type !== "message" &&
       (request.status === "pending" ||
-        // Recovery closes live callbacks on the cut turn; it does not answer them.
         ((request.status === "expired" || request.status === "cancelled") &&
           request.responseCapability.type === "not_resumable" &&
           turn !== undefined &&
@@ -73,7 +70,6 @@ function restartContinuationBlocked(
       item.type === "secret_request" &&
       item.runId === source.id &&
       (item.secretStatus === "pending" ||
-        // Recovery cancels an open secret card and its run at the same instant.
         (item.secretStatus === "cancelled" &&
           item.completedAt !== null &&
           source.completedAt !== null &&
@@ -82,8 +78,36 @@ function restartContinuationBlocked(
 }
 
 /**
- * Resume only an unfinished root turn. Leftover background work is cleaned up
- * separately and reported on the next user turn; it must not wake a settled run.
+ * App-owned delegations are not counted: their own threads continue and report
+ * back.
+ */
+function hasOpenAwaitedWork(
+  projection: Pick<ProjectionRuntimeRecoveryState, "runs" | "turnItems">,
+  providerThread: ProjectionRuntimeRecoveryState["providerThreads"][number],
+): boolean {
+  const openItem = projection.turnItems.some((item) => {
+    if (item.status !== "pending" && item.status !== "running" && item.status !== "waiting")
+      return false;
+    if (item.type === "subagent" && item.origin === "app_owned" && item.childThreadId !== null)
+      return false;
+    const work = cancelledTurnItemWork(item);
+    const providerThreadId =
+      item.providerThreadId ??
+      projection.runs.find((run) => run.id === item.runId)?.providerThreadId;
+    return work !== undefined && isAwaitedWork(work) && providerThreadId === providerThread.id;
+  });
+  return (
+    openItem ||
+    (providerThread.ownerNodeId === null &&
+      (providerThread.pendingBackgroundTasks ?? []).some((task) =>
+        isAwaitedWork(cancelledRosterTaskWork(task)),
+      ))
+  );
+}
+
+/**
+ * A settled run needs a live session, so stale records from an older crash
+ * never wake it.
  */
 export function restartContinuationRun(
   projection: Pick<
@@ -98,7 +122,6 @@ export function restartContinuationRun(
   >,
   now: DateTime.Utc,
 ): OrchestrationV2Run | undefined {
-  // Queued runs never started; recovery holds them behind the cut run.
   const run = projection.runs.reduce<OrchestrationV2Run | undefined>(
     (latest, candidate) =>
       candidate.status !== "queued" && (!latest || runRanAfter(candidate, latest))
@@ -109,9 +132,10 @@ export function restartContinuationRun(
   if (!run) return;
   const preparedContinuation =
     run.status === "starting" && run.restartContinuationOfRunId !== undefined;
-  if (run.status !== "running" && !preparedContinuation) return;
-  if (restartContinuationBlocked(projection, run, now)) return;
-  const liveTurnRequired = !preparedContinuation;
+  const settled = run.status === "completed" || run.status === "waiting";
+  if (run.status !== "running" && !preparedContinuation && !settled) return;
+  if (restartContinuationBlocked(projection, run, now, settled)) return;
+  const liveTurnRequired = !preparedContinuation && !settled;
   if (projection.thread.providerInstanceId !== run.providerInstanceId) return;
   const providerThread = projection.providerThreads.find(
     (thread) => thread.id === run.providerThreadId,
@@ -138,9 +162,10 @@ export function restartContinuationRun(
     session === undefined ||
     session.providerInstanceId !== run.providerInstanceId ||
     session.driver !== providerThread.driver ||
-    (liveTurnRequired && (session.status === "stopped" || session.status === "error"))
+    (!preparedContinuation && (session.status === "stopped" || session.status === "error"))
   )
     return;
+  if (settled) return hasOpenAwaitedWork(projection, providerThread) ? run : undefined;
   if (
     liveTurnRequired &&
     !projection.providerTurns.some(
@@ -173,17 +198,17 @@ export const continueRestartedRun = Effect.fn("RestartContinuation.continueResta
       return;
     if (projection.messages.some((message) => message.id === messageId)) return;
     const source = projection.runs.find((run) => run.id === input.sourceRunId);
-    // Pending effects from older versions may target settled background work,
-    // including waiting runs that reconciliation subsequently cancelled.
     if (
       !source ||
-      source.status !== "cancelled" ||
-      isRestartNoteSource(source, projection.providerTurns) ||
-      restartContinuationBlocked(projection, source, yield* DateTime.now)
+      !isRestartContinuationSource(source, projection.providerTurns) ||
+      restartContinuationBlocked(
+        projection,
+        source,
+        yield* DateTime.now,
+        isRestartNoteSource(source, projection.providerTurns),
+      )
     )
       return;
-    // A user submission after reconciliation takes precedence over an automatic
-    // prompt. Queued runs never started and stay held behind this one.
     if (
       projection.runs.some(
         (run) => run.id !== source.id && run.status !== "queued" && runRanAfter(run, source),
@@ -216,7 +241,6 @@ export const continueRestartedRun = Effect.fn("RestartContinuation.continueResta
         turnItemTypes: ["run_interrupt_request"],
       },
     );
-    // The user asked this run to stop before the restart cut it.
     if (
       sourceRecords.turnItems.some(
         (item) => item.runId === source.id && item.type === "run_interrupt_request",
@@ -248,7 +272,6 @@ export const continueRestartedRun = Effect.fn("RestartContinuation.continueResta
         threadId: input.threadId,
         messageId,
         text,
-        // Shown as a work log row; the prompt the agent got is its detail.
         notification: {
           source: { kind: "system" },
           outcome: "updated",
