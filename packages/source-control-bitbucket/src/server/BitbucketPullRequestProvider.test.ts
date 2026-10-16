@@ -18,6 +18,11 @@ it.effect.each([
     commit: { hash: "9f3a7c2d8b1e6f045a9c3d7e2b8f1a6c0d4e5f93" },
     headSha: "9f3a7c2d8b1e6f045a9c3d7e2b8f1a6c0d4e5f93",
   },
+  {
+    metadata: "short source commit hash",
+    commit: { hash: "9f3a7c2d8b1e" },
+    headSha: "9f3a7c2d8b1e",
+  },
   { metadata: "absent commit", commit: undefined, headSha: undefined },
   { metadata: "null commit", commit: null, headSha: undefined },
   { metadata: "absent hash", commit: {}, headSha: undefined },
@@ -203,8 +208,6 @@ describe("bitbucketViewerPermissions", () => {
       comment: true,
       resolve: true,
       verdicts: ["comment", "approve", "request-changes"],
-      // Bitbucket says nothing about who may set a reviewer, and an unreported permission is
-      // granted.
       requestReviewers: true,
     });
   });
@@ -220,9 +223,6 @@ describe("bitbucketViewerPermissions", () => {
   });
 
   it("treats an author with read access as any other reader, which is all Bitbucket says", () => {
-    // The repository permission is the whole of what Bitbucket reports per account; it says
-    // nothing about who opened this pull request, and its author may decline it with read access
-    // alone — so declining stays offered rather than being taken from them.
     expect(bitbucketViewerPermissions({ canWrite: false }).actions).toEqual(["close"]);
   });
 });

@@ -13,6 +13,7 @@ import { useProjectFileQuery } from "~/components/files/projectFilesQueryState";
 const NO_SCRIPTS: ReadonlyArray<T3ProjectFileScript> = [];
 
 export interface T3ProjectFileState {
+<<<<<<< HEAD
   /**
    * - `valid`: the project file exists and decoded.
    * - `invalid`: it exists but fails to decode (the server then ignores the
@@ -20,18 +21,22 @@ export interface T3ProjectFileState {
    * - `missing`: no readable project file at the workspace root.
    * - `loading`: the file query has not settled yet.
    */
+=======
+>>>>>>> upstream-sync-e3b35d1b2-upstream-renamed
   status: "loading" | "missing" | "invalid" | "valid";
-  /** The decoded file when status is `valid`, null otherwise. */
   file: T3ProjectFile | null;
   scripts: ReadonlyArray<T3ProjectFileScript>;
 }
 
+<<<<<<< HEAD
 /**
  * Decoded state of the project's checked-in project file, including whether
  * the file exists but is broken — which the runtime otherwise swallows
  * silently. `infinitus.json` decides when it exists; a checkout carrying only
  * upstream's `t3.json` is read from that, the server's own order.
  */
+=======
+>>>>>>> upstream-sync-e3b35d1b2-upstream-renamed
 export function useT3ProjectFileState(
   environmentId: EnvironmentId,
   cwd: string | null,
@@ -67,11 +72,14 @@ export function useT3ProjectFileState(
   }, [contents, isPending]);
 }
 
+<<<<<<< HEAD
 /**
  * Scripts declared in the project's checked-in project file, offered in the
  * scripts menu for import. Missing, truncated, or invalid files resolve to
  * an empty list.
  */
+=======
+>>>>>>> upstream-sync-e3b35d1b2-upstream-renamed
 export function useT3ProjectFileScripts(
   environmentId: EnvironmentId,
   cwd: string | null,

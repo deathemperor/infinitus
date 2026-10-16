@@ -7,7 +7,6 @@ import { createPortal } from "react-dom";
 import { MobileClientsUserProfilePage } from "./MobileClientsUserProfilePage";
 import { InfinitusConnectUserProfilePage } from "./InfinitusConnectUserProfilePage";
 
-/** Custom pages in the Clerk account modal, in menu order. */
 export const T3_CONNECT_ACCOUNT_PAGES = [
   {
     label: "Mobile clients",
@@ -26,9 +25,8 @@ export const T3_CONNECT_ACCOUNT_PAGES = [
 type PortalTargets = Readonly<Record<string, HTMLDivElement | undefined>>;
 
 /**
- * Opens the Clerk account modal on the T3 Connect page from outside the
- * UserButton. Clerk mounts custom pages into DOM nodes it owns, so the caller
- * must keep `portals` rendered for as long as the modal can be open.
+ * Clerk mounts custom pages into DOM nodes it owns, so the caller must keep `portals` rendered for
+ * as long as the modal can be open.
  */
 export function useInfinitusConnectAccountPage(): {
   readonly open: (() => void) | null;

@@ -40,16 +40,10 @@ import {
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /**
- * The OAuth authorization server MCP clients (Claude Code, Codex, any agent
- * T3 Code did not launch) use to sign in to this environment's `/mcp`.
- *
  * Every URL is derived from the request's own origin, so the same server
  * answers correctly over loopback, Tailscale Serve and a T3 Connect tunnel.
- * Client registration is stateless: a client id is its signed metadata, so
- * an unauthenticated caller cannot grow server state. Redirects go to a
- * loopback address (a CLI agent on the user's machine) or any https address
- * (a hosted agent); the approval page names where access goes, and the user
- * decides.
+ * Client registration is stateless: a client id is its signed metadata, so an
+ * unauthenticated caller cannot grow server state.
  */
 
 const SIGNING_SECRET_NAME = "mcp-oauth-signing-key";
@@ -69,11 +63,6 @@ export interface McpOAuthUrls {
   readonly resource: string;
 }
 
-/**
- * Issuer and MCP resource for the origin this request reached: its Host, and
- * https when a proxy says so. A Host that is not a valid authority falls back
- * to localhost, which no client will have asked for.
- */
 export const requestUrls = (request: HttpServerRequest.HttpServerRequest): McpOAuthUrls => {
   const origin = Option.match(HttpServerRequest.toURL(request), {
     onNone: () => "http://localhost",
@@ -107,7 +96,6 @@ export const authorizationServerMetadata = (
   authorization_response_iss_parameter_supported: true,
 });
 
-/** A redirect URI an MCP client may register: loopback http, or any https. */
 const parseRedirect = (value: string): URL | undefined => {
   // No fragment, not even an empty one, which `URL.hash` reports as "" (RFC 6749 §3.1.2).
   if (value.length > MAX_REDIRECT_URI_LENGTH || value.includes("#")) return undefined;
@@ -123,9 +111,8 @@ const parseRedirect = (value: string): URL | undefined => {
 };
 
 /**
- * Whether a presented redirect is one the client registered. Loopback
- * redirects match on everything but the port (RFC 8252 §7.3), since CLI
- * agents listen on whatever port is free; https redirects match exactly.
+ * Loopback redirects match on everything but the port (RFC 8252 §7.3), since
+ * CLI agents listen on whatever port is free; https redirects match exactly.
  */
 export const redirectMatches = (registered: string, presented: string): boolean => {
   const left = parseRedirect(registered);
@@ -162,7 +149,6 @@ export interface McpOAuthClient {
   readonly redirectUris: ReadonlyArray<string>;
 }
 
-/** Problems the authorize page shows the user without redirecting anywhere. */
 export class McpOAuthPageError extends Schema.TaggedError<McpOAuthPageError>()(
   "McpOAuthPageError",
   { description: Schema.String },
@@ -172,7 +158,6 @@ export class McpOAuthPageError extends Schema.TaggedError<McpOAuthPageError>()(
   }
 }
 
-/** Problems reported back to the client through its (validated) redirect URI. */
 export class McpOAuthRedirectError extends Schema.TaggedError<McpOAuthRedirectError>()(
   "McpOAuthRedirectError",
   {
@@ -210,16 +195,11 @@ export class McpOAuth extends Context.Service<
     readonly register: (
       input: AuthMcpClientRegistration,
     ) => Effect.Effect<McpOAuthClient, AuthMcpRegistrationError>;
-    /** Validates an authorize request. Page errors must never redirect. */
+    /** Page errors must never redirect. */
     readonly validateAuthorization: (input: {
       readonly urls: McpOAuthUrls;
       readonly request: AuthMcpAuthorizationRequest;
     }) => Effect.Effect<AuthorizationRequest, McpOAuthPageError | McpOAuthRedirectError>;
-    /**
-     * The signed-in owner on this origin, when their browser session may
-     * approve at least read-only access. `approve` checks the chosen access
-     * against the session's scopes.
-     */
     readonly approvingBrowserSession: (
       request: HttpServerRequest.HttpServerRequest,
       authorization: AuthorizationRequest,
@@ -227,7 +207,6 @@ export class McpOAuth extends Context.Service<
       | { readonly csrfToken: string; readonly scopes: ReadonlyArray<AuthEnvironmentScope> }
       | undefined
     >;
-    /** Approves and returns the URL to send the browser to. */
     readonly approve: (input: {
       readonly request: HttpServerRequest.HttpServerRequest;
       readonly authorization: AuthorizationRequest;
@@ -242,7 +221,6 @@ export class McpOAuth extends Context.Service<
   }
 >()("t3/auth/McpOAuth") {}
 
-/** Appends OAuth response parameters, keeping any the client put in its redirect URI. */
 const redirectWith = (redirectUri: string, params: Record<string, string | undefined>) => {
   const url = new URL(redirectUri);
   for (const [name, value] of Object.entries(params)) {
@@ -554,11 +532,6 @@ const make = Effect.gen(function* () {
 
 export const layer = Layer.effect(McpOAuth, make);
 
-/**
- * Lets `/mcp` admit OAuth clients. Their scope has no calling thread, and
- * never carries preview or device access: those tools act on the caller's
- * own thread.
- */
 export const layerMcpClientAuthenticator = Layer.effect(
   McpHttpServer.McpClientAuthenticator,
   Effect.gen(function* () {

@@ -23,7 +23,6 @@ import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import type { ProviderClientDefinition } from "@infinitus/provider-core/client";
 
-/** What the form reads from a definition: an agent provider's, or a source control host's. */
 export type SettingsFormDefinition = Pick<ProviderClientDefinition, "settingsSchema"> & {
   readonly driverKind?: ProviderClientDefinition["driverKind"];
 };
@@ -39,7 +38,7 @@ export interface ProviderSettingsFieldModel {
   /** Kept in the server's secret store: a saved value arrives as `SECRET_REDACTED` and never shows. */
   readonly secret?: boolean | undefined;
   readonly defaultBooleanValue?: boolean | undefined;
-  /** Choices for a `select` control. The first entry is the default. */
+
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
   /** A `select` that also takes a typed value (#1232). */
   readonly customOption?: ProviderSettingsFormCustomOption | undefined;
@@ -300,14 +299,11 @@ interface ProviderSettingsFormProps {
   readonly definition: SettingsFormDefinition;
   readonly value: unknown;
   readonly idPrefix: string;
-  /**
-   * `card` stacks label over control, `dialog` is the compact wizard layout,
-   * and `settings` renders the shared settings row treatment.
-   */
   readonly variant: "card" | "dialog" | "settings";
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
 }
 
+<<<<<<< HEAD
 const CUSTOM_OPTION_VALUE = "__custom__";
 
 /**
@@ -316,6 +312,8 @@ const CUSTOM_OPTION_VALUE = "__custom__";
  * value none of the options carry is shown there, and picking it with nothing
  * typed yet keeps the input open without touching the config (#1232).
  */
+=======
+>>>>>>> upstream-sync-e3b35d1b2-upstream-renamed
 function ProviderSettingsSelect({
   field,
   value,

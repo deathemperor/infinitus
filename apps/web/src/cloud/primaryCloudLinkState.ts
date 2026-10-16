@@ -80,7 +80,6 @@ export function usePrimaryCloudLinkState() {
         : null,
     [primary],
   );
-  // Builds without T3 Connect have no link to read; skip the request.
   const atom =
     target && hasCloudPublicConfig() && canReadRelay
       ? primaryCloudLinkStateAtom(targetKey(target))

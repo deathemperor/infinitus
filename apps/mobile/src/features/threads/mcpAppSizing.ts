@@ -1,6 +1,5 @@
 import { clampMcpAppHeight } from "@infinitus/shared/mcpApp";
 
-/** Taller apps scroll inside the inline view; full screen fills its own screen. */
 export const MCP_APP_INLINE_MAX_HEIGHT = 420;
 
 export function mcpAppInlineHeight(height: number | undefined): number | undefined {
