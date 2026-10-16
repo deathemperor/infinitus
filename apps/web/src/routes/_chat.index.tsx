@@ -14,6 +14,7 @@ import { SidebarInset } from "../components/ui/sidebar";
 import { WorkspacePageHeader } from "../components/WorkspacePageHeader";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import {
+  readProject,
   useAllEnvironmentShellsBootstrapped,
   useProjects,
   useThreadShells,
@@ -34,11 +35,6 @@ function ChatIndexRouteView() {
   return <IndexDraftLanding />;
 }
 
-/**
- * Landing on the index route drops straight into a draft thread for the most
- * recently active project, so the first screen is a prompt instead of a dead
- * end. Falls back to an add-project hero when no project exists yet.
- */
 function IndexDraftLanding() {
   const projects = useProjects();
   const threads = useThreadShells();
@@ -64,13 +60,22 @@ function IndexDraftLanding() {
     if (mostRecentProject === null || startingRef.current || !isStillOnIndex()) {
       return;
     }
+    const projectRef = scopeProjectRef(mostRecentProject.environmentId, mostRecentProject.id);
+    if (readProject(projectRef) === null) {
+      return;
+    }
     startingRef.current = true;
-    void handleNewThread(scopeProjectRef(mostRecentProject.environmentId, mostRecentProject.id), {
-      replace: true,
-    }).catch(() => {
-      startingRef.current = false;
-      setStartState((state) => ({ ...state, failed: true }));
-    });
+    void handleNewThread(projectRef, { replace: true })
+      .then((opened) => {
+        if (opened === null) {
+          startingRef.current = false;
+          setStartState((state) => ({ ...state, retryRequest: state.retryRequest + 1 }));
+        }
+      })
+      .catch(() => {
+        startingRef.current = false;
+        setStartState((state) => ({ ...state, failed: true }));
+      });
   }, [handleNewThread, mostRecentProject, startState.retryRequest]);
 
   if (!bootstrapped) {
@@ -88,8 +93,6 @@ function IndexDraftLanding() {
       />
     ) : null;
   }
-  // First-run routing to the welcome wizard happens in FirstRunGate at the
-  // root, before this route ever renders.
   return <NoProjectsHero />;
 }
 

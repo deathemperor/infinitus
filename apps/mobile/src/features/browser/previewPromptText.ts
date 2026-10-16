@@ -2,7 +2,6 @@ import type { PreviewStreamControl } from "@infinitus/client-runtime/preview/ser
 
 type Dialog = PreviewStreamControl["dialog"];
 
-/** Updates the native response draft when a browser control message arrives. */
 export function previewPromptText(previous: Dialog, next: Dialog, draft: string) {
   if (
     next?.type !== previous?.type ||

@@ -7,6 +7,10 @@
       "types": "./src/composerThreadItems.ts",
       "default": "./src/composerThreadItems.ts"
     },
+    "./image-attachment-size": {
+      "types": "./src/imageAttachmentSize.ts",
+      "default": "./src/imageAttachmentSize.ts"
+    },
     "./handoff": {
       "types": "./src/handoff.ts",
       "default": "./src/handoff.ts"
@@ -158,6 +162,10 @@
     "./state/git": {
       "types": "./src/state/git.ts",
       "default": "./src/state/git.ts"
+    },
+    "./state/command-output": {
+      "types": "./src/state/commandOutput.ts",
+      "default": "./src/state/commandOutput.ts"
     },
     "./state/item-support": {
       "types": "./src/state/itemSupport.ts",

@@ -1,16 +1,17 @@
+import { Toolbar } from "../../components/ui/Toolbar";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { use, useCallback, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { useNativeLayoutMetrics } from "../../native/native-layout-metrics";
 import type { SearchBarCommands } from "react-native-screens";
 
-import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
+import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
+import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { NativeWorkspaceTabActivityContext } from "../../native/v5-workspace-context";
 import { useHardwareKeyboardCommand } from "../keyboard/hardwareKeyboardCommands";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { useWorkspaceTabs } from "./WorkspaceTabsContext";
 
-/** Root actions stay in the header; UIKit owns the bottom compose button. */
 export function WorkspaceToolbar(props: {
   readonly onNewTask: () => void;
   readonly sidebar?: boolean;
@@ -26,8 +27,7 @@ export function WorkspaceToolbar(props: {
   const searchRef = useRef<SearchBarCommands>(null);
   const tab = workspace.state.tabs[workspace.state.selectedTab];
   const selectedTab = workspace.state.selectedTab;
-  const focusSearch = useCallback(() => {
-    if (!workspace.isTabActive(selectedTab)) return false;
+  const enterSearch = useCallback(() => {
     workspace.dispatch({
       type: "scroll",
       tab: selectedTab,
@@ -35,9 +35,13 @@ export function WorkspaceToolbar(props: {
     });
     workspace.dispatch({ type: "search", tab: selectedTab });
     if (props.sidebar && !panes.primarySidebarVisible) togglePrimarySidebar();
+  }, [workspace, selectedTab, props.sidebar, panes.primarySidebarVisible, togglePrimarySidebar]);
+  const focusSearch = useCallback(() => {
+    if (!workspace.isTabActive(selectedTab)) return false;
+    if (!NATIVE_LIQUID_GLASS_SUPPORTED) enterSearch();
     searchRef.current?.focus();
     return true;
-  }, [workspace, selectedTab, props.sidebar, panes.primarySidebarVisible, togglePrimarySidebar]);
+  }, [workspace, selectedTab, enterSearch]);
   useHardwareKeyboardCommand("focusSearch", focusSearch);
   const restoreSearch = useCallback(() => {
     if (isTabActive(selectedTab) && tab.searchMode !== "resting")
@@ -59,8 +63,10 @@ export function WorkspaceToolbar(props: {
       <NativeStackScreenOptions
         optionsVersion={[selectedTab, tab.searchMode]}
         options={{
+          // Liquid Glass keeps search mounted as UIKit's own header button, which
+          // morphs into the field; swapping a stacked bar in and out cannot animate.
           headerSearchBarOptions:
-            tab.searchMode !== "resting"
+            NATIVE_LIQUID_GLASS_SUPPORTED || tab.searchMode !== "resting"
               ? {
                   ref: searchRef,
                   autoFocus: tab.searchMode === "active",
@@ -68,12 +74,15 @@ export function WorkspaceToolbar(props: {
                   hideNavigationBar: false,
                   hideWhenScrolling: false,
                   obscureBackground: false,
-                  placement: "stacked",
-                  allowToolbarIntegration: false,
+                  placement: NATIVE_LIQUID_GLASS_SUPPORTED ? "integratedButton" : "stacked",
+                  allowToolbarIntegration: NATIVE_LIQUID_GLASS_SUPPORTED,
                   placeholder:
                     selectedTab === "pullRequests" ? "Search pull requests" : "Search threads",
                   cancelButtonText: "✕",
-                  onFocus: () => workspace.dispatch({ type: "search", tab: selectedTab }),
+                  onFocus: () =>
+                    tab.searchMode === "resting"
+                      ? enterSearch()
+                      : workspace.dispatch({ type: "search", tab: selectedTab }),
                   onBlur: () => workspace.dispatch({ type: "expand", tab: selectedTab }),
                   onSearchButtonPress: () => searchRef.current?.blur(),
                   onChangeText: ({ nativeEvent }) =>
@@ -91,8 +100,8 @@ export function WorkspaceToolbar(props: {
         }}
       />
       {/* UIKit lays trailing items out from the edge inward. */}
-      <NativeHeaderToolbar placement="right">
-        <NativeHeaderToolbar.Button
+      <Toolbar placement="right">
+        <Toolbar.Button
           accessibilityLabel="Settings"
           icon="gearshape"
           onPress={() =>
@@ -102,18 +111,20 @@ export function WorkspaceToolbar(props: {
             })
           }
         />
-        <NativeHeaderToolbar.Button
-          accessibilityLabel={
-            selectedTab === "pullRequests" ? "Search pull requests" : "Search threads"
-          }
-          icon="magnifyingglass"
-          onPress={focusSearch}
-        />
-      </NativeHeaderToolbar>
-      <NativeHeaderToolbar placement="bottom">
-        {nativeToolbarCompose ? <NativeHeaderToolbar.Spacer flexible /> : null}
+        {NATIVE_LIQUID_GLASS_SUPPORTED ? null : (
+          <Toolbar.Button
+            accessibilityLabel={
+              selectedTab === "pullRequests" ? "Search pull requests" : "Search threads"
+            }
+            icon="magnifyingglass"
+            onPress={focusSearch}
+          />
+        )}
+      </Toolbar>
+      <Toolbar placement="bottom">
+        {nativeToolbarCompose ? <Toolbar.Spacer flexible /> : null}
         {nativeToolbarCompose ? (
-          <NativeHeaderToolbar.Button
+          <Toolbar.Button
             identifier="workspace-compose"
             accessibilityLabel="New chat"
             icon="square.and.pencil"
@@ -121,7 +132,7 @@ export function WorkspaceToolbar(props: {
             separateBackground
           />
         ) : null}
-      </NativeHeaderToolbar>
+      </Toolbar>
     </>
   );
 }
