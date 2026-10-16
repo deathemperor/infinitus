@@ -710,7 +710,7 @@ jobs:
     runs-on: ubuntu-24.04
 =======
     if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.quality.result == 'success' && needs.test.result == 'success' && needs.test_server.result == 'success' && needs.desktop_mac_arm64.result == 'success' && needs.desktop_mac_x64.result == 'success' && needs.desktop_linux_x64.result == 'success' && needs.desktop_linux_arm64.result == 'success' && needs.desktop_win_x64.result == 'success' && needs.desktop_win_arm64.result == 'success' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-e3b35d1b2-upstream-renamed
     timeout-minutes: 30
     permissions:
@@ -1065,7 +1065,7 @@ jobs:
 =======
     needs: [preflight, build_web, release, publish_cli]
     if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build_web.result == 'success' && needs.release.result == 'success' && needs.publish_cli.result == 'success' && needs.preflight.outputs.release_channel != 'preview' }}
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-e3b35d1b2-upstream-renamed
     timeout-minutes: 10
     env:
