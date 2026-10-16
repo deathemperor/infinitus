@@ -17,11 +17,6 @@ import { resolveScopedSettingsTargets, selectScopedSettingsEnvironments } from "
 import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
 import { selectSingleEnvironmentScope } from "./settingsScopeAxis";
 
-/**
- * Each member's decoded t3.json, so file-backed settings show the file as a
- * layer in the inheritance chain. A member is only present once its read has
- * settled; the query atom caches per (environment, cwd).
- */
 function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
   const members = scope.kind === "project" || scope.kind === "checkout" ? scope.members : [];
   return useAtomValue(
@@ -37,6 +32,7 @@ function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
             const result = get(
               getProjectFileQueryAtom(member.environmentId, member.workspaceRoot, fileName),
             );
+<<<<<<< HEAD
             if (result.waiting) return "waiting";
             return (
               get(optimisticFileAtom(member.environmentId, member.workspaceRoot, fileName))?.data ??
@@ -50,6 +46,17 @@ function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
             if (preferred === "waiting") continue;
             const data = preferred ?? read(member, LEGACY_T3_PROJECT_FILE_NAME);
             if (data === "waiting") continue;
+=======
+            if (result.waiting) continue;
+            const data =
+              get(
+                optimisticFileAtom(
+                  member.environmentId,
+                  member.workspaceRoot,
+                  T3_PROJECT_FILE_NAME,
+                ),
+              )?.data ?? Option.getOrNull(AsyncResult.value(result));
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
             files.set(
               member.physicalProjectKey,
               data === null || data.truncated ? null : parseT3ProjectFile(data.contents),
@@ -94,8 +101,6 @@ function useResolvedSettingsScope(rawSearch: SettingsScopeSearch, singleEnvironm
       selected.connectedEnvironments,
       projectFiles,
     );
-    // The representative target supplies display values; project scopes
-    // prefer the member on the primary environment, like environments do.
     const target =
       targets.find(
         (candidate) => candidate.environmentId === selected.environment?.environmentId,

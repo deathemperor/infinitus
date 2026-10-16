@@ -306,6 +306,7 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
           success: outcome,
         });
       }
+<<<<<<< HEAD
       for (const [response, reason] of [
         [Response.json({ result: "cooldown" }), "coolingDown"],
         // Claude could not say whether the claim landed: the retry keeps the request id.
@@ -318,6 +319,27 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
           _tag: "Failure",
           failure: { reason },
         });
+=======
+      for (const client of [
+        respond(200, { result: "cooldown" }),
+        respond(429, {}),
+        respond(401, {}),
+      ]) {
+        const result = yield* consume(client);
+        expect(result).toMatchObject({ _tag: "Failure" });
+        if (result._tag === "Failure") {
+          expect(ClaudeResetCredits.isSettledClaudeResetCreditFailure(result.failure)).toBe(true);
+        }
+      }
+      for (const client of [respond(500, {}), respond(200, { result: "unavailable" })]) {
+        const unanswered = yield* consume(client);
+        expect(unanswered).toMatchObject({ _tag: "Failure" });
+        if (unanswered._tag === "Failure") {
+          expect(ClaudeResetCredits.isSettledClaudeResetCreditFailure(unanswered.failure)).toBe(
+            false,
+          );
+        }
+>>>>>>> upstream-sync-09c5e7ac0-upstream-renamed
       }
     }),
   );
