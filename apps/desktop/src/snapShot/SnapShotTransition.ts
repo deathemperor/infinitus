@@ -18,7 +18,6 @@ type SnapShotAnimationDetails = {
 
 export type SnapShotAnimationDestination = {
   readonly frame: Electron.Rectangle;
-  /** Unit coordinates in T3's content area; GNOME supplies the real compositor origin. */
   readonly relativeFrame?: Electron.Rectangle | undefined;
   readonly backgroundColor: string;
   readonly borderColor: string;
@@ -411,7 +410,6 @@ export class SnapShotTransition {
       }),
     );
     if (this.active !== active) return;
-    // One display failing must not cut the flight short on the others.
     await Promise.allSettled(
       prepared.map((result) => {
         if (result.status !== "fulfilled" || !result.value || result.value.window.isDestroyed()) {

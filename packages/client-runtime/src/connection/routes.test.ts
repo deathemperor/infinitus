@@ -74,7 +74,6 @@ describe("connection routes", () => {
   });
 
   it("keeps a user's order when a saved route is replaced", () => {
-    // The user preferred T3 Connect over the LAN; re-pairing the LAN keeps that.
     const repaired = direct("lan", "http://192.168.1.11:3773/");
     expect(upsertRoute([RELAY, LAN], repaired)).toEqual([RELAY, repaired]);
   });
@@ -135,7 +134,6 @@ describe("learned routes", () => {
       reported: [lan],
       allowInsecure: true,
     })!;
-    // The user prefers T3 Connect over the learned LAN address.
     const reordered = entryWithRoutes(relayOnly, [first[1]!, first[0]!]);
     expect(
       mergeLearnedRoutes({
@@ -145,7 +143,6 @@ describe("learned routes", () => {
         allowInsecure: true,
       }),
     ).toBeNull();
-    // A newly reported address is still placed by speed.
     const next = mergeLearnedRoutes({
       entry: reordered,
       activeRoute: RELAY,
@@ -170,7 +167,6 @@ describe("learned routes", () => {
     })!;
     expect(first.map(connectionRouteLabel)).toEqual(["Tailscale", "VPN", CONNECT_NAME]);
 
-    // The server later finds the address is not on its Tailscale interface.
     const corrected = mergeLearnedRoutes({
       entry: entryWithRoutes(relayOnly, first),
       activeRoute: RELAY,
@@ -200,7 +196,6 @@ describe("learned routes", () => {
       reported: [{ kind: "tailnet", httpBaseUrl: "http://100.101.102.103:3773/" }],
       allowInsecure: true,
     })!;
-    // Same routes in the same order; only the label of the confirmed one changes.
     expect(ids(confirmed)).toEqual(["paired", "other", "relay"]);
     expect(confirmed.map(connectionRouteLabel)).toEqual(["Tailscale", "VPN", CONNECT_NAME]);
   });
@@ -220,7 +215,6 @@ describe("learned routes", () => {
         allowInsecure: true,
       }),
     ).toBeNull();
-    // The server stops reporting the LAN address; the paired route stays.
     expect(
       mergeLearnedRoutes({ entry, activeRoute: RELAY, reported: [], allowInsecure: true }),
     ).toBeNull();
@@ -279,7 +273,6 @@ describe("learned routes", () => {
       allowInsecure: true,
     })!;
     expect(ids(routesAfterRemoving(overLan, "lan"))).toEqual(["relay"]);
-    // Removing T3 Connect keeps the paired LAN and what it learned.
     expect(ids(routesAfterRemoving(overLan, "relay"))).toHaveLength(2);
   });
 

@@ -285,8 +285,14 @@ the workspace. These scopes control direct file access from the client.
 To remove an environment from Infinitus Connect, open your account menu's **Infinitus Connect**
 page, or **Settings → Infinitus Connect** on mobile, and choose **Deregister**. This
 revokes its cloud access and frees its host space even when the environment is
-offline or has been wiped. Removing an environment from a device's connection
-settings only forgets it on that device; it stays registered to your account.
+offline or has been wiped. When Infinitus Connect rejects a host's link, the host
+shows that it was removed from Infinitus Connect. To link it again, turn on
+**Infinitus Connect** in **Settings → Connections** on a desktop host, or run
+`t3 connect link` on a command-line host and then restart Infinitus there. A
+command-line host that released its tunnel when it last stopped may link itself
+again on its next start; run `t3 connect unlink` on that host to keep it off.
+Removing an environment from a device's connection settings only forgets it on
+that device; it stays registered to your account.
 
 When idle tunnel cleanup is enabled, Infinitus Connect removes a linked environment's
 tunnel after it stays offline for several minutes. The environment stays linked
