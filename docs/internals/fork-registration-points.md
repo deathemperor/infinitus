@@ -902,3 +902,4 @@ background`). Riding along, all
   (the follow-up copy), `apps/mobile/src/features/threads/ThreadQueueControl.tsx`
   (the "Next step" tag); `docs/user/composer.md` says a steer lands at the
   next step.
+- `apps/server/src/preview/ServerBrowser.ts` (+ test) — the desktop `attached` handler also hands a tab that started headless (no panel showed it within `DESKTOP_ATTACH_TIMEOUT`) to the desktop's page once it mounts, so the agent drives the page the person sees, with their sign-ins; `dropTab`'s `handOff` sends streaming viewers `reconnect`. Port of upstream's closed #17336 for its open #16901. If upstream lands #18217 instead (it streams the headless page and keeps it), keep ours: the sign-in is the point.
