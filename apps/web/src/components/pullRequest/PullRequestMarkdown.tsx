@@ -2,7 +2,7 @@ import { ExternalLinkIcon, PaperclipIcon } from "lucide-react";
 import { markdownImageSourceFragment } from "@infinitus/client-runtime/markdown-images";
 import { githubMediaFetchUrl } from "@infinitus/shared/githubMedia";
 import type { AssetResource, EnvironmentId, ScopedThreadRef } from "@infinitus/contracts";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext } from "react";
 import type { Options as ReactMarkdownOptions } from "react-markdown";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
@@ -18,11 +18,13 @@ export const PullRequestMarkdownContext = createContext<{
   threadRef: ScopedThreadRef | null;
 } | null>(null);
 
-/**
- * A video GitHub hosts for the repository. It plays through a signed asset URL the server
- * fetches with the repository's GitHub credential, which is what a private repository's
- * uploads need; the URL is re-signed on retry, so a stale one recovers without a reload.
- */
+// Both asset hooks key on the resource's identity; the compiler cannot cache a value
+// across successive hook calls in the component itself.
+function useGitHubMediaResource(cwd: string, fetchUrl: string): AssetResource {
+  "use memo";
+  return { _tag: "github-media", cwd, url: fetchUrl };
+}
+
 function PullRequestGitHubVideo({
   environmentId,
   cwd,
@@ -31,19 +33,12 @@ function PullRequestGitHubVideo({
 }: {
   environmentId: EnvironmentId;
   cwd: string;
-  /** What the body authored, which is what "Open original" should reach. */
   url: string;
-  /** The canonical GitHub media URL: a `blob` link addresses the page, not the bytes. */
   fetchUrl: string;
 }) {
-  const resource = useMemo<AssetResource>(
-    () => ({ _tag: "github-media", cwd, url: fetchUrl }),
-    [cwd, fetchUrl],
-  );
+  const resource = useGitHubMediaResource(cwd, fetchUrl);
   const assetUrl = useAssetUrlState(environmentId, resource);
   const refreshAssetUrl = useAssetUrlRefresh(environmentId, resource);
-  // A server too old to sign this resource, or one with no route to GitHub, still leaves a
-  // public repository's video playing exactly as it did before.
   const src =
     assetUrl._tag === "Success" ? assetUrl.url : assetUrl._tag === "Failure" ? fetchUrl : null;
   return (
@@ -58,7 +53,6 @@ function PullRequestGitHubVideo({
   );
 }
 
-/** Renders PR uploads inline, with retry and an original link when video playback fails. */
 export function PullRequestMarkdown({
   text,
   cwd,
@@ -69,7 +63,6 @@ export function PullRequestMarkdown({
   text: string;
   cwd: string;
   environmentId: EnvironmentId;
-  /** Thread the body is shown beside, so its links can open in that thread's in-app browser. */
   threadRef?: ScopedThreadRef | null;
   className?: string;
 }) {
@@ -77,10 +70,9 @@ export function PullRequestMarkdown({
   const context = useContext(PullRequestMarkdownContext);
   const repositoryUrl = context?.repositoryUrl;
   const resolvedThreadRef = threadRef ?? context?.threadRef ?? undefined;
-  const extraRemarkPlugins = useMemo<NonNullable<ReactMarkdownOptions["remarkPlugins"]>>(
-    () => (repositoryUrl ? [[remarkPullRequestAutolinks, { repositoryUrl }]] : []),
-    [repositoryUrl],
-  );
+  const extraRemarkPlugins: NonNullable<ReactMarkdownOptions["remarkPlugins"]> = repositoryUrl
+    ? [[remarkPullRequestAutolinks, { repositoryUrl }]]
+    : [];
   return (
     <div
       className={cn(

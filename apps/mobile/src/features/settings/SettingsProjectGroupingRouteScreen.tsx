@@ -1,4 +1,4 @@
-import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
+import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { SidebarProjectGroupingMode } from "@infinitus/contracts";
 import { AsyncResult } from "effect/reactivity";

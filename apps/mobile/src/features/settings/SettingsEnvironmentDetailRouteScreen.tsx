@@ -1,3 +1,4 @@
+import * as Dialog from "../../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import {
@@ -9,13 +10,17 @@ import {
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import { useEffect, useRef, useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { AppText as Text } from "../../components/AppText";
+=======
+import { AppText as Text } from "../../components/ui/AppText";
+>>>>>>> upstream-sync-a72b58e12-upstream-renamed
 import { ProviderIcon } from "../../components/ProviderIcon";
-import { ScreenScrollView } from "../../components/ScreenScrollView";
+import { ScreenScrollView } from "../../components/ui/ScreenScrollView";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { serverEnvironment } from "../../state/server";
 import { environmentSession, useEnvironmentScope, readEnvironmentScope } from "../../state/session";
@@ -112,7 +117,7 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
     const targetVersion = checkedRelease?.targetVersion;
     if (disabled || !targetVersion || !capabilities || !supportsEnvironmentUpdate(capabilities))
       return;
-    Alert.alert(
+    Dialog.alert(
       `Update ${environment?.environmentLabel ?? "environment"}?`,
       `Install ${PRODUCT_NAME} ${targetVersion}. ${capabilities.serverSelfUpdate === "desktop-managed" ? "The desktop app will close and relaunch." : "The server will restart and reconnect."} Running threads may be interrupted.`,
       [

@@ -1,9 +1,3 @@
-/**
- * Grok's client definition: settings form, label, and glyph.
- * Browser- and React Native-safe.
- *
- * @module provider-grok/client
- */
 import { ProviderDriverKind } from "@infinitus/contracts";
 import { defineProviderClient } from "@infinitus/provider-core/client";
 

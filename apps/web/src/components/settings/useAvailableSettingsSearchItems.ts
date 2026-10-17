@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { AuthEnvironmentMaintainScope } from "@infinitus/contracts";
 
 import { usePrimaryCloudLinkState } from "~/cloud/primaryCloudLinkState";
@@ -29,8 +28,10 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
   const cloudLinkState = usePrimaryCloudLinkState().data;
   // Same fallback as the Connections row: older servers imply a tunnel from `linked`.
   const managedTunnelActive =
-    cloudLinkState?.managedTunnelActive ?? cloudLinkState?.linked ?? false;
+    cloudLinkState?.linkRevoked !== true &&
+    (cloudLinkState?.managedTunnelActive ?? cloudLinkState?.linked ?? false);
 
+<<<<<<< HEAD
   return useMemo(
     () =>
       filterAvailableSettingsSearchItems({
@@ -64,15 +65,64 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
           (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
         ),
         managedTunnelActive,
+=======
+  return useFilteredSettingsSearchItems({
+    localEnvironmentDisabled,
+    hasCloudPublicConfig: hasCloudPublicConfig(),
+    hasEnvironment: environments.some((environment) => environment.serverConfig !== null),
+    hasProviderSettingsEnvironment: environments.some((environment) =>
+      isProviderSettingsEnvironmentAvailable({
+        connectionPhase: environment.connection.phase,
+        hasServerConfig: environment.serverConfig !== null,
+>>>>>>> upstream-sync-a72b58e12-upstream-renamed
       }),
-    [
-      managedTunnelActive,
-      canManageLocalBackend,
-      desktopWsl.data,
-      desktopWsl.error,
-      environments,
-      localEnvironmentDisabled,
-      scopeSearch.machine,
-    ],
-  );
+    ),
+    hasMacProviderSettingsEnvironment: environments.some(
+      (environment) =>
+        (scopeSearch.machine === undefined || environment.environmentId === scopeSearch.machine) &&
+        environment.serverConfig?.environment.platform.os === "darwin" &&
+        isProviderSettingsEnvironmentAvailable({
+          connectionPhase: environment.connection.phase,
+          hasServerConfig: true,
+        }),
+    ),
+    canManageLocalBackend,
+    isWslSettingsRowVisible: isWslSettingsRowVisible({
+      state: desktopWsl.data,
+      error: desktopWsl.error,
+    }),
+    hasThreadAutoSettlement:
+      getThreadAutoSettlementSearchAvailability(environments).eligibleEnvironmentIds.length > 0,
+    managedTunnelActive,
+  });
+}
+
+// The availability flags are primitives, so caching on them keeps the item list stable for the
+// search memo and the command palette while environments update.
+function useFilteredSettingsSearchItems(
+  availability: Required<Parameters<typeof filterAvailableSettingsSearchItems>[0]>,
+) {
+  "use memo";
+  const {
+    localEnvironmentDisabled,
+    hasCloudPublicConfig,
+    hasEnvironment,
+    hasProviderSettingsEnvironment,
+    hasMacProviderSettingsEnvironment,
+    canManageLocalBackend,
+    isWslSettingsRowVisible,
+    hasThreadAutoSettlement,
+    managedTunnelActive,
+  } = availability;
+  return filterAvailableSettingsSearchItems({
+    localEnvironmentDisabled,
+    hasCloudPublicConfig,
+    hasEnvironment,
+    hasProviderSettingsEnvironment,
+    hasMacProviderSettingsEnvironment,
+    canManageLocalBackend,
+    isWslSettingsRowVisible,
+    hasThreadAutoSettlement,
+    managedTunnelActive,
+  });
 }
