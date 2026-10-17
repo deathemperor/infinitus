@@ -8,10 +8,8 @@ export interface ServerConfigProjection {
 }
 
 /**
- * Cached config keeps the provider and model catalog available across reconnects.
  * Published themes and usage-limit sources are current machine state, so a
- * cache could restore a set the machine no longer reports. Replay sends both
- * as separate events.
+ * cache could restore a set the machine no longer reports.
  */
 export function withoutEnvironmentThemes(config: ServerConfig): ServerConfig {
   if (config.environmentThemes === undefined && config.usageLimitSources === undefined) {
@@ -19,6 +17,47 @@ export function withoutEnvironmentThemes(config: ServerConfig): ServerConfig {
   }
   const { environmentThemes: _themes, usageLimitSources: _sources, ...rest } = config;
   return rest;
+}
+
+/**
+ * Returns `next` with every part deep-equal to `previous` replaced by the
+ * previous object. A provider status push re-sends every provider even when
+ * only one field (often just `checkedAt`) changed, so this keeps unchanged
+ * providers, models and skills identical and lets memoized UI skip them.
+ */
+export function reuseUnchanged<T>(previous: unknown, next: T): T {
+  if (Object.is(previous, next)) return next;
+  if (
+    typeof previous !== "object" ||
+    typeof next !== "object" ||
+    previous === null ||
+    next === null ||
+    Array.isArray(previous) !== Array.isArray(next)
+  ) {
+    return next;
+  }
+  if (Array.isArray(next)) {
+    const before = previous as ReadonlyArray<unknown>;
+    let same = before.length === next.length;
+    const merged = next.map((item, index) => {
+      const reused = reuseUnchanged(before[index], item);
+      if (reused !== before[index]) same = false;
+      return reused;
+    });
+    return (same ? previous : merged) as T;
+  }
+  if (Object.getPrototypeOf(next) !== Object.prototype) return next;
+  const before = previous as Record<string, unknown>;
+  const after = next as Record<string, unknown>;
+  const keys = Object.keys(after);
+  let same = keys.length === Object.keys(before).length;
+  const merged: Record<string, unknown> = {};
+  for (const key of keys) {
+    const reused = reuseUnchanged(before[key], after[key]);
+    if (reused !== before[key] || !(key in before)) same = false;
+    merged[key] = reused;
+  }
+  return (same ? previous : merged) as T;
 }
 
 export function applyServerConfigProjection(
@@ -63,7 +102,7 @@ export function applyServerConfigProjection(
       return Option.map(current, (projection) => ({
         config: {
           ...projection.config,
-          providers: event.payload.providers,
+          providers: reuseUnchanged(projection.config.providers, event.payload.providers),
         },
         latestEvent: event,
         source: "live",
