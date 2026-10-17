@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
@@ -22,7 +22,6 @@ import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import type { ProviderClientDefinition } from "@infinitus/provider-core/client";
 
-/** What the form reads from a definition: an agent provider's, or a source control host's. */
 export type SettingsFormDefinition = Pick<ProviderClientDefinition, "settingsSchema"> & {
   readonly driverKind?: ProviderClientDefinition["driverKind"];
 };
@@ -38,7 +37,7 @@ export interface ProviderSettingsFieldModel {
   /** Kept in the server's secret store: a saved value arrives as `SECRET_REDACTED` and never shows. */
   readonly secret?: boolean | undefined;
   readonly defaultBooleanValue?: boolean | undefined;
-  /** Choices for a `select` control. The first entry is the default. */
+
   readonly options?: ReadonlyArray<ProviderSettingsFormOption> | undefined;
 }
 
@@ -155,19 +154,21 @@ function commandArgumentsEqual(left: ReadonlyArray<string>, right: ReadonlyArray
   return left.length === right.length && left.every((argument, index) => argument === right[index]);
 }
 
+function configuredCommandArgs(value: ProviderSettingsFormProps["value"]) {
+  const configured =
+    value !== null && typeof value === "object"
+      ? (value as Record<string, unknown>).commandArgs
+      : undefined;
+  return Array.isArray(configured)
+    ? configured.filter((argument): argument is string => typeof argument === "string")
+    : [];
+}
+
 function ProviderCommandArguments({
   value,
   onChange,
 }: Pick<ProviderSettingsFormProps, "value" | "onChange">) {
-  const args = useMemo(() => {
-    const configured =
-      value !== null && typeof value === "object"
-        ? (value as Record<string, unknown>).commandArgs
-        : undefined;
-    return Array.isArray(configured)
-      ? configured.filter((argument): argument is string => typeof argument === "string")
-      : [];
-  }, [value]);
+  const args = configuredCommandArgs(value);
   const [rows, setRows] = useState(() => args.map(makeCommandArgumentDraftRow));
   const rowsRef = useRef(rows);
   const previousArgsRef = useRef(args);
@@ -294,15 +295,10 @@ interface ProviderSettingsFormProps {
   readonly definition: SettingsFormDefinition;
   readonly value: unknown;
   readonly idPrefix: string;
-  /**
-   * `card` stacks label over control, `dialog` is the compact wizard layout,
-   * and `settings` renders the shared settings row treatment.
-   */
   readonly variant: "card" | "dialog" | "settings";
   readonly onChange: (nextConfig: Record<string, unknown> | undefined) => void;
 }
 
-/** Stores the default choice as an omitted key so unchanged configs stay small. */
 function ProviderSettingsSelect({
   field,
   value,
@@ -557,10 +553,7 @@ export function ProviderSettingsForm({
   variant,
   onChange,
 }: ProviderSettingsFormProps) {
-  const fields = useMemo(
-    () => deriveProviderSettingsFields(definition, value),
-    [definition, value],
-  );
+  const fields = deriveProviderSettingsFields(definition, value);
   const isLocalAcp =
     definition.driverKind === "acpRegistry" &&
     readProviderConfigString(value, "source") === "local";

@@ -1,5 +1,5 @@
 import { proposedPlanTitle, stripDisplayedPlanMarkdown } from "@infinitus/shared/proposedPlanText";
-import { memo, useCallback, useState, useId } from "react";
+import { memo, useState, useId } from "react";
 import { useFindRevealRef } from "./markdownFindContext";
 import {
   isAtomCommandInterrupted,
@@ -85,8 +85,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
   // While finding, the full plan stays mounted but clipped, so a match past the
   // preview can be counted and then opened only once it is selected.
   const showPreview = isCollapsed && !findActive;
-  const revealForFind = useCallback(() => setExpanded(true), []);
-  const findRevealRef = useFindRevealRef(revealForFind);
+  const findRevealRef = useFindRevealRef(() => setExpanded(true));
   const downloadFilename = buildProposedPlanMarkdownFilename(planMarkdown);
   const saveContents = normalizePlanMarkdownForExport(planMarkdown);
 
@@ -165,8 +164,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Badge variant="secondary">Plan</Badge>
-          {/* Same heading level as the message author headings in the timeline,
-              so a plan's own headings nest beneath it in the outline. */}
+          {}
           <h3 data-thread-find-text="true" className="truncate text-sm font-medium text-foreground">
             {title}
           </h3>

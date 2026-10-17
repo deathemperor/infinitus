@@ -1,12 +1,4 @@
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-  type KeyboardEvent,
-} from "react";
+import { memo, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
 import { Image as ImageGlyph, Text as TextGlyph } from "lucide";
 import { Button } from "../ui/button";
@@ -81,7 +73,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  // The offset accumulates without bound, so wrap it into range in both directions:
   // JavaScript `%` keeps the sign of the dividend, and a negative index blanks the dialog.
   const imageCount = preview.images.length;
   const index =
@@ -103,9 +94,9 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
       }
     : source;
 
-  const navigateImage = useCallback((direction: -1 | 1) => {
+  const navigateImage = (direction: -1 | 1) => {
     setImageOffset((current) => current + direction);
-  }, []);
+  };
 
   // The element that opened the preview gets focus back on close. Without
   // this a close button click leaves focus on the unmounted dialog, and the
@@ -189,7 +180,6 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
         }}
       >
         <DialogTitle className="sr-only">Expanded {mediaLabel} preview</DialogTitle>
-        {/* The stage keeps a fixed size, so the close button stays put whatever the media or caption. */}
         <Button
           type="button"
           ref={closeButtonRef}

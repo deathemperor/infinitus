@@ -9,7 +9,10 @@ import {
   type UsageProviderKind,
 } from "@infinitus/contracts";
 import { CircleAlertIcon, ChevronDownIcon, InfoIcon, SlidersHorizontalIcon } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { settlePromise } from "@infinitus/client-runtime/state/runtime";
+import * as AsyncResult from "effect/reactivity/AsyncResult";
+import * as Cause from "effect/Cause";
 import {
   cursorKeychainAccessEnvironments,
   refreshUsageLimits,
@@ -111,6 +114,61 @@ function isUsageWindowDays(value: number): value is UsagePagePreferences["window
 
 const providerLabel = (provider: UsageProviderKind) => PROVIDER_PRESENTATION[provider].label;
 
+// useUsage keys its queries on this set, so it must keep its identity.
+function useHiddenProviderSet(hiddenProviders: UsagePagePreferences["hiddenProviders"]) {
+  "use memo";
+  return new Set(hiddenProviders);
+}
+
+function usageLoading(
+  showingKept: boolean,
+  selectedEnvironments: Parameters<typeof usageLoadingState>[0],
+  refreshingUsage: boolean,
+  hiddenProviders: ReadonlySet<UsageProviderKind>,
+) {
+  if (showingKept) {
+    return { partial: true, everyProvider: true, providers: new Set<UsageProviderKind>() };
+  }
+  const state = usageLoadingState(selectedEnvironments, refreshingUsage);
+  const providers = new Set([...state.providers].filter((p) => !hiddenProviders.has(p)));
+  return {
+    partial: state.everyProvider || providers.size > 0,
+    everyProvider: state.everyProvider,
+    providers,
+  };
+}
+
+// UsageProviderChart memoizes on the provider collections, so they must keep their identity.
+function useUsageProviders(
+  showingKept: boolean,
+  selectedEnvironments: Parameters<typeof usageLoadingState>[0],
+  refreshingUsage: boolean,
+  hiddenProviders: ReadonlySet<UsageProviderKind>,
+  mergedProviders: MergedUsage["providers"],
+) {
+  "use memo";
+  const loading = usageLoading(showingKept, selectedEnvironments, refreshingUsage, hiddenProviders);
+  const providersWithData = providersWithUsage(mergedProviders);
+  const activeProviders = PROVIDER_ORDER.filter(
+    (provider) => providersWithData.includes(provider) || loading.providers.has(provider),
+  );
+  const chartLoadingProviders = new Set(
+    activeProviders.filter((provider) => loading.everyProvider || loading.providers.has(provider)),
+  );
+  return { loading, providersWithData, activeProviders, chartLoadingProviders };
+}
+
+// UsageProviderChart memoizes on these arrays, so they must keep their identity.
+function useUsagePeriods(usageWindow: ReturnType<typeof makeWindow>) {
+  "use memo";
+  const days = enumerateDays(usageWindow.sinceDay, usageWindow.untilDay);
+  const hours =
+    usageWindow.sinceTime === undefined || usageWindow.untilTime === undefined
+      ? []
+      : enumerateHourStarts(usageWindow.sinceTime, usageWindow.untilTime);
+  return { days, hours };
+}
+
 export function UsagePage() {
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
   useEscapeToGoBack();
@@ -141,10 +199,7 @@ export function UsagePage() {
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
     useState<ReadonlySet<EnvironmentId> | null>(null);
-  const hiddenProviders = useMemo(
-    () => new Set(preferences.hiddenProviders),
-    [preferences.hiddenProviders],
-  );
+  const hiddenProviders = useHiddenProviderSet(preferences.hiddenProviders);
   const { days: windowDays, window } = windowSelection;
   const isPast24Hours = windowDays === 1;
   const {
@@ -155,26 +210,18 @@ export function UsagePage() {
     isPartial,
     refresh,
   } = useUsage(window, selectedEnvironmentIds, hiddenProviders);
-  // Until a new window's first answer, the previous one stays on screen, muted.
   const merged = shown?.merged ?? answeredUsage;
   const shownWindow = shown?.window ?? window;
   const shownHourly = shownWindow.resolution === "hour";
   const refreshingUsage = isRefreshing && !showingLimits;
-  // Usage kept from another window is all old, so every figure stays muted.
   const showingKept = shown !== null && shown.window !== window;
-  const loading = useMemo(() => {
-    if (showingKept) {
-      return { partial: true, everyProvider: true, providers: new Set<UsageProviderKind>() };
-    }
-    const state = usageLoadingState(selectedEnvironments, refreshingUsage);
-    // A hidden provider still refreshing must not add its row or mute the totals.
-    const providers = new Set([...state.providers].filter((p) => !hiddenProviders.has(p)));
-    return {
-      partial: state.everyProvider || providers.size > 0,
-      everyProvider: state.everyProvider,
-      providers,
-    };
-  }, [showingKept, refreshingUsage, selectedEnvironments, hiddenProviders]);
+  const { loading, providersWithData, activeProviders, chartLoadingProviders } = useUsageProviders(
+    showingKept,
+    selectedEnvironments,
+    refreshingUsage,
+    hiddenProviders,
+    merged.providers,
+  );
   const isProviderLoading = (provider: UsageProviderKind) =>
     loading.everyProvider || loading.providers.has(provider);
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
@@ -206,48 +253,14 @@ export function UsagePage() {
     (environment) => environment.canReadDiagnostics,
   );
 
-  const days = useMemo(
-    () => enumerateDays(shownWindow.sinceDay, shownWindow.untilDay),
-    [shownWindow.sinceDay, shownWindow.untilDay],
-  );
-  const hours = useMemo(
-    () =>
-      shownWindow.sinceTime === undefined || shownWindow.untilTime === undefined
-        ? []
-        : enumerateHourStarts(shownWindow.sinceTime, shownWindow.untilTime),
-    [shownWindow.sinceTime, shownWindow.untilTime],
-  );
-  // Newest first: the window can run 90 periods, so the interesting end
-  // belongs at the top of the table.
-  const breakdownPeriods = useMemo<readonly (DailyTotals | HourlyTotals)[]>(
-    () => (shownHourly ? merged.hourly : merged.daily).toReversed(),
-    [shownHourly, merged.daily, merged.hourly],
-  );
-  const breakdownModels = useMemo(
-    () =>
-      breakdown === "model" && metric === "tokens"
-        ? sortModelsByTokens(merged.models)
-        : merged.models,
-    [breakdown, merged.models, metric],
-  );
-  const providersWithData = useMemo(() => providersWithUsage(merged.providers), [merged.providers]);
-  // A provider still refreshing keeps its row and line before its usage lands.
-  const activeProviders = useMemo(
-    () =>
-      PROVIDER_ORDER.filter(
-        (provider) => providersWithData.includes(provider) || loading.providers.has(provider),
-      ),
-    [loading.providers, providersWithData],
-  );
-  const chartLoadingProviders = useMemo(
-    () =>
-      new Set(
-        activeProviders.filter(
-          (provider) => loading.everyProvider || loading.providers.has(provider),
-        ),
-      ),
-    [activeProviders, loading.everyProvider, loading.providers],
-  );
+  const { days, hours } = useUsagePeriods(shownWindow);
+  const breakdownPeriods: readonly (DailyTotals | HourlyTotals)[] = (
+    shownHourly ? merged.hourly : merged.daily
+  ).toReversed();
+  const breakdownModels =
+    breakdown === "model" && metric === "tokens"
+      ? sortModelsByTokens(merged.models)
+      : merged.models;
   const selectedModel =
     selectedModelKey === null
       ? undefined
@@ -286,9 +299,10 @@ export function UsagePage() {
     if (nextMetric === "limits") setLimitsNow(Date.now());
     updatePreferences({ metric: nextMetric });
   };
-  const refreshLimits = async (automatic = false, afterPending = false) => {
-    try {
-      await Promise.all(
+  const refreshLimits = (automatic = false, afterPending = false) =>
+    // Settled so the timestamp still advances when a refresh throws.
+    settlePromise(() =>
+      Promise.all(
         Array.from(presentations, ([environmentId, presentation]) => {
           if (selectedEnvironmentIds !== null && !selectedEnvironmentIds.has(environmentId)) return;
           if (presentation.connection.phase === "connected" && presentation.serverConfig !== null) {
@@ -300,11 +314,11 @@ export function UsagePage() {
             );
           }
         }),
-      );
-    } finally {
+      ),
+    ).then((result) => {
       setLimitsNow(Date.now());
-    }
-  };
+      if (!AsyncResult.isSuccess(result)) throw Cause.squash(result.cause);
+    });
   const onUsageKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (
       event.defaultPrevented ||
@@ -376,7 +390,6 @@ export function UsagePage() {
     if (showingLimits && connectedLimitsEnvironments) autoRefreshLimits();
   }, [showingLimits, connectedLimitsEnvironments]);
 
-  // Names the period on screen, which is the previous one until the new one answers.
   const windowLabel =
     shownHourly && shownWindow.sinceTime !== undefined && shownWindow.untilTime !== undefined
       ? `${formatDateTimeShort(shownWindow.sinceTime, shownWindow.timeZone)} to ${formatDateTimeShort(shownWindow.untilTime, shownWindow.timeZone)}`
@@ -431,8 +444,6 @@ export function UsagePage() {
             </Toggle>
           ))}
         </ToggleGroup>
-        {/* The period does not apply to Limits, so it stays in place but
-            disabled; unmounting it shifted the metric toggle ~300px. */}
         <ToggleGroup
           aria-label="Usage period"
           variant="segmented"
@@ -689,7 +700,6 @@ export function UsagePage() {
                                   : formatTokens(totals?.totalTokens ?? 0)}
                             </span>
                           </div>
-                          {/* Kept while awaiting data so the row does not grow when it lands. */}
                           <span
                             className={cn(
                               "text-xs text-muted-foreground",
@@ -849,8 +859,6 @@ export function UsagePage() {
                               >
                                 <td className="py-2.5 pr-3 text-left text-xs">{index + 1}</td>
                                 <td className="py-2.5 text-left whitespace-normal">
-                                  {/* The button's overlay makes the whole row open the model.
-                                      Focus shows as the row's hover fill, not a ring. */}
                                   <button
                                     type="button"
                                     onClick={() => setSelectedModelKey(key)}
@@ -866,7 +874,6 @@ export function UsagePage() {
                                     <div
                                       className="h-full rounded-full"
                                       style={{
-                                        // A short minimum keeps tiny shares a dash, not a dot.
                                         width:
                                           value > 0 && breakdownPeak > 0
                                             ? `max(0.5rem, ${(value / breakdownPeak) * 100}%)`
@@ -1032,15 +1039,12 @@ function CursorEnableButton({
   const [pending, setPending] = useState(false);
   const enable = async () => {
     setPending(true);
-    try {
-      const result = await updateSettings({
-        environmentId,
-        input: { patch: { cursorKeychainUsageEnabled: true } },
-      });
-      if (result._tag === "Success") onEnabled();
-    } finally {
-      setPending(false);
-    }
+    const result = await updateSettings({
+      environmentId,
+      input: { patch: { cursorKeychainUsageEnabled: true } },
+    });
+    if (result._tag === "Success") onEnabled();
+    setPending(false);
   };
   const button = tooltip ? (
     <InlineButton
@@ -1142,7 +1146,6 @@ function CursorEnableLimits({
   );
 }
 
-/** Brand mark for the harness a row belongs to. */
 function ProviderMark({
   provider,
   className,
@@ -1160,7 +1163,6 @@ function ProviderMark({
   );
 }
 
-/** Mutes a figure that is still coming in. The delay keeps a quick answer from flashing. */
 function figureClass(loading: boolean) {
   return cn("transition-opacity", loading && "opacity-40 delay-150");
 }
@@ -1186,10 +1188,6 @@ function Metric({
   );
 }
 
-/**
- * Explains failed or incompatible environments and deduplicated transcripts.
- * Shown inside the environment filter so arriving results do not move the page.
- */
 function UsageCoverageNotice({
   environments,
   duplicateSources,
@@ -1233,7 +1231,6 @@ function UsageCoverageNotice({
   );
 }
 
-/** Environment selection, with each environment's scan status in the menu. */
 function UsageEnvironmentFilter({
   environments,
   selectedEnvironments,
@@ -1370,7 +1367,6 @@ function UsageEnvironmentFilter({
   );
 }
 
-/** Provider visibility shared by every tab. Stored as the hidden set. */
 function UsageProviderFilter({
   hiddenProviders,
   onChange,
@@ -1430,11 +1426,6 @@ function UsageProviderFilter({
   );
 }
 
-/**
- * Stand-in with the loaded page's shape, using the shared `Skeleton` bars so it
- * breathes with the same `animate-skeleton` pulse as every other loading state.
- * Replaced by results as soon as the first environment answers.
- */
 function UsageSkeleton() {
   return (
     <>

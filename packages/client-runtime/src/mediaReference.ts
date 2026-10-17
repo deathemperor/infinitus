@@ -2,7 +2,6 @@ import { isWindowsAbsolutePath } from "@infinitus/shared/path";
 
 import { safeDecodeURIComponent } from "@infinitus/shared/markdownLinks";
 
-/** The authored media location, never the temporary URL used to load its bytes. */
 export type MediaReference =
   | {
       readonly kind: "file";
@@ -31,7 +30,6 @@ function absolutePathParts(path: string) {
   return { root: windows ? root.toLowerCase() : root, segments, windows };
 }
 
-/** Compares paths lexically for the copy menu; it does not resolve filesystem symlinks. */
 export function mediaFileReference(
   path: string,
   workspaceRoot?: string | null,

@@ -4,6 +4,8 @@ import namespaceNodeImports from "./rules/namespace-node-imports.ts";
 import noGlobalProcessRuntime from "./rules/no-global-process-runtime.ts";
 import noHermesUnsupportedApis from "./rules/no-hermes-unsupported-apis.ts";
 import noInlineSchemaCompile from "./rules/no-inline-schema-compile.ts";
+import noLowValueComments from "./rules/no-low-value-comments.ts";
+import noManualMemo from "./rules/no-manual-memo.ts";
 import noManualEffectRuntimeInTests from "./rules/no-manual-effect-runtime-in-tests.ts";
 import noMobileUniwindThemeEscapeHatches from "./rules/no-mobile-uniwind-theme-escape-hatches.ts";
 import noNativeTitleTooltip from "./rules/no-native-title-tooltip.ts";
@@ -26,7 +28,9 @@ export default definePlugin({
     "no-global-process-runtime": noGlobalProcessRuntime,
     "no-hermes-unsupported-apis": noHermesUnsupportedApis,
     "no-inline-schema-compile": noInlineSchemaCompile,
+    "no-low-value-comments": noLowValueComments,
     "no-manual-effect-runtime-in-tests": noManualEffectRuntimeInTests,
+    "no-manual-memo": noManualMemo,
     "no-mobile-uniwind-theme-escape-hatches": noMobileUniwindThemeEscapeHatches,
     "no-native-title-tooltip": noNativeTitleTooltip,
     "no-outset-state-indicators": noOutsetStateIndicators,

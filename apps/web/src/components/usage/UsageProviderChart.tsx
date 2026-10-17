@@ -1,6 +1,6 @@
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import type { UsageProviderKind } from "@infinitus/contracts";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import type { DailyTotals, HourlyTotals } from "@infinitus/shared/usageMerge";
 import {
@@ -24,7 +24,6 @@ export type UsageChartMetric = "tokens" | "cost";
 
 interface UsageProviderChartProps {
   readonly providers: readonly UsageProviderKind[];
-  /** Providers whose figures are still coming in: their lines are muted. */
   readonly loadingProviders?: ReadonlySet<UsageProviderKind>;
   readonly days: readonly string[];
   readonly daily: readonly DailyTotals[];
@@ -36,7 +35,6 @@ interface UsageProviderChartProps {
   readonly timeZone: string;
 }
 
-/** One day's per-provider values, shared by the paths and the hover readout. */
 export interface DayColumn {
   readonly bands: readonly {
     readonly provider: UsageProviderKind;
@@ -75,7 +73,6 @@ export function buildPeriodColumns(
   });
 }
 
-/** Shape-preserving cubic tangents that cannot overshoot spiky usage data. */
 function monotoneTangents(points: readonly Point[]): readonly number[] {
   const count = points.length;
   if (count < 2) return [0];
@@ -157,14 +154,6 @@ function areaPath(line: string) {
   return line === "" ? "" : `${line} L${VIEW_WIDTH},${VIEW_HEIGHT} L0,${VIEW_HEIGHT} Z`;
 }
 
-/**
- * Builds a scale whose maximum is a readable 1/2/5 x 10^n step at or above the
- * peak.
- *
- * Rounding the maximum *up* is the point: stopping at the last step below the
- * peak leaves the tallest day drawn past the top of the plot, where it is
- * clipped.
- */
 export function niceScale(peak: number, count: number): { max: number; ticks: readonly number[] } {
   if (peak <= 0) return { max: 0, ticks: [0] };
 
@@ -181,11 +170,6 @@ export function niceScale(peak: number, count: number): { max: number; ticks: re
 
 const PLACEHOLDER_TICKS = Array.from({ length: TICK_COUNT + 1 }, (_, index) => index);
 
-/**
- * Scales to the largest single provider-period. With nothing to show yet while
- * providers load, unlabeled placeholder gridlines hold their usual spacing so
- * nothing shifts on arrival.
- */
 export function chartScale(
   columns: readonly DayColumn[],
   loadingProviders: ReadonlySet<UsageProviderKind>,
@@ -207,7 +191,6 @@ function valueToY(value: number, max: number) {
   return max === 0 ? VIEW_HEIGHT : VIEW_HEIGHT - (value / max) * (VIEW_HEIGHT - PLOT_TOP);
 }
 
-/** Per-provider paths in paint order, heaviest first. */
 function buildChart(
   periods: readonly string[],
   byPeriod: ReadonlyMap<string, DailyTotals | HourlyTotals>,
@@ -237,8 +220,22 @@ function buildChart(
     };
   });
 
-  // Paint the heavier series first so the lighter one is not buried.
   return { columns, scale, stepX, paths: paths.toSorted((a, b) => b.total - a.total) };
+}
+
+// Rebuilding the chart walks every period and provider; keep it cached across hover renders.
+function useChart(
+  periods: readonly string[],
+  totals: readonly DailyTotals[] | readonly HourlyTotals[],
+  metric: UsageChartMetric,
+  providers: readonly UsageProviderKind[],
+  loadingProviders: ReadonlySet<UsageProviderKind>,
+) {
+  "use memo";
+  const byPeriod = new Map<string, DailyTotals | HourlyTotals>(
+    totals.map((entry) => ["hourStart" in entry ? entry.hourStart : entry.day, entry]),
+  );
+  return buildChart(periods, byPeriod, metric, providers, loadingProviders);
 }
 
 export function UsageProviderChart({
@@ -254,30 +251,25 @@ export function UsageProviderChart({
   timeZone,
 }: UsageProviderChartProps) {
   const periods = resolution === "hour" ? hours : days;
-  const byPeriod = useMemo(
-    () =>
-      resolution === "hour"
-        ? new Map(hourly.map((entry) => [entry.hourStart, entry]))
-        : new Map(daily.map((entry) => [entry.day, entry])),
-    [daily, hourly, resolution],
+  const { columns, scale, paths, stepX } = useChart(
+    periods,
+    resolution === "hour" ? hourly : daily,
+    metric,
+    providers,
+    loadingProviders,
   );
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const plotRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const hoverPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  const { columns, scale, paths, stepX } = useMemo(
-    () => buildChart(periods, byPeriod, metric, providers, loadingProviders),
-    [byPeriod, loadingProviders, metric, periods, providers],
-  );
   const toY = (value: number) => valueToY(value, scale.max);
-  // The delay keeps a quick answer from flashing, as with the page's figures.
   const seriesClassName = (loading: boolean) =>
     cn("transition-opacity", loading && "opacity-40 delay-150");
 
   const format = metric === "tokens" ? formatTokens : formatUsd;
 
-  const positionTooltip = useCallback(() => {
+  const positionTooltip = () => {
     const plot = plotRef.current;
     const tooltip = tooltipRef.current;
     const hoverPosition = hoverPositionRef.current;
@@ -300,7 +292,7 @@ export function UsageProviderChart({
     const top = Math.min(Math.max(0, preferredTop), Math.max(0, plotHeight - tooltipHeight));
     plot.style.setProperty("--usage-tooltip-left", `${left}px`);
     plot.style.setProperty("--usage-tooltip-top", `${top}px`);
-  }, []);
+  };
 
   useLayoutEffect(() => {
     if (hoverIndex === null) return;
@@ -313,22 +305,19 @@ export function UsageProviderChart({
     return observeResize([plot, tooltip], positionTooltip);
   }, [hoverIndex, positionTooltip]);
 
-  const handleMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      const plot = plotRef.current;
-      if (plot === null || periods.length === 0) return;
-      const bounds = plot.getBoundingClientRect();
-      if (bounds.width === 0) return;
-      const localX = Math.min(bounds.width, Math.max(0, event.clientX - bounds.left));
-      const localY = Math.min(bounds.height, Math.max(0, event.clientY - bounds.top));
-      const fraction = localX / bounds.width;
-      const index = Math.round(fraction * (periods.length - 1));
-      hoverPositionRef.current = { x: localX, y: localY };
-      positionTooltip();
-      setHoverIndex(Math.min(periods.length - 1, Math.max(0, index)));
-    },
-    [periods.length, positionTooltip],
-  );
+  const handleMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const plot = plotRef.current;
+    if (plot === null || periods.length === 0) return;
+    const bounds = plot.getBoundingClientRect();
+    if (bounds.width === 0) return;
+    const localX = Math.min(bounds.width, Math.max(0, event.clientX - bounds.left));
+    const localY = Math.min(bounds.height, Math.max(0, event.clientY - bounds.top));
+    const fraction = localX / bounds.width;
+    const index = Math.round(fraction * (periods.length - 1));
+    hoverPositionRef.current = { x: localX, y: localY };
+    positionTooltip();
+    setHoverIndex(Math.min(periods.length - 1, Math.max(0, index)));
+  };
 
   const hoveredPeriod = hoverIndex === null ? undefined : periods[hoverIndex];
   const hoveredColumn = hoverIndex === null ? undefined : columns[hoverIndex];
@@ -343,7 +332,6 @@ export function UsageProviderChart({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex gap-2">
-        {/* Axis labels sit outside the plot so they stay aligned to gridlines. */}
         <div className="relative h-56 w-14 shrink-0">
           {scale.labeled
             ? scale.ticks.map((tick) => (
@@ -391,7 +379,6 @@ export function UsageProviderChart({
               );
             })}
 
-            {/* Fills first, then every stroke, so no series covers another's line. */}
             {paths.map(({ provider, loading, area }) => (
               <path
                 key={provider}

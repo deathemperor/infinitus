@@ -88,8 +88,10 @@ const makeEnvironmentQueryHarness = Effect.fn("TestEnvironmentQuery.makeHarness"
     idleTtlMs,
     persistence,
     initialState,
+    isFinal,
   }: {
     readonly refreshTrigger?: Atom.Atom<unknown>;
+    readonly isFinal?: (value: A) => boolean;
     readonly idleTtlMs?: number;
     readonly persistence?: QueryPersistence<A>;
     readonly initialState?: SupervisorConnectionState;
@@ -127,6 +129,7 @@ const makeEnvironmentQueryHarness = Effect.fn("TestEnvironmentQuery.makeHarness"
     execute: () => execute,
     ...(refreshTrigger === undefined ? {} : { refreshTrigger: () => refreshTrigger }),
     ...(idleTtlMs === undefined ? {} : { idleTtlMs }),
+    ...(isFinal === undefined ? {} : { isFinal }),
   });
 
   return {
@@ -137,8 +140,8 @@ const makeEnvironmentQueryHarness = Effect.fn("TestEnvironmentQuery.makeHarness"
 });
 
 /**
- * Reads a query's settled value without leaving it mounted. `getResult` resumes from inside the
- * query's listener, so it only unsubscribes once the reader yields.
+ * `getResult` resumes from inside the query's listener, so it only unsubscribes
+ * once the reader yields.
  */
 const readEnvironmentQuery = <A, E>(
   registry: AtomRegistry.AtomRegistry,
@@ -317,7 +320,6 @@ describe("finite environment subscription lifecycle", () => {
               Deferred.await(releaseFinal).pipe(Effect.as({ complete: true, count: 123 })),
             ),
           ).pipe(Stream.ensuring(Deferred.succeed(closed, undefined)));
-          // Following a registered environment normally remains open for replacements.
           const environmentRegistry = EnvironmentRegistry.EnvironmentRegistry.of({
             followStream: (_environmentId: EnvironmentId, source: typeof stream) =>
               Stream.concat(source, Stream.never),
@@ -664,13 +666,36 @@ describe("environment query lifecycle", () => {
         registry.set(trigger, 1);
         expect(yield* read).toBe(2);
 
-        // Unmounted, the query stays alive on its idle TTL, but nothing reads it.
         unmount();
         registry.set(trigger, 2);
         registry.set(trigger, 3);
         expect(executions).toBe(2);
 
         expect(yield* read).toBe(3);
+      }),
+    ),
+  );
+
+  it.effect("stops refreshing on its trigger once the value is final", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        let executions = 0;
+        const trigger = Atom.make(0).pipe(Atom.keepAlive);
+        const harness = yield* makeEnvironmentQueryHarness(
+          Effect.sync(() => (executions += 1)),
+          { refreshTrigger: trigger, isFinal: (value) => value >= 2 },
+        );
+        const registry = AtomRegistry.make();
+        yield* Effect.addFinalizer(() => Effect.sync(() => registry.dispose()));
+        const read = readEnvironmentQuery(registry, harness.atom);
+
+        registry.mount(harness.atom);
+        expect(yield* read).toBe(1);
+        registry.set(trigger, 1);
+        expect(yield* read).toBe(2);
+        registry.set(trigger, 2);
+        expect(yield* read).toBe(2);
+        expect(executions).toBe(2);
       }),
     ),
   );
@@ -702,7 +727,6 @@ describe("environment query lifecycle", () => {
   it.effect("refreshes an idle query the registry swept and rebuilt after its trigger moved", () =>
     Effect.scoped(
       Effect.gen(function* () {
-        // Only the registry's idle-TTL sweeps run on these; effects keep their own scheduler.
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
         yield* Effect.addFinalizer(() => Effect.sync(() => vi.useRealTimers()));
         let executions = 0;
@@ -718,12 +742,10 @@ describe("environment query lifecycle", () => {
         const unmount = registry.mount(harness.atom);
         expect(yield* read).toBe(1);
         unmount();
-        // Lets the registry start the query node's idle TTL.
         yield* Effect.yieldNow;
         vi.advanceTimersByTime(500);
         registry.set(trigger, 1);
         yield* Effect.yieldNow;
-        // Sweeps the query node but not the data it read, whose idle TTL started with the trigger.
         vi.advanceTimersByTime(700);
         expect(executions).toBe(1);
 
