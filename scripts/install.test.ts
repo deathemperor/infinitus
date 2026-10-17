@@ -8,11 +8,14 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
+<<<<<<< HEAD
 // util-linux's script gives the real installer a terminal without a browser or extra packages.
 // Fork re-flip (#1368 D, INFINITUS.md): upstream's copy of this test names the
 // `t3` archive, executable, launcher and "Installed T3 Code" line. The fork's
 // server archive, binary and launcher are `infinitus`, so every fixture name
 // here is flipped after each sync — the installer itself is upstream's.
+=======
+>>>>>>> upstream-sync-a72b58e12-upstream-renamed
 describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer terminal", () => {
   it.each([false, true])(
     "preserves download and install behavior (HTTP failure: %s)",

@@ -27,7 +27,6 @@ function readAcknowledgedProfiles(): string[] {
   }
 }
 
-/** Read the verified environment snapshot, never the browser callback acknowledgment. */
 export function ChatGptWelcomeCoordinator() {
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const [acknowledged, setAcknowledged] = useState(readAcknowledgedProfiles);
@@ -51,9 +50,7 @@ export function ChatGptWelcomeCoordinator() {
     setAcknowledged(updated);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      /* Session dismissal still works. */
-    }
+    } catch {}
   };
   return (
     <Dialog

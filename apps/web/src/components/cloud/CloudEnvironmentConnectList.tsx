@@ -8,6 +8,7 @@ import {
 import { relayOfflineReasonMessage } from "@infinitus/client-runtime/relay";
 import {
   isAtomCommandInterrupted,
+  settlePromise,
   squashAtomCommandFailure,
 } from "@infinitus/client-runtime/state/runtime";
 import {
@@ -20,7 +21,7 @@ import type {
   RelayEnvironmentStatusResponse,
 } from "@infinitus/contracts/relay";
 import * as Option from "effect/Option";
-import { type ReactNode, useCallback, useEffect, useEffectEvent, useState } from "react";
+import { type ReactNode, useEffect, useEffectEvent, useState } from "react";
 
 import { environmentCatalog } from "~/connection/catalog";
 import { cn } from "~/lib/utils";
@@ -50,9 +51,7 @@ function discoveredCompatibilityError(
 export interface SavedCloudEnvironmentConnection {
   readonly environmentId: EnvironmentId;
   readonly connection: EnvironmentConnectionPresentation;
-  /** False for a machine saved over another route (LAN, Tailscale, SSH) only. */
   readonly relayManaged: boolean;
-  /** Present once connected; carries the user's icon override. */
   readonly serverConfig?: ServerConfig | null;
 }
 
@@ -70,13 +69,6 @@ function RemoteEnvironmentRowsSkeleton() {
   );
 }
 
-/**
- * The user's T3 Connect environments from relay discovery, each with a
- * Connect button. The primary environment is always excluded; already-saved
- * environments are hidden unless `showSavedEnvironments` renders them with
- * their live connection state (used by onboarding, where the full device mesh
- * should be visible).
- */
 export function CloudEnvironmentConnectRows({
   primaryEnvironmentId,
   savedEnvironments,
@@ -109,18 +101,15 @@ export function CloudEnvironmentConnectRows({
     if (environmentsState.refreshing || environmentsState.offline) return;
     await refreshRelayEnvironments();
   });
-  const connectRelayEnvironment = useCallback(
-    (environment: RelayClientEnvironmentRecord) =>
-      registerEnvironment(
-        new RelayConnectionRegistration({
-          target: new RelayConnectionTarget({
-            environmentId: environment.environmentId,
-            label: environment.label,
-          }),
+  const connectRelayEnvironment = (environment: RelayClientEnvironmentRecord) =>
+    registerEnvironment(
+      new RelayConnectionRegistration({
+        target: new RelayConnectionTarget({
+          environmentId: environment.environmentId,
+          label: environment.label,
         }),
-      ),
-    [registerEnvironment],
-  );
+      }),
+    );
   const [connectingEnvironmentIds, setConnectingEnvironmentIds] = useState<
     ReadonlySet<EnvironmentId>
   >(new Set());
@@ -129,7 +118,6 @@ export function CloudEnvironmentConnectRows({
       .filter((environment) => environment.relayManaged)
       .map((environment) => [environment.environmentId, environment]),
   );
-  // Saved over another route only: T3 Connect would be an added fallback.
   const savedWithoutRelay = new Set(
     savedEnvironments
       .filter((environment) => !environment.relayManaged)
@@ -201,38 +189,43 @@ export function CloudEnvironmentConnectRows({
   // During onboarding selection a machine saved over another route already
   // has its own row elsewhere, and selecting it must not add a T3 Connect
   // route as a side effect, so it is left out here.
+  const isVisibleEnvironment = (environmentId: EnvironmentId) =>
+    environmentId !== primaryEnvironmentId &&
+    (showSavedEnvironments || !savedById.has(environmentId)) &&
+    !(selection && savedWithoutRelay.has(environmentId));
   const visibleEnvironments = [...environmentsState.environments.values()].filter(
-    ({ environment }) =>
-      environment.environmentId !== primaryEnvironmentId &&
-      (showSavedEnvironments || !savedById.has(environment.environmentId)) &&
-      !(selection && savedWithoutRelay.has(environment.environmentId)),
+    ({ environment }) => isVisibleEnvironment(environment.environmentId),
   );
-  const selectNewComputers = useEffectEvent(() => {
-    const seen = selection?.autoSelectedComputers;
-    if (!selection || !seen) return;
-    for (const { environment, status, availability } of visibleEnvironments) {
-      const id = environment.environmentId;
-      if (availability === "checking") continue;
-      if (
-        discoveredCompatibilityError(status) !== null ||
-        savedById.get(id)?.connection.phase === "unsupported"
-      ) {
+  const selectNewComputers = useEffectEvent(
+    (environments: typeof environmentsState.environments) => {
+      const seen = selection?.autoSelectedComputers;
+      if (!selection || !seen) return;
+      for (const { environment, status, availability } of environments.values()) {
+        if (!isVisibleEnvironment(environment.environmentId)) continue;
+        const id = environment.environmentId;
+        if (availability === "checking") continue;
+        if (
+          discoveredCompatibilityError(status) !== null ||
+          savedById.get(id)?.connection.phase === "unsupported"
+        ) {
+          seen.add(id);
+          if (selection.selectedIds.has(id)) selection.onChange(id, false);
+          continue;
+        }
+        if (seen.has(id)) continue;
         seen.add(id);
-        if (selection.selectedIds.has(id)) selection.onChange(id, false);
-        continue;
+        selection.onChange(id, true);
+        if (!savedById.has(id)) {
+          void connectEnvironment(environment).then((connected) => {
+            if (!connected) selection.onChange(id, false);
+          });
+        }
       }
-      if (seen.has(id)) continue;
-      seen.add(id);
-      selection.onChange(id, true);
-      if (!savedById.has(id)) {
-        void connectEnvironment(environment).then((connected) => {
-          if (!connected) selection.onChange(id, false);
-        });
-      }
-    }
-  });
+    },
+  );
   useEffect(() => {
-    selectNewComputers();
+    // oxlint-disable-next-line react/set-state-in-effect -- Discovery results arrive from an external store and auto-selection starts relay connections, which mark themselves connecting.
+    selectNewComputers(environmentsState.environments);
   }, [environmentsState.environments]);
 
   // Discovery clears its list on refresh, so poll only until a machine appears.
@@ -255,12 +248,9 @@ export function CloudEnvironmentConnectRows({
       if (disposed || pending || !visible()) return;
       clearTimeout(timer);
       pending = true;
-      try {
-        await refreshDiscoveryWhenIdle();
-      } finally {
-        pending = false;
-        schedule();
-      }
+      await settlePromise(() => refreshDiscoveryWhenIdle());
+      pending = false;
+      schedule();
     };
     const onFocus = () => void refresh();
     const onVisibilityChange = () => {
@@ -292,8 +282,6 @@ export function CloudEnvironmentConnectRows({
   }
 
   if (standalone && visibleEnvironments.length === 0) {
-    // A failed or offline discovery is not "no environments" — misreporting it
-    // as empty would read as the user's devices having disappeared.
     const discoveryProblem = environmentsState.offline
       ? "You appear to be offline."
       : (Option.getOrNull(environmentsState.error)?.message ?? null);
@@ -334,13 +322,8 @@ export function CloudEnvironmentConnectRows({
       : savedEnvironment
         ? presentSavedCloudEnvironmentConnection(savedEnvironment.connection)
         : null;
-    // A connected machine's own config (with the user's icon pick) wins. Before
-    // that, the relay's health probe already carries the server's descriptor, so
-    // a machine can wear its detected glyph before this device ever connects.
     const relayStatus = status === undefined ? null : Option.getOrNull(status);
     const descriptor = relayStatus?.descriptor;
-    // Why the relay reports this environment offline, when it knows more than
-    // "no answer". Shown for saved and unsaved rows alike.
     const offlineReason =
       availability === "offline" && relayStatus !== null
         ? relayOfflineReasonMessage(relayStatus)

@@ -12,6 +12,7 @@ import {
 } from "~/components/files/projectFilesQueryState";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 
+<<<<<<< HEAD
 /**
  * Read and decode the project's checked-in `t3.json`.
  *
@@ -24,6 +25,8 @@ import { appAtomRegistry } from "~/rpc/atomRegistry";
  * `infinitus.json`, then upstream's `t3.json` — and the first file that reads
  * decides.
  */
+=======
+>>>>>>> upstream-sync-a72b58e12-upstream-renamed
 export async function readT3ProjectFile(
   environmentId: EnvironmentId,
   workspaceRoot: string,

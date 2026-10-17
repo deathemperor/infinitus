@@ -17,6 +17,7 @@
       "vitest": { "entry": [".github/**/*.test.cjs"] },
     },
     "scripts": {
+<<<<<<< HEAD
       // Knip loads its preprocessor through a CLI option, not a source import;
       // native verification and worktree setup (from infinitus.json) run
       // directly; the fork's visual pass (harness, fixture, check) is run by
@@ -33,6 +34,13 @@
         "infinitus-rename.ts",
         "export-infinitus-splash.ts",
       ],
+=======
+      // Knip loads its preprocessor through a CLI option; native verification and
+      // worktree setup (from t3.json) run directly.
+      "entry": ["knip-schemas.ts", "mobile-native-client.ts", "setup-worktree.ts"],
+      // The `t3` npm package's files: copied into the package, never imported.
+      "ignore": ["npm-launcher/**"],
+>>>>>>> upstream-sync-a72b58e12-upstream-renamed
     },
     "apps/server": {
       // Vite+ pack entries and the launcher used by installed background services.
@@ -128,6 +136,11 @@
       "includeEntryExports": true,
       "entry": ["test/fixtures/*.ts"],
       "ignoreIssues": { "src/_generated/**": ["exports", "types"] },
+    },
+    "packages/source-control-github": {
+      // graphqlgen reads its config; the generated operations export every selection's class.
+      "entry": ["graphql.config.ts"],
+      "ignoreIssues": { "**/*.graphql.ts": ["exports", "types", "namespaceMembers"] },
     },
   },
 }

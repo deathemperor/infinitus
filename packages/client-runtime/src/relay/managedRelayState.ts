@@ -197,7 +197,6 @@ function readSessionClerkToken(
   );
 }
 
-/** Removes an environment from the signed-in account without contacting that environment. */
 export const deregisterManagedRelayEnvironment = Effect.fn(
   "clientRuntime.managedRelaySession.deregisterEnvironment",
 )(function* (
