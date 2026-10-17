@@ -3,8 +3,6 @@ import type { ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
-// Pinned so the direction cases below read as fixed versions instead of
-// arithmetic on whatever version this checkout happens to be at.
 const branding = vi.hoisted(() => ({ APP_VERSION: "0.0.34" }));
 vi.mock("./branding", () => branding);
 

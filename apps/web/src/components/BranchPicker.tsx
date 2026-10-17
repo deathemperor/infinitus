@@ -1,7 +1,6 @@
 import type { VcsRef } from "@infinitus/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import {
-  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -28,7 +27,6 @@ import {
 } from "./ui/combobox";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
-/** Shared composer picker UI. The caller owns selection and any checkout mutations. */
 export function BranchPicker({
   items,
   filteredItems,
@@ -72,24 +70,21 @@ export function BranchPicker({
   const startFromOriginSwitchId = useId();
   const branchListScrollElementRef = useRef<HTMLElement | null>(null);
   const previousBranchListScrollTopRef = useRef<number | null>(null);
-  const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      previousBranchListScrollTopRef.current = null;
-      if (!nextOpen) highlightedValueRef.current = null;
-      onOpenChange(nextOpen);
-    },
-    [onOpenChange],
-  );
+  const handleOpenChange = (nextOpen: boolean) => {
+    previousBranchListScrollTopRef.current = null;
+    if (!nextOpen) highlightedValueRef.current = null;
+    onOpenChange(nextOpen);
+  };
   const [showTopBranchScrollFade, setShowTopBranchScrollFade] = useState(false);
   const [showBottomBranchScrollFade, setShowBottomBranchScrollFade] = useState(false);
-  const fetchNextBranchPage = useCallback(() => {
+  const fetchNextBranchPage = () => {
     if (!hasNextPage || isFetchingNextPage) {
       return;
     }
 
     onLoadNext();
-  }, [onLoadNext, hasNextPage, isFetchingNextPage]);
-  const maybeFetchNextBranchPage = useCallback(() => {
+  };
+  const maybeFetchNextBranchPage = () => {
     const scrollElement = branchListScrollElementRef.current;
     if (!scrollElement) {
       return;
@@ -112,10 +107,10 @@ export function BranchPicker({
     }
 
     fetchNextBranchPage();
-  }, [fetchNextBranchPage, hasNextPage, open, isFetchingNextPage]);
+  };
 
   const branchListRef = useRef<LegendListRef | null>(null);
-  const updateBranchListScrollFades = useCallback(() => {
+  const updateBranchListScrollFades = () => {
     const scrollElement = branchListRef.current?.getScrollableNode?.();
     if (!(scrollElement instanceof HTMLElement)) {
       return;
@@ -124,7 +119,7 @@ export function BranchPicker({
     const maxScrollOffset = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
     setShowTopBranchScrollFade(scrollElement.scrollTop > 1);
     setShowBottomBranchScrollFade(maxScrollOffset - scrollElement.scrollTop > 1);
-  }, []);
+  };
 
   useLayoutEffect(() => {
     if (!open) {

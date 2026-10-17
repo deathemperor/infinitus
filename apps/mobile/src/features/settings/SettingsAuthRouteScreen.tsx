@@ -1,5 +1,9 @@
 import { useAuth } from "@clerk/expo";
-import { AuthView, type UserProfileCustomPage, UserProfileView } from "@clerk/expo/native";
+import {
+  AuthView,
+  type UserProfileCustomPage,
+  UserProfileView,
+} from "@clerk/expo/native-components";
 import { StackActions, useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { View } from "react-native";
@@ -8,7 +12,6 @@ import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { InfinitusConnectProfilePage } from "../cloud/InfinitusConnectProfilePage";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 
-// Custom rows in Clerk's native profile. Mirrors the web UserButton pages.
 const USER_PROFILE_CUSTOM_PAGES = [
   {
     path: "t3-connect",

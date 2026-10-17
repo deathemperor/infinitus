@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ProviderDriverKind } from "@infinitus/contracts";
+import {
+  makeProviderSettingsSchema,
+  ProviderDriverKind,
+  TrimmedString,
+} from "@infinitus/contracts";
+import * as Schema from "effect/Schema";
 
 import { providerClients } from "./providerDriverMeta";
 import {
@@ -30,9 +35,22 @@ describe("ProviderSettingsForm helpers", () => {
 
     expect(serverPassword).toMatchObject({
       label: "Server password",
-      description: "Stored in plain text on disk.",
+      description: "Stored separately on the host.",
       control: "password",
+      secret: true,
     });
+  });
+
+  it("keeps every masked field as a stored secret", () => {
+    const settingsSchema = makeProviderSettingsSchema({
+      token: TrimmedString.pipe(
+        Schema.annotateKey({ providerSettingsForm: { control: "password" } }),
+      ),
+    });
+
+    expect(deriveProviderSettingsFields({ settingsSchema })).toMatchObject([
+      { key: "token", secret: true },
+    ]);
   });
 
   it("uses a dedicated environment field instead of legacy Cursor CLI settings", () => {

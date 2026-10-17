@@ -173,7 +173,6 @@ export class LinuxCaptureConnection {
       });
       if (kde !== undefined && decodeKde(kde).Version.value >= 2) return "kde";
     }
-    // Sandboxed apps already have an identity. Host apps register before any portal calls.
     if (!process.env.FLATPAK_ID && !process.env.SNAP) {
       await this.call({
         destination: PORTAL,
@@ -298,7 +297,6 @@ export class LinuxCaptureConnection {
           }),
         );
       }
-      // Closing this dedicated connection also removes the signal match.
     }
   }
 
