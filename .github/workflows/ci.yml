@@ -23,7 +23,7 @@ jobs:
   # open: if the diff cannot be resolved, everything runs.
   changes:
     name: Changes
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       typecheck: ${{ steps.detect.outputs.typecheck }}
@@ -137,7 +137,7 @@ jobs:
     name: Build and Typecheck
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.build != 'false' || needs.changes.outputs.typecheck != 'false') }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 >>>>>>> upstream-sync-a72b58e12-upstream-renamed
     steps:
@@ -223,7 +223,7 @@ jobs:
 =======
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.test != 'false' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 >>>>>>> upstream-sync-a72b58e12-upstream-renamed
     steps:
@@ -300,7 +300,7 @@ jobs:
 =======
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.test_web != 'false' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 >>>>>>> upstream-sync-a72b58e12-upstream-renamed
     steps:
@@ -452,7 +452,7 @@ jobs:
 =======
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 >>>>>>> upstream-sync-a72b58e12-upstream-renamed
     steps:
@@ -574,7 +574,7 @@ jobs:
     name: Mobile Native Static Analysis
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.mobile_native != 'false' }}
-    runs-on: blacksmith-6vcpu-macos-26
+    runs-on: macos-latest
     timeout-minutes: 10
 >>>>>>> upstream-sync-a72b58e12-upstream-renamed
     steps:
@@ -609,7 +609,7 @@ jobs:
 =======
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.release_smoke != 'false' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 >>>>>>> upstream-sync-a72b58e12-upstream-renamed
     steps:
