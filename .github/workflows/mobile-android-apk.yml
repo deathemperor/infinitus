@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
 =======
     name: Mirror beta APK
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
 >>>>>>> upstream-sync-2fbd4318f-upstream-renamed
     timeout-minutes: 10
     permissions:
