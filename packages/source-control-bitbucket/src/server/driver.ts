@@ -1,10 +1,4 @@
 import { SourceControlProviderKind } from "@infinitus/contracts";
-/**
- * The Bitbucket Cloud driver: repository operations, discovery, and pull requests through the
- * Bitbucket REST API.
- *
- * @module source-control-bitbucket/server/driver
- */
 import { defineSourceControlDriver } from "@infinitus/source-control-core/server/driver";
 import * as Effect from "effect/Effect";
 

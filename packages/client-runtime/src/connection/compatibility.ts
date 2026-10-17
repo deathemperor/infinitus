@@ -27,7 +27,6 @@ export function orchestrationProtocolCompatibilityError(
       });
 }
 
-/** Whether this client can drive the host's update remotely. */
 function canSelfUpdate(descriptor: ExecutionEnvironmentDescriptor): boolean {
   const { serverSelfUpdate, desktopAppUpdate } = descriptor.capabilities;
   return (

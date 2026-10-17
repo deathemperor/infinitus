@@ -1,11 +1,3 @@
-/**
- * TerminalManager - Terminal session orchestration service interface.
- *
- * Owns terminal lifecycle operations, output fanout, and session state
- * transitions for thread-scoped terminals.
- *
- * @module TerminalManager
- */
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import {
   DEFAULT_TERMINAL_ID,
@@ -49,6 +41,7 @@ import { mergePathEntries } from "@infinitus/shared/shell";
 import { acpRegistryManagedBinaryDirectories } from "@infinitus/provider-acp-registry/server";
 import { getTerminalLabel } from "@infinitus/shared/terminalLabels";
 import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
@@ -148,56 +141,30 @@ class TerminalProcessSignalError extends Schema.TaggedError<TerminalProcessSigna
   }
 }
 
-/**
- * TerminalManager - Service tag for terminal session orchestration.
- */
 export class TerminalManager extends Context.Service<
   TerminalManager,
   {
-    /**
-     * Open or attach to a terminal session.
-     *
-     * Reuses an existing session for the same thread/terminal id and restores
-     * persisted history on first open.
-     */
     readonly open: (
       input: TerminalOpenInput,
     ) => Effect.Effect<TerminalSessionSnapshot, TerminalError>;
 
-    /**
-     * Attach to a terminal and stream its initial snapshot followed by live events.
-     *
-     * Returns an unsubscribe function.
-     */
     readonly attachStream: (
       input: TerminalAttachInput,
       listener: (event: TerminalAttachStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void, TerminalError>;
 
-    /** Observe an existing session without starting or changing its process. */
     readonly observeStream: (
       input: TerminalObserveInput,
       listener: (event: TerminalAttachStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void, TerminalError>;
 
-    /**
-     * Write input bytes to a terminal session.
-     */
     readonly write: (input: TerminalWriteInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Resize the PTY backing a terminal session.
-     */
     readonly resize: (input: TerminalResizeInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Clear terminal output history.
-     */
     readonly clear: (input: TerminalClearInput) => Effect.Effect<void, TerminalError>;
 
     /**
-     * Restart a terminal session in place.
-     *
      * Always resets history before spawning the new process.
      */
     readonly restart: (
@@ -205,37 +172,19 @@ export class TerminalManager extends Context.Service<
     ) => Effect.Effect<TerminalSessionSnapshot, TerminalError>;
 
     /**
-     * Close an active terminal session.
-     *
      * When `terminalId` is omitted, closes all sessions for the thread.
      */
     readonly close: (input: TerminalCloseInput) => Effect.Effect<void, TerminalError>;
 
-    /**
-     * Close a thread's terminals that wait at an idle shell prompt. A terminal
-     * that runs a command stays open. When `terminalId` is set, only that
-     * terminal is considered. Used when a thread settles and when a setup
-     * script finishes.
-     */
     readonly closeIdle: (input: {
       readonly threadId: string;
       readonly terminalId?: string;
     }) => Effect.Effect<void>;
 
-    /**
-     * Subscribe to terminal runtime events with a direct callback.
-     *
-     * Returns an unsubscribe function.
-     */
     readonly subscribe: (
       listener: (event: TerminalEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void>;
 
-    /**
-     * Subscribe to lightweight terminal metadata with an initial full snapshot.
-     *
-     * Returns an unsubscribe function.
-     */
     readonly subscribeMetadata: (
       listener: (event: TerminalMetadataStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void>;
@@ -299,7 +248,6 @@ interface TerminalSessionState {
   exitSignal: number | null;
   updatedAt: string;
   eventSequence: number;
-  /** Counts writes, so closeIdle can see input that has not echoed yet. */
   inputCount: number;
   cols: number;
   rows: number;
@@ -307,7 +255,6 @@ interface TerminalSessionState {
   unsubscribeData: (() => void) | null;
   unsubscribeExit: (() => void) | null;
   hasRunningSubprocess: boolean;
-  /** Normalized child command name when `hasRunningSubprocess`; cleared when idle. */
   childCommandLabel: string | null;
   runtimeEnv: Record<string, string> | null;
 }
@@ -875,7 +822,6 @@ export class BoundedTerminalHistory {
     this.cachedValue = null;
     if (this.maxBytes <= 0 || this.maxLines <= 0) {
       this.clear();
-      // Preserve the existing zero-line limit's trailing newline behavior.
       if (this.maxBytes > 0 && text.endsWith("\n")) this.appendChunk("\n");
       return;
     }
@@ -986,14 +932,12 @@ export class BoundedTerminalHistory {
         continue;
       }
       if (first.byteLength === first.data.length && first.lineBreaks === 0) {
-        // ASCII without newlines needs no scan to find the byte cutoff.
         this.trimChunk(bytesToDrop, bytesToDrop, 0);
         continue;
       }
       let offset = 0;
       let bytes = 0;
       let lineBreaks = 0;
-      // Scan only the discarded prefix of one small chunk, never all history.
       while (bytes < bytesToDrop) {
         const codePoint = first.data.codePointAt(offset)!;
         bytes += codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4;
@@ -1124,8 +1068,6 @@ function sanitizeTerminalHistoryChunk(
   pendingControlSequence: string,
   data: string,
 ): { visibleText: string; pendingControlSequence: string } {
-  // Plain output has nothing to filter. A pending sequence still needs the parser
-  // even when this chunk only contains its final bytes.
   if (pendingControlSequence.length === 0 && !HISTORY_SEQUENCE_START.test(data)) {
     return { visibleText: data, pendingControlSequence: "" };
   }
@@ -1269,17 +1211,7 @@ function shouldExcludeTerminalEnvKey(key: string): boolean {
   return TERMINAL_ENV_BLOCKLIST.has(normalizedKey);
 }
 
-// Marker variables the AppImage runtime injects into the process it launches.
-// They describe the AppImage itself, not the user's session, so terminals must
-// not inherit them.
 const APPIMAGE_RUNTIME_ENV_KEYS = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"] as const;
-// Colon-separated search-path variables the AppImage runtime points at its
-// temporary mount (e.g. /tmp/.mount_T3-XXXX/usr/bin, the bundled glib schemas,
-// and an $APPDIR/usr/share XDG data entry). Only the mount segments are
-// dropped; the user's real entries are preserved. When nothing but mount
-// segments remain the variable is removed entirely so consumers fall back to
-// their platform default (e.g. gsettings finds the host schemas instead of
-// reporting "No schemas installed"). See issues #1699 and #5059.
 const APPIMAGE_PATH_LIKE_ENV_KEYS = [
   "PATH",
   "LD_LIBRARY_PATH",
@@ -1295,9 +1227,8 @@ function isPathSegmentUnderAppDir(segment: string, appDir: string): boolean {
 // injects APPIMAGE/APPDIR/ARGV0/OWD plus mount entries on PATH/LD_LIBRARY_PATH.
 // The integrated terminal inherits the server process environment, so without
 // this scrub those leak into the PTY and tools resolve against the AppImage
-// mount instead of the user's real environment (e.g. `php` reporting
-// PHP_BINARY as the AppImage path). See issue #1699. The scrub is gated on an
-// actual AppImage launch so non-AppImage environments are left untouched.
+// mount instead of the user's real environment (e.g. `php` reporting PHP_BINARY
+// as the AppImage path). See issue #1699.
 function stripAppImageRuntimeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (env.APPIMAGE === undefined && env.APPDIR === undefined) return env;
 
@@ -1347,8 +1278,6 @@ function createTerminalSpawnEnv(
         key === "CODEX_HOME" || key === "CLAUDE_CONFIG_DIR" ? expandHomePath(value, home) : value;
     }
   }
-  // An explicit empty override opts out for terminals started without a client.
-  // Otherwise both PTY backends feed truecolor-capable terminal clients.
   if (!spawnEnv.COLORTERM && runtimeEnv?.COLORTERM === undefined) {
     spawnEnv.COLORTERM = "truecolor";
   }
@@ -1371,11 +1300,6 @@ interface TerminalManagerOptions {
   ptyAdapter: PtyAdapter.PtyAdapter["Service"];
   shellResolver?: () => string;
   env?: NodeJS.ProcessEnv;
-  /**
-   * Catalog cache and tool directories for managed ACP Registry installs. Their
-   * install directories are appended to the terminal PATH so users can run
-   * managed agents by name (e.g. `kimi login`).
-   */
   managedBinaryCacheDir?: string;
   managedBinaryToolsDir?: string;
   subprocessInspector?: TerminalSubprocessInspector;
@@ -1496,7 +1420,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   // Terminals must inherit the user's full environment (minus the blocklist
   // applied in createTerminalSpawnEnv) — an allowlist here silently strips
   // things like PSModulePath, DISPLAY, proxies, and toolchain variables.
-  // `options.env` is the test seam.
   const baseEnv = options.env ?? process.env;
   const environment = yield* Effect.serviceOption(ServerEnvironment);
   const environmentId = Option.isSome(environment)
@@ -1533,11 +1456,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
   const fetchProcessTableSnapshot: Effect.Effect<
     {
       readonly snapshot: TerminalProcessTableSnapshot;
-      /**
-       * False when the sidecar snapshot failed and this table came from the
-       * spawned fallback. The data is still applied, but the tick counts as
-       * a failure so polling backs off instead of hot-looping the fallback.
-       */
       readonly snapshotSucceeded: boolean;
     },
     TerminalSubprocessCheckError
@@ -1655,6 +1573,11 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     fiber: Fiber.Fiber<void, never>,
   ) {
     yield* modifyManagerState((state) => {
+      // The child may finish (and run its finalizer) before this registration.
+      // Check inside the synchronized update so completed fibers are not retained.
+      if (fiber.pollUnsafe() !== undefined) {
+        return [undefined, state] as const;
+      }
       const killFibers = new Map(state.killFibers);
       killFibers.set(process, fiber);
       return [undefined, { ...state, killFibers }] as const;
@@ -1666,49 +1589,66 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     threadId: string,
     terminalId: string,
   ) {
-    const terminated = yield* Effect.try({
-      try: () => process.kill("SIGTERM"),
-      catch: (cause) =>
-        new TerminalProcessSignalError({
-          cause,
-          signal: "SIGTERM",
-          terminalPid: process.pid,
-        }),
-    }).pipe(
-      Effect.as(true),
-      Effect.catch((error) =>
-        Effect.logWarning("failed to kill terminal process", {
-          threadId,
-          terminalId,
-          signal: "SIGTERM",
-          cause: error,
-        }).pipe(Effect.as(false)),
-      ),
-    );
-    if (!terminated) {
-      return;
-    }
+    // Subscribe before SIGTERM so an immediate exit is not missed. Released with
+    // Effect.ensuring because a JS `finally` does not run when the fiber is interrupted.
+    const exited = Deferred.makeUnsafe<void>();
+    const unsubscribeExit = process.onExit(() => {
+      Deferred.doneUnsafe(exited, Effect.void);
+    });
+    yield* Effect.gen(function* () {
+      const terminated = yield* Effect.try({
+        try: () => process.kill("SIGTERM"),
+        catch: (cause) =>
+          new TerminalProcessSignalError({
+            cause,
+            signal: "SIGTERM",
+            terminalPid: process.pid,
+          }),
+      }).pipe(
+        Effect.as(true),
+        Effect.catch((error) =>
+          Effect.logWarning("failed to kill terminal process", {
+            threadId,
+            terminalId,
+            signal: "SIGTERM",
+            cause: error,
+          }).pipe(Effect.as(false)),
+        ),
+      );
+      if (!terminated) {
+        return;
+      }
 
-    yield* Effect.sleep(processKillGraceMs);
+      const exitedBeforeGrace = yield* Deferred.await(exited).pipe(
+        Effect.as(true),
+        Effect.timeoutOrElse({
+          duration: processKillGraceMs,
+          orElse: () => Effect.succeed(false),
+        }),
+      );
+      if (exitedBeforeGrace) {
+        return;
+      }
 
-    yield* Effect.try({
-      try: () => process.kill("SIGKILL"),
-      catch: (cause) =>
-        new TerminalProcessSignalError({
-          cause,
-          signal: "SIGKILL",
-          terminalPid: process.pid,
-        }),
-    }).pipe(
-      Effect.catch((error) =>
-        Effect.logWarning("failed to force-kill terminal process", {
-          threadId,
-          terminalId,
-          signal: "SIGKILL",
-          cause: error,
-        }),
-      ),
-    );
+      yield* Effect.try({
+        try: () => process.kill("SIGKILL"),
+        catch: (cause) =>
+          new TerminalProcessSignalError({
+            cause,
+            signal: "SIGKILL",
+            terminalPid: process.pid,
+          }),
+      }).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("failed to force-kill terminal process", {
+            threadId,
+            terminalId,
+            signal: "SIGKILL",
+            cause: error,
+          }),
+        ),
+      );
+    }).pipe(Effect.ensuring(Effect.sync(unsubscribeExit)));
   });
 
   const startKillEscalation = Effect.fn("terminal.startKillEscalation")(function* (
@@ -2202,6 +2142,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       args: candidate.args ?? [],
       name: "terminal",
       env: spawnEnv,
+      survivesRestart: true,
     });
     const attempt = yield* Effect.result(
       options.ptyAdapter.spawn({
@@ -3009,7 +2950,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
 
   const resizeLocked = Effect.fn("terminal.resize")(function* (input: TerminalResizeInput) {
     const session = yield* getSession(input.threadId, input.terminalId);
-    // ResizeObserver traffic can already be in flight when the UI closes the session.
     if (Option.isNone(session)) {
       return;
     }
@@ -3172,9 +3112,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
             (input.terminalId === undefined || session.terminalId === input.terminalId),
         );
         if (running.length === 0) return;
-        // A command started during the process check can miss the snapshot,
-        // but its input or echo still lands. Both counters only grow, so the
-        // sum changes when either one does.
         const activityMark = (session: TerminalSessionState) =>
           session.eventSequence + session.inputCount;
         const marks = new Map(
@@ -3198,7 +3135,6 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         );
       }),
     ).pipe(
-      // The process check failed, so every terminal stays open.
       Effect.catch((error) =>
         Effect.logWarning("failed to close idle terminals", {
           threadId: input.threadId,
