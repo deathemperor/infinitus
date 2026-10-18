@@ -1,44 +1,63 @@
 import { NATIVE_WORKSPACE_COLUMNS_SUPPORTED } from "../native/NativeWorkspaceColumns";
 import Constants from "expo-constants";
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
+import { useState } from "react";
 import { Platform, View } from "react-native";
 
+<<<<<<< HEAD
 import { AppText as Text } from "./AppText";
 import { IPAD_HOME_TITLE_OFFSET } from "../lib/layoutMetrics";
 import { resolveMobileStageLabel } from "../lib/mobileBranding";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAndroidControlSizing } from "./useAndroidControlSizing";
+=======
+import { AppText as Text } from "./ui/AppText";
+import { InfinitusWordmark } from "./InfinitusWordmark";
+import { IPAD_HOME_TITLE_OFFSET } from "../lib/layoutMetrics";
+import { resolveMobileStageLabel } from "../lib/mobileBranding";
+import { useAndroidControlSizing } from "./ui/useAndroidControlSizing";
+>>>>>>> upstream-sync-eb1d80c66-upstream-renamed
 
-/**
- * Horizontal correction applied to content rendered in the brand title slot,
- * shared with the connection-status swap so both align identically.
- */
 export function brandTitleOffset(): number {
   if (Platform.OS !== "ios") return 0;
   return Platform.isPad && !NATIVE_WORKSPACE_COLUMNS_SUPPORTED ? IPAD_HOME_TITLE_OFFSET : 0;
 }
 
-/**
- * Compact brand lockup sized for native navigation bars.
- */
 export function CompactBrandTitle(
   props: {
     readonly allowFontScaling?: boolean;
     readonly accessibilityLabel?: string;
+    /**
+     * Fills the parent row and drops the stage badge when the full title does not fit.
+     * Narrow Android sidebar headers otherwise draw their actions over the badge.
+     */
+    readonly fit?: boolean;
   } = {},
 ) {
   const stageLabel = resolveMobileStageLabel(Constants.expoConfig?.extra?.appVariant);
   const titleOffset = brandTitleOffset();
   const { scale } = useAndroidControlSizing();
+  const [availableWidth, setAvailableWidth] = useState<number | null>(null);
+  // Measured only while the badge shows, so hiding it does not make it look like it fits.
+  const [fullWidth, setFullWidth] = useState<number | null>(null);
+  const showStage =
+    !props.fit || availableWidth === null || fullWidth === null || fullWidth <= availableWidth;
 
-  return (
+  const title = (
     <View
+      onLayout={
+        props.fit && showStage ? (event) => setFullWidth(event.nativeEvent.layout.width) : undefined
+      }
       aria-level={1}
       accessibilityLabel={props.accessibilityLabel ?? `${PRODUCT_NAME}, Threads`}
       accessible
       role="heading"
       className="flex-row items-center gap-1.5"
-      style={[{ marginLeft: titleOffset }, Platform.OS === "android" && { gap: 5.25 * scale }]}
+      style={[
+        { marginLeft: titleOffset },
+        Platform.OS === "android" && { gap: 5.25 * scale },
+        props.fit && { flexShrink: 0 },
+      ]}
     >
       <Text
         allowFontScaling={props.allowFontScaling}
@@ -47,23 +66,36 @@ export function CompactBrandTitle(
       >
         {PRODUCT_NAME}
       </Text>
-      <View
-        className="rounded-full bg-subtle px-1.5 py-0.5"
-        style={
-          Platform.OS === "android"
-            ? { paddingHorizontal: 5.25 * scale, paddingVertical: 1.75 * scale }
-            : undefined
-        }
-      >
-        <Text
-          allowFontScaling={props.allowFontScaling}
-          className="font-infinitus-bold text-foreground-muted uppercase"
-          style={{ fontSize: 9 * scale, letterSpacing: 0.9 * scale }}
+      {showStage ? (
+        <View
+          className="rounded-full bg-subtle px-1.5 py-0.5"
+          style={
+            Platform.OS === "android"
+              ? { paddingHorizontal: 5.25 * scale, paddingVertical: 1.75 * scale }
+              : undefined
+          }
         >
-          {stageLabel}
-        </Text>
-      </View>
+          <Text
+            allowFontScaling={props.allowFontScaling}
+            className="font-infinitus-bold text-foreground-muted uppercase"
+            style={{ fontSize: 9 * scale, letterSpacing: 0.9 * scale }}
+          >
+            {stageLabel}
+          </Text>
+        </View>
+      ) : null}
     </View>
+  );
+
+  return props.fit ? (
+    <View
+      className="min-w-0 flex-1 flex-row items-center"
+      onLayout={(event) => setAvailableWidth(event.nativeEvent.layout.width)}
+    >
+      {title}
+    </View>
+  ) : (
+    title
   );
 }
 

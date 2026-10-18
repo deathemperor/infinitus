@@ -4,10 +4,6 @@ import { withUniwind } from "uniwind";
 
 const ThemedPath = withUniwind(Path);
 
-/**
- * The "T3" brand mark, matching the desktop sidebar's InfinitusWordmark SVG
- * (apps/web Sidebar.tsx). Width derives from the viewBox aspect ratio.
- */
 export function InfinitusWordmark(props: {
   readonly height: number;
   readonly color?: ColorValue;

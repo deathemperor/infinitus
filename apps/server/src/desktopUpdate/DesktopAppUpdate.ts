@@ -19,13 +19,9 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as ServerConfig from "../config.ts";
 import * as DesktopTelemetryReceiver from "../resourceTelemetry/DesktopTelemetryReceiver.ts";
 
-/** Backstop for a desktop updater that hangs without ever reporting a
-    terminal outcome. Generous: it covers a slow download of a full build. */
 const DESKTOP_UPDATE_TIMEOUT = Duration.minutes(20);
 const DESKTOP_INSTALL_TIMEOUT = Duration.minutes(2);
 
-/** Progress stage a desktop update state maps to, or null when the state
-    carries no progress worth streaming. */
 function desktopUpdateProgressStage(
   state: DesktopUpdateState,
 ): ServerSelfUpdateProgressStage | null {
@@ -44,17 +40,13 @@ function desktopUpdateProgressStage(
 export class DesktopAppUpdate extends Context.Service<
   DesktopAppUpdate,
   {
-    /** True when this server was spawned by a desktop app that can be
-        driven over the telemetry control channel. */
     readonly available: boolean;
-    /** Checks and downloads through the desktop app, then returns a token
-        while this server is still connected. `commit` starts installation. */
     readonly run: (
       reportProgress: (
         stage: ServerSelfUpdateProgressStage,
       ) => Effect.Effect<void, ServerSelfUpdateError>,
     ) => Effect.Effect<ServerSelfUpdateResult, ServerSelfUpdateError>;
-    /** Starts the prepared install. Success stops this server, so this effect
+    /** Success stops this server, so this effect
         returns only when installation fails or times out. */
     readonly commit: (
       requestId: string,
@@ -157,11 +149,13 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
 
       return yield* Effect.scoped(
         Effect.gen(function* () {
-          const requestId = yield* crypto.randomUUIDv4.pipe(
-            Effect.mapError((error) =>
-              failWith("Could not generate a desktop update request id.", error),
-            ),
-          );
+          const requestId = yield* crypto
+            .randomUUIDv4()
+            .pipe(
+              Effect.mapError((error) =>
+                failWith("Could not generate a desktop update request id.", error),
+              ),
+            );
           // Subscribe before sending the request so a fast first report
           // cannot be missed.
           const { changes } = yield* receiver.desktopUpdates;

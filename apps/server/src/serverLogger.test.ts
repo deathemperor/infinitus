@@ -1,19 +1,29 @@
 import * as NodePath from "@effect/platform-node/NodePath";
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeOS from "node:os";
+import { ExternalLauncherBrowserSpawnError } from "@infinitus/contracts";
+import * as Cause from "effect/Cause";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Tracer from "effect/Tracer";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as TestConsole from "effect/testing/TestConsole";
 
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
 
 import * as ServerConfig from "./config.ts";
+import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ServerLogger from "./serverLogger.ts";
+import {
+  announceStartupPairingUrl,
+  logBrowserAutoOpenUnavailable,
+  maybeOpenBrowser,
+} from "./serverRuntimeStartup.ts";
 
 interface ExportedRequest {
   readonly url: string;
@@ -21,7 +31,6 @@ interface ExportedRequest {
   readonly body: string;
 }
 
-/** Answers every export with a 200 and keeps what was posted for assertions. */
 const layerCollector = (requests: Array<ExportedRequest>) =>
   Layer.succeed(
     HttpClient.HttpClient,
@@ -84,9 +93,8 @@ const layerConfig = (overrides: Partial<ServerConfig.ServerConfig["Service"]>) =
   ).pipe(Layer.provide(NodePath.layer));
 
 /**
- * Logs once with the server's own logger set installed, then reports what the
- * collector received. The export is asserted after the layer's scope closes,
- * which is where the exporter flushes whatever the interval did not.
+ * The export is asserted after the layer's scope closes, which is where the
+ * exporter flushes whatever the interval did not.
  */
 const logThrough = (overrides: Partial<ServerConfig.ServerConfig["Service"]>) =>
   Effect.gen(function* () {
@@ -103,10 +111,14 @@ const logThrough = (overrides: Partial<ServerConfig.ServerConfig["Service"]>) =>
   });
 
 /**
- * Logs inside a span so the tracer logger has somewhere to attach an event,
- * then reports both what the collector received and what landed on the span.
+ * Runs `program` (one log line by default) inside a span so the tracer logger
+ * has somewhere to attach an event, then reports both what the collector
+ * received and what landed on the span.
  */
-const logInSpanThrough = (overrides: Partial<ServerConfig.ServerConfig["Service"]>) =>
+const logInSpanThrough = (
+  overrides: Partial<ServerConfig.ServerConfig["Service"]>,
+  program: Effect.Effect<void> = Effect.log("server logger under test"),
+) =>
   Effect.gen(function* () {
     const requests: Array<ExportedRequest> = [];
     const spans: Array<Tracer.NativeSpan> = [];
@@ -120,7 +132,7 @@ const logInSpanThrough = (overrides: Partial<ServerConfig.ServerConfig["Service"
         },
       }),
     );
-    yield* Effect.log("server logger under test").pipe(
+    yield* program.pipe(
       Effect.withSpan("server-logger-test"),
       Effect.provide(
         Layer.mergeAll(
@@ -228,4 +240,79 @@ describe("ServerLoggerLive", () => {
       assert.lengthOf(spans[0]?.events ?? [], 0);
     }),
   );
+
+  describe("startup pairing URL", () => {
+    const pairingToken = "PAIRTOKEN7Q4K9";
+    const pairingUrl = `http://localhost:3773/pair#token=${pairingToken}`;
+    const announce = announceStartupPairingUrl(pairingUrl).pipe(
+      Effect.andThen(logBrowserAutoOpenUnavailable),
+    );
+
+    it.effect("prints the full URL but keeps its token out of exported log records", () =>
+      Effect.gen(function* () {
+        const { requests } = yield* logInSpanThrough(
+          { otlpLogsUrl: "https://collector.example.com/v1/logs" },
+          announce,
+        );
+
+        const body = requests.map((request) => request.body).join("\n");
+        assert.include(body, "Authentication required");
+        assert.notInclude(body, pairingToken);
+        const printed = (yield* TestConsole.logLines).map((line) =>
+          Array.isArray(line) ? line.join(" ") : String(line),
+        );
+        assert.isTrue(printed.some((line) => line.includes(`pairingUrl: ${pairingUrl}`)));
+      }).pipe(Effect.provide(TestConsole.layer)),
+    );
+
+    it.effect("keeps the token off the span events the trace file records", () =>
+      Effect.gen(function* () {
+        const { spans } = yield* logInSpanThrough({}, announce);
+
+        const events = JSON.stringify(
+          spans.flatMap((span) => span.events.map(([name, , attributes]) => [name, attributes])),
+        );
+        assert.include(events, "Authentication required");
+        assert.notInclude(events, pairingToken);
+      }).pipe(Effect.provide(TestConsole.layer)),
+    );
+
+    it.effect("keeps the token out of traces when the browser fails to open", () =>
+      Effect.gen(function* () {
+        // A failed launch records its error, which names the target, on its span.
+        const failingLaunch = maybeOpenBrowser(pairingUrl).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              layerConfig({ noBrowser: false }),
+              Layer.mock(ExternalLauncher.ExternalLauncher)({
+                launchBrowser: (target) =>
+                  Effect.fail(
+                    new ExternalLauncherBrowserSpawnError({
+                      target,
+                      command: "xdg-open",
+                      args: [target],
+                      cause: new Error("spawn xdg-open ENOENT"),
+                    }),
+                  ).pipe(Effect.withSpan("externalLauncher.launchBrowser")),
+              }),
+            ),
+          ),
+        );
+        const { spans } = yield* logInSpanThrough({}, failingLaunch);
+
+        const recorded = JSON.stringify(
+          spans.map((span) => ({
+            name: span.name,
+            events: span.events.map(([name, , attributes]) => [name, attributes]),
+            exit:
+              span.status._tag === "Ended" && Exit.isFailure(span.status.exit)
+                ? Cause.pretty(span.status.exit.cause)
+                : null,
+          })),
+        );
+        assert.include(recorded, "browser auto-open unavailable");
+        assert.notInclude(recorded, pairingToken);
+      }),
+    );
+  });
 });

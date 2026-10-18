@@ -1,6 +1,7 @@
+import * as Dialog from "../../components/ui/Dialog";
 import { AuthRelayWriteScope } from "@infinitus/contracts";
 import { readEnvironmentScope } from "../../state/session";
-import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
+import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAuth } from "@clerk/expo";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import * as Notifications from "expo-notifications";
@@ -8,10 +9,10 @@ import { useNavigation } from "@react-navigation/native";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/reactivity";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Alert, AppState, Linking, Platform } from "react-native";
+import { AppState, Linking, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text } from "../../components/ui/AppText";
 import {
   isAtomCommandInterrupted,
   reportAtomCommandResult,
@@ -46,10 +47,6 @@ import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 type NotificationStatus = "checking" | "enabled" | "disabled" | "unsupported";
 type LiveActivityStatus = "checking" | "enabled" | "disabled" | "signed-out" | "linking";
 
-// Reflects whether the relay actually accepted this device's registration.
-// The notification and Live Activity switches are gated on this so they can
-// never read as enabled when the device cannot receive anything (e.g. the
-// registration request timed out).
 function useDeviceRegistered(): boolean {
   const status = useSyncExternalStore(
     subscribeAgentAwarenessRegistrationStatus,
@@ -163,7 +160,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        Alert.alert(
+        Dialog.alert(
           "Notifications unavailable",
           error instanceof Error ? error.message : "Could not request notification permission.",
         );
@@ -172,12 +169,10 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     }
     if (result.value.type === "granted") {
       setNotificationStatus("enabled");
-      // Permission alone is not enough: the switch stays off until the relay
-      // registration succeeds, so tell the user the truth about which happened.
       if (getAgentAwarenessRegistrationStatus() === "registered") {
-        Alert.alert("Notifications enabled", "Agent notifications are enabled for this device.");
+        Dialog.alert("Notifications enabled", "Agent notifications are enabled for this device.");
       } else {
-        Alert.alert(
+        Dialog.alert(
           "Couldn't finish enabling notifications",
           `Notification access was granted, but this device could not be registered with ${CONNECT_NAME}. Notifications will start once registration succeeds.`,
         );
@@ -186,7 +181,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     }
     if (result.value.type === "unsupported") {
       setNotificationStatus("unsupported");
-      Alert.alert(
+      Dialog.alert(
         "Notifications unavailable",
         "Agent notifications are unavailable on this platform.",
       );
@@ -194,10 +189,10 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     }
     setNotificationStatus("disabled");
     if (result.value.canAskAgain) {
-      Alert.alert("Notifications disabled", "Notifications were not enabled.");
+      Dialog.alert("Notifications disabled", "Notifications were not enabled.");
       return;
     }
-    Alert.alert(
+    Dialog.alert(
       "Notifications disabled",
       "Notifications were denied for this app. Open Settings to enable them.",
       [
@@ -208,9 +203,15 @@ function ConfiguredSettingsNotificationsRouteScreen() {
   }, []);
 
   const promptSignIn = useCallback(() => {
+<<<<<<< HEAD
     Alert.alert(
       `Sign in to ${CONNECT_NAME}`,
       `Live Activity updates require ${CONNECT_NAME} so relay can deliver updates to this device.`,
+=======
+    Dialog.alert(
+      "Sign in to T3 Connect",
+      "Live Activity updates require T3 Connect so relay can deliver updates to this device.",
+>>>>>>> upstream-sync-eb1d80c66-upstream-renamed
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -235,7 +236,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
       if (permission._tag === "Failure") {
         setLiveActivityStatus("disabled");
         const error = squashAtomCommandFailure(permission);
-        Alert.alert(
+        Dialog.alert(
           "Ongoing activity unavailable",
           error instanceof Error ? error.message : "Could not enable agent notifications.",
         );
@@ -243,7 +244,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
       }
       if (permission.value.type !== "granted") {
         setLiveActivityStatus("disabled");
-        Alert.alert(
+        Dialog.alert(
           "Notification permission needed",
           "Enable notifications in system Settings to show ongoing agent activity.",
           [
@@ -259,7 +260,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     if (tokenResult._tag === "Failure") {
       setLiveActivityStatus("disabled");
       const error = squashAtomCommandFailure(tokenResult);
-      Alert.alert(
+      Dialog.alert(
         Platform.OS === "android" ? "Ongoing activity unavailable" : "Live Activities unavailable",
         error instanceof Error ? error.message : "Could not enable agent activity updates.",
       );
@@ -287,7 +288,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
       setLiveActivityStatus("disabled");
       if (!isAtomCommandInterrupted(updateResult)) {
         const error = squashAtomCommandFailure(updateResult);
-        Alert.alert(
+        Dialog.alert(
           Platform.OS === "android"
             ? "Ongoing activity unavailable"
             : "Live Activities unavailable",
@@ -304,14 +305,14 @@ function ConfiguredSettingsNotificationsRouteScreen() {
     // (the push-to-start token the relay needs) has not — don't claim Live
     // Activities are live until the device is actually registered.
     if (getAgentAwarenessRegistrationStatus() === "registered") {
-      Alert.alert(
+      Dialog.alert(
         Platform.OS === "android" ? "Ongoing activity enabled" : "Live Activities enabled",
         environmentCount > 0
           ? "Agent activity updates are enabled for environments this connection can configure."
           : "Agent activity updates are enabled. Add an environment to start receiving updates.",
       );
     } else {
-      Alert.alert(
+      Dialog.alert(
         "Couldn't finish enabling activity updates",
         `This device could not be registered with ${CONNECT_NAME}, so activity updates won't appear yet. They'll start once registration succeeds.`,
       );
@@ -337,7 +338,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
         return;
       }
 
-      Alert.alert(
+      Dialog.alert(
         "Disable notifications",
         `Open system Settings to disable notifications for ${PRODUCT_NAME}.`,
         [
@@ -444,9 +445,6 @@ function ConfiguredSettingsNotificationsRouteScreen() {
               notificationStatus === "unsupported"
             }
             subtitle={agentAwarenessSubtitle}
-            // Only reads as on when this device is actually registered with the
-            // relay; otherwise notifications cannot be delivered regardless of
-            // the local iOS permission.
             value={
               agentAwarenessPushAvailable && notificationStatus === "enabled" && deviceRegistered
             }
@@ -469,8 +467,6 @@ function ConfiguredSettingsNotificationsRouteScreen() {
                 : "Live Activity Updates"
             }
             subtitle={agentAwarenessSubtitle}
-            // Same gate: a saved preference is meaningless until the device
-            // registration the relay needs to push updates has succeeded.
             value={
               agentAwarenessPushAvailable &&
               (liveActivityStatus === "enabled" || liveActivityStatus === "linking") &&
@@ -491,7 +487,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
               label="Live Update Settings"
               onPress={() => {
                 void openAndroidLiveUpdateSettings().catch(() => {
-                  Alert.alert(
+                  Dialog.alert(
                     "Couldn't open Settings",
                     `Open Android Settings, select ${PRODUCT_NAME}, then enable Live Updates in Notifications.`,
                   );

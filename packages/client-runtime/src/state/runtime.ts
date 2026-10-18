@@ -1,6 +1,7 @@
 import type { QueryPersistence } from "./queryPersistence.ts";
 import { createCommandPermissions } from "./commandPermissions.ts";
 import { followStreamInEnvironment } from "./environmentStreams.ts";
+import { reuseUnchanged } from "./serverConfigProjection.ts";
 export { runStreamInEnvironment, followStreamInEnvironment } from "./environmentStreams.ts";
 import {
   type ClientGuardedRpcTag,
@@ -74,6 +75,7 @@ interface EnvironmentQueryAtomOptions<Input, A, E, R> extends Omit<
     readonly environmentId: EnvironmentIdType;
     readonly input: Input;
   }) => Atom.Atom<unknown> | undefined;
+  readonly isFinal?: (value: A) => boolean;
 }
 
 interface EnvironmentSubscriptionAtomOptions<Input, A, E, R> {
@@ -109,13 +111,8 @@ export interface AtomCommand<W, A, E> {
 }
 
 export type AtomCommandConcurrency<W> =
-  /** Every invocation runs independently. */
   | { readonly mode: "parallel" }
   | {
-      /**
-       * `serial` preserves every invocation in FIFO order, `singleFlight` shares an active
-       * invocation, and `latest` coalesces queued invocations to the newest input.
-       */
       readonly mode: "serial" | "singleFlight" | "latest";
       readonly key: (input: W) => string;
     };
@@ -277,7 +274,6 @@ export function createAtomCommandScheduler(): AtomCommandScheduler {
   };
 }
 
-/** Runs one effect inside an existing command scheduler lane. */
 export function scheduleAtomCommandEffect<W, A, E, R>(
   registry: AtomRegistry.AtomRegistry,
   scheduler: AtomCommandScheduler,
@@ -357,7 +353,6 @@ export interface AtomQueryOptions extends AtomCommandOptions {
    * verification flows where a cached failure must not satisfy a retry.
    */
   readonly refresh?: boolean;
-  /** Interrupt the query wait when its caller no longer wants the result. */
   readonly signal?: AbortSignal;
 }
 
@@ -372,8 +367,6 @@ export async function executeAtomQuery<A, E>(
       yield* AtomRegistry.mount(registry, atom);
       if (options.refresh) {
         yield* Effect.sync(() => {
-          // Only a settled value can be a leftover from an earlier read; a
-          // computation that mounting just started is already fresh.
           const current = registry.get(atom);
           if (current._tag !== "Initial" && !current.waiting) {
             registry.refresh(atom);
@@ -478,15 +471,14 @@ function runInEnvironment<A, E, R>(
 }
 
 /**
- * Refreshes a query when `signal` changes, but only while something reads it.
  * `Atom.makeRefreshOnSignal` subscribes to the signal, so a query that outlives its view on an
  * idle TTL still re-runs on every change. Reading the signal as a dependency instead lets the
  * registry re-run a mounted query right away and only mark an idle one stale, which then
  * refreshes on its next read.
  */
 const refreshOnSignalWhileRead =
-  (signal: Atom.Atom<unknown>) =>
-  <A>(self: Atom.Atom<A>): Atom.Atom<A> => {
+  <V>(signal: Atom.Atom<unknown>, isFinal: (value: V) => boolean) =>
+  <A extends V>(self: Atom.Atom<A>): Atom.Atom<A> => {
     // The signal value each registry's data was read under. Held outside the node because the
     // registry can sweep this node while `self` keeps the data, and the rebuilt node must still
     // see a change it missed.
@@ -499,12 +491,37 @@ const refreshOnSignalWhileRead =
         const changed =
           readUnder.has(get.registry) && !Object.is(readUnder.get(get.registry), current);
         readUnder.set(get.registry, current);
-        if (changed) get.refresh(self);
+        if (changed && !isFinal(get.once(self))) get.refresh(self);
         return get.once(self);
       },
       { initialValueTarget: self },
     );
   };
+
+const refreshEveryUntilFinal =
+  <V>(intervalMs: number, isFinal: (value: V) => boolean) =>
+  <A extends V>(self: Atom.Atom<A>): Atom.Atom<A> =>
+    Atom.transform(
+      self,
+      (get) => {
+        const value = get(self);
+        if (!isFinal(value)) {
+          // @effect-diagnostics-next-line globalTimers:off - Mirrors `Atom.withRefresh`, outside an Effect runtime.
+          const handle = setTimeout(() => get.refresh(self), intervalMs);
+          get.addFinalizer(() => clearTimeout(handle));
+        }
+        return value;
+      },
+      { initialValueTarget: self },
+    );
+
+/**
+ * A query result's data alone. A refetch always publishes a new result (a new
+ * timestamp, `waiting` on and off), while equal data keeps its identity, so a
+ * reader of only this skips the refetches that changed nothing.
+ */
+export const selectEnvironmentQueryData = <A, E>(result: AsyncResult.AsyncResult<A, E>): A | null =>
+  Option.getOrNull(AsyncResult.value(result));
 
 export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | R, ER>,
@@ -552,8 +569,17 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
         const connection = Option.getOrNull(
           AsyncResult.value(get(connectionAtom(target.environmentId))),
         );
+        // A refetch that returns equal content keeps the previous value's
+        // references, so readers of the data skip re-rendering on idle polls.
+        const share = (value: A): A =>
+          reuseUnchanged(
+            Option.getOrUndefined(
+              Option.flatMap(get.self<AsyncResult.AsyncResult<A, unknown>>(), AsyncResult.value),
+            ),
+            value,
+          );
         const emit = (value: A) =>
-          Effect.sync(() => get.setSelf(AsyncResult.success(value, { waiting: true }))).pipe(
+          Effect.sync(() => get.setSelf(AsyncResult.success(share(value), { waiting: true }))).pipe(
             // A value set while the atom builds wins over the build's own
             // result, so a query that then settled synchronously would stay
             // waiting forever. Suspend on a promise (`yieldNow` is drained
@@ -596,7 +622,7 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
               );
           }
         };
-        if (!options.persistence) return execute();
+        if (!options.persistence) return execute().pipe(Effect.map(share));
         const persistence = options.persistence;
         const cacheKey = JSON.stringify([options.label, target.input]);
         const previous = Option.flatMap(
@@ -615,6 +641,7 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
           }
           if (Option.isNone(previous) && Option.isSome(cached)) yield* emit(cached.value);
           return yield* execute().pipe(
+            Effect.map(share),
             Effect.tap((value) => persistence.save(target.environmentId, cacheKey, value)),
           );
         });
@@ -626,15 +653,17 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
         }),
         Atom.setIdleTTL(idleTtlMs),
       );
+    const isFinal = (result: AsyncResult.AsyncResult<A, unknown>) =>
+      options.isFinal !== undefined && Option.exists(AsyncResult.value(result), options.isFinal);
     const intervalQuery =
       options.refreshIntervalMs === undefined
         ? queryAtom
-        : queryAtom.pipe(Atom.withRefresh(options.refreshIntervalMs));
+        : queryAtom.pipe(refreshEveryUntilFinal(options.refreshIntervalMs, isFinal));
     const refreshTrigger = options.refreshTrigger?.(target);
     return (
       refreshTrigger === undefined
         ? intervalQuery
-        : intervalQuery.pipe(refreshOnSignalWhileRead(refreshTrigger))
+        : intervalQuery.pipe(refreshOnSignalWhileRead(refreshTrigger, isFinal))
     ).pipe(Atom.setIdleTTL(idleTtlMs), Atom.withLabel(`${options.label}:${key}`));
   });
   return (target) => family(environmentRpcKey(target));
@@ -716,6 +745,7 @@ export function createEnvironmentRpcQueryAtomFamily<
       readonly environmentId: EnvironmentIdType;
       readonly input: EnvironmentRpcInput<TTag>;
     }) => Atom.Atom<unknown> | undefined;
+    readonly isFinal?: (value: EnvironmentRpcSuccess<TTag>) => boolean;
   },
 ) {
   return createEnvironmentQueryAtomFamily(runtime, {
@@ -727,6 +757,7 @@ export function createEnvironmentRpcQueryAtomFamily<
       ? {}
       : { refreshIntervalMs: options.refreshIntervalMs }),
     ...(options.refreshTrigger === undefined ? {} : { refreshTrigger: options.refreshTrigger }),
+    ...(options.isFinal === undefined ? {} : { isFinal: options.isFinal }),
     execute: (
       input: EnvironmentRpcInput<TTag>,
       emit: (value: EnvironmentRpcSuccess<TTag>) => Effect.Effect<void>,
