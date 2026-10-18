@@ -1,5 +1,6 @@
 "use strict";
 
+<<<<<<< HEAD
 // Ships the build's brand mark to the Live Activity / widget extension.
 //
 // expo-widgets generates ExpoWidgetsTarget without a Resources build phase and
@@ -14,6 +15,12 @@
 // any catalog written before it), and its xcodeproj mod is what creates the
 // widget target. Listed after expo-widgets, both steps silently no-op on a
 // fresh prebuild — which is how prod build 8 shipped without the logo.
+=======
+// ORDERING: must be listed BEFORE "expo-widgets" in the plugins array. That
+// matters twice: expo-widgets' dangerous mod rmSync's ios/ExpoWidgetsTarget/
+// (deleting any catalog written before it), and its xcodeproj mod is what
+// creates the widget target.
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
 
 const path = require("path");
 const fs = require("fs");

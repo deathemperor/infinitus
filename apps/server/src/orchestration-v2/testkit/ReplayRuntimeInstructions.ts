@@ -2,7 +2,6 @@ import type { ProviderDriverKind, ProviderReplayTranscript } from "@infinitus/co
 
 import { buildRuntimeInstructions } from "@infinitus/provider-core/server/runtimeInstructions";
 
-/** Adds current runtime context to legacy prompt expectations, keeping outbound matching exact. */
 export function materializeReplayTranscriptRuntimeInstructions(
   transcript: ProviderReplayTranscript,
   runtime: { readonly driver: ProviderDriverKind; readonly model: string },

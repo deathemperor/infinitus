@@ -190,13 +190,16 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
+<<<<<<< HEAD
         // A packaged build of this repo is titled plainly (#823 layer 3).
         assert.deepEqual(calls.setName, [`${PRODUCT_NAME} Alpha`]);
         assert.equal(calls.setAboutPanelOptions[0]?.applicationName, PRODUCT_NAME);
+=======
+        assert.deepEqual(calls.setName, ["T3 Code Beta"]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "T3 Code (Beta)");
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
         assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
         assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
-        // Packaged: the bundle's own icon stands, so a custom one the user
-        // attached survives.
         assert.deepEqual(calls.setDockIcon, []);
       }),
       {
@@ -212,9 +215,13 @@ describe("DesktopAppIdentity", () => {
   });
 
   it.effect.each([
+<<<<<<< HEAD
     // A fork release carries no stage in its title (#823 layer 3); upstream's
     // nightly and a dev run keep theirs.
     { stage: "Alpha", environment: {}, applicationName: PRODUCT_NAME },
+=======
+    { stage: "Beta", environment: {} },
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
     {
       stage: "Nightly",
       environment: { appVersion: "0.0.43-nightly.20260929.2428" },
@@ -239,6 +246,7 @@ describe("DesktopAppIdentity", () => {
           const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
           yield* identity.configure;
 
+<<<<<<< HEAD
           const runtimeName = calls.setName[0];
           assert.isDefined(runtimeName);
           assert.equal(runtimeName, `${PRODUCT_NAME} ${stage}`);
@@ -250,6 +258,17 @@ describe("DesktopAppIdentity", () => {
       );
     },
   );
+=======
+        const runtimeName = calls.setName[0];
+        assert.isDefined(runtimeName);
+        assert.equal(runtimeName, `T3 Code ${stage}`);
+        assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `T3 Code (${stage})`);
+      }),
+      { calls, environment },
+    );
+  });
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
 
   it.effect("sets the dock icon only when running unpackaged", () => {
     const calls: ElectronAppCalls = {
@@ -263,8 +282,6 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
-        // Electron shows a generic icon for an unpackaged run, which is the
-        // reason this call exists at all.
         assert.deepEqual(calls.setDockIcon, ["/icon.png"]);
       }),
       {

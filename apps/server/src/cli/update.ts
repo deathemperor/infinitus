@@ -51,11 +51,8 @@ const ReleaseIndex = Schema.Array(
 const decodeReleaseIndex = Schema.decodeUnknownEffect(Schema.fromJsonString(ReleaseIndex));
 
 const RELEASE_INDEX_TIMEOUT = Duration.seconds(30);
-// Enough to walk past a long run of nightlies without hammering the API when
-// a channel genuinely has nothing published.
 const RELEASE_INDEX_MAX_PAGES = 10;
 
-/** Asks GitHub for the newest published version on a channel, page by page. */
 const resolveNewestVersion = Effect.fn("cli.update.resolve_newest")(function* (
   channel: CliReleaseChannel,
 ) {
@@ -90,7 +87,6 @@ const resolveNewestVersion = Effect.fn("cli.update.resolve_newest")(function* (
   return yield* new CliUpdateError({ reason: `No published ${channel} release was found.` });
 });
 
-/** Whether a launcher target lives inside `<baseDir>/runtime/versions`. */
 export function launcherOwnsVersionsDir(
   path: Path.Path,
   versionsDir: string,
@@ -101,16 +97,19 @@ export function launcherOwnsVersionsDir(
 }
 
 /**
+<<<<<<< HEAD
  * The launcher the install scripts leave behind: a symlink at `<bin>/infinitus` on
  * POSIX, an `infinitus.cmd` shim on Windows. `infinitus update` repoints it so the next `infinitus`
  * invocation is the new version. Only a launcher that already points into
  * this home's `runtime/versions` tree is touched; a plain copy of the
  * executable, or a launcher for some other install, is left alone.
+=======
+ * Only a launcher that already points into this home's `runtime/versions` tree is touched; a
+ * plain copy of the executable, or a launcher for some other install, is left alone.
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
  */
 export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function* (input: {
-  /** Path the current process was started through, if known. */
   readonly launchedAs: string | undefined;
-  /** `<baseDir>/runtime/versions` of the home being updated. */
   readonly versionsDir: string;
   readonly targetEntryPath: string;
 }) {
@@ -122,10 +121,13 @@ export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function
     launcherOwnsVersionsDir(path, input.versionsDir, candidate);
 
   if (platform === "win32") {
+<<<<<<< HEAD
     // The shim runs the executable by absolute path, so the executable sees
     // itself as argv0; the shim is the `infinitus.cmd` next to it only when launched
     // from an install script's bin directory. Find it by searching the
     // directories that would resolve `infinitus` on this shell's PATH.
+=======
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
     const shimPath = yield* findWindowsShim(input.launchedAs);
     if (shimPath === undefined) return Option.none<string>();
     const current = yield* fs.readFileString(shimPath).pipe(Effect.option);
@@ -160,10 +162,16 @@ export const repointLauncher = Effect.fn("cli.update.repoint_launcher")(function
 });
 
 /**
+<<<<<<< HEAD
  * The path the executable was started through. Node keeps the shell's
  * spelling in argv0: a launcher symlink or `./infinitus` resolves against the
  * working directory, while a bare `infinitus` was found on PATH and has to be
  * looked up there again, or the launcher symlink is never seen.
+=======
+ * Node keeps the shell's spelling in argv0: a launcher symlink or `./t3` resolves against the
+ * working directory, while a bare `t3` was found on PATH and has to be looked up there again, or
+ * the launcher symlink is never seen.
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
  */
 export const resolveLauncherPath = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -272,6 +280,7 @@ export const updateCommand = Command.make("update", {
   ),
 );
 
+<<<<<<< HEAD
 /**
  * A `infinitus serve` or `infinitus` someone started by hand, as opposed to the one the
  * background service supervises. The server records its pid on startup; a
@@ -282,6 +291,8 @@ export const updateCommand = Command.make("update", {
  * lineage: a service server's parent is the launcher, and on Linux that
  * launcher runs inside the unit's cgroup.
  */
+=======
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
 const findForegroundServer = Effect.fn("cli.update.find_foreground_server")(function* (input: {
   readonly serverRuntimeStatePath: string;
   readonly serviceInstalled: boolean;
@@ -305,7 +316,6 @@ const belongsToBootService = Effect.fn("cli.update.belongs_to_boot_service")(fun
     return Option.isSome(cgroup) && cgroup.value.includes("/t3code.service");
   }
   if (platform === "darwin") {
-    // The service server's parent is the launcher process.
     const parent = yield* runner
       .run({
         command: "ps",
@@ -360,10 +370,6 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   ).pipe(Effect.ensuring(Effect.sync(progress.finish)));
   const targetChannel = cliReleaseChannelOf(targetVersion);
 
-  // Preview is a maintainers' dogfooding train: it is cut by hand from
-  // unmerged branches, receives no fixes, and is never offered to anyone.
-  // Reaching it from stable or nightly takes an explicit ask and an explicit
-  // acknowledgement; the flag alone is not enough from a script.
   const currentChannel = cliReleaseChannelOf(currentVersion);
   if (targetChannel === "preview" && currentChannel !== "preview") {
     yield* Console.log(
@@ -389,8 +395,6 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     }
   }
 
-  // Work out everything that will be touched before touching anything, so the
-  // user sees one plan and one question rather than a surprise restart.
   const status = yield* service.status;
   // The unit name is per user, not per Infinitus home. Only touch the service when it
   // serves the home this update targets; otherwise it belongs to another
@@ -403,18 +407,8 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     serverRuntimeStatePath: input.serverRuntimeStatePath,
     serviceInstalled,
   });
-  // What this machine runs is the executable behind the launcher and, when a
-  // service is installed for this home, the version that service runs. Either
-  // being stale is an update to do, and the newest of the two is what the
-  // downgrade check protects.
   const serviceVersion = serviceInstalled ? status.installedVersion : undefined;
   const executableCurrent = targetVersion === currentVersion;
-  // A service whose recorded version is missing or unreadable is not known
-  // to be current, so it gets the update rather than being skipped. Nor is
-  // one on the right version that is stopped, disabled, or still running the
-  // version before it (an earlier update where the restart was declined):
-  // `status.current` covers all of that when the target is this executable,
-  // and the problem list is what can be judged for any other target.
   const restartPending = status.problems?.includes("restart-pending") === true;
   const serviceCurrent =
     !serviceInstalled ||
@@ -536,12 +530,19 @@ const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     targetEntryPath: runtime.entryPath,
   });
 
+<<<<<<< HEAD
   // The service switch runs in this process against the target version: the
   // downloaded runtime has already proven it runs (the `--version` check
   // above), and doing it here rather than through the target's own CLI means
   // a downgrade to a version without today's commands still works. The unit
   // is rewritten either way so a later `infinitus service restart` lands on the new
   // version; only the restart itself waits for the user's answer.
+=======
+  // The service switch runs in this process against the target version: the downloaded runtime
+  // has already proven it runs (the `--version` check above), and doing it here rather than
+  // through the target's own CLI means a downgrade to a version without today's commands still
+  // works.
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
   let serviceUpdated = false;
   if (serviceInstalled && !serviceCurrent) {
     yield* Console.log(

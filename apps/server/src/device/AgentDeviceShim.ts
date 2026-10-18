@@ -1,10 +1,4 @@
 // @effect-diagnostics preferSchemaOverJson:off - JSON string literals embed paths safely into generated JavaScript.
-/**
- * A directory holding an `agent-device` launcher that runs the pinned install
- * with a Node runtime. Prepended to provider subprocess PATHs so the agent
- * types `agent-device …` and gets the version the injected instructions were
- * written for, regardless of what is or is not globally installed.
- */
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { resolveNodeExecutable } from "@infinitus/shared/nodeRuntime";
 import * as Effect from "effect/Effect";

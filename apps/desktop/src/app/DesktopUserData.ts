@@ -35,6 +35,7 @@ export class DesktopUserDataInitializationError extends Schema.TaggedError<Deskt
   }
 }
 
+<<<<<<< HEAD
 /**
  * Select Electron's profile independently of the server's home directory.
  *
@@ -44,6 +45,8 @@ export class DesktopUserDataInitializationError extends Schema.TaggedError<Deskt
  * installed T3 Code app, whose live state the fork must leave alone, and the
  * fork has never shipped under another name, so there is nothing to migrate.
  */
+=======
+>>>>>>> upstream-sync-6a6ebb278-upstream-renamed
 export const resolveUserDataPath = Effect.fn("desktop.userData.resolveUserDataPath")(
   function* (input: {
     readonly appDataDirectory: string;

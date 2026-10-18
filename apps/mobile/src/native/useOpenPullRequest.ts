@@ -2,13 +2,11 @@ import { useNavigation, useRoute, StackActions } from "@react-navigation/native"
 import { nativePullRequestDestination } from "../lib/pullRequestNavigation";
 import { useCallback } from "react";
 import { Platform } from "react-native";
-import { CommonActions } from "@react-navigation/native";
-import { androidWorkspaceNavigationState } from "../lib/android-workspace-navigation";
+import { resetAndroidWorkspace } from "../lib/android-workspace-navigation";
 import { EnvironmentId, ThreadId } from "@infinitus/contracts";
 import { useThreadShell } from "../state/entities";
 import { tryOpenExternalUrl } from "../lib/openExternalUrl";
 
-/** Use the thread's environment; the shared router resolves the repository's project there. */
 export function useOpenPullRequest(options?: {
   readonly replace?: boolean;
   readonly context?: { readonly environmentId: string; readonly projectId: string };
@@ -46,11 +44,7 @@ export function useOpenPullRequest(options?: {
       );
       if (!params) return tryOpenExternalUrl(url, "pull-request");
       if (Platform.OS === "android")
-        navigation.dispatch((state) =>
-          CommonActions.reset(
-            androidWorkspaceNavigationState(state, { name: "PullRequest", params }),
-          ),
-        );
+        resetAndroidWorkspace(navigation, { name: "PullRequest", params });
       else if (replace) navigation.dispatch(StackActions.replace("PullRequest", params));
       else navigation.navigate("PullRequest", params);
       return true;
