@@ -72,7 +72,6 @@ export function targetConnectionKey(target: DesktopSshEnvironmentTarget): string
   return `${target.alias}\u0000${target.hostname}\u0000${target.username ?? ""}\u0000${target.port ?? ""}`;
 }
 
-/** Names the remote state directory for a target: the first 16 hex chars of its SHA-256 key. */
 export const remoteStateKey = Effect.fn("ssh/command.remoteStateKey")(function* (
   target: DesktopSshEnvironmentTarget,
 ): Effect.fn.Return<string, never, Crypto.Crypto> {
@@ -203,6 +202,7 @@ const runSshCommandInScope = Effect.fn("ssh/command.runSshCommand.inScope")(func
       batchMode: input.batchMode ?? (input.interactiveAuth ? "no" : "yes"),
     }),
     ...(input.preHostArgs ?? []),
+    "--",
     hostSpec,
     ...(input.remoteCommandArgs ?? []),
   ];

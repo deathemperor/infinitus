@@ -143,9 +143,7 @@ it.layer(layerTest)("CodexDriver", (it) => {
         const launches: Array<
           Parameters<CodexAdapterV2.CodexAppServerClientFactoryShape["open"]>[0]
         > = [];
-        // Sign-out interrupts an account check that is still resolving the runtime.
-        // Interrupt the two startup checks that way (one is the sign-in listener's);
-        // the disconnect below must still refresh.
+
         let interruptedChecks = 0;
         const startupChecksInterrupted = yield* Deferred.make<void>();
         const acquire = () =>
@@ -215,7 +213,7 @@ it.layer(layerTest)("CodexDriver", (it) => {
           `providers/codex/${instanceId}/shadow`,
         );
         yield* Deferred.await(observedAccount);
-        // Sessions launch the T3-installed Codex with the account's token, not ambient credentials.
+
         const threadId = ThreadId.make("managed-account-thread");
         yield* instance.orchestrationAdapter
           .openSession({
