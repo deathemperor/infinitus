@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import { createDeviceEnvironmentAtoms } from "@infinitus/client-runtime/state/device";
 import {
@@ -39,11 +38,6 @@ export function useDeviceState(environmentId: EnvironmentId | null): {
   return { state: query.data ?? EMPTY_DEVICE_STATE, loaded: query.data !== undefined };
 }
 
-/**
- * Hub access for one environment. Bearer and DPoP connections mint a ticket
- * here; a stream that gets a 401 back refreshes this atom and reconnects.
- * Keyed on the prepared connection so a re-pair produces new credentials.
- */
 const deviceHubAccessAtom = Atom.family((environmentId: EnvironmentId) =>
   connectionAtomRuntime
     .atom((get) => {
@@ -63,13 +57,9 @@ export function useDeviceHubAccess(
   const result = useAtomValue(
     environmentId === null ? EMPTY_ACCESS_ATOM : deviceHubAccessAtom(environmentId),
   );
-  return useMemo(
-    () =>
-      AsyncResult.isSuccess(result)
-        ? { ...result.value, query: { ...result.value.query, hostId } }
-        : null,
-    [result, hostId],
-  );
+  return AsyncResult.isSuccess(result)
+    ? { ...result.value, query: { ...result.value.query, hostId } }
+    : null;
 }
 
 const EMPTY_ACCESS_ATOM = Atom.make(AsyncResult.initial<DeviceHubAccess, never>()).pipe(

@@ -22,7 +22,7 @@ type DraftThreadRouteState = {
 export type ThreadRouteRenderState = "loading" | "ready" | "missing";
 
 export function isThreadRouteSnapshotAuthoritative(
-  status: EnvironmentShellStatus | undefined,
+  status: EnvironmentShellStatus | null | undefined,
 ): boolean {
   return status === "live";
 }
@@ -88,10 +88,6 @@ export function resolveThreadRouteTarget(
   };
 }
 
-/**
- * Resolves the thread represented by either a canonical thread route or a
- * draft route whose promotion to a server thread has been recorded.
- */
 export function resolveActiveThreadRouteRef(
   target: ThreadRouteTarget | null,
   draftThread: DraftThreadRouteState | null,
