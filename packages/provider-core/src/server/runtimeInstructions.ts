@@ -6,7 +6,6 @@ When the infinitus MCP server exposes link_pull_request, you must use it to regi
 
 /**
  * Shared runtime context; omit model and effort when the harness manages them dynamically.
- * `modelName` is the display name users see in the model picker; `model` is the slug.
  */
 export function buildRuntimeInstructions(runtime: {
   readonly harness: string;

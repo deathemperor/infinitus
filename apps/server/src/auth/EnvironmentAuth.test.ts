@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+<<<<<<< HEAD
 import {
   authScopeResponse,
   AuthAdministrativeScopes,
@@ -6,6 +7,9 @@ import {
 } from "@infinitus/contracts";
 import { DESKTOP_URL_SCHEME } from "@infinitus/shared/desktopIdentity";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import { authScopeResponse, AuthStandardClientScopes } from "@infinitus/contracts";
+>>>>>>> upstream-sync-1451e7cb2-upstream-renamed
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,7 +27,6 @@ import * as EnvironmentAuth from "./EnvironmentAuth.ts";
 import * as ServerSecretStore from "./ServerSecretStore.ts";
 import * as SessionStore from "./SessionStore.ts";
 
-/** Pinned so dev-mode cookie tests can assert the port-scoped name. */
 const TEST_SERVER_PORT = 13_773;
 const isPairingCredentialIssueError = Schema.is(PairingGrantStore.PairingCredentialIssueError);
 const isPersistenceSqlError = Schema.is(PersistenceErrors.PersistenceSqlError);
@@ -36,8 +39,6 @@ const layerServerConfig = (overrides?: Partial<ServerConfig.ServerConfig["Servic
       return {
         ...config,
         ...overrides,
-        // Keep the test server deterministic even when the default test layer
-        // changes its development port.
         port: TEST_SERVER_PORT,
       } satisfies ServerConfig.ServerConfig["Service"];
     }),
@@ -108,7 +109,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
       const authenticated = yield* serverAuth.authenticateHttpRequest(request);
       expect(devExchange.cookieName).toMatch(/^t3_dev_session_/);
       expect(devExchange.expireNormalCookie).toBe(true);
-      expect(devExchange.response).toMatchObject(authScopeResponse(AuthAdministrativeScopes));
+      expect(devExchange.response).toMatchObject(authScopeResponse(AuthStandardClientScopes));
       expect(authenticated.scopes).toEqual(["orchestration:read"]);
     }).pipe(
       Effect.provide(
@@ -258,7 +259,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
       expect((yield* Effect.flip(sessions.verify(token)))._tag).toBe("SessionTokenRevokedError");
       expect(
         (yield* serverAuth.createBrowserSession(recovery.credential, requestMetadata)).response,
-      ).toMatchObject({ authenticated: true, ...authScopeResponse(AuthAdministrativeScopes) });
+      ).toMatchObject({ authenticated: true, ...authScopeResponse(AuthStandardClientScopes) });
     }).pipe(
       Effect.provide(
         layerEnvironmentAuth({
@@ -367,7 +368,9 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
   it.effect("preserves pairing grants after rejecting scopes they do not grant", () =>
     Effect.gen(function* () {
       const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
-      const pairingCredential = yield* serverAuth.issuePairingCredential();
+      const pairingCredential = yield* serverAuth.issuePairingCredential({
+        scopes: ["orchestration:read", "orchestration:operate"],
+      });
 
       const error = yield* serverAuth
         .exchangeBootstrapCredentialForAccessToken(
@@ -519,7 +522,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
     Effect.gen(function* () {
       const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
       const pairingCredential = yield* serverAuth.issuePairingCredential({
-        scopes: AuthAdministrativeScopes,
+        scopes: AuthStandardClientScopes,
       });
       const listedPairingLinks = yield* serverAuth.listPairingLinks();
 
@@ -549,7 +552,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
         makeCookieRequest(sessions.cookieName, exchanged.sessionToken),
       );
 
-      expect(verified.scopes).toEqual(AuthAdministrativeScopes);
+      expect(verified.scopes).toEqual(AuthStandardClientScopes);
       expect(verified.subject).toBe("administrative-bootstrap");
     }).pipe(Effect.provide(layerEnvironmentAuth())),
   );
@@ -640,7 +643,6 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
           headers: { host: "192.168.1.50:3773", ...headers },
         } as never);
 
-      // Same host, a proxy-reported host, a trusted app origin, or no browser at all.
       yield* upgrade({ origin: "http://192.168.1.50:3773" });
       yield* upgrade({
         origin: "https://box.tail1234.ts.net",
@@ -650,7 +652,6 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
       yield* upgrade({ origin: "http://localhost:5733" });
       yield* upgrade({});
 
-      // Another port on the same machine is the same site but not the app.
       const otherPort = yield* Effect.flip(upgrade({ origin: "http://192.168.1.50:8080" }));
       expect(otherPort._tag).toBe("ServerAuthInvalidCredentialError");
       const opaque = yield* Effect.flip(upgrade({ origin: "null" }));
@@ -678,7 +679,6 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
           headers: { host: "localhost:13773", ...headers },
         } as never);
 
-      // The dev proxy rewrites Host, so a LAN page relies on the browser's own verdict.
       yield* post({ origin: "http://192.168.1.50:5733", "sec-fetch-site": "same-origin" });
       yield* post({ origin: "http://localhost:13773" });
 

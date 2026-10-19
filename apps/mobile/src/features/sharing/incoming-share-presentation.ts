@@ -20,11 +20,14 @@ export const EMPTY_INCOMING_SHARE_PRESENTATION_STATE: IncomingSharePresentationS
   dismissedShareId: null,
 };
 
+<<<<<<< HEAD
 /**
  * Tracks presentation by durable share id rather than object identity. A
  * dismissal names the item to discard, and suppresses it until the inbox
  * removal lands or a new handoff replaces it.
  */
+=======
+>>>>>>> upstream-sync-1451e7cb2-upstream-renamed
 export function transitionIncomingSharePresentation(
   state: IncomingSharePresentationState,
   input: {
