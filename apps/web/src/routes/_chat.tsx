@@ -1,12 +1,11 @@
 import { AuthPreviewOperateScope } from "@infinitus/contracts";
-import { Outlet, createFileRoute, redirect, useParams } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { ThreadRouteView } from "../components/ThreadRouteView";
 import { ThreadLinkPrompt } from "../components/promptLinks/ThreadLinkPrompt";
-import { resolveThreadRouteTarget } from "../threadRoutes";
 import { useClientSettings, useLegacySidebarEnabled } from "../hooks/useSettings";
 import { openCommandPalette } from "../commandPaletteBus";
 import { useProjects } from "../state/entities";
@@ -14,7 +13,10 @@ import { isPreviewAvailableFor } from "../browser/previewRuntime";
 import { usePrimaryEnvironmentId } from "../state/environments";
 import { useEnvironmentScope } from "../state/session";
 import { selectProjectGroupingSettings } from "../logicalProject";
-import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
+import {
+  buildSidebarProjectSnapshots,
+  countSidebarProjectChoices,
+} from "../sidebarProjectGrouping";
 import { dispatchPreviewAction } from "../components/preview/previewActionBus";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useScratchProject } from "../hooks/useScratchProject";
@@ -30,6 +32,7 @@ import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { primaryServerKeybindingsAtom } from "~/state/server";
+import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
 
 function ChatRouteGlobalShortcuts() {
   const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
@@ -46,15 +49,13 @@ function ChatRouteGlobalShortcuts() {
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { scratchEnvironmentId, startScratchThread } = useScratchProject();
-  const projectGroupCount = useMemo(
-    () =>
-      buildSidebarProjectSnapshots({
-        projects,
-        settings: projectGroupingSettings,
-        primaryEnvironmentId,
-        resolveEnvironmentLabel: () => null,
-      }).length,
-    [primaryEnvironmentId, projectGroupingSettings, projects],
+  const projectChoiceCount = countSidebarProjectChoices(
+    buildSidebarProjectSnapshots({
+      projects,
+      settings: projectGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    }),
   );
   const terminalOpen = useTerminalUiStateStore((state) =>
     routeThreadRef
@@ -128,10 +129,7 @@ function ChatRouteGlobalShortcuts() {
       if (command === "chat.new") {
         event.preventDefault();
         event.stopPropagation();
-        // The default sidebar routes creation through the command palette
-        // whenever there is a real choice to make; the legacy sidebar (and
-        // single-project setups) keep the immediate contextual create.
-        if (!legacySidebarEnabled && projectGroupCount > 1) {
+        if (!legacySidebarEnabled && projectChoiceCount > 1) {
           openCommandPalette({ open: "new-thread-in" });
           return;
         }
@@ -162,9 +160,6 @@ function ChatRouteGlobalShortcuts() {
         return;
       }
 
-      // The remaining preview commands only fire when the panel is the
-      // currently-focused tenant. The `when: previewFocus` rule already
-      // gates this, but defend against the keybinding being misconfigured.
       if (
         command === "preview.refresh" ||
         command === "preview.focusUrl" ||
@@ -203,7 +198,7 @@ function ChatRouteGlobalShortcuts() {
     defaultProjectRef,
     previewOpen,
     primaryEnvironmentId,
-    projectGroupCount,
+    projectChoiceCount,
     routeThreadRef,
     scratchEnvironmentId,
     selectedThreadKeysSize,
@@ -218,10 +213,7 @@ function ChatRouteGlobalShortcuts() {
 function ChatRouteLayout() {
   // Both thread routes render here, not in their own leaf components, so the
   // draft-to-thread promotion keeps one ChatView mounted across the swap.
-  const threadTarget = useParams({
-    strict: false,
-    select: (params) => resolveThreadRouteTarget(params),
-  });
+  const threadTarget = useThreadRouteTarget();
   return (
     <>
       <ChatRouteGlobalShortcuts />

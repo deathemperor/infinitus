@@ -10,7 +10,7 @@ import * as Electron from "electron";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 
 import * as DesktopEarlyElectronStartup from "./DesktopEarlyElectronStartup.ts";
-import { resolveDesktopAppBranding } from "./DesktopEnvironment.ts";
+import { resolveDesktopAppBranding, resolveDesktopSafeStorageName } from "./DesktopEnvironment.ts";
 import { renderUrlHandlerDesktopEntry } from "./DesktopLinuxUrlHandler.ts";
 import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 
@@ -54,6 +54,11 @@ export const make = Effect.gen(function* () {
   const platform = yield* HostProcess.Platform;
   const homeDirectory = yield* HostProcess.HomeDirectory;
   return yield* Effect.sync((): DesktopPreReadyElectronOptions["Service"] => {
+    // Chromium reads the safeStorage key's name before startup first yields.
+    // DesktopAppIdentity's later rename only changes the branded app name.
+    if (platform === "darwin" || platform === "linux") {
+      Electron.app.setName(resolveDesktopSafeStorageName(Electron.app.getVersion()));
+    }
     const linuxPasswordStoreCommandLine =
       platform === "linux"
         ? readCommandLineSwitchValue(Electron.app.commandLine, "password-store")
@@ -62,6 +67,17 @@ export const make = Effect.gen(function* () {
       platform === "linux" ? resolveEarlyLinuxElectronOptionsFromProcess(homeDirectory) : null;
 
     if (linux !== null) {
+      DesktopEarlyElectronStartup.restoreEarlyLinuxDeviceScaleFactor({
+        env: process.env,
+        homeDirectory,
+        joinPath: NodePath.posix.join,
+        commandLine: Electron.app.commandLine,
+        readFileString: (path) => NodeFS.readFileSync(path, "utf8"),
+        writeFileString: (path, value) => {
+          NodeFS.mkdirSync(NodePath.posix.dirname(path), { recursive: true });
+          NodeFS.writeFileSync(path, value, "utf8");
+        },
+      });
       // The portal also requires a valid desktop entry. An AppImage update may
       // have removed the executable referenced by the previous launch's entry.
       try {
@@ -81,17 +97,22 @@ export const make = Effect.gen(function* () {
           : undefined;
         if (iconPath !== undefined) {
           try {
-            NodeFS.mkdirSync(NodePath.posix.dirname(iconPath), { recursive: true });
-            NodeFS.copyFileSync(
+            // Electron's copyFile extracts ASAR entries to temporary files it never removes.
+            const icon = NodeFS.readFileSync(
               NodePath.posix.join(
                 Electron.app.getAppPath(),
                 "apps/desktop/prod-resources/icon.png",
               ),
-              iconPath,
             );
-          } catch {
-            // Icon installation is optional; registration retries after readiness.
-          }
+            let current: Buffer | null = null;
+            try {
+              current = NodeFS.readFileSync(iconPath);
+            } catch {}
+            if (current === null || !current.equals(icon)) {
+              NodeFS.mkdirSync(NodePath.posix.dirname(iconPath), { recursive: true });
+              NodeFS.writeFileSync(iconPath, icon, { mode: 0o600 });
+            }
+          } catch {}
         }
         NodeFS.writeFileSync(
           NodePath.posix.join(applicationsDir, linux.linuxDesktopEntryName),
@@ -106,9 +127,7 @@ export const make = Effect.gen(function* () {
           }),
           "utf8",
         );
-      } catch {
-        // The URL handler retries with the full environment and logs failures.
-      }
+      } catch {}
       // Chromium caches its portal registration during startup. Set the identity
       // before any asynchronous work can initialize it with Electron's default.
       Electron.app.setDesktopName(linux.linuxDesktopEntryName);
@@ -122,7 +141,6 @@ export const make = Effect.gen(function* () {
         ozonePlatform: readCommandLineSwitchValue(Electron.app.commandLine, "ozone-platform"),
         enableFeatures: readCommandLineSwitchValue(Electron.app.commandLine, "enable-features"),
         disableFeatures: readCommandLineSwitchValue(Electron.app.commandLine, "disable-features"),
-        // Runs only on Hyprland Wayland sessions without an explicit feature override.
         readHyprctlVersionJson: () =>
           NodeChildProcess.execFileSync("hyprctl", ["version", "-j"], {
             encoding: "utf8",

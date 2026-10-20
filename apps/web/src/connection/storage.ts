@@ -15,6 +15,7 @@ import {
   setRoutesInCatalog,
   replaceCatalogValue,
   Persistence,
+  makeStoredShellSnapshotEncoder,
 } from "@infinitus/client-runtime/platform";
 import { TokenStore } from "@infinitus/client-runtime/authorization";
 import {
@@ -68,7 +69,6 @@ const ConnectionCatalogDocumentJson = Schema.fromJsonString(ConnectionCatalogDoc
 const decodeConnectionCatalogDocument = Schema.decodeUnknownEffect(ConnectionCatalogDocumentJson);
 const encodeConnectionCatalogDocument = Schema.encodeEffect(ConnectionCatalogDocumentJson);
 const decodeStoredShellSnapshot = Schema.decodeUnknownEffect(StoredShellSnapshotJson);
-const encodeStoredShellSnapshot = Schema.encodeEffect(StoredShellSnapshotJson);
 const decodeStoredThreadSnapshot = Schema.decodeUnknownEffect(StoredThreadSnapshotJson);
 const encodeStoredThreadSnapshot = Schema.encodeEffect(StoredThreadSnapshotJson);
 const decodeStoredServerConfig = Schema.decodeUnknownEffect(StoredServerConfigJson);
@@ -152,11 +152,9 @@ const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* (
 
 interface DatabaseHandle {
   readonly get: Effect.Effect<IDBDatabase, ConnectionTransientError>;
-  /** Forget `database` if it is still the shared connection, so the next access reopens. */
   readonly invalidate: (database: IDBDatabase) => Effect.Effect<void>;
 }
 
-/** Share a connection until the browser closes it; the next access reopens it. */
 const makeDatabaseHandle = Effect.fn("web.connectionStorage.makeDatabaseHandle")(function* () {
   const lock = yield* Semaphore.make(1);
   let current: IDBDatabase | null = null;
@@ -195,16 +193,14 @@ const makeDatabaseHandle = Effect.fn("web.connectionStorage.makeDatabaseHandle")
 });
 
 /**
- * Runs `use` on the shared connection. A connection the browser already closed
- * throws InvalidStateError even when no close event reached this tab, so drop
- * it and retry once on a fresh one instead of failing every later operation.
+ * A connection the browser already closed throws InvalidStateError even when no
+ * close event reached this tab, so drop it and retry once on a fresh one
+ * instead of failing every later operation.
  */
 function withDatabase<A>(
   database: DatabaseHandle,
   use: (opened: IDBDatabase) => Effect.Effect<A, ConnectionTransientError>,
 ) {
-  // Only a connection that opened and then failed is stale; a failing open is
-  // storage being unavailable, which a retry would not fix.
   const closedConnection = Symbol("closedConnection");
   const attempt = Effect.flatMap(database.get, (opened) =>
     use(opened).pipe(
@@ -601,6 +597,25 @@ export function makeBrowserGitHubRoutingPermissions(
   });
 }
 
+// A posted message resumes in a fresh task, so input and rendering get a turn between
+// encoding chunks. A zero-delay timer would not do: browsers clamp nested timers to
+// 4 ms and throttle them to once a second or less in a background tab.
+const yieldToBrowserTask = Effect.callback<void>((resume) => {
+  const { port1, port2 } = new MessageChannel();
+  port1.addEventListener(
+    "message",
+    () => {
+      port1.close();
+      resume(Effect.void);
+    },
+    { once: true },
+  );
+  port1.start();
+  port2.postMessage(null);
+  // A closed port delivers nothing, so interruption needs no listener bookkeeping.
+  return Effect.sync(() => port1.close());
+});
+
 export const layer = Layer.effectContext(
   Effect.gen(function* () {
     const { handle: database } = yield* Effect.acquireRelease(
@@ -609,6 +624,10 @@ export const layer = Layer.effectContext(
     );
     const catalog = yield* makeCatalogStore(makeCatalogBackend(database));
     const githubRoutingPermissions = makeBrowserGitHubRoutingPermissions();
+    // Remembers each thread row's encoding, so a save only encodes rows that changed.
+    const encodeStoredShellSnapshot = makeStoredShellSnapshotEncoder({
+      yieldToHost: yieldToBrowserTask,
+    });
 
     const targetStore = Persistence.ConnectionTargetStore.of({
       list: catalog.read.pipe(
@@ -731,21 +750,21 @@ export const layer = Layer.effectContext(
           }),
           Effect.mapError((cause) => persistenceError("load-shell", cause)),
         ),
-      saveShell: (environmentId, snapshot) =>
-        Effect.gen(function* () {
+      saveShell: Effect.fn("storage.saveShell")(
+        function* (environmentId, snapshot) {
           const encoded = yield* encodeStoredShellSnapshot({
             schemaVersion: ORCHESTRATION_CACHE_SCHEMA_VERSION,
             environmentId,
             snapshot,
           }).pipe(Effect.mapError((cause) => persistenceError("save-shell", cause)));
           yield* writeDatabaseValue(database, SHELL_STORE_NAME, environmentId, encoded);
-        }).pipe(
-          Effect.mapError((cause) =>
-            cause._tag === "ConnectionPersistenceError"
-              ? cause
-              : persistenceError("save-shell", cause),
-          ),
+        },
+        Effect.mapError((cause) =>
+          cause._tag === "ConnectionPersistenceError"
+            ? cause
+            : persistenceError("save-shell", cause),
         ),
+      ),
       loadServerConfig: (environmentId) =>
         readDatabaseValue(database, SERVER_CONFIG_STORE_NAME, environmentId).pipe(
           Effect.flatMap((raw) => {
@@ -765,21 +784,21 @@ export const layer = Layer.effectContext(
               : persistenceError("load-server-config", cause),
           ),
         ),
-      saveServerConfig: (environmentId, config) =>
-        Effect.gen(function* () {
+      saveServerConfig: Effect.fn("storage.saveServerConfig")(
+        function* (environmentId, config) {
           const encoded = yield* encodeStoredServerConfig({
             schemaVersion: 1,
             environmentId,
             config,
           }).pipe(Effect.mapError((cause) => persistenceError("save-server-config", cause)));
           yield* writeDatabaseValue(database, SERVER_CONFIG_STORE_NAME, environmentId, encoded);
-        }).pipe(
-          Effect.mapError((cause) =>
-            cause._tag === "ConnectionPersistenceError"
-              ? cause
-              : persistenceError("save-server-config", cause),
-          ),
+        },
+        Effect.mapError((cause) =>
+          cause._tag === "ConnectionPersistenceError"
+            ? cause
+            : persistenceError("save-server-config", cause),
         ),
+      ),
       loadThread: (environmentId, threadId) =>
         readDatabaseValue(
           database,
@@ -808,8 +827,8 @@ export const layer = Layer.effectContext(
           }),
           Effect.mapError((cause) => persistenceError("load-thread", cause)),
         ),
-      saveThread: (environmentId, snapshot) =>
-        Effect.gen(function* () {
+      saveThread: Effect.fn("storage.saveThread")(
+        function* (environmentId, snapshot) {
           const encoded = yield* encodeStoredThreadSnapshot({
             schemaVersion: ORCHESTRATION_THREAD_CACHE_SCHEMA_VERSION,
             environmentId,
@@ -822,13 +841,13 @@ export const layer = Layer.effectContext(
             threadCacheKey(environmentId, snapshot.projection.thread.id),
             encoded,
           );
-        }).pipe(
-          Effect.mapError((cause) =>
-            cause._tag === "ConnectionPersistenceError"
-              ? cause
-              : persistenceError("save-thread", cause),
-          ),
+        },
+        Effect.mapError((cause) =>
+          cause._tag === "ConnectionPersistenceError"
+            ? cause
+            : persistenceError("save-thread", cause),
         ),
+      ),
       loadVcsRefs: (environmentId, cwd) =>
         readDatabaseValue(database, VCS_REFS_STORE_NAME, vcsRefsCacheKey(environmentId, cwd)).pipe(
           Effect.flatMap((raw) => {
@@ -850,8 +869,8 @@ export const layer = Layer.effectContext(
               : persistenceError("load-vcs-refs", cause),
           ),
         ),
-      saveVcsRefs: (environmentId, cwd, refs) =>
-        Effect.gen(function* () {
+      saveVcsRefs: Effect.fn("storage.saveVcsRefs")(
+        function* (environmentId, cwd, refs) {
           const encoded = yield* encodeStoredVcsRefs({
             schemaVersion: 1,
             environmentId,
@@ -864,13 +883,13 @@ export const layer = Layer.effectContext(
             vcsRefsCacheKey(environmentId, cwd),
             encoded,
           );
-        }).pipe(
-          Effect.mapError((cause) =>
-            cause._tag === "ConnectionPersistenceError"
-              ? cause
-              : persistenceError("save-vcs-refs", cause),
-          ),
+        },
+        Effect.mapError((cause) =>
+          cause._tag === "ConnectionPersistenceError"
+            ? cause
+            : persistenceError("save-vcs-refs", cause),
         ),
+      ),
       removeVcsRefs: (environmentId, cwd) =>
         removeDatabaseValue(
           database,

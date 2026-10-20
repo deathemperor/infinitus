@@ -15,7 +15,10 @@ import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
-import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
+import {
+  isNightlyDesktopVersion,
+  resolveDefaultDesktopUpdateChannel,
+} from "../updates/updateChannels.ts";
 import type { OtlpProtocol } from "@infinitus/shared/observability";
 
 export interface MakeDesktopEnvironmentInput {
@@ -54,19 +57,11 @@ export class DesktopEnvironment extends Context.Service<
     readonly browserArtifactsDir: string;
     readonly rootDir: string;
     readonly appRoot: string;
-    // Root of the tree containing apps/server/dist and node_modules for the
-    // backend. Equals appRoot everywhere except packaged Windows, where the
-    // server tree ships as the resources/server.asar sidecar (see
-    // scripts/build-desktop-artifact.ts) that the asar-aware
-    // ELECTRON_RUN_AS_NODE primary reads in place and the WSL backend
-    // extracts on demand (see DesktopWslServerTree).
     readonly serverRoot: string;
     readonly backendEntryPath: string;
-    // Built web client the packaged renderer is served from over t3code://app.
     readonly clientAssetsDir: string;
     readonly backendCwd: string;
     readonly preloadPath: string;
-    // Preload that turns on the V8 compile cache for the local backend.
     readonly compileCachePath: string;
     readonly appUpdateYmlPath: string;
     readonly devServerUrl: Option.Option<URL>;
@@ -103,7 +98,7 @@ function resolveDesktopAppStageLabel(input: {
     return "Dev";
   }
 
-  return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Alpha";
+  return isNightlyDesktopVersion(input.appVersion) ? "Nightly" : "Beta";
 }
 
 export function resolveDesktopAppBranding(input: {
@@ -116,6 +111,13 @@ export function resolveDesktopAppBranding(input: {
     stageLabel,
     displayName: `${APP_BASE_NAME} (${stageLabel})`,
   };
+}
+
+// Keep Chromium's encryption identity on the names shipped before branding changed.
+export function resolveDesktopSafeStorageName(appVersion: string): string {
+  return resolveDefaultDesktopUpdateChannel(appVersion) === "nightly"
+    ? "T3 Code (Nightly)"
+    : "T3 Code (Alpha)";
 }
 
 function normalizeDesktopArch(arch: string): DesktopRuntimeArch {

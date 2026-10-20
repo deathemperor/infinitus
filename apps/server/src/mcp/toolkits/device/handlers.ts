@@ -19,19 +19,12 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import { DeviceScreenshotToolkit, DeviceStandardToolkit, DeviceToolkit } from "./tools.ts";
 
-/** The flags that pin every agent-device command to one device. */
 export function agentDeviceTargetArgs(device: DeviceSummary): ReadonlyArray<string> {
   return device.platform === "ios"
     ? ["--platform", "ios", "--udid", device.id]
     : ["--platform", "android", "--serial", device.id];
 }
 
-/**
- * Just-in-time guidance returned from `device_open`. This is the one place
- * the agent learns how to drive the device, so it lives with the tool result
- * rather than in the always-on prompt block; threads that never open a device
- * never pay for it.
- */
 export function agentDeviceQuickStart(
   device: DeviceSummary,
   targetArgs = agentDeviceTargetArgs(device),
@@ -76,46 +69,45 @@ const requireDeviceAccess = McpInvocationContext.requireThreadMcpCapability("dev
   ),
 );
 
-const pickDevice = (
+const pickDevice = Effect.fn("handlers.pickDevice")(function* (
   devices: ReadonlyArray<DeviceSummary>,
   input: {
     readonly deviceId?: DeviceId | undefined;
     readonly platform?: DevicePlatform | undefined;
     readonly hostId?: DeviceHostId | undefined;
   },
-): Effect.Effect<DeviceSummary, DeviceToolUnavailableError> =>
-  Effect.gen(function* () {
-    const hostId = input.hostId ?? LOCAL_DEVICE_HOST_ID;
-    if (input.deviceId !== undefined) {
-      const match = devices.find(
-        (device) => device.hostId === hostId && device.id === input.deviceId,
-      );
-      if (match) return match;
-      return yield* new DeviceToolUnavailableError({
-        reason: `No device ${input.deviceId} on host ${hostId}. Call device_list for current ids.`,
-      });
-    }
-    const candidates = devices.filter(
-      (device) =>
-        device.hostId === hostId &&
-        (input.platform === undefined || device.platform === input.platform),
+): Effect.fn.Return<DeviceSummary, DeviceToolUnavailableError> {
+  const hostId = input.hostId ?? LOCAL_DEVICE_HOST_ID;
+  if (input.deviceId !== undefined) {
+    const match = devices.find(
+      (device) => device.hostId === hostId && device.id === input.deviceId,
     );
-    if (candidates.length === 0) {
-      return yield* new DeviceToolUnavailableError({
-        reason:
-          input.platform === undefined
-            ? "No simulators or emulators were found. Call device_list to see why."
-            : `No ${input.platform} devices were found on host ${hostId}. Call device_list to see why.`,
-      });
-    }
-    const platforms = new Set(candidates.map((device) => device.platform));
-    if (input.platform === undefined && platforms.size > 1) {
-      return yield* new DeviceToolUnavailableError({
-        reason: "Both iOS and Android devices are available; pass platform or deviceId.",
-      });
-    }
-    return candidates.find((device) => device.booted) ?? candidates[0]!;
-  });
+    if (match) return match;
+    return yield* new DeviceToolUnavailableError({
+      reason: `No device ${input.deviceId} on host ${hostId}. Call device_list for current ids.`,
+    });
+  }
+  const candidates = devices.filter(
+    (device) =>
+      device.hostId === hostId &&
+      (input.platform === undefined || device.platform === input.platform),
+  );
+  if (candidates.length === 0) {
+    return yield* new DeviceToolUnavailableError({
+      reason:
+        input.platform === undefined
+          ? "No simulators or emulators were found. Call device_list to see why."
+          : `No ${input.platform} devices were found on host ${hostId}. Call device_list to see why.`,
+    });
+  }
+  const platforms = new Set(candidates.map((device) => device.platform));
+  if (input.platform === undefined && platforms.size > 1) {
+    return yield* new DeviceToolUnavailableError({
+      reason: "Both iOS and Android devices are available; pass platform or deviceId.",
+    });
+  }
+  return candidates.find((device) => device.booted) ?? candidates[0]!;
+});
 
 const toolError = (error: DeviceError | DeviceToolUnavailableError) => error;
 
@@ -211,7 +203,6 @@ const handlers = {
       const scope = yield* requireDeviceAccess;
       const devices = yield* DeviceService.DeviceService;
       const sessions = yield* devices.sessionsForThread(scope.thread.threadId);
-      // Only devices this thread opened: another thread's device is not this agent's to watch.
       const hostId =
         input.deviceId === undefined ? input.hostId : (input.hostId ?? LOCAL_DEVICE_HOST_ID);
       const target = sessions.findLast(
@@ -253,7 +244,6 @@ const handlers = {
   ),
 } satisfies McpToolAccess.Handlers<typeof DeviceToolkit.tools>;
 
-/** Width and height from the IHDR chunk; a PNG that lacks one reports 0×0. */
 export function pngDimensions(png: Uint8Array): { width: number; height: number } {
   if (png.length < 24) return { width: 0, height: 0 };
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);

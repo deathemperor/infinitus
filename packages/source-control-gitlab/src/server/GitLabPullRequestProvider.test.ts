@@ -2,13 +2,13 @@ import { assert, describe, expect, it, vi } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import * as GitLabCli from "./GitLabCli.ts";
 import * as GitLabPullRequestCli from "./GitLabPullRequestCli.ts";
 import { gitLabViewerPermissions, make } from "./GitLabPullRequestProvider.ts";
 
 describe("gitLabViewerPermissions", () => {
   it("offers everything to a viewer GitLab says can merge", () => {
     expect(gitLabViewerPermissions({ viewerCanMerge: true })).toEqual({
-      // Arming a merge for later and taking the arming back answer to the same `can_merge`.
       actions: [
         "merge",
         "ready",
@@ -22,17 +22,12 @@ describe("gitLabViewerPermissions", () => {
       comment: true,
       resolve: true,
       verdicts: ["comment", "approve"],
-      // GitLab says nothing about who may set a reviewer, and an unreported permission is granted.
       requestReviewers: true,
-      // Rebase and nothing else: GitLab cannot merge a target branch into a source branch, so
-      // offering the choice would be offering something no request could carry out.
       updateMethods: ["rebase"],
     });
   });
 
   it("keeps merge, now and later, from a viewer GitLab says cannot", () => {
-    // `user.can_merge` already accounts for the role, the approval rules and a protected target
-    // branch, so it is the one answer here that does not have to be inferred.
     expect(gitLabViewerPermissions({ viewerCanMerge: false })).toEqual({
       actions: ["ready", "draft", "close", "reopen"],
       comment: true,
@@ -43,15 +38,10 @@ describe("gitLabViewerPermissions", () => {
   });
 
   it("names no way of updating a branch it will not let this viewer update", () => {
-    // The action and the strategy behind it go together: a button offered with nothing to press
-    // it with, or a strategy left standing next to a withheld button, is a half-refusal.
     expect(gitLabViewerPermissions({ viewerCanMerge: false }).updateMethods).toBeUndefined();
   });
 
   it("treats an author with read access as any other reader, which is all GitLab says", () => {
-    // Its REST API names no relationship between the viewer and the merge request beyond
-    // `can_merge`, so the four an author keeps stay offered to everyone rather than being taken
-    // from the one person entitled to them.
     expect(gitLabViewerPermissions({ viewerCanMerge: false }).actions).toEqual([
       "ready",
       "draft",
@@ -144,8 +134,6 @@ describe("getChangeRequest base freshness", () => {
 
   it.effect("says nothing at all where GitLab counted nothing", () =>
     Effect.gen(function* () {
-      // An install too old to answer has to leave the page silent rather than let it claim the
-      // branch is current, which is the one wrong thing this banner could say.
       const changeRequest = yield* readWith({});
 
       expect(changeRequest.baseComparison).toBe("unknown");
@@ -177,7 +165,6 @@ describe("rewriting what has already been said", () => {
         body: "What this changes.",
       });
 
-      // GitLab calls it the description, and the title stays out of the request entirely.
       expect(updateMergeRequest).toHaveBeenCalledWith({
         cwd: "/w",
         repository: "acme/web",
@@ -274,6 +261,106 @@ describe("expanding unchanged lines", () => {
         operation: "getDiffFileContents",
         reason: "failed",
         detail: "The diff file 'assets/logo.png' is binary.",
+      });
+    }),
+  );
+});
+
+describe("optional activity reads", () => {
+  const reference = { cwd: "/w", repository: "acme/web", host: "gitlab.com", number: 7 };
+  const comment = {
+    id: "42",
+    kind: "issue-comment" as const,
+    author: null,
+    body: "Keep this comment",
+    createdAt: "2026-07-01T00:00:00Z",
+    url: null,
+    path: null,
+    reviewState: null,
+  };
+  const commit = {
+    oid: "abc",
+    messageHeadline: "Keep this commit",
+    committedDate: "2026-07-01T00:00:00Z",
+  };
+  const reads = {
+    listNotes: () => Effect.succeed({ comments: [comment], truncated: false }),
+    listCommits: () => Effect.succeed([commit]),
+    listDiscussions: () => Effect.succeed({ threads: [], truncated: false }),
+    listReactions: () => Effect.succeed({ reactions: [], reactionsByNoteId: new Map() }),
+  };
+  const context = {
+    operation: "execute" as const,
+    command: "glab" as const,
+    cwd: "/w",
+    cause: null,
+  };
+
+  it.effect.each([
+    {
+      operation: "listNotes",
+      error: new GitLabCli.GitLabCliAuthenticationError(context),
+      reason: "unauthenticated",
+    },
+    {
+      operation: "listCommits",
+      error: new GitLabCli.GitLabCliUnavailableError(context),
+      reason: "missing-tool",
+    },
+  ] as const)(
+    "reports $reason instead of successful partial activity",
+    ({ operation, error, reason }) =>
+      Effect.gen(function* () {
+        const provider = yield* make.pipe(
+          Effect.provide(
+            Layer.mock(GitLabPullRequestCli.GitLabPullRequestCli)({
+              ...reads,
+              [operation]: () => Effect.fail(error),
+            }),
+          ),
+        );
+
+        expect(yield* Effect.result(provider.getChangeRequestActivity(reference))).toMatchObject({
+          _tag: "Failure",
+          failure: {
+            _tag: "PullRequestProviderError",
+            provider: "gitlab",
+            operation: "getChangeRequestActivity",
+            reason,
+            detail: error.detail,
+            cause: error,
+          },
+        });
+      }),
+  );
+
+  it.effect("keeps comments and commits when optional discussions and reactions fail", () =>
+    Effect.gen(function* () {
+      const provider = yield* make.pipe(
+        Effect.provide(
+          Layer.mock(GitLabPullRequestCli.GitLabPullRequestCli)({
+            ...reads,
+            listDiscussions: () =>
+              Effect.fail(
+                new GitLabPullRequestCli.GitLabMergeRequestReadError({
+                  command: "glab",
+                  cwd: "/w",
+                  operation: "listDiscussions",
+                  cause: null,
+                }),
+              ),
+            listReactions: () => Effect.fail(new GitLabCli.GitLabCliCommandError(context)),
+          }),
+        ),
+      );
+
+      expect(yield* provider.getChangeRequestActivity(reference)).toEqual({
+        comments: [{ ...comment, reactions: [] }],
+        commentCount: 1,
+        commentsTruncated: true,
+        reviewThreads: [],
+        reactions: [],
+        commits: [commit],
       });
     }),
   );

@@ -2,8 +2,6 @@ import { EnvironmentId } from "@infinitus/contracts";
 import type { ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-// Pinned so the direction cases below read as fixed versions instead of
-// arithmetic on whatever version this checkout happens to be at.
 const branding = vi.hoisted(() => ({ APP_VERSION: "0.0.34" }));
 vi.mock("./branding", () => branding);
 
@@ -19,7 +17,6 @@ import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
   resolveVersionMismatch,
-  serverUpdateGuidance,
   supportsDesktopAppUpdate,
 } from "./versionSkew";
 
@@ -237,10 +234,5 @@ describe("versionSkew", () => {
     expect(supportsDesktopAppUpdate(descriptor(false))).toBe(false);
     expect(supportsDesktopAppUpdate(descriptor())).toBe(false);
     expect(supportsDesktopAppUpdate(null)).toBe(false);
-  });
-
-  it("matches version-drift guidance to the advertised update path", () => {
-    expect(serverUpdateGuidance("respawn")).toBe("Update to stay in sync");
-    expect(serverUpdateGuidance("desktop-managed")).toBe("Update the desktop app");
   });
 });

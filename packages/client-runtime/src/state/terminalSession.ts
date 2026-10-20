@@ -6,16 +6,15 @@ import type {
   TerminalSummary,
   ThreadId,
 } from "@infinitus/contracts";
+import { DEFAULT_MAX_TERMINAL_BUFFER_BYTES } from "@infinitus/contracts";
 import {
   appendOutput,
-  DEFAULT_MAX_TERMINAL_BUFFER_BYTES,
   EMPTY_TERMINAL_OUTPUT_STATE,
   resetOutput,
   type TerminalOutputState,
 } from "./terminalOutput.ts";
 
 export {
-  DEFAULT_MAX_TERMINAL_BUFFER_BYTES,
   INITIAL_TERMINAL_OUTPUT_CURSOR,
   readTerminalOutputUpdate,
   terminalOutputText,
@@ -23,6 +22,7 @@ export {
   type TerminalOutputState,
   type TerminalOutputUpdate,
 } from "./terminalOutput.ts";
+export { DEFAULT_MAX_TERMINAL_BUFFER_BYTES } from "@infinitus/contracts";
 
 export interface TerminalSessionState {
   readonly summary: TerminalSummary | null;

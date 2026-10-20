@@ -385,6 +385,80 @@ describe("OpenCodeAdapterV2", () => {
       ),
   );
 
+  it.effect("preserves native multi-select and custom-answer flags through a live reply", () =>
+    Effect.gen(function* () {
+      const nativeEvents = asyncEventStream();
+      let delivered: unknown;
+      const harness = yield* makeOpenCodeRuntimeHarness("question-flags", "root", {
+        event: { subscribe: async () => ({ stream: nativeEvents.stream }) },
+        session: {
+          create: async () => ({ data: { id: "root", time: { created: 1, updated: 1 } } }),
+          promptAsync: async () => ({ data: true }),
+          abort: async () => ({ data: true }),
+          children: async () => ({ data: [] }),
+        },
+        question: {
+          reply: async (input: unknown) => {
+            delivered = input;
+            return { data: true };
+          },
+        },
+      });
+      yield* harness.startTurn();
+      const received = yield* harness.runtime.events.pipe(
+        Stream.filter(
+          (event) =>
+            event.type === "runtime_request.updated" ||
+            (event.type === "turn_item.updated" && event.turnItem.type === "user_input_request"),
+        ),
+        Stream.take(2),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* Effect.promise(() =>
+        nativeEvents.push({
+          type: "question.asked",
+          properties: {
+            id: "question",
+            sessionID: "root",
+            questions: [
+              {
+                header: "Drinks",
+                question: "Which drinks?",
+                multiple: true,
+                custom: false,
+                options: [
+                  { label: "Tea", description: "Hot" },
+                  { label: "Water", description: "Cold" },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+      const events = yield* Fiber.join(received);
+      const item = events.find((event) => event.type === "turn_item.updated");
+      const request = events.find((event) => event.type === "runtime_request.updated");
+      assert.equal(item?.type, "turn_item.updated");
+      if (
+        item?.type !== "turn_item.updated" ||
+        item.turnItem.type !== "user_input_request" ||
+        request?.type !== "runtime_request.updated"
+      )
+        throw new Error("Native question missing");
+      assert.equal(item.turnItem.questions[0]?.multiSelect, true);
+      assert.equal(item.turnItem.questions[0]?.allowCustomAnswer, false);
+      yield* harness.runtime.respondToRuntimeRequest({
+        requestId: request.runtimeRequest.id,
+        answers: { "question-0-drinks": ["Tea", "Water"] },
+      });
+      assert.deepInclude(delivered, { answers: [["Tea", "Water"]] });
+    }).pipe(
+      Effect.provide(Layer.merge(IdAllocator.layer, McpProviderSessions.layer)),
+      Effect.scoped,
+    ),
+  );
+
   it.effect.each(["permission", "question"] as const)(
     "cancels an undelivered %s reply at its deadline",
     (kind) =>
@@ -458,7 +532,6 @@ describe("OpenCodeAdapterV2", () => {
         assert.isTrue(Exit.isFailure(yield* Fiber.join(reply)));
         assert.isTrue(signal?.aborted);
         deliver = true;
-        // Failed delivery leaves the request available for an explicit retry.
         yield* harness.runtime.respondToRuntimeRequest(response);
       }).pipe(
         Effect.provide(Layer.merge(IdAllocator.layer, McpProviderSessions.layer)),
@@ -829,8 +902,16 @@ describe("OpenCodeAdapterV2", () => {
     ),
   );
 
-  it.effect("titles OpenCode reads and searches from their input", () =>
+  it.effect("projects OpenCode read output and search titles from native tool calls", () =>
     Effect.gen(function* () {
+      const directoryOutput =
+        "<path>/workspace/src</path>\n<type>directory</type>\n<entries>\nenv.ts\nlib/\n\n(2 entries)\n</entries>";
+      const fileOutput =
+        "<path>/workspace/src/env.ts</path>\n<type>file</type>\n<content>\n1: hello\n2: </content> literal\n3: world\n</content>";
+      const fileWithInstructions =
+        "<path>/workspace/src/env.ts</path>\n<type>file</type>\n<content>1: hello\n\n(End of file - total 1 lines)\n</content>\n\n<system-reminder>\nProject instructions\n</system-reminder>";
+      const missingPath = directoryOutput.slice(directoryOutput.indexOf("<type>"));
+      const missingClose = fileOutput.slice(0, fileOutput.lastIndexOf("\n</content>"));
       const nativeEvents = asyncEventStream();
       const nativeSessionId = "native-opencode-search";
       const harness = yield* makeOpenCodeRuntimeHarness("search-projection", nativeSessionId, {
@@ -840,6 +921,7 @@ describe("OpenCodeAdapterV2", () => {
             return { stream: nativeEvents.stream };
           },
         },
+        mcp: { status: async () => ({ data: {} }) },
         session: {
           create: async () => ({
             data: { id: nativeSessionId, time: { created: 1, updated: 1 } },
@@ -855,24 +937,31 @@ describe("OpenCodeAdapterV2", () => {
         Stream.runCollect,
         Effect.forkScoped,
       );
-      for (const [tool, input, output] of [
+      const toolCalls = [
         ["read", { filePath: "src/env.ts" }, "---\nfile body"],
+        ["read", { filePath: "/workspace/src" }, directoryOutput],
+        ["read", { filePath: "/workspace/src/env.ts" }, fileOutput],
+        ["read", { filePath: "/workspace/src/env.ts" }, fileWithInstructions],
+        ["read", { filePath: "/workspace/src" }, missingPath],
+        ["read", { filePath: "/workspace/src/env.ts" }, missingClose],
+        ["custom_read", { filePath: "/workspace/src" }, directoryOutput],
         ["grep", { pattern: "TODO", path: "apps/web" }, "---\nfile body"],
         ["websearch", { query: "OpenCode documentation" }, "---\nfile body"],
         ["glob", { pattern: "missing", path: "apps/web" }, ""],
         ["codesearch", {}, " \n\t"],
-      ] as const) {
+      ] as const;
+      for (const [index, [tool, input, output]] of toolCalls.entries()) {
         yield* Effect.promise(() =>
           nativeEvents.push({
             type: "message.part.updated",
             properties: {
               sessionID: nativeSessionId,
               part: {
-                id: `part-${tool}`,
+                id: `part-${index}`,
                 sessionID: nativeSessionId,
                 messageID: "assistant-search",
                 type: "tool",
-                callID: `call-${tool}`,
+                callID: `call-${index}`,
                 tool,
                 state: {
                   status: "completed",
@@ -896,8 +985,24 @@ describe("OpenCodeAdapterV2", () => {
       const items = (yield* Fiber.join(received)).flatMap((event) =>
         event.type === "turn_item.updated" ? [event.turnItem] : [],
       );
-      const read = items.find((item) => item.type === "dynamic_tool");
-      assert.equal(read?.title, "Read src/env.ts");
+      const reads = items.filter((item) => item.type === "dynamic_tool");
+      assert.equal(reads[0]?.title, "Read src/env.ts");
+      assert.deepEqual(
+        reads.map((item) => ({ toolName: item.toolName, output: item.output })),
+        [
+          { toolName: "read", output: "---\nfile body" },
+          { toolName: "read", output: "env.ts\nlib/\n\n(2 entries)" },
+          { toolName: "read", output: "1: hello\n2: </content> literal\n3: world" },
+          {
+            toolName: "read",
+            output:
+              "1: hello\n\n(End of file - total 1 lines)\n\n<system-reminder>\nProject instructions\n</system-reminder>",
+          },
+          { toolName: "read", output: missingPath },
+          { toolName: "read", output: missingClose },
+          { toolName: "custom_read", output: directoryOutput },
+        ],
+      );
       const grep = items.find((item) => item.type === "file_search");
       assert.equal(grep?.title, "Searched TODO in web");
       assert.equal(grep?.type === "file_search" ? grep.pattern : null, "TODO");
@@ -929,6 +1034,8 @@ describe("OpenCodeAdapterV2", () => {
 
   it.effect("presents OpenCode MCP calls without treating remote tools as local edits", () =>
     Effect.gen(function* () {
+      const output =
+        "<path>/workspace/src</path>\n<type>directory</type>\n<entries>\nenv.ts\nlib/\n\n(2 entries)\n</entries>";
       const nativeEvents = asyncEventStream();
       const nativeSessionId = "native-opencode-mcp";
       let statusReads = 0;
@@ -984,7 +1091,7 @@ describe("OpenCodeAdapterV2", () => {
                   input: { document: "remote-doc" },
                   title: "Edit remote document",
                   metadata: {},
-                  output: "saved",
+                  output,
                   error: "failed",
                   time: { start: 1, end: 2 },
                 },
@@ -1077,6 +1184,7 @@ describe("OpenCodeAdapterV2", () => {
         });
         assert.deepEqual(item.input, { document: "remote-doc" });
       }
+      assert.equal(items[1]?.output, output);
       assert.equal(items[3]?.toolName, "ambiguous_server_edit_document");
       assert.isUndefined(items[3]?.toolSource);
       assert.equal(statusReads, 1);
@@ -1352,8 +1460,6 @@ describe("OpenCodeAdapterV2", () => {
           },
         },
       );
-      // A forked run starts on its own row for the same native session, while
-      // the adapter tracks the session under the id it minted.
       const forkedRow = {
         ...harness.providerThread,
         id: ProviderThreadId.make("provider-thread:opencode-test:forked-run-row"),
@@ -2485,7 +2591,6 @@ describe("OpenCodeAdapterV2", () => {
       const fakeClient = {
         event: {
           subscribe: async (_input?: unknown, options?: { readonly signal?: AbortSignal }) => ({
-            // Emits nothing and ends when the pump's abort signal fires.
             stream: {
               [Symbol.asyncIterator]: () => ({
                 next: () =>
@@ -2538,9 +2643,6 @@ describe("OpenCodeAdapterV2", () => {
         runtimePolicy: runtimePolicy("full-access"),
       });
       const now = yield* DateTime.now;
-      // The placeholder row the orchestrator creates for a first run: no
-      // native identity yet. The adapter must bind the created session to
-      // this row instead of minting a second session-keyed row.
       const placeholder: OrchestrationV2ProviderThread = {
         id: ProviderThreadId.make("thread:provider:opencode:native-thread:pending:run:adopt:1"),
         driver: OPENCODE_PROVIDER,
@@ -2566,7 +2668,6 @@ describe("OpenCodeAdapterV2", () => {
       });
       assert.equal(adopted.id, placeholder.id);
       assert.equal(adopted.nativeThreadRef?.nativeId, "ses_native_1");
-      // Without a handed-over row the adapter still derives its own id.
       const minted = yield* session.ensureThread({
         threadId,
         modelSelection,

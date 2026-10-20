@@ -31,6 +31,16 @@ The v2 checks pin these invariants:
   the wire boundary, including small outputs. Explicit failure flags and bounded result IDs
   preserve status and grouped action counts without shipping those bodies. Persisted events
   remain complete; the existing diff endpoints still provide file content when requested.
+  Explicit cross-environment transcript exports preserve full tool bodies so the destination
+  agent can read the context. The export rejects timeline JSON above the file attachment limit
+  before sending it; the client still applies its attachment limit to the complete file.
+- Live command output reaches a client only through `orchestration.subscribeCommandOutput`, which
+  an expanded command row opens and closes with itself. Raw output deltas are never orchestration
+  events: adapters send them to the
+  [command output hub](../../apps/server/src/orchestration-v2/CommandOutputHub.ts) ahead of
+  ingestion, which keeps one bounded tail per running command and throttles each subscriber. Do not
+  route output deltas through `turn_item.updated`: a busy command would flood the event store and
+  block ingestion for every other thread.
 - The initial shell contains active navigation rows only. Archived rows use the dedicated archive
   query, and transcript message bodies stay in thread detail regardless of message size.
 - Shell resume sends deltas plus compact repository-enrichment metadata, not another full project
@@ -88,7 +98,16 @@ viewport, including a small overscan region. Cached badges remain available whil
 released. Local Git status reads skip divergence calculations; callers that need ahead/behind
 counts keep the full status path. Cached fetch failures share the existing backoff and log only
 the actual failed attempt. Unchanged desktop environment bootstrap reads retain their array
-identity so polling does not invalidate subscribers.
+identity so polling does not invalidate subscribers. The desktop preload keeps the synchronous
+startup snapshot, while topology polling refreshes it through asynchronous IPC. Recurring
+`sendSync` calls block the renderer behind unrelated main-process work, even when the returned
+snapshot is unchanged.
+
+Local trace records and provider event logs use asynchronous, serialized file writes and rotation.
+Batching synchronous appends still stalls the server event loop on slow storage, especially on
+Windows. While a trace write is slow, producers keep up to one trace file of records, so the spans
+that time a stall survive it; records drop only while the disk stays stuck. Provider logging
+retains backpressure. Shutdown drains accepted writes before closing their scope.
 
 Relay awareness queues one pending publication per thread and retains a follow-up when the thread
 changes during a send. Transcript deltas and tool output do not enqueue awareness work. Run,
@@ -101,4 +120,4 @@ continuous traffic during an outage.
 
 Focused coverage: `ProjectionSettlement.test.ts`, `ThreadSettlementService.test.ts`,
 `runtimeLayer.test.ts`, `AgentAwarenessRelay.test.ts`, `GitVcsDriverCore.test.ts`,
-`ThreadStatusIndicators.subscriptions.test.tsx`, and `desktopLocal.test.ts`.
+`ThreadStatusIndicators.subscriptions.browser.test.tsx`, and `desktopLocal.test.ts`.

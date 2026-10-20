@@ -114,6 +114,8 @@ describe("native device stream transport", () => {
     socket.onopen?.();
     expect(socket.send).not.toHaveBeenCalled();
     socket.onmessage?.({ data: Uint8Array.of(0x83).buffer });
+    client.sendText("hello");
+    expect(socket.send).not.toHaveBeenCalled();
     client.setOrientation("landscape_right");
     client.pressButton("home");
     client.sendTouch("begin", 0.25, 0.75);
@@ -148,6 +150,8 @@ describe("native device stream transport", () => {
     client.setOrientation("landscape_right");
     client.pressButton("home");
     client.pressButton("appSwitcher");
+    const prefix = "a".repeat(299);
+    client.sendText(`${prefix}ä`);
     expect(
       socket.send.mock.calls.map(([message]) => JSON.parse(message as string) as unknown),
     ).toEqual([
@@ -156,6 +160,8 @@ describe("native device stream transport", () => {
       { type: "touch", action: "up", x: 0.2, y: 0.1 },
       { type: "home" },
       { type: "recents" },
+      { type: "text", text: prefix },
+      { type: "text", text: "ä" },
     ]);
     client.stop();
     expect(socket.close).toHaveBeenCalledTimes(1);
@@ -602,7 +608,6 @@ describe("shared device stream readiness and recovery", () => {
     expect(socket.send).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(videoBodies).toHaveLength(2);
-    // The old feed never produces another IDR. Only a fresh subscription can recover.
     videoBodies[1]!.enqueue(
       new Uint8Array([...envelope(1, [1, 0x64, 0, 0x1f]), ...envelope(2, [4])]),
     );
