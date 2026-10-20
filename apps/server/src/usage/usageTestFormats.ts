@@ -1,8 +1,3 @@
-/**
- * The built-in transcript formats by provider, for engine and cache tests.
- *
- * @module usageTestFormats
- */
 import type { UsageProviderKind } from "@infinitus/contracts";
 import type { TranscriptUsageFormat } from "@infinitus/provider-core/server/usage";
 import { piUsageFormat } from "@infinitus/provider-pi/server/usage";

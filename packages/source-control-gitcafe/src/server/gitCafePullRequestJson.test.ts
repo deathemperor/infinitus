@@ -1,26 +1,3 @@
-/**
- * Pins `./gitCafePullRequestJson.ts`, pure decoding of GitCafe's REST JSON into the neutral
- * `Provider*` shapes. Pass 2 creates these exports:
- *
- * Schemas (REST bodies as GitCafe sends them):
- * - `GitCafePull` (list row), `GitCafePullDetail` (row + description, closedAt, mergedAt,
- *   sourceRepo, lockedAt?, required `capabilities: { comment, review, merge, edit, moderate }`),
- * - `GitCafeComments`, `GitCafeReviews`, `GitCafeCommits`, `GitCafeReactions`
- *   (cursor envelopes `{ items, next }`; commits also `{ truncated, headOid }`),
- * - `GitCafeStackEnvelope` (`{ stack: null | { id, number, revision, landingBase, members } }`,
- *   members with an optional `headOid`), `GitCafeDiff` (`{ items, truncated? }`),
- *   `GitCafeChecks` (`{ items, next }`).
- *
- * Conversions (all take the repository host, so staging stays on staging):
- * - `toChangeRequest(pull, { repository, host }): ProviderChangeRequest`
- * - `toViewerPermissions(detail): PullRequestViewerPermissions` — fills `editChangeRequest`.
- * - `toActivity({ comments, reviews, commits, reactions?, headOid?, host }):
- *   ProviderChangeRequestActivity` — fills `canEdit` on both copies of a remark and `canResolve`
- *   on review threads, from each comment's `capabilities`.
- * - `toStack(stack, { repository, host }): ProviderChangeRequestStack`
- * - `toDiff(diff): ProviderDiffSlice`
- * - `toChecks(checks): ReadonlyArray<PullRequestCheck>`
- */
 import { assert, describe, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
@@ -239,7 +216,6 @@ describe("toActivity", () => {
     const canEdit = (id: string) => result.comments.find((comment) => comment.id === id)?.canEdit;
     assert.strictEqual(canEdit("root"), false);
     assert.strictEqual(canEdit("reply"), true);
-    // A host that says nothing about a remark leaves the page to guess.
     assert.isUndefined(canEdit("silent"));
     assert.deepStrictEqual(
       result.reviewThreads[0]?.comments.map((comment) => [comment.id, comment.canEdit]),
@@ -345,7 +321,6 @@ describe("toActivity", () => {
               viewerReactionId: null,
               reactors: [actor],
             },
-            // Neither a custom emoji nor one outside the shared set is shown under another name.
             {
               subject: { kind: "pull_request", id: "pr_one" },
               emoji: { kind: "custom", id: "party-parrot" },
@@ -501,7 +476,6 @@ describe("toDiff", () => {
         truncated: false,
       }),
     );
-    // Git quotes a name for the bytes a header can't carry, not for a space.
     assert.include(patch, "rename from old image.png");
     assert.include(patch, "Binary files a/old image.png and b/new image.png differ");
   });
@@ -520,8 +494,12 @@ describe("toDiff", () => {
 
 describe("toChecks", () => {
   it("maps GitCafe's status and conclusion onto the shared check states", () => {
-    const check = (status: string, conclusion: string | null) => ({
-      name: `${status}-${conclusion}`,
+    const check = (
+      status: string,
+      conclusion: string | null,
+      name = `${status}-${conclusion}`,
+    ) => ({
+      name,
       status,
       conclusion,
       summary: null,
@@ -532,16 +510,24 @@ describe("toChecks", () => {
         items: [
           check("queued", null),
           check("in_progress", null),
-          check("completed", "success"),
+          check("completed", "success", "Build"),
+          check("completed", "cancelled"),
           check("completed", "action_required"),
-          check("completed", "timed_out"),
+          check("completed", "timed_out", "Build"),
         ],
         next: null,
       }),
     );
     assert.deepStrictEqual(
-      checks.map((item) => item.status),
-      ["pending", "pending", "success", "action-required", "failure"],
+      checks.map((item) => [item.name, item.status]),
+      [
+        ["completed-cancelled", "cancelled"],
+        ["Build", "failure"],
+        ["queued-null", "pending"],
+        ["in_progress-null", "pending"],
+        ["Build", "success"],
+        ["completed-action_required", "action-required"],
+      ],
     );
   });
 });

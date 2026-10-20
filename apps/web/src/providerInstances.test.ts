@@ -1,4 +1,10 @@
-import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@infinitus/contracts";
+import {
+  DEFAULT_MODEL_BY_PROVIDER,
+  ProjectId,
+  ProviderDriverKind,
+  ProviderInstanceId,
+  type ServerProvider,
+} from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import {
   applyProviderInstanceSettings,
@@ -10,6 +16,7 @@ import {
   resolveDefaultProviderModelSelection,
   resolveProviderCatalogAvailability,
   resolveSelectableProviderInstance,
+  shouldShowInstanceBadge,
 } from "./providerInstances";
 
 function provider(input: {
@@ -254,7 +261,6 @@ describe("applyProviderInstanceSettings", () => {
       null,
     );
 
-    // Settings decide over a stale probe: Codex starts on, Grok starts off.
     expect(codex?.enabled).toBe(true);
     expect(grok?.enabled).toBe(false);
   });
@@ -338,6 +344,33 @@ describe("deriveProviderEntriesByEnvironment", () => {
     expect(byEnvironment.get("remote")?.get("claude")?.accentColor).toBe("#445566");
   });
 
+  it("keeps an instance a project turns on as a sibling for the instance badge", () => {
+    const codex = ProviderDriverKind.make("codex");
+    const byEnvironment = deriveProviderEntriesByEnvironment([
+      [
+        "local",
+        [
+          provider({ provider: codex, instanceId: "codex" }),
+          provider({ provider: codex, instanceId: "codex_work" }),
+        ],
+        {
+          providerInstances: {
+            [ProviderInstanceId.make("codex_work")]: { driver: codex, enabled: false },
+          },
+          projectSettingsOverrides: {
+            [ProjectId.make("project-work")]: {
+              providerInstances: { [ProviderInstanceId.make("codex_work")]: { enabled: true } },
+            },
+          },
+        },
+      ],
+    ]);
+    const entries = byEnvironment.get("local");
+    const personal = entries?.get("codex");
+
+    expect(personal && shouldShowInstanceBadge(personal, entries?.values() ?? [])).toBe(true);
+  });
+
   it("never falls back to another environment's instances", () => {
     const byEnvironment = deriveProviderEntriesByEnvironment([
       ["local", [provider({ provider: ProviderDriverKind.make("codex"), instanceId: "codex" })]],
@@ -345,8 +378,6 @@ describe("deriveProviderEntriesByEnvironment", () => {
     ]);
 
     expect(byEnvironment.get("empty")?.get("codex")).toBeUndefined();
-    // Every environment gets its own bucket, so an absent lookup is a real
-    // "this environment has no such instance", not a missing key.
     expect(byEnvironment.get("empty")?.size).toBe(0);
   });
 });
@@ -490,8 +521,7 @@ describe("getDefaultProviderInstanceModel", () => {
       providers,
       ProviderInstanceId.make("claudeAgent"),
     );
-    expect(typeof resolved).toBe("string");
-    expect(resolved?.length).toBeGreaterThan(0);
+    expect(resolved).toBe(DEFAULT_MODEL_BY_PROVIDER[ProviderDriverKind.make("claudeAgent")]);
   });
 
   it("honors the instance's declared default before model-list order", () => {

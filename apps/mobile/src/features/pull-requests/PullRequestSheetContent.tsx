@@ -1,13 +1,10 @@
+import { SheetHeader } from "../../components/ui/SheetHeader";
 import { useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
 import { Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppText as Text } from "../../components/AppText";
-import { AndroidSheetHeader } from "../../components/AndroidScreenHeader";
-import { MaterialIconButton } from "../../components/MaterialIconButton";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
-import { ControlPill } from "../../components/ControlPill";
+import { ScreenContent } from "../../components/ui/ScreenContent";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 
 export function PullRequestSheetContent(props: {
@@ -35,39 +32,14 @@ export function PullRequestSheetContent(props: {
   ) : null;
   const content = (
     <>
-      {android ? (
-        <AndroidSheetHeader
-          title={props.title}
-          subtitle={props.subtitle}
-          hideBottomBorder
-          leading={
-            <MaterialIconButton
-              icon="arrow.left"
-              accessibilityLabel="Close"
-              disabled={props.busy}
-              tintColorClassName="accent-header-foreground"
-              onPress={() => navigation.goBack()}
-            />
-          }
-        />
-      ) : (
-        <View className="flex-row items-center gap-2 px-4 pt-5 pb-5">
-          <ControlPill
-            icon="xmark"
-            accessibilityLabel="Close"
-            disabled={props.busy}
-            onPress={() => navigation.goBack()}
-          />
-          <View className="min-w-0 flex-1 items-center gap-1">
-            <Text className="text-center text-base font-infinitus-bold">{props.title}</Text>
-            <Text numberOfLines={1} className="text-center text-xs text-foreground-muted">
-              {props.subtitle}
-            </Text>
-          </View>
-          <View className="w-11" />
-        </View>
-      )}
-      <MaterialScreenContent fitToContents={fitToContents}>
+      <SheetHeader
+        presentation="inline"
+        title={props.title}
+        subtitle={props.subtitle}
+        onCancel={() => navigation.goBack()}
+        dismissDisabled={props.busy}
+      />
+      <ScreenContent fitToContents={fitToContents}>
         {props.scrollable === false ? (
           <View className="flex-1" pointerEvents={props.busy ? "none" : "auto"}>
             {props.children}
@@ -92,7 +64,7 @@ export function PullRequestSheetContent(props: {
         )}
 
         {!android || props.scrollable === false ? footer : null}
-      </MaterialScreenContent>
+      </ScreenContent>
     </>
   );
   return (

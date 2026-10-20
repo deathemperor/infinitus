@@ -1,13 +1,12 @@
 import { useNavigation, type ParamListBase } from "@react-navigation/native";
 import type {
+  NativeStackHeaderItemMenu,
   NativeStackNavigationOptions,
   NativeStackNavigationProp,
 } from "@react-navigation/native-stack";
 import { use, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { NativeWorkspaceTabActivityContext } from "./v5-workspace-context";
 import type { ColorValue } from "react-native";
-
-export { NativeHeaderToolbar } from "./NativeHeaderToolbar";
 
 export {
   nativeHeaderScrollEdgeEffects,
@@ -20,8 +19,8 @@ export type AppNativeStackNavigationOptions = Omit<
   NativeStackNavigationOptions,
   "headerTintColor" | "unstable_headerLeftItems" | "unstable_headerRightItems"
 > & {
-  /** Nested navigator leaves apply their own horizontal safe area. */
   readonly nativeContentInsetHorizontally?: boolean;
+  readonly nativeSidebarFilter?: NativeStackHeaderItemMenu;
   readonly headerTintColor?: string | ColorValue;
   readonly unstable_headerCenterItems?: unknown;
   readonly unstable_headerLeftItems?: unknown;
@@ -170,8 +169,6 @@ export function NativeStackScreenOptions(props: {
       return;
     }
     const signature = optionsSignature([stableOptions, props.optionsVersion]);
-    // Avoid re-entering navigation state when semantically equal options are
-    // reapplied every layout (common when callers pass unstable object literals).
     if (lastAppliedOptionsSignatureRef.current === signature) {
       return;
     }

@@ -584,6 +584,70 @@ it.effect.each(["github", "gitlab", "bitbucket", "azure-devops"] as const)(
     ),
 );
 
+it.effect("forgets routed viewed marks when a viewed-files batch fails", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const reference = {
+        projectId: ProjectId.make("project-1"),
+        host: "github.com",
+        repository: "acme/web",
+        number: 7,
+      };
+      const invalidations: { environment: string; input: unknown }[] = [];
+      const identity = () =>
+        Effect.succeed({
+          host: reference.host,
+          provider: "github",
+          accountId: "123",
+          viewer: "maria-rcks",
+        });
+      const clientFor = (environment: string) =>
+        ({
+          [WS_METHODS.pullRequestsRouting]: identity,
+          [WS_METHODS.pullRequestsRoutingIdentity]: identity,
+          [WS_METHODS.pullRequestsFilesViewed]: () =>
+            Effect.succeed({ files: [{ path: "a.ts", state: "unviewed" }], truncated: false }),
+          // The host may have applied part of the batch before refusing the rest.
+          [WS_METHODS.pullRequestsSetFilesViewed]: () => Effect.fail("second path refused"),
+          [WS_METHODS.pullRequestsInvalidate]: (input: unknown) =>
+            Effect.sync(() => {
+              invalidations.push({ environment, input });
+            }),
+        }) as unknown as WsRpcProtocolClient;
+      const { environmentRegistry, supervisor } = yield* makeTestRuntime(
+        clientFor("origin"),
+        clientFor("local"),
+      );
+      const route = createPullRequestRouter();
+      const write = yield* Effect.gen(function* () {
+        yield* route(WS_METHODS.pullRequestsFilesViewed, reference);
+        return yield* Effect.exit(
+          route(WS_METHODS.pullRequestsSetFilesViewed, {
+            ...reference,
+            files: [
+              { path: "a.ts", viewed: true },
+              { path: "b.ts", viewed: true },
+            ],
+          }),
+        );
+      }).pipe(
+        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, environmentRegistry),
+        Effect.provideService(GitHubRoutingPermissions, trustedRouting),
+        Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
+        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+      );
+      expect(write._tag).toBe("Failure");
+      expect(invalidations).toContainEqual({
+        environment: "local",
+        input: { reference: expect.objectContaining(reference), filesViewedOnly: true },
+      });
+      for (const call of invalidations) {
+        expect(call.input).toMatchObject({ filesViewedOnly: true });
+      }
+    }),
+  ),
+);
+
 const TARGET = new PrimaryConnectionTarget({
   environmentId: EnvironmentId.make("environment-1"),
   label: "Test environment",
@@ -690,8 +754,15 @@ const makeTestRuntime = Effect.fn("makeTestRuntime")(function* (
   return { runtime, atoms, registry, environmentRegistry, supervisor, localSupervisor };
 });
 
-it.effect.each(["default", "origin-off", "destination-off", "read-only"] as const)(
-  "does not probe another environment with %s routing permission",
+it.effect.each([
+  "default",
+  "origin-off",
+  "destination-off",
+  "read-only",
+  "destination-disabled",
+  "destination-unsupported",
+] as const)(
+  "preserves source requests when routing to another environment is blocked by %s",
   (permission) =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -701,9 +772,10 @@ it.effect.each(["default", "origin-off", "destination-off", "read-only"] as cons
           detail: "source failed",
         });
         const client = {
-          [WS_METHODS.pullRequestsSummary]: () =>
+          [WS_METHODS.pullRequestsSummary]: (input: { allowStale?: boolean }) =>
             Effect.suspend(() => {
               calls.push("source-read");
+              expect(input.allowStale).toBeUndefined();
               return Effect.fail(failure);
             }),
           [WS_METHODS.pullRequestsRunAction]: () =>
@@ -715,7 +787,31 @@ it.effect.each(["default", "origin-off", "destination-off", "read-only"] as cons
           [WS_METHODS.pullRequestsRoutingIdentity]: () =>
             Effect.die("untrusted environment was contacted"),
         } as unknown as WsRpcProtocolClient;
-        const { environmentRegistry, supervisor } = yield* makeTestRuntime(client, alternate);
+        const { environmentRegistry, supervisor, localSupervisor } = yield* makeTestRuntime(
+          client,
+          alternate,
+        );
+        if (permission === "destination-disabled" || permission === "destination-unsupported") {
+          yield* SubscriptionRef.update(
+            environmentRegistry.entries,
+            (entries) =>
+              new Map(
+                [...entries].map(([id, entry]) => [
+                  id,
+                  id === TARGET.environmentId
+                    ? entry
+                    : {
+                        ...entry,
+                        enabled: permission !== "destination-disabled",
+                        ...(permission === "destination-unsupported"
+                          ? { unsupportedReason: "Protocol version mismatch" }
+                          : {}),
+                      },
+                ]),
+              ),
+          );
+          yield* SubscriptionRef.set(localSupervisor.session, Option.none());
+        }
         const ref = {
           projectId: ProjectId.make("project-1"),
           repository: "private/repo",
@@ -741,10 +837,13 @@ it.effect.each(["default", "origin-off", "destination-off", "read-only"] as cons
                   Effect.succeed(
                     permission === "read-only"
                       ? "read"
-                      : (entry.target.environmentId === TARGET.environmentId) ===
-                          (permission === "origin-off")
-                        ? "off"
-                        : "read-write",
+                      : permission === "destination-disabled" ||
+                          permission === "destination-unsupported"
+                        ? "read-write"
+                        : (entry.target.environmentId === TARGET.environmentId) ===
+                            (permission === "origin-off")
+                          ? "off"
+                          : "read-write",
                   ),
               }),
             );
@@ -851,7 +950,6 @@ it.effect.each(
       }).pipe(
         Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, environmentRegistry),
         Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-        // This also represents a user enabling the stale catalog entry after re-resolution.
         Effect.provideService(GitHubRoutingPermissions, trustedRouting),
         Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
       );
@@ -1497,7 +1595,6 @@ it.effect("shares close, reopen, and merge with an untouched client's mounted PR
           }),
         );
         expect(AsyncResult.isSuccess(result)).toBe(true);
-        // The second client receives only the server push: no local refresh or timer tick.
         yield* detailChanged.await;
         yield* summaryChanged.await;
         yield* listChanged.await;
@@ -1912,7 +2009,6 @@ it.effect("updates reviewer requests and enriched reviewers without rereading th
         ]);
       }
       expect(reads).toBe(3);
-      // A slow activity read started before the write must not hide the new request.
       pauseActivity = true;
       registry.refresh(activity);
       yield* activityStarted.await;
@@ -1931,7 +2027,6 @@ it.effect("updates reviewer requests and enriched reviewers without rereading th
       yield* request(false);
       expect((yield* AtomRegistry.getResult(registry, activity)).reviewers).toEqual([hostActor]);
 
-      // A caller without an open picker still needs authoritative reviewer identities.
       const otherTarget = { ...target, input: { ...target.input, number: 2 } };
       const otherDetail = atoms.detail(otherTarget);
       registry.mount(otherDetail);
@@ -2009,8 +2104,6 @@ it.effect("refreshes stack state after reopening and head SHAs after a turn", ()
   ),
 );
 
-// Transport fixtures have a source-control-only session; authorization edge cases
-// are exercised by commandPermissions.test.ts.
 vi.mock("./session.ts", () => ({
   createEnvironmentSessionAtoms: () => ({ sessionStateAtom: grantedSessions }),
 }));

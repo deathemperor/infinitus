@@ -70,7 +70,6 @@ function writtenFilePaths(
   );
 }
 
-/** The Scratch project was created, but its event never reached this client. */
 export class ScratchProjectNotLoadedError extends Schema.TaggedError<ScratchProjectNotLoadedError>()(
   "ScratchProjectNotLoadedError",
   { projectId: ProjectId },
@@ -83,7 +82,6 @@ export class ScratchProjectNotLoadedError extends Schema.TaggedError<ScratchProj
 export function createProjectEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | Crypto.Crypto | R, E>,
   options: {
-    /** The client store's project; openScratch waits here for the created project. */
     readonly projectAtom: (ref: ScopedProjectRef) => Atom.Atom<EnvironmentProject | null>;
   },
 ) {
@@ -137,6 +135,11 @@ export function createProjectEnvironmentAtoms<R, E>(
           (result, isCurrent) => fileMetadata.rememberEntries(input.cwd, result.entries, isCurrent),
         ),
     }),
+    listIgnoredFiles: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:projects:list-ignored-files",
+      tag: WS_METHODS.projectsListIgnoredFiles,
+      staleTimeMs: 15_000,
+    }),
     readFile: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:projects:read-file",
       tag: WS_METHODS.projectsReadFile,
@@ -145,7 +148,10 @@ export function createProjectEnvironmentAtoms<R, E>(
       execute: (input) =>
         fileMetadata.seedAfterRead(
           request(WS_METHODS.projectsReadFile, input),
-          (result, isCurrent) => fileMetadata.rememberFile(input.cwd, result, isCurrent),
+          (result, isCurrent) =>
+            result.exists === false
+              ? Effect.void
+              : fileMetadata.rememberFile(input.cwd, result, isCurrent),
         ),
     }),
     optimisticFile: (target: OptimisticProjectFileTarget) =>
@@ -196,7 +202,6 @@ export function createProjectEnvironmentAtoms<R, E>(
       scheduler: projectScheduler,
       concurrency: { mode: "serial", key: ({ environmentId }) => environmentId },
     }),
-    // Makes a new folder and repository from just a name, then the project.
     createNew: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:projects:create-new",
       tag: WS_METHODS.projectsCreateNew,

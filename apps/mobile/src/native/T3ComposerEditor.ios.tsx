@@ -1,7 +1,7 @@
 import { PASTED_TEXT_ATTACHMENT_THRESHOLD_BYTES } from "@infinitus/client-runtime/text-paste";
 import { PROVIDER_SEND_TURN_MAX_INPUT_CHARS } from "@infinitus/contracts";
 import { collectComposerInlineTokens } from "@infinitus/shared/composerInlineTokens";
-import { composerContextEditorTokens } from "../lib/composerContext";
+import { composerContextEditorTokens, composerSkillLabels } from "../lib/composerContext";
 import { requireNativeView } from "expo";
 import {
   useCallback,
@@ -20,7 +20,7 @@ import { composerChipSizeSuffix, contextChipPresentation } from "../lib/composer
 import { resolveMarkdownFileIcon } from "../lib/markdownLinks";
 import { useUniwindTheme } from "../lib/useUniwindTheme";
 import { createNativeComposerTheme } from "../lib/nativeComposerTheme";
-import { useFontFamily } from "../lib/useFontFamily";
+import { FONT_FAMILIES } from "../lib/fontFamilies";
 import { useScaledTextRole } from "../features/settings/appearance/useScaledTextRole";
 import {
   acknowledgeComposerNativeEvent,
@@ -139,7 +139,7 @@ export function ComposerEditor({
   const confirmedTokensRef = useRef(collectComposerInlineTokens(props.value));
   const bodyText = useScaledTextRole("body");
   const theme = useUniwindTheme();
-  const fontFamily = useFontFamily("regular");
+  const fontFamily = FONT_FAMILIES.regular;
 
   useImperativeHandle(
     ref,
@@ -152,17 +152,14 @@ export function ComposerEditor({
     [],
   );
 
-  const skillLabels = useMemo(
-    () => new Map(skills.map((skill) => [skill.name, skill.displayName?.trim() || skill.name])),
-    [skills],
-  );
+  const skillLabels = useMemo(() => composerSkillLabels(skills), [skills]);
   const tokensJson = useMemo(() => {
     const tokens = collectComposerInlineTokens(props.value, {
       preserveTrailingFrom: confirmedTokensRef.current,
     });
     confirmedTokensRef.current = tokens;
     return JSON.stringify(
-      composerContextEditorTokens(props.value, tokens).map((token) => {
+      composerContextEditorTokens(props.value, tokens, skillLabels).map((token) => {
         const record =
           token.type === "context"
             ? props.context?.records.find((record) => record.contextId === token.contextId)
@@ -180,9 +177,6 @@ export function ComposerEditor({
                 ? `${token.label}${props.context?.records.some((record) => record.contextId === token.contextId) ? "" : " · unavailable"}`
                 : basename(token.value),
           detail: token.type === "context" ? composerChipSizeSuffix(record) : "",
-          // Only a mention wears per-filetype artwork. An attachment chip keeps the tinted
-          // monochrome glyph web draws for it: coloured artwork ignores the chip's accent and
-          // makes the composer chip read differently from the same chip in a sent message.
           iconUri:
             token.type === "mention"
               ? fileIconUri(token.value)
