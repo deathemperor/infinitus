@@ -1,7 +1,8 @@
 // @effect-diagnostics nodeBuiltinImport:off - plain local servers stand in for LAN services.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
-import { ThreadId } from "@infinitus/contracts";
+import { EnvironmentId, ProviderInstanceId, ThreadId } from "@infinitus/contracts";
+import * as McpProviderSessions from "@infinitus/provider-core/server/McpProviderSessions";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import {
   HTML_RENDER_MEASURE_FONTS,
@@ -26,8 +27,6 @@ import * as ServerConfig from "../config.ts";
 import * as HtmlRender from "./HtmlRender.ts";
 import * as PreviewBrowser from "../preview/PreviewBrowser.ts";
 
-// Real-browser tests run only when this names a chrome-headless-shell, for
-// example one T3 installed under <T3 home>/tools/chrome-headless-shell.
 const TEST_BROWSER_ENV = "T3CODE_TEST_HEADLESS_SHELL";
 
 const layerHtmlRender = (
@@ -49,12 +48,40 @@ const layerHtmlRender = (
         }),
       ),
     ),
+    Layer.provideMerge(McpProviderSessions.layer),
     Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-html-render-" })),
     Layer.provideMerge(NodeServices.layer),
   );
 const layerTest = layerHtmlRender();
 
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * A stand-in browser that reads T3's first command off its debugging pipe,
+ * then runs `exit`. Reading it first keeps the pipe from resetting.
+ */
+const exitingBrowser = (exit: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-exiting-browser-" });
+    const executable = path.join(directory, "chrome-headless-shell");
+    yield* fileSystem.writeFileString(
+      executable,
+      [
+        `#!${process.execPath}`,
+        `new (process.getBuiltinModule("node:net").Socket)({ fd: 3 }).on("data", (chunk) => { if (chunk.includes(0)) { ${exit} } });`,
+      ].join("\n"),
+    );
+    yield* fileSystem.chmod(executable, 0o755);
+    return executable;
+  });
+
+const previewError = (executable: string) =>
+  Effect.gen(function* () {
+    const htmlRender = yield* HtmlRender.HtmlRender;
+    return yield* htmlRender.preview({ html: "<p>x</p>" }).pipe(Effect.flip);
+  }).pipe(Effect.provide(layerHtmlRender(executable)));
 
 describe("HtmlRender", () => {
   it.effect("inlines local images by absolute path and leaves URLs and relative paths alone", () =>
@@ -91,7 +118,6 @@ describe("HtmlRender", () => {
       expect(prepared).toContain(`['${pngUri}', \`${svgUri}\`]`);
       expect(prepared).not.toContain(directory);
       for (const src of kept) expect(prepared).toContain(`<img src="${src}">`);
-      // The theme bootstrap opens the head, ahead of the page's own markup.
       expect(prepared.indexOf("<head>")).toBeLessThan(prepared.indexOf('<style id="t3-theme">'));
       expect(prepared.indexOf('<style id="t3-theme">')).toBeLessThan(prepared.indexOf("<title>"));
     }).pipe(Effect.provide(layerTest)),
@@ -127,12 +153,10 @@ describe("HtmlRender", () => {
       const folder = path.join(directory, "folder.png");
       yield* fileSystem.makeDirectory(folder);
       const missing = path.join(directory, "missing.jpg");
-      // Named like an image, but a symlink or renamed file must not carry other data.
       const secret = path.join(directory, "secret.png");
       yield* fileSystem.writeFileString(secret, "API_KEY=abc123");
       const report = path.join(directory, "report.svg");
       yield* fileSystem.writeFileString(report, "<!doctype html><body><svg></svg>API_KEY=abc123");
-      // An <svg> inside a quoted entity, and a prolog shaped to stall a backtracking matcher.
       const config = path.join(directory, "config.svg");
       yield* fileSystem.writeFileString(
         config,
@@ -142,7 +166,6 @@ describe("HtmlRender", () => {
       yield* fileSystem.writeFileString(stalling, `${"<?p?>".repeat(40)}<config><svg/></config>`);
       const unclosed = path.join(directory, "unclosed.svg");
       yield* fileSystem.writeFileString(unclosed, '<!DOCTYPE svg [<!ENTITY a "x><svg/>');
-      // Roots named SVG or svgé are other elements.
       const upper = path.join(directory, "upper.svg");
       yield* fileSystem.writeFileString(upper, "<SVG/>API_KEY=abc123");
       const longer = path.join(directory, "longer.svg");
@@ -175,15 +198,26 @@ describe("HtmlRender", () => {
       const fileSystem = yield* FileSystem.FileSystem;
       const config = yield* ServerConfig.ServerConfig;
       const htmlRender = yield* HtmlRender.HtmlRender;
+      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+      const threadId = ThreadId.make("thread-html-render");
+      const session = {
+        environmentId: EnvironmentId.make("html-render-environment"),
+        threadId,
+        providerSessionId: "first-credential",
+        providerInstanceId: ProviderInstanceId.make("claude"),
+        endpoint: "http://localhost:8311/mcp",
+        authorizationHeader: "Bearer first-token",
+        browserToolsAvailable: false,
+      };
+      yield* mcpSessions.set(session);
 
       const reference = yield* htmlRender.publish({
-        threadId: ThreadId.make("thread-html-render"),
-        html: "<p>Quarterly revenue</p>",
+        threadId,
+        html: `<p>Quarterly revenue</p>${" ".repeat(8_000)}`,
         title: "  Revenue  ",
         height: 9_000,
       });
 
-      // Without an installed preview browser the page publishes unmeasured.
       expect(reference).toEqual({
         attachmentId: expect.any(String),
         title: "Revenue",
@@ -197,32 +231,62 @@ describe("HtmlRender", () => {
       const html = yield* fileSystem.readFileString(stored ?? "");
       expect(html).toContain('<style id="t3-theme">');
       expect(html).toContain("<p>Quarterly revenue</p>");
+      // Antigravity reports the call without its result, so the thread's
+      // provider session keeps the page for one call with these arguments.
+      const page = {
+        html: `<p>Quarterly revenue</p>${" ".repeat(8_000)}`,
+        title: "  Revenue  ",
+        height: 9_000,
+      };
+      expect(
+        yield* mcpSessions.takeHtmlRender(threadId, {
+          ...page,
+          html: page.html.replace("revenue", "expense"),
+        }),
+      ).toBe(undefined);
+      expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(reference);
+      expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toBe(undefined);
+      const reused = yield* htmlRender.publish({ threadId, ...page });
+      yield* mcpSessions.set({ ...session, browserToolsAvailable: true });
+      expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(reused);
+
+      yield* htmlRender.publish({ threadId, ...page });
+      yield* mcpSessions.set({
+        ...session,
+        providerSessionId: "replacement-credential",
+        providerInstanceId: ProviderInstanceId.make("antigravity"),
+        authorizationHeader: "Bearer replacement-token",
+      });
+      const replacement = yield* htmlRender.publish({ threadId, ...page });
+      expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(replacement);
+      expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toBe(undefined);
+      // Clearing the thread's MCP session drops the pages it kept.
+      yield* htmlRender.publish({ threadId, ...page });
+      yield* mcpSessions.clear(threadId);
+      expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toBe(undefined);
     }).pipe(Effect.provide(layerTest)),
   );
 
   it.effect("removes the page when publishing is interrupted", () =>
     Effect.gen(function* () {
+      const threadId = ThreadId.make("thread-html-cancel");
+      const page = { html: "<p>x</p>", title: "X", height: 200 };
       const measuring = yield* Deferred.make<void>();
       yield* Effect.gen(function* () {
         const fileSystem = yield* FileSystem.FileSystem;
         const config = yield* ServerConfig.ServerConfig;
         const htmlRender = yield* HtmlRender.HtmlRender;
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
         const storedPages = fileSystem
           .readDirectory(config.attachmentsDir, { recursive: true })
           .pipe(Effect.map((names) => names.filter((name) => name.endsWith(".html"))));
 
-        const publishing = yield* htmlRender
-          .publish({
-            threadId: ThreadId.make("thread-html-cancel"),
-            html: "<p>x</p>",
-            title: "X",
-            height: 200,
-          })
-          .pipe(Effect.forkChild);
+        const publishing = yield* htmlRender.publish({ threadId, ...page }).pipe(Effect.forkChild);
         yield* Deferred.await(measuring);
         expect(yield* storedPages).toHaveLength(1);
         yield* Fiber.interrupt(publishing);
         expect(yield* storedPages).toEqual([]);
+        expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toBe(undefined);
       }).pipe(
         Effect.provide(
           layerHtmlRender(
@@ -232,6 +296,37 @@ describe("HtmlRender", () => {
         ),
       );
     }),
+  );
+
+  describe.skipIf(HostProcess.Platform.defaultValue() === "win32")(
+    "when the browser exits before rendering",
+    () => {
+      it.live("reports its exit code and keeps what it printed out of the message", () =>
+        Effect.gen(function* () {
+          const executable = yield* exitingBrowser(
+            `process.stderr.write("[WARNING:bus.cc] Failed to connect to the bus\\n[FATAL:shared_memory.cc] Check failed: /dev/shm is not writable\\n"); process.exit(3);`,
+          );
+
+          const error = yield* previewError(executable);
+
+          expect(error.message).toBe(
+            "Headless Chrome could not render the page: the browser exited unexpectedly (exit code 3).",
+          );
+        }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+      );
+
+      it.live("reports the signal that ended it", () =>
+        Effect.gen(function* () {
+          const executable = yield* exitingBrowser(`process.kill(process.pid, "SIGKILL");`);
+
+          const error = yield* previewError(executable);
+
+          expect(error.message).toBe(
+            "Headless Chrome could not render the page: the browser exited unexpectedly (signal SIGKILL).",
+          );
+        }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+      );
+    },
   );
 
   it.live(
@@ -328,9 +423,6 @@ describe("HtmlRender", () => {
       Effect.gen(function* () {
         const executable = (yield* HostProcess.Environment)[TEST_BROWSER_ENV];
         if (!executable) return ctx.skip(`Set ${TEST_BROWSER_ENV} to run this test.`);
-        // The page's connections go through a proxy that only reaches public
-        // addresses, and WebRTC is gone. Each line below is a way out that
-        // Chrome's own Local Network Access does not stop on its own.
         const requests: Array<string> = [];
         const server = yield* Effect.acquireRelease(
           Effect.callback<NodeHttp.Server>((resume) => {
@@ -388,10 +480,9 @@ describe("HtmlRender", () => {
         if (!executable) return ctx.skip(`Set ${TEST_BROWSER_ENV} to run this test.`);
         yield* Effect.gen(function* () {
           const htmlRender = yield* HtmlRender.HtmlRender;
-          // Like a D3 chart, the page sizes itself from the width once, at load.
           const reference = yield* htmlRender.publish({
             threadId: ThreadId.make("thread-html-measure"),
-            html: '<div id="chart"></div><script>document.getElementById("chart").style.height = innerWidth / 2 + "px";</script>',
+            html: '<div id="chart" style="background:#888"></div><script>document.getElementById("chart").style.height = innerWidth / 2 + "px";</script>',
             title: "Chart",
             height: 600,
           });

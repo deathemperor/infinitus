@@ -230,7 +230,6 @@ export const make = Effect.gen(function* () {
         job.alert ?? null;
       // Deletion jobs can observe another thread's newly completed state. They
       // update the card, but must leave that transition for its own alert job.
-      // Registration replay deliberately establishes a silent baseline.
       let acknowledgeAggregate = job.state !== null || job.replay === true || aggregate === null;
       if (job.state && preferences.value.notificationsEnabled) {
         const state = yield* rows.getForUserThread({
@@ -305,8 +304,6 @@ export const make = Effect.gen(function* () {
           ? aggregate
           : null;
       const active = (displayedAggregate?.activeCount ?? 0) > 0;
-      // A registration replay must clear an orphan even when the relay has
-      // already forgotten its baseline. Finished cards are visible, but idle.
       if (!displayedAggregate && !alert && !previousAggregate && job.state !== null) return;
       const data: Record<string, string> = {
         t3_kind: "agent_activity",

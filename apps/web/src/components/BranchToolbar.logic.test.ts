@@ -13,7 +13,7 @@ import {
   resolveBranchToolbarPrBranch,
   resolveBranchToolbarValue,
   resolveLockedWorkspaceLabel,
-  resolveLocalCheckoutBranchMismatch,
+  resolveCheckoutBranchMismatch,
   resolvePreviousWorktreeLabel,
   resolvePreviousWorktreeSeed,
   sanitizeNewRefName,
@@ -178,7 +178,7 @@ describe("resolveBranchToolbarValue", () => {
 });
 
 describe("resolveBranchTriggerLabel", () => {
-  it("shows the origin ref when a new worktree will start from origin", () => {
+  it("marks the remote base when a new worktree will start from remote", () => {
     expect(
       resolveBranchTriggerLabel({
         activeWorktreePath: null,
@@ -187,10 +187,10 @@ describe("resolveBranchTriggerLabel", () => {
         resolvedActiveBranchIsRemote: false,
         startFromOrigin: true,
       }),
-    ).toBe("From origin/main");
+    ).toBe("From main (remote)");
   });
 
-  it("shows the origin ref for local branch names that contain slashes", () => {
+  it("marks the remote base for local branch names that contain slashes", () => {
     expect(
       resolveBranchTriggerLabel({
         activeWorktreePath: null,
@@ -199,10 +199,10 @@ describe("resolveBranchTriggerLabel", () => {
         resolvedActiveBranchIsRemote: false,
         startFromOrigin: true,
       }),
-    ).toBe("From origin/feature/demo");
+    ).toBe("From feature/demo (remote)");
   });
 
-  it("shows the local ref when start from origin is disabled", () => {
+  it("shows the local ref when start from remote is disabled", () => {
     expect(
       resolveBranchTriggerLabel({
         activeWorktreePath: null,
@@ -214,7 +214,7 @@ describe("resolveBranchTriggerLabel", () => {
     ).toBe("From main");
   });
 
-  it("does not duplicate the origin prefix for an explicit remote ref", () => {
+  it("does not add a remote marker for an explicit remote ref", () => {
     expect(
       resolveBranchTriggerLabel({
         activeWorktreePath: null,
@@ -259,7 +259,7 @@ describe("resolveBranchTriggerLabel", () => {
     ).toBe("Select ref");
   });
 
-  it("does not fabricate an origin ref while branch metadata is loading", () => {
+  it("does not fabricate a remote marker while branch metadata is loading", () => {
     expect(
       resolveBranchTriggerLabel({
         activeWorktreePath: null,
@@ -301,10 +301,10 @@ describe("resolveBranchToolbarPrBranch", () => {
   });
 });
 
-describe("resolveLocalCheckoutBranchMismatch", () => {
+describe("resolveCheckoutBranchMismatch", () => {
   it("detects when a local thread is associated with a different branch than the checkout", () => {
     expect(
-      resolveLocalCheckoutBranchMismatch({
+      resolveCheckoutBranchMismatch({
         effectiveEnvMode: "local",
         activeWorktreePath: null,
         activeThreadBranch: "feature/thread",
@@ -313,12 +313,13 @@ describe("resolveLocalCheckoutBranchMismatch", () => {
     ).toEqual({
       threadBranch: "feature/thread",
       currentBranch: "feature/current",
+      canRestoreThreadBranch: true,
     });
   });
 
   it("ignores matching local checkout state", () => {
     expect(
-      resolveLocalCheckoutBranchMismatch({
+      resolveCheckoutBranchMismatch({
         effectiveEnvMode: "local",
         activeWorktreePath: null,
         activeThreadBranch: "feature/thread",
@@ -327,20 +328,34 @@ describe("resolveLocalCheckoutBranchMismatch", () => {
     ).toBeNull();
   });
 
-  it("ignores dedicated worktrees because their checkout is already thread-scoped", () => {
+  it("warns about worktree branch drift without restore, but ignores a pending rename status", () => {
+    const worktree = {
+      effectiveEnvMode: "worktree" as const,
+      activeWorktreePath: "/repo/.t3/worktrees/feature-thread",
+      activeThreadBranch: "t3code/fix-sidebar",
+    };
+
     expect(
-      resolveLocalCheckoutBranchMismatch({
-        effectiveEnvMode: "worktree",
-        activeWorktreePath: "/repo/.t3/worktrees/feature-thread",
-        activeThreadBranch: "feature/thread",
-        currentGitBranch: "feature/current",
+      resolveCheckoutBranchMismatch({
+        ...worktree,
+        currentGitBranch: "t3code/1a2b3c4d",
       }),
     ).toBeNull();
+    expect(
+      resolveCheckoutBranchMismatch({
+        ...worktree,
+        currentGitBranch: "feature/checkout",
+      }),
+    ).toEqual({
+      threadBranch: worktree.activeThreadBranch,
+      currentBranch: "feature/checkout",
+      canRestoreThreadBranch: false,
+    });
   });
 
   it("ignores new-worktree base selection before a worktree exists", () => {
     expect(
-      resolveLocalCheckoutBranchMismatch({
+      resolveCheckoutBranchMismatch({
         effectiveEnvMode: "worktree",
         activeWorktreePath: null,
         activeThreadBranch: "feature/base",
@@ -424,6 +439,37 @@ describe("shouldShowEnvironmentIndicator", () => {
 });
 
 describe("shouldShowComposerContextStrip", () => {
+  it("keeps a sole primary server update reachable in a non-Git draft", () => {
+    const environment = {
+      activeEnvironment: { isPrimary: true },
+      canPickEnvironment: false,
+      serverUpdateAvailable: true,
+    };
+    const showEnvironmentIndicator = shouldShowEnvironmentIndicator(environment);
+    expect(showEnvironmentIndicator).toBe(true);
+    expect(
+      shouldShowComposerContextStrip({
+        isDraftHeroState: true,
+        persistInActiveThreads: false,
+        hasActiveProject: true,
+        isGitRepo: false,
+        showEnvironmentIndicator,
+        hostsRestingComposerControls: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowComposerContextStrip({
+        isDraftHeroState: false,
+        persistInActiveThreads: false,
+        hasActiveProject: true,
+        isGitRepo: false,
+        showEnvironmentIndicator,
+        serverUpdateAvailable: true,
+        hostsRestingComposerControls: false,
+      }),
+    ).toBe(true);
+  });
+
   it.each([false, true])(
     "honors the active-thread preference with resting controls %s",
     (hostsRestingComposerControls) => {
@@ -794,8 +840,6 @@ describe("shouldIncludeBranchPickerItem", () => {
     ).toBe(false);
   });
 
-  // Typing a spaced name must still surface the ref it would have been created
-  // as, or the picker shows nothing at all for that query.
   it("surfaces an existing ref matching the sanitized query", () => {
     expect(
       shouldIncludeBranchPickerItem({
@@ -807,8 +851,6 @@ describe("shouldIncludeBranchPickerItem", () => {
     ).toBe(true);
   });
 
-  // A partial query has to reach the ref it would have been created as, so
-  // searching "hello w" still finds an existing hello-world.
   it("surfaces a ref from a partial query containing a space", () => {
     expect(
       shouldIncludeBranchPickerItem({
@@ -832,10 +874,6 @@ describe("shouldIncludeBranchPickerItem", () => {
   });
 });
 
-// Git rejects ASCII space and the ASCII control characters in ref names, so a
-// typed name like "new branch" can only ever fail. Replacing exactly those can
-// turn a failing name into a working one without touching a name git already
-// accepts, including one holding non-ASCII whitespace such as U+00A0.
 describe("sanitizeNewRefName", () => {
   it("replaces a space with a dash", () => {
     expect(sanitizeNewRefName("new branch")).toBe("new-branch");
@@ -853,8 +891,6 @@ describe("sanitizeNewRefName", () => {
     expect(sanitizeNewRefName("new\tbranch")).toBe("new-branch");
   });
 
-  // git accepts U+00A0, U+2009 and other non-ASCII whitespace in ref names, so
-  // rewriting them would silently create a ref the user never typed.
   it("preserves whitespace that git accepts", () => {
     expect(sanitizeNewRefName("new\u00a0branch")).toBe("new\u00a0branch");
     expect(sanitizeNewRefName("new\u2009branch")).toBe("new\u2009branch");
@@ -876,8 +912,6 @@ describe("sanitizeNewRefName", () => {
     expect(sanitizeNewRefName("   ")).toBe("");
   });
 
-  // Scoped deliberately to whitespace: git accepts consecutive dashes, so
-  // collapsing them would rewrite names the user may have typed on purpose.
   it("does not collapse dashes the user typed", () => {
     expect(sanitizeNewRefName("new - branch")).toBe("new---branch");
     expect(sanitizeNewRefName("foo--bar")).toBe("foo--bar");

@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -44,7 +43,6 @@ import { useVisibleSecondClock } from "./use-visible-second-clock";
 
 const START_MS = Date.UTC(2026, 9, 3, 12, 0, 0);
 let root: Root | null = null;
-// Clock value of every committed render, the work a tick costs on device.
 let renders: number[] = [];
 
 function Probe(props: { readonly enabled: boolean }) {

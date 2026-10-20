@@ -1,0 +1,418 @@
+import {
+  EnvironmentId,
+  NodeId,
+  RuntimeRequestId,
+  ThreadId,
+  TurnItemId,
+  type OrchestrationV2ThreadProjection,
+} from "@infinitus/contracts";
+import { act, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+
+import {
+  setPendingUserInputCustomAnswer,
+  togglePendingUserInputOptionSelection,
+  type PendingUserInputDraftAnswer,
+} from "../../pendingUserInput";
+import type { PendingUserInput } from "../../session-logic";
+
+vi.mock(import("../ChatMarkdown"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  default: (({ text }: { text: string }) => <p>{text}</p>) as never,
+}));
+
+import { makeThreadProjectionFixture } from "../../test-fixtures";
+import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
+import { usePendingThreadRequests } from "./usePendingThreadRequests";
+
+const threadRef = { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") };
+
+const prompt = {
+  requestId: RuntimeRequestId.make("question-navigation"),
+  createdAt: "2026-10-09T00:00:00.000Z",
+  dismissible: false,
+  responseCapability: "live" as const,
+  questions: [0, 1, 2].map((index) => ({
+    id: `question-${index}`,
+    header: `Question ${index + 1}`,
+    question: `Choose for question ${index + 1}`,
+    options: [{ label: "Incremental", description: "One module at a time" }],
+    multiSelect: false,
+  })),
+};
+
+const previewPrompt = {
+  ...prompt,
+  questions: prompt.questions.map((question, index) => ({
+    ...question,
+    options: ["First", "Second"].map((label) => ({
+      label,
+      value: index === 1 ? label : "same-answer",
+      description: "",
+      preview: `Preview body: ${label}, question ${index + 1}`,
+    })),
+  })),
+};
+
+function Questions({
+  initialIndex = 0,
+  pendingPrompt = prompt,
+}: {
+  initialIndex?: number;
+  pendingPrompt?: PendingUserInput;
+}) {
+  const [questionIndex, setQuestionIndex] = useState(initialIndex);
+  const [answers, setAnswers] = useState<Record<string, PendingUserInputDraftAnswer>>({});
+  const question = pendingPrompt.questions[questionIndex]!;
+  const advance = () => setQuestionIndex(questionIndex + 1);
+  return (
+    <>
+      <output>{questionIndex}</output>
+      <button onClick={advance}>Next</button>
+      <button onClick={() => setQuestionIndex(questionIndex - 1)}>Previous</button>
+      <input
+        aria-label="Custom answer"
+        value={answers[question.id]?.customAnswer ?? ""}
+        onChange={(event) => {
+          const value = event.currentTarget.value;
+          setAnswers((existing) => ({
+            ...existing,
+            [question.id]: setPendingUserInputCustomAnswer(existing[question.id], value, question),
+          }));
+        }}
+      />
+      <ComposerPendingUserInputPanel
+        pendingUserInputs={[pendingPrompt]}
+        cwd="/repo"
+        threadRef={threadRef}
+        disabled={false}
+        respondingRequestIds={[]}
+        answers={answers}
+        questionIndex={questionIndex}
+        onAdvance={advance}
+        onToggleOption={(questionId, value) => {
+          const question = pendingPrompt.questions.find((entry) => entry.id === questionId)!;
+          setAnswers((existing) => ({
+            ...existing,
+            [questionId]: togglePendingUserInputOptionSelection(
+              question,
+              existing[questionId],
+              value,
+            ),
+          }));
+        }}
+        onDismiss={() => {}}
+      />
+    </>
+  );
+}
+
+let root: Root;
+let container: HTMLDivElement;
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+function buttonWithText(text: string) {
+  const button = [...document.querySelectorAll("button")].find((element) =>
+    element.textContent?.includes(text),
+  );
+  expect(button, `button ${text}`).toBeDefined();
+  return button!;
+}
+
+async function chooseOption() {
+  await act(async () => buttonWithText("Incremental").click());
+}
+
+async function navigate(label: string) {
+  await act(async () => buttonWithText(label).click());
+}
+
+function activeIndex() {
+  return container.querySelector("output")!.textContent;
+}
+
+it("does not skip the next unanswered question after manual advance", async () => {
+  await act(async () => root.render(<Questions />));
+  await chooseOption();
+  await navigate("Next");
+  expect(activeIndex()).toBe("1");
+  await act(async () => vi.advanceTimersByTime(200));
+  expect(activeIndex()).toBe("1");
+
+  await chooseOption();
+  await act(async () => vi.advanceTimersByTime(200));
+  expect(activeIndex()).toBe("2");
+});
+
+it("does not undo previous-question navigation with a stale timer", async () => {
+  await act(async () => root.render(<Questions initialIndex={1} />));
+  await chooseOption();
+  await navigate("Previous");
+  await act(async () => vi.advanceTimersByTime(200));
+  expect(activeIndex()).toBe("0");
+});
+
+it("still auto-advances once after the answer draft rerenders the same question", async () => {
+  await act(async () => root.render(<Questions />));
+  await chooseOption();
+  await act(async () => vi.advanceTimersByTime(200));
+  expect(activeIndex()).toBe("1");
+  await act(async () => vi.advanceTimersByTime(200));
+  expect(activeIndex()).toBe("1");
+});
+
+function questionProjection(threadId: ThreadId, requestIds = ["first", "second"]) {
+  const projection = makeThreadProjectionFixture();
+  return {
+    ...projection,
+    thread: { ...projection.thread, id: threadId },
+    runtimeRequests: requestIds.map((id) => ({
+      id: RuntimeRequestId.make(id),
+      nodeId: NodeId.make(id),
+      providerTurnId: null,
+      nativeRequestRef: null,
+      kind: "user_input" as const,
+      status: "pending" as const,
+      responseCapability: { type: "message" as const },
+      createdAt: projection.updatedAt,
+      resolvedAt: null,
+    })),
+    turnItems: requestIds.map((id, ordinal) => ({
+      id: TurnItemId.make(id),
+      threadId,
+      runId: null,
+      nodeId: NodeId.make(id),
+      providerThreadId: null,
+      providerTurnId: null,
+      nativeItemRef: null,
+      parentItemId: null,
+      ordinal,
+      status: "completed" as const,
+      title: null,
+      startedAt: projection.updatedAt,
+      completedAt: projection.updatedAt,
+      updatedAt: projection.updatedAt,
+      type: "user_input_request" as const,
+      requestId: RuntimeRequestId.make(id),
+      questions: prompt.questions,
+    })),
+  } satisfies OrchestrationV2ThreadProjection;
+}
+
+let requests: ReturnType<typeof usePendingThreadRequests>;
+
+function PendingRequestsProbe({
+  environmentId,
+  projection,
+  loading = false,
+}: {
+  environmentId: EnvironmentId;
+  projection: OrchestrationV2ThreadProjection;
+  loading?: boolean;
+}) {
+  const promptRef = useRef("");
+  const composerRef = useRef(null);
+  const state = usePendingThreadRequests({
+    environmentId,
+    activeThreadId: projection.thread.id,
+    activeThread: projection.thread,
+    serverProjection: loading ? null : projection,
+    supportsQuestionAttachments: false,
+    composerDraftTarget: { environmentId, threadId: projection.thread.id },
+    setComposerDraftPrompt: () => {},
+    promptRef,
+    composerRef,
+    setThreadError: () => {},
+  });
+  useLayoutEffect(() => {
+    requests = state;
+  });
+  return null;
+}
+
+it("retains answers, selections and question position after leaving chat, including while the projection reloads", async () => {
+  const environmentId = EnvironmentId.make("remount-environment");
+  const projection = questionProjection(threadRef.threadId);
+  const render = (loading = false) =>
+    act(() =>
+      root.render(
+        <PendingRequestsProbe
+          environmentId={environmentId}
+          projection={projection}
+          loading={loading}
+        />,
+      ),
+    );
+  await render();
+  await act(() =>
+    requests.onChangeActivePendingUserInputCustomAnswer("question-0", "Keep my text"),
+  );
+  await act(() => requests.onAdvanceActivePendingUserInput());
+  await act(() => requests.onSelectActivePendingUserInputOption("question-1", "Incremental"));
+  await act(() => requests.onAdvanceActivePendingUserInput());
+  const expected = {
+    activePendingQuestionIndex: 2,
+    activePendingDraftAnswers: {
+      "question-0": { customAnswer: "Keep my text" },
+      "question-1": { selectedOptionValues: ["Incremental"] },
+    },
+  };
+  expect(requests).toMatchObject(expected);
+
+  // New thread and Settings both unmount the chat that owns this hook.
+  await act(() => root.render(null));
+  await render();
+  expect(requests).toMatchObject(expected);
+
+  await act(() => root.render(null));
+  await render(true);
+  expect(requests.activePendingUserInput).toBeNull();
+  await render();
+  expect(requests).toMatchObject(expected);
+});
+
+it("isolates drafts by environment, thread and request and discards only resolved requests", async () => {
+  const environmentId = EnvironmentId.make("scope-environment");
+  const projection = questionProjection(threadRef.threadId);
+  const scopes = [
+    { environmentId, projection },
+    { environmentId: EnvironmentId.make("other-environment"), projection },
+    { environmentId, projection: questionProjection(ThreadId.make("other-thread")) },
+    { environmentId, projection: questionProjection(threadRef.threadId, ["second", "first"]) },
+  ];
+  const show = (scope: ComponentProps<typeof PendingRequestsProbe>) =>
+    act(() => root.render(<PendingRequestsProbe {...scope} />));
+  for (const [index, scope] of scopes.entries()) {
+    await show(scope);
+    expect(requests.activePendingQuestionIndex).toBe(0);
+    expect(requests.activePendingDraftAnswers["question-0"]?.customAnswer).toBeUndefined();
+    await act(() =>
+      requests.onChangeActivePendingUserInputCustomAnswer("question-0", `Answer ${index}`),
+    );
+    await act(() => requests.onAdvanceActivePendingUserInput());
+  }
+
+  await show({
+    environmentId,
+    projection: {
+      ...projection,
+      runtimeRequests: projection.runtimeRequests.map((request) =>
+        request.id === "first"
+          ? { ...request, status: "resolved", resolvedAt: projection.updatedAt }
+          : request,
+      ),
+    },
+  });
+  expect(requests.activePendingUserInput?.requestId).toBe("second");
+  for (const [index, scope] of scopes.entries()) {
+    await show(scope);
+    expect(requests.activePendingQuestionIndex).toBe(index === 0 ? 0 : 1);
+    expect(requests.activePendingDraftAnswers["question-0"]?.customAnswer).toBe(
+      index === 0 ? undefined : `Answer ${index}`,
+    );
+  }
+});
+
+function expectPreview(text: string | null) {
+  const previews = [...container.querySelectorAll("p")]
+    .map((element) => element.textContent)
+    .filter((content) => content?.startsWith("Preview body:"));
+  expect(previews).toEqual(text === null ? [] : [`Preview body: ${text}`]);
+}
+
+async function typeCustomAnswer(value: string) {
+  const input = container.querySelector("input")!;
+  await act(async () => {
+    input.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+it("previews options by focus, click, and shortcut index but only restores unambiguous saved selections", async () => {
+  await act(async () => root.render(<Questions pendingPrompt={previewPrompt} />));
+  expectPreview("First, question 1");
+
+  await act(async () => buttonWithText("Second").focus());
+  expectPreview("Second, question 1");
+  await act(async () => buttonWithText("First").focus());
+  expectPreview("First, question 1");
+
+  await act(async () => buttonWithText("Second").click());
+  expectPreview("Second, question 1");
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "1" })));
+  expectPreview("First, question 1");
+  await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "2" })));
+  expectPreview("Second, question 1");
+
+  await act(async () => vi.advanceTimersByTime(200));
+  expect(activeIndex()).toBe("1");
+  expectPreview("First, question 2");
+
+  await act(async () => buttonWithText("Second").focus());
+  expectPreview("Second, question 2");
+  await act(async () =>
+    root.render(
+      <Questions
+        pendingPrompt={{ ...previewPrompt, requestId: RuntimeRequestId.make("replacement") }}
+      />,
+    ),
+  );
+  expectPreview("First, question 2");
+
+  await act(async () => buttonWithText("Second").click());
+  expectPreview("Second, question 2");
+  await navigate("Next");
+  expectPreview("First, question 3");
+  await navigate("Previous");
+  expectPreview("Second, question 2");
+
+  await navigate("Previous");
+  expectPreview(null);
+  await act(async () =>
+    root.render(
+      <Questions
+        pendingPrompt={{ ...previewPrompt, requestId: RuntimeRequestId.make("remounted") }}
+      />,
+    ),
+  );
+  expectPreview(null);
+  await act(async () => buttonWithText("Second").click());
+  expectPreview("Second, question 1");
+});
+
+it("hides and clears hovered or focused previews while a custom answer is active", async () => {
+  await act(async () => root.render(<Questions pendingPrompt={previewPrompt} />));
+  await act(async () =>
+    buttonWithText("Second").dispatchEvent(new MouseEvent("mouseover", { bubbles: true })),
+  );
+  expectPreview("Second, question 1");
+
+  await typeCustomAnswer("Use a different approach");
+  expectPreview(null);
+  await typeCustomAnswer("");
+  expectPreview("First, question 1");
+
+  await typeCustomAnswer("Use a different approach");
+  await act(async () => buttonWithText("Second").focus());
+  expectPreview(null);
+  await act(async () =>
+    buttonWithText("Second").dispatchEvent(new MouseEvent("mouseover", { bubbles: true })),
+  );
+  expectPreview(null);
+  await typeCustomAnswer("");
+  expectPreview("First, question 1");
+});

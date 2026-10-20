@@ -1,4 +1,9 @@
-import { listLoginShellCandidates } from "@infinitus/shared/shell";
+import {
+  buildEnvironmentCaptureCommand,
+  listLoginShellCandidates,
+  setWindowsPath,
+} from "@infinitus/shared/shell";
+import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -65,7 +70,8 @@ export class DesktopShellEnvironmentCommandTimeoutError extends Schema.TaggedErr
 export class DesktopShellEnvironment extends Context.Service<
   DesktopShellEnvironment,
   {
-    readonly installIntoProcess: Effect.Effect<void>;
+    // Reuses the installation result; false leaves server hydration enabled.
+    readonly installIntoProcess: Effect.Effect<boolean>;
   }
 >()("@infinitus/desktop/shell/DesktopShellEnvironment") {}
 
@@ -87,7 +93,11 @@ const LOGIN_SHELL_ENV_NAMES = [
   "XDG_SESSION_DESKTOP",
   "XDG_SESSION_TYPE",
   "WAYLAND_DISPLAY",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_EXTRA_CA_CERTS",
   "T3CODE_TELEMETRY_ENABLED",
+  "__MISE_DIFF",
 ] as const;
 const WINDOWS_PROFILE_ENV_NAMES = ["PATH", "FNM_DIR", "FNM_MULTISHELL_PATH"] as const;
 const LOCALE_ENV_NAMES = ["LANG", "LC_ALL", "LC_CTYPE"] as const;
@@ -109,6 +119,37 @@ const readEnvPath = (env: NodeJS.ProcessEnv): Option.Option<string> =>
   trimNonEmpty(env.PATH ?? env.Path ?? env.path);
 
 const normalizeRuntimeDir = (value: string): string => value.replace(/\/+$/u, "");
+
+const APPIMAGE_SEARCH_PATH_ENV_NAMES = ["PATH", "LD_LIBRARY_PATH", "XDG_DATA_DIRS"] as const;
+
+// The AppImage runtime mounts each launch at `$TMPDIR/.mount_<id>` and prepends
+// it to the search paths above. A launch started from a shell that inherited an
+// earlier launch's env carries that mount too, and once it is unmounted every
+// spawn that walks PATH (git first of all) fails with ENOTCONN.
+const APPIMAGE_MOUNT_ROOT = /^(.*?\/\.mount_[^/]+)(?:\/|$)/u;
+
+const stripStaleAppImageMounts = (env: NodeJS.ProcessEnv): void => {
+  if (env.APPIMAGE === undefined && env.APPDIR === undefined) return;
+  const appDir = env.APPDIR === undefined ? undefined : normalizeRuntimeDir(env.APPDIR);
+  for (const name of APPIMAGE_SEARCH_PATH_ENV_NAMES) {
+    const value = env[name];
+    if (value === undefined) continue;
+    // glibc's loader also splits LD_LIBRARY_PATH on `;`.
+    const segments = value.split(name === "LD_LIBRARY_PATH" ? /[:;]/u : ":");
+    const kept = segments.filter((segment) => {
+      const mountRoot = APPIMAGE_MOUNT_ROOT.exec(segment)?.[1];
+      return mountRoot === undefined || mountRoot === appDir;
+    });
+    if (kept.length === segments.length) continue;
+    if (kept.length === 0) {
+      delete env[name];
+    } else {
+      // An empty segment is the current dir to the loader and to PATH lookup,
+      // but a lone one joins to "", which reads as unset.
+      env[name] = kept.join(":") || ":";
+    }
+  }
+};
 
 const linuxRuntimeDirCandidates = (
   env: NodeJS.ProcessEnv,
@@ -194,17 +235,6 @@ const logShellEnvironmentCommandError = (
       error,
     }),
   );
-
-const capturePosixEnvironmentCommand = (names: ReadonlyArray<string>) =>
-  names
-    .map((name) => {
-      return [
-        `printf '%s\\n' '${startMarker(name)}'`,
-        `printenv ${name} || true`,
-        `printf '%s\\n' '${endMarker(name)}'`,
-      ].join("; ");
-    })
-    .join("; ");
 
 const captureWindowsEnvironmentCommand = (names: ReadonlyArray<string>) =>
   [
@@ -316,7 +346,7 @@ const readLoginShellEnvironment = (
     : runCommandOutput({
         probe: "login-shell",
         command: shell,
-        args: ["-ilc", capturePosixEnvironmentCommand(names)],
+        args: ["-ilc", buildEnvironmentCaptureCommand(shell, names)],
         timeout: LOGIN_SHELL_TIMEOUT,
       }).pipe(Effect.map((output) => extractEnvironment(output, names)));
 
@@ -342,12 +372,16 @@ const readWindowsEnvironment = Effect.fn("desktop.shellEnvironment.readWindowsEn
       captureWindowsEnvironmentCommand(names),
     ];
 
+    const deadline =
+      (yield* Clock.monotonicTimeNanos) + Duration.toNanosUnsafe(LOGIN_SHELL_TIMEOUT);
     for (const command of WINDOWS_SHELL_CANDIDATES) {
+      const remainingNanos = deadline - (yield* Clock.monotonicTimeNanos);
+      if (remainingNanos <= 0n) break;
       const output = yield* runCommandOutput({
         probe: options.loadProfile ? "powershell-profile" : "powershell-no-profile",
         command,
         args,
-        timeout: LOGIN_SHELL_TIMEOUT,
+        timeout: Duration.nanos(remainingNanos),
       });
       const environment = extractEnvironment(output, names);
       if (Object.keys(environment).length > 0) {
@@ -362,7 +396,7 @@ const readWindowsEnvironment = Effect.fn("desktop.shellEnvironment.readWindowsEn
 const installWindowsEnvironment = Effect.fn("desktop.shellEnvironment.installWindowsEnvironment")(
   function* (
     config: ShellEnvironmentConfig,
-  ): Effect.fn.Return<void, never, ChildProcessSpawner.ChildProcessSpawner> {
+  ): Effect.fn.Return<boolean, never, ChildProcessSpawner.ChildProcessSpawner> {
     // Concurrent, not sequential: these two probes are independent (only their
     // results are combined below) and each spawns its own PowerShell. Run in
     // series they sit at offset 0 of desktop.startup, before anything else, and
@@ -383,7 +417,7 @@ const installWindowsEnvironment = Effect.fn("desktop.shellEnvironment.installWin
     ]);
 
     if (Option.isSome(mergedPath)) {
-      config.env.PATH = mergedPath.value;
+      setWindowsPath(config.env, mergedPath.value);
     }
     if (!config.env.FNM_DIR && profile.FNM_DIR) {
       config.env.FNM_DIR = profile.FNM_DIR;
@@ -391,6 +425,7 @@ const installWindowsEnvironment = Effect.fn("desktop.shellEnvironment.installWin
     if (!config.env.FNM_MULTISHELL_PATH && profile.FNM_MULTISHELL_PATH) {
       config.env.FNM_MULTISHELL_PATH = profile.FNM_MULTISHELL_PATH;
     }
+    return Boolean(noProfile.PATH && profile.PATH);
   },
 );
 
@@ -436,6 +471,9 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
     if (Option.isSome(mergedPath)) {
       config.env.PATH = mergedPath.value;
     }
+    // The server, relaunch and updater all inherit process.env, so scrubbing
+    // here keeps earlier AppImage launches' mounts out of every one of them.
+    stripStaleAppImageMounts(config.env);
     if (!config.env.SSH_AUTH_SOCK && shellEnvironment.SSH_AUTH_SOCK) {
       config.env.SSH_AUTH_SOCK = shellEnvironment.SSH_AUTH_SOCK;
     }
@@ -445,6 +483,10 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
       "XDG_CURRENT_DESKTOP",
       "XDG_SESSION_DESKTOP",
       "XDG_SESSION_TYPE",
+      // mise's record of the PATH entries it added. It must travel with the
+      // shell's PATH, or `mise x` can rebuild PATH behind a same-named wrapper
+      // (`exec mise x claude -- claude`) that then re-runs itself forever.
+      "__MISE_DIFF",
     ] as const;
     for (const name of shellPreferredEnvNames) {
       if (shellEnvironment[name]) {
@@ -461,7 +503,12 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
       "XDG_DATA_HOME",
       "XDG_RUNTIME_DIR",
       "WAYLAND_DISPLAY",
-      // The telemetry opt-out is documented as a shell variable; GUI launches never see it.
+      // CA trust set in the shell profile. Without it, a Node or OpenSSL build
+      // that has no bundled roots (a shared-OpenSSL node on PATH) cannot verify
+      // TLS, so provider updaters and agents fail to reach their registries.
+      "SSL_CERT_FILE",
+      "SSL_CERT_DIR",
+      "NODE_EXTRA_CA_CERTS",
       "T3CODE_TELEMETRY_ENABLED",
     ] as const) {
       if (!config.env[name] && shellEnvironment[name]) {
@@ -512,14 +559,18 @@ const installPosixEnvironment = Effect.fn("desktop.shellEnvironment.installPosix
 
 const installShellEnvironment = (
   config: ShellEnvironmentConfig,
-): Effect.Effect<void, never, ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem> => {
+): Effect.Effect<
+  boolean,
+  never,
+  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
+> => {
   if (config.platform === "win32") {
     return installWindowsEnvironment(config);
   }
   if (config.platform === "darwin" || config.platform === "linux") {
-    return installPosixEnvironment(config);
+    return installPosixEnvironment(config).pipe(Effect.as(true));
   }
-  return Effect.void;
+  return Effect.succeed(false);
 };
 
 /** @public Service construction is part of the canonical Effect module API. */
@@ -528,13 +579,15 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const installIntoProcess: DesktopShellEnvironment["Service"]["installIntoProcess"] =
-    installShellEnvironment({
-      env: process.env,
-      platform: environment.platform,
-    }).pipe(
-      Effect.provideService(FileSystem.FileSystem, fileSystem),
-      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-      Effect.withSpan("desktop.shellEnvironment.installIntoProcess"),
+    yield* Effect.cached(
+      installShellEnvironment({
+        env: process.env,
+        platform: environment.platform,
+      }).pipe(
+        Effect.provideService(FileSystem.FileSystem, fileSystem),
+        Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+        Effect.withSpan("desktop.shellEnvironment.installIntoProcess"),
+      ),
     );
 
   return DesktopShellEnvironment.of({ installIntoProcess });

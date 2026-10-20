@@ -46,7 +46,6 @@ const personalSkill = {
   sourceInfo: { scope: "user", path: "/home/.pi/agent/skills/personal/SKILL.md" },
 };
 
-// Respond through the real stdio transport, with a distinct command catalog for each cwd.
 const makePiSpawner = Effect.fnUntraced(function* (
   discovery: { readonly state?: unknown; readonly models?: ReadonlyArray<unknown> } = {},
 ) {
@@ -257,7 +256,7 @@ it.layer(layerTest)("PiDriver workspace discovery", (it) => {
       );
       const probe = yield* instance.snapshotForCwd!("/pending").pipe(Effect.flip, Effect.forkChild);
       yield* Deferred.await(pendingCommand);
-      yield* TestClock.adjust("15 seconds");
+      yield* TestClock.adjust("30 seconds");
       const error = yield* Fiber.join(probe);
       assert.equal(error._tag, "ProviderDriverError");
       assert.include(error.detail, "workspace commands");

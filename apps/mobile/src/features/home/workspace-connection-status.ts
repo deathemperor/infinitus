@@ -2,7 +2,10 @@ import type { WorkspaceState } from "../../state/workspaceModel";
 
 export interface WorkspaceConnectionStatusPresentation {
   readonly label: string;
+<<<<<<< HEAD
   /** True while the label describes work in flight (connecting/syncing) — render a spinner. False when the label says we cannot connect — render a wifi-slash icon. */
+=======
+>>>>>>> upstream-sync-8866e8fdc-upstream-renamed
   readonly showsProgress: boolean;
 }
 
@@ -50,7 +53,6 @@ function workspaceConnectionStatus(state: WorkspaceState): WorkspaceConnectionSt
   return { label: "Not connected", showsProgress: false };
 }
 
-/** Header-title presentation of the connection state, or null while connected. */
 export function workspaceConnectionStatusPresentation(
   state: WorkspaceState,
 ): WorkspaceConnectionStatusPresentation | null {

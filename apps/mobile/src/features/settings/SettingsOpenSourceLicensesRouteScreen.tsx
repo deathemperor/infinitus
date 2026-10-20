@@ -1,4 +1,6 @@
-import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
+import { SearchField } from "../../components/ui/SearchField";
+import { Toolbar } from "../../components/ui/Toolbar";
+import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { LegendList } from "@legendapp/list/react-native";
 import { type StaticScreenProps, useNavigation } from "@react-navigation/native";
 import {
@@ -8,6 +10,7 @@ import {
   thirdPartyLicenseEntryKey,
   type ThirdPartyLicenseEntry,
 } from "@infinitus/shared/thirdPartyLicenses";
+<<<<<<< HEAD
 import {
   PRODUCT_NAME,
   UPSTREAM_PRODUCT_NAME,
@@ -16,12 +19,17 @@ import {
 } from "@infinitus/shared/productName";
 import { useCallback, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, View } from "react-native";
+=======
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Linking, Platform, Pressable, type TextInputInstance, View } from "react-native";
+>>>>>>> upstream-sync-8866e8fdc-upstream-renamed
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SymbolView } from "../../components/AppSymbol";
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import { SymbolView } from "../../components/ui/AppSymbol";
+import { AppText as Text } from "../../components/ui/AppText";
+import { ListRow } from "../../components/ui/ListRow";
 import { SettingsScreen } from "./components/SettingsScreen";
-import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
+import { NativeStackScreenOptions } from "../../native/StackHeader";
 import {
   createNativeMailSearchToolbarItem,
   NATIVE_MAIL_SEARCH_TOOLBAR_CONTENT_INSET,
@@ -83,36 +91,18 @@ function LicenseRow(props: {
   readonly onPress: () => void;
 }) {
   return (
-    <Pressable
-      accessibilityHint="Opens the complete license notice"
-      accessibilityLabel={`${props.entry.name}, ${props.entry.license}`}
-      accessibilityRole="button"
-      onPress={props.onPress}
-      className="border-b border-border bg-grouped-card px-5 py-4 active:bg-card-alt"
-    >
-      <View className="flex-row items-start gap-3">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text className="text-base font-infinitus-medium text-foreground" numberOfLines={2}>
-            {props.entry.name}
-          </Text>
-          <Text className="text-sm text-foreground-muted" numberOfLines={2}>
-            {props.entry.version ? `${props.entry.version} · ` : ""}
-            {props.entry.license}
-          </Text>
-        </View>
-        <SymbolView
-          name="chevron.right"
-          size={16}
-          tintColorClassName={"accent-chevron"}
-          type="monochrome"
-          weight="semibold"
-        />
-      </View>
-    </Pressable>
+    <View className="border-b border-border">
+      <ListRow
+        label={props.entry.name}
+        description={[props.entry.version, props.entry.license].filter(Boolean).join(" · ")}
+        onPress={props.onPress}
+      />
+    </View>
   );
 }
 
 export function SettingsOpenSourceLicensesRouteScreen() {
+  const searchRef = useRef<TextInputInstance>(null);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
@@ -184,9 +174,9 @@ export function SettingsOpenSourceLicensesRouteScreen() {
         />
       ) : null}
       {Platform.OS === "ios" && !usesNativeMailSearchToolbar ? (
-        <NativeHeaderToolbar placement="bottom">
-          <NativeHeaderToolbar.SearchBarSlot />
-        </NativeHeaderToolbar>
+        <Toolbar placement="bottom">
+          <Toolbar.SearchBarSlot />
+        </Toolbar>
       ) : null}
 
       <LegendList
@@ -212,6 +202,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
           </View>
         }
         ListHeaderComponent={
+<<<<<<< HEAD
           <>
             {Platform.OS !== "ios" ? (
               <View className="px-5 pt-4 pb-5">
@@ -229,6 +220,21 @@ export function SettingsOpenSourceLicensesRouteScreen() {
             ) : null}
             {query.trim() === "" ? <UpstreamCreditSection /> : null}
           </>
+=======
+          Platform.OS !== "ios" ? (
+            <View className="px-5 pt-4 pb-5">
+              <SearchField
+                inputRef={searchRef}
+                autoFocus={false}
+                accessibilityLabel="Search open-source licenses"
+                clearAccessibilityLabel="Clear package search"
+                onChangeText={setQuery}
+                placeholder="Search packages"
+                value={query}
+              />
+            </View>
+          ) : null
+>>>>>>> upstream-sync-8866e8fdc-upstream-renamed
         }
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}

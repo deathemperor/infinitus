@@ -20,7 +20,6 @@ import {
   createDevRunnerEnv,
   devPortProbeHosts,
   findFirstAvailableOffset,
-  getDevRunnerModeArgs,
   isBrowserAllowedPort,
   resolveModePortOffsets,
   resolveOffset,
@@ -83,32 +82,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       assert.include(output, "[dev-runner] mode=dev");
     }),
   );
-
-  describe("getDevRunnerModeArgs", () => {
-    it.effect("lets Vite+ honor the desktop dev task graph", () =>
-      Effect.sync(() => {
-        assert.deepStrictEqual(getDevRunnerModeArgs("dev:desktop"), [
-          "run",
-          "--filter=@infinitus/desktop",
-          "--filter=@infinitus/web",
-          "dev",
-        ]);
-      }),
-    );
-
-    it.effect("places Vite+ run flags before the task name", () =>
-      Effect.sync(() => {
-        assert.deepStrictEqual(getDevRunnerModeArgs("dev"), [
-          "run",
-          "--filter=@infinitus/contracts",
-          "--filter=@infinitus/web",
-          "--filter=t3",
-          "--parallel",
-          "dev",
-        ]);
-      }),
-    );
-  });
 
   describe("resolveOffset", () => {
     it.effect("uses explicit T3CODE_PORT_OFFSET when provided", () =>
@@ -407,9 +380,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // Browser dev is single-origin: Vite proxies the backend, and the client
-    // resolves it from window.location.origin. Baking a localhost URL here is
-    // what breaks sharing a dev server to another device.
     it.effect.each(["dev", "dev:web"] as const)(
       "leaves the client backend URLs unset in %s mode",
       (mode) =>
@@ -441,8 +411,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         }),
     );
 
-    // Desktop pins the renderer at loopback deliberately; an ambient marker
-    // must not make Vite discard those URLs.
     it.effect("clears the single-origin marker in dev:desktop mode", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
@@ -485,9 +453,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // HOST is Vite's bind address and gates the HMR pin in vite.config.ts. An
-    // inherited one would survive into browser dev and point HMR at the wrong
-    // interface — invisible over a shared origin, since the page still loads.
     it.effect.each(["dev", "dev:web"] as const)("drops an inherited HOST in %s mode", (mode) =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
@@ -508,8 +473,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // --host configures the *backend* (T3CODE_HOST). It must not become Vite's
-    // bind address by way of an inherited HOST that happens to agree with it.
     it.effect("drops an inherited HOST even when --host is given", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
@@ -531,7 +494,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // Desktop sets HOST itself, so the clearing must not reach it.
     it.effect("still pins HOST for dev:desktop", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
@@ -724,8 +686,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // A port free on loopback can be taken on the interface the server will
-    // actually bind, so --host/T3CODE_HOST has to be probed as well.
     it.effect("adds a non-loopback bind host to the probe list", () =>
       Effect.sync(() => {
         assert.deepStrictEqual(devPortProbeHosts("0.0.0.0"), ["127.0.0.1", "::1", "0.0.0.0"]);
@@ -743,9 +703,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // Only the backend honours --host/T3CODE_HOST. Vite reads HOST (set for
-    // desktop only), so judging the web port against the backend's interface
-    // would reject ports for a server that never binds there.
     it.effect("passes the port role so only the server port sees the bind host", () =>
       Effect.gen(function* () {
         const probed: Array<{ port: number; role: string | undefined }> = [];
@@ -904,10 +861,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
     // `tailscale serve` config outlives the process, so a dry run that shared
     // would replace and then tear down whatever mapping the port already had.
-    // Base-dir precedence (--home-dir > worktree .t3 > ambient T3CODE_HOME)
-    // lives in runDevRunnerWithInput; the env builder must not consult the
-    // ambient variable on its own, or it would silently outrank the worktree
-    // default and land dev state on the user's real database.
     it.effect("ignores an ambient T3CODE_HOME when no home is resolved", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
@@ -928,9 +881,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    // Sharing dev:desktop would publish a URL whose renderer dials the
-    // visitor's own loopback, and would clobber the VITE_DEV_SERVER_URL that
-    // Electron loads from. It must decline, not half-work.
     it.effect("declines to share for dev:desktop and still starts the stack", () => {
       let spawnCount = 0;
       const spawnerLayer = Layer.succeed(
@@ -956,9 +906,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       });
     });
 
-    // Single-origin browser dev proxies the backend at localhost, so a backend
-    // bound only to a specific interface breaks every proxied request in a way
-    // that looks like a broken server. Reject the combination up front.
     it.effect("rejects a specific non-loopback --host for browser dev modes", () => {
       const spawnerLayer = Layer.succeed(
         ChildProcessSpawner.ChildProcessSpawner,
@@ -987,9 +934,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       });
     });
 
-    // Wildcards keep loopback answering, so the proxy target stays valid and
-    // the combination must keep working — it is the documented way to serve a
-    // LAN interface and the browser proxy at once.
     it.effect("still spawns the stack for a wildcard --host in dev mode", () => {
       let spawnCount = 0;
       const spawnerLayer = Layer.succeed(
@@ -1015,8 +959,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       });
     });
 
-    // dev:server does not proxy — the client talks to the backend directly —
-    // so a specific interface bind stays legitimate there.
     it.effect("keeps a specific --host working for dev:server", () => {
       let spawnCount = 0;
       const spawnerLayer = Layer.succeed(
@@ -1060,8 +1002,6 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
                 captured = spawned.options?.env;
                 return Effect.succeed(mockProcess(0));
               }
-              // tailscale: answer `status --json` with a valid tailnet name,
-              // succeed the `serve`/`off` calls.
               return Effect.succeed(
                 ChildProcessSpawner.makeHandle({
                   pid: ChildProcessSpawner.ProcessId(2),

@@ -17,10 +17,7 @@ import { makeComponentLogger } from "./DesktopObservability.ts";
 // appimagekit_<hash>-….desktop) and its filename is not under our control.
 // Electron's app.setAsDefaultProtocolClient resolves the desktop id from
 // setDesktopName, which cannot match those files — so the browser keeps
-// prompting "Choose an application" for every OAuth callback. Instead, write
-// our own handler entry pointing at the current AppImage, refresh the desktop
-// MIME cache so desktop environments recognize that entry as a handler, and
-// use xdg-mime to record it as the scheme default in mimeapps.list.
+// prompting "Choose an application" for every OAuth callback.
 const { logInfo, logWarning } = makeComponentLogger("desktop-linux-url-handler");
 
 export class DesktopLinuxUrlHandlerRegistrationError extends Schema.TaggedError<DesktopLinuxUrlHandlerRegistrationError>()(
@@ -67,10 +64,7 @@ const escapeDesktopEntryString = (value: string): string =>
 
 // Exec values are unescaped twice by implementations: first the general
 // string-value rules, then the Exec quoting rules — so writing composes the
-// layers in reverse. The argument is double-quoted with reserved characters
-// backslash-escaped and literal percent signs doubled (field codes), and the
-// general string escaping is applied on top: a literal backslash ends up as
-// four backslashes in the file, a quote as \\", a dollar sign as \\$.
+// layers in reverse.
 export function escapeDesktopEntryExecArgument(value: string): string {
   const quoted = value
     .replaceAll("\\", () => "\\\\")
@@ -80,6 +74,12 @@ export function escapeDesktopEntryExecArgument(value: string): string {
     .replaceAll("%", () => "%%");
   return escapeDesktopEntryString(`"${quoted}"`);
 }
+
+// Legacy xdg-open looks up the first Exec word without unquoting it.
+const escapeUrlHandlerExecTarget = (value: string): string =>
+  /[ \t\n"'\\><~|&;$*?#()`]/.test(value)
+    ? escapeDesktopEntryExecArgument(value)
+    : escapeDesktopEntryString(value.replaceAll("%", "%%"));
 
 // The AppImage integration entry owns the window identity. This
 // hidden URL-only entry must not compete with it for StartupWMClass matching.
@@ -93,7 +93,7 @@ export function renderUrlHandlerDesktopEntry(input: {
     "[Desktop Entry]",
     "Type=Application",
     `Name=${escapeDesktopEntryString(input.displayName)}`,
-    `Exec=${escapeDesktopEntryExecArgument(input.execTarget)} %U`,
+    `Exec=${escapeUrlHandlerExecTarget(input.execTarget)} %U`,
     ...(input.iconPath === undefined ? [] : [`Icon=${escapeDesktopEntryString(input.iconPath)}`]),
     "Terminal=false",
     "NoDisplay=true",
@@ -102,6 +102,19 @@ export function renderUrlHandlerDesktopEntry(input: {
     "",
   ].join("\n");
 }
+
+// Some docks and bars look the Wayland app id up in the icon theme when no
+// visible desktop entry matches the window, for example an AppImage run without
+// integration. Theme lookups are case-sensitive, so install both spellings.
+const LINUX_THEME_ICON_SIZE = "256x256";
+
+function linuxThemeIconNames(desktopEntryName: string): readonly string[] {
+  const appId = desktopEntryName.replace(/\.desktop$/u, "");
+  return [...new Set([appId.toLowerCase(), appId])];
+}
+
+const sameBytes = (left: Uint8Array, right: Uint8Array): boolean =>
+  left.length === right.length && left.every((byte, index) => byte === right[index]);
 
 export class DesktopLinuxUrlHandler extends Context.Service<
   DesktopLinuxUrlHandler,
@@ -124,6 +137,8 @@ export const make = Effect.gen(function* () {
   );
   const iconsDir = environment.path.join(environment.linuxApplicationsDir, "..", "icons");
   const iconPath = environment.path.join(iconsDir, `${environment.linuxDesktopEntryName}.png`);
+  const hicolorDir = environment.path.join(iconsDir, "hicolor");
+  const themeIconDir = environment.path.join(hicolorDir, LINUX_THEME_ICON_SIZE, "apps");
 
   const writeDesktopEntry = Effect.gen(function* () {
     // Inside the mounted AppImage, process.execPath points at a transient
@@ -186,6 +201,63 @@ export const make = Effect.gen(function* () {
     ),
   );
 
+  const refreshIconThemeCache = Effect.scoped(
+    Effect.gen(function* () {
+      const command = ChildProcess.make("gtk-update-icon-cache", ["-f", "-t", hicolorDir], {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+        // Releasing a timed-out helper otherwise waits on SIGTERM indefinitely.
+        forceKillAfter: "1 second",
+      });
+      const handle = yield* spawner.spawn(command);
+      return yield* handle.exitCode.pipe(Effect.timeout("5 seconds"));
+    }),
+  );
+
+  const modifiedAt = (filePath: string) =>
+    fileSystem
+      .stat(filePath)
+      .pipe(Effect.map((info) => Option.getOrUndefined(info.mtime)?.getTime() ?? 0));
+
+  const installThemeIcons = Effect.gen(function* () {
+    const source = yield* assets.resolveResourcePath(`icons/${LINUX_THEME_ICON_SIZE}.png`);
+    if (Option.isNone(source)) return;
+    const icon = yield* fileSystem.readFile(source.value);
+    const targets = linuxThemeIconNames(environment.linuxDesktopEntryName).map((name) =>
+      environment.path.join(themeIconDir, `${name}.png`),
+    );
+    let changed = false;
+    for (const target of targets) {
+      const current = yield* fileSystem.readFile(target).pipe(Effect.option);
+      if (Option.isSome(current) && sameBytes(current.value, icon)) continue;
+      yield* fileSystem.makeDirectory(themeIconDir, { recursive: true });
+      yield* fileSystem.writeFile(target, icon);
+      changed = true;
+    }
+    // Only keep an existing cache current. Creating one would leave GTK reading
+    // a cache that other tools installing user icons do not update. An icon
+    // newer than the cache also retries a refresh that failed on an earlier
+    // launch.
+    const cachePath = environment.path.join(hicolorDir, "icon-theme.cache");
+    const cachedAt = yield* modifiedAt(cachePath).pipe(Effect.option);
+    if (Option.isNone(cachedAt)) return;
+    let stale = changed;
+    for (const target of targets) {
+      if (stale) break;
+      if ((yield* modifiedAt(target)) > cachedAt.value) stale = true;
+    }
+    if (!stale) return;
+    const exitCode = yield* refreshIconThemeCache;
+    if (exitCode !== 0) {
+      yield* logWarning("icon theme cache refresh failed", { hicolorDir, exitCode });
+    }
+  }).pipe(
+    Effect.catch((error) =>
+      logWarning("app id theme icon install failed", { themeIconDir, category: error._tag }),
+    ),
+  );
+
   const setDefaultHandler = Effect.scoped(
     Effect.gen(function* () {
       const command = ChildProcess.make(
@@ -229,14 +301,20 @@ export const make = Effect.gen(function* () {
     yield* Effect.gen(function* () {
       const { png } = yield* assets.iconPaths;
       if (Option.isNone(png)) return;
+      // Electron's copyFile extracts ASAR entries to temporary files it never removes.
+      const icon = yield* fileSystem.readFile(png.value);
+      const current = yield* fileSystem.readFile(iconPath).pipe(Effect.option);
+      if (Option.isSome(current) && sameBytes(current.value, icon)) return;
       // The AppImage mount is temporary; the chooser needs the icon after exit.
       yield* fileSystem.makeDirectory(iconsDir, { recursive: true });
-      yield* fileSystem.copyFile(png.value, iconPath);
+      yield* fileSystem.writeFile(iconPath, icon, { mode: 0o600 });
     }).pipe(
       Effect.catch((error) =>
-        logWarning("URL handler icon copy failed", { iconPath, category: error.reason._tag }),
+        logWarning("URL handler icon install failed", { iconPath, category: error.reason._tag }),
       ),
     );
+
+    yield* installThemeIcons;
 
     yield* updateDesktopDatabase.pipe(
       // Some MIME implementations, including GIO, use mimeinfo.cache to verify
@@ -255,8 +333,6 @@ export const make = Effect.gen(function* () {
     yield* setDefaultHandler;
     yield* logInfo("registered URL scheme handler", { scheme });
   }).pipe(
-    // Registration is best-effort: a missing xdg-mime or read-only home must
-    // never block startup — the OS chooser remains as fallback.
     Effect.catch((error) =>
       logWarning("URL scheme handler registration failed", {
         scheme,

@@ -603,13 +603,10 @@ describe("AcpRuntimeModel", () => {
 
     expect(event.toolCall.detail).toBeDefined();
     const detail = event.toolCall.detail!;
-    // 8000 chars of tail plus the truncation marker, regardless of input size.
     expect(detail.length).toBe(8_028);
     expect(detail.startsWith("[Earlier output truncated]")).toBe(true);
     expect(detail.endsWith(hugeText.slice(-100))).toBe(true);
 
-    // The raw payload threaded through for logging/persistence must not smuggle the full
-    // cumulative buffer back in either.
     const rawUpdate = (
       event.rawPayload as {
         readonly update: {
@@ -633,7 +630,6 @@ describe("AcpRuntimeModel", () => {
     let cumulativeBuffer = "";
 
     for (let i = 0; i < 1_000; i += 1) {
-      // Grok resends the FULL accumulated buffer, not a delta, on every redraw.
       cumulativeBuffer += `frame ${i}: ${"#".repeat(50)}\n`;
       const isLast = i === 999;
 
@@ -678,17 +674,11 @@ describe("AcpRuntimeModel", () => {
       }
     }
 
-    // The flood as the CLI sends it: 1000 cumulative redraws, ~31.6 MB of JSON.
     expect(notificationBytes).toBeGreaterThan(31_000_000);
 
-    // 1000 cumulative redraws collapse into a fixed, small number of runtime events...
     expect(emittedCount).toBe(114);
-    // ...each individually bounded, no matter how long the tool call runs...
     expect(largestEmittedEventBytes).toBeLessThan(25_000);
-    // ...so the whole flooding tool call costs ~2.5 MB of runtime events instead of ~31.6 MB.
     expect(emittedBytes).toBeLessThan(2_600_000);
-    // ...while the FINAL state (forced by the completed status) still reflects the real,
-    // latest output rather than a stale coalesced value.
     expect(finalDetail).toBeDefined();
     expect(finalDetail?.endsWith(`frame 999: ${"#".repeat(50)}`)).toBe(true);
   });
@@ -782,9 +772,6 @@ describe("AcpRuntimeModel", () => {
   });
 
   it("bounds oversized whitespace-only tool call content that has no trimmed text", () => {
-    // Whitespace-only entries are skipped when extracting display text (`chunks.length === 0`)
-    // and used to be returned unchanged, which let a redrawing terminal persist unbounded
-    // buffers on `toolCall.data.content` and `rawPayload`.
     const hugeWhitespace = " \n\t".repeat(30_000);
     expect(hugeWhitespace.length).toBeGreaterThan(60_000);
 
@@ -982,8 +969,6 @@ describe("AcpRuntimeModel", () => {
       let previous: AcpToolCallState | undefined;
 
       for (let i = 1; i <= 12; i += 1) {
-        // Grows by 1 char per update — well under the 256-char growth threshold, so this
-        // exercises the coalesce-count fallback rather than the growth-based trigger.
         const next = toolCall("x".repeat(i), "inProgress");
         const decision = decideToolCallUpdateEmission({
           previous,
@@ -999,8 +984,6 @@ describe("AcpRuntimeModel", () => {
         previous = next;
       }
 
-      // First update always emits (no previous state yet); after that, small per-update
-      // growth should be coalesced until the coalesce limit forces a periodic emission.
       const emittedIndices = emissions.flatMap((emitted, index) => (emitted ? [index + 1] : []));
       expect(emittedIndices).toEqual([1, 11]);
     });
@@ -1268,6 +1251,7 @@ describe("AcpRuntimeModel", () => {
       command: "pnpm test",
       cwd: "/workspace",
       output: "first line\nsecond line\n",
+      outputBytes: 23,
       exitStatus: { exitCode: 0 },
     });
   });
@@ -1289,6 +1273,51 @@ describe("AcpRuntimeModel", () => {
     expect(first.pendingOutputBytes).toBeDefined();
     expect(second.output).toBe("A🙂B");
     expect(second.pendingOutputBytes).toBeUndefined();
+  });
+
+  it("keeps the newest 16 MiB of ACP terminal output at a UTF-8 boundary", () => {
+    const cap = 16 * 1024 * 1024;
+    const chunk = (text: string | Uint8Array) => ({
+      sessionUpdate: "terminal_output_chunk" as const,
+      terminalId: "terminal-cap",
+      data: Buffer.from(text).toString("base64"),
+    });
+    const seeded = applyAcpAgentTerminalUpdate(undefined, {
+      sessionUpdate: "terminal_update",
+      terminalId: "terminal-cap",
+      output: { data: Buffer.from(`é${"a".repeat(cap - 3)}`).toString("base64") },
+    });
+    expect(seeded.outputBytes).toBe(cap - 1);
+
+    // One byte over the cap falls inside "é", so the whole character is dropped.
+    const trimmed = applyAcpAgentTerminalUpdate(seeded, chunk("bc"));
+    expect(trimmed.output.length).toBe(cap - 1);
+    expect(trimmed.output.slice(0, 2)).toBe("aa");
+    expect(trimmed.output.slice(-3)).toBe("abc");
+    expect(trimmed.outputBytes).toBe(cap - 1);
+
+    const emoji = applyAcpAgentTerminalUpdate(trimmed, chunk("🙂"));
+    expect(emoji.output.slice(-5)).toBe("abc🙂");
+    expect(emoji.outputBytes).toBe(cap);
+    expect(Buffer.byteLength(emoji.output)).toBe(cap);
+
+    // Exit flushes an incomplete trailing character and trims again.
+    const pending = applyAcpAgentTerminalUpdate(emoji, chunk(Buffer.from("🙂").subarray(0, 2)));
+    const exited = applyAcpAgentTerminalUpdate(pending, {
+      sessionUpdate: "terminal_update",
+      terminalId: "terminal-cap",
+      exitStatus: { exitCode: 1 },
+    });
+    expect(exited.output.slice(-4)).toBe("c🙂\uFFFD");
+    expect(exited.outputBytes).toBe(Buffer.byteLength(exited.output));
+    expect(exited.outputBytes).toBeLessThanOrEqual(cap);
+
+    const cleared = applyAcpAgentTerminalUpdate(exited, {
+      sessionUpdate: "terminal_update",
+      terminalId: "terminal-cap",
+      output: null,
+    });
+    expect(cleared).toMatchObject({ output: "", outputBytes: 0, exitStatus: { exitCode: 1 } });
   });
 
   it("drops malformed and oversized ACP terminal frames without decoding them", () => {
@@ -1407,8 +1436,6 @@ describe("extractMcpToolCallIdentity", () => {
   }
 
   it("recovers server and tool from codex-acp tagged execute calls", () => {
-    // Captured verbatim from codex-acp 2026-08-14: MCP calls arrive as kind
-    // "execute" with the identity only in rawInput.
     const toolCall = toolCallFromUpdate({
       sessionUpdate: "tool_call",
       toolCallId: "exec-f4591587-0754-4bb4-990b-f2767894ba93",
@@ -1444,9 +1471,6 @@ describe("extractMcpToolCallIdentity", () => {
   });
 
   it("recovers T3 identity from pi-acp title-only fallback execs", () => {
-    // Captured verbatim from pi-acp 0.0.33 2026-08-14: rawInput is null and
-    // the command line only appears as the verbatim title, which the
-    // presentation layer summarizes into "Ran command".
     const toolCall = toolCallFromUpdate({
       sessionUpdate: "tool_call",
       toolCallId: "call_JdxnvzjHHrbvyASTLVekLYWV|fc_08f5a805a7159aa6016a7ec4afad548191",
@@ -1472,10 +1496,6 @@ describe("extractMcpToolCallIdentity", () => {
   });
 
   it("recovers T3 identity from server-namespaced titles across titleless updates", () => {
-    // Captured verbatim from Kilo 7.4.22 2026-08-15: the initial tool_call
-    // titles the MCP function "<server>_<tool>" with kind "other", and the
-    // completed update carries no title at all, so the merged presentation
-    // title regresses to "Tool" while data.title keeps the wire value.
     const created = toolCallFromUpdate({
       sessionUpdate: "tool_call",
       toolCallId: "chatcmpl-tool-b2a6142ee1a510a5",
@@ -1500,8 +1520,6 @@ describe("extractMcpToolCallIdentity", () => {
   });
 
   it("recovers T3 identity from Gemini and qwen MCP-server title templates", () => {
-    // Gemini CLI 0.55.1: "<tool> (<server> MCP Server)"; qwen-code 0.21.12
-    // appends ": <args json>" to the same template.
     const gemini = toolCallFromUpdate({
       sessionUpdate: "tool_call",
       toolCallId: "gemini-1",
@@ -1526,13 +1544,6 @@ describe("extractMcpToolCallIdentity", () => {
   });
 
   it("recovers T3 identity across the registry agents' naming conventions", () => {
-    // One representative per surveyed convention (2026-08 registry builds):
-    // droid triple underscore, Copilot hyphen, Amp mangled server + detail
-    // tail, cline args tail, Auggie tool-first suffix.
-    // One representative per surveyed convention (2026-08 registry builds):
-    // droid triple underscore, Copilot hyphen, Amp mangled server + detail
-    // tail, cline args tail, Auggie tool-first suffix, fast-agent slash,
-    // Kimi bare name with args tail.
     for (const title of [
       "t3-code___delegate_task",
       "t3-code-delegate_task",
@@ -1540,7 +1551,12 @@ describe("extractMcpToolCallIdentity", () => {
       't3-code__delegate_task: {"mode":"async"}',
       "delegate_task_t3-code",
       "t3-code/delegate_task",
+      "delegate_task",
       'delegate_task: {"mode":"async"}',
+      // Kimi retitles on every streamed args chunk with the raw partial JSON,
+      // and middle-truncates args longer than 50 characters.
+      'delegate_task: {"mode":"async","task":"Ru',
+      'delegate_task: {"mode":"async","task":"Ru...cho child-result-42\'"}',
     ]) {
       const toolCall = toolCallFromUpdate({
         sessionUpdate: "tool_call",
@@ -1554,6 +1570,18 @@ describe("extractMcpToolCallIdentity", () => {
         tool: "delegate_task",
       });
     }
+  });
+
+  it("does not claim an agent's own tool that shares a T3 tool name", () => {
+    // Hermes' built-in delegate_task, titled "<tool>: <description>" like all its calls.
+    const toolCall = toolCallFromUpdate({
+      sessionUpdate: "tool_call",
+      toolCallId: "own-delegate-1",
+      kind: "execute",
+      title: "delegate_task: 1 tasks: Run the terminal command 'echo child-result-42'",
+      status: "pending",
+    });
+    expect(extractMcpToolCallIdentity(toolCall)).toBeUndefined();
   });
 
   it("recovers T3 identity from goose _meta despite LLM-rewritten titles", () => {

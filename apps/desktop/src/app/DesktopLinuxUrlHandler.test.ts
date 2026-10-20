@@ -1,3 +1,4 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -21,7 +22,30 @@ interface RecordedRegistration {
   readonly files: Array<{ readonly path: string; readonly content: string }>;
   readonly commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }>;
   readonly copies: Array<{ readonly source: string; readonly destination: string }>;
+  readonly binaryReads: string[];
+  readonly binaryWrites: Array<{
+    readonly path: string;
+    readonly bytes: Uint8Array;
+    readonly mode: number | undefined;
+  }>;
 }
+
+const iconSource = "/tmp/.mount_T3/resources/app.asar/apps/desktop/prod-resources/icon.png";
+const iconPath = "/home/alice/.local/share/icons/com.t3tools.T3Code.desktop.png";
+const iconBytes = new Uint8Array([0x89, 0x50, 0x00, 0xff, 0x80, 0x0a]);
+const currentDesktopEntry = DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
+  displayName: "T3 Code (Alpha)",
+  execTarget: "/home/alice/Applications/T3-Code.AppImage",
+  scheme: "t3code",
+  iconPath,
+});
+const registrationCommands = [
+  { command: "update-desktop-database", args: ["/home/alice/.local/share/applications"] },
+  {
+    command: "xdg-mime",
+    args: ["default", "com.t3tools.T3Code.desktop", "x-scheme-handler/t3code"],
+  },
+];
 
 const makeEnvironment = (path: Path.Path, overrides: Record<string, unknown> = {}) =>
   DesktopEnvironment.DesktopEnvironment.of({
@@ -63,7 +87,8 @@ const layerHandler = (
     readonly writeError?: PlatformError.PlatformError;
     readonly existingEntry?: string;
     readonly iconSource?: string;
-    readonly iconCopyError?: PlatformError.PlatformError;
+    readonly existingIcon?: Uint8Array;
+    readonly iconReadError?: PlatformError.PlatformError;
   } = {},
 ) =>
   DesktopLinuxUrlHandler.layer.pipe(
@@ -86,11 +111,34 @@ const layerHandler = (
         }),
         FileSystem.layerNoop({
           copyFile: (source, destination) =>
-            input.iconCopyError
-              ? Effect.fail(input.iconCopyError)
-              : Effect.sync(() => {
-                  recorded.copies.push({ source, destination });
-                }),
+            Effect.sync(() => {
+              recorded.copies.push({ source, destination });
+            }),
+          readFile: (path) =>
+            Effect.gen(function* () {
+              recorded.binaryReads.push(path);
+              if (path === input.iconSource) {
+                if (input.iconReadError) return yield* input.iconReadError;
+                return new Uint8Array(iconBytes);
+              }
+              if (path === iconPath && input.existingIcon !== undefined) {
+                return input.existingIcon;
+              }
+              return yield* PlatformError.systemError({
+                _tag: "NotFound",
+                module: "FileSystem",
+                method: "readFile",
+                pathOrDescriptor: path,
+              });
+            }),
+          writeFile: (path, bytes, options) =>
+            Effect.sync(() => {
+              recorded.binaryWrites.push({
+                path,
+                bytes: new Uint8Array(bytes),
+                mode: options?.mode,
+              });
+            }),
           readFileString: () => Effect.succeed(input.existingEntry ?? ""),
           makeDirectory: (path) =>
             Effect.sync(() => {
@@ -155,6 +203,8 @@ const emptyRecording = (): RecordedRegistration => ({
   files: [],
   commands: [],
   copies: [],
+  binaryReads: [],
+  binaryWrites: [],
 });
 
 describe("DesktopLinuxUrlHandler", () => {
@@ -168,9 +218,6 @@ describe("DesktopLinuxUrlHandler", () => {
 
     assert.include(entry, "[Desktop Entry]");
     assert.include(entry, "Name=T3 Code (Nightly)");
-    // Exec composes both escaping layers: a literal backslash becomes four
-    // backslashes in the file, a quote three characters, a dollar sign two
-    // backslashes plus the sign.
     assert.include(
       entry,
       'Exec="/home/al ice/Apps/T3 \\\\"100%%\\\\" \\\\$HOME\\\\\\\\x.AppImage" %U',
@@ -179,6 +226,25 @@ describe("DesktopLinuxUrlHandler", () => {
     assert.notInclude(entry, "StartupWMClass=");
     assert.include(entry, "MimeType=x-scheme-handler/infinitus;");
     assert.include(entry, "Icon=/home/al ice/icons/T3\\\\x.png");
+  });
+
+  it.each([
+    {
+      execTarget: "/opt/T3(beta)/t3code.AppImage",
+      execLine: 'Exec="/opt/T3(beta)/t3code.AppImage" %U',
+    },
+    {
+      execTarget: "/opt/t3%20code/t3code.AppImage",
+      execLine: "Exec=/opt/t3%%20code/t3code.AppImage %U",
+    },
+  ])("renders the handler Exec line for $execTarget", ({ execTarget, execLine }) => {
+    const entry = DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
+      displayName: "T3 Code",
+      execTarget,
+      scheme: "t3code",
+    });
+
+    assert.include(entry.split("\n"), execLine);
   });
 
   it("carries structured context on registration errors", () => {
@@ -224,7 +290,7 @@ describe("DesktopLinuxUrlHandler", () => {
         );
         assert.include(
           recorded.files[0]?.content,
-          'Exec="/home/alice/Applications/T3-Code.AppImage" %U',
+          "Exec=/home/alice/Applications/T3-Code.AppImage %U",
         );
         assert.include(recorded.files[0]?.content, "MimeType=x-scheme-handler/infinitus;");
         assert.deepEqual(recorded.commands, [
@@ -249,7 +315,12 @@ describe("DesktopLinuxUrlHandler", () => {
 
       assert.include(
         recorded.files[0]?.content,
-        `Exec=${DesktopLinuxUrlHandler.escapeDesktopEntryExecArgument(process.execPath)} %U`,
+        DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
+          displayName: "T3 Code (Alpha)",
+          execTarget: process.execPath,
+          scheme: "t3code",
+          iconPath: "/home/alice/.local/share/icons/com.t3tools.T3Code.desktop.png",
+        }),
       );
     });
   });
@@ -284,9 +355,9 @@ describe("DesktopLinuxUrlHandler", () => {
 
   it.effect("installs a persistent icon even when the desktop entry is already current", () => {
     const recorded = emptyRecording();
-    const iconPath = "/home/alice/.local/share/icons/com.t3tools.T3Code.desktop.png";
     return Effect.gen(function* () {
       yield* runRegister(recorded, {
+<<<<<<< HEAD
         iconSource: "/tmp/.mount_T3/resources/icon.png",
         existingEntry: DesktopLinuxUrlHandler.renderUrlHandlerDesktopEntry({
           displayName: "T3 Code (Alpha)",
@@ -294,32 +365,57 @@ describe("DesktopLinuxUrlHandler", () => {
           scheme: "infinitus",
           iconPath,
         }),
+=======
+        iconSource,
+        existingEntry: currentDesktopEntry,
+>>>>>>> upstream-sync-8866e8fdc-upstream-renamed
       });
       assert.deepEqual(recorded.files, []);
-      assert.deepEqual(recorded.copies, [
-        { source: "/tmp/.mount_T3/resources/icon.png", destination: iconPath },
-      ]);
-      assert.equal(recorded.commands.at(-1)?.command, "xdg-mime");
+      assert.deepEqual(recorded.copies, []);
+      assert.deepEqual(recorded.binaryReads, [iconSource, iconPath]);
+      assert.deepEqual(recorded.binaryWrites, [{ path: iconPath, bytes: iconBytes, mode: 0o600 }]);
+      assert.deepEqual(recorded.commands, registrationCommands);
     });
   });
 
-  it.effect("still registers the handler when copying its icon fails", () => {
+  it.effect("refreshes a stale icon and skips equal bytes on the next registration", () => {
     const recorded = emptyRecording();
     return Effect.gen(function* () {
       yield* runRegister(recorded, {
-        iconSource: "/tmp/.mount_T3/resources/icon.png",
-        iconCopyError: PlatformError.systemError({
+        iconSource,
+        existingEntry: currentDesktopEntry,
+        existingIcon: new Uint8Array([0x89, 0x50, 0x00, 0xfe, 0x80, 0x0a]),
+      });
+      assert.deepEqual(recorded.binaryWrites, [{ path: iconPath, bytes: iconBytes, mode: 0o600 }]);
+      yield* runRegister(recorded, {
+        iconSource,
+        existingEntry: currentDesktopEntry,
+        existingIcon: new Uint8Array(recorded.binaryWrites[0]!.bytes),
+      });
+      assert.equal(recorded.binaryWrites.length, 1);
+      assert.deepEqual(recorded.copies, []);
+      assert.deepEqual(recorded.files, []);
+      assert.deepEqual(recorded.commands, [...registrationCommands, ...registrationCommands]);
+    });
+  });
+
+  it.effect("still registers the handler when reading its icon fails", () => {
+    const recorded = emptyRecording();
+    return Effect.gen(function* () {
+      yield* runRegister(recorded, {
+        iconSource,
+        iconReadError: PlatformError.systemError({
           _tag: "PermissionDenied",
           module: "FileSystem",
-          method: "copyFile",
-          description: "read-only icon directory",
+          method: "readFile",
+          description: "unreadable bundled icon",
         }),
       });
+      assert.deepEqual(recorded.binaryReads, [iconSource]);
+      assert.deepEqual(recorded.binaryWrites, []);
+      assert.deepEqual(recorded.copies, []);
       assert.equal(recorded.files.length, 1);
-      assert.deepEqual(
-        recorded.commands.map(({ command }) => command),
-        ["update-desktop-database", "xdg-mime"],
-      );
+      assert.deepEqual(recorded.commands, registrationCommands);
     });
   });
 
@@ -390,5 +486,293 @@ describe("DesktopLinuxUrlHandler", () => {
         ["update-desktop-database", "xdg-mime"],
       );
     }),
+  );
+});
+
+interface ThemeIconRun {
+  readonly root: string;
+  readonly commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }>;
+  readonly iconCacheOptions?: Array<Record<string, unknown>>;
+  readonly sourceMissing?: boolean;
+  readonly iconCacheExitCode?: number;
+  readonly iconCacheSpawnFails?: boolean;
+  readonly iconCacheStalled?: boolean;
+  readonly iconCacheStarted?: Deferred.Deferred<void>;
+  // Stands in for gtk-update-icon-cache rewriting the cache on success.
+  readonly onIconCacheRefresh?: Effect.Effect<void>;
+}
+
+const registerWithRealFileSystem = (run: ThemeIconRun) =>
+  Effect.gen(function* () {
+    const handler = yield* DesktopLinuxUrlHandler.DesktopLinuxUrlHandler;
+    yield* handler.register;
+  }).pipe(
+    Effect.provide(
+      DesktopLinuxUrlHandler.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.effect(
+              DesktopEnvironment.DesktopEnvironment,
+              Path.Path.pipe(
+                Effect.map((path) =>
+                  makeEnvironment(path, {
+                    linuxApplicationsDir: path.join(run.root, "applications"),
+                  }),
+                ),
+              ),
+            ),
+            Layer.effect(
+              DesktopAssets.DesktopAssets,
+              Path.Path.pipe(
+                Effect.map((path) => ({
+                  iconPaths: Effect.succeed({
+                    png: Option.none(),
+                    ico: Option.none(),
+                    icns: Option.none(),
+                  }),
+                  resolveResourcePath: (fileName: string) =>
+                    Effect.succeed(
+                      fileName === "icons/256x256.png"
+                        ? Option.some(
+                            path.join(
+                              run.root,
+                              run.sourceMissing ? "missing" : "resources",
+                              fileName,
+                            ),
+                          )
+                        : Option.none(),
+                    ),
+                })),
+              ),
+            ),
+            Layer.succeed(
+              ChildProcessSpawner.ChildProcessSpawner,
+              ChildProcessSpawner.make((command) => {
+                const childProcess = command as unknown as {
+                  readonly command: string;
+                  readonly args: ReadonlyArray<string>;
+                };
+                run.commands.push({ command: childProcess.command, args: childProcess.args });
+                if (childProcess.command !== "gtk-update-icon-cache") {
+                  return Effect.succeed(mockProcess(0));
+                }
+                run.iconCacheOptions?.push(
+                  (command as unknown as { readonly options: Record<string, unknown> }).options,
+                );
+                if (run.iconCacheSpawnFails) {
+                  return Effect.fail(
+                    PlatformError.systemError({
+                      _tag: "NotFound",
+                      module: "ChildProcess",
+                      method: "spawn",
+                      description: "gtk-update-icon-cache is not installed",
+                    }),
+                  );
+                }
+                const exitCode = run.iconCacheExitCode ?? 0;
+                const handle = mockProcess(exitCode, run.iconCacheStalled === true);
+                const refreshed =
+                  exitCode === 0 && run.onIconCacheRefresh ? run.onIconCacheRefresh : Effect.void;
+                return refreshed.pipe(
+                  Effect.andThen(
+                    run.iconCacheStarted
+                      ? Deferred.succeed(run.iconCacheStarted, undefined)
+                      : Effect.void,
+                  ),
+                  Effect.as(handle),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+const themeIconFixture = (source: Uint8Array) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-theme-icons-" });
+    yield* fileSystem.makeDirectory(path.join(root, "resources", "icons"), { recursive: true });
+    yield* fileSystem.writeFile(path.join(root, "resources", "icons", "256x256.png"), source);
+    const hicolorDir = path.join(root, "icons", "hicolor");
+    const appsDir = path.join(hicolorDir, "256x256", "apps");
+    const cachePath = path.join(hicolorDir, "icon-theme.cache");
+    // A fixed time in the past, in whole seconds as fs.utimes expects.
+    const pastSeconds = 1_600_000_000;
+    // An existing cache that predates any installed icon.
+    const seedCache = Effect.gen(function* () {
+      yield* fileSystem.makeDirectory(appsDir, { recursive: true });
+      yield* fileSystem.writeFile(cachePath, new Uint8Array([0]));
+      yield* fileSystem.utimes(cachePath, pastSeconds, pastSeconds);
+    });
+    const rewriteCache = fileSystem
+      .writeFile(cachePath, new Uint8Array([1]))
+      .pipe(Effect.orDie, Effect.provideService(FileSystem.FileSystem, fileSystem));
+    return { root, hicolorDir, appsDir, cachePath, pastSeconds, seedCache, rewriteCache };
+  });
+
+const iconCacheRuns = (run: ThemeIconRun) =>
+  run.commands.filter(({ command }) => command === "gtk-update-icon-cache").length;
+
+it.layer(NodeServices.layer)("DesktopLinuxUrlHandler theme icons", (it) => {
+  it.effect("installs both app id spellings without creating an icon cache", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const icon = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+      const fixture = yield* themeIconFixture(icon);
+      const run: ThemeIconRun = { root: fixture.root, commands: [] };
+
+      yield* registerWithRealFileSystem(run);
+      assert.deepEqual([...(yield* fileSystem.readDirectory(fixture.appsDir))].sort(), [
+        "com.t3tools.T3Code.png",
+        "com.t3tools.t3code.png",
+      ]);
+      for (const name of ["com.t3tools.t3code", "com.t3tools.T3Code"]) {
+        const target = path.join(fixture.appsDir, `${name}.png`);
+        assert.deepEqual([...(yield* fileSystem.readFile(target))], [...icon]);
+        yield* fileSystem.utimes(target, fixture.pastSeconds, fixture.pastSeconds);
+      }
+
+      yield* registerWithRealFileSystem(run);
+      for (const name of ["com.t3tools.t3code", "com.t3tools.T3Code"]) {
+        const info = yield* fileSystem.stat(path.join(fixture.appsDir, `${name}.png`));
+        assert.equal(Option.getOrThrow(info.mtime).getTime(), fixture.pastSeconds * 1000);
+      }
+      assert.isFalse(yield* fileSystem.exists(fixture.cachePath));
+      assert.equal(iconCacheRuns(run), 0);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("replaces same-length stale icons and refreshes an existing cache once", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const fixture = yield* themeIconFixture(new Uint8Array([1, 2, 3]));
+      yield* fixture.seedCache;
+      const lower = path.join(fixture.appsDir, "com.t3tools.t3code.png");
+      const upper = path.join(fixture.appsDir, "com.t3tools.T3Code.png");
+      yield* fileSystem.writeFile(lower, new Uint8Array([3, 2, 1]));
+      yield* fileSystem.writeFile(upper, new Uint8Array([1, 2, 3]));
+      for (const target of [lower, upper]) {
+        yield* fileSystem.utimes(target, fixture.pastSeconds, fixture.pastSeconds);
+      }
+      const run: ThemeIconRun = {
+        root: fixture.root,
+        commands: [],
+        onIconCacheRefresh: fixture.rewriteCache,
+      };
+
+      yield* registerWithRealFileSystem(run);
+      yield* registerWithRealFileSystem(run);
+
+      assert.deepEqual([...(yield* fileSystem.readFile(lower))], [1, 2, 3]);
+      const upperInfo = yield* fileSystem.stat(upper);
+      assert.equal(Option.getOrThrow(upperInfo.mtime).getTime(), fixture.pastSeconds * 1000);
+      assert.deepEqual(
+        run.commands.filter(({ command }) => command === "gtk-update-icon-cache"),
+        [{ command: "gtk-update-icon-cache", args: ["-f", "-t", fixture.hicolorDir] }],
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("refreshes when this launch changed an icon even if the cache looks newer", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const fixture = yield* themeIconFixture(new Uint8Array([1, 2, 3]));
+      yield* fixture.seedCache;
+      const run: ThemeIconRun = {
+        root: fixture.root,
+        commands: [],
+        onIconCacheRefresh: fixture.rewriteCache,
+      };
+      // A cache stamped later than the new icons, as after a clock correction.
+      const future = fixture.pastSeconds + 10 * 365 * 24 * 60 * 60;
+      yield* fileSystem.utimes(fixture.cachePath, future, future);
+
+      yield* registerWithRealFileSystem(run);
+
+      assert.isTrue(yield* fileSystem.exists(path.join(fixture.appsDir, "com.t3tools.T3Code.png")));
+      assert.equal(iconCacheRuns(run), 1);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("retries a failed icon cache refresh on the next launch", () =>
+    Effect.gen(function* () {
+      const fixture = yield* themeIconFixture(new Uint8Array([1, 2, 3]));
+      yield* fixture.seedCache;
+      const failing: ThemeIconRun = { root: fixture.root, commands: [], iconCacheExitCode: 1 };
+      yield* registerWithRealFileSystem(failing);
+      assert.equal(iconCacheRuns(failing), 1);
+      assert.deepEqual(failing.commands.map(({ command }) => command).slice(1), [
+        "update-desktop-database",
+        "xdg-mime",
+      ]);
+
+      const recovering: ThemeIconRun = {
+        root: fixture.root,
+        commands: [],
+        onIconCacheRefresh: fixture.rewriteCache,
+      };
+      yield* registerWithRealFileSystem(recovering);
+      yield* registerWithRealFileSystem(recovering);
+      assert.equal(iconCacheRuns(recovering), 1);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("still registers the handler when the theme icon install fails", () =>
+    Effect.gen(function* () {
+      const fixture = yield* themeIconFixture(new Uint8Array([1, 2, 3]));
+      const missingSource: ThemeIconRun = { root: fixture.root, commands: [], sourceMissing: true };
+      yield* registerWithRealFileSystem(missingSource);
+      assert.deepEqual(
+        missingSource.commands.map(({ command }) => command),
+        ["update-desktop-database", "xdg-mime"],
+      );
+
+      yield* fixture.seedCache;
+      const missingTool: ThemeIconRun = {
+        root: fixture.root,
+        commands: [],
+        iconCacheSpawnFails: true,
+      };
+      yield* registerWithRealFileSystem(missingTool);
+      assert.deepEqual(
+        missingTool.commands.map(({ command }) => command),
+        ["gtk-update-icon-cache", "update-desktop-database", "xdg-mime"],
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("continues to xdg-mime when the icon cache refresh stalls", () =>
+    Effect.gen(function* () {
+      const fixture = yield* themeIconFixture(new Uint8Array([1, 2, 3]));
+      yield* fixture.seedCache;
+      const started = yield* Deferred.make<void>();
+      const iconCacheOptions: Array<Record<string, unknown>> = [];
+      const run: ThemeIconRun = {
+        root: fixture.root,
+        commands: [],
+        iconCacheOptions,
+        iconCacheStalled: true,
+        iconCacheStarted: started,
+      };
+
+      const registration = yield* registerWithRealFileSystem(run).pipe(Effect.forkChild);
+      yield* Deferred.await(started);
+      yield* TestClock.adjust("5 seconds");
+      yield* Fiber.join(registration);
+
+      assert.deepEqual(
+        run.commands.map(({ command }) => command),
+        ["gtk-update-icon-cache", "update-desktop-database", "xdg-mime"],
+      );
+      // Without a forced kill, releasing a helper that ignores SIGTERM after
+      // the timeout would still wait for it to exit.
+      assert.equal(iconCacheOptions[0]?.forceKillAfter, "1 second");
+    }).pipe(Effect.scoped),
   );
 });
