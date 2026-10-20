@@ -137,11 +137,8 @@ function makeLink(
 interface HarnessOptions {
   readonly thread?: PullRequestTestThread | null;
   readonly project?: OrchestrationProjectShell | null;
-  /** A rejection the orchestrator reports as the dispatch error's cause. */
   readonly reject?: (command: OrchestrationCommand) => string | null;
-  /** Every project in the environment; defaults to the thread's own. */
   readonly projects?: ReadonlyArray<OrchestrationProjectShell>;
-  /** What the guide service answers for a pull request it is asked to write. */
   readonly generate?: (
     input: PullRequestRef,
   ) => Effect.Effect<
@@ -217,7 +214,6 @@ const makeHarness = Effect.fn("makePullRequestsToolkitHarness")(function* (
     toolkit.handle(name, params).pipe(
       Stream.unwrap,
       Stream.runCollect,
-      // Failure mode is "error", so a delivered result is always the success shape.
       Effect.map(
         (chunk) => chunk.at(-1)!.result as Tool.Success<(typeof PullRequestsToolkit.tools)[Name]>,
       ),
@@ -275,7 +271,6 @@ describe("pull request toolkit handlers", () => {
       const result = yield* harness.call("watch_pull_request", {
         url: "https://github.com/t3tools/t3code/pull/9",
       });
-      // The harness thread never changes, so the result reports what it still holds.
       expect(result).toMatchObject({ number: 9, watching: false, wasWatching: false });
       expect(yield* Ref.get(harness.commands)).toMatchObject([
         {
@@ -431,6 +426,44 @@ describe("pull request toolkit handlers", () => {
     }),
   );
 
+  it.effect("links Azure DevOps Server URLs and numeric references without a known provider", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness({
+        project: makeProject({
+          canonicalKey: "scm.example.test/tfs/collection/project/_git/repo",
+          locator: {
+            source: "git-remote",
+            remoteName: "origin",
+            remoteUrl: "http://dummy:secret@scm.example.test:8080/tfs/Collection/Project/_git/Repo",
+          },
+          provider: "unknown",
+          displayName: "tfs/collection/project/_git/repo",
+        }),
+      });
+      const generated =
+        "http://scm.example.test:8080/tfs/collection/project/_git/repo/pullrequest/124";
+      const fromNumber = yield* harness.call("link_pull_request", {
+        repository: "tfs/Collection/Project/_git/Repo",
+        number: 124,
+      });
+      expect.soft(fromNumber.url).toBe(generated);
+
+      const supplied = "https://scm.example.test/tfs/Collection/Project/_git/Repo/pullrequest/123";
+      const fromUrl = yield* harness.call("link_pull_request", { url: supplied });
+      expect(fromUrl).toEqual({
+        host: "scm.example.test",
+        repository: "tfs/collection/project/_git/repo",
+        number: 123,
+        url: supplied,
+        alreadyLinked: false,
+      });
+      expect(yield* Ref.get(harness.commands)).toMatchObject([
+        { type: "thread.pull-request.link", number: 124, url: generated },
+        { type: "thread.pull-request.link", number: 123, url: supplied },
+      ]);
+    }),
+  );
+
   it.effect("rejects a target that names neither a URL nor repository and number", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness();
@@ -578,6 +611,22 @@ describe("listThreadPullRequests", () => {
       [1, { kind: "native", position: 1, size: 2 }],
     ]);
     expect(result.chains).toEqual([{ kind: "native", numbers: [1, 2] }]);
+  });
+
+  it("gives pull requests built on the same one the same position", () => {
+    const result = listThreadPullRequests({
+      pullRequests: [
+        makeLink(1, { headBranch: "feat-a", baseBranch: "main" }),
+        makeLink(2, { headBranch: "feat-b", baseBranch: "feat-a" }),
+        makeLink(3, { headBranch: "feat-c", baseBranch: "feat-a" }),
+      ],
+    });
+    expect(result.pullRequests.map((entry) => [entry.number, entry.stack])).toEqual([
+      [1, { kind: "derived", position: 1, size: 3 }],
+      [2, { kind: "derived", position: 2, size: 3 }],
+      [3, { kind: "derived", position: 2, size: 3 }],
+    ]);
+    expect(result.chains).toEqual([{ kind: "derived", numbers: [1, 2, 3] }]);
   });
 });
 

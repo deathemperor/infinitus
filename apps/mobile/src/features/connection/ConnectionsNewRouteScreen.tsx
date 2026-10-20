@@ -1,4 +1,6 @@
-import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
+import { ListRow } from "../../components/ui/ListRow";
+import * as Dialog from "../../components/ui/Dialog";
+import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAuth } from "@clerk/expo";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Constants from "expo-constants";
@@ -12,25 +14,30 @@ import {
 } from "@react-navigation/native";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { AsyncResult } from "effect/reactivity";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "../../lib/cn";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
+<<<<<<< HEAD
 import { InfinitusAskToApprove } from "../infinitus/InfinitusAskToApprove";
 import { InfinitusNearbyServers } from "../infinitus/InfinitusNearbyServers";
 import { PICKED_HOST_HINT, pickedHostNeedsCode } from "../infinitus/lanDiscovery.logic";
 import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../components/AppText";
 import { FrostedCutout } from "../../components/FrostedCutout";
+=======
+import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../components/ui/AppText";
+import { FrostedCutout } from "../../components/ui/FrostedCutout";
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
 import {
   setPendingConnectionError,
   useRemoteConnections,
 } from "../../state/use-remote-environment-registry";
-import { SymbolView } from "../../components/AppSymbol";
+import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
 import { splitEnvironmentSections } from "./environmentSections";
@@ -41,7 +48,6 @@ type ConnectionsNewRouteParams = {
   readonly mode?: string;
   readonly pairingUrl?: string;
   readonly autoConnect?: string;
-  /** Adds a route to this saved machine instead of a new environment. */
   readonly routeFor?: EnvironmentId;
 };
 
@@ -104,16 +110,17 @@ export function ConnectionsNewRouteScreen({
     }
   }, [pairingConnectionError]);
 
-  const handleHostChange = useCallback((value: string) => {
+  const handleHostChange = (value: string) => {
     setHostInput(value);
     setPendingConnectionError(null);
-  }, []);
+  };
 
-  const handleCodeChange = useCallback((value: string) => {
+  const handleCodeChange = (value: string) => {
     setCodeInput(value);
     setPendingConnectionError(null);
-  }, []);
+  };
 
+<<<<<<< HEAD
   const handleNearbyPick = useCallback(
     (host: string) => {
       handleHostChange(host);
@@ -123,17 +130,18 @@ export function ConnectionsNewRouteScreen({
   );
 
   // The error is shared app state; a stale failure must not greet the next visit.
+=======
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
   useEffect(() => () => setPendingConnectionError(null), []);
 
-  // Opening the sheet never prompts; a tap on the scan card asks for the camera.
-  const handleScanPress = useCallback(async () => {
+  const handleScanPress = async () => {
     const permission = await requestCameraPermission();
     if (permission.granted) {
       setScanComplete(false);
       return;
     }
     if (permission.canAskAgain) return;
-    Alert.alert(
+    Dialog.alert(
       "Camera access needed",
       "Camera access was denied for this app. Open Settings to enable it.",
       [
@@ -141,63 +149,36 @@ export function ConnectionsNewRouteScreen({
         { text: "Open Settings", onPress: () => void Linking.openSettings() },
       ],
     );
-  }, [requestCameraPermission]);
+  };
 
-  const handleQrScan = useCallback(
-    ({ data }: { readonly data: string }) => {
-      if (scannerLocked) {
-        return;
-      }
+  const handleQrScan = ({ data }: { readonly data: string }) => {
+    if (scannerLocked) {
+      return;
+    }
 
-      setScannerLocked(true);
+    setScannerLocked(true);
 
-      try {
-        const pairingUrl = extractPairingUrlFromQrPayload(data);
-        const { host, code } = parsePairingUrl(pairingUrl);
-        setHostInput(host);
-        setCodeInput(code);
-        onChangeConnectionPairingUrl(pairingUrl);
-        setScanComplete(true);
-        setScannerLocked(false);
-      } catch (error) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert(
-          "Invalid QR code",
-          error instanceof Error ? error.message : "Scanned QR code was not recognized.",
-        );
-        setTimeout(() => {
-          setScannerLocked(false);
-        }, 600);
-      }
-    },
-    [onChangeConnectionPairingUrl, scannerLocked],
-  );
-
-  const connectAndClose = useCallback(
-    async (pairingUrl: string, replaceWithHome: boolean) => {
-      setIsSubmitting(true);
+    try {
+      const pairingUrl = extractPairingUrlFromQrPayload(data);
+      const { host, code } = parsePairingUrl(pairingUrl);
+      setHostInput(host);
+      setCodeInput(code);
       onChangeConnectionPairingUrl(pairingUrl);
-      try {
-        const result = await onConnectPress(pairingUrl, params.routeFor);
-        void Haptics.notificationAsync(
-          AsyncResult.isSuccess(result)
-            ? Haptics.NotificationFeedbackType.Success
-            : Haptics.NotificationFeedbackType.Error,
-        );
-        if (AsyncResult.isSuccess(result)) {
-          if (replaceWithHome || !navigation.canGoBack()) {
-            navigation.dispatch(StackActions.replace("Home"));
-          } else {
-            navigation.goBack();
-          }
-        }
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [navigation, onChangeConnectionPairingUrl, onConnectPress, params.routeFor],
-  );
+      setScanComplete(true);
+      setScannerLocked(false);
+    } catch (error) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Dialog.alert(
+        "Invalid QR code",
+        error instanceof Error ? error.message : "Scanned QR code was not recognized.",
+      );
+      setTimeout(() => {
+        setScannerLocked(false);
+      }, 600);
+    }
+  };
 
+<<<<<<< HEAD
   const handleApprovedCredential = useCallback(
     (credential: string) => {
       void connectAndClose(buildPairingUrl(hostInput, credential), false);
@@ -208,6 +189,32 @@ export function ConnectionsNewRouteScreen({
   const handleSubmit = useCallback(async () => {
     await connectAndClose(buildPairingUrl(hostInput, codeInput), false);
   }, [codeInput, connectAndClose, hostInput]);
+=======
+  const connectAndClose = async (pairingUrl: string) => {
+    setIsSubmitting(true);
+    onChangeConnectionPairingUrl(pairingUrl);
+    const result = await onConnectPress(pairingUrl, params.routeFor);
+    setIsSubmitting(false);
+    void Haptics.notificationAsync(
+      AsyncResult.isSuccess(result)
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error,
+    );
+    if (AsyncResult.isSuccess(result)) {
+      // Return to whatever opened the sheet. Replacing it with Home would
+      // nest Home inside any sheet still below it.
+      if (!navigation.canGoBack()) {
+        navigation.dispatch(StackActions.replace("Home"));
+      } else {
+        navigation.goBack();
+      }
+    }
+  };
+
+  const handleSubmit = async () => {
+    await connectAndClose(buildPairingUrl(hostInput, codeInput));
+  };
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 
   useEffect(() => {
     if (!shouldAutoConnect || attemptedAutoConnectRef.current === routePairingUrl) {
@@ -215,7 +222,7 @@ export function ConnectionsNewRouteScreen({
     }
 
     attemptedAutoConnectRef.current = routePairingUrl;
-    void connectAndClose(routePairingUrl, true);
+    void connectAndClose(routePairingUrl);
   }, [connectAndClose, routePairingUrl, shouldAutoConnect]);
 
   return (
@@ -318,11 +325,6 @@ const SCAN_RETICLE_SIZE = 150;
 const SCAN_RETICLE_TOP = 36;
 const SCAN_RETICLE_RADIUS = 28;
 
-/**
- * Live QR scanner: the camera fills the card, blurred everywhere except the
- * reticle so the code being aimed at stays sharp. Without a camera it shows the
- * same frame over a dark gradient.
- */
 function PairingScanCard(props: {
   readonly cameraActive: boolean;
   readonly onScan: (result: { readonly data: string }) => void;
@@ -413,11 +415,14 @@ function PairingScanCard(props: {
   );
 }
 
+<<<<<<< HEAD
 /**
  * Managed-relay alternative to manual pairing: signed in, the account's
  * published environments connect with a switch; signed out, one row opens the
  * account sheet.
  */
+=======
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 function InfinitusConnectSection() {
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const navigation = useNavigation();
@@ -441,10 +446,12 @@ function InfinitusConnectSection() {
           showHeader={false}
         />
       ) : (
-        <Pressable
-          accessibilityRole="button"
+        <ListRow
+          label="Sign in to T3 Connect"
+          description="Reach your machines from anywhere, no network setup."
           disabled={!isLoaded}
           onPress={() => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" })}
+<<<<<<< HEAD
           className="min-h-13 flex-row items-center gap-3 rounded-[26px] border-continuous bg-grouped-card px-4 active:opacity-70"
         >
           <View className="min-w-0 flex-1 py-3">
@@ -461,12 +468,14 @@ function InfinitusConnectSection() {
             weight="semibold"
           />
         </Pressable>
+=======
+        />
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
       )}
     </View>
   );
 }
 
-/** Inline grouped-list field: fixed label column, input filling the rest. */
 function PairingInputRow({
   label,
   ...inputProps

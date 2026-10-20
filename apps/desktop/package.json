@@ -1,6 +1,6 @@
 {
   "name": "@infinitus/desktop",
-  "version": "0.0.45",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist-electron/boot.cjs",
@@ -42,5 +42,9 @@
     "tailwindcss": "^4.0.0",
     "vite-plus": "catalog:"
   },
+<<<<<<< HEAD
   "productName": "Infinitus (Dev)"
+=======
+  "productName": "T3 Code (Beta)"
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 }

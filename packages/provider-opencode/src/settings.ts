@@ -1,13 +1,12 @@
 /**
- * OpenCode instance settings. Shared by the server driver and the client
- * settings form, so it holds only browser-safe schema code.
- *
- * @module provider-opencode/settings
+ * Shared by the server driver and the client settings form, so it holds only
+ * browser-safe schema code.
  */
 import {
   CustomModelSetting,
   makeBinaryPathSetting,
   makeProviderSettingsSchema,
+  secretSetting,
   TrimmedString,
 } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
@@ -16,8 +15,6 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const OpenCodeSettings = makeProviderSettingsSchema(
   {
-    // Off by default (like Cursor and Grok): the binding is not yet stable
-    // enough to probe on every install. Users opt in from Settings.
     enabled: Schema.Boolean.pipe(
       Schema.withDecodingDefault(Effect.succeed(false)),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
@@ -44,10 +41,11 @@ export const OpenCodeSettings = makeProviderSettingsSchema(
       }),
     ),
     serverPassword: TrimmedString.pipe(
+      secretSetting,
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
         title: "Server password",
-        description: "Stored in plain text on disk.",
+        description: "Stored separately on the host.",
         providerSettingsForm: {
           control: "password",
           placeholder: "Optional",

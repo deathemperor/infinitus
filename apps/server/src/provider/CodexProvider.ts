@@ -37,7 +37,6 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
 import { codexAppServerArgs, resolveCodexLaunchArgs } from "./codexLaunchArgs.ts";
 import {
-  AUTH_PROBE_TIMEOUT_MS,
   buildServerProvider,
   COMPACT_SLASH_COMMAND,
   providerModelsFromSettings,
@@ -64,16 +63,26 @@ type CodexRateLimitsProbe =
         | null
         | undefined;
       readonly resetCredits: CodexResetCreditsSummary | null | undefined;
-      /** The ChatGPT workspace the usage belongs to, when the backend names it. */
       readonly accountId?: string | null | undefined;
     }
   | { readonly failure: string };
 
 const CODEX_APP_SERVER_PROBE_FORCE_KILL_AFTER = "2 seconds" as const;
-const CODEX_CATALOG_REFRESH_TIMEOUT = "3 seconds" as const;
+const CODEX_CATALOG_REFRESH_TIMEOUT_MS = 3_000;
+const CODEX_CONFIG_PROBE_TIMEOUT_MS = 3_000;
 const CODEX_CATALOG_REFRESH_POLL = "100 millis" as const;
+<<<<<<< HEAD
 // Fork: the client name Codex sees is the product name.
 const CODEX_CLIENT_NAME = PRODUCT_NAME;
+=======
+const CODEX_CLIENT_NAME = "T3 Code";
+// Codex's probe does a full handshake plus account, models, and skills requests, which can
+// legitimately run past the shared 10s AUTH_PROBE_TIMEOUT_MS on a loaded or slow machine
+// (most often reported on Windows). Give Codex its own longer budget instead of raising the
+// timeout for every provider.
+const CODEX_AUTH_PROBE_TIMEOUT_MS = 20_000;
+const CODEX_DISCOVERY_MARGIN_MS = 250;
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 
 const CODEX_PRESENTATION = {
   displayName: "Codex",
@@ -85,7 +94,8 @@ export interface CodexAppServerProviderSnapshot {
   readonly account: CodexSchema.V2GetAccountResponse;
   readonly rateLimits?: CodexRateLimitsProbe;
   readonly version: string | undefined;
-  readonly models: ReadonlyArray<ServerProviderModel>;
+  readonly models: ReadonlyArray<ServerProviderModel> | undefined;
+  readonly serviceTier?: string | undefined;
   readonly skills: ReadonlyArray<ServerProviderSkill>;
 }
 
@@ -102,7 +112,6 @@ const REASONING_EFFORT_LABELS: Readonly<Record<string, string>> = {
 
 const DEFAULT_SERVICE_TIER_ID = "default";
 
-/** Shorter copy for tiers whose catalog description wraps in the traits menu. */
 const SERVICE_TIER_DESCRIPTIONS: Readonly<Record<string, string>> = {
   ultrafast: "Even faster, more expensive",
 };
@@ -119,7 +128,6 @@ function codexAccountAuthLabel(account: CodexSchema.V2GetAccountResponse["accoun
   return codexPlanLabel(account.planType);
 }
 
-/** Shared with usage-limit sources, which report the same `planType` slugs. */
 export function codexPlanLabel(planType: string | null | undefined): string | undefined {
   switch (planType) {
     case "free":
@@ -161,12 +169,16 @@ function codexAccountEmail(account: CodexSchema.V2GetAccountResponse["account"])
   return account.email;
 }
 
+export function codexDefaultReasoningEffortOverride(model: string): "medium" | undefined {
+  return codexModelFamily(model) === "gpt-6-astra" ? "medium" : undefined;
+}
+
 export function mapCodexModelCapabilities(
   model: CodexSchema.V2ModelListResponse__Model,
 ): ModelCapabilities {
   const reasoningOptions = model.supportedReasoningEfforts.map(({ reasoningEffort }) =>
     reasoningEffort ===
-    (codexModelFamily(model.model) === "gpt-6-astra" ? "medium" : model.defaultReasoningEffort)
+    (codexDefaultReasoningEffortOverride(model.model) ?? model.defaultReasoningEffort)
       ? {
           id: reasoningEffort,
           label: reasoningEffortLabel(reasoningEffort),
@@ -245,10 +257,6 @@ function parseCodexModelListResponse(
   }));
 }
 
-/**
- * Prefer our own default-model ranking when one of the preferred slugs is in
- * the live catalog; otherwise keep whatever Codex itself flagged as default.
- */
 export function applyPreferredCodexDefaultModel(
   models: ReadonlyArray<ServerProviderModel>,
 ): ReadonlyArray<ServerProviderModel> {
@@ -267,6 +275,37 @@ export function applyPreferredCodexDefaultModel(
     }
     const { isDefault: _isDefault, ...rest } = model;
     return rest;
+  });
+}
+
+function applyConfiguredCodexServiceTier(
+  models: ReadonlyArray<ServerProviderModel>,
+  serviceTier: string | undefined,
+): ReadonlyArray<ServerProviderModel> {
+  if (!serviceTier) return models;
+  return models.map((model) => {
+    if (!model.capabilities?.optionDescriptors) return model;
+    return {
+      ...model,
+      capabilities: {
+        ...model.capabilities,
+        optionDescriptors: model.capabilities.optionDescriptors.map((descriptor) => {
+          if (descriptor.id !== "serviceTier" || descriptor.type !== "select") return descriptor;
+          const value = descriptor.options.find(
+            (option) =>
+              option.id === serviceTier || (serviceTier === "fast" && option.id === "priority"),
+          )?.id;
+          if (!value) return descriptor;
+          return {
+            ...descriptor,
+            currentValue: value,
+            options: descriptor.options.map(({ isDefault: _isDefault, ...option }) =>
+              option.id === value ? { ...option, isDefault: true } : option,
+            ),
+          };
+        }),
+      },
+    };
   });
 }
 
@@ -341,7 +380,6 @@ const decodeCodexModelsCacheStamp = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ fetched_at: Schema.String })),
 );
 
-/** When Codex last wrote `models_cache.json`, in epoch millis; NaN when unreadable. */
 const readCodexModelsCacheFetchedAt = Effect.fn("readCodexModelsCacheFetchedAt")(function* (
   codexHome: string,
 ) {
@@ -356,49 +394,63 @@ const readCodexModelsCacheFetchedAt = Effect.fn("readCodexModelsCacheFetchedAt")
   );
 });
 
+const withCodexDiscoveryDeadline = Effect.fnUntraced(function* <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  deadlineMs: number,
+  timeoutMs = Infinity,
+) {
+  const remainingMs = Math.min(timeoutMs, deadlineMs - DateTime.toEpochMillis(yield* DateTime.now));
+  if (remainingMs <= 0) return undefined;
+  return yield* effect.pipe(
+    Effect.timeoutOption(Duration.millis(remainingMs)),
+    Effect.map(Option.getOrUndefined),
+  );
+});
+
 /**
- * Lists the ChatGPT model catalog as fetched for T3 Code.
- *
- * `model/list` serves `CODEX_HOME/models_cache.json` while it is under five
- * minutes old. Every Codex client on the machine shares that file, and the
- * backend tailors the catalog to each client's originator: the plain CLI does
- * not get Sol Ultrafast. So the first answer can be another client's catalog.
- * App-server refreshes the catalog online at startup, so wait until a write
- * newer than this process's spawn lands, then list again. If no refresh
- * lands in time, keep the first answer. Another client writing in the same
- * few hundred milliseconds can still win; the next probe corrects it.
+ * Every Codex client on the machine shares that file, and the backend tailors
+ * the catalog to each client's originator: the plain CLI does not get Sol
+ * Ultrafast. App-server refreshes the catalog online at startup, so wait until
+ * a write newer than this process's spawn lands, then list again.
  */
 const requestCodexChatGptModels = Effect.fn("requestCodexChatGptModels")(function* (input: {
   readonly client: CodexClient.CodexAppServerClient["Service"];
   readonly codexHome: string;
   readonly spawnedAtMs: number;
+  readonly deadlineMs: number;
 }) {
-  const models = yield* requestAllCodexModels(input.client);
-  const refreshed = yield* readCodexModelsCacheFetchedAt(input.codexHome).pipe(
-    Effect.repeat({
-      schedule: Schedule.spaced(CODEX_CATALOG_REFRESH_POLL),
-      until: (fetchedAtMs) => fetchedAtMs >= input.spawnedAtMs,
-    }),
-    Effect.timeoutOption(CODEX_CATALOG_REFRESH_TIMEOUT),
+  const models = yield* withCodexDiscoveryDeadline(
+    requestAllCodexModels(input.client),
+    input.deadlineMs,
   );
-  if (Option.isNone(refreshed)) {
+  if (models === undefined) return undefined;
+  const refreshed = yield* withCodexDiscoveryDeadline(
+    readCodexModelsCacheFetchedAt(input.codexHome).pipe(
+      Effect.repeat({
+        schedule: Schedule.spaced(CODEX_CATALOG_REFRESH_POLL),
+        until: (fetchedAtMs) => fetchedAtMs >= input.spawnedAtMs,
+      }),
+    ),
+    input.deadlineMs,
+    CODEX_CATALOG_REFRESH_TIMEOUT_MS,
+  );
+  if (refreshed === undefined) {
     yield* Effect.logWarning(
       "Codex did not refresh its model catalog in time; using the cached catalog.",
     );
     return models;
   }
-  return yield* requestAllCodexModels(input.client);
+  return (
+    (yield* withCodexDiscoveryDeadline(requestAllCodexModels(input.client), input.deadlineMs)) ??
+    models
+  );
 });
 
 /**
- * Environment for every `codex app-server` T3 Code spawns.
- *
- * Codex sends its client name as the `originator` header, and the backend
- * tailors the model catalog to it. App-server starts its catalog refresh
- * before `initialize` names the client, so that first fetch goes out as the
- * plain CLI, misses tiers like Sol Ultrafast, and overwrites the shared
- * `models_cache.json`. Naming the originator at spawn closes that race.
- * A value the user already set wins.
+ * App-server starts its catalog refresh before `initialize` names the client,
+ * so that first fetch goes out as the plain CLI, misses tiers like Sol
+ * Ultrafast, and overwrites the shared `models_cache.json`. Naming the
+ * originator at spawn closes that race.
  */
 export const codexAppServerEnvironment = (
   environment: NodeJS.ProcessEnv | undefined,
@@ -420,12 +472,6 @@ export function buildCodexInitializeParams(): CodexSchema.V1InitializeParams {
   };
 }
 
-/**
- * Spawns a short-lived `codex app-server`, runs the initialize handshake, and
- * hands the caller a connected client. Scoped: the process is killed when
- * the caller's scope closes. Shared by the status probe, the skills probe,
- * and account-level requests such as reset-credit redemption.
- */
 export const withCodexAppServerClient = Effect.fn("withCodexAppServerClient")(function* (input: {
   readonly binaryPath: string;
   readonly homePath?: string | undefined;
@@ -436,7 +482,6 @@ export const withCodexAppServerClient = Effect.fn("withCodexAppServerClient")(fu
   // `~` is not shell-expanded when env vars are set via `child_process.spawn`,
   // so `CODEX_HOME=~/.codex_work` would reach codex verbatim and trip
   // "CODEX_HOME points to '~/.codex_work', but that path does not exist".
-  // Expand here for parity with `CodexTextGeneration`.
   const resolvedHomePath = input.homePath
     ? expandHomePath(input.homePath, yield* HostProcess.HomeDirectory)
     : undefined;
@@ -483,14 +528,12 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
   readonly homePath?: string;
   readonly launchArgs?: string;
   readonly cwd: string;
-  readonly customModels?: ReadonlyArray<CustomModelSetting>;
   readonly environment?: NodeJS.ProcessEnv;
   readonly skipNativeUsage?: boolean;
 }) {
   const spawnedAtMs = DateTime.toEpochMillis(yield* DateTime.now);
   const { client, initialize } = yield* withCodexAppServerClient(input);
 
-  // Extract the version string after the first '/' in userAgent, up to the next space or the end
   const versionMatch = initialize.userAgent.match(/\/([^\s]+)/);
   const version = versionMatch ? versionMatch[1] : undefined;
 
@@ -499,35 +542,51 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
     return {
       account: accountResponse,
       version,
-      models: appendCustomCodexModels([], input.customModels ?? []),
+      models: [],
       skills: [],
     } satisfies CodexAppServerProviderSnapshot;
   }
 
-  const [skillsResponse, models, rateLimits] = yield* Effect.all(
+  // Optional discovery must finish before the outer timeout can discard the account result.
+  const deadlineMs = spawnedAtMs + CODEX_AUTH_PROBE_TIMEOUT_MS - CODEX_DISCOVERY_MARGIN_MS;
+  const [skillsResponse, models, serviceTier, rateLimits] = yield* Effect.all(
     [
-      client.request("skills/list", {
-        cwds: [input.cwd],
-      }),
+      withCodexDiscoveryDeadline(client.request("skills/list", { cwds: [input.cwd] }), deadlineMs),
       accountResponse.account?.type === "chatgpt"
-        ? requestCodexChatGptModels({ client, codexHome: initialize.codexHome, spawnedAtMs })
-        : requestAllCodexModels(client),
+        ? requestCodexChatGptModels({
+            client,
+            codexHome: initialize.codexHome,
+            spawnedAtMs,
+            deadlineMs,
+          })
+        : withCodexDiscoveryDeadline(requestAllCodexModels(client), deadlineMs),
+      // The shared catalog must exclude config from the server's launch project.
+      withCodexDiscoveryDeadline(
+        client.request("config/read", { includeLayers: false }),
+        deadlineMs,
+        CODEX_CONFIG_PROBE_TIMEOUT_MS,
+      ).pipe(
+        Effect.map((response) => response?.config.service_tier ?? undefined),
+        Effect.catch(() => Effect.logDebug("Codex config read failed.").pipe(Effect.as(undefined))),
+      ),
       // Usage is an enrichment: a failure or a slow answer degrades to "no
       // usage this probe" rather than costing the account and models.
       input.skipNativeUsage
         ? Effect.succeed(undefined)
-        : client.request("account/rateLimits/read", null).pipe(
-            Effect.map((response): CodexRateLimitsProbe => ({
-              snapshot: response.rateLimits,
-              rateLimitsByLimitId: response.rateLimitsByLimitId,
-              resetCredits: response.rateLimitResetCredits,
-              accountId: response.accountId,
-            })),
-            Effect.timeoutOption(Duration.millis(RATE_LIMITS_PROBE_TIMEOUT_MS)),
-            Effect.map(
-              Option.getOrElse((): CodexRateLimitsProbe => ({
-                failure: "Codex did not answer the usage request.",
-              })),
+        : withCodexDiscoveryDeadline(
+            client.request("account/rateLimits/read", null),
+            deadlineMs,
+            RATE_LIMITS_PROBE_TIMEOUT_MS,
+          ).pipe(
+            Effect.map((response): CodexRateLimitsProbe =>
+              response
+                ? {
+                    snapshot: response.rateLimits,
+                    rateLimitsByLimitId: response.rateLimitsByLimitId,
+                    resetCredits: response.rateLimitResetCredits,
+                    accountId: response.accountId,
+                  }
+                : { failure: "Codex did not answer the usage request." },
             ),
             Effect.catch((error) =>
               Effect.logDebug("Codex rate-limit read failed.", { cause: error }).pipe(
@@ -543,10 +602,9 @@ const probeCodexAppServerProvider = Effect.fn("probeCodexAppServerProvider")(fun
     account: accountResponse,
     ...(rateLimits ? { rateLimits } : {}),
     version,
-    models: applyPreferredCodexDefaultModel(
-      appendCustomCodexModels(models, input.customModels ?? []),
-    ),
-    skills: parseCodexSkillsListResponse(skillsResponse, input.cwd),
+    models,
+    serviceTier,
+    skills: skillsResponse ? parseCodexSkillsListResponse(skillsResponse, input.cwd) : [],
   } satisfies CodexAppServerProviderSnapshot;
 });
 
@@ -565,8 +623,9 @@ export const probeCodexSkillsForCwd = Effect.fn("probeCodexSkillsForCwd")(functi
 const emptyCodexModelsFromSettings = (codexSettings: CodexSettings): ServerProvider["models"] =>
   appendCustomCodexModels([], codexSettings.customModels);
 
-const makePendingCodexProvider = (
+const makePendingCodexProvider = Effect.fn("CodexProvider.makePendingCodexProvider")(function* (
   codexSettings: CodexSettings,
+<<<<<<< HEAD
 ): Effect.Effect<ServerProviderDraft> =>
   Effect.gen(function* () {
     const checkedAt = yield* Effect.map(DateTime.now, DateTime.formatIso);
@@ -588,10 +647,16 @@ const makePendingCodexProvider = (
         },
       });
     }
+=======
+): Effect.fn.Return<ServerProviderDraft> {
+  const checkedAt = yield* Effect.map(DateTime.now, DateTime.formatIso);
+  const models = emptyCodexModelsFromSettings(codexSettings);
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 
+  if (!codexSettings.enabled) {
     return buildServerProvider({
       presentation: CODEX_PRESENTATION,
-      enabled: true,
+      enabled: false,
       checkedAt,
       models,
       skills: [],
@@ -600,10 +665,26 @@ const makePendingCodexProvider = (
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex provider status has not been checked in this session yet.",
+        message: "Codex is disabled in T3 Code settings.",
       },
     });
+  }
+
+  return buildServerProvider({
+    presentation: CODEX_PRESENTATION,
+    enabled: true,
+    checkedAt,
+    models,
+    skills: [],
+    probe: {
+      installed: false,
+      version: null,
+      status: "warning",
+      auth: { status: "unknown" },
+      message: "Codex provider status has not been checked in this session yet.",
+    },
   });
+});
 
 function accountProbeStatus({ account, rateLimits }: CodexAppServerProviderSnapshot): {
   readonly status: Exclude<ServerProviderState, "disabled">;
@@ -612,8 +693,6 @@ function accountProbeStatus({ account, rateLimits }: CodexAppServerProviderSnaps
 } {
   const authLabel = codexAccountAuthLabel(account.account);
   const authEmail = codexAccountEmail(account.account);
-  // One email can hold several workspaces, each with its own quota; the usage
-  // read names the one this login draws on.
   const workspaceId =
     rateLimits && "accountId" in rateLimits ? rateLimits.accountId?.trim() : undefined;
   const auth = {
@@ -646,7 +725,6 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
     readonly homePath?: string;
     readonly launchArgs?: string;
     readonly cwd: string;
-    readonly customModels: ReadonlyArray<CustomModelSetting>;
     readonly environment?: NodeJS.ProcessEnv;
     readonly skipNativeUsage?: boolean;
   }) => Effect.Effect<
@@ -687,12 +765,12 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
     homePath: codexSettings.homePath,
     launchArgs: resolveCodexLaunchArgs(codexSettings.launchArgs, resolvedEnvironment),
     cwd: process.cwd(),
-    customModels: codexSettings.customModels,
     environment: resolvedEnvironment,
     ...(managedAuth ? { skipNativeUsage: true } : {}),
   }).pipe(
+    // Process teardown can outlast the work budget without discarding a completed snapshot.
+    Effect.timeoutOption(Duration.millis(CODEX_AUTH_PROBE_TIMEOUT_MS)),
     Effect.scoped,
-    Effect.timeoutOption(Duration.millis(AUTH_PROBE_TIMEOUT_MS)),
     Effect.result,
   );
 
@@ -761,7 +839,12 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
     presentation: CODEX_PRESENTATION,
     enabled: codexSettings.enabled,
     checkedAt,
-    models: snapshot.models,
+    models: applyConfiguredCodexServiceTier(
+      applyPreferredCodexDefaultModel(
+        appendCustomCodexModels(snapshot.models ?? [], codexSettings.customModels),
+      ),
+      snapshot.serviceTier,
+    ),
     skills: snapshot.skills,
     slashCommands: [
       COMPACT_SLASH_COMMAND,
@@ -779,19 +862,16 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
     probe: {
       installed: true,
       version: snapshot.version ?? null,
-      status: accountStatus.status,
+      status: snapshot.models === undefined ? "warning" : accountStatus.status,
       auth: accountStatus.auth,
-      ...(accountStatus.message ? { message: accountStatus.message } : {}),
+      ...(accountStatus.message
+        ? { message: accountStatus.message }
+        : snapshot.models === undefined
+          ? { message: "Codex did not return its model catalog in time." }
+          : {}),
       ...(managedAuth ? {} : { usageLimits }),
     },
   });
 });
 
-// NOTE: the singleton `CodexProviderLive` Layer has been removed as part of
-// the per-instance-driver refactor. `CodexDriver.create()` builds a managed
-// snapshot per instance (each with its own `CodexSettings`) and hands the
-// resulting `ManagedServerProvider` back as `ProviderInstance.snapshot`.
-//
-// The `makePendingCodexProvider` and `checkCodexProviderStatus` helpers are
-// re-exported for use by `CodexDriver`.
 export { makePendingCodexProvider };

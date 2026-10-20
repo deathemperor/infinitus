@@ -83,7 +83,6 @@ export function resolveEarlyLinuxPasswordStorePreference(
 
 const WAYLAND_COLOR_MANAGER_FEATURE = "WaylandWpColorManagerV1";
 
-// Chromium feature entries look like `*Name<Trial.Group:param/value`.
 const featureListNames = (value: string | null): ReadonlyArray<string> =>
   (value ?? "").split(",").flatMap((entry) => entry.trim().match(/^\*?([^<:]+)/)?.[1] ?? []);
 
@@ -129,14 +128,6 @@ const hasBrokenColorManager = (readHyprctlVersionJson: () => string): boolean =>
   }
 };
 
-/**
- * Returns the merged `--disable-features` value to apply before Electron is ready,
- * or null to leave the command line alone. `ozonePlatform` is the resolved
- * `--ozone-platform` value; Electron fills it in before app code runs.
- *
- * Color management stays on unless `hyprctl version -j` identifies a stock Hyprland
- * release known to kill the native Wayland connection right after the first window opens.
- */
 export function resolveLinuxDisableFeaturesSwitch(input: {
   readonly env: NodeJS.ProcessEnv;
   readonly ozonePlatform: string | null;
@@ -167,4 +158,44 @@ export function resolveEarlyLinuxElectronOptions(
       env: input.env,
     }),
   };
+}
+
+/** Remember the explicit Chromium scale across AppImage updates, which drop launch arguments. */
+export function restoreEarlyLinuxDeviceScaleFactor(
+  input: EarlyDesktopSettingsInput & {
+    readonly commandLine: {
+      readonly hasSwitch: (name: string) => boolean;
+      readonly getSwitchValue: (name: string) => string;
+      readonly appendSwitch: (name: string, value: string) => void;
+    };
+    readonly writeFileString: (path: string, value: string) => void;
+  },
+): void {
+  // Keep this separate from desktop-settings.json: the settings service rewrites
+  // that document, and Chromium needs the value before that service is available.
+  const path = input.joinPath(
+    resolveEarlyDesktopSettingsPath(input),
+    "..",
+    "linux-device-scale-factor",
+  );
+  const switchName = "force-device-scale-factor";
+  const isValid = (value: string) =>
+    value.trim().length > 0 && Number.isFinite(Number(value)) && Number(value) > 0;
+  if (input.commandLine.hasSwitch(switchName)) {
+    const value = input.commandLine.getSwitchValue(switchName);
+    if (isValid(value)) {
+      try {
+        input.writeFileString(path, value);
+      } catch {
+        // A read-only state directory must not prevent startup with the explicit switch.
+      }
+    }
+    return;
+  }
+  try {
+    const value = input.readFileString(path).trim();
+    if (isValid(value)) input.commandLine.appendSwitch(switchName, value);
+  } catch {
+    // First launch, missing state, or unreadable state: keep Chromium's default.
+  }
 }

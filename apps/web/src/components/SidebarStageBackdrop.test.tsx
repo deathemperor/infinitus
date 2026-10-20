@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
-import { renderToStaticMarkup } from "react-dom/server";
 
 import { STAGE_ART_SCENES } from "../themePalette";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
-  StageBackdropArt,
 } from "./SidebarStageBackdrop";
 
 describe("SidebarStageBackdrop", () => {
@@ -34,6 +32,7 @@ describe("SidebarStageBackdrop", () => {
     expect(resolveEnvironmentIdentificationPillLabel("Latest")).toBeNull();
     expect(resolveEnvironmentIdentificationPillLabel("Alpha")).toBe("Alpha");
   });
+<<<<<<< HEAD
 
   // A <pattern> clips to its own tile, so a blurred or overflowing shape drawn
   // inside one is cut at every repeat — a hard vertical seam across the header
@@ -61,4 +60,6 @@ describe("SidebarStageBackdrop", () => {
       expect(new Set(ids).size).toBe(ids.length);
     },
   );
+=======
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 });

@@ -9,16 +9,14 @@ const COMPOSER_GAP = 8;
 type Frame = { readonly x: number; readonly y: number; readonly width: number };
 
 /**
- * Places a composer popover just above the composer. Android only delivers
- * drags to views inside their parent's bounds, so a popover hung above the
- * composer with `bottom-full` takes taps but its list never scrolls. Render it
- * into ComposerPopoverHost instead, which shares the composer's keyboard
- * transform, so only the composer's resting layout needs measuring.
+ * Android only delivers drags to views inside their parent's bounds, so a popover hung above the
+ * composer with `bottom-full` takes taps but its list never scrolls.
  */
 export function ComposerPopoverAnchor(props: { readonly children: ReactNode }) {
   const host = useComposerPopoverHost();
   const anchorRef = useRef<ViewInstance>(null);
   const [frame, setFrame] = useState<Frame | null>(null);
+  const popoverHeight = host?.popoverHeight;
 
   const measure = () => {
     const hostView = host?.hostRef.current;
@@ -44,20 +42,31 @@ export function ComposerPopoverAnchor(props: { readonly children: ReactNode }) {
           className="absolute top-0 justify-end"
           style={{ left: frame.x, width: frame.width, height: frame.y - COMPOSER_GAP }}
         >
-          {props.children}
+          <View
+            onLayout={(event) => {
+              popoverHeight?.set(event.nativeEvent.layout.height);
+            }}
+          >
+            {props.children}
+          </View>
         </View>
       ),
     );
   });
 
   const setHostContent = host?.setContent;
-  useEffect(() => () => setHostContent?.(null), [setHostContent]);
+  useEffect(
+    () => () => {
+      setHostContent?.(null);
+      popoverHeight?.set(0);
+    },
+    [setHostContent, popoverHeight],
+  );
 
   if (host === null) {
     return <View className="absolute inset-x-0 bottom-full z-10 mb-2">{props.children}</View>;
   }
 
-  // Covers the composer, so its onLayout fires whenever the composer resizes.
   return (
     <View
       ref={anchorRef}

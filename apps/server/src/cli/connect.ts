@@ -1,6 +1,10 @@
 import {
+  AuthRelayReadScope,
   AuthRelayWriteScope,
+  type AuthEnvironmentScope,
+  type EnvironmentConnectReachability,
   EnvironmentHttpApi,
+  formatConnectReachable,
   type RelayClientInstallProgressEvent,
   type RelayClientInstallProgressStage,
 } from "@infinitus/contracts";
@@ -10,6 +14,7 @@ import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as RelayClient from "@infinitus/shared/relayClient";
 import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
 import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";
 import * as Crypto from "effect/Crypto";
@@ -30,8 +35,10 @@ import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as BootService from "../cloud/bootService.ts";
 import * as CliState from "../cloud/CliState.ts";
 import * as CliTokenManager from "../cloud/CliTokenManager.ts";
+import { formatReachabilityFailure } from "../cloud/ConnectReachability.ts";
 import { filterRelayResponse } from "../cloud/relayResponse.ts";
 import {
+  CLOUD_LINK_REVOKED,
   CLOUD_LINKED_USER_ID,
   isAgentActivityPublishingEnabledValue,
   PUBLISH_AGENT_ACTIVITY_SECRET,
@@ -45,7 +52,6 @@ import * as ExternalLauncher from "../process/externalLauncher.ts";
 import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import { resolveCliCommand } from "./invocation.ts";
-import { offerServiceDuringOnboarding, recoverServiceOnboardingOffer } from "./service.ts";
 import * as CliService from "./service.ts";
 
 const jsonFlag = Flag.Boolean("json").pipe(
@@ -90,7 +96,6 @@ function formatDeviceAuthorizationPrompt(
   ].join("\n");
 }
 
-/** Returns the connected account identity, if the flow could determine one. */
 const authorizeCli = Effect.fn("cloud.cli.authorize")(function* (options: {
   readonly headless: boolean;
 }) {
@@ -103,8 +108,6 @@ const authorizeCli = Effect.fn("cloud.cli.authorize")(function* (options: {
     }
     yield* Console.log("\nHeadless mode enabled. A new authorization link is ready below.");
   }
-  // A stored credential whose refresh fails (revoked, expired grant) must
-  // fall through to a fresh device authorization, not dead-end the command.
   const existing = yield* tokens.getExisting.pipe(
     Effect.catchTags({
       CloudCliCredentialRefreshError: () =>
@@ -141,10 +144,14 @@ interface CloudCliStatus {
   readonly desired: boolean;
   readonly authenticated: boolean;
   readonly linked: boolean;
+  readonly revoked: boolean;
   readonly cloudUserId: string | null;
   readonly relayUrl: string | null;
   readonly publishAgentActivity: boolean;
   readonly relayClient: RelayClient.RelayClientStatus;
+  readonly linkMode: CliState.CliDesiredLinkMode;
+  /** `null` when no server answered the live check, or none ran because no tunnel is wanted. */
+  readonly reachability: EnvironmentConnectReachability | null;
 }
 
 function formatRelayClientStatus(executable: RelayClient.RelayClientStatus): ReadonlyArray<string> {
@@ -177,18 +184,31 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
     return JSON.stringify(status, null, 2);
   }
 
-  const provisioned = status.linked
-    ? "provisioned"
-    : status.desired && status.authenticated
-      ? "pending server startup"
-      : "not provisioned";
+  const provisioned = status.revoked
+    ? "removed from T3 Connect"
+    : status.linked
+      ? "provisioned"
+      : status.desired && status.authenticated
+        ? "pending server startup"
+        : "not provisioned";
   const nextStep = !status.authenticated
+<<<<<<< HEAD
     ? `Run \`t3 connect link\` to authorize and enable ${CONNECT_NAME}.`
     : !status.desired
       ? `Run \`t3 connect link\` to enable ${CONNECT_NAME}.`
       : !status.linked
         ? `Start ${PRODUCT_NAME} to provision the environment link and launch its managed tunnel.`
         : undefined;
+=======
+    ? "Run `t3 connect link` to authorize and enable T3 Connect."
+    : status.revoked
+      ? "Run `t3 connect link` to link this environment again."
+      : !status.desired
+        ? "Run `t3 connect link` to enable T3 Connect."
+        : !status.linked
+          ? "Start T3 to provision the environment link and launch its managed tunnel."
+          : undefined;
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
 
   return [
     CONNECT_NAME,
@@ -198,8 +218,19 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
     `  Relay: ${status.relayUrl ?? "not provisioned"}`,
     `  Publish agent activity: ${status.publishAgentActivity ? "enabled" : "disabled"}`,
     ...formatRelayClientStatus(status.relayClient),
-    "",
-    "This is saved setup, not a live connection check. Check the background service with `t3 service status`.",
+    ...(!status.desired || status.linkMode !== "managed"
+      ? []
+      : status.reachability === null
+        ? [
+            "",
+            "No running server answered, so reachability was not checked. Check the background service with `t3 service status`.",
+          ]
+        : status.reachability.status === "reachable"
+          ? [
+              "",
+              `✓ Other devices can reach this machine · ${formatConnectReachable(status.reachability)}`,
+            ]
+          : ["", formatReachabilityFailure(status.reachability)]),
     ...(nextStep ? ["", `Next: ${nextStep}`] : []),
   ].join("\n");
 }
@@ -260,11 +291,12 @@ export const acquireRelayClientForLink = Effect.fn("cloud.cli.acquire_relay_clie
 
 const withCloudCliSessionToken = <A, E, R>(
   environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"],
+  scope: AuthEnvironmentScope,
   run: (token: string) => Effect.Effect<A, E, R>,
 ) =>
   Effect.acquireUseRelease(
     environmentAuth.issueSession({
-      scopes: [AuthRelayWriteScope],
+      scopes: [scope],
       subject: "cloud-cli",
       label: "infinitus connect cli",
     }),
@@ -286,7 +318,7 @@ const runLiveCloudUnlink = Effect.fn("cloud.cli.run_live_unlink")(function* () {
 
   const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
   const result = yield* Effect.exit(
-    withCloudCliSessionToken(environmentAuth, (token) =>
+    withCloudCliSessionToken(environmentAuth, AuthRelayWriteScope, (token) =>
       HttpApiClient.make(EnvironmentHttpApi, {
         baseUrl: runtimeState.value.origin,
       }).pipe(
@@ -300,6 +332,73 @@ const runLiveCloudUnlink = Effect.fn("cloud.cli.run_live_unlink")(function* () {
   return Exit.isSuccess(result)
     ? ({ status: "succeeded" } satisfies LiveCloudActionResult)
     : ({ status: "failed", cause: result.cause } satisfies LiveCloudActionResult);
+});
+
+// One check probes the endpoint, the tunnel edge, and Tailscale, each with its own timeout.
+const CLOUD_CLI_REACHABILITY_TIMEOUT = Duration.seconds(30);
+const CLOUD_CLI_REACHABILITY_WAIT = Duration.seconds(60);
+const CLOUD_CLI_REACHABILITY_RETRY = Duration.seconds(5);
+
+/** Asks the running server to check T3 Connect now. `null` when no server answers. */
+const checkLiveReachability = Effect.fn("cloud.cli.check_live_reachability")(function* () {
+  const config = yield* ServerConfig.ServerConfig;
+  const runtimeState = yield* readPersistedServerRuntimeState(config.serverRuntimeStatePath);
+  if (Option.isNone(runtimeState)) return null;
+  const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
+  return yield* withCloudCliSessionToken(environmentAuth, AuthRelayReadScope, (token) =>
+    HttpApiClient.make(EnvironmentHttpApi, { baseUrl: runtimeState.value.origin }).pipe(
+      Effect.flatMap((client) =>
+        client.connect.checkReachability({ headers: { authorization: `Bearer ${token}` } }),
+      ),
+      Effect.timeout(CLOUD_CLI_REACHABILITY_TIMEOUT),
+    ),
+  ).pipe(Effect.orElseSucceed(() => null));
+});
+
+function formatAlertBox(text: string): string {
+  const lines = text.split("\n");
+  const width = Math.max(...lines.map((line) => line.length));
+  const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
+  const red = (line: string) => (color ? `\x1b[1;31m${line}\x1b[0m` : line);
+  return [
+    `┌${"─".repeat(width + 2)}┐`,
+    ...lines.map((line) => `│ ${line.padEnd(width)} │`),
+    `└${"─".repeat(width + 2)}┘`,
+  ]
+    .map(red)
+    .join("\n");
+}
+
+/**
+ * Waits for the server that `t3 connect` just started to prove other devices
+ * can reach it, so a broken tunnel fails setup instead of looking green.
+ */
+const waitForReachability = Effect.fn("cloud.cli.wait_for_reachability")(function* () {
+  yield* Console.log("\nChecking that other devices can reach this machine...");
+  const deadline =
+    (yield* Clock.currentTimeMillis) + Duration.toMillis(CLOUD_CLI_REACHABILITY_WAIT);
+  let last: EnvironmentConnectReachability | null = null;
+  while (true) {
+    last = (yield* checkLiveReachability()) ?? last;
+    if (last?.status === "reachable") {
+      yield* Console.log(
+        `✓ Other devices can reach this machine · ${formatConnectReachable(last)}`,
+      );
+      return;
+    }
+    if ((yield* Clock.currentTimeMillis) >= deadline) break;
+    yield* Effect.sleep(CLOUD_CLI_REACHABILITY_RETRY);
+  }
+  yield* Console.error(
+    formatAlertBox(
+      last === null
+        ? "✕ Could not check T3 Connect\n  The T3 server on this machine did not answer.\n  Fix: run `t3 service status`, then `t3 connect status`."
+        : formatReachabilityFailure(last),
+    ),
+  );
+  yield* Effect.sync(() => {
+    process.exitCode = 1;
+  });
 });
 
 type RelayUnlinkResult =
@@ -347,6 +446,11 @@ const unlinkRelayEnvironment = Effect.fn("cloud.cli.unlink_relay_environment")(f
     : ({ status: "not-linked" } satisfies RelayUnlinkResult);
 });
 
+/**
+ * Prints the local disconnect outcome, then whether the relay record was revoked.
+ * A missing CLI login or a failed relay DELETE leaves that record registered, so
+ * those outcomes warn to deregister it from the T3 Connect account page.
+ */
 export const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconnect_results")(
   function* (input: {
     readonly clearAuthorization: boolean;
@@ -375,7 +479,11 @@ export const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconne
       yield* Console.warn(
         input.clearAuthorization
           ? "Could not revoke the relay-side environment record before signing out.\nThe stored CLI authorization was still removed locally."
-          : "Could not revoke the relay-side environment record yet.\nRun `t3 connect unlink` again when the relay is reachable.",
+          : "Could not revoke the relay-side environment record yet.\nRun `t3 connect unlink` again when the relay is reachable, or deregister it from the T3 Connect page of your T3 account.",
+      );
+    } else if (input.relayResult.value.status === "not-authenticated") {
+      yield* Console.warn(
+        "The relay-side environment record was not revoked.\nDeregister it from the T3 Connect page of your T3 account, or run `t3 connect login` and retry.",
       );
     } else if (input.relayResult.value.status === "revoked") {
       yield* Console.log("Revoked the relay-side environment record.");
@@ -478,6 +586,11 @@ const linkEnvironmentForConnect = Effect.fn("cloud.cli.link_environment")(functi
 
   const identity = yield* authorizeCli(options);
   yield* CliState.setCliDesiredCloudLink(true, publishOnly ? "publish_only" : "managed");
+  if (yield* CliState.dropRevokedCloudLink) {
+    yield* Console.log(
+      "Removed the link T3 Connect no longer accepts. The next start links this environment again.",
+    );
+  }
   if (publishOnly) {
     const secrets = yield* ServerSecretStore.ServerSecretStore;
     yield* secrets.set(PUBLISH_AGENT_ACTIVITY_SECRET, stringToBytes("true"));
@@ -536,7 +649,13 @@ const connectStatusCommand = Command.make("status", {
   ...projectLocationFlags,
   json: jsonFlag,
 }).pipe(
+<<<<<<< HEAD
   Command.withDescription(`Show persisted ${CONNECT_NAME} and relay client state.`),
+=======
+  Command.withDescription(
+    "Show T3 Connect setup and check that other devices can reach this machine.",
+  ),
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
   Command.withHandler((flags) =>
     runCloudCommand(
       flags,
@@ -544,28 +663,44 @@ const connectStatusCommand = Command.make("status", {
         const secrets = yield* ServerSecretStore.ServerSecretStore;
         const relayClient = yield* RelayClient.RelayClient;
         const tokens = yield* CliTokenManager.CloudCliTokenManager;
-        const [desired, authenticated, cloudUserId, relayUrl, publishAgentActivity, executable] =
-          yield* Effect.all(
-            [
-              CliState.readCliDesiredCloudLink,
-              tokens.hasCredential,
-              secrets.get(CLOUD_LINKED_USER_ID),
-              secrets.get(RELAY_URL_SECRET),
-              secrets.get(PUBLISH_AGENT_ACTIVITY_SECRET),
-              relayClient.resolve,
-            ],
-            { concurrency: "unbounded" },
-          );
+        const [
+          desired,
+          authenticated,
+          cloudUserId,
+          relayUrl,
+          publishAgentActivity,
+          revoked,
+          executable,
+          linkMode,
+        ] = yield* Effect.all(
+          [
+            CliState.readCliDesiredCloudLink,
+            tokens.hasCredential,
+            secrets.get(CLOUD_LINKED_USER_ID),
+            secrets.get(RELAY_URL_SECRET),
+            secrets.get(PUBLISH_AGENT_ACTIVITY_SECRET),
+            secrets.get(CLOUD_LINK_REVOKED),
+            relayClient.resolve,
+            CliState.readCliDesiredLinkMode,
+          ],
+          { concurrency: "unbounded" },
+        );
+        // A publish-only link has no tunnel for other devices to reach.
+        const reachability =
+          desired && linkMode === "managed" ? yield* checkLiveReachability() : null;
         const status: CloudCliStatus = {
           desired,
           authenticated,
           linked: Option.isSome(cloudUserId),
+          revoked: Option.isSome(cloudUserId) && Option.isSome(revoked),
           cloudUserId: Option.isSome(cloudUserId) ? bytesToString(cloudUserId.value) : null,
           relayUrl: Option.isSome(relayUrl) ? bytesToString(relayUrl.value) : null,
           publishAgentActivity: isAgentActivityPublishingEnabledValue(
             Option.isSome(publishAgentActivity) ? bytesToString(publishAgentActivity.value) : null,
           ),
           relayClient: executable,
+          linkMode,
+          reachability,
         };
         yield* Console.log(formatCloudStatus(status, { json: flags.json }));
       }),
@@ -617,10 +752,13 @@ const connectPublishCommand = Command.make("publish", {
           return;
         }
 
+<<<<<<< HEAD
         // Publishing needs the relay to know this environment belongs to you.
         // Establish a tunnel-free publish-only link automatically so signing in
         // is all it takes — the mobile client can still reach the environment
         // out of band without the tunnel.
+=======
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
         if (!(yield* tokens.hasCredential)) {
           yield* Console.log(
             "Run `t3 connect login` first so this environment can be authorized to publish.",
@@ -664,6 +802,30 @@ const connectLogoutCommand = Command.make("logout", {
   ),
 );
 
+export const reportServiceOnboarding = Effect.fn("cli.connect.report_service_onboarding")(
+  function* (outcome: CliService.ServiceOnboardingOutcome) {
+    if (outcome === "pending") {
+      yield* Console.log(
+        "\nBackground service restarting\n\nThe server establishes the T3 Connect link once it is back. Check the log above if it does not come back.",
+      );
+      return;
+    }
+    if (outcome === "ready") {
+      const platform = yield* HostProcess.Platform;
+      yield* Console.log(
+        platform === "darwin"
+          ? "\n✓ Background service ready\n\nT3 Code is set to run while you are logged in to this Mac. The server establishes the T3 Connect link on startup."
+          : "\n✓ Background service ready\n\nT3 Code is set to keep running after you log out. The server establishes the T3 Connect link on startup.",
+      );
+      return;
+    }
+    const serveCommand = yield* resolveCliCommand("serve");
+    yield* Console.log(
+      `\nNext\n  Start the server with \`${serveCommand}\` to make this machine reachable.\n  It checks that other devices can reach this machine when it starts.`,
+    );
+  },
+);
+
 export const connectCommand = Command.make("connect", {
   ...projectLocationFlags,
   headless: headlessFlag,
@@ -678,11 +840,9 @@ export const connectCommand = Command.make("connect", {
         if (!linked) {
           return;
         }
-        // Show which account was linked so an unexpected identity (an
-        // authorization code for a different account) is visible before the
-        // machine is brought online.
         yield* Console.log(`✓ Authorized${connectedAs(linked.identity)}`);
 
+<<<<<<< HEAD
         // Authorization is stored. If service setup fails, preserve it and
         // show how to run the server manually.
         const background = yield* recoverServiceOnboardingOffer(offerServiceDuringOnboarding);
@@ -698,7 +858,15 @@ export const connectCommand = Command.make("connect", {
         const serveCommand = yield* resolveCliCommand("serve");
         yield* Console.log(
           `\nNext\n  Start the server with \`${serveCommand}\` to make this machine reachable.`,
+=======
+        const outcome = yield* CliService.recoverServiceOnboardingOffer(
+          CliService.offerServiceDuringOnboarding,
+>>>>>>> upstream-sync-774c6c195-upstream-renamed
         );
+        yield* reportServiceOnboarding(outcome);
+        if (outcome !== "skipped") {
+          yield* waitForReachability();
+        }
       }),
     ),
   ),

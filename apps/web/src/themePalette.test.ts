@@ -116,7 +116,6 @@ describe("theme files", () => {
       expect(
         distance(colors.searchMatchBackground, colors.searchMatchActiveBackground),
       ).toBeGreaterThan(0.14);
-      // Check inline-code tints, code blocks, and user-message bubbles.
       for (const background of [colors.muted, colors.messageSurface, colors.codeBackground]) {
         expect(distance(colors.searchMatchBackground, background)).toBeGreaterThan(0.08);
         expect(distance(colors.searchMatchActiveBackground, background)).toBeGreaterThan(0.08);
@@ -201,7 +200,6 @@ describe("theme files", () => {
       ["dark", "#101a2c", "#4f8fe8"],
       ["dark", "#211a23", "#df5398"],
       ["light", "#fdf6ec", "#c2571b"],
-      // Inverted canvases: the palette follows the picked color, not the slot.
       ["light", "#111827", "#8ab4f8"],
       ["dark", "#f5ecf5", "#a84370"],
     ];
@@ -213,12 +211,10 @@ describe("theme files", () => {
       ];
     for (const [appearance, canvas, accent] of seeds) {
       const colors = createVividThemeColors(appearance, canvas, accent);
-      // Exact seeds are honored.
       expect(colors.canvas).toMatch(/^oklch\(/);
       expect(colors.accent).toMatch(/^oklch\(/);
       expect(asHex(colors.canvas)).toBe(canvas);
       expect(asHex(colors.accent)).toBe(accent);
-      // Readability is solved per surface.
       expect(contrastRatio(colors.text, colors.canvas)).toBeGreaterThanOrEqual(7);
       expect(contrastRatio(colors.textMuted, colors.canvas)).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(colors.textMuted, colors.canvas)).toBeLessThan(5.5);
@@ -248,11 +244,8 @@ describe("theme files", () => {
         4.5,
       );
       expect(contrastRatio(colors.sidebarForeground, colors.sidebar)).toBeGreaterThanOrEqual(4.5);
-      // The companion action is a distinct voice, not the accent again.
       expect(colors.messageAction).not.toBe(colors.accent);
-      // Update family follows the theme, not the default palette.
       expect(asHex(colors.update)).toBe(accent);
-      // Semantic statuses stay red and amber instead of inheriting a brand tint.
       const [errorRed, errorGreen, errorBlue] = channels(colors.error);
       expect(errorRed).toBeGreaterThan(errorGreen * 2);
       expect(errorRed).toBeGreaterThan(errorBlue * 2);
@@ -267,8 +260,6 @@ describe("theme files", () => {
   });
 
   it("keys status colors off the canvas, not the appearance slot", () => {
-    // Inverted seeds: a dark canvas in the light slot must still get the dark
-    // status pair, or the alert foreground lands on a dark surface unreadable.
     const inverted = [
       createVividThemeColors("light", "#111827", "#8ab4f8"),
       createVividThemeColors("dark", "#f5ecf5", "#a84370"),
@@ -1069,7 +1060,6 @@ describe("theme files", () => {
 
 describe("stored theme preferences", () => {
   it("lets a configured half unlock an appearance the base theme lacks", () => {
-    // Light-only base: without halves, dark requests fall back to light.
     const lightOnly = parseThemeFile({
       version: THEME_FILE_VERSION,
       id: "paper",
@@ -1115,9 +1105,7 @@ describe("stored theme preferences", () => {
       expect(isKnownThemePreference(legacy)).toBe(true);
       expect(canonicalThemePreference(legacy)).toBe(theme.id);
     }
-    // The dark-variant alias keeps its raw form: it still carries a mode hint.
     expect(canonicalThemePreference("t3-chat-dark")).toBe("t3-chat-dark");
-    // A stored mix that predates the rename resolves to the new ids.
     expect(parseThemeHalves(JSON.stringify({ light: "t3-ocean", dark: "t3-grove" }))).toEqual({
       light: OCEAN_THEME.id,
       dark: GROVE_THEME.id,

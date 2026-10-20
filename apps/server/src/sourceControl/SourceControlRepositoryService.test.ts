@@ -270,13 +270,14 @@ it.effect("keeps arbitrary Bitbucket request failures out of the repository mess
   }),
 );
 
-it.effect("clones a looked-up repository into the requested destination", () =>
+it.effect("clones a looked-up repository after creating missing parent directories", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const parent = yield* fs.makeTempDirectoryScoped({
+    const temporaryDirectory = yield* fs.makeTempDirectoryScoped({
       prefix: "t3-source-control-clone-parent-",
     });
+    const parent = path.join(temporaryDirectory, "missing", "nested");
     const destinationPath = path.join(parent, "t3code");
     const cloneCalls: Array<{ cwd: string; args: ReadonlyArray<string> }> = [];
 
@@ -305,7 +306,8 @@ it.effect("clones a looked-up repository into the requested destination", () =>
         layer({
           git: {
             execute: (input) =>
-              Effect.sync(() => {
+              Effect.gen(function* () {
+                assert.isTrue(yield* fs.exists(parent).pipe(Effect.orDie));
                 cloneCalls.push({ cwd: input.cwd, args: input.args });
                 return processOutput();
               }),
@@ -406,7 +408,6 @@ it.effect("reports clone progress from git's stderr and keeps its error text on 
       { stage: "receiving", percent: 40, detail: "1.00 MiB | 2.00 MiB/s" },
       { stage: "receiving", percent: 100, detail: "2.50 MiB | 2.00 MiB/s" },
     ]);
-    // Git echoes the remote in some failures; the credentials must not follow.
     assert.strictEqual(
       error.detail,
       "fatal: early EOF fatal: unable to access 'https://github.com/octocat/t3code.git/': could not resolve host",
@@ -441,7 +442,6 @@ it.effect("strips embedded credentials from the remote URL it reports", () =>
       ),
     );
     assert.equal(result.remoteUrl, "https://github.com/octocat/t3code.git");
-    // Git itself still receives the credentials.
     assert.equal(result.cloneUrl, "https://user:s3cret@github.com/octocat/t3code.git");
   }).pipe(Effect.provide(NodeServices.layer)),
 );
@@ -458,7 +458,6 @@ it.effect("discards only a directory git wrote to", () =>
     yield* fs.makeDirectory(foreign);
     yield* fs.writeFileString(path.join(foreign, "notes.txt"), "mine");
 
-    // A file where the directory should be must not be removed either.
     const replaced = path.join(parent, "replaced");
     yield* fs.writeFileString(replaced, "not a directory");
 
@@ -469,11 +468,9 @@ it.effect("discards only a directory git wrote to", () =>
       assert.include(error.detail, "not from the clone");
       const replacedError = yield* Effect.flip(service.discardClone(replaced));
       assert.include(replacedError.detail, "could not be inspected");
-      // A destination that never got created is nothing to discard.
       yield* service.discardClone(path.join(parent, "missing"));
     }).pipe(Effect.provide(layer({})));
 
-    // The partial clone is emptied but its directory (the workspace root) stays.
     assert.deepStrictEqual(yield* fs.readDirectory(partial), []);
     assert.deepStrictEqual(yield* fs.readDirectory(foreign), ["notes.txt"]);
     assert.strictEqual(yield* fs.readFileString(replaced), "not a directory");
@@ -532,6 +529,45 @@ it.effect("preserves destination probe failures instead of treating them as miss
     ),
   );
 });
+
+it.effect("clones directly under an existing filesystem root without recreating it", () =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const root = path.parse(path.resolve(".")).root;
+    const cloneCalls: Array<string> = [];
+
+    yield* Effect.gen(function* () {
+      const service = yield* SourceControlRepositoryService.SourceControlRepositoryService;
+      yield* service.cloneRepository({
+        provider: SourceControlProviderKind.make("github"),
+        repository: "octocat/t3code",
+        destinationPath: path.join(root, "t3code"),
+        protocol: "https",
+      });
+
+      assert.deepStrictEqual(cloneCalls, [root]);
+    }).pipe(
+      Effect.provide(
+        layer({
+          fileSystem: FileSystem.makeNoop({
+            exists: (target) => Effect.succeed(target === root),
+            makeDirectory: (target) =>
+              Effect.sync(() => {
+                assert.notStrictEqual(target, root, "must not try to create the existing root");
+              }),
+          }),
+          git: {
+            execute: (input) =>
+              Effect.sync(() => {
+                cloneCalls.push(input.cwd);
+                return processOutput();
+              }),
+          },
+        }),
+      ),
+    );
+  }).pipe(Effect.provide(NodePath.layer)),
+);
 
 it.effect("publishes by creating the repository, adding a remote, and pushing upstream", () => {
   const createCalls: Array<{ cwd: string; repository: string; visibility: string }> = [];
@@ -637,6 +673,63 @@ it.effect("publishes to the remote name returned by ensureRemote", () => {
     ),
   );
 });
+
+function failingPush(reason?: GitCommandError["reason"]) {
+  return {
+    pushCurrentBranch: (cwd: string) =>
+      Effect.fail(
+        new GitCommandError({
+          operation: "GitVcsDriver.pushCurrentBranch.pushWithRequestedRemote",
+          command: "git",
+          cwd,
+          ...(reason === undefined ? {} : { reason }),
+          detail: "Git command exited with a non-zero status.",
+        }),
+      ),
+  } satisfies Partial<GitVcsDriver.GitVcsDriver["Service"]>;
+}
+
+it.effect("explains a rejected SSH push after creating the repository", () =>
+  Effect.gen(function* () {
+    const service = yield* SourceControlRepositoryService.SourceControlRepositoryService;
+    const error = yield* Effect.flip(
+      service.publishRepository({
+        cwd: "/workspace",
+        provider: SourceControlProviderKind.make("github"),
+        repository: "octocat/t3code",
+        visibility: "private",
+        protocol: "ssh",
+      }),
+    );
+
+    assert.strictEqual(error.operation, "publishRepository");
+    assert.strictEqual(
+      error.detail,
+      'Created octocat/t3code and added it as remote "origin", but the push failed because SSH authentication was rejected. Add an SSH key to your account, or switch the remote to HTTPS with "git remote set-url origin https://github.com/octocat/t3code", then push again.',
+    );
+    assert.instanceOf(error.cause, GitCommandError);
+  }).pipe(Effect.provide(layer({ git: failingPush("authentication_failed") }))),
+);
+
+it.effect("says the repository exists when an unclassified publish push fails", () =>
+  Effect.gen(function* () {
+    const service = yield* SourceControlRepositoryService.SourceControlRepositoryService;
+    const error = yield* Effect.flip(
+      service.publishRepository({
+        cwd: "/workspace",
+        provider: SourceControlProviderKind.make("github"),
+        repository: "octocat/t3code",
+        visibility: "private",
+        protocol: "https",
+      }),
+    );
+
+    assert.strictEqual(
+      error.detail,
+      'Created octocat/t3code and added it as remote "origin", but the push failed. Fix the problem, then push again.',
+    );
+  }).pipe(Effect.provide(layer({ git: failingPush() }))),
+);
 
 it.effect("publish succeeds with status remote_added when the local repo has no commits", () => {
   let pushCalls = 0;
