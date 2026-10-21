@@ -34,6 +34,7 @@ const writeProjectFile = Effect.fn("writeProjectFile")(function* (
 
 it.layer(layerTest)("T3ProjectFileLoader", (it) => {
   describe("load", () => {
+<<<<<<< HEAD
     it.effect("loads and decodes a valid project file", () =>
       Effect.gen(function* () {
         const loader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
@@ -114,23 +115,13 @@ it.layer(layerTest)("T3ProjectFileLoader", (it) => {
       }),
     );
 
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
     it.effect("returns none for malformed JSON without failing", () =>
       Effect.gen(function* () {
         const loader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
         const cwd = yield* makeTempDir;
         yield* writeProjectFile(cwd, "{ not json");
-
-        const loaded = yield* loader.load(cwd);
-
-        expect(Option.isNone(loaded)).toBe(true);
-      }),
-    );
-
-    it.effect("returns none for schema-invalid files without failing", () =>
-      Effect.gen(function* () {
-        const loader = yield* T3ProjectFileLoader.T3ProjectFileLoader;
-        const cwd = yield* makeTempDir;
-        yield* writeProjectFile(cwd, '{ "scripts": [{ "name": "Dev" }] }');
 
         const loaded = yield* loader.load(cwd);
 

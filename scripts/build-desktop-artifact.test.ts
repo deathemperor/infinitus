@@ -6,26 +6,30 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { extractFile } from "@electron/asar";
 import { assert, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
+import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as PlatformError from "effect/PlatformError";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Sink from "effect/Sink";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import {
+  buildDesktopBundles,
+  DesktopBuildManifestRestoreError,
   BundleNotSelfContainedError,
   BuildCommandFailedError,
   parseWslRuntimeArchiveMembers,
-  DesktopDmgBackgroundSourceMissingError,
-  createStageWorkspaceConfig,
-  createStagePatchedDependencies,
   readWorkspaceConfig,
   createBuildConfig,
-  DESKTOP_ELECTRON_LANGUAGES,
   DESKTOP_FILE_EXCLUSIONS,
+<<<<<<< HEAD
   DESKTOP_EXTRA_RESOURCES,
   LINUX_CAPTURE_EXTRA_RESOURCES,
   LINUX_BROWSER_SECRET_EXTRA_RESOURCES,
@@ -35,28 +39,21 @@ import {
   NATIVE_HELPER_SIGN_IGNORE,
   NATIVE_HELPER_STAGE_DIR,
   NATIVE_HELPER_STAGE_ROOT,
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
   InvalidMacPasskeyRpDomainError,
   InvalidMacPasskeyPublishableKeyError,
-  InvalidMockUpdateServerPortError,
   UnsupportedDesktopBuildArchitectureError,
-  isMacPasskeySigningConfigurationError,
-  LinuxIconResizeError,
-  LinuxDesktopBuildPrerequisitesMissingError,
-  MacDesktopBuildPrerequisitesMissingError,
   MacPasskeySigningConfigurationResolutionError,
   MissingMacPasskeyProvisioningProfileError,
   packWindowsServerAsar,
-  preflightLinuxDesktopBuild,
-  preflightMacDesktopBuild,
   preflightWindowsDesktopBuild,
   renderMacPasskeyEntitlements,
   resolveMacWebAuthnEntitlements,
-  resolveClerkPasskeyNativeArtifacts,
   resolveMacPasskeySigningConfiguration,
-  resolveDesktopRuntimeDependencies,
   resolveMergedStageDependencies,
-  resolveFffNativeDependencies,
   resolveBuildOptions,
+<<<<<<< HEAD
   resolveDesktopBuildIconAssets,
   resolveDesktopProductName,
   resolveDesktopPublishChannel,
@@ -73,45 +70,42 @@ import {
   stageDesktopDmgBackground,
   stageResourceMonitor,
   stageLinuxCaptureHelper,
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
   stageWslRuntimeArchive,
-  bundlesWslRuntime,
-  STAGE_INSTALL_ARGS,
   ancestorNodeModulesPaths,
   copyDirectoryPreservingSymlinks,
   LinuxBrowserSecretHostError,
   stageBrowserSecret,
   validateWindowsPackagedPayload,
+  verifyPackagedBundleIsSelfContained,
   WindowsPrimaryNativeProbeError,
   WindowsDesktopBuildPrerequisitesMissingError,
   WindowsPackagedPayloadValidationError,
-  WINDOWS_NATIVE_ASAR_UNPACK_GLOB,
   stageCursorSdkPlatformPackages,
   WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT,
   WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
-  WINDOWS_SERVER_EXTRA_RESOURCES,
   WINDOWS_SERVER_ASAR_RESOURCE,
-  WINDOWS_SERVER_RESOURCE_SOURCE_DIR,
   WSL_RUNTIME_ARCHIVE_EXTRA_RESOURCE,
   WSL_RUNTIME_ARCHIVE_HASH_EXTRA_RESOURCE,
   WSL_RUNTIME_ARCHIVE_HASH_NAME,
   WSL_RUNTIME_ARCHIVE_NAME,
-  WSL_RUNTIME_EXTRA_RESOURCES,
-  WslRuntimeArchiveMissingError,
   wslRuntimeArchiveStem,
 } from "./build-desktop-artifact.ts";
-import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
+import {
+  ReleasePackageManifestError,
+  releasePackageFiles,
+} from "./update-release-package-versions.ts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { symlinksSupported } from "@infinitus/shared/testing/symlinks";
 
-// Keeps pnpm from auto-installing TypeScript, a types-only peer, into the app.
-const stagePackageExtensions = {
-  "electron-webauthn": { peerDependenciesMeta: { typescript: { optional: true } } },
-  "@electron-webauthn/macos": { peerDependenciesMeta: { typescript: { optional: true } } },
-};
+const encodeModuleUrl = Schema.encodeEffect(Schema.fromJsonString(Schema.String));
+const decodePackageVersion = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
+);
 
-// A minimal stand-in for the Linux CLI release archive: one top-level
-// directory named after the archive stem holding the executable, the web
-// client, and the runtime externals with node-pty built from source.
+// Keeps pnpm from auto-installing TypeScript, a types-only peer, into the app.
+
 const makeLinuxCliArchiveFixture = Effect.fn("test.makeLinuxCliArchiveFixture")(function* (input: {
   readonly root: string;
   readonly stem: string;
@@ -163,27 +157,6 @@ function mockProcess(exitCode: number, stdout = "") {
   });
 }
 
-function iconResizeSpawnerLayer(
-  commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }>,
-  exitCodes: ReadonlyArray<number>,
-) {
-  let commandIndex = 0;
-  return Layer.succeed(
-    ChildProcessSpawner.ChildProcessSpawner,
-    ChildProcessSpawner.make((command) => {
-      const childProcess = command as unknown as {
-        readonly command: string;
-        readonly args: ReadonlyArray<string>;
-      };
-      commands.push({
-        command: childProcess.command,
-        args: childProcess.args,
-      });
-      return Effect.succeed(mockProcess(exitCodes[commandIndex++] ?? 0));
-    }),
-  );
-}
-
 const WINDOWS_PAYLOAD_FIXTURE_VERSION = "1.2.3";
 
 const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(function* (input: {
@@ -232,9 +205,13 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
     const stem = wslRuntimeArchiveStem(WINDOWS_PAYLOAD_FIXTURE_VERSION, input.targetArch ?? "x64");
     const sourceArchivePath =
       input.wslRuntime === "loose-server-tree"
+<<<<<<< HEAD
         ? // The old hand-rolled runtime: apps/server/dist + node_modules at the
           // archive root, no single stem directory, no `infinitus` executable.
           yield* makeLinuxCliArchiveFixture({
+=======
+        ? yield* makeLinuxCliArchiveFixture({
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
             root: path.join(tempDir, "wsl-runtime"),
             stem: "apps",
             omitMembers: ["apps/t3", "apps/client/index.html"],
@@ -272,6 +249,7 @@ const makeWindowsPayloadFixture = Effect.fn("test.makeWindowsPayloadFixture")(fu
 });
 
 it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
+<<<<<<< HEAD
   it("resolves the dedicated nightly updater channel from nightly versions", () => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17-nightly.20260413.42"), "nightly");
   });
@@ -383,15 +361,135 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
               },
             }),
           ),
+=======
+  it.effect("rejects overlapping builds from another process until restoration finishes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-concurrent-build-" });
+      yield* fs.writeFileString(
+        path.join(root, "package.json"),
+        '{ "scripts": { "build:desktop": "node build.cjs" } }',
+      );
+      const original = '{ "version": "0.0.42", "private": true }\n';
+      for (const relativePath of releasePackageFiles) {
+        const filePath = path.join(root, relativePath);
+        yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+        yield* fs.writeFileString(filePath, original);
+      }
+      yield* fs.writeFileString(
+        path.join(root, "build.cjs"),
+        `require("node:fs").writeFileSync("version.txt", require("./apps/server/package.json").version);`,
+      );
+      const restoring = yield* Deferred.make<void>();
+      const resume = yield* Deferred.make<void>();
+      const contenderPath = path.join(root, "contender.mjs");
+      yield* fs.writeFileString(
+        contenderPath,
+        `import * as Effect from ${yield* encodeModuleUrl(import.meta.resolve("effect/Effect"))};
+           import * as NodeServices from ${yield* encodeModuleUrl(import.meta.resolve("@effect/platform-node/NodeServices"))};
+           import { buildDesktopBundles } from ${yield* encodeModuleUrl(import.meta.resolve("./build-desktop-artifact.ts"))};
+           const result = await Effect.runPromise(buildDesktopBundles(process.argv[2], "0.0.44", false).pipe(
+             Effect.as("success"), Effect.catch(error => Effect.succeed(error._tag)),
+             Effect.scoped, Effect.provide(NodeServices.layer)));
+           process.stdout.write(result);`,
+      );
+      const first = yield* Effect.forkChild(
+        Effect.exit(buildDesktopBundles(root, "0.0.43", false)).pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            writeFileString: (filePath, contents, options) =>
+              filePath === path.join(root, releasePackageFiles[0]) && contents === original
+                ? Deferred.succeed(restoring, undefined).pipe(
+                    Effect.andThen(Deferred.await(resume)),
+                    Effect.andThen(fs.writeFileString(filePath, contents, options)),
+                  )
+                : fs.writeFileString(filePath, contents, options),
+          }),
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
         ),
       );
+      yield* Deferred.await(restoring);
+      yield* Effect.gen(function* () {
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const child = yield* spawner.spawn(
+          ChildProcess.make(process.execPath, [contenderPath, root]),
+        );
+        const [stdout, stderr, exitCode] = yield* Effect.all(
+          [
+            child.stdout.pipe(Stream.decodeText, Stream.mkString),
+            child.stderr.pipe(Stream.decodeText, Stream.mkString),
+            child.exitCode,
+          ],
+          { concurrency: "unbounded" },
+        );
+        assert.equal(Number(exitCode), 0, stderr);
+        assert.equal(stdout, "DesktopBuildAlreadyRunningError");
+      }).pipe(Effect.ensuring(Deferred.succeed(resume, undefined)));
+      const firstExit = yield* Fiber.join(first);
+      assert.isTrue(Exit.isSuccess(firstExit));
+      assert.equal(yield* fs.readFileString(path.join(root, "version.txt")), "0.0.43");
+      for (const relativePath of releasePackageFiles) {
+        assert.equal(yield* fs.readFileString(path.join(root, relativePath)), original);
+      }
+      yield* buildDesktopBundles(root, "0.0.44", false);
+      assert.equal(yield* fs.readFileString(path.join(root, "version.txt")), "0.0.44");
+      for (const relativePath of releasePackageFiles) {
+        assert.equal(yield* fs.readFileString(path.join(root, relativePath)), original);
+      }
+    }),
+  );
 
-      assert.deepStrictEqual(latestConfig, {
-        provider: "github",
-        owner: "pingdotgg",
-        repo: "t3code",
-        releaseType: "release",
+  it.effect("restores manifests and releases the checkout lock after interruption", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-interrupted-build-" });
+      const original = '{ "version": "0.0.42", "private": true }\n';
+      for (const relativePath of releasePackageFiles) {
+        const filePath = path.join(root, relativePath);
+        yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+        yield* fs.writeFileString(filePath, original);
+      }
+      const started = yield* Deferred.make<void>();
+      const childStopped = yield* Deferred.make<{ lockExists: boolean; version: string }>();
+      const build = yield* Effect.forkChild(
+        buildDesktopBundles(root, "0.0.43", false).pipe(
+          Effect.provideService(
+            ChildProcessSpawner.ChildProcessSpawner,
+            ChildProcessSpawner.make(() =>
+              Effect.acquireRelease(
+                Effect.succeed({ ...mockProcess(0), exitCode: Effect.never }).pipe(
+                  Effect.tap(() => Deferred.succeed(started, undefined)),
+                ),
+                () =>
+                  Effect.gen(function* () {
+                    const lockExists = yield* fs.exists(path.join(root, ".desktop-build.lock"));
+                    const manifest = yield* decodePackageVersion(
+                      yield* fs.readFileString(path.join(root, releasePackageFiles[0])),
+                    );
+                    yield* Deferred.succeed(childStopped, {
+                      lockExists,
+                      version: manifest.version,
+                    });
+                  }).pipe(Effect.orDie),
+              ),
+            ),
+          ),
+          Effect.scoped,
+        ),
+      );
+      yield* Deferred.await(started);
+      const aligned = yield* decodePackageVersion(
+        yield* fs.readFileString(path.join(root, releasePackageFiles[0])),
+      );
+      assert.equal(aligned.version, "0.0.43");
+      yield* Fiber.interrupt(build);
+      assert.deepEqual(yield* Deferred.await(childStopped), {
+        lockExists: true,
+        version: "0.0.43",
       });
+<<<<<<< HEAD
       const infinitusConfig = yield* resolveGitHubPublishConfig("0.5.0-alpha.2").pipe(
         Effect.provide(
           ConfigProvider.layer(
@@ -420,6 +518,140 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         releaseType: "prerelease",
         channel: "alpha",
       });
+=======
+      assert.isFalse(yield* fs.exists(path.join(root, ".desktop-build.lock")));
+      for (const relativePath of releasePackageFiles) {
+        assert.equal(yield* fs.readFileString(path.join(root, relativePath)), original);
+      }
+      yield* buildDesktopBundles(root, "0.0.44", false).pipe(
+        Effect.provideService(
+          ChildProcessSpawner.ChildProcessSpawner,
+          ChildProcessSpawner.make(() => Effect.succeed(mockProcess(0))),
+        ),
+      );
+      assert.isFalse(yield* fs.exists(path.join(root, ".desktop-build.lock")));
+    }),
+  );
+
+  it.effect(
+    "builds web, server and desktop with the resolved version, restores changed manifests and preserves edits to matching ones",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-desktop-build-version-" });
+        const packageJson = `{
+          "name": "desktop-version-fixture",
+          "version": "0.0.42",
+          "scripts": { "build:desktop": "node build.cjs" }
+        }`;
+        yield* fs.writeFileString(path.join(root, "package.json"), packageJson);
+        const version = "0.0.43-nightly.20260920.2018";
+        const matchingPath = "packages/contracts/package.json";
+        const originals = releasePackageFiles.map((relativePath, index) => ({
+          relativePath,
+          contents: `{ "version": "${relativePath === matchingPath ? version : `0.0.${index + 1}`}", "name": "${relativePath}" }\r\n`,
+        }));
+        const afterBuild = originals.map(({ relativePath, contents }) => ({
+          relativePath,
+          contents:
+            relativePath === matchingPath
+              ? `${JSON.stringify({ version, name: matchingPath, description: "edited during compilation" })}\n`
+              : contents,
+        }));
+        for (const { relativePath, contents } of originals) {
+          const filePath = path.join(root, relativePath);
+          yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+          yield* fs.writeFileString(filePath, contents);
+        }
+        yield* fs.writeFileString(
+          path.join(root, "build.cjs"),
+          `require("node:fs").writeFileSync("version.txt", [
+            process.env.APP_VERSION,
+            require("./apps/web/package.json").version,
+            require("./apps/server/package.json").version,
+            require("./apps/desktop/package.json").version
+          ].join("\\n"));
+          const manifest = require("./${matchingPath}");
+          manifest.description = "edited during compilation";
+          require("node:fs").writeFileSync("${matchingPath}", JSON.stringify(manifest) + "\\n");`,
+        );
+        yield* buildDesktopBundles(root, version, false);
+        assert.equal(
+          yield* fs.readFileString(path.join(root, "version.txt")),
+          [version, version, version, version].join("\n"),
+        );
+        for (const { relativePath, contents } of afterBuild) {
+          assert.equal(yield* fs.readFileString(path.join(root, relativePath)), contents);
+        }
+        assert.equal(yield* fs.readFileString(path.join(root, "package.json")), packageJson);
+        yield* fs.writeFileString(path.join(root, "build.cjs"), "process.exit(1);");
+        const failure = yield* Effect.flip(buildDesktopBundles(root, "0.0.44", false));
+        assert.instanceOf(failure, BuildCommandFailedError);
+        for (const { relativePath, contents } of afterBuild) {
+          assert.equal(yield* fs.readFileString(path.join(root, relativePath)), contents);
+        }
+        const invalidPath = releasePackageFiles[releasePackageFiles.length - 1]!;
+        yield* fs.writeFileString(path.join(root, invalidPath), "invalid manifest");
+        // A successful child would leave a marker if partial alignment accidentally starts it.
+        yield* fs.writeFileString(
+          path.join(root, "build.cjs"),
+          'require("node:fs").writeFileSync("unexpected-build.txt", "started");',
+        );
+        const alignmentFailure = yield* Effect.flip(buildDesktopBundles(root, "0.0.44", false));
+        assert.instanceOf(alignmentFailure, ReleasePackageManifestError);
+        for (const { relativePath, contents } of afterBuild) {
+          assert.equal(
+            yield* fs.readFileString(path.join(root, relativePath)),
+            relativePath === invalidPath ? "invalid manifest" : contents,
+          );
+        }
+        assert.isFalse(yield* fs.exists(path.join(root, "unexpected-build.txt")));
+        assert.isFalse(yield* fs.exists(path.join(root, ".desktop-build.lock")));
+        assert.equal(yield* fs.readFileString(path.join(root, "package.json")), packageJson);
+      }),
+  );
+
+  it.effect("reports a restore failure while still restoring the remaining manifests", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-manifest-restore-failure-" });
+      yield* fs.writeFileString(
+        path.join(root, "package.json"),
+        `{
+          "name": "restore-fixture", "scripts": { "build:desktop": "node build.cjs" }
+        }`,
+      );
+      yield* fs.writeFileString(path.join(root, "build.cjs"), "process.exit(0);");
+      const original = '{ "version": "0.0.42" }\n';
+      for (const relativePath of releasePackageFiles) {
+        const filePath = path.join(root, relativePath);
+        yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
+        yield* fs.writeFileString(filePath, original);
+      }
+      const failedPath = path.join(root, releasePackageFiles[0]);
+      const writeFailure = PlatformError.systemError({
+        _tag: "PermissionDenied",
+        module: "FileSystem",
+        method: "writeFileString",
+        pathOrDescriptor: failedPath,
+      });
+      const failure = yield* Effect.flip(buildDesktopBundles(root, "0.0.43", false)).pipe(
+        Effect.provideService(FileSystem.FileSystem, {
+          ...fs,
+          writeFileString: (filePath, contents, options) =>
+            filePath === failedPath && contents === original
+              ? Effect.fail(writeFailure)
+              : fs.writeFileString(filePath, contents, options),
+        }),
+      );
+      assert.instanceOf(failure, DesktopBuildManifestRestoreError);
+      assert.notEqual(yield* fs.readFileString(failedPath), original);
+      for (const relativePath of releasePackageFiles.slice(1)) {
+        assert.equal(yield* fs.readFileString(path.join(root, relativePath)), original);
+      }
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
     }),
   );
 
@@ -454,10 +686,15 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         undefined,
       );
 
+<<<<<<< HEAD
       assert.notProperty(preview, "publish");
       assert.notProperty(previewChannel, "publish");
       // A plain version is a full release on the stable feed (`latest-mac.yml`,
       // `releases/latest`), whatever repo it publishes to (#823, #924).
+=======
+      assert.isNull(preview.publish);
+      assert.isNull(previewChannel.publish);
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",
@@ -475,117 +712,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it("stages only the desktop main-process externals", () => {
-    assert.deepStrictEqual(
-      resolveDesktopRuntimeDependencies(
-        {
-          "@clerk/electron": "catalog:",
-          "@clerk/electron-passkeys": "catalog:",
-          "@crowecawcaw/xa11y": "0.13.0",
-          "@effect/platform-node": "catalog:",
-          "@napi-rs/keyring": "^1.3.0",
-          "@infinitus/contracts": "workspace:*",
-          "@infinitus/shared": "workspace:*",
-          "dbus-next": "0.10.2",
-          effect: "catalog:",
-          electron: "41.5.0",
-          "electron-updater": "^6.6.2",
-          "ffi-rs": "1.3.2",
-          "playwright-core": "1.60.0",
-        },
-        {
-          "@clerk/electron": "0.0.37",
-          "@clerk/electron-passkeys": "0.0.3",
-          "@effect/platform-node": "4.0.0-beta.59",
-          effect: "4.0.0-beta.59",
-        },
-      ),
-      {
-        "@clerk/electron-passkeys": "0.0.3",
-        "@crowecawcaw/xa11y": "0.13.0",
-        "@napi-rs/keyring": "^1.3.0",
-        "ffi-rs": "1.3.2",
-        "playwright-core": "1.60.0",
-      },
-    );
-  });
-
-  it("carries only staged dependency patch metadata into staged desktop installs", () => {
-    assert.deepStrictEqual(
-      createStagePatchedDependencies(
-        {
-          "@expo/metro-config@56.0.13": "patches/@expo%2Fmetro-config@56.0.13.patch",
-          "@ff-labs/fff-node@0.9.4": "patches/@ff-labs__fff-node@0.9.4.patch",
-          "@pierre/diffs@1.1.20": "patches/@pierre%2Fdiffs@1.1.20.patch",
-          "alchemy@2.0.0-beta.49": "patches/alchemy@2.0.0-beta.49.patch",
-          "effect@4.0.0-beta.73": "patches/effect@4.0.0-beta.73.patch",
-        },
-        {
-          "@ff-labs/fff-node": "0.9.4",
-          "@pierre/diffs": "1.1.20",
-          effect: "4.0.0-beta.73",
-        },
-      ),
-      {
-        "@ff-labs/fff-node@0.9.4": "patches/@ff-labs__fff-node@0.9.4.patch",
-        "@pierre/diffs@1.1.20": "patches/@pierre%2Fdiffs@1.1.20.patch",
-        "effect@4.0.0-beta.73": "patches/effect@4.0.0-beta.73.patch",
-      },
-    );
-
-    assert.deepStrictEqual(
-      createStagePatchedDependencies(
-        {
-          "@expo/metro-config@56.0.13": "patches/@expo%2Fmetro-config@56.0.13.patch",
-        },
-        { effect: "4.0.0-beta.73" },
-      ),
-      {},
-    );
-  });
-
-  it("installs optional native dependencies for the target desktop architecture", () => {
-    assert.deepStrictEqual(STAGE_INSTALL_ARGS, ["install", "--prod"]);
-    assert.deepStrictEqual(createStageWorkspaceConfig({ platform: "mac", arch: "x64" }), {
-      supportedArchitectures: {
-        os: ["darwin"],
-        cpu: ["x64"],
-      },
-      packageExtensions: stagePackageExtensions,
-    });
-    assert.deepStrictEqual(createStageWorkspaceConfig({ platform: "linux", arch: "x64" }), {
-      supportedArchitectures: {
-        os: ["linux"],
-        cpu: ["x64"],
-        libc: ["glibc"],
-      },
-      packageExtensions: stagePackageExtensions,
-    });
-    // Windows stages only win32 natives; WSL runs the separately built Linux
-    // CLI archive rather than anything installed here.
-    assert.deepStrictEqual(createStageWorkspaceConfig({ platform: "win", arch: "x64" }), {
-      supportedArchitectures: {
-        os: ["win32"],
-        cpu: ["x64"],
-      },
-      packageExtensions: stagePackageExtensions,
-    });
-    assert.deepStrictEqual(createStageWorkspaceConfig({ platform: "win", arch: "arm64" }), {
-      supportedArchitectures: {
-        os: ["win32"],
-        cpu: ["arm64"],
-      },
-      packageExtensions: stagePackageExtensions,
-    });
-    assert.deepStrictEqual(createStageWorkspaceConfig({ platform: "mac", arch: "universal" }), {
-      supportedArchitectures: {
-        os: ["darwin"],
-        cpu: ["arm64", "x64"],
-      },
-      packageExtensions: stagePackageExtensions,
-    });
-  });
-
   // pnpm writes "set this to true or false" placeholders into allowBuilds when a
   // tarball changes. pnpm ignores them, but the release build decode rejects them.
   it.effect("decodes the repo allowBuilds and every file: tarball it names exists", () =>
@@ -595,7 +721,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       const { allowBuilds = {} } = yield* readWorkspaceConfig();
       const repoRoot = path.join(import.meta.dirname, "..");
       for (const key of Object.keys(allowBuilds)) {
-        const tarball = key.split("@file:")[1];
+        const tarball = key.split("@file:")[1]?.replace(/\(patch_hash=[a-f0-9]+\)$/, "");
         if (tarball === undefined) continue;
         assert.isTrue(
           yield* fs.exists(path.join(repoRoot, tarball)),
@@ -605,6 +731,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
+<<<<<<< HEAD
   it("stages pnpm 11 allowBuilds and patchedDependencies in the workspace yaml", () => {
     assert.deepStrictEqual(
       createStageWorkspaceConfig({
@@ -923,6 +1050,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }
   });
 
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
   it("stages only the externals of both bundles in merged packages", () => {
     assert.deepStrictEqual(
       resolveMergedStageDependencies({
@@ -1022,23 +1151,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it("excludes node-pty binaries for the other Windows architecture", () => {
-    assert.deepStrictEqual(resolveWindowsServerAsarIgnoreGlobs("x64"), [
-      ...WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
-      "**/node_modules/node-pty/prebuilds/win32-arm64",
-      "**/node_modules/node-pty/prebuilds/win32-arm64/**",
-      "**/node_modules/node-pty/third_party/conpty/*/win10-arm64",
-      "**/node_modules/node-pty/third_party/conpty/*/win10-arm64/**",
-    ]);
-    assert.deepStrictEqual(resolveWindowsServerAsarIgnoreGlobs("arm64"), [
-      ...WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
-      "**/node_modules/node-pty/prebuilds/win32-x64",
-      "**/node_modules/node-pty/prebuilds/win32-x64/**",
-      "**/node_modules/node-pty/third_party/conpty/*/win10-x64",
-      "**/node_modules/node-pty/third_party/conpty/*/win10-x64/**",
-    ]);
-  });
-
   it.effect("unpacks target Windows natives while excluding the other architecture", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -1080,7 +1192,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
             path.join(unpackedRoot, "node_modules/node-pty/prebuilds/win32-x64/pty.node"),
           ),
         );
-        // Signed builds sign every unpacked .node, so the ELF prebuild stays packed.
         assert.isFalse(
           yield* fs.exists(path.join(unpackedRoot, "node_modules/node-pty/prebuilds/linux-x64")),
         );
@@ -1099,123 +1210,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
             path.join(unpackedRoot, "node_modules/node-pty/third_party/conpty/1.0.0/win10-arm64"),
           ),
         );
-      }),
-    ),
-  );
-
-  it.effect("stages a cached resource monitor without invoking Cargo", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const repoRoot = yield* fs.makeTempDirectoryScoped({
-          prefix: "t3-resource-monitor-cache-test-",
-        });
-        const binaryPath = path.join(
-          repoRoot,
-          "native/resource-monitor/target/x86_64-unknown-linux-gnu/release/t3-resource-monitor",
-        );
-        const stageResourcesDir = path.join(repoRoot, "stage");
-        yield* fs.makeDirectory(path.dirname(binaryPath), { recursive: true });
-        yield* fs.writeFileString(binaryPath, "cached monitor");
-
-        yield* stageResourceMonitor({
-          repoRoot,
-          stageResourcesDir,
-          platform: "linux",
-          arch: "x64",
-          verbose: false,
-        }).pipe(
-          Effect.provide(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({
-                env: { T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: "true" },
-              }),
-            ),
-          ),
-        );
-
-        assert.equal(
-          yield* fs.readFileString(
-            path.join(stageResourcesDir, "resource-monitor/t3-resource-monitor"),
-          ),
-          "cached monitor",
-        );
-      }),
-    ),
-  );
-
-  it.effect("reports every missing Linux desktop build prerequisite with an install command", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }> =
-          [];
-        const spawner = Layer.succeed(
-          ChildProcessSpawner.ChildProcessSpawner,
-          ChildProcessSpawner.make((command) => {
-            const childProcess = command as unknown as {
-              readonly command: string;
-              readonly args: ReadonlyArray<string>;
-            };
-            commands.push(childProcess);
-            const fails =
-              childProcess.command === "cargo" ||
-              childProcess.command === "rustc" ||
-              childProcess.command === "pkg-config";
-            return Effect.succeed(mockProcess(fails ? 1 : 0));
-          }),
-        );
-
-        const error = yield* preflightLinuxDesktopBuild("arm64").pipe(
-          Effect.provide(spawner),
-          Effect.flip,
-        );
-
-        assert.instanceOf(error, LinuxDesktopBuildPrerequisitesMissingError);
-        assert.deepStrictEqual(error.missing, ["cargo", "rust-target", "libsecret"]);
-        assert.include(error.message, "Rust compiler and Cargo (cargo, rustc)");
-        assert.include(error.message, "Requested Rust standard library");
-        assert.include(
-          error.message,
-          "sudo apt-get install cargo rustc libsecret-1-dev pkg-config",
-        );
-        assert.include(error.message, "rustup target add aarch64-unknown-linux-gnu");
-        assert.isTrue(
-          commands.some(
-            (command) =>
-              command.command === "rustc" && command.args.includes("aarch64-unknown-linux-gnu"),
-          ),
-        );
-      }),
-    ),
-  );
-
-  it.effect("reports missing macOS tools and Rust targets before building", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const spawner = Layer.succeed(
-          ChildProcessSpawner.ChildProcessSpawner,
-          ChildProcessSpawner.make((command) => {
-            const childProcess = command as unknown as {
-              readonly command: string;
-              readonly args: ReadonlyArray<string>;
-            };
-            const fails =
-              childProcess.command === "rustc" ||
-              (childProcess.command === "xcrun" && childProcess.args.includes("iconutil"));
-            return Effect.succeed(mockProcess(fails ? 1 : 0));
-          }),
-        );
-        const error = yield* preflightMacDesktopBuild("universal").pipe(
-          Effect.provide(spawner),
-          Effect.flip,
-        );
-
-        assert.instanceOf(error, MacDesktopBuildPrerequisitesMissingError);
-        assert.deepStrictEqual(error.missing, ["rust", "iconutil"]);
-        assert.deepStrictEqual(error.rustTargets, ["aarch64-apple-darwin", "x86_64-apple-darwin"]);
-        assert.include(error.message, "xcode-select --install");
-        assert.include(error.message, "rustup target add aarch64-apple-darwin x86_64-apple-darwin");
       }),
     ),
   );
@@ -1351,75 +1345,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it.effect("builds and stages native capture helpers for each Linux architecture", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const repoRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-kde-stage-test-" });
-        const protocols = path.join(repoRoot, "native/hyprland-snap-shot/protocols");
-        yield* fs.makeDirectory(protocols, { recursive: true });
-        yield* fs.writeFileString(path.join(protocols, "capture.xml"), "BSD protocol notice");
-        for (const backend of ["kde", "hyprland"] as const) {
-          for (const [arch, target] of [
-            ["x64", "x86_64-unknown-linux-gnu"],
-            ["arm64", "aarch64-unknown-linux-gnu"],
-          ] as const) {
-            const binary = path.join(
-              repoRoot,
-              `native/${backend}-snap-shot/target`,
-              target,
-              `release/t3-${backend}-snap-shot`,
-            );
-            const stageResourcesDir = path.join(repoRoot, "stage", backend, arch);
-            const spawner = Layer.succeed(
-              ChildProcessSpawner.ChildProcessSpawner,
-              ChildProcessSpawner.make((command) =>
-                Effect.gen(function* () {
-                  assert.equal(command._tag, "StandardCommand");
-                  if (command._tag !== "StandardCommand") return mockProcess(1);
-                  assert.equal(command.command, "cargo");
-                  assert.deepEqual(command.args, [
-                    "build",
-                    "--locked",
-                    "--release",
-                    "--manifest-path",
-                    path.join(repoRoot, `native/${backend}-snap-shot/Cargo.toml`),
-                    "--target",
-                    target,
-                  ]);
-                  yield* fs.makeDirectory(path.dirname(binary), { recursive: true });
-                  yield* fs.writeFileString(binary, `helper-${arch}`);
-                  return mockProcess(0);
-                }),
-              ),
-            );
-            yield* stageLinuxCaptureHelper({
-              backend,
-              repoRoot,
-              stageResourcesDir,
-              arch,
-              verbose: false,
-            }).pipe(Effect.provide(spawner));
-            const installed = path.join(
-              stageResourcesDir,
-              `${backend}-capture/t3-${backend}-snap-shot`,
-            );
-            assert.equal(yield* fs.readFileString(installed), `helper-${arch}`);
-            assert.equal((yield* fs.stat(installed)).mode & 0o777, 0o755);
-            if (backend === "hyprland")
-              assert.equal(
-                yield* fs.readFileString(
-                  path.join(stageResourcesDir, "hyprland-capture/protocols/capture.xml"),
-                ),
-                "BSD protocol notice",
-              );
-          }
-        }
-      }),
-    ),
-  );
-
   // The fixture's t3code.exe is a text placeholder, not an executable. These
   // cases reach the native-load probe, so pin only that host-platform check to
   // Linux. Host-native paths and the real Windows tar/archive checks still run.
@@ -1451,26 +1376,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         assert.deepStrictEqual(result.unpackedFiles, ["node_modules/native/addon.node"]);
         assert.isBelow(result.fileCount, WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT);
         assert.deepStrictEqual(secondAsar, firstAsar);
-      }),
-    ).pipe(Effect.provideService(HostProcess.Platform, "linux")),
-  );
-
-  it.effect("accepts an embedded Linux CLI release archive with a matching digest", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fixture = yield* makeWindowsPayloadFixture({
-          copyUnpackedNatives: true,
-          wslRuntime: "valid",
-        });
-        const result = yield* validateWindowsPackagedPayload({
-          stageDistDir: fixture.stageDistDir,
-          appExecutableName: fixture.appExecutableName,
-          targetArch: "x64",
-          appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
-          expectWslRuntime: true,
-        });
-
-        assert.equal(result.packagedAppDir, fixture.packagedAppDir);
       }),
     ).pipe(Effect.provideService(HostProcess.Platform, "linux")),
   );
@@ -1559,27 +1464,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
         assert.instanceOf(error, WindowsPackagedPayloadValidationError);
         assert.equal(error.reason, "wsl-runtime-missing");
-      }),
-    ),
-  );
-
-  it.effect("rejects a loose server tree that is not a Linux CLI release archive", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fixture = yield* makeWindowsPayloadFixture({
-          copyUnpackedNatives: true,
-          wslRuntime: "loose-server-tree",
-        });
-        const error = yield* validateWindowsPackagedPayload({
-          stageDistDir: fixture.stageDistDir,
-          appExecutableName: fixture.appExecutableName,
-          targetArch: "x64",
-          appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
-          expectWslRuntime: true,
-        }).pipe(Effect.flip);
-
-        assert.instanceOf(error, WindowsPackagedPayloadValidationError);
-        assert.equal(error.reason, "wsl-runtime-invalid");
       }),
     ),
   );
@@ -1694,49 +1578,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     );
   });
 
-  it.effect("builds the Linux browser secret helper for a concrete architecture", () => {
-    const commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }> = [];
-    const spawnerLayer = Layer.succeed(
-      ChildProcessSpawner.ChildProcessSpawner,
-      ChildProcessSpawner.make((command) => {
-        commands.push(command as unknown as (typeof commands)[number]);
-        return Effect.succeed(mockProcess(0));
-      }),
-    );
-
-    return Effect.gen(function* () {
-      // `universal` is a mac-only arch the option type still admits. The helper
-      // script only knows x64 and arm64, so the request maps to x64, the same
-      // concrete target the Linux resource monitor resolves it to.
-      yield* stageBrowserSecret({
-        repoRoot: "/repo",
-        stageResourcesDir: "/stage/resources",
-        platform: "linux",
-        arch: "universal",
-        verbose: false,
-      });
-      const helper = commands.find((command) =>
-        command.args.some((arg) => arg.endsWith("build-browser-secret.mjs")),
-      );
-      assert.isDefined(helper);
-      const path = yield* Path.Path;
-      assert.deepStrictEqual(helper.args.slice(-4), [
-        "--arch",
-        "x64",
-        "--output",
-        path.join("/stage/resources", "browser-secret", "t3-browser-secret"),
-      ]);
-    }).pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          spawnerLayer,
-          Layer.succeed(HostProcess.Platform, "linux"),
-          Layer.succeed(HostProcess.Architecture, "x64"),
-        ),
-      ),
-    );
-  });
-
   it.effect("refuses a Linux build on a host that cannot build the browser secret helper", () => {
     const commands: Array<{ readonly command: string }> = [];
     const spawnerLayer = Layer.succeed(
@@ -1748,9 +1589,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     );
 
     return Effect.gen(function* () {
-      // The helper links against the host's libsecret and its build script is
-      // a no-op elsewhere, so a Linux artifact built on macOS would ship
-      // without it and report the keyring as unavailable on every import.
       const error = yield* stageBrowserSecret({
         repoRoot: "/repo",
         stageResourcesDir: "/stage/resources",
@@ -1942,115 +1780,23 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it.effect("rejects a sidecar whose extracted server bundle cannot resolve", () =>
     Effect.scoped(
       Effect.gen(function* () {
+        const path = yield* Path.Path;
         const fixture = yield* makeWindowsPayloadFixture({
           copyUnpackedNatives: true,
           serverEntrySource: 'import "t3code-deliberately-missing-package";\n',
         });
-        const error = yield* validateWindowsPackagedPayload({
-          stageDistDir: fixture.stageDistDir,
-          appExecutableName: fixture.appExecutableName,
-          targetArch: "x64",
-          appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
+        const error = yield* verifyPackagedBundleIsSelfContained({
+          asarPath: path.join(fixture.packagedAppDir, "resources", WINDOWS_SERVER_ASAR_RESOURCE),
+          verbose: false,
         }).pipe(Effect.flip);
 
         assert.instanceOf(error, BundleNotSelfContainedError);
         assert.include(error.output, "t3code-deliberately-missing-package");
       }),
-    ).pipe(Effect.provideService(HostProcess.Platform, "linux")),
-  );
-
-  it.effect("preserves both Linux icon resize failures with structural context", () => {
-    const commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }> = [];
-
-    return Effect.gen(function* () {
-      const error = yield* stageLinuxIconSize("source.png", "target.png", 512, false).pipe(
-        Effect.provide(iconResizeSpawnerLayer(commands, [1, 2])),
-        Effect.flip,
-      );
-
-      assert.instanceOf(error, LinuxIconResizeError);
-      assert.equal(error.operation, "resize");
-      assert.equal(error.iconSize, 512);
-      assert.equal(error.primaryTool, "magick");
-      assert.equal(error.fallbackTool, "convert");
-      assert.include(error.message, "512x512");
-      assert.include(error.message, "`magick`");
-      assert.include(error.message, "`convert`");
-      assert.notInclude(error.message, "non-zero exit code");
-
-      assert.instanceOf(error.cause, AggregateError);
-      const aggregateCause = error.cause as AggregateError;
-      assert.lengthOf(aggregateCause.errors, 2);
-      assert.strictEqual(aggregateCause.cause, aggregateCause.errors[0]);
-      assert.instanceOf(aggregateCause.errors[0], BuildCommandFailedError);
-      assert.instanceOf(aggregateCause.errors[1], BuildCommandFailedError);
-      const primaryError = aggregateCause.errors[0] as BuildCommandFailedError;
-      const fallbackError = aggregateCause.errors[1] as BuildCommandFailedError;
-      assert.equal(primaryError.command, "magick linux icon 512x512");
-      assert.equal(primaryError.exitCode, 1);
-      assert.include(primaryError.message, "magick linux icon");
-      assert.equal(fallbackError.command, "convert linux icon 512x512");
-      assert.equal(fallbackError.exitCode, 2);
-      assert.include(fallbackError.message, "convert linux icon");
-      assert.deepStrictEqual(
-        commands.map(({ command }) => command),
-        ["magick", "convert"],
-      );
-    });
-  });
-
-  it.effect("rasterizes staged DMG backgrounds at standard and Retina sizes", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const stageResourcesDir = yield* fs.makeTempDirectoryScoped({
-          prefix: "t3code-dmg-background-",
-        });
-        const dmgDir = path.join(stageResourcesDir, "dmg");
-        yield* fs.makeDirectory(dmgDir, { recursive: true });
-        const sourcePath = path.join(dmgDir, "dmg-background-nightly.svg");
-        yield* fs.writeFileString(sourcePath, '<svg xmlns="http://www.w3.org/2000/svg"/>');
-        const commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }> =
-          [];
-
-        yield* stageDesktopDmgBackground(stageResourcesDir, "nightly", false).pipe(
-          Effect.provide(iconResizeSpawnerLayer(commands, [0, 0])),
-        );
-
-        assert.deepStrictEqual(
-          commands.map((command) => [command.command, ...command.args]),
-          [
-            [
-              "sips",
-              "-s",
-              "format",
-              "png",
-              "-z",
-              "432",
-              "640",
-              sourcePath,
-              "--out",
-              path.join(dmgDir, "dmg-background-nightly.png"),
-            ],
-            [
-              "sips",
-              "-s",
-              "format",
-              "png",
-              "-z",
-              "864",
-              "1280",
-              sourcePath,
-              "--out",
-              path.join(dmgDir, "dmg-background-nightly@2x.png"),
-            ],
-          ],
-        );
-      }),
     ),
   );
 
+<<<<<<< HEAD
   it.effect("rasterizes the fork's own DMG background for the infinitus channel", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -2085,21 +1831,29 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   );
 
   it.effect("fails clearly when the selected DMG background source is missing", () =>
+=======
+  it.effect("leaves the bundle self-check of a cross-built payload to the verify job", () =>
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
     Effect.scoped(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const stageResourcesDir = yield* fs.makeTempDirectoryScoped({
-          prefix: "t3code-dmg-background-missing-",
+        const fixture = yield* makeWindowsPayloadFixture({
+          copyUnpackedNatives: true,
+          serverEntrySource: 'import "t3code-deliberately-missing-package";\n',
         });
-
-        const error = yield* stageDesktopDmgBackground(stageResourcesDir, "latest", false).pipe(
-          Effect.flip,
-        );
-
-        assert.instanceOf(error, DesktopDmgBackgroundSourceMissingError);
-        assert.equal(error.channel, "latest");
-        assert.include(error.sourcePath, "dmg-background-latest.svg");
+        yield* validateWindowsPackagedPayload({
+          stageDistDir: fixture.stageDistDir,
+          appExecutableName: fixture.appExecutableName,
+          targetArch: "arm64",
+          appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
+        });
       }),
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          Layer.succeed(HostProcess.Platform, "linux"),
+          Layer.succeed(HostProcess.Architecture, "x64"),
+        ),
+      ),
     ),
   );
 
@@ -2157,13 +1911,19 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.include(entitlements, "<string>webcredentials:clerk.example.com</string>");
     assert.include(entitlements, "<string>webcredentials:example.clerk.accounts.dev</string>");
     assert.include(entitlements, "<key>com.apple.security.cs.allow-jit</key>");
+    assert.match(entitlements, /<key>com\.apple\.security\.device\.camera<\/key>\s*<true\/>/u);
+    assert.match(entitlements, /<key>com\.apple\.security\.device\.audio-input<\/key>\s*<true\/>/u);
     assert.notInclude(entitlements, "keychain-access-groups");
     assert.notInclude(entitlements, "com.apple.developer.web-browser.public-key-credential");
   });
 
   it("grants in-app browser passkey entitlements only when the provisioning profile does", () => {
+<<<<<<< HEAD
     const configuration = { appId: "run.infinitus.desktop", teamId: "ABC1234567" };
     // Profiles are CMS envelopes around a plain XML plist.
+=======
+    const configuration = { appId: "com.t3tools.t3code", teamId: "ABC1234567" };
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
     const profile = (entitlements: string, outside = "") =>
       `0\x82\x1f\x9a\x06\t*\x86H<?xml version="1.0"?><plist version="1.0"><dict>${outside}<key>Entitlements</key><dict>${entitlements}</dict></dict></plist>\x00\x01`;
     const teamWildcardGroups = `<key>keychain-access-groups</key>
@@ -2183,8 +1943,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       ),
       { touchIdKeychainAccessGroup: undefined, browserPasskeys: false },
     );
-    // Only real values inside the Entitlements dict count: not comments, not
-    // explicit false, not keys elsewhere in the profile.
     assert.deepStrictEqual(
       resolveMacWebAuthnEntitlements(
         profile(
@@ -2290,17 +2048,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.notInclude(invalidPublishableKeyError.message, "pk_test_%");
   });
 
-  it("preserves known passkey signing configuration errors at the build boundary", () => {
-    const decodingCause = new Error("publishable-key-decode-failed");
-    const knownError = new InvalidMacPasskeyPublishableKeyError({ cause: decodingCause });
-    const error = MacPasskeySigningConfigurationResolutionError.fromCause(knownError);
-
-    assert.strictEqual(error, knownError);
-    assert.instanceOf(error, InvalidMacPasskeyPublishableKeyError);
-    assert.strictEqual(error.cause, decodingCause);
-    assert.isTrue(isMacPasskeySigningConfigurationError(error));
-  });
-
   it("wraps unknown passkey signing configuration defects without copying cause text", () => {
     const secret = "pk_test_do-not-retain";
     const cause = new Error(secret);
@@ -2312,13 +2059,15 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.notInclude(error.message, secret);
   });
 
-  it.effect("adds passkey entitlements and both renderer protocols to signed macOS builds", () =>
+  it.effect("signs Windows builds with signtool on Windows and the jsign hook elsewhere", () =>
     Effect.gen(function* () {
-      const config = yield* createBuildConfig("mac", "dmg", "1.2.3", true, false, undefined, {
-        entitlementsPath: "/tmp/entitlements.mac.plist",
-        provisioningProfilePath: "/tmp/t3code.provisionprofile",
-      });
+      const signedWinConfig = (hostPlatform: string) =>
+        createBuildConfig("win", "nsis", "1.2.3", true, false, undefined, undefined).pipe(
+          Effect.map((config) => config.win as Record<string, unknown>),
+          Effect.provideService(HostProcess.Platform, hostPlatform),
+        );
 
+<<<<<<< HEAD
       const mac = config.mac as Record<string, unknown>;
       assert.equal(config.appId, "run.infinitus.desktop");
       assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
@@ -2416,6 +2165,34 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(wslRuntimeArchiveStem("1.2.3", "x64"), "infinitus-1.2.3-linux-x64");
   });
 
+=======
+      const onWindows = yield* signedWinConfig("win32");
+      assert.equal((onWindows.azureSignOptions as Record<string, unknown>).publisherName, "T3");
+      assert.notProperty(onWindows, "signtoolOptions");
+
+      const onLinux = yield* signedWinConfig("linux");
+      assert.notProperty(onLinux, "azureSignOptions");
+      const signtoolOptions = onLinux.signtoolOptions as Record<string, unknown>;
+      assert.match(signtoolOptions.sign as string, /scripts[\\/]lib[\\/]windows-jsign\.ts$/);
+      assert.deepStrictEqual(signtoolOptions.signingHashAlgorithms, ["sha256"]);
+      assert.deepStrictEqual(signtoolOptions.publisherName, ["T3"]);
+    }).pipe(
+      Effect.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnv({
+            env: {
+              AZURE_TRUSTED_SIGNING_PUBLISHER_NAME: "T3",
+              AZURE_TRUSTED_SIGNING_ENDPOINT: "https://eus.codesigning.azure.net/",
+              AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME: "profile",
+              AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: "account",
+            },
+          }),
+        ),
+      ),
+    ),
+  );
+
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
   it("parses Windows bsdtar member listings with CRLF line endings", () => {
     assert.deepStrictEqual(
       parseWslRuntimeArchiveMembers(
@@ -2446,14 +2223,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           fs.readFile(archivePath),
         ]);
         assert.deepStrictEqual(staged, source);
-        // The digest both gates installation inside the distro and names the
-        // extracted runtime's cache directory.
         const hash = yield* fs.readFileString(hashPath);
         assert.equal(hash, `${NodeCrypto.createHash("sha256").update(source).digest("hex")}\n`);
       }),
     ),
   );
 
+<<<<<<< HEAD
   it.effect("fails when the Linux CLI archive handed to the build does not exist", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -2602,6 +2378,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
   it.effect("rejects universal builds on Linux and Windows before staging binaries", () =>
     Effect.gen(function* () {
       for (const platform of ["linux", "win"] as const) {
@@ -2670,28 +2448,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   );
 });
 
-// The self-containment check runs the packaged tree in a scratch directory. Its
-// own node_modules holds the sidecar externals and must be ignored, but any
-// node_modules *above* it would let Node's parent walk satisfy an import that is
-// missing from the package, so the probe refuses to run in that case.
-it("lists ancestor node_modules, nearest first, excluding the start directory", () => {
-  assert.deepStrictEqual(ancestorNodeModulesPaths("C:\\tmp\\probe\\app", "\\"), [
-    "C:\\tmp\\probe\\node_modules",
-    "C:\\tmp\\node_modules",
-    "C:\\node_modules",
-  ]);
-});
-
-it("includes the filesystem root for posix paths", () => {
-  assert.deepStrictEqual(ancestorNodeModulesPaths("/tmp/probe", "/"), [
-    "/tmp/node_modules",
-    "/node_modules",
-  ]);
-});
-
-// A UNC root must keep its \\server\share prefix. Rebuilding it from segments
-// produced relative paths, which fs.exists resolves against the build cwd, so
-// the guard checked directories that do not exist and silently passed.
 it("keeps the prefix of a UNC path instead of going relative", () => {
   const paths = ancestorNodeModulesPaths("\\\\server\\share\\tmp\\app", "\\");
   for (const candidate of paths) {
@@ -2744,10 +2500,3 @@ it.effect.skipIf(!symlinksSupported)("rebases packaged links into the isolated t
     );
   }).pipe(Effect.provide(NodeServices.layer)),
 );
-
-it("ignores trailing separators", () => {
-  assert.deepStrictEqual(
-    ancestorNodeModulesPaths("C:\\tmp\\probe\\app\\", "\\"),
-    ancestorNodeModulesPaths("C:\\tmp\\probe\\app", "\\"),
-  );
-});

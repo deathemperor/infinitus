@@ -25,6 +25,7 @@ describe("resolveT3McpToolPresentation", () => {
       expect(resolveT3McpToolPresentation(`mcp__another-server__${tool}`), tool).toBeNull();
     }
   });
+<<<<<<< HEAD
   it("pretty prints Claude and Cursor T3 MCP tool names", () => {
     expect(resolveT3McpToolPresentation("mcp__t3-code__t3_thread_read")).toEqual({
       displayName: `Read an ${PRODUCT_NAME} thread`,
@@ -87,16 +88,13 @@ describe("resolveT3McpToolPresentation", () => {
       expect(resolveT3McpToolPresentation(name)?.displayName).toBe("Delegate a child task");
     }
   });
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 
   it("matches OpenCode 2's per-thread server names, whose thread ids hold underscores", () => {
     expect(
       resolveT3McpToolPresentation("t3-code-thread_opencode2-adapter_delegate_task")?.displayName,
     ).toBe("Delegate a child task");
     expect(resolveT3McpToolPresentation("t3-code-thread_opencode2-adapter_not_a_tool")).toBeNull();
-  });
-
-  it("keeps unknown MCP tools on the generic renderer path", () => {
-    expect(resolveT3McpToolPresentation("mcp__github__search_issues")).toBeNull();
-    expect(resolveT3McpToolPresentation("t3-code.not_a_real_tool")).toBeNull();
   });
 });

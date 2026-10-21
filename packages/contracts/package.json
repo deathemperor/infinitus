@@ -1,6 +1,6 @@
 {
   "name": "@infinitus/contracts",
-  "version": "0.0.45",
+  "version": "0.1.1",
   "private": true,
   "files": [
     "dist"

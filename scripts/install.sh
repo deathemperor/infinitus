@@ -230,7 +230,15 @@ fi
 
 step "Setting up the t3 command..."
 mkdir -p "$bin_dir"
+<<<<<<< HEAD
 ln -sfn "${target_dir}/infinitus" "${bin_dir}/infinitus"
+=======
+ln -sfn "${target_dir}/t3" "${bin_dir}/t3"
+# Pruning keeps what this launcher points at; a background service cannot see bin_dir otherwise.
+launcher="$(CDPATH='' cd -P -- "$bin_dir" && pwd)/t3"
+launchers="${t3_home}/runtime/launchers"
+grep -qxF "$launcher" "$launchers" 2>/dev/null || printf '%s\n' "$launcher" >> "$launchers"
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 if "$interactive"; then printf '\r\033[2K' >&2; fi
 printf '  %sInstalled Infinitus %s%s\n\n' "$green" "$version" "$reset" >&2
 case ":${PATH}:" in

@@ -1,18 +1,15 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import * as Deferred from "effect/Deferred";
 import * as Crypto from "effect/Crypto";
 import type * as Duration from "effect/Duration";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Hex from "effect/encoding/Hex";
-import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
-import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import * as NodeZlib from "node:zlib";
 
@@ -26,7 +23,6 @@ const executableName =
   hostPlatform === "win32" ? "chrome-headless-shell.exe" : "chrome-headless-shell";
 const ROOT = "chrome-headless-shell-fixture/";
 
-/** A stored ZIP whose entries carry Unix modes, like Chrome for Testing's archives. */
 const makeZip = (
   entries: ReadonlyArray<{ readonly name: string; readonly data?: string; readonly mode: number }>,
 ) => {
@@ -130,7 +126,6 @@ it.layer(NodeServices.layer)("PreviewBrowser", (it) => {
     Effect.gen(function* () {
       const { browser, fs, path, installRoot, requests } = yield* makeHarness();
       yield* fs.makeDirectory(path.join(installRoot, "1.0.0"), { recursive: true });
-      // Another server's install in progress, and one abandoned two hours ago.
       const active = path.join(installRoot, ".install-other");
       const abandoned = path.join(installRoot, ".install-abandoned");
       yield* fs.makeDirectory(active);
@@ -151,7 +146,6 @@ it.layer(NodeServices.layer)("PreviewBrowser", (it) => {
         expect(yield* mode("libEGL.so")).toBe(0o755);
         expect(yield* mode(path.join("locales", "en-US.pak"))).toBe(0o644);
       }
-      // The old build and stale staging directories are gone; a fresh one stays.
       expect((yield* fs.readDirectory(installRoot)).toSorted()).toEqual([
         ".install-other",
         "1.2.3",
@@ -207,6 +201,7 @@ it.layer(NodeServices.layer)("PreviewBrowser", (it) => {
       );
     }),
   );
+<<<<<<< HEAD
 
   it.effect("shares one install between callers and finishes it after they stop waiting", () =>
     Effect.gen(function* () {
@@ -298,4 +293,6 @@ it("tells the agent how far the install has come", () => {
   ).toBe(
     `${PRODUCT_NAME} is installing its headless browser (37 of 120 MB downloaded). Try again in a minute.`,
   );
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 });

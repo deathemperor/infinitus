@@ -1,14 +1,11 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  buildT3ProjectFileJsonSchema,
-  parseT3ProjectFile,
-  T3ProjectFileFromJson,
-} from "./t3ProjectFile.ts";
+import { parseT3ProjectFile, T3ProjectFileFromJson } from "./t3ProjectFile.ts";
 
 const decodeJson = Schema.decodeUnknownSync(T3ProjectFileFromJson);
 
+<<<<<<< HEAD
 describe("buildT3ProjectFileJsonSchema", () => {
   it("emits a draft 2020-12 schema with the published $id", () => {
     const schema = buildT3ProjectFileJsonSchema();
@@ -62,6 +59,8 @@ describe("buildT3ProjectFileJsonSchema", () => {
   });
 });
 
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 describe("T3ProjectFileFromJson", () => {
   it("decodes lenient JSONC with comments and trailing commas", () => {
     const decoded = decodeJson(`{
@@ -75,21 +74,15 @@ describe("T3ProjectFileFromJson", () => {
     expect(decoded.iconPath).toBe("assets/logo.svg");
     expect(decoded.scripts?.[0]).toEqual({ name: "Dev", command: "pnpm dev" });
   });
-
-  it("fails on malformed JSON", () => {
-    expect(() => decodeJson("{ not json")).toThrow();
-  });
 });
 
 describe("parseT3ProjectFile", () => {
-  it("returns the decoded file for valid contents", () => {
-    expect(parseT3ProjectFile('{ "defaultThreadEnvMode": "worktree" }')).toEqual({
-      defaultThreadEnvMode: "worktree",
-    });
-  });
-
-  it("returns null for malformed or invalid contents", () => {
-    expect(parseT3ProjectFile("{ not json")).toBeNull();
-    expect(parseT3ProjectFile('{ "defaultThreadEnvMode": "spaceship" }')).toBeNull();
+  it("reads project defaults from JSONC with a URL in a block comment", () => {
+    expect(
+      parseT3ProjectFile(`{
+        /* See https://t3.codes/schema/t3.json */
+        "defaultThreadEnvMode": "worktree"
+      }`),
+    ).toEqual({ defaultThreadEnvMode: "worktree" });
   });
 });

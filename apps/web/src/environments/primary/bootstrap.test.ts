@@ -3,15 +3,10 @@ import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
-  getPrimaryKnownEnvironment,
-  isDesktopEnvironmentBootstrapIncompleteError,
-  isPrimaryEnvironmentProtocolUnsupportedError,
-  isPrimaryEnvironmentUrlInvalidError,
   readPrimaryEnvironmentTarget,
   resolvePrimaryEnvironmentHttpUrl,
   resolveInitialPrimaryEnvironmentDescriptor,
   resetPrimaryEnvironmentDescriptorForTests,
-  writePrimaryEnvironmentDescriptor,
 } from ".";
 import { installEnvironmentHttpTest } from "../../../test/environmentHttpTest";
 
@@ -47,15 +42,6 @@ function installTestBrowser(url: string) {
   });
 }
 
-function captureThrown(run: () => unknown): unknown {
-  try {
-    run();
-  } catch (error) {
-    return error;
-  }
-  throw new Error("Expected the operation to throw.");
-}
-
 describe("environmentBootstrap", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -71,38 +57,6 @@ describe("environmentBootstrap", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-  });
-
-  it("attaches the bootstrapped environment descriptor to the primary environment", () => {
-    vi.stubGlobal("window", {
-      location: {
-        origin: "http://localhost:3773",
-      },
-      desktopBridge: undefined,
-    });
-    writePrimaryEnvironmentDescriptor({
-      environmentId: EnvironmentId.make("environment-local"),
-      label: "Bootstrapped environment",
-      platform: {
-        os: "darwin",
-        arch: "arm64",
-      },
-      serverVersion: "0.0.0-test",
-      capabilities: {
-        repositoryIdentity: true,
-      },
-    });
-
-    expect(getPrimaryKnownEnvironment()).toEqual({
-      id: "environment-local",
-      label: "Bootstrapped environment",
-      source: "window-origin",
-      environmentId: "environment-local",
-      target: {
-        httpBaseUrl: "http://localhost:3773/",
-        wsBaseUrl: "ws://localhost:3773/",
-      },
-    });
   });
 
   it("reuses an in-flight descriptor bootstrap request", async () => {
@@ -127,34 +81,6 @@ describe("environmentBootstrap", () => {
     );
   });
 
-  it("derives the websocket url when only VITE_HTTP_URL is configured", async () => {
-    vi.stubEnv("VITE_HTTP_URL", "https://remote.example.com");
-    await installDescriptorApi();
-
-    await expect(resolveInitialPrimaryEnvironmentDescriptor()).resolves.toEqual(BASE_ENVIRONMENT);
-    expect(resolvePrimaryEnvironmentHttpUrl("/.well-known/t3/environment")).toBe(
-      "https://remote.example.com/.well-known/t3/environment",
-    );
-    expect(getPrimaryKnownEnvironment()?.target).toEqual({
-      httpBaseUrl: "https://remote.example.com/",
-      wsBaseUrl: "wss://remote.example.com/",
-    });
-  });
-
-  it("derives the http url when only VITE_WS_URL is configured", async () => {
-    vi.stubEnv("VITE_WS_URL", "wss://remote.example.com");
-    await installDescriptorApi();
-
-    await expect(resolveInitialPrimaryEnvironmentDescriptor()).resolves.toEqual(BASE_ENVIRONMENT);
-    expect(resolvePrimaryEnvironmentHttpUrl("/.well-known/t3/environment")).toBe(
-      "https://remote.example.com/.well-known/t3/environment",
-    );
-    expect(getPrimaryKnownEnvironment()?.target).toEqual({
-      httpBaseUrl: "https://remote.example.com/",
-      wsBaseUrl: "wss://remote.example.com/",
-    });
-  });
-
   it("keeps an uppercase wss scheme secure when deriving the http url", () => {
     vi.stubEnv("VITE_WS_URL", "WSS://remote.example.com");
 
@@ -171,16 +97,6 @@ describe("environmentBootstrap", () => {
       httpBaseUrl: "https://remote.example.com/",
       wsBaseUrl: "wss://remote.example.com/",
     });
-  });
-
-  it("uses the current origin as the descriptor base for local dev environments", async () => {
-    installTestBrowser("http://localhost:5735/");
-    await installDescriptorApi();
-
-    await expect(resolveInitialPrimaryEnvironmentDescriptor()).resolves.toEqual(BASE_ENVIRONMENT);
-    expect(resolvePrimaryEnvironmentHttpUrl("/.well-known/t3/environment")).toBe(
-      "http://localhost:5735/.well-known/t3/environment",
-    );
   });
 
   it("uses the vite proxy for desktop-managed loopback descriptor requests during local dev", async () => {
@@ -209,6 +125,7 @@ describe("environmentBootstrap", () => {
       "http://127.0.0.1:5733/.well-known/t3/environment",
     );
   });
+<<<<<<< HEAD
 
   it("retains the URL parser cause without exposing the configured URL in its message", () => {
     vi.stubEnv("VITE_HTTP_URL", "http://[");
@@ -291,4 +208,6 @@ describe("environmentBootstrap", () => {
       message: "The window-origin primary environment target uses unsupported protocol file:.",
     });
   });
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 });

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { formatStartupCrashReport, parseStartupCrashRecords } from "./crash-log-model";
+import { parseStartupCrashRecords } from "./crash-log-model";
 
-// Verbatim shape of the entry expo-updates wrote for the build 56 launch crash.
 const BUNDLE =
   "/Users/expo/workingdir/build/apps/mobile/ios/build/Build/Intermediates.noindex/ArchiveIntermediates/T3Code/BuildProductsPath/Release-iphoneos/main.jsbundle";
 const FATAL = {
@@ -45,6 +44,7 @@ describe("parseStartupCrashRecords", () => {
     ]);
     expect(records.map((record) => record.timestamp)).toEqual([20, 10]);
   });
+<<<<<<< HEAD
 
   it("skips a runtime error entry without a description line", () => {
     expect(
@@ -71,4 +71,6 @@ describe("formatStartupCrashReport", () => {
       "Infinitus 1.1.1 (56)\nNo startup crashes recorded.",
     );
   });
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 });

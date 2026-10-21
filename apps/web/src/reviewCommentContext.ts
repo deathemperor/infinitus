@@ -2,6 +2,8 @@ import type { FileDiffMetadata, SelectedLineRange, SelectionSide } from "@pierre
 import { PullRequestContextMetadata, type PullRequestReviewPosition } from "@infinitus/contracts";
 import * as Schema from "effect/Schema";
 
+import { isLineInFileDiff } from "./components/pullRequest/pullRequestDiff.logic";
+
 const ReviewCommentSelectionSchema = Schema.Struct({
   start: Schema.Number,
   side: Schema.Literals(["additions", "deletions"]),
@@ -331,7 +333,6 @@ function findDiffReviewLineIndex(
     : findOnSide(selectedSide === "left" ? "right" : "left");
 }
 
-/** Resolve the host-facing coordinates of a line selected in the diff viewer. */
 export function resolveDiffReviewPosition(
   fileDiff: FileDiffMetadata,
   lineNumber: number,
@@ -345,13 +346,25 @@ export function resolveDiffReviewPosition(
   })[0];
   if (line === undefined) return null;
 
+  // An explicit selection must not resolve to a same-numbered line on the other side.
+  if (
+    (side === "additions" && line.newLineNumber !== lineNumber) ||
+    (side === "deletions" && line.oldLineNumber !== lineNumber)
+  ) {
+    return null;
+  }
+
   switch (line.change) {
     case "add":
       return line.newLineNumber === null ? null : { kind: "added", newLine: line.newLineNumber };
     case "delete":
       return line.oldLineNumber === null ? null : { kind: "deleted", oldLine: line.oldLineNumber };
     case "context":
-      return line.oldLineNumber === null || line.newLineNumber === null
+      // An expanded file also shows the gaps between hunks, and GitHub rejects a whole review
+      // over one comment anchored there.
+      return line.oldLineNumber === null ||
+        line.newLineNumber === null ||
+        !isLineInFileDiff(fileDiff, "right", line.newLineNumber)
         ? null
         : {
             kind: "context",

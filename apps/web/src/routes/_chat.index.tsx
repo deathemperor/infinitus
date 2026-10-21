@@ -1,27 +1,30 @@
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { scopeProjectRef } from "@infinitus/client-runtime/environment";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { LinkIcon, PlusIcon } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { isLocalEnvironmentDisabled } from "../localEnvironment";
 import { isElectron } from "../env";
 import { NoProjectsHero } from "../components/NoProjectsHero";
 import { sortScopedProjectsForSidebar } from "../components/Sidebar.logic";
 import { Button } from "../components/ui/button";
+import { HostedEmptyState } from "../components/HostedEmptyState";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty";
 import { SidebarInset } from "../components/ui/sidebar";
 import { WorkspacePageHeader } from "../components/WorkspacePageHeader";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import {
+  readProject,
   useAllEnvironmentShellsBootstrapped,
   useProjects,
   useThreadShells,
 } from "../state/entities";
 import { useEnvironments } from "../state/environments";
+<<<<<<< HEAD
 import { APP_DISPLAY_NAME } from "~/branding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
 
 function ChatIndexRouteView() {
   const { authGateState } = Route.useRouteContext();
@@ -29,17 +32,12 @@ function ChatIndexRouteView() {
 
   if (authGateState.status === "hosted-static") {
     if (!isReady) return null;
-    if (environments.length === 0) return <HostedStaticOnboardingState />;
+    if (environments.length === 0) return <HostedEmptyState />;
   }
 
   return <IndexDraftLanding />;
 }
 
-/**
- * Landing on the index route drops straight into a draft thread for the most
- * recently active project, so the first screen is a prompt instead of a dead
- * end. Falls back to an add-project hero when no project exists yet.
- */
 function IndexDraftLanding() {
   const projects = useProjects();
   const threads = useThreadShells();
@@ -49,34 +47,34 @@ function IndexDraftLanding() {
   // Read at effect time: this page stays mounted while a navigation away from
   // "/" is still loading, but the router already points at the new location.
   const isStillOnIndex = useEffectEvent(() => router.state.location.pathname === "/");
-  const startingRef = useRef(false);
+  const startedAttemptRef = useRef<number | null>(null);
   const [startState, setStartState] = useState({ failed: false, retryRequest: 0 });
 
-  const mostRecentProject = useMemo(
-    () =>
-      bootstrapped
-        ? (sortScopedProjectsForSidebar(projects, threads, "updated_at")[0] ?? null)
-        : null,
-    [bootstrapped, projects, threads],
-  );
+  const mostRecentProject =
+    sortScopedProjectsForSidebar(projects, threads, "updated_at")[0] ?? null;
+  const attempt = startState.retryRequest;
 
   useEffect(() => {
     // Starting a draft after the user has left would replace the page they picked.
-    if (mostRecentProject === null || startingRef.current || !isStillOnIndex()) {
+    if (mostRecentProject === null || startedAttemptRef.current === attempt || !isStillOnIndex()) {
       return;
     }
-    startingRef.current = true;
-    void handleNewThread(scopeProjectRef(mostRecentProject.environmentId, mostRecentProject.id), {
-      replace: true,
-    }).catch(() => {
-      startingRef.current = false;
-      setStartState((state) => ({ ...state, failed: true }));
-    });
-  }, [handleNewThread, mostRecentProject, startState.retryRequest]);
+    const projectRef = scopeProjectRef(mostRecentProject.environmentId, mostRecentProject.id);
+    if (readProject(projectRef) === null) {
+      return;
+    }
+    startedAttemptRef.current = attempt;
+    void handleNewThread(projectRef, { replace: true })
+      .then((opened) => {
+        if (opened === null) {
+          setStartState((state) => ({ ...state, retryRequest: state.retryRequest + 1 }));
+        }
+      })
+      .catch(() => {
+        setStartState((state) => ({ ...state, failed: true }));
+      });
+  }, [attempt, handleNewThread, mostRecentProject]);
 
-  if (!bootstrapped) {
-    return null;
-  }
   if (mostRecentProject !== null) {
     return startState.failed ? (
       <DraftStartError
@@ -89,9 +87,8 @@ function IndexDraftLanding() {
       />
     ) : null;
   }
-  // First-run routing to the welcome wizard happens in FirstRunGate at the
-  // root, before this route ever renders.
-  return <NoProjectsHero />;
+  // A pending environment cannot prove the workspace is empty.
+  return bootstrapped ? <NoProjectsHero /> : null;
 }
 
 function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
@@ -119,6 +116,7 @@ function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
 export const Route = createFileRoute("/_chat/")({
   component: ChatIndexRouteView,
 });
+<<<<<<< HEAD
 
 function HostedStaticOnboardingState() {
   const cloudEnabled = hasCloudPublicConfig();
@@ -166,3 +164,5 @@ function HostedStaticOnboardingState() {
     </SidebarInset>
   );
 }
+=======
+>>>>>>> upstream-sync-4f651cb10-upstream-renamed
