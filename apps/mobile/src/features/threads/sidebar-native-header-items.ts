@@ -31,29 +31,30 @@ function toNativeHeaderMenuItems(items: HomeListFilterMenu["items"]): NativeHead
   );
 }
 
-/**
- * Right-side UINavigationBar items for the sidebar column: the thread list
- * filter/sort menu plus the settings button, sharing one glass capsule —
- * the Messages-style grouped header buttons. The embedded sidebar keeps these
- * beside its title; only the detail column uses the Duo's vertical bar.
- */
+export function createSidebarFilterHeaderItem(input: {
+  readonly filterIcon: string;
+  readonly filterMenu: HomeListFilterMenu;
+}): NativeStackHeaderItemMenu {
+  return withNativeGlassHeaderItem({
+    type: "menu",
+    axisBehavior: "horizontalOnly",
+    label: "",
+    accessibilityLabel: "Filter threads",
+    icon: sfSymbolIcon(input.filterIcon),
+    menu: {
+      title: input.filterMenu.title,
+      items: toNativeHeaderMenuItems(input.filterMenu.items),
+    },
+  });
+}
+
 export function createSidebarHeaderItems(input: {
   readonly filterIcon: string;
   readonly filterMenu: HomeListFilterMenu;
   readonly onOpenSettings: () => void;
 }): NativeStackHeaderItem[] {
   return [
-    withNativeGlassHeaderItem({
-      type: "menu",
-      axisBehavior: "horizontalOnly",
-      label: "",
-      accessibilityLabel: "Filter threads",
-      icon: sfSymbolIcon(input.filterIcon),
-      menu: {
-        title: input.filterMenu.title,
-        items: toNativeHeaderMenuItems(input.filterMenu.items),
-      },
-    }),
+    createSidebarFilterHeaderItem(input),
     withNativeGlassHeaderItem({
       type: "button",
       axisBehavior: "horizontalOnly",

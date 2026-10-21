@@ -26,11 +26,11 @@ export function dedupeProviderSkillsByName(
 }
 
 /**
- * Whether a composer pick can start this skill. A skill switched off in the
- * provider's settings will not run, and one the provider reserves for the
- * agent (Claude Code's `user-invocable: false`) rejects a user invocation.
- * Everything else, including skills the agent may not start on its own, is
- * fair game: the server dispatches the pick in the provider's native form.
+ * A skill switched off in the provider's settings will not run, and one the
+ * provider reserves for the agent (Claude Code's `user-invocable: false`)
+ * rejects a user invocation. Everything else, including skills the agent may
+ * not start on its own, is fair game: the server dispatches the pick in the
+ * provider's native form.
  */
 export function isProviderSkillUserInvocable(
   skill: Pick<ServerProviderSkill, "enabled" | "userInvocable">,
@@ -101,7 +101,6 @@ export function hasCompleteProviderWorkspaceSnapshot(
   return Boolean(snapshot && !snapshot.slashCommandsPending);
 }
 
-/** A complete snapshot young enough that opening a composer need not rescan. */
 export function hasCurrentProviderWorkspaceSnapshot(
   provider: ServerProvider | null | undefined,
   cwd: string | null | undefined,
@@ -113,6 +112,30 @@ export function hasCurrentProviderWorkspaceSnapshot(
     !snapshot.slashCommandsPending &&
     isProviderWorkspaceSnapshotCurrent(snapshot, nowMs),
   );
+}
+
+export function resolveProviderForCwd(
+  provider: ServerProvider,
+  cwd: string | null | undefined,
+): ServerProvider {
+  const descriptors = resolveProviderWorkspaceSnapshot(provider, cwd)?.optionDescriptors;
+  if (descriptors === undefined) return provider;
+  const overriddenIds = new Set(descriptors.map((descriptor) => descriptor.id));
+  return {
+    ...provider,
+    models: provider.models.map((model) => ({
+      ...model,
+      capabilities: {
+        ...model.capabilities,
+        optionDescriptors: [
+          ...(model.capabilities?.optionDescriptors ?? []).filter(
+            (descriptor) => !overriddenIds.has(descriptor.id),
+          ),
+          ...descriptors,
+        ],
+      },
+    })),
+  };
 }
 
 export function resolveProviderSkillsForCwd(

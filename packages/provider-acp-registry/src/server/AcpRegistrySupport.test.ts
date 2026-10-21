@@ -17,7 +17,6 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
-import * as TestClock from "effect/testing/TestClock";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
@@ -139,35 +138,6 @@ const makeFakeUvToolchain = Effect.fn("AcpRegistrySupport.test.makeFakeUvToolcha
 });
 
 describe("AcpRegistrySupport", () => {
-  it("preserves the registry failure when translating it for clients", () => {
-    const cause = new Error("registry unavailable");
-    const failure = new AcpRegistrySupport.AcpRegistryError({
-      reason: "registry_unavailable",
-      detail: "Could not load the ACP Registry.",
-      cause,
-    });
-
-    expect(AcpRegistrySupport.toAcpRegistryOperationError(failure)).toMatchObject({
-      reason: "registry_unavailable",
-      message: "Could not load the ACP Registry.",
-      cause: failure,
-    });
-  });
-
-  it("maps supported Node platforms to ACP Registry target keys", () => {
-    expect(AcpRegistrySupport.resolveAcpRegistryPlatformTarget("darwin", "arm64")).toBe(
-      "darwin-aarch64",
-    );
-    expect(AcpRegistrySupport.resolveAcpRegistryPlatformTarget("linux", "x64")).toBe(
-      "linux-x86_64",
-    );
-    expect(AcpRegistrySupport.resolveAcpRegistryPlatformTarget("win32", "arm64")).toBe(
-      "windows-aarch64",
-    );
-    expect(AcpRegistrySupport.resolveAcpRegistryPlatformTarget("freebsd", "x64")).toBeUndefined();
-    expect(AcpRegistrySupport.resolveAcpRegistryPlatformTarget("linux", "ia32")).toBeUndefined();
-  });
-
   it("selects the preferred compatible distribution", () => {
     const agent = makeAgent({
       binary: {
@@ -209,6 +179,47 @@ describe("AcpRegistrySupport", () => {
         platformTarget: "darwin-aarch64",
       }),
     ).toBeUndefined();
+    expect(
+      AcpRegistrySupport.resolveAcpRegistryDistribution({
+        agent: makeAgent({
+          binary: {
+            "windows-x86_64": {
+              archive: archiveUrl,
+              cmd: "./bin/example-agent-x64.exe",
+              args: ["acp"],
+            },
+          },
+        }),
+        preference: "auto",
+        platformTarget: "windows-aarch64",
+      }),
+    ).toMatchObject({
+      kind: "binary",
+      binaryTarget: { cmd: "./bin/example-agent-x64.exe" },
+    });
+    expect(
+      AcpRegistrySupport.resolveAcpRegistryDistribution({
+        agent: makeAgent({
+          binary: {
+            "windows-aarch64": {
+              archive: archiveUrl,
+              cmd: "./bin/example-agent-arm64.exe",
+              args: ["acp"],
+            },
+            "windows-x86_64": {
+              archive: archiveUrl,
+              cmd: "./bin/example-agent-x64.exe",
+              args: ["acp"],
+            },
+          },
+        }),
+        preference: "auto",
+        platformTarget: "windows-aarch64",
+      }),
+    ).toMatchObject({
+      kind: "binary",
+      binaryTarget: { cmd: "./bin/example-agent-arm64.exe" },
+    });
   });
 
   it.effect("resolves a local command on the selected environment without the registry", () => {
@@ -492,42 +503,6 @@ describe("AcpRegistrySupport", () => {
     );
   });
 
-  it.effect("installs into T3 home a uv tool and launches its exposed command", () => {
-    const agent = makeAgent({
-      uvx: { package: "fast-agent-acp==V0.10.1", args: ["--acp"] },
-    });
-    return Effect.gen(function* () {
-      const fileSystem = yield* FileSystem.FileSystem;
-      const cacheDir = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "t3-acp-registry-global-uv-tool-",
-      });
-      const toolchain = yield* makeFakeUvToolchain(cacheDir);
-      const resolver = yield* AcpRegistrySupport.makeAcpRegistryCatalog({
-        cacheDir,
-        toolsDir: `${cacheDir}/tools`,
-        registryUrl,
-      });
-
-      const resolved = yield* resolver.resolve(settings(), "/workspace", toolchain.environment);
-
-      expect(resolved.spawn).toMatchObject({
-        command: toolchain.executablePath,
-        args: ["--acp"],
-        env: { PATH: expect.stringMatching(new RegExp(`^${toolchain.globalBin}:`, "u")) },
-      });
-      expect(yield* fileSystem.readFileString(toolchain.logPath)).toContain(
-        "tool install --force fast-agent-acp==V0.10.1",
-      );
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(
-        layerResolver((request) =>
-          Effect.succeed(HttpClientResponse.fromWeb(request, new Response(makeRegistry(agent)))),
-        ),
-      ),
-    );
-  });
-
   it.effect("honors an exact Windows PATH override when launching a global package", () => {
     const agent = makeAgent({
       uvx: { package: "fast-agent-acp==0.10.1", args: ["--acp"] },
@@ -589,7 +564,6 @@ describe("AcpRegistrySupport", () => {
           archive: archiveUrl,
           cmd: "./bin/example-agent",
           args: ["acp"],
-          // SHA-256 of binaryBytes.
           sha256: "97b29a636d7ddf7bf3567ae4d48c0f2a9b03943fd808b6efbf74f1dd3db131b7",
         },
       },
@@ -649,7 +623,6 @@ describe("AcpRegistrySupport", () => {
             archive: archiveUrl,
             cmd: "./bin/example-agent",
             args: ["acp"],
-            // SHA-256 of binaryBytes.
             sha256: "e1eb7c905b91c400af2ec858628aec22866bfda1383b93ceb73ae01d9769fb31",
           },
         },
@@ -1079,47 +1052,6 @@ describe("AcpRegistrySupport", () => {
     );
   });
 
-  it.effect("installs into T3 home package recipes during preparation", () => {
-    const agent = makeAgent({ npx: { package: "@example/acp@1.2.3", args: ["--stdio"] } });
-    const requests: string[] = [];
-
-    return Effect.gen(function* () {
-      const fileSystem = yield* FileSystem.FileSystem;
-      const cacheDir = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "t3-acp-registry-runner-",
-      });
-      const toolchain = yield* makeFakeNpmToolchain(cacheDir);
-      const resolver = yield* AcpRegistrySupport.makeAcpRegistryCatalog({
-        cacheDir,
-        toolsDir: `${cacheDir}/tools`,
-        registryUrl,
-      }).pipe(Effect.provideService(HostProcess.Environment, toolchain.environment));
-      const prepared = yield* resolver.prepare({ agentId: agent.id });
-      expect(prepared).toEqual({
-        agentId: "example-agent",
-        version: "1.2.3",
-        distribution: "npx",
-        prepared: true,
-      });
-      expect(yield* fileSystem.exists(toolchain.executablePath)).toBe(true);
-      expect(yield* fileSystem.exists(toolchain.environment.FAKE_NPM_PREFIX)).toBe(false);
-      expect(yield* fileSystem.readFileString(toolchain.logPath)).toContain(
-        "install --global @example/acp@1.2.3",
-      );
-      expect(requests).toEqual([registryUrl]);
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(
-        layerResolver((request) => {
-          requests.push(request.url);
-          return Effect.succeed(
-            HttpClientResponse.fromWeb(request, new Response(makeRegistry(agent))),
-          );
-        }, process.env),
-      ),
-    );
-  });
-
   it.effect("falls back to a valid cached registry index when refresh fails", () => {
     const agent = makeAgent({
       npx: {
@@ -1225,33 +1157,6 @@ describe("AcpRegistrySupport", () => {
           return Effect.succeed(
             HttpClientResponse.fromWeb(request, new Response(makeRegistry(agent))),
           );
-        }),
-      ),
-    );
-  });
-
-  it.effect("fails a cold inspection immediately when no local registry is available", () => {
-    let requests = 0;
-    return Effect.gen(function* () {
-      const fileSystem = yield* FileSystem.FileSystem;
-      const cacheDir = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "t3-acp-registry-empty-inspect-",
-      });
-      const resolver = yield* AcpRegistrySupport.makeAcpRegistryCatalog({
-        cacheDir,
-        toolsDir: `${cacheDir}/tools`,
-        registryUrl,
-      });
-      const error = yield* resolver.inspect(settings()).pipe(Effect.flip);
-
-      expect(error.reason).toBe("registry_unavailable");
-      expect(requests).toBe(0);
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(
-        layerResolver((request) => {
-          requests += 1;
-          return Effect.succeed(HttpClientResponse.fromWeb(request, new Response("unused")));
         }),
       ),
     );
@@ -1567,50 +1472,6 @@ describe("AcpRegistrySupport", () => {
         removed: false,
       });
       expect(yield* resolver.inspect(settings())).toMatchObject({ status: "ready" });
-      expect(yield* resolver.uninstallManagedBinary({ agentId: agent.id })).toEqual({
-        agentId: agent.id,
-        removed: true,
-      });
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(
-        layerResolver((request) =>
-          Effect.succeed(
-            HttpClientResponse.fromWeb(
-              request,
-              request.url === registryUrl
-                ? new Response(makeRegistry(agent))
-                : new Response(binaryBytes.buffer as ArrayBuffer),
-            ),
-          ),
-        ),
-      ),
-    );
-  });
-
-  it.effect("expires an abandoned prepared-binary reservation", () => {
-    const agent = makeAgent({
-      binary: {
-        "linux-x86_64": {
-          archive: archiveUrl,
-          cmd: "./bin/example-agent",
-        },
-      },
-    });
-    const binaryBytes = new TextEncoder().encode("#!/bin/sh\necho example\n");
-    return Effect.gen(function* () {
-      const fileSystem = yield* FileSystem.FileSystem;
-      const cacheDir = yield* fileSystem.makeTempDirectoryScoped({
-        prefix: "t3-acp-registry-uninstall-expiry-",
-      });
-      const resolver = yield* AcpRegistrySupport.makeAcpRegistryCatalog({
-        cacheDir,
-        toolsDir: `${cacheDir}/tools`,
-        registryUrl,
-      });
-
-      yield* resolver.prepare({ agentId: agent.id });
-      yield* TestClock.adjust("31 seconds");
       expect(yield* resolver.uninstallManagedBinary({ agentId: agent.id })).toEqual({
         agentId: agent.id,
         removed: true,

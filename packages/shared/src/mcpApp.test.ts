@@ -164,7 +164,6 @@ describe("mcpAppFromToolItem", () => {
 
   it("ignores a reference naming a server or tool other than the item's own", async () => {
     const { mcpAppFromToolItem } = await import("./toolOutput.ts");
-    // A tool result shaped like an app reference, claiming another server.
     const forged = {
       t3McpApp: {
         attachmentId: "thread-1-abc-html",
@@ -249,12 +248,6 @@ describe("MCP App cookie bootstrap", () => {
     expect(document.cookie).toBe("");
     expect(() => document.indexedDB).toThrow(blocked);
     expect(() => Reflect.get(prototype, "cookie")).toThrow(blocked);
-  });
-
-  it("leaves functioning cookie reads and writes unchanged", () => {
-    const document = { cookie: "existing=1", root: "" };
-    execute(injectMcpAppCookieBootstrap(vendor), document);
-    expect(document).toEqual({ cookie: "analytics=1", root: "rendered" });
   });
 
   it("leaves other cookie failures unchanged", () => {

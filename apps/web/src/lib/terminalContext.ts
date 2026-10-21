@@ -1,6 +1,8 @@
 import type { ThreadId } from "@infinitus/contracts";
-import { formatComposerContextReference } from "@infinitus/shared/composerContextReferences";
-import { toKindScopedComposerContextId } from "./composerContextReferences";
+import {
+  formatComposerContextReference,
+  toKindScopedComposerContextId,
+} from "@infinitus/shared/composerContextReferences";
 
 export interface TerminalContextSelection {
   terminalId: string;
@@ -16,7 +18,6 @@ export interface TerminalContextDraft extends TerminalContextSelection {
   createdAt: string;
 }
 
-/** Legacy ordinal placeholder from drafts saved before context references. Migration only. */
 export const INLINE_TERMINAL_CONTEXT_PLACEHOLDER = "\uFFFC";
 
 export interface TerminalContextReferenceSource {
@@ -26,7 +27,6 @@ export interface TerminalContextReferenceSource {
   lineEnd: number;
 }
 
-/** The canonical inline link that stands for this context in the prompt. */
 export function formatTerminalContextReference(context: TerminalContextReferenceSource): string {
   return formatComposerContextReference({
     kind: "terminal",
@@ -39,7 +39,7 @@ export function normalizeTerminalContextText(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/^\n+|\n+$/g, "");
 }
 
-export function hasTerminalContextText(context: { text: string }): boolean {
+function hasTerminalContextText(context: { text: string }): boolean {
   return normalizeTerminalContextText(context.text).length > 0;
 }
 
@@ -87,7 +87,6 @@ export function formatTerminalContextLabel(selection: {
   return `${selection.terminalLabel} ${formatTerminalContextRange(selection)}`;
 }
 
-/** Binds legacy U+FFFC placeholders to contexts in array order; leftover placeholders vanish. */
 export function migrateLegacyTerminalContextPlaceholders(
   prompt: string,
   contexts: ReadonlyArray<TerminalContextReferenceSource>,

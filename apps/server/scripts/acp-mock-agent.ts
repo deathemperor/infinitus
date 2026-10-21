@@ -46,17 +46,16 @@ const emitXAiAskUserQuestionThenHang =
   process.env.T3_ACP_EMIT_XAI_ASK_USER_QUESTION_THEN_HANG === "1";
 const emitContentThenHang = process.env.T3_ACP_EMIT_CONTENT_THEN_HANG === "1";
 const emitPlanThenHang = process.env.T3_ACP_EMIT_PLAN_THEN_HANG === "1";
+const grokKillTaskShape = process.env.T3_ACP_GROK_KILL_TASK_SHAPE;
 const emitActiveToolThenHang = process.env.T3_ACP_EMIT_ACTIVE_TOOL_THEN_HANG === "1";
 const emitGrokMonitorPostTurnPoll = process.env.T3_ACP_EMIT_GROK_MONITOR_POST_TURN_POLL === "1";
 const emitGrokBackgroundTaskStarted = process.env.T3_ACP_EMIT_GROK_BACKGROUND_TASK_STARTED === "1";
+const emitGrokBackgroundTaskPoll = process.env.T3_ACP_GROK_BACKGROUND_TASK_COMPLETION === "poll";
 const emitForeignSessionUpdates = process.env.T3_ACP_EMIT_FOREIGN_SESSION_UPDATES === "1";
 const waitForResumeRelease = process.env.T3_ACP_WAIT_FOR_RESUME_RELEASE === "1";
 const completeFirstPromptOnCancel = process.env.T3_ACP_COMPLETE_FIRST_PROMPT_ON_CANCEL === "1";
 const floodStderr = process.env.T3_ACP_FLOOD_STDERR === "1";
 const hangPromptForever = process.env.T3_ACP_HANG_PROMPT_FOREVER === "1";
-// Sends fs/write_text_file for this path, then fs/read_text_file, at the start of
-// each prompt whatever the client advertised, and appends each outcome as a JSON
-// line to T3_ACP_CLIENT_FS_PROBE_LOG_PATH.
 const clientFsProbePath = process.env.T3_ACP_CLIENT_FS_PROBE_PATH;
 const clientFsProbeLogPath = process.env.T3_ACP_CLIENT_FS_PROBE_LOG_PATH;
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
@@ -93,10 +92,15 @@ const emitStaleXAiPromptCompleteBeforeSecondHang =
 const emitOverlappingXAiPromptCompleteOutOfOrder =
   process.env.T3_ACP_EMIT_OVERLAPPING_XAI_PROMPT_COMPLETE_OUT_OF_ORDER === "1";
 const failPrompt = process.env.T3_ACP_FAIL_PROMPT === "1";
+const failPromptOrdinal = Number(process.env.T3_ACP_FAIL_PROMPT_ORDINAL);
+const compactionPromptOrdinals = new Set(
+  (process.env.T3_ACP_COMPACTION_PROMPT_ORDINALS ?? "").split(",").map(Number),
+);
 const failSetConfigOption = process.env.T3_ACP_FAIL_SET_CONFIG_OPTION === "1";
 const failSetModeConfigOption = process.env.T3_ACP_FAIL_SET_MODE_CONFIG_OPTION === "1";
 const exitOnSetConfigOption = process.env.T3_ACP_EXIT_ON_SET_CONFIG_OPTION === "1";
 const omitModelConfigOption = process.env.T3_ACP_OMIT_MODEL_CONFIG_OPTION === "1";
+const emitEmptyDefaultAgentOption = process.env.T3_ACP_EMIT_EMPTY_DEFAULT_AGENT_OPTION === "1";
 const promptResponseText = process.env.T3_ACP_PROMPT_RESPONSE_TEXT;
 const initialGrokReasoningEffort =
   process.env.T3_ACP_INITIAL_GROK_REASONING_EFFORT?.trim() || undefined;
@@ -130,6 +134,7 @@ let parameterizedModelPicker = false;
 let currentReasoning = "medium";
 let currentContext = "272k";
 let currentFast = false;
+let currentAgent = "";
 let authenticated = !requiresAuthentication;
 let promptCount = 0;
 let overlappingFirstPromptId: string | undefined;
@@ -315,6 +320,22 @@ function configOptions(): ReadonlyArray<AcpSchema.SessionConfigOption> {
   }
 
   return [
+    // Mirrors GitHub Copilot, whose default agent is the empty-valued choice.
+    ...(emitEmptyDefaultAgentOption
+      ? [
+          {
+            configId: "agent",
+            name: "Agent",
+            category: "_agent",
+            type: "select" as const,
+            currentValue: currentAgent,
+            options: [
+              { value: "", name: "Copilot" },
+              { value: "example", name: "example" },
+            ],
+          },
+        ]
+      : []),
     {
       configId: "mode",
       name: "Mode",
@@ -409,13 +430,14 @@ function modeState(): AcpCompat.SessionModeState {
 }
 
 // Mirrors the real Grok ACP: it advertises versioned model ids, never the CLI's own
-// "grok-build" product name. Native helper model switching has its own v1 fixture.
+// "grok-build" product name.
 const grokAcpModels: ReadonlyArray<AcpCompat.ModelInfo> = [
   {
-    modelId: "grok-4.6",
+    modelId: process.env.T3_ACP_GROK_MODEL ?? "grok-4.6",
     name: "Grok 4.6",
     _meta: {
-      totalContextTokens: 500_000,
+      totalContextTokens: Number(process.env.T3_ACP_GROK_CONTEXT_TOKENS ?? 500_000),
+      contextWindows: [256_000, 500_000],
       supportsReasoningEffort: true,
       reasoningEffort: initialGrokReasoningEffort ?? "high",
       reasoningEfforts: [
@@ -434,11 +456,76 @@ function modelState(): AcpCompat.SessionModelState {
   }
   const modelId = grokAcpModels.some((model) => model.modelId === currentModelId)
     ? currentModelId
-    : "grok-4.6";
+    : (process.env.T3_ACP_GROK_MODEL ?? "grok-4.6");
   return {
     currentModelId: modelId,
     availableModels: grokAcpModels,
   };
+}
+
+function emitGrokKillTaskScenario(
+  sessionId: string,
+  promptId: string | undefined,
+  shape: string,
+): void {
+  const taskId = "call-fb9d0000-0000-0000-0000-000000000026-29";
+  const outcome =
+    shape === "already_exited" || shape === "known_failure" ? "already_exited" : "killed";
+  writeJsonRpcNotification("session/update", {
+    sessionId,
+    update: {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "kill-target-command",
+      title: "run_terminal_command",
+      kind: "execute",
+      status: "in_progress",
+      rawInput: { command: "sleep 40" },
+    },
+  });
+  writeJsonRpcNotification("session/update", {
+    sessionId,
+    update: {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "kill-target-command",
+      status: "completed",
+      rawOutput: {
+        type: "BackgroundTaskStarted",
+        task_id: taskId,
+        task_type: "bash",
+        command: "sleep 40",
+      },
+    },
+  });
+  if (shape === "known_failure") {
+    writeJsonRpcNotification("_x.ai/task_completed", {
+      sessionId,
+      update: {
+        sessionUpdate: "task_completed",
+        task_snapshot: { task_id: taskId, kind: "bash", exit_code: 7, output: "known failure\n" },
+      },
+    });
+  }
+  writeJsonRpcNotification("session/update", {
+    sessionId,
+    update: {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "kill-command",
+      title: `kill ${taskId} (${outcome})`,
+      kind: "other",
+      status: "completed",
+      rawInput: {
+        task_id: taskId,
+        ...(shape === "output_only" ? {} : { variant: "KillTask" }),
+      },
+      ...(shape === "variant_only" ? {} : { rawOutput: { type: "KillTask", outcome } }),
+    },
+  });
+  writeJsonRpcNotification("_x.ai/session/prompt_complete", {
+    sessionId,
+    promptId,
+    stopReason: "end_turn",
+    agentResult: null,
+  });
 }
 
 const program = Effect.gen(function* () {
@@ -791,6 +878,9 @@ const program = Effect.gen(function* () {
       if (request.configId === "model" && typeof request.value === "string") {
         currentModelId = request.value;
       }
+      if (request.configId === "agent" && typeof request.value === "string") {
+        currentAgent = request.value;
+      }
       if (request.configId === "reasoning" && typeof request.value === "string") {
         currentReasoning = request.value;
       }
@@ -837,8 +927,6 @@ const program = Effect.gen(function* () {
         });
       }
       if (emitTaskBackgroundedAfterCancel) {
-        // Grok cancel-as-detach: the foreground command is re-run as a
-        // background task that later completes on its own.
         yield* Effect.sync(() => {
           writeJsonRpcNotification("_x.ai/task_backgrounded", {
             sessionId: cancelledSessionId,
@@ -923,7 +1011,6 @@ const program = Effect.gen(function* () {
           requestedSessionId,
           requestedSessionId,
         ].entries()) {
-          // Progress from an earlier tool must not end the retry.
           if (index === 2 && vibeRetryOutcome === "recovered") {
             yield* Effect.sync(() =>
               writeJsonRpcNotification("session/update", {
@@ -1283,7 +1370,20 @@ const program = Effect.gen(function* () {
         yield* Effect.sleep(`${promptDelayMs} millis`);
       }
 
-      if (failPrompt) {
+      if (compactionPromptOrdinals.has(promptCount)) {
+        for (const status of ["in_progress", "completed"] as const) {
+          yield* agent.client.sessionUpdate({
+            sessionId: requestedSessionId,
+            update: {
+              sessionUpdate: "compaction_update",
+              compactionId: `compact-${promptCount}`,
+              status,
+            },
+          });
+        }
+      }
+
+      if (failPrompt || promptCount === failPromptOrdinal) {
         return yield* AcpError.AcpRequestError.internalError("Mock prompt failure");
       }
 
@@ -1350,6 +1450,7 @@ const program = Effect.gen(function* () {
         (emitRunningCommandThenHangOnFirstPrompt && promptCount === 1)
       ) {
         const toolCallId = "tool-call-running-1";
+        let runningCommandPublished: Promise<void> = Promise.resolve();
         if (runningCommandPidPath !== undefined) {
           const command = runningCommandIgnoresTerm
             ? 'trap "" TERM; bash -c \'trap "" TERM; while :; do sleep 1; done\' & child=$!; printf "%s %s\n" "$$" "$child" > "$1"; wait "$child"'
@@ -1357,19 +1458,24 @@ const program = Effect.gen(function* () {
           if (runningCommandSeparateSession) {
             const launcher = [
               'const { spawn } = require("node:child_process");',
-              "const child = spawn(process.argv[1], process.argv.slice(2), { stdio: 'ignore' });",
+              "const child = spawn(process.argv[1], process.argv.slice(2), { stdio: ['ignore', 'inherit', 'ignore'] });",
               "child.once('exit', (code, signal) => process.exitCode = code ?? (signal ? 1 : 0));",
             ].join(" ");
             const detachedCommand = runningCommandIgnoresTerm
-              ? 'trap "" TERM; bash -c \'trap "" TERM; while :; do sleep 1; done\' & child=$!; printf "%s %s %s\n" "$PPID" "$$" "$child" > "$1"; wait "$child"'
-              : 'sleep 120 & child=$!; printf "%s %s %s\n" "$PPID" "$$" "$child" > "$1"; wait "$child"';
+              ? 'trap "" TERM; bash -c \'trap "" TERM; while :; do sleep 1; done\' & child=$!; printf "%s %s %s\n" "$PPID" "$$" "$child" > "$1"; echo published; wait "$child"'
+              : 'sleep 120 & child=$!; printf "%s %s %s\n" "$PPID" "$$" "$child" > "$1"; echo published; wait "$child"';
             // Nested bash publishes "$PPID $$ $child" once it starts. Do not
             // write the launcher PID alone here: that races with bash and can
-            // clobber the triple that interrupt tests wait for.
+            // clobber the triple that interrupt tests wait for. It then prints a
+            // line, so an agent that exits after launch only exits once the
+            // triple exists instead of racing a slow launcher start.
             const detachedLauncher = NodeChildProcess.spawn(
               process.execPath,
               ["-e", launcher, "bash", "-c", detachedCommand, "bash", runningCommandPidPath],
-              { detached: true, stdio: "ignore" },
+              { detached: true, stdio: ["ignore", "pipe", "ignore"] },
+            );
+            runningCommandPublished = new Promise((resolve) =>
+              detachedLauncher.stdout.once("data", () => resolve()),
             );
             detachedLauncher.unref();
           } else {
@@ -1427,10 +1533,10 @@ const program = Effect.gen(function* () {
           },
         });
         if (exitAfterRunningCommandLaunch) {
-          yield* Effect.sleep("100 millis");
-          return yield* Effect.sync(() => process.exit(0));
+          // The test sends `_test/exit` once T3 has recorded the published processes.
+          yield* Effect.promise(() => runningCommandPublished);
+          return yield* Effect.never;
         }
-        // Stay open until session/cancel so interrupt tests can observe a running tool.
         while (!cancelledSessions.has(requestedSessionId)) {
           yield* Effect.sleep("25 millis");
         }
@@ -1456,6 +1562,16 @@ const program = Effect.gen(function* () {
             content: { type: "text", text: "partial before stall" },
           },
         });
+        return yield* Effect.never;
+      }
+
+      if (grokKillTaskShape !== undefined) {
+        emitGrokKillTaskScenario(
+          requestedSessionId,
+          promptIdFromRequestMeta(request),
+          grokKillTaskShape,
+        );
+        // Keep the prompt RPC and peer alive after the kill result.
         return yield* Effect.never;
       }
 
@@ -1646,13 +1762,15 @@ const program = Effect.gen(function* () {
         return yield* Effect.never;
       }
 
-      if (emitGrokBackgroundTaskStarted) {
-        const toolCallId = "call-fb9d0000-0000-0000-0000-000000000026";
+      if (emitGrokBackgroundTaskStarted || emitGrokBackgroundTaskPoll) {
+        const toolCallId = !emitGrokBackgroundTaskPoll
+          ? "call-fb9d0000-0000-0000-0000-000000000026"
+          : "call-fb9d0000-0000-0000-0000-000000000026-29";
         const command = "sleep 40; echo done-a";
         writeJsonRpcNotification("session/update", {
           sessionId: requestedSessionId,
           update: {
-            sessionUpdate: "tool_call",
+            sessionUpdate: !emitGrokBackgroundTaskPoll ? "tool_call" : "tool_call_update",
             toolCallId,
             title: "run_terminal_command",
             kind: "execute",
@@ -1675,6 +1793,46 @@ const program = Effect.gen(function* () {
             },
           },
         });
+        if (emitGrokBackgroundTaskPoll) {
+          writeJsonRpcNotification("session/update", {
+            sessionId: requestedSessionId,
+            update: {
+              sessionUpdate: "tool_call_update",
+              toolCallId: "call-background-poll",
+              title: "get_command_or_subagent_output",
+              kind: "other",
+              status: "completed",
+              rawOutput: {
+                type: "TaskOutput",
+                Result: {
+                  task_id: toolCallId,
+                  command,
+                  status: "completed",
+                  exit_code: 0,
+                  output: "done-a",
+                },
+              },
+            },
+          });
+
+          yield* agent.client.sessionUpdate({
+            sessionId: requestedSessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: { type: "text", text: "The background command finished." },
+            },
+          });
+          writeJsonRpcNotification("_x.ai/session/update", {
+            sessionId: requestedSessionId,
+            update: {
+              sessionUpdate: "turn_completed",
+              prompt_id: promptIdFromRequestMeta(request),
+              stop_reason: "end_turn",
+            },
+          });
+          // Neither the prompt RPC nor the process ends, matching the Grok incident.
+          return yield* Effect.never;
+        }
         writeJsonRpcNotification("_x.ai/session/prompt_complete", {
           sessionId: requestedSessionId,
           promptId: promptIdFromRequestMeta(request) ?? "mock-xai-prompt-1",
@@ -1685,8 +1843,6 @@ const program = Effect.gen(function* () {
       }
 
       if (emitBackgroundToolDuringAnswer) {
-        // A command backgrounded earlier reports progress and then finishes
-        // while the next answer is still streaming.
         const toolCallId = "background-1";
         const say = (text: string) =>
           agent.client.sessionUpdate({
@@ -1719,7 +1875,6 @@ const program = Effect.gen(function* () {
         yield* say("| x |\n");
         yield* progress("completed", "done");
         yield* say("| 2 | y |\n");
-        // Agents can repeat a terminal update after the call finished.
         yield* progress("completed", "done");
         yield* say("| 3 | z |");
         return yield* finishPrompt(requestedSessionId, "end_turn");
@@ -1960,9 +2115,6 @@ const program = Effect.gen(function* () {
         return yield* finishPrompt(requestedSessionId, "end_turn");
       }
 
-      // In-turn monitor + TaskOutput hydrate, then a late post-finalize
-      // duplicate terminal TaskOutput for the same task. Exercises the
-      // already-handled short-circuit: must not pin hasPendingBackgroundWork.
       if (emitInTurnTaskOutputThenLateDuplicate) {
         const monitorToolCallId = "tool-call-monitor-1";
         yield* agent.client.sessionUpdate({
@@ -2012,9 +2164,6 @@ const program = Effect.gen(function* () {
             content: { type: "text", text: "Monitor listing ready in-turn." },
           },
         });
-        // After deferred finalize (~2s) clears activeTurn, re-emit a terminal
-        // TaskOutput for the same task so bufferPostSettleWake sees
-        // alreadyHandledToolUpdate with a non-empty wake path.
         yield* Effect.gen(function* () {
           yield* Effect.sleep("2500 millis");
           yield* Effect.sync(() => {
@@ -2058,10 +2207,6 @@ const program = Effect.gen(function* () {
           },
         });
 
-        // After the prompt settles, replay the CLI-injected monitor-event
-        // turn: end notice, TaskOutput hydration, then (once the trigger
-        // file exists) the report chunk. Detached fiber on the real clock;
-        // it outlives the prompt handler.
         yield* Effect.gen(function* () {
           yield* Effect.sleep("150 millis");
           yield* Effect.sync(() => {
@@ -2181,7 +2326,6 @@ const program = Effect.gen(function* () {
         const planRoot = process.env.T3_ACP_PLAN_ROOT ?? "/tmp/mock-home/.grok";
         const planPath = `${planRoot}/sessions/${requestedSessionId}/plan.md`;
         const planBody = "# Mock plan\n\n- Write the feature\n- Add a test\n- Ship it\n";
-        // enter_plan_mode first so the adapter arms planModeActive.
         yield* agent.client.sessionUpdate({
           sessionId: requestedSessionId,
           update: {
@@ -2423,8 +2567,14 @@ const program = Effect.gen(function* () {
     return Effect.succeed({});
   });
 
-  yield* agent.handleUnknownExtNotification((method) =>
-    method === "_test/exit" ? Effect.sync(() => process.exit(19)) : Effect.void,
+  yield* agent.handleUnknownExtNotification((method, params) =>
+    method === "_test/exit"
+      ? Effect.sync(() => {
+          const code =
+            typeof params === "object" && params !== null ? Reflect.get(params, "code") : undefined;
+          process.exit(typeof code === "number" ? code : 19);
+        })
+      : Effect.void,
   );
 
   return yield* Effect.never;
