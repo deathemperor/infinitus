@@ -20,12 +20,6 @@ const runTexts = (projection: OrchestrationV2ThreadProjection, runId: string | u
     item.runId === runId && item.type === "assistant_message" ? [item.text.trim()] : [],
   );
 
-/**
- * A background `subagent` call. The parent's first execution ends at once,
- * so run 1 waits on the subagent. When it ends, OpenCode reports it to the
- * parent and runs the parent again on its own: that execution is run 2, a
- * continuation T3 opens for it, and nothing stays waiting afterwards.
- */
 export function assertOpenCode2BackgroundOutput(
   result: OrchestratorV2ScenarioResult,
   transcript: ProviderReplayTranscript,
@@ -53,8 +47,6 @@ export function assertOpenCode2BackgroundOutput(
   });
   assert.deepEqual(runTexts(projection, rootRun?.id), ["PARENT_OK"]);
 
-  // Run 1's turn ends while the subagent runs: the run parks at `waiting` on
-  // that background work, and the wake follows the subagent's end.
   const indexOf = (predicate: (event: (typeof result.domainEvents)[number]) => boolean) =>
     result.domainEvents.findIndex(predicate);
   const rootWaiting = indexOf(
@@ -76,7 +68,6 @@ export function assertOpenCode2BackgroundOutput(
   assert.isAbove(subagentDone, rootWaiting, "run 1 ends its turn before its subagent ends");
   assert.isAbove(wakeStarted, subagentDone, "the wake follows the subagent's end");
 
-  // The child's own tool call and answer stay in its thread.
   const child = result.projections.get(subagent.childThreadId!);
   assert.isDefined(child);
   assert.isTrue(
@@ -92,8 +83,6 @@ export function assertOpenCode2BackgroundOutput(
     "the child's shell call must not land on the parent",
   );
 
-  // The continuation is a provider wake that names the subagent, and it
-  // carries the parent's own answer to the report.
   const wakeMessage = projection.messages.find((message) => message.id === wakeRun?.userMessageId);
   assert.equal(`${wakeMessage?.createdBy}:${wakeMessage?.creationSource}`, "agent:provider");
   assert.include(wakeMessage?.text ?? "", "CHILD_OK");
@@ -108,7 +97,6 @@ export function assertOpenCode2BackgroundOutput(
     "The background subagent finished and returned `CHILD_OK`.",
   ]);
 
-  // Nothing is left waiting once the subagent and the wake ended.
   const shell = result.shellSnapshot.threads.find((thread) => thread.id === projection.thread.id);
   assert.deepEqual(shell?.pendingBackgroundTasks ?? [], []);
   assert.isFalse(

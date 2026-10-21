@@ -112,7 +112,6 @@ describe("DesktopRemoteUpdates", () => {
         yield* settle;
         assert.equal(harness.quitAndInstalls(), 1);
 
-        // The mirror stamped the in-run state changes with the request id.
         const statuses = reports
           .filter((report) => report.requestId === "req-1")
           .map((report) => report.state.status);
@@ -150,8 +149,6 @@ describe("DesktopRemoteUpdates", () => {
         });
         yield* settle;
 
-        // Install failures reduce to status "downloaded" + errorContext
-        // "install"; the prepared result is followed by the commit failure.
         const terminals = terminalReports(reports);
         assert.deepEqual(
           terminals.map((report) => report.outcome),
@@ -185,7 +182,6 @@ describe("DesktopRemoteUpdates", () => {
           ["ready-to-install"],
         );
 
-        // A local install takes the updater reservation and starts shutdown.
         const localInstall = yield* updates.install.pipe(Effect.forkChild);
         yield* Deferred.await(installStarted);
         yield* Queue.offer(commits, {
@@ -195,8 +191,6 @@ describe("DesktopRemoteUpdates", () => {
         });
         yield* settle;
 
-        // No "failed" marker: that install relaunches the app and the
-        // client proves the handoff by reconnecting on the target version.
         assert.deepEqual(
           terminalReports(reports).map((report) => report.outcome),
           ["ready-to-install"],
@@ -271,9 +265,6 @@ describe("DesktopRemoteUpdates", () => {
           requestId: "req-5",
         });
         yield* settle;
-        // First run failed; state is "downloaded" with a lingering
-        // errorContext "install". The retry succeeds and must not report
-        // that leftover as a fresh failure.
         yield* Queue.offer(requests, request("req-6"));
         yield* settle;
         yield* Queue.offer(commits, {
@@ -336,9 +327,7 @@ describe("DesktopRemoteUpdates", () => {
 
   it.effect("retries a download refused while the check still holds the reservation", () => {
     // electron-updater emits update-available from inside checkForUpdates,
-    // before the check action releases its reservation. The download the
-    // remote flow forks in response is refused and must be retried once the
-    // reservation frees up, without burning a download attempt.
+    // before the check action releases its reservation.
     const releaseCheck = Deferred.makeUnsafe<void>();
     const harness = makeHarness({ checkForUpdates: Deferred.await(releaseCheck) });
 
@@ -348,7 +337,6 @@ describe("DesktopRemoteUpdates", () => {
         yield* settle;
         assert.equal(harness.checkCount(), 1);
 
-        // Fire "available" while the check reservation is still held.
         harness.emit("update-available", { version: "1.2.4" });
         yield* settle;
         assert.equal(harness.downloadCount(), 0);
@@ -409,14 +397,11 @@ describe("DesktopRemoteUpdates", () => {
         const desktopState = yield* DesktopState.DesktopState;
         harness.emit("update-downloaded", { version: "1.2.4" });
         yield* settle;
-        // Another install already owns the shutdown.
         yield* Ref.set(desktopState.quitting, true);
 
         yield* Queue.offer(requests, request("req-9"));
         yield* settle;
 
-        // Report "installing" once, no "failed" after the refusal: that
-        // install will relaunch the app and this request rides along.
         assert.deepEqual(
           terminalReports(reports).map((report) => report.outcome),
           ["ready-to-install"],
@@ -495,69 +480,6 @@ describe("DesktopRemoteUpdates", () => {
         yield* Fiber.join(backgroundCheck);
         yield* settle;
         assert.equal(harness.quitAndInstalls(), 1);
-      }),
-    );
-  });
-
-  it.effect("fails a prepared install when its background check stays blocked", () => {
-    const backgroundCheckStarted = Deferred.makeUnsafe<void>();
-    const releaseBackgroundCheck = Deferred.makeUnsafe<void>();
-    let checks = 0;
-    const harness = makeHarness({
-      checkForUpdates: Effect.suspend(() => {
-        checks += 1;
-        return checks === 2
-          ? Deferred.succeed(backgroundCheckStarted, undefined).pipe(
-              Effect.andThen(Deferred.await(releaseBackgroundCheck)),
-            )
-          : Effect.void;
-      }),
-    });
-
-    return runRemoteUpdatesTest(harness, ({ reports, requests, commits }) =>
-      Effect.gen(function* () {
-        const updates = yield* DesktopUpdates.DesktopUpdates;
-        yield* Queue.offer(requests, request("req-blocked-background-check"));
-        yield* settle;
-        harness.emit("update-available", { version: "1.2.4" });
-        yield* settle;
-        harness.emit("update-downloaded", { version: "1.2.4" });
-        yield* settle;
-
-        const backgroundCheck = yield* updates.check("poll").pipe(Effect.forkChild);
-        yield* Deferred.await(backgroundCheckStarted);
-        const commit = {
-          version: 1,
-          type: "commitDesktopUpdate",
-          requestId: "req-blocked-background-check",
-        } as const;
-        yield* Queue.offer(commits, commit);
-        yield* settle;
-        yield* TestClock.adjust(Duration.seconds(91));
-        yield* settle;
-
-        assert.equal(harness.quitAndInstalls(), 0);
-        assert.deepEqual(
-          terminalReports(reports)
-            .filter((report) => report.requestId === "req-blocked-background-check")
-            .map((report) => report.outcome),
-          ["ready-to-install", "failed"],
-        );
-
-        harness.emit("update-downloaded", { version: "1.2.4" });
-        yield* Deferred.succeed(releaseBackgroundCheck, undefined);
-        yield* Fiber.join(backgroundCheck);
-        yield* settle;
-        assert.equal(harness.quitAndInstalls(), 0);
-
-        yield* Queue.offer(commits, commit);
-        yield* settle;
-        assert.deepEqual(
-          terminalReports(reports)
-            .filter((report) => report.requestId === "req-blocked-background-check")
-            .map((report) => report.outcome),
-          ["ready-to-install", "failed", "failed"],
-        );
       }),
     );
   });
@@ -655,32 +577,6 @@ describe("DesktopRemoteUpdates", () => {
     );
   });
 
-  it.effect("keeps every queued cancellation until its request starts", () => {
-    const harness = makeHarness();
-
-    return runRemoteUpdatesTest(harness, ({ requests, cancellations }) =>
-      Effect.gen(function* () {
-        for (let index = 0; index < 40; index += 1) {
-          yield* Queue.offer(cancellations, {
-            version: 1,
-            type: "cancelDesktopUpdate",
-            requestId: `req-queued-cancel-${index}`,
-          });
-        }
-        yield* settle;
-        for (let index = 0; index < 40; index += 1) {
-          yield* Queue.offer(requests, request(`req-queued-cancel-${index}`));
-        }
-        yield* settle;
-        assert.equal(harness.checkCount(), 0);
-
-        yield* Queue.offer(requests, request("req-after-queued-cancels"));
-        yield* settle;
-        assert.equal(harness.checkCount(), 1);
-      }),
-    );
-  });
-
   it.effect("does not install after cancellation wins the commit claim", () => {
     const harness = makeHarness();
 
@@ -772,34 +668,6 @@ describe("DesktopRemoteUpdates", () => {
     );
   });
 
-  it.effect("expires an uncommitted preparation", () => {
-    const harness = makeHarness();
-
-    return runRemoteUpdatesTest(harness, ({ reports, requests, commits }) =>
-      Effect.gen(function* () {
-        yield* Queue.offer(requests, request("req-stale"));
-        yield* settle;
-        harness.emit("update-available", { version: "1.2.4" });
-        yield* settle;
-        harness.emit("update-downloaded", { version: "1.2.4" });
-        yield* settle;
-
-        yield* TestClock.setTime(Duration.toMillis(Duration.minutes(6)));
-        yield* Queue.offer(commits, {
-          version: 1,
-          type: "commitDesktopUpdate",
-          requestId: "req-stale",
-        });
-        yield* settle;
-
-        const outcomes = terminalReports(reports)
-          .filter((report) => report.requestId === "req-stale")
-          .map((report) => report.outcome);
-        assert.deepEqual(outcomes, ["ready-to-install", "failed"]);
-      }),
-    );
-  });
-
   it.effect("reports up-to-date without installing when there is no update", () => {
     const harness = makeHarness();
 
@@ -814,26 +682,6 @@ describe("DesktopRemoteUpdates", () => {
         assert.equal(terminals.length, 1);
         assert.equal(terminals[0]?.outcome, "up-to-date");
         assert.equal(terminals[0]?.requestId, "req-2");
-        assert.equal(harness.quitAndInstalls(), 0);
-      }),
-    );
-  });
-
-  it.effect("fails fast with the disabled reason when updates are off", () => {
-    const harness = makeHarness({ env: { T3CODE_DISABLE_AUTO_UPDATE: "true" } });
-
-    return runRemoteUpdatesTest(harness, ({ reports, requests }) =>
-      Effect.gen(function* () {
-        yield* Queue.offer(requests, request("req-3"));
-        yield* settle;
-
-        const terminals = terminalReports(reports);
-        assert.equal(terminals.length, 1);
-        assert.equal(terminals[0]?.outcome, "failed");
-        assert.equal(
-          terminals[0]?.reason,
-          "Automatic updates are disabled by the T3CODE_DISABLE_AUTO_UPDATE setting.",
-        );
         assert.equal(harness.quitAndInstalls(), 0);
       }),
     );

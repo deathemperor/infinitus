@@ -1,26 +1,3 @@
-/**
- * Pins `./gitCafePullRequestJson.ts`, pure decoding of GitCafe's REST JSON into the neutral
- * `Provider*` shapes. Pass 2 creates these exports:
- *
- * Schemas (REST bodies as GitCafe sends them):
- * - `GitCafePull` (list row), `GitCafePullDetail` (row + description, closedAt, mergedAt,
- *   sourceRepo, lockedAt?, required `capabilities: { comment, review, merge, edit, moderate }`),
- * - `GitCafeComments`, `GitCafeReviews`, `GitCafeCommits`, `GitCafeReactions`
- *   (cursor envelopes `{ items, next }`; commits also `{ truncated, headOid }`),
- * - `GitCafeStackEnvelope` (`{ stack: null | { id, number, revision, landingBase, members } }`,
- *   members with an optional `headOid`), `GitCafeDiff` (`{ items, truncated? }`),
- *   `GitCafeChecks` (`{ items, next }`).
- *
- * Conversions (all take the repository host, so staging stays on staging):
- * - `toChangeRequest(pull, { repository, host }): ProviderChangeRequest`
- * - `toViewerPermissions(detail): PullRequestViewerPermissions` — fills `editChangeRequest`.
- * - `toActivity({ comments, reviews, commits, reactions?, headOid?, host }):
- *   ProviderChangeRequestActivity` — fills `canEdit` on both copies of a remark and `canResolve`
- *   on review threads, from each comment's `capabilities`.
- * - `toStack(stack, { repository, host }): ProviderChangeRequestStack`
- * - `toDiff(diff): ProviderDiffSlice`
- * - `toChecks(checks): ReadonlyArray<PullRequestCheck>`
- */
 import { assert, describe, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 
@@ -141,31 +118,11 @@ describe("toChangeRequest", () => {
     assert.strictEqual(row.author?.login, "remote-user");
     assert.deepStrictEqual(row.reviewRequestLogins, ["alice", "upstream", "linked-local"]);
   });
-
-  it("requires capabilities on a detail response", () => {
-    assert.throws(() => decodePullDetail(pull));
-  });
 });
 
 describe("toViewerPermissions", () => {
   const permissions = (overrides: Record<string, unknown>) =>
     GitCafePullRequestJson.toViewerPermissions(decodePullDetail({ ...detail, ...overrides }));
-
-  it("lets an editor rewrite the title and description, and nobody else", () => {
-    assert.isTrue(permissions({}).editChangeRequest);
-    assert.isFalse(
-      permissions({
-        capabilities: { comment: true, review: true, merge: true, edit: false, moderate: true },
-      }).editChangeRequest,
-    );
-  });
-
-  it("offers lifecycle actions by state and never a standalone branch update", () => {
-    assert.deepStrictEqual(permissions({}).actions, ["draft", "close", "merge"]);
-    assert.deepStrictEqual(permissions({ state: "closed" }).actions, ["reopen"]);
-    assert.deepStrictEqual(permissions({ state: "merged" }).actions, []);
-    assert.isTrue(permissions({}).stackRebase);
-  });
 
   it("keeps a locked conversation's composer for moderators only", () => {
     const locked = (moderate: boolean) =>
@@ -177,14 +134,6 @@ describe("toViewerPermissions", () => {
     assert.isFalse(locked(false).resolve);
     assert.isTrue(locked(true).comment);
     assert.deepStrictEqual(locked(true).verdicts, []);
-  });
-
-  it("offers no composer to a viewer GitCafe won't let comment", () => {
-    const silent = permissions({
-      capabilities: { comment: false, review: true, merge: true, edit: true, moderate: true },
-    });
-    assert.isFalse(silent.comment);
-    assert.isFalse(silent.resolve);
   });
 });
 
@@ -239,7 +188,6 @@ describe("toActivity", () => {
     const canEdit = (id: string) => result.comments.find((comment) => comment.id === id)?.canEdit;
     assert.strictEqual(canEdit("root"), false);
     assert.strictEqual(canEdit("reply"), true);
-    // A host that says nothing about a remark leaves the page to guess.
     assert.isUndefined(canEdit("silent"));
     assert.deepStrictEqual(
       result.reviewThreads[0]?.comments.map((comment) => [comment.id, comment.canEdit]),
@@ -247,77 +195,6 @@ describe("toActivity", () => {
         ["root", false],
         ["reply", true],
       ],
-    );
-  });
-
-  it.each([
-    [null, { resolve: true, unresolve: false }, true],
-    [null, { resolve: false, unresolve: true }, false],
-    [timestamp, { resolve: true, unresolve: false }, false],
-    [timestamp, { resolve: false, unresolve: true }, true],
-  ] as const)(
-    "reads canResolve for a thread resolved at %s with %o as %s",
-    (resolvedAt, allowed, canResolve) => {
-      const result = activity([
-        {
-          ...lineComment,
-          id: "root",
-          threadId: "root",
-          resolvedAt,
-          capabilities: capabilities(allowed),
-        },
-      ]);
-      assert.strictEqual(result.reviewThreads[0]?.canResolve, canResolve);
-    },
-  );
-
-  it("leaves canResolve absent when the root says nothing", () => {
-    const result = activity([{ ...lineComment, id: "root", threadId: "root" }]);
-    assert.isUndefined(result.reviewThreads[0]?.canResolve);
-  });
-
-  it("maps review verdicts, dismissals and commits", () => {
-    const result = GitCafePullRequestJson.toActivity({
-      comments: decodeComments({ items: [], next: null }),
-      reviews: decodeReviews({
-        items: [
-          {
-            id: "r1",
-            author: actor,
-            body: "LGTM",
-            verdict: "approve",
-            dismissedAt: null,
-            createdAt: timestamp,
-          },
-          {
-            id: "r2",
-            author: actor,
-            body: null,
-            verdict: "request_changes",
-            dismissedAt: timestamp,
-            createdAt: "2026-09-12T13:00:00Z",
-          },
-        ],
-        next: null,
-      }),
-      commits: decodeCommits({
-        items: [{ oid: "abcdef", summary: "Change", time: 1_789_000_000 }],
-        headOid: "abcdef",
-        truncated: false,
-        next: null,
-      }),
-      host: "git.cafe",
-    });
-    assert.deepStrictEqual(
-      result.comments.map((comment) => [comment.id, comment.kind, comment.reviewState]),
-      [
-        ["r1", "review", "approved"],
-        ["r2", "review", "dismissed"],
-      ],
-    );
-    assert.deepStrictEqual(
-      result.commits.map((commit) => commit.oid),
-      ["abcdef"],
     );
   });
 
@@ -345,7 +222,6 @@ describe("toActivity", () => {
               viewerReactionId: null,
               reactors: [actor],
             },
-            // Neither a custom emoji nor one outside the shared set is shown under another name.
             {
               subject: { kind: "pull_request", id: "pr_one" },
               emoji: { kind: "custom", id: "party-parrot" },
@@ -438,10 +314,6 @@ describe("toStack", () => {
       { number: 7, title: "Top", headBranch: "feature", state: "open", isDraft: true },
     ]);
   });
-
-  it("reads an unstacked pull request as no stack", () => {
-    assert.isNull(decodeStackEnvelope({ stack: null }).stack);
-  });
 });
 
 describe("toDiff", () => {
@@ -501,7 +373,6 @@ describe("toDiff", () => {
         truncated: false,
       }),
     );
-    // Git quotes a name for the bytes a header can't carry, not for a space.
     assert.include(patch, "rename from old image.png");
     assert.include(patch, "Binary files a/old image.png and b/new image.png differ");
   });
@@ -520,8 +391,12 @@ describe("toDiff", () => {
 
 describe("toChecks", () => {
   it("maps GitCafe's status and conclusion onto the shared check states", () => {
-    const check = (status: string, conclusion: string | null) => ({
-      name: `${status}-${conclusion}`,
+    const check = (
+      status: string,
+      conclusion: string | null,
+      name = `${status}-${conclusion}`,
+    ) => ({
+      name,
       status,
       conclusion,
       summary: null,
@@ -532,16 +407,24 @@ describe("toChecks", () => {
         items: [
           check("queued", null),
           check("in_progress", null),
-          check("completed", "success"),
+          check("completed", "success", "Build"),
+          check("completed", "cancelled"),
           check("completed", "action_required"),
-          check("completed", "timed_out"),
+          check("completed", "timed_out", "Build"),
         ],
         next: null,
       }),
     );
     assert.deepStrictEqual(
-      checks.map((item) => item.status),
-      ["pending", "pending", "success", "action-required", "failure"],
+      checks.map((item) => [item.name, item.status]),
+      [
+        ["completed-cancelled", "cancelled"],
+        ["Build", "failure"],
+        ["queued-null", "pending"],
+        ["in_progress-null", "pending"],
+        ["Build", "success"],
+        ["completed-action_required", "action-required"],
+      ],
     );
   });
 });

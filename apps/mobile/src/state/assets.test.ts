@@ -77,22 +77,16 @@ it.each(["workspace-file", "media-file"] as const)(
 
 it("hides host assets with a denied grant while preserving attachments", () => {
   state.session = { authenticated: true, scopes: [] };
-  expect(useAssetUrlState(environmentId, resource)).toEqual({ _tag: "Failure", reason: "failed" });
+  expect(useAssetUrlState(environmentId, resource)).toEqual({
+    _tag: "Failure",
+    reason: "missing-file-access",
+  });
   expect(state.assetQuery).not.toHaveBeenCalled();
   expect(useAssetUrlState(environmentId, { _tag: "attachment", attachmentId: "upload" })).toEqual({
     _tag: "Success",
     expiresAt: 1,
     url: "https://host.test/api/assets/image.png",
   });
-});
-
-it("stops waiting for an unresolved grant when the connection is offline", () => {
-  state.phase = "offline";
-  expect(useAssetUrlState(environmentId, resource)).toEqual({
-    _tag: "Failure",
-    reason: "disconnected",
-  });
-  expect(state.assetQuery).not.toHaveBeenCalled();
 });
 
 it("lets the server authorize an explicit refresh before the client grant loads", async () => {

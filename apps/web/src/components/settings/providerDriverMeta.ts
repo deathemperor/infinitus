@@ -12,7 +12,6 @@ import { museClient } from "@infinitus/provider-muse/client";
 import { openCodeClient } from "@infinitus/provider-opencode/client";
 import { piClient } from "@infinitus/provider-pi/client";
 
-/** The provider client definitions this web build ships, in presentation order. */
 export const providerClients = makeProviderClientRegistry([
   {
     driverKind: ProviderDriverKind.make("codex"),
