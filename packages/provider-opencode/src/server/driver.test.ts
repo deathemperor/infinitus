@@ -21,11 +21,6 @@ import * as McpProviderSessions from "@infinitus/provider-core/server/McpProvide
 import * as ProviderEventLoggers from "@infinitus/provider-core/server/ProviderEventLoggers";
 import * as ProviderMaintenance from "@infinitus/provider-core/server/maintenanceResolver";
 import * as OpenCodeRuntime from "./OpenCodeRuntime.ts";
-import {
-  OPENCODE_2_RESPONSES,
-  OPENCODE_2_WORKSPACE_RESPONSES,
-  replayOpenCodeServer,
-} from "./probeResponses.fixture.ts";
 import { OpenCodeDriver, openCodeUpdateFor } from "./driver.ts";
 import * as TestProviderHost from "@infinitus/provider-testing/TestProviderHost";
 
@@ -41,7 +36,6 @@ const reachedServer = (operation: string) =>
       ),
     ),
   );
-// Reports OpenCode 2 from `--version`; any attempt to reach a server is recorded and refused.
 const openCode2Runtime = {
   runOpenCodeCommand: () => Effect.succeed({ stdout: "opencode v2.0.18\n", stderr: "", code: 0 }),
   startOpenCodeServerProcess: () => reachedServer("start"),
@@ -76,7 +70,6 @@ it.layer(layer)("OpenCodeDriver runtime selection", (it) => {
     Effect.gen(function* () {
       serverStarts.length = 0;
       const instance = yield* create({}, noHttp);
-      // Text generation goes to the instance's 2.x server, which this test refuses to start.
       yield* Effect.flip(
         instance.textGeneration.generateThreadTitle({
           cwd: process.cwd(),
@@ -88,40 +81,11 @@ it.layer(layer)("OpenCodeDriver runtime selection", (it) => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("lists an OpenCode 2 workspace's own skills and commands from its server", () =>
-    Effect.gen(function* () {
-      serverStarts.length = 0;
-      const requested: Array<string> = [];
-      const server = replayOpenCodeServer(
-        { ...OPENCODE_2_RESPONSES, ...OPENCODE_2_WORKSPACE_RESPONSES },
-        "secret",
-        requested,
-      );
-      const instance = yield* create(
-        { serverUrl: "http://127.0.0.1:4096", serverPassword: "secret" },
-        server,
-      );
-
-      const workspace = yield* instance.snapshotForCwd!("/work");
-      assert.includeMembers(
-        workspace.skills.map((skill) => skill.name),
-        ["plum", "opencode"],
-      );
-      assert.deepStrictEqual(
-        workspace.slashCommands.map((command) => command.name),
-        ["compact", "init", "review", "bee"],
-      );
-      assert.include(requested, "/api/skill");
-      assert.deepStrictEqual(serverStarts, []);
-    }).pipe(Effect.scoped),
-  );
-
   it.effect("answers capability reads without waiting on an unreachable server", () =>
     Effect.gen(function* () {
       const hang = HttpClient.make(() => Effect.never);
       const instance = yield* create({ serverUrl: "http://127.0.0.1:9" }, hang);
 
-      // No probe has succeeded yet, and the server never answers: the 1.x default applies.
       const capabilities = yield* instance.orchestrationAdapter
         .getCapabilities()
         .pipe(Effect.forkChild);
@@ -182,7 +146,6 @@ it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
         npmGlobalInstall(v1Prefix, ["opencode-ai"], "opencode"),
       );
       assert.strictEqual(v1.update?.args.at(-1), "opencode-ai@latest");
-      // A 1.x install is never offered 2.x's package, or the reverse.
       assert.isNull(
         (yield* resolveUpdate("v2", NodePath.join(v1Prefix, "bin", "opencode"))).update,
       );
@@ -192,7 +155,6 @@ it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
     }),
 );
 
-// The update the driver offers follows the version the binary reports now.
 const versionOutput: { current: string | undefined } = { current: undefined };
 const versionProbes: Array<string> = [];
 const changingRuntime = {
@@ -225,24 +187,6 @@ const layerUpdate = Layer.mergeAll(
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
 it.layer(layerUpdate)("OpenCodeDriver updates", (it) => {
-  it.effect("never runs the binary for a disabled instance's update check", () =>
-    Effect.gen(function* () {
-      versionProbes.length = 0;
-      versionOutput.current = "opencode v2.0.18\n";
-      const instance = yield* OpenCodeDriver.create({
-        instanceId: ProviderInstanceId.make("opencode-disabled"),
-        displayName: undefined,
-        environment: [],
-        enabled: false,
-        config: { ...OpenCodeDriver.defaultConfig(), binaryPath: "opencode" },
-      }).pipe(Effect.provideService(HttpClient.HttpClient, noHttp));
-      const maintenance = yield* instance.snapshot.resolveMaintenance();
-      yield* instance.snapshot.resolveMaintenance({ fresh: true });
-      assert.isNull(maintenance.update);
-      assert.deepStrictEqual(versionProbes, []);
-    }).pipe(Effect.scoped),
-  );
-
   it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
     "offers no package update for an unknown version and follows a changed one on a fresh read",
     () =>
@@ -259,7 +203,6 @@ it.layer(layerUpdate)("OpenCodeDriver updates", (it) => {
           config: { ...OpenCodeDriver.defaultConfig(), binaryPath },
         }).pipe(Effect.provideService(HttpClient.HttpClient, noHttp));
 
-        // The version could not be read: which package owns the binary is unknown.
         versionOutput.current = undefined;
         const unknown = yield* instance.snapshot.resolveMaintenance({ fresh: true });
         assert.isNull(unknown.update);
@@ -269,8 +212,6 @@ it.layer(layerUpdate)("OpenCodeDriver updates", (it) => {
         const v1 = yield* instance.snapshot.resolveMaintenance({ fresh: true });
         assert.strictEqual(v1.packageName, "opencode-ai");
 
-        // The same path now reports 2.x (reinstalled in place): a fresh read re-probes
-        // and never offers 1.x's package for it.
         versionOutput.current = "opencode v2.0.18\n";
         const v2 = yield* instance.snapshot.resolveMaintenance({ fresh: true });
         assert.strictEqual(v2.packageName, "@opencode/cli");

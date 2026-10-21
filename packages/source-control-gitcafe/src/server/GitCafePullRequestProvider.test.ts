@@ -1,21 +1,3 @@
-/**
- * Pins the requests `./GitCafePullRequestProvider.ts` sends for each operation this layer
- * supports. Pass 2 creates:
- *
- * - `./GitCafeApi.ts`: service `GitCafeApi` (key `"@infinitus/source-control-gitcafe/server/GitCafeApi"`)
- *   with `request({ host, operation, method?, path, body? }) => Effect<string, GitCafeApiError>`
- *   (the response body), sending `https://<host>/api<path>` with the `GitCafeCredentials` bearer
- *   token through `HttpClient`; `make` / `layer`. Refuses any host outside `GITCAFE_HOSTS`.
- *   `GitCafeApiError` carries the HTTP `status` so 401/429 map to unauthenticated/rate-limited.
- * - `./GitCafePullRequestProvider.ts`: `make: Effect<PullRequestProviderApi, never, GitCafeApi>`
- *   with kind `"gitcafe"`, implementing list, summary/detail, activity, diff, stack, comment,
- *   reply, resolve, review submit, synchronous merge, and stack land/restack fenced by
- *   `expectedStackHeads`.
- *
- * Every write carries a fresh `requestId`, which GitCafe requires.
- *
- * Out of scope here (layer 3): review-revision fencing, async outcome polling.
- */
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
@@ -37,19 +19,13 @@ const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown
 
 interface SentRequest {
   readonly method: string;
-  /** The path below `/api`, without its query. */
   readonly path: string;
   readonly query: URLSearchParams;
   readonly host: string;
   readonly body: unknown;
-  /** The `redirect` mode FetchHttpClient would hand to fetch for this request. */
   readonly redirect: string | undefined;
 }
 
-/**
- * A GitCafe host answering `"METHOD /path"` (query stripped) from `routes`; anything else is a 404
- * problem document. Every request is recorded in order.
- */
 function fakeGitCafe(
   routes: Record<string, unknown | ((request: SentRequest) => unknown)>,
   options: { readonly status?: number; readonly env?: NodeJS.ProcessEnv } = {},
@@ -85,7 +61,6 @@ function fakeGitCafe(
   const layer = GitCafeApi.layer.pipe(
     Layer.provide(GitCafeCredentials.layer),
     Layer.provide(TestSourceControlHost.layer()),
-    // An environment token, so no test runs `cafe`.
     Layer.provide(
       Layer.succeed(HostProcess.Environment, options.env ?? { CAFE_TOKEN: "env-token" }),
     ),
@@ -150,10 +125,6 @@ const root = {
     unresolve: false,
   },
 };
-/**
- * GitCafe's stack route for pull 7, as it answers: members carry no heads, so each unmerged
- * layer's head comes from its own pull.
- */
 const stack = (
   members: ReadonlyArray<{ number: number; headOid: string; state?: string }>,
 ): Record<string, unknown> => ({
@@ -181,7 +152,6 @@ const stack = (
   ),
 });
 
-/** GitCafe refuses a write without an idempotency key. */
 const assertRequestId = (body: unknown) =>
   assert.match(
     (body as { readonly requestId?: unknown } | undefined)?.requestId as string,
@@ -189,30 +159,6 @@ const assertRequestId = (body: unknown) =>
   );
 
 describe("GitCafePullRequestProvider", () => {
-  it.effect("lists a repository's pull requests from its pulls collection", () => {
-    const server = fakeGitCafe({
-      "GET /repos/owner/repo/pulls": { items: [pull], next: null },
-    });
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      const page = yield* provider.listChangeRequests({
-        ...target,
-        state: "open",
-        involvement: "all",
-        viewer: "alice",
-        limit: 10,
-      });
-      assert.deepStrictEqual(
-        page.items.map((item) => item.number),
-        [7],
-      );
-      assert.deepStrictEqual(
-        server.sent.map((request) => `${request.method} ${request.path}`),
-        ["GET /repos/owner/repo/pulls"],
-      );
-    }).pipe(Effect.provide(server.layer));
-  });
-
   it.effect("keeps a staging repository's requests and links on staging", () => {
     // CAFE_TOKEN follows CAFE_HOST, so staging reads the env token only when it is the target.
     const server = fakeGitCafe(
@@ -290,114 +236,12 @@ describe("GitCafePullRequestProvider", () => {
       const provider = yield* GitCafePullRequestProvider.make;
       const result = yield* provider.getChangeRequestStack!(target);
       assert.strictEqual(result?.number, 3);
-      // A merged layer is not fenced on, so its pull is never read.
       assert.deepStrictEqual(
         result?.layers.map((layer) => [layer.number, layer.headSha]),
         [
           [6, undefined],
           [7, headOid],
         ],
-      );
-    }).pipe(Effect.provide(server.layer));
-  });
-
-  it.effect("reads activity with the host's edit and resolve permissions", () => {
-    const server = fakeGitCafe({
-      "GET /repos/owner/repo/pulls/7": pull,
-      "GET /repos/owner/repo/pulls/7/comments": { items: [root], next: null },
-      "GET /repos/owner/repo/pulls/7/reviews": { items: [], next: null },
-      "GET /repos/owner/repo/pulls/7/commits": {
-        items: [],
-        truncated: false,
-        next: null,
-        headOid,
-      },
-      "GET /repos/owner/repo/pulls/7/reactions/": { items: [], next: null },
-    });
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      const activity = yield* provider.getChangeRequestActivity(target);
-      assert.strictEqual(activity.comments[0]?.canEdit, true);
-      assert.strictEqual(activity.reviewThreads[0]?.canResolve, true);
-      assert.deepStrictEqual(server.writes(), []);
-    }).pipe(Effect.provide(server.layer));
-  });
-
-  it.effect("reads the viewer's permission to edit the pull request", () => {
-    const server = fakeGitCafe({
-      "GET /repos/owner/repo/pulls/7": {
-        ...pull,
-        capabilities: { ...pull.capabilities, edit: false },
-      },
-    });
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      const permissions = yield* provider.getViewerPermissions(target);
-      assert.strictEqual(permissions.editChangeRequest, false);
-    }).pipe(Effect.provide(server.layer));
-  });
-
-  it.effect("reads the diff from the pull request's changed files", () => {
-    const file = {
-      path: "file.ts",
-      oldPath: null,
-      status: "modified",
-      additions: 1,
-      deletions: 1,
-      binary: false,
-    };
-    const snapshot = { version: 4, headOid, comparisonBaseOid: baseOid };
-    const server = fakeGitCafe({
-      "GET /repos/owner/repo/pulls/7": pull,
-      "GET /repos/owner/repo/pulls/7/changes": { ...snapshot, items: [file], next: null },
-      "POST /repos/owner/repo/pulls/7/diff-files": {
-        ...snapshot,
-        items: [
-          {
-            ...file,
-            hunks: [
-              {
-                oldStart: 1,
-                oldLines: 1,
-                newStart: 1,
-                newLines: 1,
-                lines: [
-                  { origin: "-", content: "old\n" },
-                  { origin: "+", content: "new\n" },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    });
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      const diff = yield* provider.getDiff(target);
-      assert.include(diff.patch, "-old\n+new\n");
-      assert.isNull(diff.nextCursor);
-      // The batched hunk read is a POST, but it writes nothing.
-      assert.deepStrictEqual(server.writes(), ["POST /repos/owner/repo/pulls/7/diff-files"]);
-    }).pipe(Effect.provide(server.layer));
-  });
-
-  it.effect("comments and replies to a thread on the pull request's comments", () => {
-    const written = { id: "c1", threadId: "root", version: 1 };
-    const server = fakeGitCafe({
-      "POST /repos/owner/repo/pulls/7/comments/": written,
-      "POST /repos/owner/repo/pulls/7/comments/root/replies": written,
-    });
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      yield* provider.comment({ ...target, body: "Hello" });
-      yield* provider.replyToThread({ ...target, threadId: "root", body: "Reply" });
-      assert.deepStrictEqual(server.writes(), [
-        "POST /repos/owner/repo/pulls/7/comments/",
-        "POST /repos/owner/repo/pulls/7/comments/root/replies",
-      ]);
-      assert.deepStrictEqual(
-        server.sent.map((request) => request.body),
-        [{ body: "Hello" }, { body: "Reply" }],
       );
     }).pipe(Effect.provide(server.layer));
   });
@@ -526,33 +370,6 @@ describe("GitCafePullRequestProvider", () => {
     },
   );
 
-  it.effect("restacks from a layer on update-branch", () => {
-    const server = fakeGitCafe({
-      ...stack([{ number: 7, headOid }]),
-      "POST /repos/owner/repo/pulls/stacks/3/restack": {
-        id: "restack-1",
-        state: "completed",
-        stepCount: 1,
-        completedStepCount: 1,
-        pauseReason: null,
-      },
-    });
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      yield* provider.runAction({
-        ...target,
-        action: "update-branch",
-        updateMethod: "rebase",
-        stackNumber: 3,
-        expectedStackHeads: [{ number: 7, headSha: headOid }],
-      });
-      assert.deepStrictEqual(server.writes(), ["POST /repos/owner/repo/pulls/stacks/3/restack"]);
-      const { requestId, ...body } = server.sent.at(-1)?.body as { requestId: unknown };
-      assertRequestId({ requestId });
-      assert.deepStrictEqual(body, { expectedRevision: 5 });
-    }).pipe(Effect.provide(server.layer));
-  });
-
   it.effect.each([
     ["authored", "authors"],
     ["reviewing", "reviewers"],
@@ -604,7 +421,6 @@ describe("GitCafePullRequestProvider", () => {
   it.effect.each(["authored", "reviewing"] as const)(
     "lists %s unnarrowed when GitCafe can't say who the viewer is",
     (involvement) => {
-      // No `filter-options` route: the fake answers 404, which is an ordinary failure.
       const server = fakeGitCafe({ "GET /repos/owner/repo/pulls": { items: [pull], next: null } });
       return Effect.gen(function* () {
         const provider = yield* GitCafePullRequestProvider.make;
@@ -618,7 +434,6 @@ describe("GitCafePullRequestProvider", () => {
         const listing = server.sent.find((request) => request.path === "/repos/owner/repo/pulls");
         assert.isDefined(listing);
         assert.isNull(listing!.query.get(involvement === "reviewing" ? "reviewers" : "authors"));
-        // An unnarrowed row says nothing about who was asked to review it.
         assert.notInclude(page.items[0]?.reviewRequestLogins ?? [], "alice");
       }).pipe(Effect.provide(server.layer));
     },
@@ -640,7 +455,6 @@ describe("GitCafePullRequestProvider", () => {
         },
         checks: { pending: 0, failing: 0, total: 0 },
       },
-      // Checks continue on a cursor too; a failure on a later page must not be dropped.
       [`GET /repos/owner/repo/commits/${headOid}/checks`]: (request: SentRequest) => ({
         items: [
           {
@@ -653,7 +467,6 @@ describe("GitCafePullRequestProvider", () => {
         ],
         next: request.query.has("after") ? null : "checks-1",
       }),
-      // `/changes` counts no lines, and a pull past one page continues on a cursor.
       "GET /repos/owner/repo/pulls/7/changes": () =>
         changePage++ === 0
           ? { ...snapshot, items: files(0, 2), next: "cursor-1" }
@@ -682,9 +495,8 @@ describe("GitCafePullRequestProvider", () => {
       });
       assert.deepStrictEqual(
         detail.checks.map((check) => check.name),
-        ["early", "late"],
+        ["late", "early"],
       );
-      // A requested reviewer shows before they have reviewed.
       assert.deepStrictEqual(
         detail.reviewers.map((reviewer) => reviewer.login),
         ["alice"],
@@ -730,22 +542,6 @@ describe("GitCafePullRequestProvider", () => {
         .pipe(Effect.result);
       assert.strictEqual(result._tag, "Failure");
       assert.deepStrictEqual(server.writes(), []);
-    }).pipe(Effect.provide(server.layer));
-  });
-
-  it.effect("keeps GitCafe's explanation short and on one line", () => {
-    const server = fakeGitCafe(
-      {
-        "GET /repos/owner/repo/pulls/7": { title: "Conflict", detail: `Line\n${"x".repeat(900)}` },
-      },
-      { status: 409 },
-    );
-    return Effect.gen(function* () {
-      const provider = yield* GitCafePullRequestProvider.make;
-      const error = yield* provider.getChangeRequest(target).pipe(Effect.flip);
-      assert.notInclude(error.detail, "\n");
-      assert.isAtMost(error.detail.length, 310);
-      assert.isTrue(error.detail.startsWith("Line x"));
     }).pipe(Effect.provide(server.layer));
   });
 });

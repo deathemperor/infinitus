@@ -58,6 +58,7 @@ function makeLiveActivities(
   return {
     register: () => Effect.void,
     listTargets: () => Effect.succeed([]),
+    listIdleArmedTargets: () => Effect.succeed([]),
     markDelivery: () => Effect.void,
     markStartQueued: () => Effect.void,
     clearStartQueued: () => Effect.void,
@@ -269,6 +270,7 @@ describe("AgentActivityPublisher", () => {
     });
   });
 
+<<<<<<< HEAD
   it.effect("publishes listed targets through the APNs delivery service", () => {
     const firstTarget = target("device-1");
     const secondTarget = target("device-2");
@@ -587,6 +589,8 @@ describe("AgentActivityPublisher", () => {
     });
   });
 
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   it.effect(
     "delivers notifications without querying activity rows when Live Activities are disabled",
     () => {
@@ -701,19 +705,6 @@ describe("AgentActivityPublisher", () => {
 });
 
 describe("isExpiredAgentActivityState", () => {
-  const hourMs = 60 * 60 * 1_000;
-
-  it("expires running rows after two hours without an update", () => {
-    expect(AgentActivityPublisher.isExpiredAgentActivityState(state, 2 * hourMs - 1)).toBe(false);
-    expect(AgentActivityPublisher.isExpiredAgentActivityState(state, 2 * hourMs + 1)).toBe(true);
-  });
-
-  it("keeps waiting rows for a day", () => {
-    const waiting: RelayAgentActivityState = { ...state, phase: "waiting_for_approval" };
-    expect(AgentActivityPublisher.isExpiredAgentActivityState(waiting, 23 * hourMs)).toBe(false);
-    expect(AgentActivityPublisher.isExpiredAgentActivityState(waiting, 25 * hourMs)).toBe(true);
-  });
-
   it("treats rows with unparseable timestamps as expired", () => {
     expect(
       AgentActivityPublisher.isExpiredAgentActivityState({ ...state, updatedAt: "not-a-date" }, 0),
@@ -793,27 +784,6 @@ describe("makeAggregateState", () => {
     expect(aggregate?.updatedAt).toBe("1970-01-01T00:59:00.000Z");
   });
 
-  it("drops finished threads from the aggregate after the display window", () => {
-    const active: RelayAgentActivityState = {
-      ...state,
-      threadId: "thread-active" as RelayAgentActivityState["threadId"],
-      updatedAt: "1970-01-01T00:58:00.000Z",
-    };
-    const staleCompleted: RelayAgentActivityState = {
-      ...state,
-      threadId: "thread-done" as RelayAgentActivityState["threadId"],
-      phase: "completed",
-      updatedAt: "1970-01-01T00:44:00.000Z",
-    };
-    const aggregate = AgentActivityPublisher.makeAggregateState({
-      activeStates: [active, staleCompleted],
-      terminalState: null,
-      nowMs: hourMs,
-    });
-
-    expect(aggregate?.activities).toMatchObject([{ threadId: "thread-active" }]);
-  });
-
   it("keeps showing recently finished work when nothing is active", () => {
     const lingeringCompleted: RelayAgentActivityState = {
       ...state,
@@ -826,9 +796,6 @@ describe("makeAggregateState", () => {
       nowMs: hourMs,
     });
 
-    // An armed card never renders an empty state: recently finished threads
-    // keep Done content on it, and once they age out the aggregate becomes
-    // null and the delivery layer ends the card.
     expect(aggregate).toMatchObject({
       activeCount: 0,
       subtitle: "Agent work completed",

@@ -80,6 +80,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     ]);
   });
 
+<<<<<<< HEAD
   it("keeps per-version order and drops empty groups", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       [
@@ -100,6 +101,8 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     });
   });
 
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   it("drops releases from other trains before grouping on nightly", () => {
     // electron-updater's full changelog is "every version above the running
     // one", and preview sorts above nightly, so the preview cuts come first.
@@ -123,6 +126,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     expect(result.omittedReleaseCount).toBe(0);
   });
 
+  // regression: #11753 prerelease entries leaked into a channel's update changelog
   it("keeps only stable releases on the latest channel", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       [
@@ -161,6 +165,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     expect(result.omittedReleaseCount).toBe(1);
   });
 
+<<<<<<< HEAD
   it("decodes valid HTML entities", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       "- Fix &amp; polish &#128512;",
@@ -173,6 +178,8 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     });
   });
 
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   it("ignores malformed and empty entries instead of throwing", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       [
@@ -193,6 +200,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     });
   });
 
+<<<<<<< HEAD
   it("returns an empty result for an invalid payload", () => {
     expect(normalizeDesktopUpdateReleaseNotes({ note: "- Invalid" }, "1.0.0", "infinitus")).toEqual(
       {
@@ -202,6 +210,8 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     );
   });
 
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   it("does not throw on out-of-range numeric entities and keeps the literal", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       "- Broken entity &#9999999999;",

@@ -1,8 +1,12 @@
 import { scopeProjectRef, scopeThreadRef } from "@infinitus/client-runtime/environment";
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { EnvironmentId, ScopedThreadRef } from "@infinitus/contracts";
+import { parseChangeRequestUrl } from "@infinitus/shared/changeRequestUrl";
 import { promptLinkAppPath } from "@infinitus/shared/promptLinks";
 import { useRouter } from "@tanstack/react-router";
+import * as Effect from "effect/Effect";
+import { AtomRegistry } from "effect/reactivity";
+import * as Stream from "effect/Stream";
 import { useEffect, useEffectEvent, useRef } from "react";
 
 import { openFileInPreview, openUrlInPreview } from "../../browser/openFileInPreview";
@@ -10,19 +14,40 @@ import { isPreviewAvailableFor } from "../../browser/previewRuntime";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { useScratchProject } from "../../hooks/useScratchProject";
+import { useClientSettings } from "../../hooks/useSettings";
+import { useOpenChangeRequestLink } from "../../lib/openPullRequestLink";
 import { selectActiveRightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
+import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { assetEnvironment } from "../../state/assets";
 import { useEnvironmentHttpBaseUrl, usePrimaryEnvironment } from "../../state/environments";
 import { previewEnvironment } from "../../state/preview";
+import { allReachableShellsLiveAtom } from "../../state/shell";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 
+/** A link handed over by the OS is a plain click: nothing about it asks for the browser. */
+const externalClick = {
+  preventDefault() {},
+  stopPropagation() {},
+  metaKey: false,
+  ctrlKey: false,
+};
+
+/** Resolves once every reachable environment has reported its projects or settled offline. */
+const projectsSettled = (): Promise<void> =>
+  Effect.runPromise(
+    AtomRegistry.toStream(appAtomRegistry, allReachableShellsLiveAtom).pipe(
+      Stream.filter((settled) => settled),
+      Stream.runHead,
+      Effect.asVoid,
+    ),
+  );
+
 /**
- * The thread on screen when its browser panel is showing, so a link opens as
- * another tab there, the way a browser window takes new links. HTML files are
- * served by this machine's environment, so only its threads can take them.
+ * HTML files are served by this machine's environment, so only its threads can
+ * take them.
  */
 function threadShowingBrowser(
   routeParams: Record<string, string | undefined>,
@@ -45,16 +70,11 @@ function threadShowingBrowser(
   return surface?.kind === "preview" ? threadRef : null;
 }
 
-/**
- * Opens each link the OS hands T3 Code. Prompt and thread links, by `t3code://`
- * or as hosted-app pages, open in the app. Other web links and HTML files arrive
- * because T3 Code is the default browser (macOS): with a browser panel on screen
- * the page opens as a new tab there; otherwise it starts a thread without a
- * project, its browser panel maximized.
- */
 export function DesktopWebLinkCoordinator() {
   const router = useRouter();
   const primaryEnvironment = usePrimaryEnvironment();
+  const openPullRequestsInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
+  const openChangeRequest = useOpenChangeRequestLink();
   const { scratchEnvironmentId, openScratchProject } = useScratchProject();
   const openThread = useNewThreadHandler();
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
@@ -75,14 +95,12 @@ export function DesktopWebLinkCoordinator() {
       stackedThreadToast({ type: "error", title: "Could not open the link", description }),
     );
 
-  // The OS hands each link over once, so a thread that could not start says so.
   const startThread = async (url: string): Promise<ScopedThreadRef | null> => {
     const environmentId = scratchEnvironmentId(primaryEnvironment?.environmentId ?? null);
     if (environmentId === null) {
       reportFailure(url);
       return null;
     }
-    // Reports its own failure.
     const project = await openScratchProject(environmentId, "Could not open the link");
     if (!project) return null;
     const opened = await openThread(scopeProjectRef(project.environmentId, project.id));
@@ -101,6 +119,7 @@ export function DesktopWebLinkCoordinator() {
       await router.navigate({ href: appPath });
       return;
     }
+    if (openChangeRequest(externalClick, url)) return;
     const isFile = url.startsWith("file:");
     const routeParams = router.state.matches.at(-1)?.params ?? {};
     const threadRef =
@@ -109,7 +128,6 @@ export function DesktopWebLinkCoordinator() {
         isFile ? (primaryEnvironment?.environmentId ?? null) : null,
       ) ?? (await startThread(url));
     if (threadRef === null) return;
-    // An HTML file is served from the environment, which runs on this machine.
     const result = isFile
       ? httpBaseUrl === null
         ? null
@@ -132,14 +150,23 @@ export function DesktopWebLinkCoordinator() {
     }
   });
 
+  const receiveLink = useEffectEvent((url: string) => {
+    // A connected server publishes its config before its project snapshot, so a PR link
+    // delivered at launch would miss its project and fall through to the browser. Hold PR
+    // links, and only those, until discovery settles; an ordinary link never waits for it.
+    const hold =
+      openPullRequestsInApp && parseChangeRequestUrl(url) !== null
+        ? projectsSettled()
+        : Promise.resolve();
+    void hold.then(() => {
+      queueRef.current = queueRef.current.then(() => openLink(url)).catch(() => undefined);
+    });
+  });
+
   useEffect(() => {
     if (!ready || webLinks === undefined) return;
     let subscribed = true;
-    // Links open one at a time, in the order they came.
-    const unsubscribe = webLinks.onOpen((url) => {
-      queueRef.current = queueRef.current.then(() => openLink(url)).catch(() => undefined);
-    });
-    // Skip readiness if React runs cleanup before this subscription can receive links.
+    const unsubscribe = webLinks.onOpen(receiveLink);
     queueMicrotask(() => {
       if (subscribed) void webLinks.setReady(true).catch(() => undefined);
     });

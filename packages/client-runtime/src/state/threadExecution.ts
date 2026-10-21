@@ -7,6 +7,7 @@ import {
 import {
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
+  latestProviderTurnForAttempt,
   type ModelSelection,
   type OrchestrationV2NotificationSource,
   type OrchestrationV2PendingBackgroundTask,
@@ -23,7 +24,7 @@ import {
 } from "@infinitus/shared/orchestrationV2PendingBackgroundWork";
 import {
   getProviderOptionCurrentLabel,
-  getProviderOptionDescriptors,
+  getProviderOptionStatedValue,
 } from "@infinitus/shared/model";
 import { formatDuration } from "@infinitus/shared/orchestrationTiming";
 import * as DateTime from "effect/DateTime";
@@ -55,6 +56,9 @@ function summarizeThreadRun(
   projection: OrchestrationV2ThreadProjection,
   run: OrchestrationV2ThreadProjection["runs"][number],
 ): ThreadRunSummary {
+  const turnStatus = ACTIVITY_RUN_STATUSES.has(run.status)
+    ? latestProviderTurnForAttempt(projection.providerTurns, run.activeAttemptId)?.status
+    : undefined;
   return {
     runId: run.id,
     status: run.status,
@@ -65,6 +69,9 @@ function summarizeThreadRun(
       projection.messages.findLast(
         (message) => message.runId === run.id && message.role === "assistant",
       )?.id ?? null,
+    ...(turnStatus === undefined || turnStatus === "pending" || turnStatus === "running"
+      ? {}
+      : { turnEnded: true }),
     ...(run.sourcePlanRef === undefined ? {} : { sourcePlanRef: run.sourcePlanRef }),
   };
 }
@@ -82,7 +89,6 @@ function presentedUsageLimitRun(
   );
 }
 
-/** The run that stands for the thread's outcome when no run is executing. */
 function presentedLatestRun(
   projection: OrchestrationV2ThreadProjection,
 ): OrchestrationV2ThreadProjection["runs"][number] | null {
@@ -96,11 +102,6 @@ export function deriveLatestThreadRun(
   return run === null ? null : summarizeThreadRun(projection, run);
 }
 
-/**
- * Returns the run that owns live provider work, falling back to the newest run
- * once the thread is idle. A newer queued run must not make an older executing
- * run look settled in clients that render per-run activity.
- */
 export function deriveThreadActivityRun(
   projection: OrchestrationV2ThreadProjection,
 ): ThreadRunSummary | null {
@@ -112,9 +113,7 @@ export function deriveThreadActivityRun(
 
 /**
  * Provider-native subagent threads never get app runs: their work is a runless
- * root turn whose status follows the subagent. Returns when that work started
- * while it is still active, so clients can show the same working state (and
- * timer) as a run. Stop, queue, and steer stay run-only.
+ * root turn whose status follows the subagent.
  */
 export function deriveRunlessWorkStartedAt(
   projection: OrchestrationV2ThreadProjection,
@@ -129,11 +128,6 @@ export interface ProviderSubagentStatus {
   readonly completedAt: string | null;
 }
 
-/**
- * Status of a provider-native subagent thread (see
- * isProviderNativeSubagentThread), read from its runless root turn. Null
- * until that root turn arrives, and for every other thread.
- */
 export function deriveProviderSubagentStatus(
   projection: OrchestrationV2ThreadProjection,
 ): ProviderSubagentStatus | null {
@@ -149,7 +143,6 @@ export function deriveProviderSubagentStatus(
   };
 }
 
-/** The observed selection belongs to the active provider thread, never a previous handoff. */
 export function deriveReportedModelSelection(
   projection: OrchestrationV2ThreadProjection,
 ): ModelSelection | null {
@@ -161,16 +154,14 @@ export function deriveReportedModelSelection(
   return providerThread?.nativeMetadata?.modelSelection ?? null;
 }
 
-// Option ids providers use for reasoning effort (Codex, Claude, Grok/ACP, OpenCode).
-const REASONING_EFFORT_OPTION_IDS = ["reasoningEffort", "effort", "reasoning", "variant"] as const;
+export const REASONING_EFFORT_OPTION_IDS: ReadonlyArray<string> = [
+  "reasoningEffort",
+  "effort",
+  "reasoning",
+  "variant",
+  "reasoning_effort",
+];
 
-/**
- * The reasoning effort a thread's model runs at, resolved and named the way
- * the composer's effort picker does: the stored choice when valid, else the
- * descriptor's current value, else the model's default. Null when the
- * provider catalog has no effort option for this model (a subagent on a
- * model the catalog does not describe), rather than guessing.
- */
 export function formatModelSelectionEffort(
   selection: ModelSelection,
   models: ReadonlyArray<ServerProviderModel> = [],
@@ -178,11 +169,18 @@ export function formatModelSelectionEffort(
 ): string | null {
   const caps = models.find((model) => model.slug === selection.model)?.capabilities;
   if (!caps) return null;
-  const descriptors = getProviderOptionDescriptors({ caps, selections: selection.options });
   for (const id of REASONING_EFFORT_OPTION_IDS) {
-    const descriptor = descriptors.find((candidate) => candidate.id === id);
+    const descriptor = caps.optionDescriptors?.find((candidate) => candidate.id === id);
     if (descriptor?.type !== "select") continue;
-    const label = getProviderOptionCurrentLabel(descriptor, selection, reportedSelection);
+    const value = getProviderOptionStatedValue(id, selection, reportedSelection);
+    if (value === undefined && id !== "variant") continue;
+    if (typeof value === "boolean") continue;
+    // Bypass picker normalization so an obsolete choice cannot become a catalog default.
+    const label = getProviderOptionCurrentLabel(
+      { ...descriptor, currentValue: value },
+      selection,
+      reportedSelection,
+    );
     if (label) return label;
   }
   return null;
@@ -200,10 +198,6 @@ const SUBAGENT_STATUS_LABELS: Record<OrchestrationV2ExecutionNode["status"], str
   rolled_back: "Cancelled",
 };
 
-/**
- * One line for the read-only subagent bar: "Working 12s", "Completed in 34s",
- * or just the status when no duration is known.
- */
 export function formatProviderSubagentStatus(
   status: ProviderSubagentStatus | null,
   nowMs: number,
@@ -219,7 +213,6 @@ export function formatProviderSubagentStatus(
       ? Number.NaN
       : Date.parse(status.completedAt);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return label;
-  // Whole seconds: a ticking label must not flicker through tenths.
   const elapsed = formatDuration(Math.max(1_000, Math.floor((end - start) / 1_000) * 1_000));
   return live ? `${label} ${elapsed}` : `${label} in ${elapsed}`;
 }
@@ -237,8 +230,6 @@ export function deriveThreadRuntime(
   const liveActivityRun = latestMatchingRun(projection, (run) =>
     ACTIVITY_RUN_STATUSES.has(run.status),
   );
-  // Same rule as the shell runtime: only background work that holds the
-  // completion parks the thread at idle; a dev server left running does not.
   const backgroundWorkHoldsRun = backgroundWorkHoldsCompletion(
     derivePendingBackgroundWork({
       latestRun: latestRunProjection,
@@ -292,7 +283,6 @@ export function threadRuntimeHasInterruptibleRun(
 
 type BackgroundWorkKind = OrchestrationV2PendingBackgroundTask["kind"];
 
-// `order` groups work the way a reader thinks about it: agents first, loose tasks last.
 const BACKGROUND_WORK_KINDS: Record<
   BackgroundWorkKind,
   { readonly order: number; readonly singular: string; readonly plural: string }
@@ -306,23 +296,13 @@ const BACKGROUND_WORK_KINDS: Record<
 export interface PendingBackgroundWorkItem {
   readonly taskId: string;
   readonly kind: BackgroundWorkKind;
-  /** The work's name, or its noun when the provider gave none. */
   readonly label: string;
-  /** A subagent's own thread, when it has one. */
   readonly childThreadId: ThreadId | undefined;
 }
 
 export interface PendingBackgroundWorkPresentation {
-  /**
-   * "Waiting on subagent Review src/math.ts", "Waiting on 2 subagents and 1 command",
-   * or "Running: Start the dev server" when only commands remain.
-   */
   readonly title: string;
   readonly items: ReadonlyArray<PendingBackgroundWorkItem>;
-  /**
-   * True when the work will wake the agent (subagents, monitors). False when
-   * only commands remain, such as a dev server: the agent is done.
-   */
   readonly waiting: boolean;
 }
 
@@ -331,7 +311,6 @@ function joinWithAnd(parts: ReadonlyArray<string>): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
-/** Names what a settled thread still runs, grouped by kind, for the composer strip. */
 export function presentPendingBackgroundWork(
   tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>,
 ): PendingBackgroundWorkPresentation | null {
@@ -382,12 +361,9 @@ export function presentPendingBackgroundWork(
 }
 
 export interface ProviderGoalPresentation {
-  /** "Pursuing goal", "Goal paused", "Goal complete"... */
   readonly title: string;
   readonly objective: string;
-  /** "12k / 50k tokens · 4m" for Codex, "2 checks" for Claude; null when nothing is reported. */
   readonly usage: string | null;
-  /** Only Codex stops a goal short of done, and only a stopped goal can resume. */
   readonly canResume: boolean;
 }
 
@@ -406,10 +382,6 @@ function formatGoalTokens(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
 }
 
-/**
- * Status line for a native `/goal`, shared by the web composer row and mobile.
- * An active goal on an idle thread (Claude after Stop) is set, not pursued.
- */
 export function presentProviderGoal(
   goal: OrchestrationV2ProviderGoal,
   working: boolean,
@@ -436,7 +408,6 @@ export function presentProviderGoal(
   };
 }
 
-/** The thread a notification row opens: that of the one subagent or delegated task it reports. */
 export function notificationChildThreadId(
   source: OrchestrationV2NotificationSource,
 ): ThreadId | undefined {

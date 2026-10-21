@@ -19,11 +19,7 @@ export const layer = (config: ServerConfig.ServerConfig["Service"]) =>
     baseDir: config.baseDir,
     logsDir: config.logsDir,
     cliVersion: packageJson.version,
-  }).pipe(
-    Layer.provide(ProcessRunner.layer),
-    // Archive-distributed versions download the release archive here.
-    Layer.provide(FetchHttpClient.layer),
-  );
+  }).pipe(Layer.provide(ProcessRunner.layer), Layer.provide(FetchHttpClient.layer));
 
 export type ServiceReconcileResult =
   | {
@@ -36,8 +32,7 @@ export type ServiceReconcileResult =
       readonly plan: BootService.BootServicePlan;
     };
 
-/** Install, update, or repair the service using the CLI version running this command. */
-export const reconcileService = Effect.fn("cli.service.reconcile")(function* (options?: {
+const reconcileService = Effect.fn("cli.service.reconcile")(function* (options?: {
   readonly allowDowngrade?: boolean;
   readonly start?: boolean;
 }) {
@@ -64,10 +59,16 @@ export const reconcileService = Effect.fn("cli.service.reconcile")(function* (op
   } satisfies ServiceReconcileResult;
 });
 
-export function formatServiceStatus(
-  status: BootService.BootServiceStatus,
-  cliVersion: string,
+function formatServiceChange(
+  result: Extract<ServiceReconcileResult, { readonly changed: true }>,
 ): string {
+  if (result.plan.handedOff === true) {
+    return `Handed the T3 Code service switch to t3@${packageJson.version} to a separate systemd unit, since this session runs inside the service and disconnects when it restarts.\nResult: ${result.plan.logPath}`;
+  }
+  return `${result.previouslyInstalled ? "Updated" : "Installed"} T3 Code service with t3@${packageJson.version}.\nLogs: ${result.plan.logPath}`;
+}
+
+function formatServiceStatus(status: BootService.BootServiceStatus, cliVersion: string): string {
   if (!status.supported) {
     return `${PRODUCT_NAME} service\n  Status: unavailable on this machine\n  Supported on: Linux with systemd, macOS with launchd`;
   }
@@ -132,16 +133,23 @@ const serviceInstallCommand = Command.make("install", serviceReconcileFlags).pip
           );
           return;
         }
+<<<<<<< HEAD
         yield* Console.log(
           `${result.previouslyInstalled ? "Updated" : "Installed"} ${PRODUCT_NAME} service with infinitus ${packageJson.version}.\nLogs: ${result.plan.logPath}`,
         );
+=======
+        yield* Console.log(formatServiceChange(result));
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
       }),
     ),
   ),
 );
 
+<<<<<<< HEAD
 // Kept one release for muscle memory and old docs. It did what `infinitus service
 // install` does; the way to move to a newer release is `infinitus update`.
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
 const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
   Command.withDescription("Deprecated. Run `infinitus update` to move to a newer release."),
   Command.unlisted,
@@ -159,9 +167,13 @@ const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
           );
           return;
         }
+<<<<<<< HEAD
         yield* Console.log(
           `${result.previouslyInstalled ? "Updated" : "Installed"} ${PRODUCT_NAME} service with infinitus ${packageJson.version}.\nLogs: ${result.plan.logPath}`,
         );
+=======
+        yield* Console.log(formatServiceChange(result));
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
       }),
     ),
   ),
@@ -177,11 +189,21 @@ const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe
       Effect.gen(function* () {
         const service = yield* BootService.BootService;
         const status = yield* service.status;
-        const restarted = yield* service.restart;
+        const outcome = yield* service.restart;
+        const onVersion =
+          status.installedVersion === undefined ? "" : ` on t3@${status.installedVersion}`;
         yield* Console.log(
+<<<<<<< HEAD
           restarted
             ? `Restarted the ${PRODUCT_NAME} service${status.installedVersion === undefined ? "" : ` on infinitus ${status.installedVersion}`}.`
             : `${PRODUCT_NAME} service is not installed.`,
+=======
+          outcome === "restarted"
+            ? `Restarted the T3 Code service${onVersion}.`
+            : outcome === "queued"
+              ? `Queued a restart of the T3 Code service${onVersion}. This session runs inside the service and disconnects when it goes down.\nLogs: ${status.logPath}`
+              : "T3 Code service is not installed.",
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
         );
       }),
     ),
@@ -219,18 +241,25 @@ const serviceStatusCommand = Command.make("status", projectLocationFlags).pipe(
   ),
 );
 
+export type ServiceOnboardingOutcome = "ready" | "pending" | "skipped";
+
 export const offerServiceDuringOnboarding = Effect.gen(function* () {
   const service = yield* BootService.BootService;
   const status = yield* service.status;
   const { supported, installed, current } = status;
   if (!supported) {
-    return false;
+    return "skipped" as const;
   }
   if (installed && current) {
+<<<<<<< HEAD
     yield* Console.log(
       `${PRODUCT_NAME} is already set up to run in the background on this machine.`,
     );
     return true;
+=======
+    yield* Console.log("T3 Code is already set up to run in the background on this machine.");
+    return "ready" as const;
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   }
   for (const problem of status.problems ?? []) {
     yield* Console.warn(`[${problem}] ${BootService.formatBootServiceProblem(problem)}`);
@@ -243,11 +272,8 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
     yield* Console.log(
       `A newer infinitus ${status.installedVersion} background service is installed. Leaving it unchanged.`,
     );
-    // This CLI cannot verify the newer service. Keep the manual fallback available.
-    return false;
+    return "skipped" as const;
   }
-  // A LaunchAgent starts at login and dies at logout; there is no
-  // enable-linger equivalent on macOS. Do not promise more than that.
   const platform = yield* HostProcess.Platform;
   const wanted = yield* Prompt.run(
     Prompt.Confirm({
@@ -262,35 +288,45 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
     }),
   );
   if (!wanted) {
-    return false;
+    return "skipped" as const;
   }
   const result = yield* reconcileService();
   if (result.changed) {
     yield* Console.log(
-      `Background service ${result.previouslyInstalled ? "updated" : "installed"}. Logs: ${result.plan.logPath}`,
+      result.plan.handedOff === true
+        ? formatServiceChange(result)
+        : `Background service ${result.previouslyInstalled ? "updated" : "installed"}. Logs: ${result.plan.logPath}`,
     );
   }
-  return true;
+  return result.changed && result.plan.handedOff === true
+    ? ("pending" as const)
+    : ("ready" as const);
 });
 
+const reportServiceSetupFailure = (error: BootService.BootServiceError) =>
+  Console.warn(`Background setup did not finish: ${error.message}`).pipe(
+    Effect.as("skipped" as const),
+  );
+
 export const recoverServiceOnboardingOffer = <R>(
-  offer: Effect.Effect<boolean, BootService.BootServiceError | Terminal.QuitError, R>,
+  offer: Effect.Effect<
+    ServiceOnboardingOutcome,
+    BootService.BootServiceError | Terminal.QuitError,
+    R
+  >,
 ) =>
   offer.pipe(
     Effect.catchTags({
-      QuitError: () => Effect.succeed(false),
+      QuitError: () => Effect.succeed("skipped" as const),
       BootServiceUnsupportedError: (error) =>
-        Console.log(`Skipping background setup: ${error.message}`).pipe(Effect.as(false)),
-      BootServiceCommandError: (error) =>
-        Console.warn(`Background setup did not finish: ${error.message}`).pipe(Effect.as(false)),
-      BootServiceInstallError: (error) =>
-        Console.warn(`Background setup did not finish: ${error.message}`).pipe(Effect.as(false)),
-      BootServicePrerequisiteError: (error) =>
-        Console.warn(`Background setup did not finish: ${error.message}`).pipe(Effect.as(false)),
-      BootServiceUpdatePendingError: (error) =>
-        Console.warn(`Background setup did not finish: ${error.message}`).pipe(Effect.as(false)),
-      BootServiceDowngradeRefusedError: (error) =>
-        Console.warn(`Background setup did not finish: ${error.message}`).pipe(Effect.as(false)),
+        Console.log(`Skipping background setup: ${error.message}`).pipe(
+          Effect.as("skipped" as const),
+        ),
+      BootServiceCommandError: reportServiceSetupFailure,
+      BootServiceInstallError: reportServiceSetupFailure,
+      BootServicePrerequisiteError: reportServiceSetupFailure,
+      BootServiceUpdatePendingError: reportServiceSetupFailure,
+      BootServiceDowngradeRefusedError: reportServiceSetupFailure,
     }),
   );
 

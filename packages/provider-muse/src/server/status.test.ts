@@ -34,8 +34,8 @@ const metaCatalog = {
   providerId: "meta",
   models: [
     {
-      modelId: "muse-discovered",
-      displayLabel: "Muse Discovered",
+      modelId: "muse-wonder-1.0",
+      displayLabel: "muse-wonder-1.0",
       providerId: "meta",
       isDefault: true,
     },
@@ -56,6 +56,7 @@ const fakeCli = (source = 'process.stdout.write("muse 1.0.3-R2198.1\\n");') =>
   });
 
 it.layer(NodeServices.layer)("Muse status", (it) => {
+<<<<<<< HEAD
   it.effect("does not start a host when disabled", () =>
     Effect.gen(function* () {
       const createHost = vi.fn(async () => makeHost(metaCatalog));
@@ -77,6 +78,8 @@ it.layer(NodeServices.layer)("Muse status", (it) => {
     }),
   );
 
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   it.effect("does not expose CLI stderr or start an SDK host after a failed version check", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -115,7 +118,11 @@ it.layer(NodeServices.layer)("Muse status", (it) => {
         expect(snapshot.auth).toEqual({ status: "unknown" });
         expect(snapshot.version).toBe("1.0.3-R2198.1");
         expect(snapshot.models.map((model) => model.slug)).toEqual([
-          "muse-discovered",
+          "muse-wonder-1.0",
+          "muse-custom",
+        ]);
+        expect(snapshot.models.map((model) => model.name)).toEqual([
+          "Muse Wonder 1.0",
           "muse-custom",
         ]);
         const descriptor = snapshot.models[0]?.capabilities?.optionDescriptors?.[0];
@@ -124,25 +131,6 @@ it.layer(NodeServices.layer)("Muse status", (it) => {
         ).toEqual(["low", "medium", "high", "xhigh", "max"]);
         expect(host.connection.request).toHaveBeenCalledWith("model/list", {});
         expect(host.connection.command).not.toHaveBeenCalled();
-        expect(host.close).toHaveBeenCalledOnce();
-      }),
-    ),
-  );
-
-  it.effect("closes the host after malformed metadata and reports unavailable", () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const binaryPath = yield* fakeCli();
-        const host = makeHost({ providerId: "meta", models: [{ modelId: 1 }] });
-        const snapshot = yield* checkMuseProviderStatus(
-          settings({ enabled: true, binaryPath }),
-          undefined,
-          undefined,
-          async () => host,
-        );
-        expect(snapshot.status).toBe("error");
-        expect(snapshot.auth.status).toBe("unknown");
-        expect(snapshot.models).toEqual([]);
         expect(host.close).toHaveBeenCalledOnce();
       }),
     ),

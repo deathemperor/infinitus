@@ -1,4 +1,8 @@
 import { createServerEnvironmentAtoms } from "@infinitus/client-runtime/state/server";
+import {
+  createOutdatedServerDescriptionCommand,
+  createOutdatedServerUpdateCommand,
+} from "@infinitus/client-runtime/state/outdatedServerUpdate";
 import { createEnvironmentServerConfigsAtom } from "@infinitus/client-runtime/state/shell";
 
 import { environmentCatalog } from "../connection/catalog";
@@ -11,6 +15,8 @@ export const serverEnvironment = createServerEnvironmentAtoms(connectionAtomRunt
   usageLimitSources: true,
   usageLimitsCommand: true,
 });
+export const describeOutdatedServer = createOutdatedServerDescriptionCommand(connectionAtomRuntime);
+export const updateOutdatedServer = createOutdatedServerUpdateCommand(connectionAtomRuntime);
 export const environmentServerConfigsAtom = createEnvironmentServerConfigsAtom({
   catalogValueAtom: environmentCatalog.catalogValueAtom,
   serverConfigValueAtom: serverEnvironment.configValueAtom,

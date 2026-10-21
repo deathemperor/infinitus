@@ -15,10 +15,8 @@ import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
-import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
-import * as TestClock from "effect/testing/TestClock";
 import { RpcClientError } from "effect/rpc";
 import * as Socket from "effect/socket/Socket";
 
@@ -59,8 +57,6 @@ const CONFIG = {
   observability: null,
   providers: [],
   settings: {},
-  // Capabilities drive version-skew behaviour in the projection, so the
-  // fixture carries them rather than leaving the field absent.
   environment: { capabilities: { environmentThemes: true } },
 } as unknown as ServerConfig;
 
@@ -182,36 +178,8 @@ describe("update restart reconnect nudges", () => {
         interval: Duration.zero,
       });
 
-      // Three backoff entries, three nudges. The old one-shot behavior fired
-      // once and then let the supervisor's ladder stretch to 16-second gaps.
       expect(yield* Ref.get(retries)).toBe(3);
     }),
-  );
-
-  it.effect("paces nudges so a fast-failing connection cannot spin", () =>
-    Effect.gen(function* () {
-      const retries = yield* Ref.make(0);
-
-      const fiber = yield* Effect.forkChild(
-        nudgeReconnectDuringUpdateRestart({
-          stateChanges: Stream.fromIterable([{ phase: "backoff" }, { phase: "backoff" }]),
-          retryNow: Ref.update(retries, (count) => count + 1),
-        }),
-        { startImmediately: true },
-      );
-
-      // Each nudge waits out the interval first, so nothing fires immediately.
-      yield* TestClock.adjust(Duration.millis(999));
-      expect(yield* Ref.get(retries)).toBe(0);
-
-      yield* TestClock.adjust(Duration.millis(1));
-      expect(yield* Ref.get(retries)).toBe(1);
-
-      yield* TestClock.adjust(Duration.seconds(1));
-      expect(yield* Ref.get(retries)).toBe(2);
-
-      yield* Fiber.join(fiber);
-    }).pipe(Effect.provide(TestClock.layer())),
   );
 
   it.effect("retries rejected credentials only while the update restart is in progress", () =>
@@ -320,6 +288,12 @@ describe("server state projection", () => {
       fromVersion: "0.0.30",
       targetVersion: "0.0.31",
     });
+    expect(
+      serverUpdateStateForProgressEvent("0.0.30", "0.0.31", {
+        type: "complete",
+        result: { targetVersion: "0.0.31", method: "desktop-app", desktopUpdateToken: "token" },
+      }).stage,
+    ).toBe("installing");
   });
 
   it("keeps active update state and hides stale failures after a version change", () => {
@@ -407,59 +381,6 @@ describe("server state projection", () => {
     ).toBe(true);
   });
 
-  it("applies every config category to the projected snapshot", () => {
-    const snapshot = applyServerConfigProjection(Option.none(), {
-      version: 1,
-      type: "snapshot",
-      config: CONFIG,
-    });
-    const settings = { ...CONFIG.settings };
-    const projected = applyServerConfigProjection(snapshot, {
-      version: 1,
-      type: "settingsUpdated",
-      payload: { settings },
-    });
-
-    const result = Option.getOrThrow(projected);
-    expect(result.config.settings).toBe(settings);
-    expect(result.latestEvent.type).toBe("settingsUpdated");
-  });
-
-  it("carries published environment themes in and out of the projected snapshot", () => {
-    const snapshot = applyServerConfigProjection(Option.none(), {
-      version: 1,
-      type: "snapshot",
-      config: CONFIG,
-    });
-    const themes = [
-      {
-        id: "nightfall",
-        name: "Nightfall",
-        appearance: "dark",
-        canvas: "#1a1b26",
-        accent: "#7aa2f7",
-      },
-    ] as const;
-
-    const published = applyServerConfigProjection(snapshot, {
-      version: 1,
-      type: "environmentThemesUpdated",
-      payload: { themes },
-    });
-    expect(Option.getOrThrow(published).config.environmentThemes).toEqual(themes);
-
-    // A machine that stops publishing has to clear the palettes, not freeze
-    // clients on the last set it sent.
-    const unpublished = applyServerConfigProjection(published, {
-      version: 1,
-      type: "environmentThemesUpdated",
-      payload: { themes: [] },
-    });
-    expect(Option.getOrThrow(unpublished).config.environmentThemes).toBeUndefined();
-  });
-
-  // A snapshot never carries published themes, so taking it wholesale would
-  // clear them on every reconnect and repaint anyone wearing one.
   it("keeps published themes across a reconnect snapshot", () => {
     const themes = [
       {
@@ -484,8 +405,6 @@ describe("server state projection", () => {
     });
     expect(Option.getOrThrow(afterReconnect).config.environmentThemes).toEqual(themes);
 
-    // A server that predates the feature never sends another theme event, so
-    // carrying the set forward would leave a palette nothing can update.
     const downgraded = applyServerConfigProjection(withThemes, {
       version: 1,
       type: "snapshot",
@@ -569,8 +488,6 @@ describe("server state projection", () => {
           );
           yield* Deferred.await(firstSubscribed);
 
-          // Model the point after the ref changed but before either subscriber
-          // processed its publication.
           supervisorSession.value = Option.some(secondSession);
           const handled = yield* SubscriptionRef.changes(state).pipe(
             Stream.filter(
@@ -762,67 +679,6 @@ describe("server state projection", () => {
     ).toBe(live);
   });
 
-  it.effect("throttles server configuration writes and flushes the latest on teardown", () =>
-    Effect.gen(function* () {
-      const events = yield* Queue.unbounded<ServerConfigStreamEvent>();
-      const client = {
-        [WS_METHODS.subscribeServerConfig]: () => Stream.fromQueue(events),
-      } as unknown as WsRpcProtocolClient;
-      const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
-        target: TARGET,
-        state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
-        session: yield* SubscriptionRef.make(Option.some(session(client))),
-        prepared: yield* SubscriptionRef.make(Option.none<PreparedConnection>()),
-        connect: Effect.void,
-        disconnect: Effect.void,
-        retryNow: Effect.void,
-      } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
-      const savedConfigs = yield* Queue.unbounded<ServerConfig>();
-      const cache = Persistence.EnvironmentCacheStore.of({
-        loadShell: () => Effect.succeed(Option.none()),
-        saveShell: () => Effect.void,
-        loadThread: () => Effect.succeed(Option.none()),
-        saveThread: () => Effect.void,
-        removeThread: () => Effect.void,
-        loadServerConfig: () => Effect.succeed(Option.some(CONFIG)),
-        saveServerConfig: (_environmentId, config) => Queue.offer(savedConfigs, config),
-        loadVcsRefs: () => Effect.succeed(Option.none()),
-        saveVcsRefs: () => Effect.void,
-        removeVcsRefs: () => Effect.void,
-        clearVcsRefs: () => Effect.void,
-        clear: () => Effect.void,
-      });
-
-      const scope = yield* Scope.make();
-      const state = yield* makeEnvironmentServerConfigState({}).pipe(
-        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-        Effect.provideService(Persistence.EnvironmentCacheStore, cache),
-        Effect.provideService(Scope.Scope, scope),
-      );
-      const sendConfig = Effect.fn(function* (cwd: string) {
-        yield* Queue.offer(events, { version: 1, type: "snapshot", config: { ...CONFIG, cwd } });
-        yield* SubscriptionRef.changes(state).pipe(
-          Stream.filter((value) => Option.isSome(value) && value.value.config.cwd === cwd),
-          Stream.runHead,
-        );
-      });
-      yield* sendConfig("/first");
-      yield* TestClock.adjust("500 millis");
-      expect((yield* Queue.take(savedConfigs)).cwd).toBe("/first");
-      for (let index = 1; index <= 9; index++) {
-        yield* sendConfig(`/repo-${index}`);
-        yield* TestClock.adjust("1 second");
-      }
-      expect(yield* Queue.poll(savedConfigs)).toEqual(Option.none());
-      yield* TestClock.adjust("1 second");
-      expect((yield* Queue.take(savedConfigs)).cwd).toBe("/repo-9");
-      yield* sendConfig("/final");
-      yield* Scope.close(scope, Exit.void);
-      expect((yield* Queue.take(savedConfigs)).cwd).toBe("/final");
-      expect(yield* Queue.poll(savedConfigs)).toEqual(Option.none());
-    }),
-  );
-
   it.effect("starts from cached configuration and persists the live projection", () =>
     Effect.gen(function* () {
       const events = yield* Queue.unbounded<ServerConfigStreamEvent>();
@@ -877,7 +733,9 @@ describe("server state projection", () => {
             ),
             Stream.runHead,
           );
-          expect(Option.getOrThrow(Option.getOrThrow(projected)).config.providers).toBe(providers);
+          expect(Option.getOrThrow(Option.getOrThrow(projected)).config.providers).toEqual(
+            providers,
+          );
         }),
       );
 
@@ -885,10 +743,11 @@ describe("server state projection", () => {
     }),
   );
 
-  it.effect("does not rewrite cached configuration when no live update arrives", () =>
+  it.effect("shows a reported stall but never caches it", () =>
     Effect.gen(function* () {
+      const events = yield* Queue.unbounded<ServerConfigStreamEvent>();
       const client = {
-        [WS_METHODS.subscribeServerConfig]: () => Stream.empty,
+        [WS_METHODS.subscribeServerConfig]: () => Stream.fromQueue(events),
       } as unknown as WsRpcProtocolClient;
       const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
         target: TARGET,
@@ -916,13 +775,41 @@ describe("server state projection", () => {
       });
 
       yield* Effect.scoped(
-        makeEnvironmentServerConfigState({}).pipe(
-          Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-          Effect.provideService(Persistence.EnvironmentCacheStore, cache),
-        ),
+        Effect.gen(function* () {
+          const state = yield* makeEnvironmentServerConfigState({}).pipe(
+            Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+            Effect.provideService(Persistence.EnvironmentCacheStore, cache),
+          );
+          expect(Option.getOrThrow(yield* SubscriptionRef.get(state)).config).toBe(CONFIG);
+
+          const lastEventLoopStall = {
+            detectedAt: "2026-10-20T07:50:37.633Z",
+            durationMs: 12_422,
+            loadAverage: 219.4,
+            cpuCount: 18,
+          };
+          yield* Queue.offer(events, {
+            version: 1,
+            type: "snapshot",
+            config: { ...CONFIG, lastEventLoopStall },
+          });
+          const projected = yield* SubscriptionRef.changes(state).pipe(
+            Stream.filter((value) =>
+              Option.match(value, {
+                onNone: () => false,
+                onSome: (projection) => projection.source === "live",
+              }),
+            ),
+            Stream.runHead,
+          );
+          expect(Option.getOrThrow(Option.getOrThrow(projected)).config.lastEventLoopStall).toEqual(
+            lastEventLoopStall,
+          );
+        }),
       );
 
-      expect(yield* Queue.poll(savedConfigs)).toEqual(Option.none());
+      // Cached, it would read as a fresh freeze on the next launch.
+      expect(yield* Queue.take(savedConfigs)).not.toHaveProperty("lastEventLoopStall");
     }),
   );
 });

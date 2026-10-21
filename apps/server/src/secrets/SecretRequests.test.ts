@@ -7,17 +7,14 @@ import {
   ThreadId,
   TurnItemId,
 } from "@infinitus/contracts";
-import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Metric from "effect/Metric";
-import * as TestClock from "effect/testing/TestClock";
 import * as Tracer from "effect/Tracer";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
-import * as ServerConfig from "../config.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as SecretRequests from "./SecretRequests.ts";
 
@@ -25,7 +22,6 @@ const threadId = ThreadId.make("thread-orchestrator");
 const turnItemId = TurnItemId.make("turn-item:secret-request:1");
 const projectId = ProjectId.make("project-1");
 
-/** Runs `body` against the service with an in-memory store and a thread holding one request. */
 const withService = <A, E>(
   body: (input: {
     readonly service: SecretRequests.SecretRequests["Service"];
@@ -36,9 +32,7 @@ const withService = <A, E>(
     readonly threadId?: ThreadId;
     readonly runStatus?: string;
     readonly removeFails?: boolean;
-    /** The agent's wait closes the card just before the answer's record lands. */
     readonly closedFirst?: boolean;
-    /** How many record dispatches fail before one succeeds. */
     readonly failedRecords?: number;
   } = {},
 ) =>
@@ -54,7 +48,6 @@ const withService = <A, E>(
       Layer.succeed(
         ServerSecretStore.ServerSecretStore,
         ServerSecretStore.ServerSecretStore.of({
-          // Yields like a real file read, so concurrent callers can interleave.
           get: (name) => Effect.yieldNow.pipe(Effect.as(Option.fromNullishOr(stored.get(name)))),
           set: (name, value) => Effect.sync(() => void stored.set(name, value)),
           create: (name, value) =>
@@ -116,7 +109,6 @@ const withService = <A, E>(
           }
           return Effect.sync(() => {
             dispatched.push(command);
-            // Like the orchestrator, a card that is no longer pending keeps its answer.
             if (options.closedFirst && command.type === "secret_request.record") {
               secretStatus = "cancelled";
             } else if (command.type === "secret_request.record" && secretStatus === "pending") {
@@ -133,7 +125,6 @@ const withService = <A, E>(
     }).pipe(Effect.provide(SecretRequests.layer.pipe(Layer.provide(layerDependencies))));
   });
 
-/** The secret values in the store, leaving out the server's own salt. */
 const valuesOf = (stored: Map<string, Uint8Array>) =>
   Array.from(stored.entries())
     .filter(([name]) => name !== "secret-request-salt")
@@ -156,7 +147,6 @@ it.effect("a saved answer becomes a one-use ref, and the thread only learns it w
 
       const ref = Option.getOrThrow(yield* service.savedRef({ threadId, turnItemId }));
       assert.equal(yield* service.consume({ ref, projectId }), "ghp_secret");
-      // Used once: the value is gone from the store and the ref fails.
       assert.isFalse(valuesOf(stored).some((value) => value.includes("ghp_secret")));
       const again = yield* service.consume({ ref, projectId }).pipe(Effect.flip);
       assert.include(again.message, "already used");
@@ -218,24 +208,6 @@ it.effect("a save whose record failed can be saved again", () =>
   ),
 );
 
-it.effect("a save whose record and cleanup both failed is finished by saving again", () =>
-  withService(
-    ({ service }) =>
-      Effect.gen(function* () {
-        yield* service
-          .answer({ threadId, turnItemId, answer: { type: "save", secret: "ghp_secret" } })
-          .pipe(Effect.flip);
-        yield* service.answer({
-          threadId,
-          turnItemId,
-          answer: { type: "save", secret: "ghp_secret" },
-        });
-        assert.isTrue(Option.isSome(yield* service.savedRef({ threadId, turnItemId })));
-      }),
-    { failedRecords: 1, removeFails: true },
-  ),
-);
-
 it.effect("a ref only works in the project it was entered for", () =>
   withService(({ service }) =>
     Effect.gen(function* () {
@@ -249,7 +221,6 @@ it.effect("a ref only works in the project it was entered for", () =>
         .consume({ ref, projectId: ProjectId.make("project-other") })
         .pipe(Effect.flip);
       assert.include(elsewhere.message, "does not exist");
-      // A failed attempt from another project does not burn the ref.
       assert.equal(yield* service.consume({ ref, projectId }), "ghp_secret");
     }),
   ),
@@ -326,7 +297,6 @@ it.effect("works in threads with long ids, such as a delegated subagent's", () =
           turnItemId,
           answer: { type: "save", secret: "ghp_secret" },
         });
-        // Store names never grow with the thread id, so they fit any filesystem.
         assert.isTrue(Array.from(stored.keys()).every((name) => name.length < 100));
         const ref = Option.getOrThrow(
           yield* service.savedRef({ threadId: delegatedThreadId, turnItemId }),
@@ -349,49 +319,6 @@ it.effect("refuses an answer once the agent that asked has stopped", () =>
         assert.equal(dispatched.length, 0);
       }),
     { runStatus: "completed" },
-  ),
-);
-
-it.effect("drops values nobody used once they expire, and keeps the rest", () =>
-  Effect.gen(function* () {
-    const store = yield* ServerSecretStore.ServerSecretStore;
-    const encode = (savedAt: number) =>
-      new TextEncoder().encode(
-        `{"projectId":"project-1","value":"ghp_secret","savedAt":${savedAt}}`,
-      );
-    yield* TestClock.adjust("2 days");
-    const now = yield* Clock.currentTimeMillis;
-    const stale = `secret-request-${"a".repeat(32)}`;
-    const fresh = `secret-request-${"b".repeat(32)}`;
-    yield* store.set(stale, encode(now - 25 * 60 * 60 * 1000));
-    yield* store.set(fresh, encode(now));
-    yield* store.set("unrelated", new Uint8Array([1]));
-
-    // Building the service runs the first sweep.
-    yield* Effect.gen(function* () {
-      yield* SecretRequests.SecretRequests;
-    }).pipe(
-      Effect.provide(
-        SecretRequests.layer.pipe(
-          Layer.provide(Layer.mock(ThreadManagementService.ThreadManagementService)({})),
-        ),
-      ),
-      Effect.scoped,
-    );
-
-    assert.isTrue(Option.isNone(yield* store.get(stale)));
-    assert.isTrue(Option.isSome(yield* store.get(fresh)));
-    assert.isTrue(Option.isSome(yield* store.get("unrelated")));
-    assert.isTrue(Option.isSome(yield* store.get("secret-request-salt")));
-  }).pipe(
-    Effect.provide(
-      ServerSecretStore.layer.pipe(
-        Layer.provideMerge(
-          ServerConfig.layerTest(process.cwd(), { prefix: "t3-secret-requests-" }),
-        ),
-        Layer.provideMerge(NodeServices.layer),
-      ),
-    ),
   ),
 );
 

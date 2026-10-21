@@ -1,5 +1,3 @@
-"use client";
-
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { CheckIcon, ChevronRightIcon } from "lucide-react";
 import type * as React from "react";
@@ -26,6 +24,7 @@ function MenuPopup({
   side = "bottom",
   anchor,
   keepMounted = false,
+  width = "default",
   ...props
 }: MenuPrimitive.Popup.Props & {
   align?: MenuPrimitive.Positioner.Props["align"];
@@ -34,6 +33,7 @@ function MenuPopup({
   side?: MenuPrimitive.Positioner.Props["side"];
   anchor?: MenuPrimitive.Positioner.Props["anchor"];
   keepMounted?: boolean;
+  width?: "default" | "content";
 }) {
   return (
     <MenuPrimitive.Portal keepMounted={keepMounted}>
@@ -53,8 +53,8 @@ function MenuPopup({
             // the Review panel header). Drag hit-testing ignores z-index, so
             // the topmost row would stay unhoverable without this opt-out.
             "[-webkit-app-region:no-drag]",
-            // Menus size to their content from one minimum, never past the viewport.
-            "min-w-[min(10rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]",
+            "max-w-[calc(100vw-2rem)]",
+            width === "content" ? "w-max min-w-0" : "min-w-[min(10rem,calc(100vw-2rem))]",
             className,
           )}
           data-slot="menu-popup"
@@ -104,8 +104,6 @@ function MenuItem({
   );
 }
 
-// Trim font leading so visible letters center with the icons in touch rows.
-// Symmetric padding keeps accents and descenders inside truncated labels.
 function MenuItemLabel({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -278,11 +276,9 @@ function MenuSubTrigger({
   return (
     <MenuPrimitive.SubmenuTrigger
       className={cn(
-        // Leading-icon treatment matches `MenuItem`: a sub-trigger sits in the
-        // same column as the items around it, so its icon has to align and dim
-        // with theirs. Scoped away from the last child because the chevron is
-        // also a direct svg — on a sub-trigger with no leading icon it is the
-        // only one, and these rules would take away its `ms-auto` alignment.
+        // Scoped away from the last child because the chevron is also a direct
+        // svg — on a sub-trigger with no leading icon it is the only one, and
+        // these rules would take away its `ms-auto` alignment.
         "[&>svg:not(:last-child)]:-mx-0.5 flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-accent data-popup-open:bg-accent data-inset:ps-8 data-highlighted:text-accent-foreground data-popup-open:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground [&>svg:not(:last-child):not([class*='opacity-'])]:opacity-80 [&_svg]:pointer-events-none [&>svg]:shrink-0",
         density === "touch" && "min-h-10 sm:min-h-10",
         className,

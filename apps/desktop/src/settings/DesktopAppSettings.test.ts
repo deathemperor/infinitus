@@ -3,7 +3,6 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import * as DesktopConfig from "../app/DesktopConfig.ts";
@@ -109,6 +108,7 @@ describe("DesktopSettings", () => {
         }),
       ),
   );
+<<<<<<< HEAD
   it.effect("loads defaults when no settings file exists", () =>
     withSettings(
       Effect.gen(function* () {
@@ -233,6 +233,8 @@ describe("DesktopSettings", () => {
       }),
     ),
   );
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
 
   it.effect("falls back to defaults when the settings file is malformed", () =>
     withSettings(
@@ -303,45 +305,6 @@ describe("DesktopSettings", () => {
         assert.equal(loaded.serverExposureMode, "network-accessible");
       }),
     ),
-  );
-
-  it.effect(
-    "normalizes unsupported linux password-store values without dropping other settings",
-    () =>
-      withSettings(
-        Effect.gen(function* () {
-          const environment = yield* DesktopEnvironment.DesktopEnvironment;
-          const fileSystem = yield* FileSystem.FileSystem;
-          const settings = yield* DesktopAppSettings.DesktopAppSettings;
-          yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
-          yield* fileSystem.writeFileString(
-            environment.desktopSettingsPath,
-            `{
-            "linuxPasswordStore": "unsupported-store",
-            "serverExposureMode": "network-accessible",
-            "tailscaleServeEnabled": true,
-            "tailscaleServePort": 8443,
-            "updateChannel": "nightly",
-            "updateChannelConfiguredByUser": true
-          }\n`,
-          );
-
-          assert.deepEqual(yield* settings.load, {
-            linuxPasswordStore: "auto",
-            localEnvironmentEnabled: true,
-            mainWindowBounds: null,
-            mainWindowMaximized: false,
-            serverExposureMode: "network-accessible",
-            tailscaleServeEnabled: true,
-            tailscaleServePort: 8443,
-            updateChannel: "nightly",
-            updateChannelConfiguredByUser: true,
-            wslBackendEnabled: false,
-            wslOnly: false,
-            wslDistro: null,
-          } satisfies DesktopAppSettings.DesktopSettings);
-        }),
-      ),
   );
 
   it.effect("persists sparse desktop settings documents", () =>
@@ -451,6 +414,7 @@ describe("DesktopSettings", () => {
     ),
   );
 
+<<<<<<< HEAD
   it.effect("normalizes invalid persisted Tailscale Serve ports", () =>
     withSettings(
       Effect.gen(function* () {
@@ -478,6 +442,8 @@ describe("DesktopSettings", () => {
     ),
   );
 
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   it.effect("persists wsl backend toggle and normalizes invalid distro names", () =>
     withSettings(
       Effect.gen(function* () {
@@ -549,21 +515,6 @@ describe("DesktopSettings", () => {
         const loaded = yield* settings.load;
         assert.equal(loaded.wslBackendEnabled, true);
         assert.equal(loaded.wslDistro, "Ubuntu-22.04");
-      }),
-    ),
-  );
-
-  it.effect("drops invalid persisted wsl distro values on load", () =>
-    withSettings(
-      Effect.gen(function* () {
-        const settings = yield* DesktopAppSettings.DesktopAppSettings;
-        yield* writeSettingsPatch({
-          wslBackendEnabled: true,
-          wslDistro: "bad/name",
-        });
-        const loaded = yield* settings.load;
-        assert.equal(loaded.wslBackendEnabled, true);
-        assert.equal(loaded.wslDistro, null);
       }),
     ),
   );

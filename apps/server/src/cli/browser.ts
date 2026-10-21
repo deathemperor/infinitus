@@ -1,15 +1,3 @@
-/**
- * `t3 browser setup` - prepares a Linux host for T3's headless browser, which
- * server browser tabs and HTML render previews share. It is the fix every
- * browser host error names, so it does the whole job in one run:
- *
- * - installs the AppArmor profile that lets Chrome's sandbox run where the host
- *   restricts unprivileged user namespaces (Ubuntu 23.10+), and
- * - installs the Debian packages for any libraries the browser cannot load.
- *
- * Both need root. Without it, the command prints what it would change and the
- * `sudo` line to run. It is safe to run again; it skips what is already done.
- */
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
@@ -36,7 +24,6 @@ export class BrowserSetupStepError extends Schema.TaggedError<BrowserSetupStepEr
   }
 }
 
-/** Runs one setup command, streaming its output, and fails with its exit code. */
 const runStep = Effect.fn("browserSetup.runStep")(function* (
   step: string,
   command: string,
@@ -54,8 +41,8 @@ const runStep = Effect.fn("browserSetup.runStep")(function* (
 });
 
 /**
- * The T3 home to check. Under `sudo` the process home is root's, so an
- * unspecified home falls back to the invoking user's `~/.t3`.
+ * Under `sudo` the process home is root's, so an unspecified home falls back to
+ * the invoking user's `~/.t3`.
  */
 const setupBaseDir = Effect.fn("browserSetup.baseDir")(function* (explicit: Option.Option<string>) {
   const env = yield* HostProcess.Environment;
@@ -72,7 +59,6 @@ const setupBaseDir = Effect.fn("browserSetup.baseDir")(function* (explicit: Opti
   return home ? path.join(home, ".t3") : yield* resolveBaseDir(undefined);
 });
 
-/** Whether apt has an installable candidate for `name`. */
 const aptOffers = Effect.fn("browserSetup.aptOffers")(function* (name: string) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const policy = yield* spawner
@@ -82,7 +68,6 @@ const aptOffers = Effect.fn("browserSetup.aptOffers")(function* (name: string) {
   return candidate !== undefined && candidate !== "(none)";
 });
 
-/** The installed browser in this T3 home, if any, to check its libraries. */
 const installedBrowser = Effect.fn("browserSetup.installedBrowser")(function* (baseDir: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -100,9 +85,35 @@ const installedBrowser = Effect.fn("browserSetup.installedBrowser")(function* (b
   return Option.none<string>();
 });
 
+/**
+ * Chrome starts without fonts, but pages then render no text. Without
+ * fontconfig there is no `fc-match` at all, which counts as no font.
+ */
+const fontAvailable = Effect.gen(function* () {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const font = yield* spawner
+    .string(
+      ChildProcess.make("fc-match", ["--format=%{file}", "sans-serif"], {
+        stdin: "ignore",
+        stderr: "ignore",
+      }),
+    )
+    .pipe(
+      Effect.timeout("5 seconds"),
+      Effect.orElseSucceed(() => ""),
+    );
+  return font.trim() !== "";
+}).pipe(Effect.withSpan("browserSetup.fontAvailable"));
+
+const FONT_PACKAGES = ["fontconfig", "fonts-liberation"];
+
 const browserSetupCommand = Command.make("setup", { baseDir: baseDirFlag }).pipe(
   Command.withDescription(
+<<<<<<< HEAD
     `Set up this Linux host for ${PRODUCT_NAME}'s browser: allow Chrome's sandbox and install its libraries.`,
+=======
+    "Set up this Linux host for T3's browser: allow Chrome's sandbox and install its libraries and fonts.",
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   ),
   Command.withHandler(({ baseDir }) =>
     Effect.gen(function* () {
@@ -114,19 +125,33 @@ const browserSetupCommand = Command.make("setup", { baseDir: baseDirFlag }).pipe
       const fs = yield* FileSystem.FileSystem;
       const isRoot = (yield* HostProcess.UserId) === 0;
       const setupCommand = yield* resolveRootCliCommand(PreviewBrowserHost.SETUP_SUBCOMMAND);
+      // Root, unless sudo came from another user, is likely the server's own account.
+      const env = yield* HostProcess.Environment;
+      const rootWarning =
+        isRoot && (env.SUDO_USER ?? "root") === "root" && !PreviewBrowserHost.sandboxDisabled(env)
+          ? new PreviewBrowserHost.PreviewBrowserRootError().message
+          : undefined;
 
       const needsProfile = yield* PreviewBrowserHost.sandboxBlocked;
       const browser = yield* installedBrowser(yield* setupBaseDir(baseDir));
       const missing = Option.isSome(browser)
         ? yield* PreviewBrowserHost.missingLibraries(browser.value)
         : [];
+      const needsFonts = !(yield* fontAvailable);
       const hasApt = yield* fs.exists("/usr/bin/apt-get").pipe(Effect.orElseSucceed(() => false));
 
-      if (!needsProfile && missing.length === 0) {
+      if (!needsProfile && missing.length === 0 && !needsFonts) {
         return yield* Console.log(
+<<<<<<< HEAD
           Option.isSome(browser)
             ? `This host is ready for ${PRODUCT_NAME}'s browser.`
             : `Chrome's sandbox is allowed here. ${PRODUCT_NAME}'s browser installs on first use; if it then reports missing libraries, run this again.`,
+=======
+          rootWarning ??
+            (Option.isSome(browser)
+              ? "This host is ready for T3's browser."
+              : "Chrome's sandbox is allowed here. T3's browser installs on first use; if it then reports missing libraries, run this again."),
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
         );
       }
 
@@ -139,6 +164,11 @@ const browserSetupCommand = Command.make("setup", { baseDir: baseDirFlag }).pipe
         if (missing.length > 0) {
           yield* Console.log(
             `${PRODUCT_NAME}'s browser is missing ${missing.join(", ")}; setup installs them.`,
+          );
+        }
+        if (needsFonts) {
+          yield* Console.log(
+            "T3's browser needs fontconfig and system fonts; setup installs them.",
           );
         }
         return yield* Console.log(`\nThis needs root. Run:\n\n  ${setupCommand}\n`);
@@ -166,13 +196,31 @@ const browserSetupCommand = Command.make("setup", { baseDir: baseDirFlag }).pipe
         yield* Console.log(`Allowed Chrome's sandbox for ${PRODUCT_NAME}'s browser.`);
       }
 
+<<<<<<< HEAD
       if (missing.length > 0) {
         if (!hasApt) {
           return yield* Console.log(
             `${PRODUCT_NAME}'s browser is missing ${missing.join(", ")}. Install them with your package manager, then run this again.`,
+=======
+      if ((missing.length > 0 || needsFonts) && !hasApt) {
+        if (missing.length > 0) {
+          yield* Console.log(
+            `T3's browser is missing ${missing.join(", ")}. Install them with your package manager, then run this again.`,
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
           );
         }
+        if (needsFonts) {
+          yield* Console.log(
+            "T3's browser needs fontconfig and system fonts. Install them with your package manager, then run this again.",
+          );
+        }
+        return;
+      }
+      if (missing.length > 0 || needsFonts) {
         yield* runStep("refresh the package lists", "apt-get", ["update"]);
+      }
+
+      if (missing.length > 0) {
         const packages = yield* Effect.forEach(PreviewBrowserHost.DEBIAN_PACKAGES, (names) =>
           Effect.findFirst(names, aptOffers).pipe(Effect.map(Option.getOrElse(() => names[0]!))),
         );
@@ -185,7 +233,28 @@ const browserSetupCommand = Command.make("setup", { baseDir: baseDirFlag }).pipe
         yield* Console.log("Installed the browser's libraries.");
       }
 
+<<<<<<< HEAD
       yield* Console.log(`This host is ready for ${PRODUCT_NAME}'s browser.`);
+=======
+      if (needsFonts) {
+        yield* runStep("install the browser's fonts", "apt-get", [
+          "install",
+          "-y",
+          "--no-install-recommends",
+          ...FONT_PACKAGES,
+        ]);
+        if (!(yield* fontAvailable)) {
+          return yield* Console.log(
+            "Font packages are installed, but Fontconfig still finds no system font. Check its configuration and run setup again.",
+          );
+        }
+        yield* Console.log(
+          "Installed the browser's fonts. Restart the T3 server if browser tabs were already open.",
+        );
+      }
+
+      yield* Console.log(rootWarning ?? "This host is ready for T3's browser.");
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
     }),
   ),
 );

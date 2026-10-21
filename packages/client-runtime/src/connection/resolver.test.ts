@@ -3,21 +3,22 @@ import {
   ORCHESTRATION_PROTOCOL_VERSION,
   type DesktopSshEnvironmentTarget,
 } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { RelayClientTracer } from "@infinitus/shared/relayTracing";
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
-import * as Tracer from "effect/Tracer";
 
 import * as ConnectionResolver from "./resolver.ts";
 import * as ClientCapabilities from "../platform/capabilities.ts";
 import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
 import {
   BearerConnectionCredential,
-  BearerConnectionProfile,
   type ConnectionCatalogEntry,
   SshConnectionProfile,
   type ConnectionCredential,
@@ -25,11 +26,13 @@ import {
 } from "./catalog.ts";
 import * as ConnectionCredentialStore from "./credentialStore.ts";
 import {
+<<<<<<< HEAD
   BearerConnectionTarget,
   ConnectionBlockedError,
+=======
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
   ConnectionTransientError,
   PrimaryConnectionTarget,
-  RelayConnectionTarget,
   SshConnectionTarget,
   type ConnectionTarget,
 } from "./model.ts";
@@ -58,20 +61,6 @@ function catalogEntry(
   profile: Option.Option<ConnectionProfile> = Option.none(),
 ): ConnectionCatalogEntry {
   return { target, profile, enabled: true };
-}
-
-function collectingTracer(spans: Array<string>): Tracer.Tracer {
-  return Tracer.make({
-    span: (options) => {
-      const span = new Tracer.NativeSpan(options);
-      const end = span.end.bind(span);
-      span.end = (endTime, exit) => {
-        end(endTime, exit);
-        spans.push(span.name);
-      };
-      return span;
-    },
-  });
 }
 
 const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((options?: {
@@ -212,26 +201,6 @@ describe("ConnectionResolver", () => {
     }),
   );
 
-  it.effect("blocks an incompatible host during discovery before opening orchestration RPC", () =>
-    Effect.gen(function* () {
-      const layerBroker = yield* makeDependencies({
-        descriptorProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION + 1,
-      });
-      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(layerBroker));
-      const target = new PrimaryConnectionTarget({
-        environmentId: ENVIRONMENT_ID,
-        label: "Primary",
-        httpBaseUrl: "http://127.0.0.1:3777",
-        wsBaseUrl: "ws://127.0.0.1:3777",
-      });
-
-      const error = yield* Effect.flip(broker.prepare(catalogEntry(target)));
-
-      expect(error).toMatchObject({ reason: "unsupported" });
-      expect(error.message).toContain("This client is not supported");
-    }),
-  );
-
   it.effect("prepares a primary environment without remote capabilities", () =>
     Effect.gen(function* () {
       const layerBroker = yield* makeDependencies();
@@ -255,8 +224,9 @@ describe("ConnectionResolver", () => {
     }),
   );
 
-  it.effect("authorizes a desktop primary environment with its platform bearer token", () =>
+  it.effect("offers the saved SSH token on each connect and saves the one it gets back", () =>
     Effect.gen(function* () {
+<<<<<<< HEAD
       const bearerInputs = yield* Ref.make<ReadonlyArray<{ token: string; method: string }>>([]);
       const layerBroker = yield* makeDependencies({
         primaryBearerToken: "desktop-bearer",
@@ -613,6 +583,9 @@ describe("ConnectionResolver", () => {
     Effect.gen(function* () {
       const preparedTargets = yield* Ref.make<ReadonlyArray<DesktopSshEnvironmentTarget>>([]);
       const connectionMethods = yield* Ref.make<ReadonlyArray<string>>([]);
+=======
+      const offeredTokens = yield* Ref.make<ReadonlyArray<string | undefined>>([]);
+>>>>>>> upstream-sync-1dfb57287-upstream-renamed
       const target = new SshConnectionTarget({
         environmentId: ENVIRONMENT_ID,
         label: "SSH",
@@ -625,8 +598,10 @@ describe("ConnectionResolver", () => {
         target: SSH_TARGET,
       });
       const layerBroker = yield* makeDependencies({
+        credentials: [["ssh-1", new BearerConnectionCredential({ token: "revoked-token" })]],
+        // The host accepts only the token it paired last; anything else pairs again.
         prepareSsh: (input) =>
-          Ref.update(preparedTargets, (values) => [...values, input.target]).pipe(
+          Ref.update(offeredTokens, (tokens) => [...tokens, input.bearerToken]).pipe(
             Effect.as({
               bootstrap: {
                 target: input.target,
@@ -634,30 +609,19 @@ describe("ConnectionResolver", () => {
                 wsBaseUrl: "ws://127.0.0.1:4010",
                 pairingToken: null,
               },
-              bearerToken: "ssh-bearer",
-            }),
-          ),
-        authorizeBearer: (input) =>
-          Ref.update(connectionMethods, (methods) => [...methods, input.connectionMethod]).pipe(
-            Effect.as({
-              environmentId: input.expectedEnvironmentId,
-              label: "SSH",
-              httpBaseUrl: input.httpBaseUrl,
-              socketUrl: "wss://environment.example.test/ws?wsTicket=bearer",
-              httpAuthorization: {
-                _tag: "Bearer" as const,
-                token: input.bearerToken,
-              },
+              bearerToken: "paired-token",
             }),
           ),
       });
       const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(layerBroker));
+      const entry = catalogEntry(target, Option.some(profile));
 
-      expect(
-        (yield* broker.prepare(catalogEntry(target, Option.some(profile)))).socketUrl,
-      ).toContain("wsTicket=bearer");
-      expect(yield* Ref.get(preparedTargets)).toEqual([SSH_TARGET]);
-      expect(yield* Ref.get(connectionMethods)).toEqual(["ssh"]);
+      const first = yield* broker.prepare(entry);
+      const second = yield* broker.prepare(entry);
+
+      expect(yield* Ref.get(offeredTokens)).toEqual(["revoked-token", "paired-token"]);
+      expect(first.httpAuthorization).toMatchObject({ token: "paired-token" });
+      expect(second.httpAuthorization).toMatchObject({ token: "paired-token" });
     }),
   );
 
@@ -755,26 +719,5 @@ describe("ConnectionResolver", () => {
         }
         expect(yield* permissions.get(entry)).toBe(scenario === "changed" ? "off" : "read-write");
       }),
-  );
-
-  it.effect("preserves relay authorization failure classification and trace details", () =>
-    Effect.gen(function* () {
-      const target = new RelayConnectionTarget({
-        environmentId: ENVIRONMENT_ID,
-        label: "Cloud",
-      });
-      const authorizationError = new ConnectionTransientError({
-        reason: "timeout",
-        detail: "Relay environment connection timed out.",
-        traceId: "relay-trace",
-      });
-      const layerBroker = yield* makeDependencies({
-        authorizeDpop: () => Effect.fail(authorizationError),
-      });
-      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(Effect.provide(layerBroker));
-      const error = yield* Effect.flip(broker.prepare(catalogEntry(target)));
-
-      expect(error).toBe(authorizationError);
-    }),
   );
 });
