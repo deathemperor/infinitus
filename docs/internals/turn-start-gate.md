@@ -59,7 +59,7 @@ ruling on #1318; upstream's own client-side parking from #11673 is gone in
 v2). Two halves:
 
 - `Orchestrator.ts`, `message.dispatch`: a dispatch with `deliveryIntent:
-"steer"` — the composer's steer mode on web and phone — that resolves to
+  "steer"` — the composer's steer mode on web and phone — that resolves to
   `steer_active` and is not a mailbox delivery (no `delegatedCompletion`, no
   `notification`) is queued instead, as a run with `sendAt: "tool_boundary"`.
   Everything that names its target keeps upstream's immediate delivery: a
