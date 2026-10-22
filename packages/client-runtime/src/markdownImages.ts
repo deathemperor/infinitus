@@ -1,4 +1,9 @@
-import { isWindowsAbsolutePath, stripSlashPrefixedWindowsDrive } from "@infinitus/shared/path";
+import {
+  isNetworkPath,
+  isWindowsAbsolutePath,
+  stripSlashPrefixedWindowsDrive,
+  workspaceRelativeFilePath,
+} from "@infinitus/shared/path";
 
 import {
   normalizeMarkdownLinkDestination,
@@ -26,8 +31,17 @@ function joinWorkspacePath(workspaceRoot: string, relativePath: string): string 
   return `${root}${separator}${path}`;
 }
 
+/** Rendering is not a click, so a network path loads only from the project's own share. */
+function hostFileSource(
+  path: string,
+  workspaceRoot: string | null | undefined,
+): MarkdownImageSource {
+  return isNetworkPath(path) && workspaceRelativeFilePath(path, workspaceRoot) === null
+    ? { _tag: "Blocked" }
+    : { _tag: "WorkspaceFile", path };
+}
+
 /**
- * Classifies a markdown image or video source by where its bytes must be loaded from.
  * Filesystem paths belong to the environment host and must never reach a
  * browser or native image component without first becoming a signed asset URL.
  */
@@ -49,10 +63,10 @@ export function classifyMarkdownImageSource(
     const target = parseFileUrlHref(source);
     return target === null
       ? { _tag: "Blocked" }
-      : {
-          _tag: "WorkspaceFile",
-          path: stripSlashPrefixedWindowsDrive(safeDecodeURIComponent(target.path)),
-        };
+      : hostFileSource(
+          stripSlashPrefixedWindowsDrive(safeDecodeURIComponent(target.path)),
+          workspaceRoot,
+        );
   }
 
   const path = stripSlashPrefixedWindowsDrive(
@@ -60,7 +74,7 @@ export function classifyMarkdownImageSource(
   );
   if (path.length === 0) return { _tag: "Blocked" };
   if (path.startsWith("/") || isWindowsAbsolutePath(path)) {
-    return { _tag: "WorkspaceFile", path };
+    return hostFileSource(path, workspaceRoot);
   }
   if (URI_SCHEME_PATTERN.test(path) || path.startsWith("~/") || path.startsWith("~\\")) {
     return { _tag: "Blocked" };

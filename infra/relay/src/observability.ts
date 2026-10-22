@@ -10,6 +10,7 @@ import * as Tracer from "effect/Tracer";
 
 import { relayResourceNameForStage } from "./deploymentConfig.ts";
 import { PRODUCT_NAME } from "@infinitus/contracts/productName";
+import { RelayMonitoring } from "./monitoring.ts";
 
 const relayRecentSpansQuery = (dataset: string) =>
   [
@@ -62,6 +63,8 @@ export const RelayObservability = Effect.gen(function* () {
     datasets: [traces.name],
     aplQuery: Output.map(traces.name, relayRecentSpansQuery),
   });
+
+  yield* RelayMonitoring(traces);
 
   return { traces, workerIngestToken, mobileIngestToken, clientIngestToken } as const;
 });
@@ -210,11 +213,6 @@ const withSchemaErrorAttributes = (delegate: Tracer.Tracer): Tracer.Tracer =>
     ...(delegate.context ? { context: delegate.context } : {}),
   });
 
-/**
- * Adds a failed span's schema error fields (`error.type`, `error.<field>`) to
- * the span, on whichever tracer is current. Provide it around the work whose
- * spans should carry them; the Worker's telemetry still owns export.
- */
 export const withSchemaErrorSpanAttributes = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R> =>

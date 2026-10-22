@@ -1,3 +1,4 @@
+import { Button } from "../../components/ui/Button";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -10,16 +11,16 @@ import {
   resolveEnvironmentMachineKind,
 } from "@infinitus/contracts";
 import { useNavigation } from "@react-navigation/native";
-import { AppActivityIndicator } from "../../components/AppActivityIndicator";
-import { ScreenHeader } from "../../components/ScreenHeader";
-import { SymbolView } from "../../components/AppSymbol";
+import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
+import { AppBar } from "../../components/ui/AppBar";
+import { SymbolView } from "../../components/ui/AppSymbol";
 import { useCallback, useMemo, useRef, type ComponentProps } from "react";
-import { Platform, Pressable, RefreshControl, useWindowDimensions, View } from "react-native";
+import { Platform, RefreshControl, useWindowDimensions, View } from "react-native";
 import { GestureDetector, useNativeGesture } from "react-native-gesture-handler";
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 
-import { AppText as Text } from "../../components/AppText";
-import { EmptyState } from "../../components/EmptyState";
+import { AppText as Text } from "../../components/ui/AppText";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
 import { relativeTime } from "../../lib/time";
@@ -49,7 +50,7 @@ function ArchivedThreadsHeader(props: {
   const { width } = useWindowDimensions();
   const hasCustomFilter = props.selectedEnvironmentId !== null || props.sortOrder !== "newest";
   return (
-    <ScreenHeader
+    <AppBar
       title="Archived threads"
       sidebar={false}
       onBack={() => navigation.goBack()}
@@ -239,7 +240,6 @@ function ArchivedThreadRow(props: {
       </View>
     </View>
   );
-  // Keep the group's rounded corners on both interactive and read-only rows.
   const containerStyle = {
     borderTopLeftRadius: props.isFirst ? 20 : 0,
     borderTopRightRadius: props.isFirst ? 20 : 0,
@@ -280,9 +280,9 @@ function ArchiveError(props: { readonly message: string; readonly onRetry: () =>
         Could not load every archive
       </Text>
       <Text className="mt-1 text-sm text-foreground-muted">{props.message}</Text>
-      <Pressable className="mt-3 self-start active:opacity-60" onPress={props.onRetry}>
-        <Text className="text-sm font-infinitus-bold text-danger-foreground">Try again</Text>
-      </Pressable>
+      <View className="mt-3">
+        <Button label="Try again" tone="secondary" onPress={props.onRetry} />
+      </View>
     </View>
   );
 }

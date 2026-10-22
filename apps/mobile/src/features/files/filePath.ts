@@ -1,3 +1,4 @@
+import { resolvePathLinkTarget } from "@infinitus/shared/fileLinks";
 import {
   isWorkspaceAudioPreviewPath,
   isWorkspaceVideoPreviewPath,
@@ -13,12 +14,10 @@ function isWindowsAbsolutePath(value: string): boolean {
   return /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("\\\\");
 }
 
-/** A file route holding an absolute path shows a host file outside the workspace. */
 export function isAbsolutePath(value: string): boolean {
   return value.startsWith("/") || isWindowsAbsolutePath(value);
 }
 
-/** Route segments that `normalizeRoutePath` joins back into the same path, root included. */
 export function fileRoutePathSegments(path: string): string[] {
   const segments = path.split("/").filter((segment) => segment.length > 0);
   return path.startsWith("/") ? ["", ...segments] : segments;
@@ -68,16 +67,26 @@ function normalizeRelativePath(value: string): string | null {
   return segments.length > 0 ? segments.join("/") : null;
 }
 
+export function resolveFileLinkPath(
+  workspaceRoot: string | null | undefined,
+  targetPath: string,
+): string | null {
+  if (targetPath.startsWith("~/") || targetPath.startsWith("~\\")) {
+    if (!workspaceRoot) return null;
+    const expanded = resolvePathLinkTarget(targetPath, workspaceRoot);
+    return isAbsolutePath(expanded) ? expanded : null;
+  }
+  return isAbsolutePath(targetPath) ? targetPath : normalizeRelativePath(targetPath);
+}
+
 export function resolveWorkspaceRelativeFilePath(
   workspaceRoot: string | null | undefined,
   targetPath: string,
 ): string | null {
-  if (!isAbsolutePath(targetPath)) {
-    if (targetPath.startsWith("~/") || targetPath.startsWith("~\\")) {
-      return null;
-    }
-    return normalizeRelativePath(targetPath);
-  }
+  const resolved = resolveFileLinkPath(workspaceRoot, targetPath);
+  if (resolved === null) return null;
+  targetPath = resolved;
+  if (!isAbsolutePath(targetPath)) return targetPath;
   if (!workspaceRoot) {
     return null;
   }
@@ -92,7 +101,6 @@ export function resolveWorkspaceRelativeFilePath(
   }
 
   const relativePath = normalizedTarget.slice(normalizedRoot.length + 1);
-  // `/repo/../x` starts with the root but escapes it.
   if (relativePath.split("/").includes("..")) {
     return null;
   }
@@ -127,10 +135,6 @@ export function fileBreadcrumbs(projectName: string, relativePath: string): File
   ];
 }
 
-/**
- * The location line under a file's name: `project · parent/dir`. A host file outside the
- * workspace is not under the project, so it shows its directory alone.
- */
 export function fileHeaderSubtitle(projectName: string, relativePath: string): string {
   const parentDir = relativePath.slice(
     0,

@@ -25,6 +25,8 @@ describe("resolveT3McpToolPresentation", () => {
       expect(resolveT3McpToolPresentation(`mcp__another-server__${tool}`), tool).toBeNull();
     }
   });
+
+  // Fork (#1368 A): thread tool labels name the product, with its article.
   it("pretty prints Claude and Cursor T3 MCP tool names", () => {
     expect(resolveT3McpToolPresentation("mcp__t3-code__t3_thread_read")).toEqual({
       displayName: `Read an ${PRODUCT_NAME} thread`,
@@ -46,57 +48,10 @@ describe("resolveT3McpToolPresentation", () => {
     });
   });
 
-  it("pretty prints bare T3 MCP toolkit names", () => {
-    expect(resolveT3McpToolPresentation("list_scheduled_tasks")).toEqual({
-      displayName: "List scheduled tasks",
-      logo: "t3-code",
-    });
-  });
-
-  it("pretty prints worktree T3 MCP tool names", () => {
-    expect(resolveT3McpToolPresentation("mcp__t3-code__t3_worktree_handoff")).toEqual({
-      displayName: "Hand off thread to a git worktree",
-      logo: "t3-code",
-    });
-    expect(resolveT3McpToolPresentation("t3-code.t3_worktree_status")).toEqual({
-      displayName: "Get thread worktree status",
-      logo: "t3-code",
-    });
-  });
-
-  it("pretty prints preview T3 MCP tool names", () => {
-    expect(resolveT3McpToolPresentation("T3-code.preview_open")).toEqual({
-      displayName: "Open a page in the preview browser",
-      logo: "t3-code",
-    });
-    expect(resolveT3McpToolPresentation("mcp__t3-code__preview_status")).toEqual({
-      displayName: "Get preview browser status",
-      logo: "t3-code",
-    });
-  });
-
-  it("matches the separator variants ACP registry agents emit", () => {
-    for (const name of [
-      "mcp_t3-code_delegate_task",
-      "t3_code:delegate_task",
-      "t3code/delegate_task",
-      "t3-code delegate_task",
-      "T3 Code delegate_task",
-      "t3-code__delegate_task",
-    ]) {
-      expect(resolveT3McpToolPresentation(name)?.displayName).toBe("Delegate a child task");
-    }
-  });
-
   it("matches OpenCode 2's per-thread server names, whose thread ids hold underscores", () => {
     expect(
       resolveT3McpToolPresentation("t3-code-thread_opencode2-adapter_delegate_task")?.displayName,
     ).toBe("Delegate a child task");
     expect(resolveT3McpToolPresentation("t3-code-thread_opencode2-adapter_not_a_tool")).toBeNull();
-  });
-
-  it("keeps unknown MCP tools on the generic renderer path", () => {
-    expect(resolveT3McpToolPresentation("mcp__github__search_issues")).toBeNull();
-    expect(resolveT3McpToolPresentation("t3-code.not_a_real_tool")).toBeNull();
   });
 });

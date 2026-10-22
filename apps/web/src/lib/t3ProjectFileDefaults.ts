@@ -13,16 +13,8 @@ import {
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 
 /**
- * Read and decode the project's checked-in `t3.json`.
- *
- * Imperative counterpart to `useT3ProjectFileState` for the new-thread path,
- * which resolves defaults at call time rather than render time. The file
- * query atom caches per (environment, cwd), so repeat calls don't re-fetch.
- * Optimistic in-app writes overlay the query result, matching what
- * `useProjectFileQuery` renders. Missing, truncated, or invalid files
- * resolve to null. The names are tried in the server's order —
- * `infinitus.json`, then upstream's `t3.json` — and the first file that reads
- * decides.
+ * The names are tried in the server's order — `infinitus.json`, then
+ * upstream's `t3.json` — and the first file that reads decides.
  */
 export async function readT3ProjectFile(
   environmentId: EnvironmentId,
@@ -40,7 +32,7 @@ export async function readT3ProjectFile(
       fileName,
       result._tag === "Success" ? result.value : null,
     );
-    if (data === null) continue;
+    if (data === null || data.exists === false) continue;
     if (data.truncated) return null;
     return parseT3ProjectFile(data.contents);
   }

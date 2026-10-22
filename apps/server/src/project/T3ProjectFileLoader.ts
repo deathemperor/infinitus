@@ -1,16 +1,7 @@
 /**
- * T3ProjectFileLoader - Effect service that loads the checked-in
- * `infinitus.json` project file from a workspace root.
- *
  * A checkout that only carries upstream's `t3.json` still works: the names in
  * `T3_PROJECT_FILE_NAMES` are tried in order and the first one that exists
  * decides, so a repository never has to be converted to be read.
- *
- * Loading is best-effort: a missing file resolves to `Option.none`, and
- * unreadable or invalid files are logged and treated as absent so callers
- * can fall back to their defaults.
- *
- * @module T3ProjectFileLoader
  */
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -39,16 +30,12 @@ export class T3ProjectFileLoadError extends Schema.TaggedError<T3ProjectFileLoad
   }
 }
 
-/** Service tag for project file loading. */
 export class T3ProjectFileLoader extends Context.Service<
   T3ProjectFileLoader,
   {
     /**
-     * Load and decode the project file at the workspace root, preferring
-     * `infinitus.json` over upstream's `t3.json`.
-     *
-     * Never fails: missing, unreadable, or invalid files resolve to
-     * `Option.none` (invalid files are logged as warnings).
+     * Prefers `infinitus.json` over upstream's `t3.json`. Never fails: missing, unreadable, or
+     * invalid files resolve to `Option.none` (invalid files are logged as warnings).
      */
     readonly load: (workspaceRoot: string) => Effect.Effect<Option.Option<T3ProjectFile>>;
   }

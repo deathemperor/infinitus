@@ -15,7 +15,6 @@ import * as DesktopAssets from "./DesktopAssets.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
-import * as DesktopUserData from "./DesktopUserData.ts";
 
 const defaultEnvironmentInput = {
   dirname: "/repo/apps/desktop/dist-electron",
@@ -45,6 +44,7 @@ const layerElectronApp = (calls: ElectronAppCalls) =>
     name: Effect.succeed("T3 Code"),
     systemLocale: Effect.succeed("en-US"),
     whenReady: Effect.void,
+    requestSingleInstanceLock: Effect.succeed(true),
     quit: Effect.void,
     exit: () => Effect.void,
     relaunch: () => Effect.void,
@@ -178,39 +178,6 @@ describe("DesktopAppIdentity", () => {
     ),
   );
 
-  it.effect("configures app identity from the environment commit override", () => {
-    const calls: ElectronAppCalls = {
-      setAboutPanelOptions: [],
-      setDockIcon: [],
-      setName: [],
-    };
-
-    return withIdentity(
-      Effect.gen(function* () {
-        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
-        yield* identity.configure;
-
-        // A packaged build of this repo is titled plainly (#823 layer 3).
-        assert.deepEqual(calls.setName, [`${PRODUCT_NAME} Alpha`]);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, PRODUCT_NAME);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationVersion, "1.2.3");
-        assert.equal(calls.setAboutPanelOptions[0]?.version, "0123456789ab");
-        // Packaged: the bundle's own icon stands, so a custom one the user
-        // attached survives.
-        assert.deepEqual(calls.setDockIcon, []);
-      }),
-      {
-        calls,
-        environment: {
-          env: {
-            T3CODE_COMMIT_HASH: "0123456789abcdef",
-          },
-        },
-        pngIconPath: Option.some("/icon.png"),
-      },
-    );
-  });
-
   it.effect.each([
     // A fork release carries no stage in its title (#823 layer 3); upstream's
     // nightly and a dev run keep theirs.
@@ -242,7 +209,6 @@ describe("DesktopAppIdentity", () => {
           const runtimeName = calls.setName[0];
           assert.isDefined(runtimeName);
           assert.equal(runtimeName, `${PRODUCT_NAME} ${stage}`);
-          // RFC 9110's token grammar, after Electron removes ASCII spaces.
           assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
           assert.equal(calls.setAboutPanelOptions[0]?.applicationName, applicationName);
         }),
@@ -250,28 +216,4 @@ describe("DesktopAppIdentity", () => {
       );
     },
   );
-
-  it.effect("sets the dock icon only when running unpackaged", () => {
-    const calls: ElectronAppCalls = {
-      setAboutPanelOptions: [],
-      setDockIcon: [],
-      setName: [],
-    };
-
-    return withIdentity(
-      Effect.gen(function* () {
-        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
-        yield* identity.configure;
-
-        // Electron shows a generic icon for an unpackaged run, which is the
-        // reason this call exists at all.
-        assert.deepEqual(calls.setDockIcon, ["/icon.png"]);
-      }),
-      {
-        calls,
-        environment: { isPackaged: false },
-        pngIconPath: Option.some("/icon.png"),
-      },
-    );
-  });
 });

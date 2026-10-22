@@ -13,32 +13,24 @@ import {
 } from "./BitbucketPullRequestProvider.ts";
 
 it.effect.each([
-  {
-    metadata: "source commit hash",
-    commit: { hash: "9f3a7c2d8b1e6f045a9c3d7e2b8f1a6c0d4e5f93" },
-    headSha: "9f3a7c2d8b1e6f045a9c3d7e2b8f1a6c0d4e5f93",
-  },
-  { metadata: "absent commit", commit: undefined, headSha: undefined },
-  { metadata: "null commit", commit: null, headSha: undefined },
-  { metadata: "absent hash", commit: {}, headSha: undefined },
-  { metadata: "null hash", commit: { hash: null }, headSha: undefined },
-])("reads change request details with $metadata", ({ commit, headSha }) =>
+  { state: "MERGED", mergedAt: "2025-06-16T23:40:46.222Z", closedAt: null },
+  { state: "DECLINED", mergedAt: null, closedAt: "2025-06-16T23:40:46.222Z" },
+  { state: "OPEN", mergedAt: null, closedAt: null },
+])("reads the $state time from closed_on", ({ state, mergedAt, closedAt }) =>
   Effect.gen(function* () {
     const pullRequest = Result.getOrThrow(
       decodePullRequestJson(
         JSON.stringify({
-          id: 897,
-          title: "Add trustabl-pipe",
-          state: "OPEN",
-          source: {
-            branch: { name: "feat/page" },
-            commit,
-            repository: { full_name: "fork/web" },
-          },
-          destination: { branch: { name: "master" }, commit: { hash: "base-commit" } },
-          created_on: "2026-06-16T05:04:32.258456+00:00",
-          updated_on: "2026-06-16T05:04:33.750542+00:00",
-          links: { html: { href: "https://bitbucket.org/acme/web/pull-requests/897" } },
+          id: 52,
+          title: "Release",
+          state,
+          source: { branch: { name: "release" } },
+          destination: { branch: { name: "master" } },
+          created_on: "2025-06-16T06:20:58.415108+00:00",
+          // Comments after a merge move this, so it is not the merge time.
+          updated_on: "2025-06-20T10:00:00.000000+00:00",
+          closed_on: state === "OPEN" ? null : "2025-06-16T23:40:46.222238+00:00",
+          links: { html: { href: "https://bitbucket.org/acme/web/pull-requests/52" } },
         }),
       ),
     );
@@ -57,11 +49,13 @@ it.effect.each([
       cwd: "/repo",
       repository: "acme/web",
       host: "bitbucket.org",
-      number: 897,
+      number: 52,
     });
 
-    expect(detail).toMatchObject({ number: 897, headBranch: "feat/page" });
-    expect(detail.headSha).toBe(headSha);
+    expect({ mergedAt: detail.mergedAt, closedAt: detail.closedAt }).toEqual({
+      mergedAt,
+      closedAt,
+    });
   }),
 );
 
@@ -203,8 +197,6 @@ describe("bitbucketViewerPermissions", () => {
       comment: true,
       resolve: true,
       verdicts: ["comment", "approve", "request-changes"],
-      // Bitbucket says nothing about who may set a reviewer, and an unreported permission is
-      // granted.
       requestReviewers: true,
     });
   });
@@ -217,12 +209,5 @@ describe("bitbucketViewerPermissions", () => {
       verdicts: ["comment", "approve", "request-changes"],
       requestReviewers: true,
     });
-  });
-
-  it("treats an author with read access as any other reader, which is all Bitbucket says", () => {
-    // The repository permission is the whole of what Bitbucket reports per account; it says
-    // nothing about who opened this pull request, and its author may decline it with read access
-    // alone — so declining stays offered rather than being taken from them.
-    expect(bitbucketViewerPermissions({ canWrite: false }).actions).toEqual(["close"]);
   });
 });

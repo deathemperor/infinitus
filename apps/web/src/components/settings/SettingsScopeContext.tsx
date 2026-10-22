@@ -1,14 +1,15 @@
 import {
+  type EnvironmentId,
   LEGACY_T3_PROJECT_FILE_NAME,
-  T3_PROJECT_FILE_NAME,
   type ProjectReadFileResult,
+  T3_PROJECT_FILE_NAME,
   type T3ProjectFile,
 } from "@infinitus/contracts";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { createContext, type ReactNode, useContext, useMemo } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
 import { getProjectFileQueryAtom, optimisticFileAtom } from "../files/projectFilesQueryState";
@@ -17,47 +18,57 @@ import { resolveScopedSettingsTargets, selectScopedSettingsEnvironments } from "
 import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
 import { selectSingleEnvironmentScope } from "./settingsScopeAxis";
 
-/**
- * Each member's decoded t3.json, so file-backed settings show the file as a
- * layer in the inheritance chain. A member is only present once its read has
- * settled; the query atom caches per (environment, cwd).
- */
+type ProjectFileMember = readonly [
+  environmentId: EnvironmentId,
+  workspaceRoot: string,
+  physicalProjectKey: string,
+];
+
+// Keyed by the members' identifying fields so each render reads the same atom.
+const memberProjectFilesAtom = Atom.family((membersKey: string) => {
+  const members = JSON.parse(membersKey) as ReadonlyArray<ProjectFileMember>;
+  return Atom.make((get) => {
+    const files = new Map<string, T3ProjectFile | null>();
+    // A pending in-app save overlays the query, like useProjectFileQuery.
+    const read = (
+      environmentId: EnvironmentId,
+      workspaceRoot: string,
+      fileName: string,
+    ): ProjectReadFileResult | null | "waiting" => {
+      const result = get(getProjectFileQueryAtom(environmentId, workspaceRoot, fileName));
+      if (result.waiting) return "waiting";
+      const data =
+        get(optimisticFileAtom(environmentId, workspaceRoot, fileName))?.data ??
+        Option.getOrNull(AsyncResult.value(result));
+      return data === null || data.exists === false ? null : data;
+    };
+    for (const [environmentId, workspaceRoot, physicalProjectKey] of members) {
+      // `infinitus.json` decides when it exists; a checkout carrying only
+      // upstream's `t3.json` is read from that, the server's own order.
+      const preferred = read(environmentId, workspaceRoot, T3_PROJECT_FILE_NAME);
+      if (preferred === "waiting") continue;
+      const data = preferred ?? read(environmentId, workspaceRoot, LEGACY_T3_PROJECT_FILE_NAME);
+      if (data === "waiting") continue;
+      files.set(
+        physicalProjectKey,
+        data === null || data.truncated ? null : parseT3ProjectFile(data.contents),
+      );
+    }
+    return files;
+  }).pipe(Atom.withLabel(`web-settings-member-project-files:${membersKey}`));
+});
+
 function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
   const members = scope.kind === "project" || scope.kind === "checkout" ? scope.members : [];
   return useAtomValue(
-    useMemo(
-      () =>
-        Atom.make((get) => {
-          const files = new Map<string, T3ProjectFile | null>();
-          // A pending in-app save overlays the query, like useProjectFileQuery.
-          const read = (
-            member: (typeof members)[number],
-            fileName: string,
-          ): ProjectReadFileResult | null | "waiting" => {
-            const result = get(
-              getProjectFileQueryAtom(member.environmentId, member.workspaceRoot, fileName),
-            );
-            if (result.waiting) return "waiting";
-            return (
-              get(optimisticFileAtom(member.environmentId, member.workspaceRoot, fileName))?.data ??
-              Option.getOrNull(AsyncResult.value(result))
-            );
-          };
-          for (const member of members) {
-            // `infinitus.json` decides when it exists; a checkout carrying only
-            // upstream's `t3.json` is read from that, the server's own order.
-            const preferred = read(member, T3_PROJECT_FILE_NAME);
-            if (preferred === "waiting") continue;
-            const data = preferred ?? read(member, LEGACY_T3_PROJECT_FILE_NAME);
-            if (data === "waiting") continue;
-            files.set(
-              member.physicalProjectKey,
-              data === null || data.truncated ? null : parseT3ProjectFile(data.contents),
-            );
-          }
-          return files;
-        }),
-      [members],
+    memberProjectFilesAtom(
+      JSON.stringify(
+        members.map((member): ProjectFileMember => [
+          member.environmentId,
+          member.workspaceRoot,
+          member.physicalProjectKey,
+        ]),
+      ),
     ),
   );
 }
@@ -66,44 +77,27 @@ function useResolvedSettingsScope(rawSearch: SettingsScopeSearch, singleEnvironm
   const groups = useSettingsProjectGroups();
   const { environments: availableEnvironments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const search = useMemo(
-    () =>
-      singleEnvironment
-        ? selectSingleEnvironmentScope(
-            rawSearch,
-            resolveSettingsScope(rawSearch, groups, availableEnvironments),
-            availableEnvironments,
-            primaryEnvironmentId,
-          )
-        : rawSearch,
-    [availableEnvironments, groups, primaryEnvironmentId, rawSearch, singleEnvironment],
-  );
-  const scope = useMemo(
-    () => resolveSettingsScope(search, groups, availableEnvironments),
-    [availableEnvironments, groups, search],
-  );
+  const search = singleEnvironment
+    ? selectSingleEnvironmentScope(
+        rawSearch,
+        resolveSettingsScope(rawSearch, groups, availableEnvironments),
+        availableEnvironments,
+        primaryEnvironmentId,
+      )
+    : rawSearch;
+  const scope = resolveSettingsScope(search, groups, availableEnvironments);
   const projectFiles = useMemberProjectFiles(scope);
-  return useMemo(() => {
-    const selected = selectScopedSettingsEnvironments(
-      scope,
-      availableEnvironments,
-      primaryEnvironmentId,
-    );
-    const targets = resolveScopedSettingsTargets(
-      scope,
-      selected.connectedEnvironments,
-      projectFiles,
-    );
-    // The representative target supplies display values; project scopes
-    // prefer the member on the primary environment, like environments do.
-    const target =
-      targets.find(
-        (candidate) => candidate.environmentId === selected.environment?.environmentId,
-      ) ??
-      targets[0] ??
-      null;
-    return { scope, groups, search, ...selected, targets, target };
-  }, [availableEnvironments, groups, primaryEnvironmentId, projectFiles, scope, search]);
+  const selected = selectScopedSettingsEnvironments(
+    scope,
+    availableEnvironments,
+    primaryEnvironmentId,
+  );
+  const targets = resolveScopedSettingsTargets(scope, selected.connectedEnvironments, projectFiles);
+  const target =
+    targets.find((candidate) => candidate.environmentId === selected.environment?.environmentId) ??
+    targets[0] ??
+    null;
+  return { scope, groups, search, ...selected, targets, target };
 }
 
 const SettingsScopeContext = createContext<
@@ -127,10 +121,7 @@ export function SettingsScopeProvider({
   children: ReactNode;
 }) {
   const resolved = useResolvedSettingsScope(search, singleEnvironment);
-  const value = useMemo(
-    () => ({ ...resolved, singleEnvironment, selectScope: onChange }),
-    [onChange, resolved, singleEnvironment],
-  );
+  const value = { ...resolved, singleEnvironment, selectScope: onChange };
   return <SettingsScopeContext value={value}>{children}</SettingsScopeContext>;
 }
 

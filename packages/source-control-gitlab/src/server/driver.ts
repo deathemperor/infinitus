@@ -1,9 +1,4 @@
 import { SourceControlProviderKind } from "@infinitus/contracts";
-/**
- * The GitLab driver: repository operations, discovery, and merge requests through `glab`.
- *
- * @module source-control-gitlab/server/driver
- */
 import { defineSourceControlDriver } from "@infinitus/source-control-core/server/driver";
 import * as Effect from "effect/Effect";
 

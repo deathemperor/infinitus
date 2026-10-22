@@ -3,7 +3,6 @@ import { assert, it } from "@effect/vitest";
 import { DESKTOP_USER_DATA_DIR_NAME } from "@infinitus/shared/desktopIdentity";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Path from "effect/Path";
 
 import * as DesktopPreReadyFileSystem from "./DesktopPreReadyFileSystem.ts";
 import * as DesktopUserData from "./DesktopUserData.ts";
