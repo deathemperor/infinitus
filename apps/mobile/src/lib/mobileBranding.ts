@@ -1,9 +1,11 @@
-export type MobileStageLabel = "Beta" | "Dev" | "Nightly";
+export type MobileStageLabel = "Alpha" | "Dev" | "Nightly";
 
+// The fork's line is versioned alpha (0.5.0-alpha.N), so its builds keep
+// "Alpha" where upstream's stable stage moved to "Beta".
 export function resolveMobileStageLabel(appVariant: unknown): MobileStageLabel {
   if (appVariant === "development") return "Dev";
   if (appVariant === "preview") return "Nightly";
-  return "Beta";
+  return "Alpha";
 }
 
 /**

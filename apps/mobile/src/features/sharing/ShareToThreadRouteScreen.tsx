@@ -192,7 +192,9 @@ export function ShareToThreadRouteScreen({
       const draftKey = scopedThreadKey(thread.environmentId, thread.id);
       setImportingThreadKey(draftKey);
       void Haptics.selectionAsync();
-      try {
+      // The compiler cannot lower conditionals inside try/catch, so the import
+      // runs as its own async function and failures land in its rejection.
+      const imported = await (async () => {
         // Merge before consuming: the draft's importedShareIds receipt makes a
         // retry into the same thread a no-op if the app dies in between.
         const { skippedAttachmentCount } = await mergeComposerDraftContent(draftKey, {
@@ -220,17 +222,20 @@ export function ShareToThreadRouteScreen({
         if (warnings.length > 0) {
           Dialog.alert("Some shared content was skipped", warnings.join("\n"));
         }
-      } catch (error) {
-        if (mountedRef.current) {
-          setImportingThreadKey(null);
-          Dialog.alert(
-            "Could not import shared content",
-            error instanceof Error ? error.message : "The shared content could not be saved.",
-          );
-        }
-        return;
-      }
-      if (!mountedRef.current) {
+      })().then(
+        () => true,
+        (error: unknown) => {
+          if (mountedRef.current) {
+            setImportingThreadKey(null);
+            Dialog.alert(
+              "Could not import shared content",
+              error instanceof Error ? error.message : "The shared content could not be saved.",
+            );
+          }
+          return false;
+        },
+      );
+      if (!imported || !mountedRef.current) {
         return;
       }
       // The draft and the pickers over it give way to the chosen thread.

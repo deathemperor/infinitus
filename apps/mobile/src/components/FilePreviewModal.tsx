@@ -144,7 +144,9 @@ function ResolvedFilePreview(props: {
   const retryWithFreshUrl = () => {
     retrying.current = true;
     setReusedSelectedUrl(false);
-    setResolved(({ [selectedKey]: _stale, ...rest }) => rest);
+    setResolved((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => key !== selectedKey)),
+    );
     setFreshUrlAttempt((attempt) => attempt + 1);
   };
   const selected = resolved[selectedKey];

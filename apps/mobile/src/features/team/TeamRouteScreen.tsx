@@ -121,20 +121,20 @@ function TeamPane(props: { readonly code: string }) {
   const pickedRef = useRef<string | null>(null);
   const loadTeams = useCallback(
     async (prefer?: string) => {
-      try {
-        const list = await client.listTeams();
-        setTeams(list);
-        setError(null);
-        const wanted = prefer ?? pickedRef.current;
-        const next = list.find((row) => row.teamId === wanted)?.teamId ?? list[0]?.teamId ?? null;
-        pickedRef.current = next;
-        setTeamId(next);
-        if (next === null) setTeam(null);
-        else await loadTeam(next);
-      } catch (cause) {
+      const list = await client.listTeams().catch((cause: unknown) => {
         setTeams([]);
         fail(cause);
-      }
+        return null;
+      });
+      if (list === null) return;
+      setTeams(list);
+      setError(null);
+      const wanted = prefer ?? pickedRef.current;
+      const next = list.find((row) => row.teamId === wanted)?.teamId ?? list[0]?.teamId ?? null;
+      pickedRef.current = next;
+      setTeamId(next);
+      if (next === null) setTeam(null);
+      else await loadTeam(next);
     },
     [client, fail, loadTeam],
   );
@@ -151,9 +151,8 @@ function TeamPane(props: { readonly code: string }) {
       setError(null);
     } catch (cause) {
       fail(cause);
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   /** One relay write that answers nothing; the snapshot is read again. */
@@ -165,9 +164,8 @@ function TeamPane(props: { readonly code: string }) {
       if (teamId !== null) await loadTeam(teamId);
     } catch (cause) {
       fail(cause);
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   const id = team?.teamId ?? null;
@@ -416,9 +414,8 @@ function JoinSection(props: {
       await props.onJoined(joined);
     } catch (cause) {
       setError(teamErrorMessage(cause));
-    } finally {
-      props.setBusy(null);
     }
+    props.setBusy(null);
   };
 
   return (

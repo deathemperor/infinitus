@@ -178,6 +178,11 @@ vi.mock("./use-thread-outbox", async () => {
     useThreadOutboxShellStatuses: () => new Map(),
   };
 });
+// Infinitus (fork, #742): the drain pins a created thread; its hook reaches
+// preferences storage, which loads `expo` and needs a React Native global.
+vi.mock("../features/infinitus/pinAtCreation", () => ({
+  usePinAtCreation: () => async () => undefined,
+}));
 vi.mock("./use-remote-environment-registry", () => ({
   useRemoteConnectionStatus: () => ({
     connectedEnvironments: [{ environmentId: "environment-1", connectionState: "connected" }],
