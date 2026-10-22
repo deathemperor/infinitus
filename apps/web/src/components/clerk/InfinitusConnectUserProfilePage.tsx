@@ -38,7 +38,7 @@ function endpointLabel(environment: RelayClientEnvironmentRecord): string {
     : "Activity publishing only";
 }
 
-export function InfinitusConnectEnvironmentRow(props: {
+function InfinitusConnectEnvironmentRow(props: {
   readonly environment: RelayClientEnvironmentRecord;
   readonly confirmationOpen: boolean;
   readonly mutationPending: boolean;

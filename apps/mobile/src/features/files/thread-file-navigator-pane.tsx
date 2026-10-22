@@ -1,8 +1,8 @@
 import { resolveFilesystemReadAccess } from "@infinitus/client-runtime/state/filesystem";
 import { environmentSession } from "../../state/session";
 import type { EnvironmentId } from "@infinitus/contracts";
-import { SymbolView } from "../../components/AppSymbol";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
+import { SymbolView } from "../../components/ui/AppSymbol";
+import { ScreenContent } from "../../components/ui/ScreenContent";
 import { useCallback, useMemo, useState, type ComponentProps } from "react";
 import { Platform, Pressable, View, type NativeSyntheticEvent } from "react-native";
 import {
@@ -13,14 +13,15 @@ import {
   SearchBar,
 } from "react-native-screens";
 
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
-import { MaterialFilesHeader } from "./MaterialFilesHeader";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/ui/AppText";
+import { FilesHeader } from "./FilesHeader";
 import { nativeHeaderScrollEdgeEffects } from "../../native/StackHeader";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useEnvironmentQuery } from "../../state/query";
 import { useEnvironmentPresentation } from "../../state/presentation";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import { FileTreeBrowser } from "./FileTreeBrowser";
+import { NativeInspectorContent } from "../../native/NativeInspectorContent";
 import { useFileTreeEntries } from "./useFileTreeEntries";
 import { preloadWorkspaceFileContents } from "./preload-workspace-file";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
@@ -99,6 +100,7 @@ export function ThreadFileNavigatorPane(props: {
       isPending={fileAccess.isPending || entriesQuery.isPending}
       isRefreshing={entriesQuery.isRefreshing}
       searchQuery={searchQuery}
+      searchResultPaths={entriesQuery.searchResultPaths}
       searchTruncated={entriesQuery.searchTruncated}
       selectedPath={props.selectedPath}
       onPreviewFile={handlePreviewFile}
@@ -119,7 +121,7 @@ export function ThreadFileNavigatorPane(props: {
             scrollEdgeEffects={headerScrollEdgeEffects}
             style={{ backgroundColor: sheetColor, flex: 1 }}
           >
-            {fileTree}
+            <NativeInspectorContent>{fileTree}</NativeInspectorContent>
             <ScreenStackHeaderConfig
               backgroundColor="rgba(0,0,0,0)"
               color={foregroundColor}
@@ -172,7 +174,7 @@ export function ThreadFileNavigatorPane(props: {
         style={{ paddingTop: Platform.OS === "android" ? 0 : props.headerInset }}
       >
         {Platform.OS === "android" ? (
-          <MaterialFilesHeader
+          <FilesHeader
             projectName={props.projectName}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
@@ -223,7 +225,7 @@ export function ThreadFileNavigatorPane(props: {
           </View>
         ) : null}
       </View>
-      <MaterialScreenContent insetHorizontal>{fileTree}</MaterialScreenContent>
+      <ScreenContent insetHorizontal>{fileTree}</ScreenContent>
     </View>
   );
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import { useLayoutEffect, useRef } from "react";
 
 import { acquireBrowserSurface } from "./browserSurfaceStore";
@@ -87,7 +85,13 @@ export function BrowserSurfaceSlot(props: {
   useLayoutEffect(() => {
     presentationRef.current = { visible, cornerRadius, zIndex };
     updateRef.current?.();
-  }, [cornerRadius, layoutVersion, visible, zIndex]);
+  }, [
+    cornerRadius,
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A layoutVersion bump means the slot moved without resizing, so it re-presents at the new position.
+    layoutVersion,
+    visible,
+    zIndex,
+  ]);
 
   return <div ref={elementRef} className={className} data-browser-surface-slot={tabId} />;
 }
