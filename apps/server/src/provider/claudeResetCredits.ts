@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Claude banked resets (the CLI's `cedar_ember` program, Claude Code 2.1.280).
  * The CLI reads the grants from the OAuth usage endpoint and claims one
@@ -15,6 +16,8 @@
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no sha256 digest.
 import * as NodeCrypto from "node:crypto";
 
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 import type {
   ProviderConsumeResetCreditOutcome,
   ServerProviderResetCredits,
@@ -154,15 +157,14 @@ export class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCredit
 const isClaudeResetCreditError = Schema.is(ClaudeResetCreditError);
 
 /**
- * Every reset failure except `requestFailed` and `unconfirmed` is final:
- * Claude answered, or nothing was sent. An unanswered or unconfirmed claim
- * retries with the same request id.
+ * An unanswered or unconfirmed claim retries with the same request id.
  */
 export const isSettledClaudeResetCreditFailure = (error: unknown) =>
   isClaudeResetCreditError(error) &&
   error.reason !== "requestFailed" &&
   error.reason !== "unconfirmed";
 
+<<<<<<< HEAD
 const isoFuture = (value: string | null | undefined, nowMs: number): string | undefined => {
   if (!value) return undefined;
   const dt = DateTime.make(value);
@@ -183,6 +185,16 @@ const isPast = (value: string | null | undefined, nowMs: number): boolean => {
  * client shows the balance and waits the button instead of spending a click
  * on a `not_limited` answer.
  */
+=======
+const isFutureTimestamp = (value: string, nowMs: number) => {
+  if (!COMPLETE_TIMESTAMP.test(value)) return false;
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  return (
+    Date.parse(value) > nowMs && Date.UTC(year!, month! - 1, day!) <= Date.UTC(year!, month!, 0)
+  );
+};
+
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 export function claudeResetCreditsToContract(
   block: unknown,
   nowMs: number,
@@ -219,6 +231,7 @@ export function claudeResetCreditsToContract(
   };
 }
 
+<<<<<<< HEAD
 /** `security find-generic-password -w`: the item's payload, or nothing. Stdout is never logged. */
 const readKeychainItem = Effect.fn("readKeychainItem")(function* (service: string) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -272,6 +285,29 @@ const readAccessToken = Effect.fn("readClaudeAccessToken")(function* (login: Cla
   const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
   if (typeof oauth?.expiresAt === "number" && oauth.expiresAt <= nowMs) return undefined;
   return token;
+=======
+const readJson = Effect.fn("claudeResetCredits.readJson")(function* <S extends Schema.Top>(
+  schema: S,
+  file: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  return yield* fs.readFileString(file).pipe(
+    Effect.catchTags({
+      PlatformError: (error) =>
+        error.reason._tag === "NotFound" ? Effect.succeed("{}") : Effect.fail(error),
+    }),
+    Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(schema))),
+  );
+});
+
+const readAccessToken = Effect.fn("claudeResetCredits.readAccessToken")(function* (
+  configDir: string,
+) {
+  if ((yield* HostProcess.Platform) === "darwin") return undefined;
+  const path = yield* Path.Path;
+  const credentials = yield* readJson(Credentials, path.join(configDir, ".credentials.json"));
+  return credentials.claudeAiOauth?.accessToken?.trim() || undefined;
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 });
 
 /** The headers the CLI sends: its bearer, the OAuth beta and its own user agent. */
@@ -283,11 +319,14 @@ const withClaudeHeaders = (token: string, version: string) =>
     "user-agent": `claude-cli/${version} (external, cli)`,
   });
 
+<<<<<<< HEAD
 /**
  * Reads the banked resets for `login`. Any failure — no OAuth login, a
  * throttled endpoint, a shape the CLI would also reject — reads as "no
  * resets", so the usage bars never break on this optional extra.
  */
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
   function* (login: ClaudeLoginLocation, version: string) {
     const token = yield* readAccessToken(login);
@@ -310,6 +349,7 @@ export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
   Effect.catch(() => Effect.succeed(undefined)),
 );
 
+<<<<<<< HEAD
 /**
  * The organization the claim is posted to, from the token's own profile
  * rather than `.claude.json`: an account engine that swaps the live login
@@ -323,6 +363,12 @@ const readOrganization = Effect.fn("readClaudeOrganization")(function* (
   const client = yield* HttpClient.HttpClient;
   const response = yield* client.execute(
     HttpClientRequest.get(`${API_BASE}/api/oauth/profile`).pipe(withClaudeHeaders(token, version)),
+=======
+export const readClaudeOrganizationId = (accountConfigPath: string) =>
+  readJson(Config, accountConfigPath).pipe(
+    Effect.map((config) => config.oauthAccount?.organizationUuid?.trim() || undefined),
+    Effect.orElseSucceed(() => undefined),
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
   );
   if (response.status === 401 || response.status === 403) {
     return yield* new ClaudeResetCreditError({ reason: "signedOut" });
@@ -369,9 +415,14 @@ const CLAIM_OUTCOMES = {
 } as const satisfies Record<string, ProviderConsumeResetCreditOutcome>;
 
 /**
+<<<<<<< HEAD
  * Claims `grantId`. `requestId` is the idempotency key: a retry with the same
  * id is the same claim, which is why the coordinator keeps it until Claude
  * answers. Ids are checked before anything is sent.
+=======
+ * `requestId` is the idempotency key: a retry with the same id is the same
+ * claim.
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
  */
 export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(function* (input: {
   readonly login: ClaudeLoginLocation;

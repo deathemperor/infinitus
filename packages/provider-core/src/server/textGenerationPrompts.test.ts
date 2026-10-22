@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
+<<<<<<< HEAD
 import {
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
@@ -361,52 +362,11 @@ describe("sanitizeThreadTitle", () => {
     expect(title.endsWith("...")).toBe(true);
   });
 });
+=======
+import { normalizeCliError } from "./textGenerationUtils.ts";
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 
 describe("normalizeCliError", () => {
-  it("detects 'Command not found' and includes CLI name in the message", () => {
-    const error = normalizeCliError(
-      "claude",
-      "generateCommitMessage",
-      new Error("Command not found: claude"),
-      "Something went wrong",
-    );
-
-    expect(error).toBeInstanceOf(TextGenerationError);
-    expect(error.detail).toContain("Claude CLI");
-    expect(error.detail).toContain("not available on PATH");
-  });
-
-  it("uses the CLI name from the first argument for codex", () => {
-    const error = normalizeCliError(
-      "codex",
-      "generateBranchName",
-      new Error("Command not found: codex"),
-      "Something went wrong",
-    );
-
-    expect(error).toBeInstanceOf(TextGenerationError);
-    expect(error.detail).toContain("Codex CLI");
-    expect(error.detail).toContain("not available on PATH");
-  });
-
-  it("returns the error as-is if it is already a TextGenerationError", () => {
-    const existing = new TextGenerationError({
-      operation: "generatePrContent",
-      detail: "Already wrapped",
-    });
-
-    const result = normalizeCliError("claude", "generatePrContent", existing, "fallback");
-
-    expect(result).toBe(existing);
-  });
-
-  it("wraps unknown non-Error values with the fallback message", () => {
-    const result = normalizeCliError("codex", "generateCommitMessage", "string error", "fallback");
-
-    expect(result).toBeInstanceOf(TextGenerationError);
-    expect(result.detail).toBe("fallback");
-  });
-
   it("does not expose CLI failure details in the public error message", () => {
     const result = normalizeCliError(
       "codex",

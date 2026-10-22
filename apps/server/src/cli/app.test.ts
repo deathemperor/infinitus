@@ -1,11 +1,13 @@
 // @effect-diagnostics nodeBuiltinImport:off -- The integration fixture binds the same platform socket or named pipe as the CLI.
+import * as NodeChildProcess from "node:child_process";
+import * as NodeEvents from "node:events";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { it } from "@effect/vitest";
+import { assert, it } from "@effect/vitest";
 import type { DesktopAppActivationRequest } from "@infinitus/contracts";
 import { resolveDesktopAppControlAddress } from "@infinitus/shared/desktopAppControl";
 import { DEFAULT_HOME_DIR_NAME } from "@infinitus/shared/homeDir";
@@ -21,6 +23,22 @@ import { describe, expect } from "vite-plus/test";
 
 import { makeCli } from "../binCli.ts";
 import { PersistedServerRuntimeState } from "../serverRuntimeState.ts";
+
+const liveProcess = Effect.acquireRelease(
+  Effect.promise(async () => {
+    const child = NodeChildProcess.spawn(process.execPath, ["-e", "process.stdin.resume()"], {
+      stdio: ["pipe", "ignore", "ignore"],
+    });
+    await NodeEvents.EventEmitter.once(child, "spawn");
+    return child;
+  }),
+  (child) =>
+    Effect.promise(async () => {
+      const exited = NodeEvents.EventEmitter.once(child, "exit");
+      child.kill();
+      await exited;
+    }),
+);
 
 const encodeRuntimeState = Schema.encodeEffect(Schema.fromJsonString(PersistedServerRuntimeState));
 
@@ -150,6 +168,7 @@ describe("t3 server command safety", () => {
     ),
   );
 
+<<<<<<< HEAD
   it.effect("shows help without creating state", () =>
     withTempDirectory("t3-cli-help-", (root) =>
       Effect.gen(function* () {
@@ -161,15 +180,19 @@ describe("t3 server command safety", () => {
     ),
   );
 
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
   it.effect("refuses manual startup over a live server before creating directories", () =>
     withTempDirectory("t3-cli-running-", (root) =>
       Effect.gen(function* () {
         const baseDir = NodePath.join(root, "home");
         const stateDir = NodePath.join(baseDir, "userdata");
         const statePath = NodePath.join(stateDir, "server-runtime.json");
+        const child = yield* liveProcess;
+        assert(child.pid !== undefined);
         const record = yield* encodeRuntimeState({
           version: 1,
-          pid: process.pid,
+          pid: child.pid,
           port: 3773,
           origin: "http://127.0.0.1:3773",
           startedAt: "2026-10-01T00:00:00.000Z",
@@ -208,6 +231,7 @@ describe("t3 server command safety", () => {
 });
 
 describe("t3 app", () => {
+<<<<<<< HEAD
   it.effect("rejects SSH before it tries to reach a desktop app", () =>
     withTempDirectory("t3-app-ssh-test-", (root) =>
       Effect.gen(function* () {
@@ -263,6 +287,8 @@ describe("t3 app", () => {
     ),
   );
 
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
   it.effect("uses T3CODE_HOME or --base-dir and sends the default or explicit path", () =>
     withTempDirectory("t3-app-command-test-", (root) =>
       Effect.gen(function* () {

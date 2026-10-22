@@ -1,17 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  cliArchiveFileName,
-  cliArchivePlatformKey,
-  cliArchiveTarCommand,
-  cliReleaseDownloadBaseUrl,
-  cliReleaseChannelOf,
-  cliReleaseIndexPageUrl,
-  newestCliReleaseVersion,
-  parseChecksums,
-} from "./cliRelease.ts";
+import { cliArchiveTarCommand, newestCliReleaseVersion, parseChecksums } from "./cliRelease.ts";
 
 describe("cliRelease", () => {
+<<<<<<< HEAD
   it("names archives by version and platform, zip only on Windows", () => {
     expect(cliArchiveFileName("1.2.3-preview.20260911.4", "linux-x64")).toBe(
       "infinitus-1.2.3-preview.20260911.4-linux-x64.tar.gz",
@@ -40,6 +32,8 @@ describe("cliRelease", () => {
     );
   });
 
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
   it("parses sha256sum output including binary-mode markers", () => {
     const checksums = parseChecksums(
       [
@@ -62,6 +56,7 @@ describe("cliRelease", () => {
     expect(cliArchiveTarCommand("win32", {})).toBe("C:\\Windows\\System32\\tar.exe");
   });
 
+<<<<<<< HEAD
   it("derives the release channel from the version alone", () => {
     expect(cliReleaseChannelOf("1.2.3")).toBe("stable");
     expect(cliReleaseChannelOf("1.2.3-nightly.20260911.4")).toBe("nightly");
@@ -76,6 +71,8 @@ describe("cliRelease", () => {
     expect(cliReleaseChannelOf("0.5.0-alpha.7")).toBe("stable");
   });
 
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
   it("picks the newest non-draft release on the requested channel", () => {
     const releases = [
       { tag_name: "v1.2.4-preview.20260912.9", draft: true },
@@ -90,6 +87,7 @@ describe("cliRelease", () => {
     expect(newestCliReleaseVersion(releases, "stable")).toBe("1.2.3");
     expect(newestCliReleaseVersion([{ tag_name: "v1.2.3" }], "preview")).toBeUndefined();
   });
+<<<<<<< HEAD
 
   it("pages through the release index at the largest page GitHub allows", () => {
     expect(cliReleaseIndexPageUrl(1)).toBe(
@@ -97,4 +95,6 @@ describe("cliRelease", () => {
     );
     expect(cliReleaseIndexPageUrl(3)).toContain("page=3");
   });
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 });

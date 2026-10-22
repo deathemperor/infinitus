@@ -5,24 +5,31 @@ import { T3ProjectFile, T3_PROJECT_FILE_SCHEMA_URL } from "@infinitus/contracts"
 
 import { fromLenientJson } from "./schemaJson.ts";
 
+<<<<<<< HEAD
 /**
  * Codec between the raw project file contents (lenient JSONC string) and the
  * decoded {@link T3ProjectFile}.
  */
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 export const T3ProjectFileFromJson = fromLenientJson(T3ProjectFile);
 
 const decodeT3ProjectFile = Schema.decodeExit(T3ProjectFileFromJson);
 
+<<<<<<< HEAD
 /**
  * Decode raw project file contents, treating invalid or malformed files as
  * absent. Clients use this to read optional defaults (scripts, thread env
  * mode) without surfacing decode errors to the user.
  */
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 export function parseT3ProjectFile(contents: string): T3ProjectFile | null {
   const decoded = decodeT3ProjectFile(contents);
   return Exit.isSuccess(decoded) ? decoded.value : null;
 }
 
+<<<<<<< HEAD
 /**
  * Build the publishable JSON Schema document for the project file
  * (draft 2020-12).
@@ -31,9 +38,9 @@ export function parseT3ProjectFile(contents: string): T3ProjectFile | null {
  * a `$schema` reference; `scripts/build-project-file-schema.ts` writes it into
  * the site's assets.
  */
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 export function buildT3ProjectFileJsonSchema(): Record<string, unknown> {
-  // Closed objects, as before effect rc.113 changed the generator default;
-  // editors then flag unknown keys in t3.json.
   const document = Schema.toJsonSchemaDocument(T3ProjectFile, { onExcessProperty: "error" });
   const jsonSchema: Record<string, unknown> = {
     $schema: "https://json-schema.org/draft/2020-12/schema",

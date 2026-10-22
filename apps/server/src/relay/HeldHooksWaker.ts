@@ -9,11 +9,6 @@ import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { makeRelayEnvironmentClient } from "./relayEnvironmentClient.ts";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 
-/**
- * Tells T3 Connect this environment is reachable again, so the relay delivers
- * the webhook requests it held while we were offline now rather than at its
- * next backoff step. Nothing happens unless the environment opted in.
- */
 const wakeHeldHooks = Effect.fn("HeldHooksWaker.wake")(function* () {
   if (!(yield* readHoldWebhooksWhileOffline)) return false;
   const connection = yield* readRelayConnection;
@@ -25,13 +20,11 @@ const wakeHeldHooks = Effect.fn("HeldHooksWaker.wake")(function* () {
   return pending;
 });
 
-/** Wakes held webhooks each time the managed tunnel connects. */
 export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const runtime = yield* CloudManagedEndpointRuntime.CloudManagedEndpointRuntime;
     const wake = wakeHeldHooks().pipe(
       Effect.timeout("10 seconds"),
-      // The relay retries on its own schedule too, so a few tries are enough.
       Effect.retry({ schedule: Schedule.exponential("2 seconds"), times: 3 }),
       Effect.tap((pending) =>
         pending

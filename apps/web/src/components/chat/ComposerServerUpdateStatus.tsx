@@ -1,11 +1,6 @@
 import { Spinner } from "~/components/ui/spinner";
 import type { ServerUpdateState } from "@infinitus/client-runtime/state/server";
 import { CircleAlertIcon, DownloadIcon } from "lucide-react";
-import { useId, useState } from "react";
-
-import { serverUpdateStageLabel } from "../ServerUpdateAction";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { ComposerBanner } from "./ComposerBanner";
 
 export function ComposerServerUpdateIcon({
   status,
@@ -20,6 +15,7 @@ export function ComposerServerUpdateIcon({
   }
   return <DownloadIcon aria-hidden />;
 }
+<<<<<<< HEAD
 
 /** One text line, clipped at the end so the error detail never squeezes its title. */
 export function ComposerServerUpdateStatus({
@@ -66,3 +62,5 @@ export function ComposerServerUpdateStatus({
     </span>
   );
 }
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed

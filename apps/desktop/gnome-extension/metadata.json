@@ -1,8 +1,15 @@
 {
   "uuid": "snap-shot@t3.codes",
+<<<<<<< HEAD
   "name": "Infinitus SnapShots",
   "description": "Allows Infinitus to capture the focused window, identify it for optional accessibility text, and animate it into Infinitus. Disable this extension to revoke access.",
   "shell-version": ["45", "46", "47", "48", "49", "50"],
   "version": 2,
+=======
+  "name": "T3 Code SnapShots",
+  "description": "Allows T3 Code to capture the focused window, identify it for optional accessibility text, and animate it into T3 Code. Disable this extension to revoke access.",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
+  "version": 3,
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
   "url": "https://github.com/pingdotgg/t3code"
 }

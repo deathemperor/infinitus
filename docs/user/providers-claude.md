@@ -57,6 +57,7 @@ history for that message. The cache lasts about an hour on a Claude
 subscription and 5 minutes with an API key, Bedrock, or Vertex. See [commands and skills](./composer.md#commands-and-skills) for using
 composer commands.
 
+<<<<<<< HEAD
 ## Consult a stronger model
 
 Set **Advisor model** in a Claude instance's runtime settings to let the agent
@@ -65,6 +66,17 @@ model ID; the advisor must rank at or above the instance's model, or Claude
 skips it. Leave it **Off** to keep Claude Code's own setting. The advisor's
 answer stays inside the turn: the thread only shows that the agent consulted
 it. An instance that routes through a proxy has no advisor.
+=======
+**Compact idle threads** in **Settings > General** controls this for threads
+over 200,000 tokens. Each Claude provider's settings can override it:
+
+- **When you return** shows the **Compact** chip described above. This is the default.
+- **Before the cache expires (beta)** compacts an idle thread shortly before its
+  prompt cache expires, so coming back does not reprocess the whole conversation.
+  The compaction appears in the thread as a `/compact` turn sent by Infinitus.
+- **Never** skips idle compaction and Claude's resume prompt. **Auto-compact after**
+  still applies, and you can still compact by hand.
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 
 ## Usage limits
 
@@ -80,10 +92,18 @@ Claude skills come from the config directory's `skills` folder and the project's
 `.claude/skills` folder. If both define the same name, the config-directory copy
 wins. Skills disabled in Claude's settings do not appear in the composer.
 
-Use `$` in the composer to select a skill. Skills marked `disable-model-invocation`
+Use `$` in the composer to select a skill. Enabled installed Claude plugins also
+contribute skills under names such as `plugin:review`. Skills marked `disable-model-invocation`
 can still be started by you. Invoke those one per message: Claude directly runs
 only the last named skill and may try to start earlier ones through its Skill
 tool, which refuses skills reserved for manual invocation.
+
+## Task lists
+
+To show Claude task lists in the web and desktop apps, add
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` under **Variables** in the Claude instance's
+**Environment** section in **Settings > Providers**. Unfinished tasks stay visible
+between turns in the same Claude session.
 
 ## OpenRouter
 

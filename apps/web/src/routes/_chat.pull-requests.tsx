@@ -1,54 +1,7 @@
-import { RefreshIcon } from "~/components/ui/refresh-icon";
-import { Spinner } from "~/components/ui/spinner";
-import { useShortcutModifierState } from "~/shortcutModifierState";
-import type { PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
-import { usePullRequestCloseBatch } from "~/components/pullRequest/usePullRequestActions";
-import { SidebarPointerSensor } from "~/components/Sidebar.pointer";
-import { resolveSidebarSweepKeys } from "~/components/Sidebar.logic";
-import { pullRequestHostOf, resolveEnvironmentMachineKind } from "@infinitus/contracts";
-import type {
-  EnvironmentId,
-  ProjectId,
-  PullRequestAction,
-  PullRequestInvolvement,
-  PullRequestListCursors,
-  PullRequestListFilters,
-  PullRequestListInput,
-  PullRequestListResult,
-  PullRequestListState,
-  SourceControlProviderKind,
-} from "@infinitus/contracts";
-import { useAtomValue } from "@effect/atom-react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  ArrowDownUpIcon,
-  CalendarArrowDownIcon,
-  CalendarArrowUpIcon,
-  ChevronDownIcon,
-  ClockIcon,
-  EyeIcon,
-  LayersIcon,
-  ListChecksIcon,
-  PenLineIcon,
-  UsersIcon,
-  Plug2Icon,
-  Maximize2Icon,
-  Minimize2Icon,
-  SearchIcon,
-  UserLockIcon,
-  type LucideIcon,
-} from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import type { EnvironmentId, ProjectId } from "@infinitus/contracts";
+import { createFileRoute } from "@tanstack/react-router";
 
+<<<<<<< HEAD
 import {
   filterPullRequestsByInvolvement,
   findScopedProject,
@@ -169,119 +122,14 @@ import { primaryServerKeybindingsAtom } from "~/state/server";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+=======
+import { type PullRequestListSort } from "../components/pullRequest/pullRequestListPreferences";
+import { SORT_OPTIONS } from "../components/pullRequest/pullRequestListOptions";
+import { type PullRequestsSearch } from "../components/pullRequest/usePullRequestListView";
+import { PullRequestsPage } from "../components/pullRequest/PullRequestsPage";
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
 
-function getShortcutContext() {
-  return {
-    terminalFocus: isTerminalFocused(),
-    terminalOpen: false,
-    previewFocus: false,
-    previewOpen: false,
-    modelPickerOpen: false,
-    isWeb: !isElectron,
-    isDesktop: isElectron,
-  };
-}
-
-export interface PullRequestsSearch extends PullRequestListPreferences {
-  /**
-   * Narrows the list to one server. Absent means every connected one, which is the default the
-   * page has now — so a link written before servers could be chosen still opens the whole list.
-   */
-  readonly environmentId?: EnvironmentId;
-  /** Scopes the list. Separate from the selection so one cannot silently change the other. */
-  readonly projectId?: ProjectId;
-  /**
-   * Narrows the list to one host, named as the host itself: two GitHub installs are two
-   * accounts, and their shared provider kind cannot tell them apart. Absent means every host.
-   */
-  readonly host?: string;
-  readonly repository?: string;
-  readonly number?: number;
-  readonly selectedProjectId?: ProjectId;
-  /** Host of the open review; changing tabs must not narrow the list host filter. */
-  readonly selectedHost?: string;
-  /**
-   * Which server the selected pull request was read from. A project id only names a project on
-   * its own server, so this is what tells two servers holding one project apart. Optional: a
-   * link without it still opens, resolved by project id alone where that is unambiguous.
-   */
-  readonly selectedEnvironmentId?: EnvironmentId;
-}
-
-/**
- * A group reads like the sidebar's shelves: its glyph, its name, how many, then a rule out
- * to the edge. The glyph is the one the involvement filter uses for the same idea.
- */
-const GROUP_ICONS: Record<string, LucideIcon> = {
-  authored: PenLineIcon,
-  reviewRequested: EyeIcon,
-  others: UsersIcon,
-};
-
-function PullRequestGroupHeader({
-  group,
-}: {
-  group: { key: string; label: string; entries: ReadonlyArray<unknown> };
-}) {
-  const Icon = GROUP_ICONS[group.key] ?? LayersIcon;
-  return (
-    <div className="flex items-center gap-2 px-3 pb-1 text-xs font-medium text-muted-foreground/70">
-      <Icon aria-hidden className="size-3.5 shrink-0" />
-      <h2 className="shrink-0">{group.label}</h2>
-      <span className="shrink-0 tabular-nums text-muted-foreground/50">{group.entries.length}</span>
-      <Separator className="min-w-2 flex-1" />
-    </div>
-  );
-}
-
-// The state filters wear the same glyphs the rows do, so the two read as one vocabulary.
-const INVOLVEMENT_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "reviewing", label: "Reviewing", Icon: EyeIcon },
-  { value: "authored", label: "Authored", Icon: PenLineIcon },
-] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestInvolvement>>;
-
-const STATE_TABS = [
-  { value: "all", label: "All", Icon: LayersIcon },
-  { value: "open", label: "Open", Icon: PullRequestGlyph.pullRequest },
-  { value: "closed", label: "Closed", Icon: PullRequestGlyph.closed },
-  { value: "merged", label: "Merged", Icon: PullRequestGlyph.merged },
-] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListState>>;
-
-const SORT_OPTIONS = [
-  { value: "ready", label: "Merge readiness", Icon: ListChecksIcon },
-  { value: "blocked", label: "Blocked on me", Icon: UserLockIcon },
-  { value: "updated", label: "Recently updated", Icon: ClockIcon },
-  { value: "newest", label: "Newest shown", Icon: CalendarArrowDownIcon },
-  { value: "oldest", label: "Oldest shown", Icon: CalendarArrowUpIcon },
-  { value: "largest", label: "Largest shown", Icon: Maximize2Icon },
-  { value: "smallest", label: "Smallest shown", Icon: Minimize2Icon },
-] as const satisfies ReadonlyArray<PullRequestFilterOption<PullRequestListSort>>;
-
-/** Long enough that a keystroke does not become a request, short enough to feel answered. */
-const SEARCH_DEBOUNCE_MS = 250;
-/** What `scorePullRequestMatch` gives a row none of whose own fields carry the search text. */
-const MATCHED_ELSEWHERE_SCORE = 10;
-/**
- * One whole page from the host and no more: every provider asks for one row beyond the page as
- * its "is there more" probe, and GitHub serves a hundred per request — so asking for ninety-nine
- * costs one round trip where a hundred costs two.
- */
-const PAGE_SIZE = 99;
-/** The largest page the listing accepts; past it the request is refused outright. */
-const MAX_PAGE_SIZE = 500;
-/** Stable empty map so the memos below do not see a new object on every render. */
-const EMPTY_VIEWERS: PullRequestListResult["viewers"] = {};
-/** Stable so a read that is not wanted right now does not re-key on every render. */
-const NO_LIST_TARGETS: ReadonlyArray<EnvironmentQueryTarget<PullRequestListInput>> = [];
-const EMPTY_PREVIEW_SESSIONS = {};
-const EMPTY_PREVIEW_DESKTOP_STATE = {};
-const EMPTY_TERMINAL_LABELS = new Map<string, string>();
-const EMPTY_PENDING_SURFACES = new Set<string>();
 const MAX_SEARCH_LABEL_CANDIDATES = 100;
-
-const pullRequestListEntryId = (target: Parameters<typeof pullRequestSurfaceId>[0]) =>
-  pullRequestSurfaceId({ ...target, repository: target.repository.toLowerCase() });
 
 function pullRequestSearchLabels(raw: unknown): Partial<Pick<PullRequestsSearch, "labels">> {
   const values = (Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : []).slice(
@@ -349,8 +197,9 @@ export const Route = createFileRoute("/_chat/pull-requests")({
       : {}),
     ...pullRequestSearchLabels(raw.labels),
   }),
-  component: PullRequestsRouteView,
+  component: PullRequestsPage,
 });
+<<<<<<< HEAD
 
 function PullRequestsRouteView() {
   useEscapeToGoBack();
@@ -2781,3 +2630,5 @@ function PullRequestRefreshControl({
     </Button>
   );
 }
+=======
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed

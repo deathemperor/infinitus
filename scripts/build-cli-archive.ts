@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /**
+<<<<<<< HEAD
  * Packages the server single-executable into a self-contained per-platform
  * archive: the `infinitus` binary, the web client, the resource monitor, and a
  * production install of the native packages the bundle keeps external. The
@@ -13,6 +14,10 @@
  *   client/              web app served by the server
  *   resource-monitor/    per-platform Rust helper, same paths as the npm package
  *   node_modules/        runtime externals (node-pty, msgpackr-extract, fff)
+=======
+ * The archive is the unit every runtime installer downloads, so nothing in it
+ * may require Node, npm, or a compiler on the machine that unpacks it.
+>>>>>>> upstream-sync-3b95e7831-upstream-renamed
  */
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -43,6 +48,8 @@ import {
 import { applyWebBrandAssets } from "./apply-web-brand-assets.ts";
 import { resolveWebAssetBrandForPackageVersion } from "./lib/brand-assets.ts";
 import { selectCliRuntimeExternalDependencies } from "./lib/cli-external-packages.ts";
+import { signWithJsign } from "./lib/windows-jsign.ts";
+import { windowsSystemTar } from "./lib/windows-tar.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -93,7 +100,6 @@ export class CliArchiveInputMissingError extends Schema.TaggedError<CliArchiveIn
   }
 }
 
-/** Platform/arch pair as it appears in archive names and `process.platform`/`process.arch`. */
 export function cliArchivePlatformKey(platform: BuildPlatform, arch: BuildArch): string {
   const nodePlatform = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   return `${nodePlatform}-${arch}`;
@@ -109,19 +115,11 @@ export function cliArchiveFileName(version: string, platform: BuildPlatform, arc
   return `${cliArchiveStem(version, platform, arch)}.${platform === "win" ? "zip" : "tar.gz"}`;
 }
 
-/** The bsdtar Windows ships in System32; resolves regardless of which tar is first on PATH. */
-export function windowsSystemTar(): string {
-  const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
-  return `${systemRoot}\\System32\\tar.exe`;
-}
-
 const runCommand = Effect.fn("runCommand")(function* (
   command: ChildProcess.Command,
   label: string,
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  // Output is inherited so the build log shows what each tool did; a failing
-  // signing or packaging step is otherwise a bare exit code.
   const child = yield* spawner.spawn(
     ChildProcess.isStandardCommand(command)
       ? ChildProcess.make(command.command, command.args, {
@@ -145,9 +143,8 @@ const requireInput = Effect.fn("requireInput")(function* (inputPath: string, hin
 });
 
 /**
- * Installs the runtime-external packages into `stageDir/node_modules` with a
- * hoisted, symlink-free layout. The tree is archived and unpacked on machines
- * without pnpm, so the store layout cannot be relied on to survive the trip.
+ * The tree is archived and unpacked on machines without pnpm, so the store
+ * layout cannot be relied on to survive the trip.
  */
 const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (input: {
   readonly repoRoot: string;
@@ -221,9 +218,6 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
     "vp install --prod (cli archive runtime externals)",
   );
 
-  // pnpm's bookkeeping and the manifest only matter to pnpm; the runtime
-  // resolves packages by directory. node-pty ships every platform's prebuilds
-  // in one package (58 MB); only the archive's own platform loads.
   const platformKey = cliArchivePlatformKey(input.platform, input.arch);
   const prebuildsDir = path.join(input.stageDir, "node_modules/node-pty/prebuilds");
   const foreignPrebuilds = (yield* fs
@@ -251,12 +245,12 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
   yield* removeNestedBinDirectories(fs, path, path.join(input.stageDir, "node_modules"));
 });
 
-const removeNestedBinDirectories = (
-  fs: FileSystem.FileSystem,
-  path: Path.Path,
-  root: string,
-): Effect.Effect<void, PlatformError.PlatformError> =>
-  Effect.gen(function* () {
+const removeNestedBinDirectories = Effect.fn("build-cli-archive.removeNestedBinDirectories")(
+  function* (
+    fs: FileSystem.FileSystem,
+    path: Path.Path,
+    root: string,
+  ): Effect.fn.Return<void, PlatformError.PlatformError> {
     const entries = yield* fs.readDirectory(root).pipe(Effect.orElseSucceed(() => []));
     for (const entry of entries) {
       const child = path.join(root, entry);
@@ -269,9 +263,9 @@ const removeNestedBinDirectories = (
         yield* removeNestedBinDirectories(fs, path, child);
       }
     }
-  });
+  },
+);
 
-/** Copies the web client without its sourcemaps, which nothing serves. */
 const stageWebClient = Effect.fn("stageWebClient")(function* (source: string, target: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -380,14 +374,11 @@ const WindowsSigningConfig = Config.all({
 });
 
 /**
- * Node's --build-sea injects the blob into a copy of node.exe by rebuilding
- * its resource section but, unlike its Mach-O path, leaves node's original
+ * Node's --build-sea injects the blob into a copy of node.exe by rebuilding its
+ * resource section but, unlike its Mach-O path, leaves node's original
  * Authenticode data-directory entry in the PE header. The file grows, so the
  * entry now points into the middle of the new section at bytes that are not a
- * certificate table. signtool refuses to sign such an image (0x800700C1, "not
- * a valid Win32 application") and cannot `remove /s` it either, since the SIP
- * fails to parse the garbage. Clearing the entry is exactly what a signature
- * strip does, without needing a parser that trusts the broken table.
+ * certificate table.
  */
 const stripStaleAuthenticodeEntry = Effect.fn("stripStaleAuthenticodeEntry")(function* (
   executablePath: string,
@@ -423,7 +414,6 @@ const stripStaleAuthenticodeEntry = Effect.fn("stripStaleAuthenticodeEntry")(fun
   );
 });
 
-/** Signs t3.exe through the same Azure Trusted Signing setup the installer uses. */
 const signWindowsExecutable = Effect.fn("signWindowsExecutable")(function* (
   executablePath: string,
 ) {
@@ -436,9 +426,11 @@ const signWindowsExecutable = Effect.fn("signWindowsExecutable")(function* (
     return;
   }
   yield* stripStaleAuthenticodeEntry(executablePath);
-  // Mirrors electron-builder's invocation for the installer: every value
-  // single-quoted, the file path in Windows form. `$ErrorActionPreference`
-  // makes a signing failure inside the cmdlet surface as a non-zero exit.
+  if ((yield* HostProcess.Platform) !== "win32") {
+    yield* signWithJsign(executablePath);
+    yield* Effect.log("[cli-archive] Signed t3.exe (Azure Trusted Signing via jsign).");
+    return;
+  }
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
   const script = [
     "$ErrorActionPreference = 'Stop';",
@@ -547,7 +539,14 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     cliArchiveFileName(input.version, input.platform, input.arch),
   );
   yield* fs.remove(archivePath, { force: true });
-  if (input.platform === "win") {
+  if (input.platform === "win" && hostPlatform !== "win32") {
+    yield* runCommand(
+      ChildProcess.make("zip", ["-q", "-r", "-X", path.resolve(archivePath), stem], {
+        cwd: stageRoot,
+      }),
+      "zip",
+    );
+  } else if (input.platform === "win") {
     // Windows ships bsdtar, which writes zip natively. Name it by path: under
     // the Git Bash shell CI uses, a bare `tar` is GNU tar, which neither
     // writes zip nor accepts a drive-letter path.

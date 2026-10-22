@@ -99,7 +99,7 @@ const GENERIC_CHANGE_REQUEST_PRESENTATION: ChangeRequestPresentation = {
   urlExample: "#42",
 };
 
-export function resolveChangeRequestPresentation(
+function resolveChangeRequestPresentation(
   provider: SourceControlProviderInfo | null | undefined,
 ): ChangeRequestPresentation {
   switch (provider?.kind) {
@@ -144,10 +144,6 @@ export function isSshRemoteUrl(remoteUrl: string): boolean {
   return SCP_SSH_REMOTE_PATTERN.test(trimmed) || trimmed.toLowerCase().startsWith("ssh://");
 }
 
-/**
- * Extracts the normalized host used for provider detection. SCP-style and SSH remotes return the
- * hostname only, while other URL schemes retain explicit ports for non-default web endpoints.
- */
 function parseRemoteHost(remoteUrl: string): string | null {
   const trimmed = remoteUrl.trim();
   if (trimmed.length === 0) {
@@ -183,8 +179,9 @@ function hasDnsLabel(host: string, label: string): boolean {
   return host.split(".").includes(label);
 }
 
+/** `*.ghe.com` is GitHub Enterprise Cloud with data residency, one subdomain per enterprise. */
 function isGitHubHost(host: string): boolean {
-  return host === "github.com" || hasDnsLabel(host, "github");
+  return host === "github.com" || host.endsWith(".ghe.com") || hasDnsLabel(host, "github");
 }
 
 function isGitLabHost(host: string): boolean {
@@ -203,7 +200,6 @@ function isAzureDevOpsHost(host: string): boolean {
   );
 }
 
-/** GitCafe has no self-hosted installs: production and staging are the only hosts. */
 function isGitCafeHost(host: string): boolean {
   return host === "git.cafe" || host === "staging.git.cafe";
 }
@@ -282,18 +278,21 @@ export function detectSourceControlProviderFromRemoteUrl(
   };
 }
 
+function decodeUrlPathSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 /**
- * The provider-native repository selector. `displayName` is the full path below the host, which
- * is what nested GitLab groups need; owner/name is the two-segment fallback for identities
- * recorded before that field existed.
- *
  * Azure DevOps is the exception: `az repos pr list --repository` takes a repository name, and
  * takes the organisation and project from the checkout it detects — so the recorded
  * `org/project/_git/repo` path is refused outright and the whole repository reads as
- * unavailable. Its name is the last segment, which is what this hands over.
- *
- * One function because everything downstream is keyed by what it answers: the rows' own
- * `repository`, the per-repository cursors, and the detail and diff reads a row leads to.
+ * unavailable. Its name is the last segment, which is what this hands over. The segment comes
+ * from the remote URL, where a name with a space reads `my%20repo`; `az` looks that up literally
+ * and answers 404, so it goes out decoded.
  */
 export function sourceControlRepositorySelector(
   identity:
@@ -304,7 +303,8 @@ export function sourceControlRepositorySelector(
   if (!identity) return null;
   if (identity.provider === "azure-devops") {
     const segments = (identity.displayName ?? "").split("/").filter((part) => part !== "_git");
-    return identity.name || segments.at(-1) || null;
+    const name = identity.name || segments.at(-1);
+    return name ? decodeUrlPathSegment(name) : null;
   }
   if (identity.displayName) return identity.displayName;
   return identity.owner && identity.name ? `${identity.owner}/${identity.name}` : null;
