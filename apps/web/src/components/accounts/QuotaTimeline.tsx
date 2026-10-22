@@ -16,7 +16,7 @@ import type { EnvironmentId } from "@infinitus/contracts";
 import type { TimestampFormat } from "@infinitus/contracts/settings";
 import * as Schema from "effect/Schema";
 import { ChevronLeftIcon, ChevronRightIcon, FlameIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { usePrimarySettings } from "../../hooks/useSettings";
@@ -88,17 +88,12 @@ export function QuotaTimeline({
         })
       : null,
   );
-  const utilization = useMemo(
-    () => (utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result)),
-    [utilizationQuery.data],
-  );
-  const history = useMemo(
-    () => ({
-      generations: utilization === null ? [] : utilizationGenerations(utilization),
-      fiveHourWindows: utilization === null ? [] : utilizationFiveHourWindows(utilization),
-    }),
-    [utilization],
-  );
+  const utilization =
+    utilizationQuery.data === null ? null : decodeUtilization(utilizationQuery.data.result);
+  const history = {
+    generations: utilization === null ? [] : utilizationGenerations(utilization),
+    fiveHourWindows: utilization === null ? [] : utilizationFiveHourWindows(utilization),
+  };
   // A handful of lanes: cheaper to rebuild than to key a memo on.
   const range = quotaTimelineRange(view, nowMs, offset, { weekStartsOn });
   const lanes = quotaTimelineLanes({ sections, ...history, view, range, nowMs });

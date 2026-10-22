@@ -62,6 +62,24 @@ export function ProjectPromptSnippetsSection(props: {
   );
   const [saving, setSaving] = useState(false);
 
+  // Writes to each member in turn; the first failure stops the rest.
+  const saveToMembers = async (next: readonly PromptSnippet[]) => {
+    for (const member of members) {
+      const result = await updateServerSettings({
+        environmentId: member.environmentId,
+        input: { patch: promptSnippetsPatch(member.projectId, next) },
+      });
+      if (result._tag === "Failure") {
+        reportFailure(
+          `Failed to save prompts on ${member.label}`,
+          mapAtomCommandResult(result, () => undefined),
+        );
+        return false;
+      }
+    }
+    return true;
+  };
+
   const store = async (next: readonly PromptSnippet[]) => {
     const offline = members.find((member) => !member.connected);
     if (offline !== undefined) {
@@ -73,24 +91,7 @@ export function ProjectPromptSnippetsSection(props: {
       return false;
     }
     setSaving(true);
-    try {
-      for (const member of members) {
-        const result = await updateServerSettings({
-          environmentId: member.environmentId,
-          input: { patch: promptSnippetsPatch(member.projectId, next) },
-        });
-        if (result._tag === "Failure") {
-          reportFailure(
-            `Failed to save prompts on ${member.label}`,
-            mapAtomCommandResult(result, () => undefined),
-          );
-          return false;
-        }
-      }
-      return true;
-    } finally {
-      setSaving(false);
-    }
+    return saveToMembers(next).finally(() => setSaving(false));
   };
 
   const submit = async () => {

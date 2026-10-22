@@ -11,6 +11,7 @@ import {
   resolveSubagentMetadata,
   subagentDetailPreview,
 } from "@infinitus/client-runtime/state/subagent-display";
+import { REASONING_EFFORT_OPTION_IDS } from "@infinitus/client-runtime/state/thread-execution";
 import {
   getModelSelectionStringOptionValue,
   resolveSelectableModel,
@@ -40,7 +41,6 @@ export function SubagentTooltipContent(props: {
   origin: OrchestrationV2Subagent["origin"];
   modelSelection?: OrchestrationV2Subagent["modelSelection"];
   provider?: ServerProvider | undefined;
-  /** The environment's instances; with several accounts on one provider, the card names this one. */
   providers?: ReadonlyArray<ServerProvider> | undefined;
   driver?: ProviderDriverKind | undefined;
   elapsed?: ReactNode;
@@ -76,9 +76,9 @@ export function SubagentTooltipContent(props: {
     childModel === (modelSlug ?? model) && childSelection?.instanceId === props.providerInstanceId
       ? childSelection
       : undefined;
-  const effort = ["reasoningEffort", "effort", "reasoning", "variant"]
-    .map((id) => getModelSelectionStringOptionValue(matchingSelection, id))
-    .find(Boolean);
+  const effort = REASONING_EFFORT_OPTION_IDS.map((id) =>
+    getModelSelectionStringOptionValue(matchingSelection, id),
+  ).find(Boolean);
   const speed = provider
     ? providerModel?.capabilities?.optionDescriptors
         ?.map((descriptor) => {
@@ -131,7 +131,6 @@ export function SubagentTooltipContent(props: {
             displayName={entry?.displayName ?? props.provider?.displayName ?? driver}
             accentColor={entry?.accentColor}
             acpRegistryIconUrl={props.provider?.iconUrl}
-            // Same treatment as the sidebar card: accent dot, account in the label.
             showBadge={showInstanceBadge && entry?.accentColor !== undefined}
             badgeContent="none"
             badgeClassName="h-2 min-w-2 px-0"

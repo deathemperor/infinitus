@@ -6,7 +6,6 @@ export type PendingThreadFeedEntry = ThreadFeedEntry & {
   readonly acknowledged?: boolean;
 };
 
-/** Append the outbox after all presented activity, until the server echoes each message. */
 export function appendPendingThreadMessages(
   presentedFeed: ReadonlyArray<ThreadFeedEntry>,
   feed: ReadonlyArray<ThreadFeedEntry>,
@@ -17,7 +16,12 @@ export function appendPendingThreadMessages(
     feed.flatMap((entry) => (entry.type === "message" ? [entry.message.id] : [])),
   );
   return [
-    ...presentedFeed,
+    ...presentedFeed.map((entry): PendingThreadFeedEntry => {
+      const pendingMessage = queuedMessages.find(
+        (message) => message.creation !== undefined && message.messageId === entry.id,
+      );
+      return pendingMessage ? { ...entry, pendingMessage, acknowledged: false } : entry;
+    }),
     ...queuedMessages
       .filter((message) => !deliveredIds.has(message.messageId))
       .map((pendingMessage): PendingThreadFeedEntry => ({

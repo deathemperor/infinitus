@@ -11,7 +11,7 @@ import {
 } from "@infinitus/client-runtime/state/infinitusActivity";
 import type { InfinitusEvent } from "@infinitus/contracts/infinitus";
 import * as Schema from "effect/Schema";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
@@ -64,32 +64,35 @@ export function ActivityPage() {
   const eventsQuery = useEnvironmentQuery(
     ready && hasVerb ? infinitusEnvironment.events({ environmentId, input: EVENTS_INPUT }) : null,
   );
-  const initial = useMemo(
-    () => (eventsQuery.data === null ? null : decodeEventRows(eventsQuery.data.result)),
-    [eventsQuery.data],
-  );
+  const initial = eventsQuery.data === null ? null : decodeEventRows(eventsQuery.data.result);
 
   // Deltas since mount: each snapshot carries the events new to that poll.
-  const [deltas, setDeltas] = useState<ReadonlyArray<InfinitusEvent>>([]);
+  // The batch already on hand at mount or at an environment switch is the
+  // events read's to show, so collection starts from the next one.
   const news = snapshot?.events;
-  useEffect(() => {
-    if (news === undefined || news.length === 0) return;
-    setDeltas((previous) => [...previous, ...news]);
-  }, [news]);
-  useEffect(() => setDeltas([]), [environmentId]);
+  const [collected, setCollected] = useState<{
+    environmentId: typeof environmentId;
+    news: typeof news;
+    deltas: ReadonlyArray<InfinitusEvent>;
+  }>({ environmentId, news, deltas: [] });
+  if (collected.environmentId !== environmentId) {
+    setCollected({ environmentId, news, deltas: [] });
+  } else if (collected.news !== news) {
+    setCollected({
+      environmentId,
+      news,
+      deltas:
+        news === undefined || news.length === 0 ? collected.deltas : [...collected.deltas, ...news],
+    });
+  }
+  const deltas = collected.deltas;
 
   // The store keeps every row so the toggle is instant; only the view drops
   // the poller's lines.
-  const rows = useMemo(
-    () => (initial === null ? [] : activityRows(initial, deltas)),
-    [initial, deltas],
-  );
-  const visible = useMemo(
-    () => (showPolls ? rows : rows.filter((row) => !isPollRow(row))),
-    [rows, showPolls],
-  );
+  const rows = initial === null ? [] : activityRows(initial, deltas);
+  const visible = showPolls ? rows : rows.filter((row) => !isPollRow(row));
   const hiddenPolls = rows.length - visible.length;
-  const days = useMemo(() => activityDays(visible, Date.parse(minute)), [visible, minute]);
+  const days = activityDays(visible, Date.parse(minute));
 
   const headerAction = (
     <div className="flex items-center gap-x-2">

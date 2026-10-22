@@ -1,7 +1,7 @@
 import type { ForecastModel } from "@infinitus/client-runtime/state/infinitusAccounts";
 import { View } from "react-native";
 
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text } from "../../components/ui/AppText";
 
 function clock(iso: string): string {
   const date = new Date(iso);

@@ -7,8 +7,10 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
 import {
+  GitCommandError,
   SourceControlProviderError,
   SourceControlRepositoryError,
+  type GitCommandFailureReason,
   type SourceControlCloneRepositoryInput,
   type SourceControlCloneRepositoryResult,
   type SourceControlCloneProtocol,
@@ -30,8 +32,10 @@ import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as BitbucketApi from "@infinitus/source-control-bitbucket/server/BitbucketApi";
 import * as SourceControlProviderRegistry from "./SourceControlProviderRegistry.ts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { cloneUrlForProtocol, cloneUrlProtocol } from "@infinitus/shared/cloneUrl";
 const isSourceControlRepositoryError = Schema.is(SourceControlRepositoryError);
 const isSourceControlProviderError = Schema.is(SourceControlProviderError);
+const isGitCommandError = Schema.is(GitCommandError);
 const isBitbucketRepositoryLocatorError = Schema.is(BitbucketApi.BitbucketRepositoryLocatorError);
 
 export class SourceControlRepositoryService extends Context.Service<
@@ -40,11 +44,6 @@ export class SourceControlRepositoryService extends Context.Service<
     readonly lookupRepository: (
       input: SourceControlRepositoryLookupInput,
     ) => Effect.Effect<SourceControlRepositoryInfo, SourceControlRepositoryError>;
-    /**
-     * Everything `cloneRepository` checks before running git: the resolved
-     * remote, the normalized destination, and that the destination is empty.
-     * Lets a caller create the project first and clone afterwards.
-     */
     readonly prepareClone: (
       input: SourceControlCloneRepositoryInput,
     ) => Effect.Effect<SourceControlPreparedClone, SourceControlRepositoryError>;
@@ -52,7 +51,6 @@ export class SourceControlRepositoryService extends Context.Service<
       input: SourceControlCloneRepositoryInput,
       options?: SourceControlCloneOptions,
     ) => Effect.Effect<SourceControlCloneRepositoryResult, SourceControlRepositoryError>;
-    /** Removes a partial or failed clone so the destination is empty again. */
     readonly discardClone: (
       destinationPath: string,
     ) => Effect.Effect<void, SourceControlRepositoryError>;
@@ -64,9 +62,7 @@ export class SourceControlRepositoryService extends Context.Service<
 
 export interface SourceControlPreparedClone {
   readonly destinationPath: string;
-  /** Credential-free; safe to show and to store in snapshots. */
   readonly remoteUrl: string;
-  /** What git is given; may carry embedded credentials. */
   readonly cloneUrl: string;
   readonly repository: SourceControlRepositoryInfo | null;
 }
@@ -145,10 +141,57 @@ function redactRemoteUrl(remoteUrl: string): string {
 // host boundary goes.
 const URL_WITH_USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/]+@/gi;
 
-/** Drops `user:token@` from any URL embedded in free text. */
 function redactUrlCredentials(text: string): string {
   return text.replace(URL_WITH_USERINFO, "$1");
 }
+
+/**
+ * Explains a failed first push of a published repository. The repository
+ * already exists by then, so publishing again cannot help; the user has to
+ * fix access and push. Built from fixed text and the provider's URLs only,
+ * since git's stderr can carry credentials.
+ */
+function publishPushFailureDetail(input: {
+  readonly urls: SourceControlRepositoryCloneUrls;
+  readonly remoteName: string;
+  readonly remoteUrl: string;
+  readonly reason: GitCommandFailureReason | undefined;
+}): string {
+  const created = `Created ${input.urls.nameWithOwner} and added it as remote "${input.remoteName}", but the push failed`;
+  const switchToHttps = `git remote set-url ${input.remoteName} ${input.urls.url}`;
+  const usesSsh = input.remoteUrl === input.urls.sshUrl;
+  switch (input.reason) {
+    case "authentication_failed":
+      return usesSsh
+        ? `${created} because SSH authentication was rejected. Add an SSH key to your account, or switch the remote to HTTPS with "${switchToHttps}", then push again.`
+        : `${created} because Git could not authenticate. Check your Git credentials, then push again.`;
+    case "host_key_unverified":
+      return `${created} because the host's SSH key is not trusted yet. Verify it by connecting once with ssh, or switch the remote to HTTPS with "${switchToHttps}", then push again.`;
+    default:
+      return `${created}. Fix the problem, then push again.`;
+  }
+}
+
+/**
+ * Adding a project clones over SSH for most hosts, and a machine with no SSH
+ * key there would fail every time, while the host's HTTPS credential helper
+ * may be set up. A clone whose SSH login was refused is retried once over
+ * HTTPS, unless the caller asked for SSH. A looked-up repository has the
+ * provider's own HTTPS URL; any other URL is rewritten, which is refused
+ * where it would have to guess.
+ */
+function httpsFallbackUrl(
+  input: SourceControlCloneRepositoryInput,
+  prepared: SourceControlPreparedClone,
+): string | null {
+  if (input.protocol === "ssh" || cloneUrlProtocol(prepared.cloneUrl) !== "ssh") return null;
+  if (prepared.repository?.sshUrl === prepared.cloneUrl) return prepared.repository.url;
+  return cloneUrlForProtocol(prepared.cloneUrl, "https");
+}
+
+const isSshRejection = (error: SourceControlRepositoryError) =>
+  isGitCommandError(error.cause) &&
+  (error.cause.reason === "authentication_failed" || error.cause.reason === "host_key_unverified");
 
 function selectRemoteUrl(
   urls: SourceControlRepositoryCloneUrls,
@@ -243,7 +286,11 @@ export const make = Effect.gen(function* () {
           });
         }
       } else {
-        yield* fileSystem.makeDirectory(path.dirname(normalizedDestination), { recursive: true });
+        // Skip existing parents: recursive mkdir on a Windows drive root fails with EPERM.
+        const parentPath = path.dirname(normalizedDestination);
+        if (!(yield* fileSystem.exists(parentPath))) {
+          yield* fileSystem.makeDirectory(parentPath, { recursive: true });
+        }
       }
 
       return {
@@ -289,11 +336,12 @@ export const make = Effect.gen(function* () {
     } satisfies SourceControlPreparedClone;
   });
 
-  const cloneRepository = Effect.fn("SourceControlRepositoryService.cloneRepository")(function* (
+  const runClone = Effect.fn("SourceControlRepositoryService.runClone")(function* (
     input: SourceControlCloneRepositoryInput,
+    destinationPath: string,
+    cloneUrl: string,
     options?: SourceControlCloneOptions,
   ) {
-    const prepared = yield* prepareClone(input);
     const onProgress = options?.onProgress;
     // Git interleaves progress redraws with its real messages on stderr. The
     // last non-progress lines are what explain a failure ("Repository not
@@ -313,14 +361,8 @@ export const make = Effect.gen(function* () {
     yield* git
       .execute({
         operation: "SourceControlRepositoryService.cloneRepository",
-        cwd: path.dirname(prepared.destinationPath),
-        args: [
-          "clone",
-          "--progress",
-          "--",
-          prepared.cloneUrl,
-          path.basename(prepared.destinationPath),
-        ],
+        cwd: path.dirname(destinationPath),
+        args: ["clone", "--progress", "--", cloneUrl, path.basename(destinationPath)],
         timeoutMs: options?.timeoutMs === undefined ? CLONE_TIMEOUT_MS : options.timeoutMs,
         // Progress redraws add up on a slow multi-GB clone. The buffered copy
         // is never read (the tail is kept by hand above), so keep it small
@@ -345,10 +387,42 @@ export const make = Effect.gen(function* () {
             }),
         ),
       );
+  });
+
+  const cloneRepository = Effect.fn("SourceControlRepositoryService.cloneRepository")(function* (
+    input: SourceControlCloneRepositoryInput,
+    options?: SourceControlCloneOptions,
+  ) {
+    const prepared = yield* prepareClone(input);
+    const httpsUrl = httpsFallbackUrl(input, prepared);
+    const remoteUrl = yield* runClone(
+      input,
+      prepared.destinationPath,
+      prepared.cloneUrl,
+      options,
+    ).pipe(
+      Effect.as(prepared.remoteUrl),
+      Effect.catch((sshError) =>
+        httpsUrl === null || !isSshRejection(sshError)
+          ? Effect.fail(sshError)
+          : runClone(input, prepared.destinationPath, httpsUrl, options).pipe(
+              Effect.as(redactRemoteUrl(httpsUrl)),
+              Effect.mapError(
+                (httpsError) =>
+                  new SourceControlRepositoryError({
+                    operation: "cloneRepository",
+                    provider: sshError.provider,
+                    detail: `${sshError.detail} Cloning over HTTPS instead also failed: ${httpsError.detail}`,
+                    cause: httpsError.cause,
+                  }),
+              ),
+            ),
+      ),
+    );
 
     return {
       cwd: prepared.destinationPath,
-      remoteUrl: prepared.remoteUrl,
+      remoteUrl,
       repository: prepared.repository,
     };
   });
@@ -446,7 +520,22 @@ export const make = Effect.gen(function* () {
         };
       }
 
-      const pushResult = yield* git.pushCurrentBranch(input.cwd, null, { remoteName });
+      const pushResult = yield* git.pushCurrentBranch(input.cwd, null, { remoteName }).pipe(
+        Effect.mapError(
+          (cause) =>
+            new SourceControlRepositoryError({
+              operation: "publishRepository",
+              provider: providerKind,
+              detail: publishPushFailureDetail({
+                urls,
+                remoteName,
+                remoteUrl,
+                reason: cause.reason,
+              }),
+              cause,
+            }),
+        ),
+      );
 
       return {
         repository: toRepositoryInfo(providerKind, urls),

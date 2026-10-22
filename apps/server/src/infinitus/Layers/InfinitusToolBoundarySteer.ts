@@ -29,8 +29,8 @@ export const InfinitusToolBoundarySteerLive = Layer.effectDiscard(
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
 
-    const onBoundary = (item: OrchestrationV2TurnItem) =>
-      Effect.gen(function* () {
+    const onBoundary = Effect.fn("InfinitusToolBoundarySteer.onBoundary")(
+      function* (item: OrchestrationV2TurnItem) {
         const targetRunId = item.runId;
         if (targetRunId === null) return;
         const { runs } = yield* projectionStore.getThreadRecords(item.threadId, ["runs"]);
@@ -43,15 +43,18 @@ export const InfinitusToolBoundarySteerLive = Layer.effectDiscard(
           queuedRunId,
           targetRunId,
         });
-      }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logDebug("infinitus.tool-boundary-steer.skipped", {
-            threadId: item.threadId,
-            itemId: item.id,
-            cause: Cause.pretty(cause),
-          }),
+      },
+      (effect, item) =>
+        effect.pipe(
+          Effect.catchCause((cause) =>
+            Effect.logDebug("infinitus.tool-boundary-steer.skipped", {
+              threadId: item.threadId,
+              itemId: item.id,
+              cause: Cause.pretty(cause),
+            }),
+          ),
         ),
-      );
+    );
 
     const worker = yield* makeDrainableWorker(onBoundary);
 

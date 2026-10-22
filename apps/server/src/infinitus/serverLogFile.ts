@@ -34,6 +34,36 @@ export interface ServerLogFileOptions {
 }
 
 /**
+ * `Logger.formatJson` stringifies the message, which runs every getter on it:
+ * a getter that throws would fail the log call itself. Write accessor fields
+ * of a plain message object as `[Getter]`, as the console's `util.inspect`
+ * does, so logging never runs caller code.
+ */
+const formatJsonWithoutGetters = Logger.make<unknown, string>((options) =>
+  Logger.formatJson.log({
+    ...options,
+    message: Array.isArray(options.message)
+      ? options.message.map(withoutGetters)
+      : withoutGetters(options.message),
+  }),
+);
+
+function withoutGetters(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return value;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  const descriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(value);
+  let changed = false;
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const descriptor = descriptors[key];
+    if (descriptor === undefined || "value" in descriptor) continue;
+    descriptors[key] = { value: "[Getter]", enumerable: descriptor.enumerable === true };
+    changed = true;
+  }
+  return changed ? Object.create(prototype, descriptors) : value;
+}
+
+/**
  * A logger that appends each record as one NDJSON line. Batched on a window,
  * so a burst of log lines is one append; the batch flushes when the scope
  * closes, so a clean shutdown loses nothing.
@@ -50,7 +80,7 @@ export const makeServerLogFileLogger = Effect.fnUntraced(function* (options: Ser
       return (chunk) => sink.write(chunk);
     })();
 
-  return yield* Logger.batched(Logger.formatJson, {
+  return yield* Logger.batched(formatJsonWithoutGetters, {
     window: `${options.batchWindowMs ?? SERVER_LOG_FILE_BATCH_WINDOW_MS} millis`,
     // A sink that cannot write says so by swallowing it (`throwOnError` is
     // off): a log file is never worth failing a turn over.

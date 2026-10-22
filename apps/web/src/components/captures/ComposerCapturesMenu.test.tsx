@@ -1,8 +1,8 @@
 import type { CaptureItem } from "@infinitus/contracts/captures";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
-import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../test/reactTestRenderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { fake } = vi.hoisted(() => ({
@@ -84,7 +84,6 @@ describe("ComposerCapturesMenu", () => {
   let renderer: ReactTestRenderer | null = null;
 
   beforeEach(() => {
-    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     fake.list = [];
     fake.apply.mockReset();
     fake.apply.mockResolvedValue({ _tag: "Success", value: {} });

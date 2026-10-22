@@ -10,7 +10,6 @@ export interface NativeMarkdownTextStyle {
   readonly codeBackgroundColor: string;
   readonly codeBlockBackgroundColor: string;
   readonly fileTextColor: string;
-  readonly skillTextColor: string;
   readonly quoteMarkerColor: string;
   readonly dividerColor: string;
   readonly contextChipBorderColor?: string;
@@ -25,6 +24,7 @@ export interface NativeMarkdownTextStyle {
 export interface SelectableMarkdownSkill {
   readonly name: string;
   readonly displayName?: string | null;
+  readonly path?: string;
 }
 
 export interface MarkdownImageRequest {
@@ -34,10 +34,9 @@ export interface MarkdownImageRequest {
 }
 
 /**
- * App-supplied renderer for markdown images. The module cannot load
- * workspace-relative image paths itself — the host app resolves them (for
- * example through a signed asset URL) and returns the element to show.
- * Returning null keeps Enriched's native media rendering.
+ * The module cannot load workspace-relative image paths itself — the host app
+ * resolves them (for example through a signed asset URL) and returns the
+ * element to show. Returning null keeps Enriched's native media rendering.
  */
 export type MarkdownImageRenderer = (image: MarkdownImageRequest) => import("react").ReactNode;
 
@@ -64,6 +63,7 @@ export interface MarkdownLinkCustomization {
   readonly color?: string;
   readonly label?: string;
   readonly icon?: import("react-native").ImageSourcePropType;
+  readonly chip?: { readonly accent?: string; readonly tintsIcon: boolean };
 }
 
 export interface SelectableMarkdownTextProps {

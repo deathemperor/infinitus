@@ -1,6 +1,5 @@
 import { useAuth } from "@clerk/react";
 import { makeInfinitusTeamClient } from "@infinitus/client-runtime/relay/infinitusTeam";
-import { useMemo } from "react";
 
 import {
   resolveCloudPublicConfig,
@@ -13,12 +12,8 @@ import {
 export function useInfinitusTeamClient() {
   const { getToken } = useAuth();
   const relayUrl = resolveCloudPublicConfig().relayUrl ?? "";
-  return useMemo(
-    () =>
-      makeInfinitusTeamClient({
-        relayUrl,
-        readClerkToken: () => getToken(resolveRelayClerkTokenOptions()),
-      }),
-    [getToken, relayUrl],
-  );
+  return makeInfinitusTeamClient({
+    relayUrl,
+    readClerkToken: () => getToken(resolveRelayClerkTokenOptions()),
+  });
 }

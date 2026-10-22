@@ -352,15 +352,14 @@ const make = Effect.gen(function* () {
 
   return InfinitusEngineSupervisorService.of({
     get: Effect.sync(() => supervisor.snapshot()),
-    setSettings: (change) =>
-      Effect.gen(function* () {
-        const written = yield* prefs.setEngine(change).pipe(Effect.catch(() => prefs.get));
-        settings = written.engines;
-        return yield* Effect.sync(() => {
-          supervisor.reconcile();
-          return supervisor.snapshot();
-        });
-      }),
+    setSettings: Effect.fn("infinitus.engines.setSettings")(function* (change) {
+      const written = yield* prefs.setEngine(change).pipe(Effect.catch(() => prefs.get));
+      settings = written.engines;
+      return yield* Effect.sync(() => {
+        supervisor.reconcile();
+        return supervisor.snapshot();
+      });
+    }),
     control: (input) =>
       Effect.sync(() => {
         supervisor.control(input);

@@ -78,6 +78,15 @@ export const RENAMES: ReadonlyArray<Rename> = [
     replacement: "$1InfinitusConnect",
   },
   {
+    what: "the relay's Effect service tags (t3code-relay/<dir>/<Name> → infinitus-relay/…, slice B)",
+    // The language service's deterministicKeys rule derives them from the
+    // relay's package name, which slice B renamed; upstream's new services
+    // otherwise arrive with the old prefix every sync.
+    pattern: /(["'`])t3code-relay\//g,
+    replacement: "$1infinitus-relay/",
+    within: "infra/relay/src/",
+  },
+  {
     what: "Expo autolinking's gradle project names, derived from the package scope (':t3tools-* → ':infinitus-*)",
     pattern: /':t3tools-/g,
     replacement: "':infinitus-",
@@ -147,10 +156,6 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
   [
     "apps/web/src/components/clerk/T3ConnectUserProfilePage.tsx",
     "apps/web/src/components/clerk/InfinitusConnectUserProfilePage.tsx",
-  ],
-  [
-    "apps/web/src/components/clerk/T3ConnectUserProfilePage.test.tsx",
-    "apps/web/src/components/clerk/InfinitusConnectUserProfilePage.test.tsx",
   ],
   [
     "apps/web/src/components/clerk/useT3ConnectAuthPrompt.tsx",

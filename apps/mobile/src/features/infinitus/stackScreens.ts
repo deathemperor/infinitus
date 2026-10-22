@@ -1,4 +1,7 @@
-import { createNativeStackScreen } from "@react-navigation/native-stack";
+import {
+  createNativeStackScreen,
+  type NativeStackNavigationOptions,
+} from "@react-navigation/native-stack";
 
 import { AccountsRouteScreen } from "../accounts/AccountsRouteScreen";
 import { ShareToThreadRouteScreen } from "../sharing/ShareToThreadRouteScreen";
@@ -24,14 +27,15 @@ export const INFINITUS_SETTINGS_SCREENS = {
   }),
 };
 
-/** The fork's new-task sheet route, spread the same way: a native share can
-    land in an existing thread instead of a new task. */
-export const INFINITUS_NEW_TASK_SCREENS = {
-  NewTaskShareThread: createNativeStackScreen({
-    screen: ShareToThreadRouteScreen,
-    linking: "share/thread",
-    options: {
-      title: "Choose thread",
-    },
-  }),
-};
+/** The fork's new-task route, spread into the root stack beside upstream's
+    `NewTaskProject` with the same header options: a native share can land in
+    an existing thread instead of a new task. */
+export function infinitusNewTaskScreens(headerOptions: NativeStackNavigationOptions) {
+  return {
+    NewTaskShareThread: createNativeStackScreen({
+      screen: ShareToThreadRouteScreen,
+      linking: "new/share/thread",
+      options: { ...headerOptions, title: "Choose thread" },
+    }),
+  };
+}

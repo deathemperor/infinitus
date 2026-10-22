@@ -1,7 +1,7 @@
 import type { ExhaustedBandModel } from "@infinitus/client-runtime/state/infinitusExhausted";
 import { View } from "react-native";
 
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text } from "../../components/ui/AppText";
 import { exhaustedCopy } from "./accountsRoute.logic";
 
 /** The compact all-accounts-exhausted band a fleet card opens with when every

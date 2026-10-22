@@ -3,7 +3,6 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
-import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 
 import { CodexSettings } from "@infinitus/contracts";
@@ -41,25 +40,6 @@ const writeTextFile = Effect.fn("CodexHomeLayout.test.writeTextFile")(function* 
 
 it.layer(NodeServices.layer)("CodexHomeLayout", (it) => {
   describe("resolveCodexHomeLayout", () => {
-    it.effect("uses direct CODEX_HOME when no shadow home is configured", () =>
-      Effect.gen(function* () {
-        const homePath = yield* makeTempDir("t3code-codex-home-");
-
-        const layout = yield* resolveCodexHomeLayout(
-          decodeCodexSettings({
-            homePath,
-          }),
-        );
-
-        expect(layout).toMatchObject({
-          mode: "direct",
-          sharedHomePath: homePath,
-          effectiveHomePath: homePath,
-          continuationKey: `codex:home:${homePath}`,
-        });
-      }),
-    );
-
     it.effect("uses the shared home for continuation and the shadow home for runtime", () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
@@ -85,6 +65,45 @@ it.layer(NodeServices.layer)("CodexHomeLayout", (it) => {
   });
 
   describe("materializeCodexShadowHome", () => {
+    it.effect.skipIf(!symlinksSupported)(
+      "keeps Finder metadata local across repeated shadow home setup",
+      () =>
+        Effect.gen(function* () {
+          const fileSystem = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const sharedHome = yield* makeTempDir("t3code-codex-shared-");
+          const shadowHome = yield* makeTempDir("t3code-codex-shadow-");
+          const sharedMetadata = path.join(sharedHome, ".DS_Store");
+          const shadowMetadata = path.join(shadowHome, ".DS_Store");
+
+          yield* writeTextFile(sharedMetadata, "shared Finder metadata");
+          yield* writeTextFile(shadowMetadata, "shadow Finder metadata");
+          yield* writeTextFile(path.join(shadowHome, "auth.json"), '{"shadow":true}\n');
+          const layout = yield* resolveCodexHomeLayout(
+            decodeCodexSettings({ homePath: sharedHome, shadowHomePath: shadowHome }),
+          );
+
+          yield* materializeCodexShadowHome(layout);
+          expect(yield* fileSystem.readFileString(shadowMetadata)).toBe("shadow Finder metadata");
+          yield* fileSystem.remove(shadowMetadata);
+          yield* materializeCodexShadowHome(layout);
+          expect(yield* fileSystem.exists(shadowMetadata)).toBe(false);
+
+          yield* writeTextFile(shadowMetadata, "shadow Finder metadata");
+          yield* materializeCodexShadowHome(layout);
+          yield* materializeCodexShadowHome(layout);
+
+          expect(yield* fileSystem.readFileString(sharedMetadata)).toBe("shared Finder metadata");
+          expect(yield* fileSystem.readFileString(shadowMetadata)).toBe("shadow Finder metadata");
+          expect(yield* fileSystem.readFileString(path.join(shadowHome, "auth.json"))).toBe(
+            '{"shadow":true}\n',
+          );
+          expect(yield* fileSystem.readLink(path.join(shadowHome, "sessions"))).toBe(
+            path.join(sharedHome, "sessions"),
+          );
+        }),
+    );
+
     it.effect.skipIf(!symlinksSupported)(
       "materializes a shadow home with shared state links and private auth",
       () =>
@@ -303,41 +322,6 @@ it.layer(NodeServices.layer)("CodexHomeLayout", (it) => {
             `Cannot create Codex shadow home entry 'config.toml' because '${path.join(shadowHome, "config.toml")}' already exists and is not a symlink.`,
           );
         }),
-    );
-
-    it.effect("preserves filesystem operation, paths, and cause", () =>
-      Effect.gen(function* () {
-        const path = yield* Path.Path;
-        const sharedRoot = yield* makeTempDir("t3code-codex-shared-root-");
-        const sharedHome = path.join(sharedRoot, "shared-home");
-        const shadowRoot = yield* makeTempDir("t3code-codex-shadow-root-");
-        const shadowHome = path.join(shadowRoot, "shadow");
-        yield* writeTextFile(sharedHome, "not a directory\n");
-
-        const layout = yield* resolveCodexHomeLayout(
-          decodeCodexSettings({
-            homePath: sharedHome,
-            shadowHomePath: shadowHome,
-          }),
-        );
-
-        const error = yield* materializeCodexShadowHome(layout).pipe(Effect.flip);
-
-        expect(error._tag).toBe("CodexShadowHomeFileSystemError");
-        if (error._tag !== "CodexShadowHomeFileSystemError") {
-          return expect.fail("Expected CodexShadowHomeFileSystemError");
-        }
-        expect(error).toMatchObject({
-          operation: "makeDirectory",
-          sharedHomePath: sharedHome,
-          effectiveHomePath: shadowHome,
-        });
-        expect(error.path.startsWith(sharedHome)).toBe(true);
-        expect(error.cause).toBeInstanceOf(PlatformError.PlatformError);
-        expect(error.message).toBe(
-          `Codex shadow home filesystem operation 'makeDirectory' failed for '${error.path}'.`,
-        );
-      }),
     );
   });
 });

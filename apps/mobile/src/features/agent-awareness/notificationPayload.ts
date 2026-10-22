@@ -21,11 +21,12 @@ function dataFromNotificationResponse(response: unknown): Record<string, unknown
   return pushPayloadFromRequest(request);
 }
 
-/** Infinitus (fork, #1375): expo-notifications on iOS fills `content.data`
-    for a remote push from the payload's `body` key alone, and the relay
-    sends its keys (`environmentId`, `threadId`, `deepLink`) at the top level
-    beside `aps` — so `data` is empty there. The push trigger carries the
-    whole `userInfo` as `payload`; that is the same keys, read second. */
+/** Infinitus (fork, #1375): the relay's keys (`environmentId`, `threadId`,
+    `deepLink`) off the push trigger, which carries the whole `userInfo` as
+    `payload`. The relay now nests them under `body`, which expo-notifications
+    on iOS also copies into `content.data`; relays deployed before that sent
+    them at the top level beside `aps`, leaving `data` empty, so a payload
+    without a `body` object is read as is. */
 export function pushPayloadFromRequest(request: unknown): Record<string, unknown> | null {
   if (typeof request !== "object" || request === null) {
     return null;
@@ -38,9 +39,13 @@ export function pushPayloadFromRequest(request: unknown): Record<string, unknown
     return null;
   }
   const payload = (trigger as { readonly payload?: unknown }).payload;
-  return typeof payload === "object" && payload !== null
-    ? (payload as Record<string, unknown>)
-    : null;
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+  const body = (payload as { readonly body?: unknown }).body;
+  return typeof body === "object" && body !== null
+    ? (body as Record<string, unknown>)
+    : (payload as Record<string, unknown>);
 }
 
 function identifierFromNotificationResponse(response: unknown): string | null {
@@ -101,11 +106,6 @@ export const INFINITUS_ACCOUNTS_DEEP_LINK = "/settings/accounts";
 /** Infinitus (fork, #1076): a lapsed sign-in's alert lands on the home
     screen, where the sign-in cards are. */
 export const INFINITUS_HOME_DEEP_LINK = "/";
-/**
- * The deep link a notification would have to carry to target the thread the
- * given route is showing, including its nested screens such as the file
- * inspector. Null when the route is not inside a thread.
- */
 export function threadDeepLinkOnScreen(pathname: string): string | null {
   const match = /^\/threads\/([^/]+)\/([^/]+)(?:\/|$)/.exec(pathname);
   if (!match?.[1] || !match[2]) {

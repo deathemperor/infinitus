@@ -1,6 +1,6 @@
 import {
   AuthAccessWriteScope,
-  AuthAdministrativeScopes,
+  AuthStandardClientScopes,
   AuthOrchestrationReadScope,
 } from "@infinitus/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -129,7 +129,7 @@ describe("InfinitusPairing", () => {
         const decided = yield* pairing.decide({
           id: created.id,
           approve: true,
-          approverScopes: AuthAdministrativeScopes,
+          approverScopes: AuthStandardClientScopes,
         });
         expect(decided).toEqual({ decided: true });
         expect(yield* Ref.get(issued)).toEqual(["Loc's iPhone"]);
@@ -148,7 +148,7 @@ describe("InfinitusPairing", () => {
           yield* pairing.decide({
             id: created.id,
             approve: false,
-            approverScopes: AuthAdministrativeScopes,
+            approverScopes: AuthStandardClientScopes,
           }),
         ).toEqual({ decided: false });
         expect(yield* Ref.get(issued)).toHaveLength(1);
@@ -164,7 +164,7 @@ describe("InfinitusPairing", () => {
           yield* pairing.decide({
             id: created.id,
             approve: false,
-            approverScopes: AuthAdministrativeScopes,
+            approverScopes: AuthStandardClientScopes,
           }),
         ).toEqual({ decided: true });
         expect(yield* pairing.poll({ id: created.id, secret: SECRET })).toEqual({

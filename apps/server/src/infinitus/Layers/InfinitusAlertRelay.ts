@@ -79,9 +79,11 @@ export const InfinitusAlertRelayLive = Layer.effect(
         const deepLink = input.deepLink ?? INFINITUS_ALERT_DEEP_LINK;
         const alert = { title: input.title, body: input.body, deepLink };
         const now = yield* DateTime.now;
-        const jti = yield* crypto.randomUUIDv4.pipe(
-          Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "sign", cause })),
-        );
+        const jti = yield* crypto
+          .randomUUIDv4()
+          .pipe(
+            Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "sign", cause })),
+          );
         const payload = {
           iss: `t3-env:${environmentId}`,
           aud: normalizeRelayIssuer(link.issuer),

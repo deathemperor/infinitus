@@ -7,7 +7,7 @@ import { CircleAlertIcon } from "lucide-react";
 
 import { cn } from "../../lib/utils";
 import { infinitusLimitStopsAtom } from "../../state/infinitus";
-import { formatTimestamp } from "../../timestampFormat";
+import { formatShortTimestamp } from "../../timestampFormat";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 /**
@@ -33,7 +33,7 @@ export function limitStopTooltip(
   timestampFormat: TimestampFormat,
 ): string | null {
   return limitStop !== null && status === "limited"
-    ? limitStopLine(limitStop, (iso) => formatTimestamp(iso, timestampFormat), Date.now())
+    ? limitStopLine(limitStop, (iso) => formatShortTimestamp(iso, timestampFormat), Date.now())
     : null;
 }
 

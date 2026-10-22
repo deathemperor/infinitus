@@ -1,8 +1,9 @@
 import { InfinitusSecretRefused, type InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
-import { act, StrictMode, type ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../../test/reactTestRenderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { fake } = vi.hoisted(() => ({
@@ -103,7 +104,6 @@ function answerReads(input: { command: string }) {
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fake.capability = true;
   fake.snapshot = snapshot();
   fake.run = vi.fn(async ({ input }: { input: { command: string } }) => answerReads(input));
@@ -113,7 +113,6 @@ beforeEach(() => {
 afterEach(async () => {
   await act(() => renderer?.unmount());
   renderer = undefined;
-  vi.unstubAllGlobals();
 });
 
 async function renderSection(processes: InfinitusEngineProcesses | null = null) {

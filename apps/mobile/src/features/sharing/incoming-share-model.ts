@@ -12,6 +12,7 @@ import * as Schema from "effect/Schema";
 import type { ResolvedSharePayload, SharePayload } from "expo-sharing";
 
 import { DraftComposerAttachmentSchema } from "../../lib/composer-image-schema";
+import { fitComposerImage } from "../../lib/composerImageFit";
 import type { DraftComposerAttachment } from "../../lib/composerImages";
 import { estimateBase64ByteSize } from "../../lib/base64";
 import { jpegAttachmentName, originalImagePassthroughMimeType } from "../../lib/image-passthrough";
@@ -55,7 +56,7 @@ export function decodeIncomingShareDraft(value: unknown): IncomingShareDraft {
 /**
  * `file:` path with the iOS `/private` prefix stripped, so URIs that reach the
  * same file through the `/var` symlink and through `/private/var` compare
- * equal. Null for anything that is not a `file:` URI.
+ * equal.
  */
 function normalizedFileUriPath(uri: string): string | null {
   try {
@@ -115,7 +116,6 @@ export interface IncomingShareFileReader {
   readonly renderImageAsJpeg?: (uri: string) => Promise<{ base64: string; uri: string }>;
 }
 
-/** Apply the destination server's file support after the user chooses a project. */
 export function selectIncomingShareAttachments(input: {
   readonly attachments: ReadonlyArray<DraftComposerAttachment>;
   readonly maxFileAttachmentBytes: number | null;
@@ -233,10 +233,7 @@ async function releaseOwnedFiles(
   for (const uri of new Set(uris.filter((candidate): candidate is string => Boolean(candidate)))) {
     try {
       await fileReader.removeOwnedFile(uri);
-    } catch {
-      // Temporary-file cleanup is best-effort and must never discard content
-      // that was successfully converted into a durable composer attachment.
-    }
+    } catch {}
   }
 }
 
@@ -246,9 +243,7 @@ function fallbackName(uri: string, index: number, mimeType: string): string {
     if (pathName) {
       return decodeURIComponent(pathName);
     }
-  } catch {
-    // Fall through to a deterministic attachment name.
-  }
+  } catch {}
   const family = mimeType.split("/")[0]?.toLowerCase();
   const kind = family === "image" || family === "audio" || family === "video" ? family : "file";
   const extension =
@@ -301,8 +296,6 @@ export async function buildIncomingShareDraft(input: {
       (payload.shareType === "image" ? "image/png" : "application/octet-stream")
     ).toLowerCase();
     if (payload.shareType !== "image") {
-      // The patched native module never emits a blank display name, but keep
-      // the guard: an empty name would fail the attachment name contract.
       const sharedFileName =
         typeof payload.originalName === "string" && payload.originalName.trim().length > 0
           ? payload.originalName
@@ -346,10 +339,9 @@ export async function buildIncomingShareDraft(input: {
         }
         if (persistedFileUri === undefined && input.fileReader.persistFile) {
           persistedFileUri = await input.fileReader.persistFile(uri, name);
-          // An Android content: source can misreport its size while the
-          // stored copy is what uploads, so the copy's measured size is what
-          // the attachment must record. A measured zero means the copy holds
-          // no bytes: reject it, whatever the source claimed.
+          // An Android content: source can misreport its size while the stored
+          // copy is what uploads, so the copy's measured size is what the
+          // attachment must record.
           const storedSize = (await input.fileReader.readSize?.(persistedFileUri)) ?? null;
           if (storedSize !== null) {
             sizeBytes = storedSize;
@@ -376,8 +368,6 @@ export async function buildIncomingShareDraft(input: {
         retainedFileUri = persistedFileUri ?? uri;
       } catch (error) {
         warnings.push(error instanceof Error ? error.message : `Could not read '${name}'.`);
-        // A copy persisted before the failure has no attachment referencing
-        // it; release it or it leaks in the app's attachment directory.
         if (persistedFileUri !== undefined) {
           await releaseOwnedFiles(input.fileReader, [persistedFileUri]);
         }
@@ -424,8 +414,18 @@ export async function buildIncomingShareDraft(input: {
     let renderedUri: string | undefined;
     try {
       let image: { readonly base64: string; readonly mimeType: string; readonly name: string };
+      let fitted = false;
       if (passthroughMimeType !== null || !render) {
-        image = { base64: await input.fileReader.readBase64(uri), mimeType, name: imageName };
+        const sharedBase64 = await input.fileReader.readBase64(uri);
+        // Rendered from the bytes already read, since the provider's file may not be readable
+        // by the native image loader.
+        const fit = await fitComposerImage({
+          uri: `data:${mimeType};base64,${sharedBase64}`,
+          mimeType,
+          base64: sharedBase64,
+        });
+        fitted = fit !== null;
+        image = { base64: fit?.base64 ?? sharedBase64, mimeType, name: imageName };
       } else {
         const rendered = await render(uri);
         renderedUri = rendered.uri;
@@ -436,7 +436,7 @@ export async function buildIncomingShareDraft(input: {
         };
       }
       const sizeBytes =
-        passthroughMimeType !== null && sourceBytes !== null
+        passthroughMimeType !== null && sourceBytes !== null && !fitted
           ? sourceBytes
           : estimateBase64ByteSize(image.base64);
       if (sizeBytes <= 0 || sizeBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {

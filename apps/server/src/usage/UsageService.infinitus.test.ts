@@ -35,6 +35,8 @@ import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AntigravityUsage from "../provider/Drivers/AntigravityUsage.ts";
 import * as ProviderHostLive from "../provider/ProviderHostLive.ts";
 import { UsageAttribution } from "../infinitus/Services/UsageAttribution.ts";
+import * as Sqlite from "../persistence/Sqlite.ts";
+import * as CodexUsageHistory from "./CodexUsageHistory.ts";
 import * as UsageService from "./UsageService.ts";
 
 const encodeUnknownJsonString = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
@@ -105,6 +107,7 @@ const layerService = (input: {
     .pipe(
       Layer.provideMerge(AntigravityUsage.layer),
       Layer.provideMerge(ProviderHostLive.layer),
+      Layer.provideMerge(CodexUsageHistory.layer.pipe(Layer.provideMerge(Sqlite.layerMemory))),
       Layer.provideMerge(Layer.mock(BackgroundPolicy.BackgroundPolicy)({})),
       Layer.provideMerge(Layer.mock(ServerSecretStore.ServerSecretStore)({})),
       Layer.provideMerge(

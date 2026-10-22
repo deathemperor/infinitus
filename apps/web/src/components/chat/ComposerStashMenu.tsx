@@ -1,15 +1,14 @@
 import { BookmarkIcon, FileIcon, FileTextIcon } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type RefObject } from "react";
 import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
 
-import { formatRelativeTimeLabel } from "../../timestampFormat";
+import { RelativeTime } from "../RelativeTime";
 import { cn } from "~/lib/utils";
 import { type PromptStashEntry } from "../../promptStashStore";
 import { ComposerBanner } from "./ComposerBanner";
 
 const SNIPPET_MAX_CHARS = 90;
 
-/** Images that did not make it into the entry, whatever the reason. */
 function missingImageCount(entry: PromptStashEntry): number {
   return entry.droppedImageNames.length + (entry.unreadableImageNames?.length ?? 0);
 }
@@ -30,19 +29,18 @@ function stashEntrySnippet(entry: PromptStashEntry): string {
 }
 
 /**
- * Attached banner listing the stashed prompts. Opened by the stash badge or ⌘S
- * when the empty composer cannot restore a single entry. Navigated with arrows,
- * restored with Enter, dismissed with Escape. The listener runs capture-phase
- * on window so it wins over the composer's handlers while the menu is open.
+ * The listener runs capture-phase on window so it wins over the composer's handlers while the
+ * menu is open.
  */
 export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
   entries: ReadonlyArray<PromptStashEntry>;
   stashShortcutLabel: string | null;
+  composerFormRef: RefObject<HTMLFormElement | null>;
   onRestore: (entry: PromptStashEntry) => void;
   onDelete: (entry: PromptStashEntry) => void;
   onClose: () => void;
 }) {
-  const { entries, stashShortcutLabel, onRestore, onDelete, onClose } = props;
+  const { entries, stashShortcutLabel, composerFormRef, onRestore, onDelete, onClose } = props;
   const drawerRef = useRef<HTMLDivElement>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(entries[0]?.id ?? null);
 
@@ -66,6 +64,16 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        !(target instanceof Node) ||
+        (target !== document.body &&
+          !(target instanceof Element && target.closest('[data-prompt-stash-badge="true"]')) &&
+          !drawerRef.current?.contains(target) &&
+          !composerFormRef.current?.querySelector('textarea, [role="textbox"]')?.contains(target))
+      ) {
+        return;
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -110,7 +118,7 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
     };
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
-  }, [entries, highlightedEntry, onClose, onDelete, onRestore]);
+  }, [composerFormRef, entries, highlightedEntry, onClose, onDelete, onRestore]);
 
   return (
     <ComposerBanner.Root ref={drawerRef} data-composer-stash-drawer="true">
@@ -208,7 +216,7 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
                     dateTime={entry.createdAt}
                     className="shrink-0 text-muted-foreground tabular-nums max-sm:hidden"
                   >
-                    {formatRelativeTimeLabel(entry.createdAt)}
+                    <RelativeTime timestamp={entry.createdAt} />
                   </time>
                   <ComposerBanner.Dismiss
                     className="z-10"

@@ -1,8 +1,9 @@
 import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
-import { act, StrictMode } from "react";
+import { StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../../test/reactTestRenderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { fake } = vi.hoisted(() => ({

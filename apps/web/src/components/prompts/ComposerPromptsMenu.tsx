@@ -1,7 +1,7 @@
 import type { PromptSnippet } from "@infinitus/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { BookmarkIcon, SettingsIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 
 import { ComposerBanner } from "../chat/ComposerBanner";
 import { toastManager } from "../ui/toast";
@@ -25,28 +25,25 @@ export const ComposerPromptsMenu = memo(function ComposerPromptsMenu(props: {
   const drawerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const insert = useCallback(
-    (snippet: PromptSnippet) => {
-      if (onInsert(snippet.text)) {
-        onClose();
-        return;
-      }
-      toastManager.add({
-        type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
-      });
-    },
-    [onClose, onInsert],
-  );
+  const insert = (snippet: PromptSnippet) => {
+    if (onInsert(snippet.text)) {
+      onClose();
+      return;
+    }
+    toastManager.add({
+      type: "error",
+      title: "Unable to add to chat",
+      description: "The composer is busy; try again once it is ready.",
+    });
+  };
 
-  const openSettings = useCallback(() => {
+  const openSettings = () => {
     onClose();
     void navigate({
       to: "/settings/projects",
       search: { project: projectKey ?? undefined, machine: undefined },
     });
-  }, [navigate, onClose, projectKey]);
+  };
 
   useEffect(() => {
     if (typeof document === "undefined") return;

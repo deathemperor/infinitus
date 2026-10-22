@@ -2,22 +2,55 @@ import type {
   OrchestrationV2ThreadProjection,
   OrchestrationV2RuntimeRequest,
   OrchestrationV2UserInputQuestion,
+  ProviderApprovalFullAccessOverride,
   ProviderApprovalOption,
+  ProviderApprovalDecision,
   ProviderRequestKind,
   RuntimeRequestId,
 } from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import type { AtomCommandResult } from "./runtime.ts";
+import type { ThreadStructure, ThreadStructureVisibleTurnItem } from "./models.ts";
+
+export type ApprovalResponder = (
+  requestId: RuntimeRequestId,
+  decision: ProviderApprovalDecision,
+) => Promise<AtomCommandResult<unknown, unknown> | undefined>;
+
+/** Declines every approval a redirect replaces; any one still pending would block the agent. */
+export async function declinePendingApprovals(
+  approvals: ReadonlyArray<ThreadPendingApproval>,
+  respond: ApprovalResponder,
+): Promise<boolean> {
+  for (const approval of approvals) {
+    // A request the provider can no longer answer has nothing to decline.
+    if (approval.responseCapability !== "live") continue;
+    if ((await respond(approval.requestId, "decline"))?._tag !== "Success") return false;
+  }
+  return true;
+}
 
 export interface ThreadPendingApproval {
   readonly requestId: RuntimeRequestId;
   readonly requestKind: ProviderRequestKind;
   readonly createdAt: string;
   readonly detail?: string;
-  /** App requesting access for mcp-elicitation approvals (#8058). */
+  readonly reason?: string;
+  readonly fullAccessOverride?: ProviderApprovalFullAccessOverride;
   readonly appName?: string;
-  /** Approval choices advertised by the provider (#8058); defaults apply when absent. */
   readonly options?: ReadonlyArray<ProviderApprovalOption>;
   readonly responseCapability: "live" | "not_resumable";
+}
+
+export const FULL_ACCESS_OVERRIDE_QUESTION = "Why am I being asked this?";
+
+export function fullAccessOverrideExplanation(
+  override: ProviderApprovalFullAccessOverride,
+): string {
+  return override === "ask_rule"
+    ? "Full access skips approvals, but an ask rule in the agent's own settings matches this action, so it still asks. Remove or narrow that rule to stop these prompts."
+    : `Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. ${PRODUCT_NAME} can't turn these off, so check the request and approve it if it's what you expect.`;
 }
 
 export interface ThreadUserInputQuestion extends Omit<
@@ -41,7 +74,6 @@ export interface PendingThreadRequests {
   readonly userInputs: ReadonlyArray<ThreadPendingUserInput>;
 }
 
-/** Seed each question once. Existing edits, cleared answers, and option selections win. */
 export function seedUserInputDraftAnswers<Draft extends { readonly customAnswer?: string }>(
   questions: ReadonlyArray<
     Pick<OrchestrationV2UserInputQuestion, "id" | "allowCustomAnswer" | "initialAnswer">
@@ -62,9 +94,8 @@ export function seedUserInputDraftAnswers<Draft extends { readonly customAnswer?
   return seeded;
 }
 
-/** Joins pending request entities to the request items that carry display data. */
 export function derivePendingThreadRequests(
-  projection: Pick<OrchestrationV2ThreadProjection, "runtimeRequests" | "turnItems">,
+  projection: Pick<ThreadStructure, "runtimeRequests" | "turnItems">,
 ): PendingThreadRequests {
   const approvals: ThreadPendingApproval[] = [];
   const userInputs: ThreadPendingUserInput[] = [];
@@ -103,6 +134,10 @@ export function derivePendingThreadRequests(
       requestKind: request.kind,
       createdAt: DateTime.formatIso(request.createdAt),
       ...(item?.type === "approval_request" && item.prompt ? { detail: item.prompt } : {}),
+      ...(item?.type === "approval_request" && item.reason ? { reason: item.reason } : {}),
+      ...(item?.type === "approval_request" && item.fullAccessOverride
+        ? { fullAccessOverride: item.fullAccessOverride }
+        : {}),
       ...(item?.type === "approval_request" && item.appName ? { appName: item.appName } : {}),
       ...(item?.type === "approval_request" && item.options !== undefined
         ? { options: item.options }
@@ -114,22 +149,25 @@ export function derivePendingThreadRequests(
   return { approvals, userInputs };
 }
 
-/** Older V2 answers were saved on requests without updating their timeline items. */
-export function createQuestionHistoryProjector() {
-  type Rows = OrchestrationV2ThreadProjection["visibleTurnItems"];
+export function createQuestionHistoryProjector<
+  Row extends ThreadStructureVisibleTurnItem =
+    OrchestrationV2ThreadProjection["visibleTurnItems"][number],
+>() {
+  type Rows = ReadonlyArray<Row>;
   type Requests = OrchestrationV2ThreadProjection["runtimeRequests"];
   let previousRows: Rows | undefined;
   let previousRequests: Requests | undefined;
   let previousResult: Rows | undefined;
-  const cache = new WeakMap<Rows[number], { request: Requests[number]; row: Rows[number] }>();
-  return (
-    projection: Pick<OrchestrationV2ThreadProjection, "visibleTurnItems" | "runtimeRequests">,
-  ): Rows => {
+  const cache = new WeakMap<Row, { request: Requests[number]; row: Row }>();
+  return (projection: {
+    readonly visibleTurnItems: Rows;
+    readonly runtimeRequests: Requests;
+  }): Rows => {
     const { visibleTurnItems: rows, runtimeRequests: requests } = projection;
     if (rows === previousRows && requests === previousRequests && previousResult)
       return previousResult;
     const byId = new Map(requests.map((request) => [request.id, request]));
-    let result: Rows[number][] | undefined;
+    let result: Row[] | undefined;
     for (const [index, row] of rows.entries()) {
       const item = row.item;
       const request =

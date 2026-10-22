@@ -17,7 +17,9 @@ import type {
   InfinitusEngineSupervision,
   InfinitusEngines,
 } from "@infinitus/contracts/infinitus";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+
+import { useStableCallback } from "~/hooks/useStableCallback";
 
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
@@ -43,16 +45,16 @@ const BADGE_VARIANT = {
     call on one engine locks the other's buttons too. */
 export function useInfinitusEngineProcesses() {
   // A window global, fixed for the page's life.
-  const bridge = useMemo(
-    () => infinitusEngineBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
-    [],
+  const [bridge] = useState(() =>
+    infinitusEngineBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
   );
   const [engines, setEngines] = useState<InfinitusEngines | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<{ key: string | null; message: string } | null>(null);
 
-  const apply = useCallback((next: InfinitusEngines) => {
+  // One identity: the read effect depends on it.
+  const apply = useStableCallback((next: InfinitusEngines) => {
     setEngines(next);
     // A command the user has not touched follows what the shell resolved.
     setDrafts((current) => {
@@ -62,7 +64,7 @@ export function useInfinitusEngineProcesses() {
       }
       return merged;
     });
-  }, []);
+  });
 
   useEffect(() => {
     if (bridge === null) return;
@@ -82,18 +84,15 @@ export function useInfinitusEngineProcesses() {
     };
   }, [bridge, apply]);
 
-  const run = useCallback(
-    (key: string, change: Promise<InfinitusEngines>) => {
-      setError(null);
-      setBusy(key);
-      change
-        .then(apply, (cause: unknown) => {
-          setError({ key, message: cause instanceof Error ? cause.message : String(cause) });
-        })
-        .finally(() => setBusy(null));
-    },
-    [apply],
-  );
+  const run = (key: string, change: Promise<InfinitusEngines>) => {
+    setError(null);
+    setBusy(key);
+    change
+      .then(apply, (cause: unknown) => {
+        setError({ key, message: cause instanceof Error ? cause.message : String(cause) });
+      })
+      .finally(() => setBusy(null));
+  };
 
   if (bridge === null || engines === null) return null;
   return { bridge, engines, drafts, setDrafts, locked: busy !== null, error, run };

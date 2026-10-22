@@ -4,7 +4,6 @@ import type { InfinitusSnapshot, InfinitusUtilization } from "@infinitus/contrac
 import { decodeUtilization } from "@infinitus/client-runtime/state/infinitusUtilization";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { useCallback } from "react";
 
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { infinitusEnvironment } from "./infinitus";
@@ -123,7 +122,7 @@ export function useEnvironmentUtilizations(days: string): {
   readonly refresh: () => void;
 } {
   const statuses = useAtomValue(utilizationByDaysAtom(days));
-  const refresh = useCallback(() => {
+  const refresh = () => {
     for (const status of statuses) {
       if (status.snapshot === null || status.missing !== null) continue;
       appAtomRegistry.refresh(
@@ -133,6 +132,6 @@ export function useEnvironmentUtilizations(days: string): {
         }),
       );
     }
-  }, [days, statuses]);
+  };
   return { statuses, refresh };
 }

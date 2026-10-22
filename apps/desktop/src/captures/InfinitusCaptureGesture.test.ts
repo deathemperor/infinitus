@@ -1,4 +1,3 @@
-// @effect-diagnostics globalTimers:off -- The fakes settle promise chains with a macrotask; no Effect fiber is involved.
 import type { DesktopCaptureGestureEvent } from "@infinitus/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 
@@ -9,7 +8,7 @@ import {
 } from "./InfinitusCaptureGesture.ts";
 
 function harness(overrides: Partial<CaptureGestureDeps> = {}) {
-  let trigger: (() => void) | undefined;
+  let trigger: (() => Promise<void>) | undefined;
   let fail: ((error: Error) => void) | undefined;
   const stop = vi.fn();
   const dispatched: DesktopCaptureGestureEvent[] = [];
@@ -36,14 +35,12 @@ function harness(overrides: Partial<CaptureGestureDeps> = {}) {
     ...overrides,
   };
   const gesture = makeCaptureGesture(deps);
-  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
   return {
     gesture,
     deps,
     stop,
     dispatched,
     logged,
-    settle,
     trigger: () => trigger?.(),
     fail: (error: Error) => fail?.(error),
     setRead: (next: typeof read) => {
@@ -68,19 +65,16 @@ describe("makeCaptureGesture", () => {
   it("dispatches the read, confirms only text, and logs the length not the text", async () => {
     const h = harness();
     await h.gesture.setEnabled(true);
-    h.trigger();
-    await h.settle();
+    await h.trigger();
     expect(h.dispatched).toEqual([{ type: "captured", text: "hello" }]);
     expect(h.deps.confirm).toHaveBeenCalledOnce();
     expect(h.logged).toContainEqual(["gesture", { outcome: "captured", length: 5 }]);
     expect(JSON.stringify(h.logged)).not.toContain("hello");
 
     h.setRead(async () => ({ type: "empty" }));
-    h.trigger();
-    await h.settle();
+    await h.trigger();
     h.setRead(async () => ({ type: "failed", reason: "accessibility" }));
-    h.trigger();
-    await h.settle();
+    await h.trigger();
     expect(h.dispatched.slice(1)).toEqual([
       { type: "empty" },
       { type: "failed", reason: "accessibility" },
@@ -99,17 +93,16 @@ describe("makeCaptureGesture", () => {
         }),
     );
     await h.gesture.setEnabled(true);
-    h.trigger();
-    h.trigger();
+    const first = h.trigger();
+    await h.trigger();
     release?.();
-    await h.settle();
+    await first;
     expect(h.dispatched).toEqual([{ type: "captured", text: "slow" }]);
 
     h.setRead(async () => {
       throw new Error("boom");
     });
-    h.trigger();
-    await h.settle();
+    await h.trigger();
     expect(h.dispatched.at(-1)).toEqual({ type: "failed", reason: "helper" });
   });
 

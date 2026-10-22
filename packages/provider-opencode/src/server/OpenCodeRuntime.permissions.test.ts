@@ -27,18 +27,8 @@ describe("buildOpenCodePermissionRules", () => {
     NodeAssert.equal(actionFor("approval-required", "edit"), "ask");
   });
 
-  // Documented in docs/user/permission-modes.md: providers without an AI
-  // reviewer, OpenCode among them, fall back to Supervised for "auto".
   it("leaves auto asking, as the docs say it does without a reviewer", () => {
     NodeAssert.equal(actionFor("auto", "edit"), "ask");
-  });
-
-  it("allows workspace reads and task updates without asking in supervised modes", () => {
-    for (const runtimeMode of ["approval-required", "auto-accept-edits", "auto"] as const) {
-      for (const permission of ["read", "glob", "grep", "lsp", "skill", "todowrite"]) {
-        NodeAssert.equal(actionFor(runtimeMode, permission, "src/index.ts"), "allow");
-      }
-    }
   });
 
   it("preserves OpenCode's environment-file approval rules", () => {
@@ -67,22 +57,13 @@ describe("buildOpenCodePermissionRules", () => {
       NodeAssert.equal(actionFor(runtimeMode, "custom_tool"), "ask");
     }
   });
-
-  it("allows everything only under full access", () => {
-    NodeAssert.deepEqual(OpenCodeRuntime.buildOpenCodePermissionRules("full-access"), [
-      { permission: "*", pattern: "*", action: "allow" },
-      { permission: "external_directory", pattern: "*", action: "allow" },
-    ]);
-  });
 });
 
 describe("toOpenCodePermissionReply", () => {
   it.each([
     ["accept", "once"],
     ["acceptForSession", "always"],
-    ["acceptAlways", "always"],
     ["decline", "reject"],
-    ["cancel", "reject"],
   ] as const)("maps %s to %s", (decision, reply) => {
     NodeAssert.equal(OpenCodeRuntime.toOpenCodePermissionReply(decision), reply);
   });

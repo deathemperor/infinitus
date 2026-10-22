@@ -154,9 +154,7 @@ export class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCredit
 const isClaudeResetCreditError = Schema.is(ClaudeResetCreditError);
 
 /**
- * Every reset failure except `requestFailed` and `unconfirmed` is final:
- * Claude answered, or nothing was sent. An unanswered or unconfirmed claim
- * retries with the same request id.
+ * An unanswered or unconfirmed claim retries with the same request id.
  */
 export const isSettledClaudeResetCreditFailure = (error: unknown) =>
   isClaudeResetCreditError(error) &&
@@ -350,8 +348,8 @@ export const claudeAccountConfigPath = Effect.fn("claudeAccountConfigPath")(func
  * email can belong to several. The claim itself asks the token's profile
  * (`readOrganization`), this read only labels the capabilities' workspace.
  */
-export const readClaudeOrganizationId = (accountConfigPath: string) =>
-  Effect.gen(function* () {
+export const readClaudeOrganizationId = Effect.fn("readClaudeOrganizationId")(
+  function* (accountConfigPath: string) {
     const fs = yield* FileSystem.FileSystem;
     const text = yield* fs.readFileString(accountConfigPath);
     return Option.getOrUndefined(
@@ -359,7 +357,9 @@ export const readClaudeOrganizationId = (accountConfigPath: string) =>
         Option.fromNullishOr(config.oauthAccount?.organizationUuid?.trim() || undefined),
       ),
     );
-  }).pipe(Effect.orElseSucceed(() => undefined));
+  },
+  Effect.orElseSucceed(() => undefined),
+);
 
 const CLAIM_OUTCOMES = {
   reset: "reset",

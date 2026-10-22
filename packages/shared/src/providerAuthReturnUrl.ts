@@ -2,7 +2,6 @@ import { DEFAULT_HOSTED_APP_URL } from "./connectAuth.ts";
 import { DESKTOP_DEV_URL_SCHEME, DESKTOP_URL_SCHEME } from "./desktopIdentity.ts";
 import { isLoopbackHost } from "./preview.ts";
 
-/** Only return to a local client or the hosted client, never an arbitrary OAuth-supplied URL. */
 export function providerAuthReturnUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
   try {

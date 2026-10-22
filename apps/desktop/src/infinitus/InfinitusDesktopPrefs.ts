@@ -120,15 +120,15 @@ const make = Effect.gen(function* () {
 
   // Temp file then rename, as desktop-settings.json is written: a crash
   // mid-write leaves the previous file, never a half one.
-  const write = (prefs: InfinitusDesktopPrefs) =>
-    Effect.gen(function* () {
+  const write = Effect.fn("infinitus.desktopPrefs.write")(
+    function* (prefs: InfinitusDesktopPrefs) {
       const tempPath = `${prefsPath}.${process.pid}.tmp`;
       yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
       yield* fileSystem.writeFileString(tempPath, encodeInfinitusDesktopPrefs(prefs));
       yield* fileSystem.rename(tempPath, prefsPath);
-    }).pipe(
-      Effect.mapError((cause) => new InfinitusDesktopPrefsWriteError({ path: prefsPath, cause })),
-    );
+    },
+    Effect.mapError((cause) => new InfinitusDesktopPrefsWriteError({ path: prefsPath, cause })),
+  );
 
   const setFlag = (key: keyof InfinitusDesktopPrefs, enabled: boolean) =>
     SynchronizedRef.updateAndGetEffect(ref, (prefs) => {

@@ -5,7 +5,7 @@ import type {
 import { EnvironmentId, ProjectId, ThreadId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { selectShareTargetThreads } from "./share-to-thread";
+import { isShareFlowRoute, selectShareTargetThreads } from "./share-to-thread";
 
 const ENV = EnvironmentId.make("env-1");
 const PROJECT = ProjectId.make("project-1");
@@ -68,5 +68,21 @@ describe("selectShareTargetThreads", () => {
       selectShareTargetThreads({ projects, query: "limit", threads }).map((row) => row.thread.id),
     ).toEqual(["a"]);
     expect(selectShareTargetThreads({ projects, query: "", threads })[1]?.projectTitle).toBeNull();
+  });
+});
+
+describe("isShareFlowRoute", () => {
+  it("counts the draft and the pickers over it, not an existing thread", () => {
+    expect(isShareFlowRoute({ name: "Thread", params: { draft: { incomingShareId: "s" } } })).toBe(
+      true,
+    );
+    expect(isShareFlowRoute({ name: "NewTaskProject" })).toBe(true);
+    expect(isShareFlowRoute({ name: "NewTaskShareThread" })).toBe(true);
+    expect(isShareFlowRoute({ name: "AddProjectLocal" })).toBe(true);
+    expect(
+      isShareFlowRoute({ name: "Thread", params: { environmentId: "e", threadId: "t" } }),
+    ).toBe(false);
+    expect(isShareFlowRoute({ name: "Home" })).toBe(false);
+    expect(isShareFlowRoute(undefined)).toBe(false);
   });
 });

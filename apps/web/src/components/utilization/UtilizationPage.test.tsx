@@ -2,7 +2,7 @@ import { decodeUtilization } from "@infinitus/client-runtime/state/infinitusUtil
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 interface TestStatus {
   readonly environmentId: string;
@@ -122,8 +122,9 @@ const forecastVerb = {
 
 const utilizationVerb = { ...forecastVerb, name: "utilization" } as const;
 
-const inAnHour = Math.floor(Date.now() / 1000) + 3600;
-const now = inAnHour - 3600;
+// The page reads the clock; every test pins it here (seconds).
+const now = Date.parse("2026-09-11T10:00:00Z") / 1000;
+const inAnHour = now + 3600;
 const utilizationReply = {
   result: {
     days: 7,
@@ -282,11 +283,16 @@ const readySnapshot: InfinitusSnapshot = {
 
 describe("UtilizationPage", () => {
   beforeEach(() => {
+    vi.setSystemTime(now * 1000);
     testState.snapshot = readySnapshot;
     testState.utilization = utilizationReply;
     testState.statuses = null;
     testState.capability = true;
     testState.refresh.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("adds up every machine's history and names the one that could not answer (#1581)", () => {
@@ -454,7 +460,7 @@ describe("UtilizationPage", () => {
     testState.utilization = { result: { ...utilizationReply.result, days: 1 } };
     const markup = renderToStaticMarkup(<UtilizationPage />);
 
-    const to = new Date(Math.max(now - 3600, Math.floor(Date.now() / 1000)) * 1000);
+    const to = new Date(now * 1000);
     const from = new Date(to.getTime() - 86_400_000);
     const label = (date: Date) =>
       date.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });

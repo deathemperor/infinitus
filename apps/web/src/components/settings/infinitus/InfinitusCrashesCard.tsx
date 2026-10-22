@@ -9,7 +9,7 @@
  *
  * @module InfinitusCrashesCard
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { infinitusEnvironment } from "~/state/infinitus";
@@ -67,30 +67,27 @@ export function InfinitusCrashesCard() {
     };
   }, [environmentId, runCommand, supported]);
 
-  const copy = useCallback(
-    async (id: string) => {
-      if (environmentId === null) return;
-      setCopied(null);
-      const result = await runCommand({ environmentId, input: crashTranscriptInput(id) });
-      if (result._tag === "Failure") {
-        setError(infinitusCommandFailure(result.cause).message);
-        return;
-      }
-      const transcript = parseCrashes(result.value.result)?.[0]?.transcript;
-      if (transcript === undefined) {
-        setError("That report is no longer on the Mac.");
-        return;
-      }
-      try {
-        await writeTextToClipboard(transcript, "crash report");
-        setError(null);
-        setCopied(id);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not copy the report.");
-      }
-    },
-    [environmentId, runCommand],
-  );
+  const copy = async (id: string) => {
+    if (environmentId === null) return;
+    setCopied(null);
+    const result = await runCommand({ environmentId, input: crashTranscriptInput(id) });
+    if (result._tag === "Failure") {
+      setError(infinitusCommandFailure(result.cause).message);
+      return;
+    }
+    const transcript = parseCrashes(result.value.result)?.[0]?.transcript;
+    if (transcript === undefined) {
+      setError("That report is no longer on the Mac.");
+      return;
+    }
+    try {
+      await writeTextToClipboard(transcript, "crash report");
+      setError(null);
+      setCopied(id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not copy the report.");
+    }
+  };
 
   useEffect(() => {
     if (copied === null) return;

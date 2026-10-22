@@ -157,7 +157,7 @@ export const PREF_COPY: Readonly<
       limit: "Limit break — RPG theme only, else ember",
     },
   },
-  // Push.
+  // Notifications: the account events the phone is pushed.
   push_all_dead: { label: "All accounts are exhausted" },
   push_last_alive: { label: "The last alive account nears its limit" },
   push_revived: { label: "An account comes back" },
@@ -183,7 +183,7 @@ export const PREF_COPY: Readonly<
     description:
       "Custom account names travel the same way, matched by email, so an account named on one machine wears that name everywhere.",
   },
-  // Engines.
+  // Engines: which ones run, and the demo fleet that stands in for them.
   engine_swapd_enabled: { label: "swapd engine on (swaps the login under each provider's CLI)" },
   engine_cliproxy_enabled: { label: "CLIProxyAPI engine on (rotates behind its own endpoint)" },
   engine_9router_enabled: { label: "9Router engine on (rotates behind its own endpoint)" },

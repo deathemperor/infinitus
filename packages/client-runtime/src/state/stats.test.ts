@@ -30,7 +30,7 @@ function presentation(id: string, stats: boolean, phase: "connected" | "offline"
     entry: { target: { label: id } },
     connection: { phase, error: null, traceId: null },
     serverConfig: { environment: { capabilities: { stats } } } as ServerConfig,
-  } as EnvironmentPresentation;
+  } as unknown as EnvironmentPresentation;
 }
 it("queries only selected connected capable servers and follows reconnects", () => {
   const mac = EnvironmentId.make("mac"),

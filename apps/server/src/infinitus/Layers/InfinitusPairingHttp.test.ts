@@ -1,7 +1,7 @@
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
-  AuthAdministrativeScopes,
+  AuthStandardClientScopes,
   type AuthEnvironmentScope,
   AuthSessionId,
   EnvironmentAuthenticatedAuth,
@@ -97,7 +97,7 @@ describe("infinitusPairingHttpApiLayer", () => {
         yield* pairing.decide({
           id: created.id,
           approve: true,
-          approverScopes: AuthAdministrativeScopes,
+          approverScopes: AuthStandardClientScopes,
         });
         const polled = yield* client.infinitusPairing.pairingApprovalPoll({
           payload: { id: created.id, secret: SECRET },

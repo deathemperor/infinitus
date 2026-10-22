@@ -1,6 +1,7 @@
 import type { DesktopCaptureGestureEvent } from "@infinitus/contracts";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { toastManager } from "../ui/toast";
 import { captureGestureFailureMessage, resolveCaptureGestureProject } from "./captureGesture.logic";
 import { captureSnippet } from "./captures.logic";
@@ -23,33 +24,28 @@ export function CaptureGestureCoordinator() {
   const pendingRef = useRef<string | null>(null);
   const queueRef = useRef(Promise.resolve());
 
-  const deliver = useCallback(
-    async (text: string) => {
-      const target = resolveCaptureGestureProject(project, lastProjectRef.current);
-      if (target === null) {
-        pendingRef.current = text;
-        toastManager.add({
-          type: "info",
-          title: "Captured, waiting for a project",
-          description: "Open a thread and the capture lands in its project.",
-        });
-        return;
-      }
-      lastProjectRef.current = target;
-      if (await addCapture(text, target)) {
-        toastManager.add({
-          type: "success",
-          title: "Captured",
-          description: captureSnippet(text, 80),
-        });
-      }
-    },
-    [addCapture, project],
-  );
-  const deliverRef = useRef(deliver);
-  useEffect(() => {
-    deliverRef.current = deliver;
-  }, [deliver]);
+  // One identity for the bridge subscription below; it always reads the
+  // current project and command.
+  const deliver = useStableCallback(async (text: string) => {
+    const target = resolveCaptureGestureProject(project, lastProjectRef.current);
+    if (target === null) {
+      pendingRef.current = text;
+      toastManager.add({
+        type: "info",
+        title: "Captured, waiting for a project",
+        description: "Open a thread and the capture lands in its project.",
+      });
+      return;
+    }
+    lastProjectRef.current = target;
+    if (await addCapture(text, target)) {
+      toastManager.add({
+        type: "success",
+        title: "Captured",
+        description: captureSnippet(text, 80),
+      });
+    }
+  });
 
   useEffect(() => {
     if (project !== null) lastProjectRef.current = project;
@@ -70,7 +66,7 @@ export function CaptureGestureCoordinator() {
     const consume = bridge.consumePendingCaptureGestures;
     const handle = async (event: DesktopCaptureGestureEvent) => {
       if (event.type === "captured") {
-        await deliverRef.current(event.text);
+        await deliver(event.text);
         return;
       }
       if (event.type === "empty") {
@@ -97,7 +93,7 @@ export function CaptureGestureCoordinator() {
     const unsubscribe = bridge.onCaptureGesturePending(drain);
     drain();
     return unsubscribe;
-  }, []);
+  }, [deliver]);
 
   return null;
 }

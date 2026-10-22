@@ -12,8 +12,9 @@
  */
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useStableCallback } from "~/hooks/useStableCallback";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -87,121 +88,110 @@ export function InfinitusEngineSecrets({
   const affinityOn =
     snapshot !== null && snapshot.available && affinitySupported(snapshot.commands);
 
-  const read = useCallback(
-    async (engine: ProxyEngine) => {
-      if (environmentId === null) return;
-      const result = await runCommand({
-        environmentId,
-        input: { command: engine.readVerb, args: [], options: {} },
-      });
-      if (result._tag === "Failure") {
-        setErrors((current) => ({
-          ...current,
-          [engine.key]: infinitusCommandFailure(result.cause).message,
-        }));
-        return;
-      }
-      const parsed = parseProxyEngineState(result.value.result);
-      if (parsed === null) {
-        setErrors((current) => ({
-          ...current,
-          [engine.key]: `Infinitus answered ${engine.readVerb} with a shape this build cannot read.`,
-        }));
-        return;
-      }
-      setErrors((current) => ({ ...current, [engine.key]: undefined }));
-      setStates((current) => ({ ...current, [engine.key]: parsed }));
-      setUrls((current) =>
-        current[engine.key] === undefined ? { ...current, [engine.key]: parsed.baseURL } : current,
-      );
-      setRelaunching(false);
-    },
-    [environmentId, runCommand],
-  );
+  // One identity, so the read effect below re-runs on its inputs, not per render.
+  const read = useStableCallback(async (engine: ProxyEngine) => {
+    if (environmentId === null) return;
+    const result = await runCommand({
+      environmentId,
+      input: { command: engine.readVerb, args: [], options: {} },
+    });
+    if (result._tag === "Failure") {
+      setErrors((current) => ({
+        ...current,
+        [engine.key]: infinitusCommandFailure(result.cause).message,
+      }));
+      return;
+    }
+    const parsed = parseProxyEngineState(result.value.result);
+    if (parsed === null) {
+      setErrors((current) => ({
+        ...current,
+        [engine.key]: `Infinitus answered ${engine.readVerb} with a shape this build cannot read.`,
+      }));
+      return;
+    }
+    setErrors((current) => ({ ...current, [engine.key]: undefined }));
+    setStates((current) => ({ ...current, [engine.key]: parsed }));
+    setUrls((current) =>
+      current[engine.key] === undefined ? { ...current, [engine.key]: parsed.baseURL } : current,
+    );
+    setRelaunching(false);
+  });
 
   // The engines' settings are not part of the snapshot: read once the app
   // answers, and again after a save's relaunch brings it back.
   useEffect(() => {
-    if (!supported) return;
+    if (!supported || environmentId === null) return;
     for (const engine of PROXY_ENGINES) void read(engine);
-  }, [read, supported]);
+  }, [environmentId, read, supported]);
 
-  const write = useCallback(
-    async (engine: ProxyEngine, value: string) => {
-      if (environmentId === null) return;
-      // Cleared before the call: the field never outlives the submit.
-      setSecrets((current) => ({ ...current, [engine.key]: "" }));
-      setBusy(engine.key);
-      const result = await runSecret({
-        environmentId,
-        input: {
-          ...engineSecretInput(engine.key, urls[engine.key] ?? ""),
-          secret: Redacted.make(value),
-        },
-      });
-      setBusy(null);
-      if (result._tag === "Failure") {
-        const error = result.cause;
-        setErrors((current) => ({
-          ...current,
-          [engine.key]: isAuthorizationFailure(Cause.squash(error))
-            ? FORBIDDEN
-            : infinitusCommandFailure(error).message,
-        }));
-        return;
-      }
-      setErrors((current) => ({ ...current, [engine.key]: undefined }));
-      setRelaunching(true);
-    },
-    [environmentId, runSecret, urls],
-  );
+  const write = async (engine: ProxyEngine, value: string) => {
+    if (environmentId === null) return;
+    // Cleared before the call: the field never outlives the submit.
+    setSecrets((current) => ({ ...current, [engine.key]: "" }));
+    setBusy(engine.key);
+    const result = await runSecret({
+      environmentId,
+      input: {
+        ...engineSecretInput(engine.key, urls[engine.key] ?? ""),
+        secret: Redacted.make(value),
+      },
+    });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      const error = result.cause;
+      setErrors((current) => ({
+        ...current,
+        [engine.key]: isAuthorizationFailure(Cause.squash(error))
+          ? FORBIDDEN
+          : infinitusCommandFailure(error).message,
+      }));
+      return;
+    }
+    setErrors((current) => ({ ...current, [engine.key]: undefined }));
+    setRelaunching(true);
+  };
 
   // The probe reads the typed url and never saves it: the Mac reaches the
   // engine with the credential in its keychain and answers with the round
   // trip or the engine's own words, which are shown as they are.
-  const probe = useCallback(
-    async (engine: ProxyEngine) => {
-      if (environmentId === null) return;
-      setBusy(engine.key);
-      const result = await runCommand({
-        environmentId,
-        input: connectionTestInput(engine.key, urls[engine.key] ?? ""),
-      });
-      setBusy(null);
-      const line =
-        result._tag === "Failure"
-          ? infinitusCommandFailure(result.cause).message
-          : (() => {
-              const parsed = parseConnectionTest(result.value.result);
-              return parsed === null
-                ? "Infinitus answered test-connection with a shape this build cannot read."
-                : connectionTestLine(parsed);
-            })();
-      setProbes((current) => ({ ...current, [engine.key]: line }));
-    },
-    [environmentId, runCommand, urls],
-  );
+  const probe = async (engine: ProxyEngine) => {
+    if (environmentId === null) return;
+    setBusy(engine.key);
+    const result = await runCommand({
+      environmentId,
+      input: connectionTestInput(engine.key, urls[engine.key] ?? ""),
+    });
+    setBusy(null);
+    const line =
+      result._tag === "Failure"
+        ? infinitusCommandFailure(result.cause).message
+        : (() => {
+            const parsed = parseConnectionTest(result.value.result);
+            return parsed === null
+              ? "Infinitus answered test-connection with a shape this build cannot read."
+              : connectionTestLine(parsed);
+          })();
+    setProbes((current) => ({ ...current, [engine.key]: line }));
+  };
 
   // The routing knobs (#1235) are plain writes over `infinitus.command`; the
   // engine's settings are not in the snapshot, so the proxy is read again
   // after each one and the select or switch follows what it answers.
-  const route = useCallback(
-    async (engine: ProxyEngine, input: ReturnType<typeof routingInput>) => {
-      if (environmentId === null) return;
-      setBusy(engine.key);
-      const result = await runCommand({ environmentId, input });
-      setBusy(null);
-      if (result._tag === "Failure") {
-        setErrors((current) => ({
-          ...current,
-          [engine.key]: infinitusCommandFailure(result.cause).message,
-        }));
-        return;
-      }
-      await read(engine);
-    },
-    [environmentId, read, runCommand],
-  );
+  const route = async (engine: ProxyEngine, input: ReturnType<typeof routingInput>) => {
+    if (environmentId === null) return;
+    setBusy(engine.key);
+    const result = await runCommand({ environmentId, input });
+    setBusy(null);
+    if (result._tag === "Failure") {
+      setErrors((current) => ({
+        ...current,
+        [engine.key]: infinitusCommandFailure(result.cause).message,
+      }));
+      return;
+    }
+    await read(engine);
+  };
 
   const answering = capability === true && snapshot !== null && snapshot.available;
   // The shell runs the engines whether or not the app answers, so their rows

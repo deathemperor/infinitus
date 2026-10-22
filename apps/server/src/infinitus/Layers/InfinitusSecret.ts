@@ -29,8 +29,9 @@ export const SECRET_ATTEMPTS_PER_MINUTE = 5;
     out of band and the Mac validates — a sign-in's code or callback, for a
     login the client can start over `infinitus.command` anyway. Every other
     secret verb (an engine key, the desktop credential) is the Mac's
-    configuration and keeps needing `access:write` — the desktop app's own
-    session, never a phone's or a `t3 pair` browser's. (The team invite
+    configuration and keeps needing `access:write`. A default pairing carries
+    it since upstream folded access and relay management into the standard
+    scopes (#20432); only a grant narrowed below it is refused. (The team invite
     code left with the git-store Team, #1592: a team is joined on the relay.) */
 const STANDARD_CLIENT_SECRET_VERBS: ReadonlySet<string> = new Set([
   "aws-login-code",
@@ -97,68 +98,68 @@ export const InfinitusSecretLive = Layer.effect(
     const attempts = yield* Ref.make<ReadonlyMap<string, ReadonlyArray<number>>>(new Map());
     const refreshHandle = yield* FiberHandle.make<void, never>();
 
-    const manifestEntry = (command: string) =>
-      Effect.gen(function* () {
-        // On a server nobody watches, `snapshot` is the pre-poll placeholder
-        // until something polls; one refresh reads the manifest for real.
-        let snapshot = yield* infinitus.snapshot;
-        if (isNotPolled(snapshot)) {
-          yield* infinitus.refresh;
-          snapshot = yield* infinitus.snapshot;
-        }
-        if (!snapshot.available) {
-          return yield* new InfinitusUnavailable({
-            path: client.socketPath ?? "",
-            cause: snapshot.unavailableReason ?? "the app is not reachable",
-          });
-        }
-        if (snapshot.commands.length === 0) {
-          return yield* new InfinitusSecretRefused({
-            command,
-            reason: "no_manifest",
-            detail: "the app's command table has not been read",
-          });
-        }
-        const entry = snapshot.commands.find((candidate) => candidate.name === command);
-        if (entry === undefined || entry.stdin !== "secret") {
-          return yield* new InfinitusSecretRefused({
-            command,
-            reason: "no_secret",
-            detail: `${command} does not take a secret`,
-          });
-        }
-        return entry;
-      });
+    const manifestEntry = Effect.fn("InfinitusSecret.manifestEntry")(function* (command: string) {
+      // On a server nobody watches, `snapshot` is the pre-poll placeholder
+      // until something polls; one refresh reads the manifest for real.
+      let snapshot = yield* infinitus.snapshot;
+      if (isNotPolled(snapshot)) {
+        yield* infinitus.refresh;
+        snapshot = yield* infinitus.snapshot;
+      }
+      if (!snapshot.available) {
+        return yield* new InfinitusUnavailable({
+          path: client.socketPath ?? "",
+          cause: snapshot.unavailableReason ?? "the app is not reachable",
+        });
+      }
+      if (snapshot.commands.length === 0) {
+        return yield* new InfinitusSecretRefused({
+          command,
+          reason: "no_manifest",
+          detail: "the app's command table has not been read",
+        });
+      }
+      const entry = snapshot.commands.find((candidate) => candidate.name === command);
+      if (entry === undefined || entry.stdin !== "secret") {
+        return yield* new InfinitusSecretRefused({
+          command,
+          reason: "no_secret",
+          detail: `${command} does not take a secret`,
+        });
+      }
+      return entry;
+    });
 
-    const countAttempt = (input: InfinitusSecretForwardInput) =>
-      Effect.gen(function* () {
-        const now = yield* Clock.currentTimeMillis;
-        const key = `${input.sessionId}\0${input.command}`;
-        const recent = ((yield* Ref.get(attempts)).get(key) ?? []).filter(
-          (at) => now - at < ATTEMPT_WINDOW_MS,
-        );
-        if (recent.length >= SECRET_ATTEMPTS_PER_MINUTE) {
-          return yield* new InfinitusSecretRefused({
-            command: input.command,
-            reason: "too_many_attempts",
-            detail: "try again in a minute",
-          });
-        }
-        // Keep only the keys still inside the window, so a server that runs
-        // for weeks does not remember every session that ever tried.
-        yield* Ref.update(
-          attempts,
-          (map) =>
-            new Map(
-              [...map, [key, [...recent, now]] as const].filter(
-                ([, at]) => (at.at(-1) ?? 0) > now - ATTEMPT_WINDOW_MS,
-              ),
+    const countAttempt = Effect.fn("InfinitusSecret.countAttempt")(function* (
+      input: InfinitusSecretForwardInput,
+    ) {
+      const now = yield* Clock.currentTimeMillis;
+      const key = `${input.sessionId}\0${input.command}`;
+      const recent = ((yield* Ref.get(attempts)).get(key) ?? []).filter(
+        (at) => now - at < ATTEMPT_WINDOW_MS,
+      );
+      if (recent.length >= SECRET_ATTEMPTS_PER_MINUTE) {
+        return yield* new InfinitusSecretRefused({
+          command: input.command,
+          reason: "too_many_attempts",
+          detail: "try again in a minute",
+        });
+      }
+      // Keep only the keys still inside the window, so a server that runs
+      // for weeks does not remember every session that ever tried.
+      yield* Ref.update(
+        attempts,
+        (map) =>
+          new Map(
+            [...map, [key, [...recent, now]] as const].filter(
+              ([, at]) => (at.at(-1) ?? 0) > now - ATTEMPT_WINDOW_MS,
             ),
-        );
-      });
+          ),
+      );
+    });
 
-    const forward: InfinitusSecretShape["forward"] = (input) =>
-      Effect.gen(function* () {
+    const forward: InfinitusSecretShape["forward"] = Effect.fn("InfinitusSecret.forward")(
+      function* (input) {
         // The verb only: never the args, never the value.
         yield* Effect.annotateCurrentSpan({ "infinitus.command": input.command });
         if (
@@ -191,7 +192,8 @@ export const InfinitusSecretLive = Layer.effect(
         // the app again, detached, like `command` does.
         yield* FiberHandle.run(refreshHandle, infinitus.refresh, { startImmediately: true });
         return result === undefined ? {} : { result };
-      }).pipe(Effect.withSpan("InfinitusSecret.forward"));
+      },
+    );
 
     return InfinitusSecret.of({ forward });
   }),

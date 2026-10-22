@@ -55,20 +55,19 @@ export const TurnStartGatePassthrough = Layer.succeed(TurnStartGate)({
  * (Stop, a restart) is a no-op. `releaseId` must be fresh per release of the
  * same run: effect ids are unique, so the outbox refuses a repeat.
  */
-export const releaseTurnStart = (input: {
+export const releaseTurnStart = Effect.fn("TurnStartGate.releaseTurnStart")(function* (input: {
   readonly threadId: ThreadId;
   readonly runId: RunId;
   readonly releaseId: string;
-}): Effect.Effect<void, EffectOutbox.EffectOutboxError, EffectOutbox.EffectOutboxV2> =>
-  Effect.gen(function* () {
-    const outbox = yield* EffectOutbox.EffectOutboxV2;
-    yield* outbox.enqueue([
-      {
-        id: `effect:turn-start-gate:${input.runId}:${input.releaseId}`,
-        commandId: CommandId.make(`command:system:turn-start-gate:${input.runId}`),
-        threadId: input.threadId,
-        request: { type: "provider-turn.start", runId: input.runId },
-      },
-    ]);
-    yield* outbox.notifyAvailable();
-  });
+}): Effect.fn.Return<void, EffectOutbox.EffectOutboxError, EffectOutbox.EffectOutboxV2> {
+  const outbox = yield* EffectOutbox.EffectOutboxV2;
+  yield* outbox.enqueue([
+    {
+      id: `effect:turn-start-gate:${input.runId}:${input.releaseId}`,
+      commandId: CommandId.make(`command:system:turn-start-gate:${input.runId}`),
+      threadId: input.threadId,
+      request: { type: "provider-turn.start", runId: input.runId },
+    },
+  ]);
+  yield* outbox.notifyAvailable();
+});

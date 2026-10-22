@@ -178,8 +178,8 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
     /** Ends this server's agents' logins for the credential the Mac just
         signed in: `ps` for the tree under this process, `kill -TERM` for the
         CLI processes found there. */
-    const endAgentLogins = (lapse: SignInLapse, profile: string) =>
-      Effect.gen(function* () {
+    const endAgentLogins = Effect.fn("InfinitusSignInLapse.endAgentLogins")(
+      function* (lapse: SignInLapse, profile: string) {
         const ps = yield* runner.run({
           command: "ps",
           args: ["-eo", "pid=,ppid=,args="],
@@ -201,14 +201,17 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
           provider: lapse.provider,
           count: pids.length,
         });
-      }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning("infinitus.signin-lapse.agent-login-end-failed", {
-            provider: lapse.provider,
-            cause: Cause.pretty(cause),
-          }),
+      },
+      (effect, lapse) =>
+        effect.pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("infinitus.signin-lapse.agent-login-end-failed", {
+              provider: lapse.provider,
+              cause: Cause.pretty(cause),
+            }),
+          ),
         ),
-      );
+    );
 
     /** Follows the Mac's login while it is in flight: `done` ends the
         agent's own, a failed, dismissed or unreachable one ends the watch
@@ -228,32 +231,32 @@ export const InfinitusSignInLapseLive = Layer.effectDiscard(
       );
     };
 
-    const onItem = (item: OrchestrationV2TurnItem) =>
-      Effect.gen(function* () {
-        const read = signInFromTurnItem(item);
-        if (read === null) return;
-        const { lapse, run } = read;
-        const threadId = item.threadId;
-        // A login the agent runs itself blocks on its browser tab now, however
-        // recently the profile lapsed: each tool call is its own need. The
-        // same item is stored again as its presentation fills in; one id.
-        const key = run
-          ? `${threadId}\nrun\n${item.id}`
-          : `${threadId}\n${lapse.provider}\n${lapse.profile}`;
-        const now = DateTime.toEpochMillis(yield* DateTime.now);
-        const last = seen.get(key);
-        if (last === undefined || now - last >= SIGN_IN_DEBOUNCE_MS) {
-          seen.delete(key);
-          if (seen.size >= SEEN_LIMIT) {
-            const oldest = seen.keys().next().value;
-            if (oldest !== undefined) seen.delete(oldest);
-          }
-          seen.set(key, now);
-          yield* login(threadId, lapse);
-          yield* notify(threadId, lapse);
+    // Runs for every shell-tool item update on the live tail; avoid a per-event span.
+    const onItem = Effect.fnUntraced(function* (item: OrchestrationV2TurnItem) {
+      const read = signInFromTurnItem(item);
+      if (read === null) return;
+      const { lapse, run } = read;
+      const threadId = item.threadId;
+      // A login the agent runs itself blocks on its browser tab now, however
+      // recently the profile lapsed: each tool call is its own need. The
+      // same item is stored again as its presentation fills in; one id.
+      const key = run
+        ? `${threadId}\nrun\n${item.id}`
+        : `${threadId}\n${lapse.provider}\n${lapse.profile}`;
+      const now = DateTime.toEpochMillis(yield* DateTime.now);
+      const last = seen.get(key);
+      if (last === undefined || now - last >= SIGN_IN_DEBOUNCE_MS) {
+        seen.delete(key);
+        if (seen.size >= SEEN_LIMIT) {
+          const oldest = seen.keys().next().value;
+          if (oldest !== undefined) seen.delete(oldest);
         }
-        if (run) yield* watch(lapse);
-      });
+        seen.set(key, now);
+        yield* login(threadId, lapse);
+        yield* notify(threadId, lapse);
+      }
+      if (run) yield* watch(lapse);
+    });
 
     const worker = yield* makeDrainableWorker((item: OrchestrationV2TurnItem) =>
       onItem(item).pipe(

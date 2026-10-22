@@ -51,12 +51,11 @@ const make = Effect.gen(function* () {
   const keepAwake = makeKeepAwake(Electron.powerSaveBlocker);
   yield* Effect.addFinalizer(() => Effect.sync(() => keepAwake.set(false)));
   return InfinitusKeepAwakeService.of({
-    set: (active) =>
-      Effect.gen(function* () {
-        if (keepAwake.set(active)) {
-          yield* logInfo(active ? "infinitus.keepAwake.held" : "infinitus.keepAwake.released");
-        }
-      }),
+    set: Effect.fn("infinitus.keepAwake.set")(function* (active) {
+      if (keepAwake.set(active)) {
+        yield* logInfo(active ? "infinitus.keepAwake.held" : "infinitus.keepAwake.released");
+      }
+    }),
   });
 });
 

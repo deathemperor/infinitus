@@ -1,18 +1,7 @@
-/**
- * Migration runner with an inline loader.
- *
- * Uses Migrator.make with fromRecord to define migrations inline.
- * All migrations are statically imported - no dynamic file system loading.
- *
- * `runMigrations` is called by the SQLite persistence layer at startup, so the
- * schema is always up to date before the application starts.
- */
-
 import * as Migrator from "effect/sql/Migrator";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
-// Import all migrations statically
 import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
 import Migration0002 from "./Migrations/002_OrchestrationCommandReceipts.ts";
 import Migration0003 from "./Migrations/003_CheckpointDiffBlobs.ts";
@@ -84,18 +73,14 @@ import Migration0068 from "./Migrations/068_WebhookRelayDeliveries.ts";
 import Migration0069 from "./Migrations/069_McpAppModelContext.ts";
 import Migration0070 from "./Migrations/070_ThreadSnapshotWindowIndexes.ts";
 import Migration0071 from "./Migrations/071_PullRequestReviewGuides.ts";
+import Migration0072 from "./Migrations/072_ThreadFailureLookupIndex.ts";
+import Migration0073 from "./Migrations/073_DropUnusedV1Projections.ts";
+import Migration0074 from "./Migrations/074_CanonicalizeThreadPullRequestLinks.ts";
+import Migration0075 from "./Migrations/075_CodexUsageNativeTurnIndex.ts";
+import Migration0076 from "./Migrations/076_RepairClientSettlementTimestamps.ts";
+import Migration0077 from "./Migrations/077_WebhookDedupe.ts";
 
-/**
- * Migration loader with all migrations defined inline.
- *
- * Key format: "{id}_{name}" where:
- * - id: numeric migration ID (determines execution order)
- * - name: descriptive name for the migration
- *
- * Uses Migrator.fromRecord which parses the key format and
- * returns migrations sorted by ID.
- */
-export const migrationEntries = [
+const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
   [2, "OrchestrationCommandReceipts", Migration0002],
   [3, "CheckpointDiffBlobs", Migration0003],
@@ -171,6 +156,13 @@ export const migrationEntries = [
   [69, "McpAppModelContext", Migration0069],
   [70, "ThreadSnapshotWindowIndexes", Migration0070],
   [71, "PullRequestReviewGuides", Migration0071],
+  // Upstream's 62-67, renumbered after the fork's own range like the V2 migrations above.
+  [72, "ThreadFailureLookupIndex", Migration0072],
+  [73, "DropUnusedV1Projections", Migration0073],
+  [74, "CanonicalizeThreadPullRequestLinks", Migration0074],
+  [75, "CodexUsageNativeTurnIndex", Migration0075],
+  [76, "RepairClientSettlementTimestamps", Migration0076],
+  [77, "WebhookDedupe", Migration0077],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -191,8 +183,7 @@ const FIRST_V2_MIGRATION_ID = 65;
  * Fail before migrating when the migrator would skip one of V2's own
  * migrations. It skips every id up to the highest recorded one, whatever name
  * was recorded, so a database that took a V2 id for another migration would
- * start without V2's schema and fail on first use. Earlier ids keep the
- * warning below: databases with a site-local migration there still work.
+ * start without V2's schema and fail on first use.
  */
 const assertV2MigrationsCanRun = Effect.fn("assertV2MigrationsCanRun")(function* (
   throughId?: number,
@@ -226,26 +217,12 @@ const assertV2MigrationsCanRun = Effect.fn("assertV2MigrationsCanRun")(function*
   });
 });
 
-/**
- * Migrator run function - no schema dumping needed
- * Uses the base Migrator.make without platform dependencies
- */
 const run = Migrator.make({});
 
 export interface RunMigrationsOptions {
   readonly toMigrationInclusive?: number | undefined;
 }
 
-/**
- * Run all pending migrations.
- *
- * Creates the migrations tracking table (effect_sql_migrations) if it doesn't exist,
- * then runs any migrations with ID greater than the latest recorded migration.
- *
- * Returns array of [id, name] tuples for migrations that were run.
- *
- * @returns Effect containing array of executed migrations
- */
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {
@@ -261,10 +238,6 @@ export const runMigrations = Effect.fn("runMigrations")(function* ({
     ? Effect.logDebug("Database schema is current")
     : Effect.log("Migrations ran successfully").pipe(Effect.annotateLogs({ migrations }));
 
-  // The migrator keys on migration_id: a database that recorded a different
-  // migration under a shared id (local or fork builds) keeps that id and
-  // silently skips this build's migration at it. Surface the divergence so the
-  // skipped schema change is diagnosable.
   const sql = yield* SqlClient.SqlClient;
   const recorded = yield* sql<{
     readonly migration_id: number;

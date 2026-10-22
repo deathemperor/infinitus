@@ -11,7 +11,8 @@ import { useEnvironmentQuery } from "../../state/query";
 /**
  * Fork (#823 layer 1): the project's checked-in file under both names,
  * `infinitus.json` first and `t3.json` as the legacy fallback, read in the
- * server's order; whichever answers first decides. Stands in for upstream's
+ * server's order; the first one that exists decides. Both are optional, so a
+ * missing file answers `exists: false` instead of failing. Stands in for upstream's
  * single `readFile` query in `new-task-flow-provider.tsx` with the same shape.
  */
 export function useProjectFileRead(
@@ -24,12 +25,18 @@ export function useProjectFileRead(
       ? null
       : projectEnvironment.readFile({
           environmentId: target.environmentId,
-          input: { cwd: target.workspaceRoot, relativePath },
+          input: { cwd: target.workspaceRoot, relativePath, allowMissing: true },
         });
   const current = useEnvironmentQuery(readFile(T3_PROJECT_FILE_NAME));
   const legacy = useEnvironmentQuery(readFile(LEGACY_T3_PROJECT_FILE_NAME));
+  const currentData = current.data as ProjectReadFileResult | null;
+  const legacyData = legacy.data as ProjectReadFileResult | null;
   return {
-    data: (current.data ?? legacy.data) as ProjectReadFileResult | null,
+    // A missing optional file still answers (`exists: false`), so it defers to the other name.
+    data:
+      currentData !== null && currentData.exists !== false
+        ? currentData
+        : (legacyData ?? currentData),
     isPending: current.isPending || legacy.isPending,
   };
 }

@@ -1,8 +1,9 @@
 import type { EnvironmentPresentation } from "../../../state/environments";
 import { InfinitusCommandFailed, type InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
-import { act, StrictMode, type ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../../test/reactTestRenderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { fake } = vi.hoisted(() => ({
@@ -124,7 +125,6 @@ const SWAPD_LABEL = "swapd engine on (swaps the login under each provider's CLI)
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fake.query.mockReset().mockReturnValue(null);
   fake.capability = true;
   fake.snapshot = snapshot();
@@ -134,7 +134,6 @@ beforeEach(() => {
 afterEach(async () => {
   await act(() => renderer?.unmount());
   renderer = undefined;
-  vi.unstubAllGlobals();
 });
 
 async function renderPanel(lead?: ReactNode, environment?: EnvironmentPresentation | null) {

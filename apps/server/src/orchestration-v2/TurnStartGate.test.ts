@@ -3,12 +3,15 @@ import { RunId, ThreadId } from "@infinitus/contracts";
 import * as FileSystem from "effect/FileSystem";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import { describe, expect } from "vite-plus/test";
 
+import * as ServerConfig from "../config.ts";
 import * as GitWorkflow from "../git/GitWorkflowService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
@@ -61,6 +64,9 @@ describe("TurnStartGate (#720, #1627)", () => {
             Layer.mock(ProviderAuthService.ProviderAuthService)({}),
             Layer.mock(RunExecutionService.RunExecutionServiceV2)({}),
             Layer.mock(RuntimePolicy.RuntimePolicyV2)({}),
+            Path.layer,
+            Layer.mock(ServerConfig.ServerConfig)({} as never),
+            Layer.mock(ServerSettings.ServerSettingsService)({}),
           ),
         ),
       );

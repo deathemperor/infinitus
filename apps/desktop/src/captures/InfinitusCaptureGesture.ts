@@ -35,7 +35,8 @@ import { readMacSelectedText } from "./MacSelectedText.ts";
 
 export type CaptureGestureDeps = {
   readonly startPoller: (
-    onTrigger: () => void,
+    /** Settles once that read is handed over (or at once, when one is already running). */
+    onTrigger: () => Promise<void>,
     onFailure: (error: Error) => void,
   ) => Promise<() => void>;
   readonly readSelectedText: () => Promise<DesktopCaptureGestureEvent>;
@@ -84,9 +85,9 @@ export function makeCaptureGesture(deps: CaptureGestureDeps): CaptureGesture {
   let reading = false;
 
   const onTrigger = () => {
-    if (reading) return;
+    if (reading) return Promise.resolve();
     reading = true;
-    void deps
+    return deps
       .readSelectedText()
       .catch((): DesktopCaptureGestureEvent => ({ type: "failed", reason: "helper" }))
       .then(async (event) => {

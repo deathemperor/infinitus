@@ -37,8 +37,9 @@ import type {
   TeamSnapshot,
 } from "@infinitus/contracts/relayInfinitusTeam";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { useStableCallback } from "~/hooks/useStableCallback";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
@@ -145,42 +146,37 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
   const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const fail = useCallback((cause: unknown) => setError(teamErrorMessage(cause)), []);
+  const fail = (cause: unknown) => setError(teamErrorMessage(cause));
 
-  const loadTeam = useCallback(
-    async (id: string) => {
-      try {
-        setTeam(await client.getTeam(id));
-        setError(null);
-      } catch (cause) {
-        fail(cause);
-      }
-    },
-    [client, fail],
-  );
+  const loadTeam = async (id: string) => {
+    try {
+      setTeam(await client.getTeam(id));
+      setError(null);
+    } catch (cause) {
+      fail(cause);
+    }
+  };
 
   // The picked team survives a reload without being an effect dependency,
-  // so the first read runs once per client.
+  // and the loader keeps one identity, so the first read runs once per mount
+  // (the client is fixed for the session; signing out unmounts this pane).
   const pickedRef = useRef<string | null>(null);
-  const loadTeams = useCallback(
-    async (prefer?: string) => {
-      try {
-        const list = await client.listTeams();
-        setTeams(list);
-        setError(null);
-        const wanted = prefer ?? pickedRef.current;
-        const next = list.find((row) => row.teamId === wanted)?.teamId ?? list[0]?.teamId ?? null;
-        pickedRef.current = next;
-        setTeamId(next);
-        if (next === null) setTeam(null);
-        else await loadTeam(next);
-      } catch (cause) {
-        setTeams([]);
-        fail(cause);
-      }
-    },
-    [client, fail, loadTeam],
-  );
+  const loadTeams = useStableCallback(async (prefer?: string) => {
+    try {
+      const list = await client.listTeams();
+      setTeams(list);
+      setError(null);
+      const wanted = prefer ?? pickedRef.current;
+      const next = list.find((row) => row.teamId === wanted)?.teamId ?? list[0]?.teamId ?? null;
+      pickedRef.current = next;
+      setTeamId(next);
+      if (next === null) setTeam(null);
+      else await loadTeam(next);
+    } catch (cause) {
+      setTeams([]);
+      fail(cause);
+    }
+  });
 
   useEffect(() => {
     void loadTeams();
@@ -194,9 +190,8 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
       setError(null);
     } catch (cause) {
       fail(cause);
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   /** One relay write that answers nothing; the snapshot is read again. */
@@ -208,9 +203,8 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
       if (teamId !== null) await loadTeam(teamId);
     } catch (cause) {
       fail(cause);
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   const isLeader = team?.role === "leader";
@@ -403,9 +397,8 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
                 await loadTeams("");
               } catch (cause) {
                 fail(cause);
-              } finally {
-                setBusy(null);
               }
+              setBusy(null);
             }}
           />
         </>
@@ -511,9 +504,8 @@ function MembersSection({
       setTranscript({ key, rows });
     } catch (cause) {
       onError(cause);
-    } finally {
-      setReading(null);
     }
+    setReading(null);
   };
 
   return (
@@ -674,9 +666,8 @@ function InvitesSection({
       setCopyError(null);
     } catch (cause) {
       onError(cause);
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   const copy = async (what: "token" | "link") => {
@@ -1106,9 +1097,8 @@ function JoinSection({
       await onJoined(joined);
     } catch (cause) {
       setError(teamErrorMessage(cause));
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   return (
@@ -1186,9 +1176,8 @@ function CreateSection({
       await onCreated(created);
     } catch (cause) {
       setError(teamErrorMessage(cause));
-    } finally {
-      setBusy(null);
     }
+    setBusy(null);
   };
 
   return (
@@ -1248,7 +1237,8 @@ function PrivateProjectsSection() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const read = useCallback(async () => {
+  // One identity, so the read effect re-runs on its inputs, not per render.
+  const read = useStableCallback(async () => {
     if (environmentId === null) return;
     const result = await runCommand({ environmentId, input: TEAM_EXCLUSIONS_INPUT });
     if (result._tag === "Failure") {
@@ -1262,11 +1252,11 @@ function PrivateProjectsSection() {
     }
     setError(null);
     setProjects(parsed);
-  }, [environmentId, runCommand]);
+  });
 
   useEffect(() => {
-    if (supported) void read();
-  }, [read, supported]);
+    if (supported && environmentId !== null) void read();
+  }, [environmentId, read, supported]);
 
   const write = async (slug: string, on: boolean) => {
     if (environmentId === null) return;

@@ -725,12 +725,9 @@ jobs:
           T3CODE_RELAY_URL: ${{ needs.connect.outputs.relay_url }}
         run: vp run --filter t3 build
 
-      # The single-executable needs a Node with --build-sea (25.7+) while the
-      # repo stays on engines.node; vp downloads this exact version. Keep in
-      # step with SEA_NODE_VERSION in apps/server/vite.config.ts.
+      # Setup Vite+ selects the exact engines.node version from package.json,
+      # which apps/server/vite.config.ts requires for a native single-executable.
       - name: Build CLI single-executable
-        env:
-          VP_NODE_VERSION: "26.8.2"
         run: node apps/server/scripts/cli.ts build-exe --verbose
 
       - name: Stage resource monitor for the CLI archive

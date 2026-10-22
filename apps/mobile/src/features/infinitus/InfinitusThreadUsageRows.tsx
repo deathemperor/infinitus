@@ -3,9 +3,8 @@ import { threadUsageFromProjection } from "@infinitus/shared/threadUsage";
 import { useMemo } from "react";
 import { View } from "react-native";
 
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text } from "../../components/ui/AppText";
 import { useThreadProjection } from "../../state/use-thread-detail";
-import { MetaCard } from "../threads/git/gitSheetComponents";
 import { threadUsageNotes, threadUsageRows } from "./threadUsage.logic";
 
 /**
@@ -34,7 +33,7 @@ export function InfinitusThreadUsageRows(props: {
       </Text>
       <View className="mx-4 gap-2">
         {threadUsageRows(usage).map((row) => (
-          <MetaCard key={row.label} label={row.label} value={row.value} />
+          <UsageCard key={row.label} label={row.label} value={row.value} />
         ))}
       </View>
       <View className="gap-1 px-5 pt-2">
@@ -45,5 +44,19 @@ export function InfinitusThreadUsageRows(props: {
         ))}
       </View>
     </>
+  );
+}
+
+/** One labelled value, the card the git sheet drew before upstream dropped it. */
+function UsageCard(props: { readonly label: string; readonly value: string }) {
+  return (
+    <View className="bg-card px-4 py-3 android:rounded-[20px] ios:rounded-[18px] ios:border ios:border-border">
+      <Text className="text-foreground-muted text-2xs font-infinitus-bold tracking-[0.9px] uppercase">
+        {props.label}
+      </Text>
+      <Text selectable className="text-foreground text-sm font-medium" numberOfLines={1}>
+        {props.value}
+      </Text>
+    </View>
   );
 }
