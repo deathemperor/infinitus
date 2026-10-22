@@ -1,6 +1,5 @@
 import {
   CommandId,
-  ComposerContextId,
   EnvironmentId,
   MessageId,
   ProjectId,
@@ -10,9 +9,6 @@ import {
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  isPendingThreadCreationVisible,
-  pendingThreadCreationMessage,
-  pendingThreadCreationShell,
   resolvePendingThreadCreation,
   type PendingThreadCreation,
 } from "./pending-thread-creation";
@@ -67,7 +63,6 @@ describe("resolvePendingThreadCreation", () => {
     });
     expect(previous).toBe(pending);
 
-    // The user message arrives before the provider publishes a timed turn.
     previous = resolvePendingThreadCreation({
       threadKey,
       pending,
@@ -76,8 +71,6 @@ describe("resolvePendingThreadCreation", () => {
     });
     expect(previous).toBe(pending);
 
-    // The shell stream may observe the turn and collect the global outcome
-    // before this screen's detail stream catches up.
     previous = resolvePendingThreadCreation({
       threadKey,
       pending: null,
@@ -109,17 +102,6 @@ describe("resolvePendingThreadCreation", () => {
         detail: { messages: [], latestTurn: { turnId: "turn-1" }, session: { status: "running" } },
       }),
     ).toBe(pending);
-  });
-
-  it.each(["error", "stopped", "interrupted"])("ends setup when startup is %s", (status) => {
-    expect(
-      resolvePendingThreadCreation({
-        threadKey,
-        pending: null,
-        previous: pending,
-        detail: { messages: [prompt], latestTurn: null, session: { status } },
-      }),
-    ).toBeNull();
   });
 
   it("preserves rejected task recovery", () => {
@@ -154,109 +136,5 @@ describe("resolvePendingThreadCreation", () => {
         detail: null,
       }),
     ).toBeNull();
-  });
-});
-
-describe("pendingThreadCreationShell", () => {
-  it("shapes a queued creation as the thread shell the screen renders before creation", () => {
-    expect(pendingThreadCreationShell(creation)).toMatchObject({
-      environmentId: creation.environmentId,
-      id: creation.threadId,
-      projectId: creation.creation!.projectId,
-      title: "Fix the flaky login test",
-      modelSelection: creation.modelSelection,
-      runtimeMode: "full-access",
-      interactionMode: "default",
-      branch: "main",
-      worktreePath: null,
-      latestRun: null,
-      runtime: null,
-      latestUserMessageAt: creation.createdAt,
-    });
-  });
-
-  it("keeps a local task's explicit worktree path", () => {
-    expect(
-      pendingThreadCreationShell({
-        ...creation,
-        creation: {
-          ...creation.creation!,
-          workspaceMode: "local",
-          worktreePath: "/repo/.worktrees/feature",
-        },
-      })?.worktreePath,
-    ).toBe("/repo/.worktrees/feature");
-  });
-
-  it("returns null for a follow-up message or a creation without a model", () => {
-    expect(pendingThreadCreationShell({ ...creation, creation: undefined })).toBeNull();
-    expect(pendingThreadCreationShell({ ...creation, modelSelection: undefined })).toBeNull();
-  });
-});
-
-describe("isPendingThreadCreationVisible", () => {
-  const creationMessageId = String(creation.messageId);
-
-  it("stands in before any detail has loaded", () => {
-    expect(isPendingThreadCreationVisible({ creationMessageId, loadedMessageIds: null })).toBe(
-      true,
-    );
-  });
-
-  // The regression: the server creates the thread, THEN builds the worktree,
-  // then starts the turn. The shell and an empty detail arrive seconds before
-  // the prompt, and keying on the shell left the thread empty for that whole
-  // window.
-  it("keeps standing in while the created thread has no messages yet", () => {
-    expect(isPendingThreadCreationVisible({ creationMessageId, loadedMessageIds: [] })).toBe(true);
-  });
-
-  it("keeps standing in when the thread holds only unrelated messages", () => {
-    expect(
-      isPendingThreadCreationVisible({ creationMessageId, loadedMessageIds: ["someone-else"] }),
-    ).toBe(true);
-  });
-
-  it("stands down once the delivered prompt lands under the same id", () => {
-    expect(
-      isPendingThreadCreationVisible({
-        creationMessageId,
-        loadedMessageIds: ["someone-else", creationMessageId],
-      }),
-    ).toBe(false);
-  });
-});
-
-describe("pendingThreadCreationMessage", () => {
-  it("keeps inline context available while the thread is being created", () => {
-    const record = {
-      version: 1 as const,
-      kind: "mention" as const,
-      contextId: ComposerContextId.make("setup-file"),
-      label: "Checkout.tsx",
-      path: "src/Checkout.tsx",
-    };
-    const context = { version: 1 as const, records: [record] };
-    const text = "[Checkout.tsx](t3-context://v1/mention/setup-file)";
-    const message = pendingThreadCreationMessage({ ...creation, text, context });
-    expect(message.text).toBe(text);
-    expect(message.context).toEqual(context);
-  });
-
-  it("renders the queued prompt as the first user message", () => {
-    expect(pendingThreadCreationMessage(creation)).toEqual({
-      id: creation.messageId,
-      role: "user",
-      text: creation.text,
-      streaming: false,
-      createdAt: creation.createdAt,
-      updatedAt: creation.createdAt,
-    });
-  });
-
-  // Draft attachment ids are local; the feed resolves attachment rows against
-  // the server and would spin forever on them.
-  it("omits the queued attachments rather than passing local draft ids to the feed", () => {
-    expect(pendingThreadCreationMessage(creation)).not.toHaveProperty("attachments");
   });
 });

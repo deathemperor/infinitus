@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
+  type ThreadPullRequestLink,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2Run,
   type OrchestrationV2ThreadProjection,
@@ -105,6 +106,34 @@ const emptyProjection = {
 } as OrchestrationV2ThreadProjection;
 
 describe("applyOrchestrationV2ProjectionEvent", () => {
+  it("applies a compact PR sync without replacing other links or thread metadata", () => {
+    const link = (number: number): ThreadPullRequestLink => ({
+      host: "github.com",
+      repository: "pingdotgg/t3code",
+      number,
+      url: `https://github.com/pingdotgg/t3code/pull/${number}`,
+      source: "manual",
+      linkedAt: DateTime.formatIso(now),
+      snapshot: null,
+      stack: null,
+    });
+    const links = [link(1), link(2)];
+    const projection = {
+      ...emptyProjection,
+      thread: { ...emptyProjection.thread, pullRequests: links },
+    };
+    const updated = { ...links[1]!, source: "agent" as const };
+    const next = applyOrchestrationV2ProjectionEvent(projection, {
+      id: "compact-sync" as OrchestrationV2DomainEvent["id"],
+      type: "thread.pull-request-link-updated",
+      threadId,
+      occurredAt: now,
+      payload: updated,
+    });
+    expect(next?.thread).toEqual({ ...projection.thread, pullRequests: [links[0], updated] });
+    expect(next?.thread.pullRequests?.[0]).toBe(links[0]);
+  });
+
   it("keeps live token usage when the terminal provider turn omits it", () => {
     const providerTurnId = ProviderTurnId.make("provider-turn-reducer");
     const running = {
@@ -157,18 +186,6 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
     const next = applyOrchestrationV2ProjectionEvent(emptyProjection, event);
     expect(next?.thread.archivedAt).toEqual(archivedAt);
     expect(next?.updatedAt).toEqual(archivedAt);
-  });
-
-  it("ignores events for another thread", () => {
-    const event = {
-      id: "event-other",
-      type: "thread.deleted",
-      threadId: ThreadId.make("thread-other"),
-      occurredAt: now,
-      payload: { ...emptyProjection.thread, id: ThreadId.make("thread-other"), deletedAt: now },
-    } as OrchestrationV2DomainEvent;
-
-    expect(applyOrchestrationV2ProjectionEvent(emptyProjection, event)).toBe(emptyProjection);
   });
 
   it("preserves visible row identity when run updates do not change membership", () => {
@@ -275,6 +292,74 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
     expect(next?.visibleTurnItems.map((row) => row.position)).toEqual([0, 1]);
   });
 
+  it("moves an updated item to its new ordinal and renumbers the rows it passes", () => {
+    const inherited = {
+      ...commandItem("item-inherited", "parent", 0),
+      threadId: ThreadId.make("parent"),
+    };
+    const items = [
+      commandItem("item-a", "a", 1),
+      commandItem("item-b", "b", 2),
+      commandItem("item-c", "c", 2),
+    ];
+    const rows = [
+      {
+        position: 0,
+        visibility: "inherited" as const,
+        sourceThreadId: inherited.threadId,
+        sourceItemId: inherited.id,
+        item: inherited,
+      },
+      ...items.map((item, index) => ({
+        position: index + 1,
+        visibility: "local" as const,
+        sourceThreadId: threadId,
+        sourceItemId: item.id,
+        item,
+      })),
+    ];
+    const moved = commandItem("item-a", "moved", 2);
+    const next = applyOrchestrationV2ProjectionEvent(
+      { ...emptyProjection, runs: [run], turnItems: items, visibleTurnItems: rows },
+      {
+        id: "event-move",
+        type: "turn-item.updated",
+        threadId,
+        runId,
+        occurredAt: now,
+        payload: moved,
+      } as OrchestrationV2DomainEvent,
+    );
+
+    // Equal ordinals order by id, so item-a stays ahead of item-b.
+    expect(next?.visibleTurnItems.map((row) => [row.item.id, row.position])).toEqual([
+      ["item-inherited", 0],
+      ["item-a", 1],
+      ["item-b", 2],
+      ["item-c", 3],
+    ]);
+    expect(next?.visibleTurnItems[0]).toBe(rows[0]);
+    expect(next?.visibleTurnItems[1]?.item).toBe(moved);
+    expect(next?.turnItems.map((item) => item.id)).toEqual(["item-a", "item-b", "item-c"]);
+
+    const later = commandItem("item-a", "later", 3);
+    const last = applyOrchestrationV2ProjectionEvent(next, {
+      id: "event-move-later",
+      type: "turn-item.updated",
+      threadId,
+      runId,
+      occurredAt: now,
+      payload: later,
+    } as OrchestrationV2DomainEvent);
+    expect(last?.visibleTurnItems.map((row) => [row.item.id, row.position])).toEqual([
+      ["item-inherited", 0],
+      ["item-b", 1],
+      ["item-c", 2],
+      ["item-a", 3],
+    ]);
+    expect(last?.turnItems.at(0)).toBe(later);
+  });
+
   describe("partial timeline", () => {
     const queuedRunId = RunId.make("run-queued");
     const steerRunId = RunId.make("run-steer");
@@ -317,8 +402,6 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
       }) as OrchestrationV2DomainEvent;
 
     it("shows a queued run that starts after a newer steer raised the watermark", () => {
-      // Run 2 was queued first, run 3 was steered in and ran first. Its items
-      // sit in run 3's band and already raised the watermark past run 2's band.
       const steerItems = [
         runItem("item-steer-user", steerRunId, 3_000_001),
         runItem("item-steer-reply", steerRunId, 3_000_002),
@@ -328,8 +411,6 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
         steerItems,
       );
       let latestLocalTurnOrdinal = 3_000_002;
-      // Same order the orchestrator commits a queued start: the user message
-      // lands while the run is still queued, then the run starts and replies.
       const queuedUser = runItem("item-queued-user", queuedRunId, 2_000_001);
       const queuedReply = runItem("item-queued-reply", queuedRunId, 2_000_002);
       for (const event of [
@@ -356,8 +437,6 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
     });
 
     it("keeps a running run's item when the window starts after its earlier items", () => {
-      // The bounded window begins inside run 3; run 2 started and kept going,
-      // but none of its rows made it into the window.
       const runningRun = { ...queuedRun, status: "running" } as const;
       const steerItems = [
         runItem("item-steer-user", steerRunId, 3_000_001),

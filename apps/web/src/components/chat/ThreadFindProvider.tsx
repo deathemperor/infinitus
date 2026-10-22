@@ -34,7 +34,7 @@ export function ThreadFindCanvas({
 }
 
 /** Owns search updates below the chat view so cycling does not rerender the composer and panels. */
-export function ThreadFindProvider({
+function ThreadFindProvider({
   controlsRef,
   onOpenChange,
   children,
@@ -49,7 +49,6 @@ export function ThreadFindProvider({
     find.open,
     find.close,
   ]);
-  // Before paint, so the details card makes room in the same frame the bar appears.
   useLayoutEffect(() => onOpenChange(find.isOpen), [find.isOpen, onOpenChange]);
   return (
     <ThreadFindBarContext value={find.barProps}>

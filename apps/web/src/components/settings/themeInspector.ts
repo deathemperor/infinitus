@@ -120,8 +120,6 @@ function spotlightRect(element: Element): {
   }
 
   const padding = 5;
-  // Keep the true bounds when an element is partially offscreen. Clamping its
-  // rectangle to the viewport would draw a fake glow edge along the crop.
   const x = bounds.left - padding;
   const y = bounds.top - padding;
   const elementRadius =
@@ -294,7 +292,7 @@ function getThemePaintSnapshot(
   };
 }
 
-export function changedThemePaintKinds(
+function changedThemePaintKinds(
   before: ThemePaintSnapshot,
   after: ThemePaintSnapshot,
 ): ReadonlyArray<ThemePaintKind> {
@@ -351,12 +349,7 @@ function themeInspectorCandidates(): ReadonlyArray<Element> {
   );
 }
 
-export function themeRoleFromUtilityClass(
-  className: string,
-  kind: ThemePaintKind,
-): ThemeColorRole | null {
-  // Stateful variants such as hover: and disabled: may not be contributing to
-  // the current paint. The computed-style probe below handles those exactly.
+function themeRoleFromUtilityClass(className: string, kind: ThemePaintKind): ThemeColorRole | null {
   if (className.includes(":")) return null;
   for (const prefix of THEME_UTILITY_PREFIXES[kind]) {
     if (!className.startsWith(prefix)) continue;
@@ -397,11 +390,6 @@ export function inspectThemeRoleFromUtilitiesAtElement(
   return null;
 }
 
-/**
- * Finds actual dependency on a theme token instead of comparing final colors.
- * A token is synchronously replaced with a sentinel, computed paint is read,
- * and the original value is restored before the browser can render a frame.
- */
 export function highlightThemeRoleUsage(roles: ReadonlyArray<ThemeColorRole>): number {
   const startedAt = performance.now();
   clearThemeInspectorAttribute(THEME_INSPECTOR_MATCH_ATTRIBUTE);
@@ -449,7 +437,6 @@ export function highlightThemeRoleUsage(roles: ReadonlyArray<ThemeColorRole>): n
   return highlightedElements.size;
 }
 
-/** Resolves the nearest painted token at a touched element. */
 export function inspectThemeRoleAtElement(initialElement: Element): ThemeElementInspection | null {
   if (initialElement.closest("[data-theme-editor-panel]")) return null;
 
@@ -457,8 +444,7 @@ export function inspectThemeRoleAtElement(initialElement: Element): ThemeElement
 
   // Most app paint comes from Tailwind's semantic color utilities. Those class
   // names express the token dependency directly and avoid dozens of forced
-  // style recalculations on every pointer-down. Custom CSS still falls through
-  // to the exact computed-style probe.
+  // style recalculations on every pointer-down.
   const utilityInspection = inspectThemeRoleFromUtilitiesAtElement(initialElement);
   if (utilityInspection) return utilityInspection;
 

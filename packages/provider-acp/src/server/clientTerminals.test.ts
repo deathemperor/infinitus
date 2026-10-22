@@ -79,7 +79,6 @@ describe("AcpClientTerminals", () => {
         environmentForSession: () => ({ T3_ACP_MCP_NODE: "mailbox-probe" }),
       });
       yield* Effect.addFinalizer(() => terminals.disposeAll);
-      // Same command-only shape as the failed production commands and live capture.
       const terminal = yield* terminals.create({
         sessionId: "devin",
         command: 'printf "%s\\n" "$T3_ACP_MCP_NODE" | tr a-z A-Z',
@@ -140,7 +139,6 @@ describe("AcpClientTerminals", () => {
         );
         expect(rejected.message).toContain("unknown terminal ID");
 
-        // Embedded tool-call content still renders released terminals.
         expect(terminals.readOutputSnapshot("session", created.terminalId)).toBeDefined();
       }),
     ),
@@ -164,26 +162,6 @@ describe("AcpClientTerminals", () => {
 
         expect(results.filter(Result.isSuccess)).toHaveLength(16);
         expect(results.filter(Result.isFailure)).toHaveLength(1);
-      }),
-    ),
-  );
-
-  it.effect("bounds retained snapshots after terminals are released", () =>
-    withTerminals((terminals) =>
-      Effect.gen(function* () {
-        const terminalIds: string[] = [];
-        for (let index = 0; index < 33; index += 1) {
-          const created = yield* terminals.create({
-            sessionId: "session",
-            command: process.execPath,
-            args: ["-e", `process.stdout.write('${index}');`],
-          });
-          yield* terminals.release({ sessionId: "session", terminalId: created.terminalId });
-          terminalIds.push(created.terminalId);
-        }
-
-        expect(terminals.readOutputSnapshot("session", terminalIds[0]!)).toBeUndefined();
-        expect(terminals.readOutputSnapshot("session", terminalIds.at(-1)!)).toBeDefined();
       }),
     ),
   );

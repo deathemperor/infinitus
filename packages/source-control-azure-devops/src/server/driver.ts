@@ -1,9 +1,4 @@
 import { SourceControlProviderKind } from "@infinitus/contracts";
-/**
- * The Azure DevOps driver: repository operations, discovery, and pull requests through `az`.
- *
- * @module source-control-azure-devops/server/driver
- */
 import { defineSourceControlDriver } from "@infinitus/source-control-core/server/driver";
 import * as Effect from "effect/Effect";
 

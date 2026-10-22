@@ -1,23 +1,12 @@
+import { classifyChangedFile } from "@infinitus/shared/changedFileKind";
 import type { ReviewParsedDiff } from "../review/reviewModel";
 
-/** Match test paths, not source names such as `testing.ts` or `contest.ts`. */
+/** Test support such as fixtures and snapshots is hidden along with the tests. */
 export function isPullRequestTestFile(path: string): boolean {
-  const segments = path.replaceAll("\\", "/").split("/");
-  const name = segments.at(-1) ?? "";
-  return (
-    segments
-      .slice(0, -1)
-      .some((segment) => /^(?:__tests__|__snapshots__|tests?|spec|e2e)$/i.test(segment)) ||
-    /\.(?:test|spec)\./i.test(name) ||
-    /\.snap$/i.test(name) ||
-    /^(?:test_.+|.+_test)\.py$/i.test(name) ||
-    /_test\.(?:go|rs|rb|c|cc|cpp|h|hpp)$/i.test(name) ||
-    /(?:Test|Tests|Spec)\.(?:java|kt|kts|swift|cs)$/.test(name) ||
-    /_spec\.rb$/i.test(name)
-  );
+  const kind = classifyChangedFile(path);
+  return kind === "tests" || kind === "mocks";
 }
 
-/** Keep original files and line IDs so hiding tests cannot move review anchors. */
 export function filterPullRequestTestFiles(
   parsed: ReviewParsedDiff,
   hideTestFiles: boolean,

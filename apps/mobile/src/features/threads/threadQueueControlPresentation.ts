@@ -1,4 +1,5 @@
 import type { EnvironmentId, RunId, ThreadId } from "@infinitus/contracts";
+import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
 
 export const REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL = "Remove queued message";
 
@@ -7,7 +8,7 @@ export interface ThreadQueueRowControls {
   readonly canEdit: boolean;
   readonly canMoveDown: boolean;
   readonly canMoveUp: boolean;
-  readonly canSteer: boolean;
+  readonly canSend: boolean;
   readonly dismissAccessibilityLabel: string;
   readonly displayText: string;
   readonly isEditing: boolean;
@@ -16,9 +17,9 @@ export interface ThreadQueueRowControls {
 export function resolveThreadQueueRowControls(input: {
   readonly busy: boolean;
   readonly canPromoteToSteer: boolean;
+  readonly canSendNow: boolean;
   readonly canReorder: boolean;
   readonly index: number;
-  /** This row's message is already open in the composer. */
   readonly isEditing?: boolean;
   readonly queuedCount: number;
   readonly text: string;
@@ -33,9 +34,10 @@ export function resolveThreadQueueRowControls(input: {
     canEdit: mutationEnabled && !isEditing,
     canMoveDown: mutationEnabled && input.canReorder && input.index < input.queuedCount - 1,
     canMoveUp: mutationEnabled && input.canReorder && input.index > 0,
-    canSteer: mutationEnabled && input.canPromoteToSteer && !isEditing,
+    canSend: mutationEnabled && (input.canPromoteToSteer || input.canSendNow) && !isEditing,
     dismissAccessibilityLabel: REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL,
-    displayText: input.text,
+    // Editing and sending keep the original text so quoted citations stay linked.
+    displayText: assistantCitationsToPlainText(input.text),
     isEditing,
   };
 }
@@ -60,7 +62,6 @@ export function buildCancelQueuedRunCommand(input: {
   };
 }
 
-/** Find the insertion anchor using the rows' original, untransformed layout. */
 export function resolveQueueDragBeforeRunId(
   rows: ReadonlyArray<{ id: RunId; y?: number; height?: number }>,
   runId: RunId,
@@ -74,7 +75,6 @@ export function resolveQueueDragBeforeRunId(
   return remaining.find((row) => center < row.y! + row.height! / 2)?.id ?? null;
 }
 
-/** Return the insertion anchor after a drag, or undefined when the order is unchanged. */
 export function resolveQueueDropBeforeRunId(
   rows: ReadonlyArray<{ id: RunId; y?: number; height?: number }>,
   runId: RunId,

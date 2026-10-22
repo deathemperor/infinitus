@@ -1,8 +1,9 @@
 import { type ResolvedKeybindingsConfig } from "@infinitus/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { ChevronRightIcon } from "lucide-react";
-import { type RefObject, useCallback, useState } from "react";
+import { type ReactNode, type RefObject, useState } from "react";
 import { cn } from "~/lib/utils";
+import { textDirection } from "~/textDirection";
 import { shortcutLabelForCommand } from "../keybindings";
 import {
   type CommandPaletteActionItem,
@@ -74,11 +75,6 @@ export function CommandPaletteResults(props: CommandPaletteResultsProps) {
   );
 }
 
-/**
- * Scrolls a keyboard highlight into view the way the unvirtualized list did:
- * nearest edge, clear of the scroll fade. Rows outside the rendered window
- * fall back to the list's own scrolling.
- */
 export function scrollCommandPaletteRowIntoView(list: LegendListRef | null, rowIndex: number) {
   const element = list?.getState?.().elementAtIndex(rowIndex);
   if (element instanceof HTMLElement) {
@@ -94,14 +90,14 @@ interface CommandPaletteVirtualizedResultsProps extends Omit<CommandPaletteResul
 }
 
 /**
- * Renders only the visible rows. The parent passes the flat item order to the
- * Command root as `items` with `virtualized`, scrolls keyboard highlights into
- * view through `listRef`, and runs Enter itself since the row may be unmounted.
+ * The parent passes the flat item order to the Command root as `items` with
+ * `virtualized`, scrolls keyboard highlights into view through `listRef`, and
+ * runs Enter itself since the row may be unmounted.
  */
 export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualizedResultsProps) {
   const { listRef } = props;
   const [scrollFade, setScrollFade] = useState({ top: false, bottom: false });
-  const updateScrollFade = useCallback(() => {
+  const updateScrollFade = () => {
     const scrollElement = listRef.current?.getScrollableNode?.();
     if (!(scrollElement instanceof HTMLElement)) return;
     const top = scrollElement.scrollTop > 1;
@@ -110,7 +106,7 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
     setScrollFade((current) =>
       current.top === top && current.bottom === bottom ? current : { top, bottom },
     );
-  }, [listRef]);
+  };
 
   if (props.rows.length === 0) {
     return <CommandPaletteEmptyState {...props} />;
@@ -155,17 +151,29 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
   );
 }
 
+export function CommandPaletteTitleIcon(props: { children: ReactNode }) {
+  return <span className="flex h-5 shrink-0 items-center self-start pt-0.5">{props.children}</span>;
+}
+
+function CommandPaletteTitle({ title }: { title: ReactNode }) {
+  return (
+    <span className="truncate" dir={typeof title === "string" ? textDirection(title) : undefined}>
+      {title}
+    </span>
+  );
+}
+
 function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
   return (
     <div className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm">
-      {props.item.icon}
+      <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
             {props.item.titleLeadingContent}
-            <span className="truncate">{props.item.title}</span>
+            <CommandPaletteTitle title={props.item.title} />
           </span>
           {props.item.threadContentMatch ? (
             <ThreadSearchMatchExcerpt match={props.item.threadContentMatch} />
@@ -179,7 +187,7 @@ function DisabledCommandPaletteResultRow(props: {
       ) : (
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-foreground">
           {props.item.titleLeadingContent}
-          <span className="truncate">{props.item.title}</span>
+          <CommandPaletteTitle title={props.item.title} />
         </span>
       )}
       {props.item.titleTrailingContent}
@@ -210,12 +218,12 @@ function CommandPaletteResultRow(props: {
         props.onExecuteItem(props.item);
       }}
     >
-      {props.item.icon}
+      <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground">
             {props.item.titleLeadingContent}
-            <span className="truncate">{props.item.title}</span>
+            <CommandPaletteTitle title={props.item.title} />
           </span>
           {props.item.threadContentMatch ? (
             <ThreadSearchMatchExcerpt match={props.item.threadContentMatch} />
@@ -229,7 +237,7 @@ function CommandPaletteResultRow(props: {
       ) : (
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-foreground">
           {props.item.titleLeadingContent}
-          <span className="truncate">{props.item.title}</span>
+          <CommandPaletteTitle title={props.item.title} />
         </span>
       )}
       {props.item.titleTrailingContent}
