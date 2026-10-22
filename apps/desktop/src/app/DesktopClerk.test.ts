@@ -2,6 +2,7 @@
 import * as NodeHttp from "node:http";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { codexAuthHandoffUrl, readCodexAuthDelivery } from "@infinitus/shared/codexAuthHandoff";
+import { DESKTOP_USER_DATA_DIR_NAME } from "@infinitus/shared/desktopIdentity";
 import { EnvironmentId, ProviderInstanceId } from "@infinitus/contracts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { assert, describe, it } from "@effect/vitest";
@@ -271,7 +272,7 @@ describe("DesktopClerk", () => {
 
         assert.isTrue(Exit.hasInterrupts(exit));
         assert.deepEqual(events, [
-          "setPath:userData:/tmp/app-data/t3code-v2",
+          `setPath:userData:/tmp/app-data/${DESKTOP_USER_DATA_DIR_NAME}`,
           "requestSingleInstanceLock",
           "quit",
         ]);

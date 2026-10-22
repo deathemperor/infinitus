@@ -7,6 +7,7 @@ import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
 
 import * as NetService from "@infinitus/shared/Net";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopBackendConfiguration from "../backend/DesktopBackendConfiguration.ts";
@@ -136,7 +137,7 @@ export const layer = Layer.effect(
                 Ref.set(
                   preflightErrorRef,
                   Option.some(
-                    "Another T3 Code server is using this distro's T3 home, or an older background service is set up for it. Stop that server or pair with it, or try `t3 update` in the distro. If the older launcher cannot update, run `t3 service uninstall` and optionally reinstall with `t3 service install` from a current CLI in the distro. Use `npx t3@latest` if `t3` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command.",
+                    `Another ${PRODUCT_NAME} server is using this distro's ${PRODUCT_NAME} home, or an older background service is set up for it. Stop that server or pair with it, or try \`infinitus update\` in the distro. If the older launcher cannot update, run \`infinitus service uninstall\` and optionally reinstall with \`infinitus service install\` from a current CLI in the distro. Reinstall from infinitus.run if \`infinitus\` is missing or outdated, and pass \`--base-dir\` with the service's ${PRODUCT_NAME} home to each command.`,
                   ),
                 ),
               ),

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { makeProviderTextDeltaCoalescer } from "./ProviderTextDeltaCoalescer.ts";
 import { claudeTaskOutputRoot, tailClaudeTaskOutput } from "./ClaudeTaskOutputTail.ts";
 import {
@@ -9622,8 +9623,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                   if (oldest !== undefined) announcedBypassDowngrades.delete(oldest);
                 }
                 const nativeItemId = `bypass-policy-downgrade:${context.providerTurnId}`;
-                const notice =
-                  "T3 could not confirm Claude bypass permissions here, so Full access is running with approval checks.";
+                const notice = `${PRODUCT_NAME} could not confirm Claude bypass permissions here, so Full access is running with approval checks.`;
                 yield* emitProviderEvent({
                   type: "turn_item.updated",
                   driver: CLAUDE_PROVIDER,

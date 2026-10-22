@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import type { CursorSettings } from "../settings.ts";
 import { CursorSettings as CursorSettingsSchema } from "../settings.ts";
 import { createModelCapabilities } from "@infinitus/shared/model";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import {
   buildCursorCapabilitiesFromSdkModel,
@@ -221,13 +222,11 @@ describe("checkCursorProviderStatus", () => {
   it.effect.each([
     {
       authenticationType: "browser" as const,
-      message:
-        "Cursor needs a paid plan to run in T3 Code. Upgrade this account or sign in with a different one.",
+      message: `Cursor needs a paid plan to run in ${PRODUCT_NAME}. Upgrade this account or sign in with a different one.`,
     },
     {
       authenticationType: "api-key" as const,
-      message:
-        "Cursor needs a paid plan to run in T3 Code. Upgrade the account that owns CURSOR_API_KEY or use a key from a paid account.",
+      message: `Cursor needs a paid plan to run in ${PRODUCT_NAME}. Upgrade the account that owns CURSOR_API_KEY or use a key from a paid account.`,
     },
   ])(
     "explains a rejected plan for $authenticationType authentication",

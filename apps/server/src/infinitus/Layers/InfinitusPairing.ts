@@ -114,7 +114,7 @@ const makeInfinitusPairing = Effect.gen(function* () {
       ) {
         return yield* new PairingApprovalRefused({ reason: "too_many_from_address" });
       }
-      const id = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
+      const id = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
       const entry: Entry = {
         id,
         deviceName: input.deviceName,

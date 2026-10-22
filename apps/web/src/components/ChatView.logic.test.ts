@@ -1112,7 +1112,7 @@ describe("planComposerTurn", () => {
     ).toMatchObject({ compactBeforeSend: false, turnDispatchMode: "auto" });
   });
 
-  it("queues behind a running turn only when asked to", () => {
+  it("queues behind a running turn when asked to or steering (#1318)", () => {
     const running = {
       ...base,
       isServerThread: true,
@@ -1122,10 +1122,14 @@ describe("planComposerTurn", () => {
     expect(planComposerTurn({ ...running, dispatchMode: "queue" }).shouldQueueBehindActiveRun).toBe(
       true,
     );
+    // Fork (#1318): the server holds a steer until the turn's next step.
     expect(planComposerTurn({ ...running, dispatchMode: "steer" })).toMatchObject({
-      shouldQueueBehindActiveRun: false,
+      shouldQueueBehindActiveRun: true,
       baseBranchForWorktree: null,
     });
+    expect(planComposerTurn({ ...running, dispatchMode: "auto" }).shouldQueueBehindActiveRun).toBe(
+      false,
+    );
   });
 });
 

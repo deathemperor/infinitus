@@ -9,6 +9,14 @@ describe("presentInForeground", () => {
         push({ aps: { alert: {} }, environmentId: "env", deepLink: "/settings/accounts" }),
       ),
     ).toBe(true);
+    expect(
+      presentInForeground(
+        push({
+          aps: { alert: {} },
+          body: { environmentId: "env", deepLink: "/settings/accounts" },
+        }),
+      ),
+    ).toBe(true);
     expect(presentInForeground(local({ type: "date" }, { infinitus: "accounts" }))).toBe(true);
     expect(presentInForeground(local(null, { infinitus: "accounts", fireAt: 1 }))).toBe(true);
   });
@@ -27,8 +35,7 @@ describe("presentInForeground", () => {
     expect(presentInForeground(local(null, undefined))).toBe(false);
   });
 
-  /** A remote push as iOS hands it over: the payload on the trigger, `data`
-      empty (expo-notifications reads only a `body` key into it). */
+  /** A remote push as iOS hands it over: the payload on the trigger. */
   function push(payload: Record<string, unknown>) {
     return { request: { trigger: { type: "push", payload }, content: {} } };
   }

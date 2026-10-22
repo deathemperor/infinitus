@@ -12,7 +12,7 @@ import {
   type ResolvedSettingsScope,
   type SettingsScopeSearch,
 } from "./settingsScope";
-import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
   INFINITUS_CATEGORY_SCOPES,
   INFINITUS_SECTION_LABELS,
@@ -764,7 +764,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-links-open-in-app",
-    title: "Open pull requests in T3 Code",
+    title: `Open pull requests in ${PRODUCT_NAME}`,
     to: "/settings/integrations",
     searchTerms: ["pr links github browser external click default pull request view panel"],
   },

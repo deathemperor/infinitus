@@ -6,7 +6,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useMemo, useState } from "react";
 import { Linking, Pressable, View } from "react-native";
 
-import { AppText as Text, AppTextInput as TextInput } from "../../components/AppText";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/ui/AppText";
 import { cn } from "../../lib/cn";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import { infinitusEnvironment } from "../../state/infinitus";

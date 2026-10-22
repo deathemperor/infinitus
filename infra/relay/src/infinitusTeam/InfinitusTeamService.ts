@@ -286,7 +286,7 @@ export const make = Effect.gen(function* () {
         ? DateTime.subtract(DateTime.makeUnsafe(iso), { seconds: -seconds })
         : DateTime.add(DateTime.makeUnsafe(iso), { seconds }),
     );
-  const uuid = crypto.randomUUIDv4.pipe(Effect.orDie);
+  const uuid = crypto.randomUUIDv4().pipe(Effect.orDie);
   const hashToken = (token: string) =>
     crypto
       .digest("SHA-256", new TextEncoder().encode(token))

@@ -9,7 +9,7 @@ import * as EventStore from "../../orchestration-v2/EventStore.ts";
 import * as ProjectionMaintenance from "../../orchestration-v2/ProjectionMaintenance.ts";
 import * as ProjectionStore from "../../orchestration-v2/ProjectionStore.ts";
 import { runMigrations } from "../Migrations.ts";
-import Migration0066 from "./066_RepairClientSettlementTimestamps.ts";
+import Migration0076 from "./076_RepairClientSettlementTimestamps.ts";
 
 const layer = it.layer(
   ProjectionMaintenance.layer.pipe(
@@ -85,7 +85,7 @@ layer("076_RepairClientSettlementTimestamps", (it) => {
         );
       });
 
-      // A finished turn must come from retained events after 063 drops projection_turns.
+      // A finished turn must come from retained events after 073 drops projection_turns.
       for (const [at, status, activeTurnId] of [
         ["2026-06-01T00:00:00.000Z", "running", "turn-1"],
         [finishedAt, "ready", null],
@@ -360,7 +360,7 @@ layer("076_RepairClientSettlementTimestamps", (it) => {
       ]);
       const repaired = yield* snapshot;
       assert.deepEqual(yield* runMigrations({ toMigrationInclusive: 76 }), []);
-      yield* Migration0066;
+      yield* Migration0076;
       assert.deepEqual(yield* snapshot, repaired);
 
       const maintenance = yield* ProjectionMaintenance.ProjectionMaintenanceV2;

@@ -46,7 +46,7 @@ You can drag or paste images into the web or desktop composer. HEIC and HEIF
 photos are converted to JPEG there and when selected from the mobile photo
 library; photos over the image limit are also resized to fit. On mobile, you can
 also send files to Infinitus through another app's system share sheet, into a new task or an existing thread.
-Closing that sheet without choosing a destination discards what you shared.
+Closing the new task without sending or choosing a thread discards what you shared.
 
 See [images and videos](#images-and-videos-in-messages) for previewing and saving media.
 

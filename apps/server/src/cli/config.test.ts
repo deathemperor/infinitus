@@ -22,6 +22,7 @@ import {
 import * as NetService from "@infinitus/shared/Net";
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { deriveServerPaths } from "../config.ts";
 import { resolveServerConfig } from "./config.ts";
@@ -186,7 +187,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           ),
           Effect.flip,
         );
-        expect(String(error)).toContain("A T3 Code server is already running");
+        expect(String(error)).toContain(`A ${PRODUCT_NAME} server is already running`);
         expect(String(error)).toContain(`pid ${child.pid}`);
         expect(yield* fs.exists(cwd)).toBe(false);
       }),

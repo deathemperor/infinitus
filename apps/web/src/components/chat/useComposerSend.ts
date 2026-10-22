@@ -1081,11 +1081,7 @@ export function useComposerSend(input: ComposerSendInput) {
         createdAt: messageCreatedAt,
         updatedAt: messageCreatedAt,
         streaming: false,
-        ...(shouldQueueBehindActiveRun
-          ? { inputIntent: "queued_turn" as const }
-          : phase === "running" && dispatchMode === "steer"
-            ? { inputIntent: "steer" as const }
-            : {}),
+        ...(shouldQueueBehindActiveRun ? { inputIntent: "queued_turn" as const } : {}),
       },
     ]);
     setThreadError(threadIdForSend, null);

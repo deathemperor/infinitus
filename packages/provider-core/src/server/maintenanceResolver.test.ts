@@ -6,6 +6,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@infinitus/contracts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Crypto from "effect/Crypto";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -228,8 +229,7 @@ it.layer(NodeServices.layer)("providerMaintenance", (it) => {
       latestVersion: "2.1.117",
       updateCommand: null,
       canUpdate: false,
-      message:
-        "Version 2.1.117 is out. T3 Code runs /Applications/Tool.app/Contents/Resources/bin/package-tool; update it with the app or tool that installed it.",
+      message: `Version 2.1.117 is out. ${PRODUCT_NAME} runs /Applications/Tool.app/Contents/Resources/bin/package-tool; update it with the app or tool that installed it.`,
     });
   });
 

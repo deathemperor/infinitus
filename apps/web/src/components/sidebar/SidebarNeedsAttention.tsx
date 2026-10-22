@@ -10,7 +10,7 @@ import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useClientSettings } from "../../hooks/useSettings";
 import { infinitusLimitStopsAtom } from "../../state/infinitus";
-import { formatElapsedDurationLabel, formatTimestamp } from "../../timestampFormat";
+import { formatElapsedDurationLabel, formatShortTimestamp } from "../../timestampFormat";
 import type { SidebarThreadSummary } from "../../types";
 import { cn } from "~/lib/utils";
 import { collectNeedsAttention, type NeedsAttentionStatus } from "./sidebarNeedsAttention.logic";
@@ -52,7 +52,7 @@ export function SidebarNeedsAttention(props: {
   const entries = useMemo(
     () =>
       collectNeedsAttention(props.threads, limitStops, (stop) =>
-        limitStopLine(stop, (iso) => formatTimestamp(iso, timestampFormat), nowMs),
+        limitStopLine(stop, (iso) => formatShortTimestamp(iso, timestampFormat), nowMs),
       ),
     [limitStops, nowMs, props.threads, timestampFormat],
   );

@@ -11,10 +11,10 @@ import type { EnvironmentId } from "@infinitus/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
 
-import { SymbolView } from "../../components/AppSymbol";
-import { AppText as Text } from "../../components/AppText";
-import { showConfirmDialog } from "../../components/ConfirmDialogHost";
-import { ControlPillMenu } from "../../components/ControlPill";
+import { SymbolView } from "../../components/ui/AppSymbol";
+import { AppText as Text } from "../../components/ui/AppText";
+import * as Dialog from "../../components/ui/Dialog";
+import { Menu } from "../../components/ui/Menu";
 import { StatusPill } from "../../components/StatusPill";
 import { cn } from "../../lib/cn";
 import { infinitusEnvironment } from "../../state/infinitus";
@@ -108,53 +108,33 @@ export function AccountRow(props: {
     (action: AccountAction) => {
       if (action === "switch") {
         const copy = switchConfirmation(row, fleetTitle);
-        if (Platform.OS === "android") {
-          showConfirmDialog({
-            title: copy.title,
-            message: copy.message,
-            confirmText: "Switch",
-            onConfirm: () => void perform("switch"),
-          });
-          return;
-        }
-        Alert.alert(copy.title, copy.message, [
-          { text: "Cancel", style: "cancel" },
-          { text: "Switch", onPress: () => void perform("switch") },
-        ]);
+        Dialog.confirm({
+          title: copy.title,
+          message: copy.message,
+          confirmText: "Switch",
+          onConfirm: () => void perform("switch"),
+        });
         return;
       }
       if (action === "reset") {
         const copy = resetConfirmation(row);
-        if (Platform.OS === "android") {
-          showConfirmDialog({
-            title: copy.title,
-            message: copy.message,
-            confirmText: "Use reset",
-            onConfirm: () => void perform("reset"),
-          });
-          return;
-        }
-        Alert.alert(copy.title, copy.message, [
-          { text: "Cancel", style: "cancel" },
-          { text: "Use reset", onPress: () => void perform("reset") },
-        ]);
+        Dialog.confirm({
+          title: copy.title,
+          message: copy.message,
+          confirmText: "Use reset",
+          onConfirm: () => void perform("reset"),
+        });
         return;
       }
       if (action === "remove") {
         const copy = removeConfirmation(row, fleetTitle);
-        if (Platform.OS === "android") {
-          showConfirmDialog({
-            title: copy.title,
-            message: copy.message,
-            confirmText: "Remove",
-            onConfirm: () => void perform("remove"),
-          });
-          return;
-        }
-        Alert.alert(copy.title, copy.message, [
-          { text: "Cancel", style: "cancel" },
-          { text: "Remove", style: "destructive", onPress: () => void perform("remove") },
-        ]);
+        Dialog.confirm({
+          title: copy.title,
+          message: copy.message,
+          confirmText: "Remove",
+          destructive: true,
+          onConfirm: () => void perform("remove"),
+        });
         return;
       }
       if (action === "rename") {
@@ -219,7 +199,7 @@ export function AccountRow(props: {
 
   if (actions.length === 0) return content;
   return (
-    <ControlPillMenu
+    <Menu
       title={row.label}
       actions={[...actions]}
       onPressAction={({ nativeEvent }) => onAction(nativeEvent.event as AccountAction)}
@@ -227,7 +207,7 @@ export function AccountRow(props: {
       accessibilityLabel={`${row.label} actions`}
     >
       <Pressable className="active:opacity-70">{content}</Pressable>
-    </ControlPillMenu>
+    </Menu>
   );
 }
 

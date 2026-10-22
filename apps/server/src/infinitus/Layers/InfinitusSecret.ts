@@ -29,8 +29,9 @@ export const SECRET_ATTEMPTS_PER_MINUTE = 5;
     out of band and the Mac validates — a sign-in's code or callback, for a
     login the client can start over `infinitus.command` anyway. Every other
     secret verb (an engine key, the desktop credential) is the Mac's
-    configuration and keeps needing `access:write` — the desktop app's own
-    session, never a phone's or a `t3 pair` browser's. (The team invite
+    configuration and keeps needing `access:write`. A default pairing carries
+    it since upstream folded access and relay management into the standard
+    scopes (#20432); only a grant narrowed below it is refused. (The team invite
     code left with the git-store Team, #1592: a team is joined on the relay.) */
 const STANDARD_CLIENT_SECRET_VERBS: ReadonlySet<string> = new Set([
   "aws-login-code",

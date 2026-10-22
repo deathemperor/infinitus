@@ -1,9 +1,9 @@
-import { SymbolView } from "../../components/AppSymbol";
+import { SymbolView } from "../../components/ui/AppSymbol";
 import { Platform, Pressable } from "react-native";
 
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text } from "../../components/ui/AppText";
 import { cn } from "../../lib/cn";
-import { MaterialButton } from "../../components/MaterialButton";
+import { Button } from "../../components/ui/Button";
 
 const CARD_SHADOW = Platform.select({
   ios: {
@@ -38,7 +38,7 @@ export function InfinitusSheetButton(props: {
 }) {
   if (Platform.OS === "android")
     return (
-      <MaterialButton
+      <Button
         label={props.label}
         disabled={props.disabled}
         onPress={props.onPress}

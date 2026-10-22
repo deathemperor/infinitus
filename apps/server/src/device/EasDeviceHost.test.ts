@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { describe, expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { EasDeviceHostConfig } from "@infinitus/contracts";
@@ -142,7 +143,7 @@ const fakeExpo = (
                             node: {
                               id: "someone-else",
                               status: "IN_PROGRESS",
-                              name: "T3 Code · EAS Simulator · 000000",
+                              name: `${PRODUCT_NAME} · EAS Simulator · 000000`,
                             },
                           },
                           ...(options.active ?? []).map((node) => ({ node })),

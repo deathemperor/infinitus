@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { EnvironmentId } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { AsyncResult } from "effect/reactivity";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
@@ -65,7 +66,7 @@ export function OutdatedServerUpdateSection({
     if (busy || !release || !targetVersion) return;
     Dialog.alert(
       `Update ${label}?`,
-      `Install T3 Code ${targetVersion}. T3 Code restarts on that machine and reconnects. Running threads may be interrupted.`,
+      `Install ${PRODUCT_NAME} ${targetVersion}. ${PRODUCT_NAME} restarts on that machine and reconnects. Running threads may be interrupted.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -84,7 +85,7 @@ export function OutdatedServerUpdateSection({
   }
 
   return (
-    <SettingsSection title="T3 Code">
+    <SettingsSection title={PRODUCT_NAME}>
       <View className="gap-1 p-4">
         <Text className="text-base text-foreground">
           {release ? `Version ${release.fromVersion}` : "Update required"}
@@ -100,7 +101,7 @@ export function OutdatedServerUpdateSection({
               ? release.targetVersion
                 ? `Version ${release.targetVersion} is available.`
                 : "No newer version is available yet."
-              : "This app needs a newer version of T3 Code on this machine."}
+              : `This app needs a newer version of ${PRODUCT_NAME} on this machine.`}
         </Text>
         {error || state.status === "failed" ? (
           <Text selectable accessibilityRole="alert" className="text-sm text-danger-foreground">

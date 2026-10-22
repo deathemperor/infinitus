@@ -9,6 +9,7 @@ import type {
   RuntimeRequestId,
 } from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { AtomCommandResult } from "./runtime.ts";
 import type { ThreadStructure, ThreadStructureVisibleTurnItem } from "./models.ts";
 
@@ -49,7 +50,7 @@ export function fullAccessOverrideExplanation(
 ): string {
   return override === "ask_rule"
     ? "Full access skips approvals, but an ask rule in the agent's own settings matches this action, so it still asks. Remove or narrow that rule to stop these prompts."
-    : "Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. T3 Code can't turn these off, so check the request and approve it if it's what you expect.";
+    : `Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. ${PRODUCT_NAME} can't turn these off, so check the request and approve it if it's what you expect.`;
 }
 
 export interface ThreadUserInputQuestion extends Omit<

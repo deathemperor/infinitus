@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAuth } from "@clerk/react";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { Link } from "@tanstack/react-router";
@@ -43,7 +44,7 @@ export function HostedEmptyState() {
                 ? "Turn it back on, or connect a different computer."
                 : cloudEnabled
                   ? "Your agents run on your computer."
-                  : "Your agents run on your computer. Start T3 Code there first."}
+                  : `Your agents run on your computer. Start ${PRODUCT_NAME} there first.`}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

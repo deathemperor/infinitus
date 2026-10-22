@@ -3,6 +3,7 @@ import type {
   ProviderInstanceId,
   ProviderInteractionMode,
   RuntimeMode,
+  ThreadUsageRollup,
 } from "@infinitus/contracts";
 import { createModelSelection } from "@infinitus/shared/model";
 import { BotIcon, PencilRulerIcon } from "lucide-react";
@@ -19,6 +20,7 @@ import {
 } from "./ComposerControl";
 import { useComposerMenuProps } from "./composerEventScope";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { ComposerThreadUsage } from "./ComposerThreadUsage";
 import { ContextWindowMeter, ContextWindowMeterPlaceholder } from "./ContextWindowMeter";
 import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
@@ -152,6 +154,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   canOperateThread: boolean;
   activeContextWindow: ContextWindowSnapshot | null;
   reserveContextWindowMeter: boolean;
+  threadUsage: ThreadUsageRollup | undefined;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
   pendingAction: {
@@ -190,6 +193,7 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
 }) {
   return (
     <>
+      {props.threadUsage ? <ComposerThreadUsage usage={props.threadUsage} /> : null}
       {props.activeContextWindow ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}

@@ -495,8 +495,8 @@ function ProjectScriptEditorForm({
                 onChange={(event) => setCommand(event.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Runs with <code>$T3CODE_PROJECT_ROOT</code>, <code>$T3CODE_WORKTREE_PATH</code>{" "}
-                and <code>$T3CODE_PORT</code>–<code>$T3CODE_PORT_END</code>: ten ports picked per
+                Runs with <code>$T3CODE_PROJECT_ROOT</code>, <code>$T3CODE_WORKTREE_PATH</code> and{" "}
+                <code>$T3CODE_PORT</code>–<code>$T3CODE_PORT_END</code>: ten ports picked per
                 worktree, so each checkout's dev server gets its own.
               </p>
             </div>

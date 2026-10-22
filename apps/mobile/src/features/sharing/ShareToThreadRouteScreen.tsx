@@ -1,24 +1,27 @@
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import { LegendList } from "@legendapp/list/react-native";
 import {
-  StackActions,
+  CommonActions,
   useNavigation,
   usePreventRemove,
   type StaticScreenProps,
 } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
-import { SymbolView } from "../../components/AppSymbol";
-import { AppText as Text } from "../../components/AppText";
-import { MaterialListRow } from "../../components/MaterialListRow";
-import { MaterialScreenContent } from "../../components/MaterialScreenContent";
+import { AndroidScreenHeader } from "../../components/ui/AndroidScreenHeader";
+import * as Dialog from "../../components/ui/Dialog";
+import { SymbolView } from "../../components/ui/AppSymbol";
+import { AppText as Text } from "../../components/ui/AppText";
+import { NavigationRow } from "../../components/ui/NavigationRow";
+import { ScreenContent } from "../../components/ui/ScreenContent";
+import { Toolbar } from "../../components/ui/Toolbar";
 import { cn } from "../../lib/cn";
 import { scopedThreadKey } from "../../lib/scopedEntities";
-import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
+import { uuidv4 } from "../../lib/uuid";
+import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { useProjects, useThreadShells } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
@@ -34,7 +37,11 @@ import {
 } from "../layout/native-mail-search-toolbar";
 import { selectIncomingShareAttachmentsForServer } from "./incoming-share-model";
 import { useIncomingShare } from "./IncomingShareProvider";
-import { selectShareTargetThreads, type ShareTargetThread } from "./share-to-thread";
+import {
+  isShareFlowRoute,
+  selectShareTargetThreads,
+  type ShareTargetThread,
+} from "./share-to-thread";
 
 type ShareToThreadRouteParams = {
   readonly incomingShareId: string;
@@ -65,7 +72,7 @@ function ThreadRow(props: {
       )}
     >
       {Platform.OS === "android" ? (
-        <MaterialListRow
+        <NavigationRow
           title={thread.title}
           subtitle={subtitle}
           disabled={props.disabled}
@@ -167,7 +174,7 @@ export function ShareToThreadRouteScreen({
       const shareId = route.params?.incomingShareId;
       const incomingShare = shareId ? getShare(shareId) : null;
       if (!shareId || !incomingShare) {
-        Alert.alert("Shared content unavailable", "The shared content is no longer in the inbox.");
+        Dialog.alert("Shared content unavailable", "The shared content is no longer in the inbox.");
         navigation.goBack();
         return;
       }
@@ -176,7 +183,7 @@ export function ShareToThreadRouteScreen({
         serverConfig: appAtomRegistry.get(serverEnvironment.configValueAtom(thread.environmentId)),
       });
       if (selectedAttachments.status === "pending") {
-        Alert.alert(
+        Dialog.alert(
           "Environment still connecting",
           "Wait for the thread's environment to connect, then choose it again.",
         );
@@ -211,12 +218,12 @@ export function ShareToThreadRouteScreen({
           );
         }
         if (warnings.length > 0) {
-          Alert.alert("Some shared content was skipped", warnings.join("\n"));
+          Dialog.alert("Some shared content was skipped", warnings.join("\n"));
         }
       } catch (error) {
         if (mountedRef.current) {
           setImportingThreadKey(null);
-          Alert.alert(
+          Dialog.alert(
             "Could not import shared content",
             error instanceof Error ? error.message : "The shared content could not be saved.",
           );
@@ -226,12 +233,20 @@ export function ShareToThreadRouteScreen({
       if (!mountedRef.current) {
         return;
       }
-      (navigation.getParent() ?? navigation).dispatch(
-        StackActions.replace("Thread", {
-          environmentId: thread.environmentId,
-          threadId: thread.id,
-        }),
-      );
+      // The draft and the pickers over it give way to the chosen thread.
+      const state = navigation.getState();
+      if (!state) return;
+      let end = state.routes.length;
+      while (end > 0 && isShareFlowRoute(state.routes[end - 1])) end -= 1;
+      const routes = [
+        ...state.routes.slice(0, end),
+        {
+          key: uuidv4(),
+          name: "Thread",
+          params: { environmentId: thread.environmentId, threadId: thread.id },
+        },
+      ];
+      navigation.dispatch(CommonActions.reset({ ...state, index: routes.length - 1, routes }));
     },
     [consumeShare, getShare, importingThreadKey, navigation, route.params?.incomingShareId],
   );
@@ -312,7 +327,7 @@ export function ShareToThreadRouteScreen({
             value={query}
           />
         </View>
-        <MaterialScreenContent>{content}</MaterialScreenContent>
+        <ScreenContent>{content}</ScreenContent>
       </View>
     );
   }
@@ -351,9 +366,9 @@ export function ShareToThreadRouteScreen({
         }}
       />
       {usesNativeMailSearchToolbar ? null : (
-        <NativeHeaderToolbar placement="bottom">
-          <NativeHeaderToolbar.SearchBarSlot />
-        </NativeHeaderToolbar>
+        <Toolbar placement="bottom">
+          <Toolbar.SearchBarSlot />
+        </Toolbar>
       )}
       {content}
     </>

@@ -14,6 +14,7 @@ import {
 import { compareSemverVersions, satisfiesSemverRange } from "@infinitus/shared/semver";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { causeErrorTag } from "@infinitus/shared/observability";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { resolveCommandPath, resolveSpawnCommand } from "@infinitus/shared/shell";
 import * as Cache from "effect/Cache";
 import * as Config from "effect/Config";
@@ -789,7 +790,7 @@ export const makeCachedProviderMaintenanceResolution = Effect.fn(
  */
 function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {
   return installPath
-    ? `Version ${latestVersion} is out. T3 Code runs ${installPath}; update it with the app or tool that installed it.`
+    ? `Version ${latestVersion} is out. ${PRODUCT_NAME} runs ${installPath}; update it with the app or tool that installed it.`
     : `Version ${latestVersion} is out. Update it with the app or tool that installed it.`;
 }
 

@@ -104,8 +104,10 @@ export function turnUsageFromProviderTurn(
 export function threadUsageFromProjection(
   projection: Pick<
     OrchestrationV2ThreadProjection,
-    "thread" | "runs" | "attempts" | "providerThreads" | "providerTurns"
-  >,
+    "runs" | "attempts" | "providerThreads" | "providerTurns"
+  > & {
+    readonly thread: Pick<OrchestrationV2ThreadProjection["thread"], "id" | "usageBaseline">;
+  },
 ): ThreadUsageRollup | undefined {
   const rootProviderThreadIds = new Set(
     projection.providerThreads

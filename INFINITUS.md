@@ -23,7 +23,7 @@ contributor shorthand for this TypeScript tree and the Swift app.
   route on the `native` branch, never a second protocol or a read of the
   native app's files.
 - **Upstream merges daily, our history never rebased.** `git fetch upstream
-&& git merge upstream/main` on a branch, PR to `main`. Our code lives in
+  && git merge upstream/main` on a branch, PR to `main`. Our code lives in
   new files, new routes, new settings sections; edits to upstream files stay
   at registration points so merges stay small. The list of upstream files we
   edit on purpose is `docs/internals/fork-registration-points.md` — keep it current.
@@ -103,7 +103,7 @@ contributor shorthand for this TypeScript tree and the Swift app.
   that silently misses commits already on main (#1092 missed #1091 this way,
   with a clean-looking stat). After every merge of main and before arming
   auto-merge: `git fetch origin main && git merge-base --is-ancestor
-origin/main HEAD || echo STALE`. A PR whose checks are green but whose
+  origin/main HEAD || echo STALE`. A PR whose checks are green but whose
   mergeability sits at UNKNOWN for a quarter hour is GitHub's, not ours:
   `gh pr close` then `gh pr reopen` recomputes it and re-fires the PR event
   (auto-merge drops on reopen; arm it again). Never push empty commits for

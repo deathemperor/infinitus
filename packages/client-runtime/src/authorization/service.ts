@@ -5,6 +5,7 @@ import {
 } from "@infinitus/contracts";
 import { RelayEnvironmentConnectScope } from "@infinitus/contracts/relay";
 import { withRelayClientTracing } from "@infinitus/shared/relayTracing";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import {
   exchangeRemoteDpopAccessToken,
   type RemoteEnvironmentAuthError,
@@ -271,7 +272,7 @@ export const make = Effect.gen(function* () {
   const sessionPending = () =>
     new ConnectionTransientError({
       reason: "session-pending",
-      detail: "Waiting for the T3 Connect sign-in to load.",
+      detail: `Waiting for the ${CONNECT_NAME} sign-in to load.`,
     });
 
   const assertSession = Effect.fnUntraced(function* (

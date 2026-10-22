@@ -248,7 +248,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
       try {
         await releaseShareReservation(incomingShare.id, incomingShare.destination);
       } catch (error) {
-        Alert.alert(
+        Dialog.alert(
           "Could not change destination",
           error instanceof Error
             ? error.message
@@ -355,7 +355,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               )}
             >
               {Platform.OS === "android" ? (
-                <MaterialListRow
+                <NavigationRow
                   title="Add to an existing thread"
                   disabled={reservedDestinationProject !== null}
                   onPress={() => void selectExistingThread()}

@@ -3,6 +3,7 @@ import {
   type RelayProtectedError,
 } from "@infinitus/contracts/relay";
 import { describe, expect, it } from "@effect/vitest";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { presentConnectionDiagnosis } from "./diagnosis.ts";
 import { mapManagedRelayError, mapRemoteEnvironmentError } from "./errors.ts";
@@ -53,7 +54,7 @@ const results = (state: SupervisorConnectionState, via?: "relay" | "direct") =>
 describe("presentConnectionDiagnosis", () => {
   it("tells a working tunnel apart from T3 Code not answering", () => {
     expect(diagnose(backoff(unavailable("origin_unreachable")))?.headline).toBe(
-      "Tunnel works, but T3 Code on Mac mini did not answer",
+      `Tunnel works, but ${PRODUCT_NAME} on Mac mini did not answer`,
     );
     expect(results(backoff(unavailable("origin_unreachable")), "direct")).toEqual([
       "device:ok",
@@ -83,7 +84,7 @@ describe("presentConnectionDiagnosis", () => {
         cause: new TypeError("Failed to fetch"),
       }),
     );
-    expect(diagnose(backoff(failure))?.headline).toBe("This device can't reach T3 Connect");
+    expect(diagnose(backoff(failure))?.headline).toBe(`This device can't reach ${CONNECT_NAME}`);
     expect(results(backoff(failure))).toEqual([
       "device:ok",
       "relay:failed",
@@ -101,7 +102,7 @@ describe("presentConnectionDiagnosis", () => {
       }),
     );
     const diagnosis = diagnose(backoff(failure));
-    expect(diagnosis?.headline).toBe("T3 Connect returned an error");
+    expect(diagnosis?.headline).toBe(`${CONNECT_NAME} returned an error`);
     expect(diagnosis?.steps.join(" ")).not.toContain("this device");
   });
 

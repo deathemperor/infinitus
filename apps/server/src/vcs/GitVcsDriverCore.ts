@@ -4293,13 +4293,13 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
   const removeWorktree: GitVcsDriver.GitVcsDriver["Service"]["removeWorktree"] = Effect.fn(
     "removeWorktree",
   )(function* (input) {
-    const present = yield* fileSystem.exists(input.path).pipe(Effect.orElseSucceed(() => false));
+    // The same directory removeWorktreeDirectory resolves and removes.
+    const target = path.resolve(input.cwd, input.path);
+    const present = yield* fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false));
     const branch =
-      present && (input.keepWork || input.deleteBranch)
-        ? yield* readWorktreeBranch(input.path)
-        : null;
+      present && (input.keepWork || input.deleteBranch) ? yield* readWorktreeBranch(target) : null;
     const savedWorkCommit =
-      present && input.keepWork && branch !== null ? yield* saveWorktreeWork(input.path) : null;
+      present && input.keepWork && branch !== null ? yield* saveWorktreeWork(target) : null;
     yield* removeWorktreeDirectory(input);
     // A saved commit is the work's only copy now; the branch stays whatever
     // the caller asked. A branch git refuses to delete (checked out again

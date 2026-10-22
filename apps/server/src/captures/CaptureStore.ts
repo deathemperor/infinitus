@@ -141,7 +141,7 @@ const make = Effect.gen(function* () {
           if (command.type === "add" && list.length >= MAX_CAPTURES_PER_PROJECT) {
             return yield* new CaptureListFull({ projectId, limit: MAX_CAPTURES_PER_PROJECT });
           }
-          const id = (yield* crypto.randomUUIDv4.pipe(Effect.orDie)) as CaptureId;
+          const id = (yield* crypto.randomUUIDv4().pipe(Effect.orDie)) as CaptureId;
           const next = applyCaptureCommand(list, command, { id, now: yield* DateTime.now });
           if (next === list) return;
           const contents = yield* encodeCaptureList(next).pipe(

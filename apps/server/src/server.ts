@@ -909,7 +909,9 @@ const layerMakeServer = Layer.unwrap(
             const recoverManagedTunnel = (config: RelayManagedEndpointRuntimeConfig) =>
               runManagedTunnelRecovery(config).pipe(
                 Effect.tap((recovered) =>
-                  recovered ? Effect.logInfo(`${CONNECT_NAME} managed tunnel recovered`) : Effect.void,
+                  recovered
+                    ? Effect.logInfo(`${CONNECT_NAME} managed tunnel recovered`)
+                    : Effect.void,
                 ),
                 Effect.catchCause((cause) =>
                   Cause.hasInterrupts(cause)

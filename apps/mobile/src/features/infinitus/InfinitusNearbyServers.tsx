@@ -2,7 +2,7 @@ import * as Network from "expo-network";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 
-import { AppText as Text } from "../../components/AppText";
+import { AppText as Text } from "../../components/ui/AppText";
 import { InfinitusSheetButton } from "./InfinitusSheetButton";
 import { discoverNearbyServers } from "./lanDiscovery";
 import {

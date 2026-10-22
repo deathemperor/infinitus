@@ -147,6 +147,8 @@ describe("searchSettings", () => {
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
+      // Its title names the product: "Open pull requests in Infinitus".
+      "pull-request-links-open-in-app",
       // Last, on no title match: the project file the Submodules row reads and
       // the Actions row imports from is named infinitus.json, and that is a
       // name people search for.

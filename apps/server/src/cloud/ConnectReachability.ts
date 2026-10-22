@@ -1,3 +1,4 @@
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeNet from "node:net";
 
 import {
@@ -65,20 +66,20 @@ export function classifyReachability(
     fix: string,
     hint: string | null = null,
   ): Unreachable => ({ status: "unreachable", checkedAt, cause, reason, hint, fix });
-  const restart = "Restart T3 Code. If it stays, run `t3 connect` again.";
+  const restart = `Restart ${PRODUCT_NAME}. If it stays, run \`infinitus connect\` again.`;
 
   if (!facts.managedTunnelConfigured) {
     return fail(
       "not_linked",
-      "The server has not set up a T3 Connect tunnel.",
-      "Run `t3 connect`, then restart the server (`t3 service restart`) so it applies the link.",
+      `The server has not set up a ${CONNECT_NAME} tunnel.`,
+      "Run `infinitus connect`, then restart the server (`infinitus service restart`) so it applies the link.",
     );
   }
   if (connector === null) {
     return fail(
       "connector_not_running",
       "The tunnel client (cloudflared) is not running.",
-      "Restart T3 Code. If it stays down, check the server log for relay client errors.",
+      `Restart ${PRODUCT_NAME}. If it stays down, check the server log for relay client errors.`,
     );
   }
   const status = endpoint?.kind === "status" ? endpoint.status : null;
@@ -110,8 +111,8 @@ export function classifyReachability(
   if (status === 502) {
     return fail(
       "origin_unreachable",
-      "The tunnel is up, but it cannot reach the T3 server on this machine.",
-      "Restart T3 Code so the tunnel uses the port the server listens on.",
+      `The tunnel is up, but it cannot reach the ${PRODUCT_NAME} server on this machine.`,
+      `Restart ${PRODUCT_NAME} so the tunnel uses the port the server listens on.`,
     );
   }
   if (endpoint === null || connector.readyConnections === 0) {
@@ -132,20 +133,20 @@ export function classifyReachability(
   if (status !== null) {
     return fail(
       "unexpected_response",
-      `The T3 Connect address answered with HTTP ${status}.`,
+      `The ${CONNECT_NAME} address answered with HTTP ${status}.`,
       restart,
     );
   }
   return endpoint.kind === "dns_failed"
     ? fail(
         "dns_failed",
-        "The T3 Connect address does not resolve from this machine.",
+        `The ${CONNECT_NAME} address does not resolve from this machine.`,
         "Check the DNS settings on this machine or its VPN.",
         exitNodeHint(exitNode),
       )
     : fail(
         "timeout",
-        "The T3 Connect address did not answer from this machine.",
+        `The ${CONNECT_NAME} address did not answer from this machine.`,
         "Check the network, VPN, or proxy on this machine.",
         exitNodeHint(exitNode),
       );
@@ -154,7 +155,7 @@ export function classifyReachability(
 /** The loud diagnosis the CLI prints and the server logs. */
 export function formatReachabilityFailure(result: Unreachable): string {
   return [
-    "✕ T3 Connect is NOT reachable from other devices",
+    `✕ ${CONNECT_NAME} is NOT reachable from other devices`,
     `  ${result.reason}`,
     ...(result.hint ? [`  ${result.hint}`] : []),
     `  Fix: ${result.fix}`,
@@ -286,7 +287,7 @@ const make = Effect.gen(function* () {
       );
     } else {
       yield* Effect.logInfo(
-        `T3 Connect is reachable from other devices. ${formatConnectReachable(result)}`,
+        `${CONNECT_NAME} is reachable from other devices. ${formatConnectReachable(result)}`,
       );
     }
     return result;

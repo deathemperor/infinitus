@@ -178,8 +178,8 @@ running is left alone.
 
 Each desktop app keeps one session on the host for its SSH connection and reuses
 it when it reconnects. Revoke sessions you no longer use in **Settings →
-Connections** on the host, or on a headless host with `t3 auth session list` and
-`t3 auth session revoke <id>`. A desktop that can still sign in over SSH pairs
+Connections** on the host, or on a headless host with `infinitus auth session list` and
+`infinitus auth session revoke <id>`. A desktop that can still sign in over SSH pairs
 again on its next connect.
 
 For Antigravity's Google callback on a remote host, see
@@ -300,9 +300,9 @@ revokes its cloud access and frees its host space even when the environment is
 offline or has been wiped. When Infinitus Connect rejects a host's link, the host
 shows that it was removed from Infinitus Connect. To link it again, turn on
 **Infinitus Connect** in **Settings → Connections** on a desktop host, or run
-`t3 connect link` on a command-line host and then restart Infinitus there. A
+`infinitus connect link` on a command-line host and then restart Infinitus there. A
 command-line host that released its tunnel when it last stopped may link itself
-again on its next start; run `t3 connect unlink` on that host to keep it off.
+again on its next start; run `infinitus connect unlink` on that host to keep it off.
 Removing an environment from a device's connection settings only forgets it on
 that device; it stays registered to your account.
 

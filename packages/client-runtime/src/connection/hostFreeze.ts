@@ -1,4 +1,5 @@
 import type { ServerEventLoopStall } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export interface HostFreezeNotice {
   readonly title: string;
@@ -20,6 +21,6 @@ export function hostFreezeNotice(
     description:
       loadAverage !== undefined && loadAverage > cpuCount
         ? `Its CPU is overloaded (load ${Math.round(loadAverage)} on ${cpuCount} cores).`
-        : `T3 Code on ${hostLabel} was too busy to answer.`,
+        : `${PRODUCT_NAME} on ${hostLabel} was too busy to answer.`,
   };
 }

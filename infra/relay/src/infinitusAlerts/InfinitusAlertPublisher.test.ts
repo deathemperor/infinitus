@@ -160,6 +160,7 @@ function harness(input?: {
         Layer.succeed(LiveActivities.LiveActivities, {
           register: () => Effect.void,
           listTargets: ({ userId }) => Effect.succeed(targets[userId] ?? []),
+          listIdleArmedTargets: () => Effect.succeed([]),
           markDelivery: () => Effect.void,
           markStartQueued: () => Effect.void,
           clearStartQueued: () => Effect.void,

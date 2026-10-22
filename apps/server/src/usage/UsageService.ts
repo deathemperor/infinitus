@@ -883,7 +883,7 @@ export const make = Effect.gen(function* () {
     // the last instant `untilDay` can still be that day in any zone (UTC-12
     // ends it 36 h after UTC midnight). Days here are the client's zone, so
     // this is a bound, not a boundary; the caption says "in this window".
-    const windowEndMs =
+    const swapWindowEndMs =
       hourlyWindow?.untilTimeMs ?? Date.parse(`${input.untilDay}T00:00:00Z`) + 36 * 60 * 60 * 1000;
 
     const retentionCutoffMs = startedAtMs - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -1084,7 +1084,7 @@ export const make = Effect.gen(function* () {
               unattributed: aggregated.attribution.unattributed,
               notClaude: aggregated.attribution.notClaude,
               switchesInWindow: timeline.switchesAtMs.filter(
-                (atMs) => atMs >= windowStartMs + MTIME_SLACK_MS && atMs < windowEndMs,
+                (atMs) => atMs >= windowStartMs + MTIME_SLACK_MS && atMs < swapWindowEndMs,
               ).length,
               basis: timeline.basis,
             },

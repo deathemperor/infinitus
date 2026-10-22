@@ -165,7 +165,7 @@ export const ThreadUsageBackfillLive = Layer.effectDiscard(
       for (const candidate of fresh) {
         const usageBaseline = baselineForCandidate(candidate, sessions, bootAt);
         if (usageBaseline === undefined) continue;
-        const uuid = yield* crypto.randomUUIDv4;
+        const uuid = yield* crypto.randomUUIDv4();
         yield* orchestrator
           .dispatch({
             type: "thread.metadata.update",

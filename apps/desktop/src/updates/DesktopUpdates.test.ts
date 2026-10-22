@@ -722,7 +722,8 @@ describe("DesktopUpdates", () => {
         harness.emit("update-available", { version: "1.2.4" });
         yield* flushCallbacks;
         const state = yield* updates.getState;
-        assert.equal(state.status, "available");
+        // Fork: the infinitus channel downloads an available update without a click.
+        assert.equal(state.status, "downloading");
         assert.equal(state.notAppliedVersion, "1.2.4");
       }),
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));

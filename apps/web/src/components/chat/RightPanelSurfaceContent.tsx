@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type {
   EditorId,
   EnvironmentId,
@@ -122,7 +123,7 @@ export function RightPanelSurfaceContent(props: {
         return (
           <PullRequestsUnavailableState
             title="Pull requests unavailable"
-            error="Update this environment's T3 Code server to browse pull requests."
+            error={`Update this environment's ${PRODUCT_NAME} server to browse pull requests.`}
           />
         );
       }

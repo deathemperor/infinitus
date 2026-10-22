@@ -552,8 +552,7 @@ const RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = "2 seconds";
 const RECONCILE_TIMEOUT = "15 seconds";
 const RECONNECT_WAIT = "30 seconds";
-const LOST_BACKGROUND =
-  `${PRODUCT_NAME} lost its connection to OpenCode while this subagent ran, so its result is not shown.`;
+const LOST_BACKGROUND = `${PRODUCT_NAME} lost its connection to OpenCode while this subagent ran, so its result is not shown.`;
 const INVENTORY_TIMEOUT = "5 seconds";
 const ACTIVE_CHECK_TIMEOUT = "5 seconds";
 /** Answers that mean the server refused a prompt; any other failure may have been accepted. */

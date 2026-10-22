@@ -1980,9 +1980,6 @@ describe("UsageService", () => {
             yield* Effect.promise(() => NodeFSP.readFile(legacyPath, "utf8")),
             legacy,
           );
-          // The state dir goes away with the layer below, before the service's
-          // own shutdown wait; let the background cache write land first.
-          yield* second.awaitPersisted;
         }).pipe(
           Effect.provide(
             layerService({

@@ -7,7 +7,7 @@ import type {
 } from "@infinitus/contracts";
 import { formatAttachmentSize } from "@infinitus/client-runtime/state/attachments";
 import { CircleAlertIcon, PaperclipIcon, PlayIcon, XIcon } from "lucide-react";
-import { type ComponentProps, useLayoutEffect, useRef } from "react";
+import { type ComponentProps, type ReactNode, useLayoutEffect, useRef } from "react";
 
 import {
   type ComposerFileAttachment,
@@ -124,6 +124,7 @@ export function ComposerAttachmentMediaRow({
   onFileOpen,
   onRemoveImage,
   onRemoveFile,
+  renderImageExtras,
 }: {
   readonly images: ReadonlyArray<ComposerImageAttachment>;
   readonly expandedImages: ReadonlyArray<ComposerImageAttachment>;
@@ -142,6 +143,8 @@ export function ComposerAttachmentMediaRow({
   readonly onFileOpen: (attachment: ChatFileAttachment) => void;
   readonly onRemoveImage: (imageId: string) => void;
   readonly onRemoveFile: (fileId: string) => void;
+  /** Fork (#875): per-image extras drawn after the tile's remove button. */
+  readonly renderImageExtras?: ((image: ComposerImageAttachment) => ReactNode) | undefined;
 }) {
   const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   const pendingSnapShotIdSet = new Set(pendingSnapShotIds);
@@ -292,6 +295,7 @@ export function ComposerAttachmentMediaRow({
                   <XIcon />
                 </Button>
               </span>
+              {renderImageExtras?.(image)}
             </SnapShotAttachmentFrame>
           );
         })

@@ -2,8 +2,8 @@ import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
 
-import { AppText as Text } from "../../components/AppText";
-import { ErrorBanner } from "../../components/ErrorBanner";
+import { AppText as Text } from "../../components/ui/AppText";
+import { ErrorBanner } from "../../components/ui/ErrorBanner";
 import { randomHex } from "../../lib/uuid";
 import { InfinitusSheetButton } from "./InfinitusSheetButton";
 import { askForApproval, waitForDecision } from "./pairingApproval";

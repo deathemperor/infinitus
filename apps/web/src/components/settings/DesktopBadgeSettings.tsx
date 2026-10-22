@@ -1,4 +1,4 @@
-import { useClientSettings, useUpdateClientSettings } from "../../hooks/useSettings";
+import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
 import { Switch } from "../ui/switch";
 import { searchableSetting } from "./settingsSearch";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
@@ -10,7 +10,6 @@ import { SettingsRow, SettingsSection } from "./settingsLayout";
  */
 export function DesktopBadgeSettings() {
   const enabled = useClientSettings((settings) => settings.desktopBadgeAttention);
-  const updateSettings = useUpdateClientSettings();
   if (window.desktopBridge?.setBadgeCount === undefined) return null;
   const { id, title } = searchableSetting("desktop-badge");
   return (
@@ -23,7 +22,9 @@ export function DesktopBadgeSettings() {
           <Switch
             checked={enabled}
             aria-label={title}
-            onCheckedChange={(checked) => void updateSettings({ desktopBadgeAttention: checked })}
+            onCheckedChange={(checked) =>
+              void updateClientSettings({ desktopBadgeAttention: checked })
+            }
           />
         }
       />

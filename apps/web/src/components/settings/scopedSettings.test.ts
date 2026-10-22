@@ -8,6 +8,7 @@ import {
 } from "@infinitus/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { applyServerSettingsPatch } from "@infinitus/shared/serverSettings";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Cause from "effect/Cause";
 import { resolveWorktreeCleanup } from "@infinitus/shared/projectSettings";
 
@@ -266,7 +267,7 @@ describe("scoped settings writes", () => {
     const unsupported = [
       {
         label: server.label,
-        message: "This environment does not support this setting. Update T3 Code on it.",
+        message: `This environment does not support this setting. Update ${PRODUCT_NAME} on it.`,
       },
     ];
 

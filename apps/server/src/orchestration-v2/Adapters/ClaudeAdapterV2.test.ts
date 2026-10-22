@@ -268,6 +268,7 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
       settings: DEFAULT_CLAUDE_SETTINGS,
     });
     assert.notProperty(unset.settings as object, "advisorModel");
+  });
 
   it("gives delegated children Claude's subagent prompt cache TTL", () => {
     const lineage = (relationshipToParent: "fork" | "subagent" | null) => ({

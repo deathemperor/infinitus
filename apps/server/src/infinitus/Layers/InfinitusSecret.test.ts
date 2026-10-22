@@ -1,4 +1,4 @@
-import { AuthAdministrativeScopes, AuthStandardClientScopes } from "@infinitus/contracts";
+import { AuthAccessWriteScope, AuthStandardClientScopes } from "@infinitus/contracts";
 import type { InfinitusManifestCommand, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -98,9 +98,9 @@ const makeHarness = (initial: InfinitusSnapshot = snapshotWith(manifest)) =>
       ) =>
         secret.forward({
           sessionId: "session-1",
-          // The desktop's own session; a phone's standard scopes are the
-          // sign-in case, passed where a test means them.
-          scopes: AuthAdministrativeScopes,
+          // A full session; a grant without access:write is the sign-in
+          // case, passed where a test means it.
+          scopes: AuthStandardClientScopes,
           args: {},
           secret: Redacted.make("s3cret"),
           ...input,
@@ -181,15 +181,16 @@ describe("InfinitusSecretLive", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const h = yield* makeHarness();
-        // A phone's standard scopes: the sign-in code goes through …
+        // A grant narrowed below access:write: the sign-in code goes through …
+        const narrowed = AuthStandardClientScopes.filter((scope) => scope !== AuthAccessWriteScope);
         yield* h.forward({
           command: "signin-code",
           args: { flowId: "f" },
-          scopes: AuthStandardClientScopes,
+          scopes: narrowed,
         });
         // … the engine key does not, and the socket never hears of it.
         const refused = yield* h
-          .forward({ command: "proxy-key", scopes: AuthStandardClientScopes })
+          .forward({ command: "proxy-key", scopes: narrowed })
           .pipe(Effect.flip);
         expect(refused).toMatchObject({ reason: "scope", command: "proxy-key" });
         expect((yield* h.requests).map((request) => request.command)).toEqual(["signin-code"]);

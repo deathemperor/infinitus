@@ -279,7 +279,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
           serverUpdateState.status === "failed"
             ? serverUpdateState.message
             : serverUpdateState.status === "running"
-              ? serverUpdateStageLabel(serverUpdateState.stage)
+              ? serverUpdateStageLabel(serverUpdateState.stage, serverUpdateState.runningTurns)
               : versionMismatchSelfUpdate !== null &&
                   (versionMismatchSelfUpdate !== "desktop-managed" ||
                     !versionMismatchDesktopAppUpdate)

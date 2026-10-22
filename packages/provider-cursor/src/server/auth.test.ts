@@ -13,6 +13,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { makeCursorAuth, type CursorAuthOptions } from "./auth.ts";
 import { InMemoryCredentialStore } from "./sdk.ts";
@@ -189,8 +190,7 @@ it.layer(NodeServices.layer)("CursorAuth", (it) => {
 
   it.effect("discards a credential rejected by verification and permits a fresh login", () =>
     Effect.gen(function* () {
-      const rejectionMessage =
-        "Cursor needs a paid plan to run in T3 Code. Upgrade this account or sign in with a different one.";
+      const rejectionMessage = `Cursor needs a paid plan to run in ${PRODUCT_NAME}. Upgrade this account or sign in with a different one.`;
       let rejected = true;
       const harness = yield* makeHarness({
         onChanged: (signedIn) =>

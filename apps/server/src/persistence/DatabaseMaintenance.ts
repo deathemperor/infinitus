@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NodeSqliteClient from "@infinitus/shared/nodeSqliteClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -17,7 +18,7 @@ export class DatabaseMissingError extends Schema.TaggedError<DatabaseMissingErro
   { path: Schema.String },
 ) {
   override get message() {
-    return "No existing T3 Code database was found in this data directory.";
+    return `No existing ${PRODUCT_NAME} database was found in this data directory.`;
   }
 }
 
@@ -26,7 +27,7 @@ export class DatabaseInUseError extends Schema.TaggedError<DatabaseInUseError>()
   { path: Schema.String, cause: Schema.Defect() },
 ) {
   override get message() {
-    return "Stop the T3 Code server and desktop app, including any version before 0.1.0, before repairing the database.";
+    return `Stop the ${PRODUCT_NAME} server and desktop app, including any version before 0.1.0, before repairing the database.`;
   }
 }
 
@@ -35,7 +36,7 @@ export class DatabaseProjectionsInvalidError extends Schema.TaggedError<Database
   { path: Schema.String },
 ) {
   override get message() {
-    return "Database projections need repair before compaction. Start T3 Code once so it rebuilds them, then run doctor again. If this CLI is older than the one that wrote the database, update T3 Code first.";
+    return `Database projections need repair before compaction. Start ${PRODUCT_NAME} once so it rebuilds them, then run doctor again. If this CLI is older than the one that wrote the database, update ${PRODUCT_NAME} first.`;
   }
 }
 
@@ -66,7 +67,7 @@ export class LegacyDatabaseRemoveError extends Schema.TaggedError<LegacyDatabase
   }
 }
 
-/** Offline inspection and repair of a T3 state database, for `t3 doctor`. */
+/** Offline inspection and repair of a state database, for `infinitus doctor`. */
 export class DatabaseMaintenance extends Context.Service<
   DatabaseMaintenance,
   {

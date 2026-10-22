@@ -1,4 +1,4 @@
-import { useClientSettings, useUpdateClientSettings } from "../../hooks/useSettings";
+import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
 import { Switch } from "../ui/switch";
 import { searchableSetting } from "./settingsSearch";
 import { SettingsRow } from "./settingsLayout";
@@ -9,7 +9,6 @@ import { SettingsRow } from "./settingsLayout";
  */
 export function DesktopKeepAwakeSettings() {
   const enabled = useClientSettings((settings) => settings.desktopKeepAwake);
-  const updateSettings = useUpdateClientSettings();
   if (window.desktopBridge?.setKeepAwake === undefined) return null;
   const { id, title } = searchableSetting("desktop-keep-awake");
   return (
@@ -21,7 +20,7 @@ export function DesktopKeepAwakeSettings() {
         <Switch
           checked={enabled}
           aria-label={title}
-          onCheckedChange={(checked) => void updateSettings({ desktopKeepAwake: checked })}
+          onCheckedChange={(checked) => void updateClientSettings({ desktopKeepAwake: checked })}
         />
       }
     />

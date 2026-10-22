@@ -1,6 +1,7 @@
 // The fork's ProviderEventIngestor cases (#834, #927: the tool-call count on the
 // terminal provider turn), beside upstream's `ProviderEventIngestor.test.ts` so that
 // file stays theirs. The fixture helpers are copies of that file's.
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import {
   type ModelSelection,
@@ -17,7 +18,9 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import * as ServerConfig from "../config.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
@@ -34,6 +37,11 @@ const layerTestEventSink = EventSink.layer.pipe(
   Layer.provide(Layer.mergeAll(layerTestStores, layerTestDatabase)),
 );
 
+const layerGit = GitVcsDriver.layer.pipe(
+  Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "ingestor-infinitus-git-" })),
+  Layer.provideMerge(NodeServices.layer),
+);
+
 const layerTest = Layer.mergeAll(
   layerTestStores,
   layerTestEventSink,
@@ -46,6 +54,7 @@ const layerTest = Layer.mergeAll(
         layerTestEventSink,
         IdAllocator.layer,
         ThreadCommandExecutor.layer,
+        layerGit,
       ),
     ),
   ),

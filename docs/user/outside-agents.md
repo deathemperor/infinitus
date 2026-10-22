@@ -94,7 +94,7 @@ Agents without OAuth support cannot connect.
 
 ## Scripts on the host
 
-On the machine that runs the environment, `t3 thread` uses the same tools
+On the machine that runs the environment, `infinitus thread` uses the same tools
 without a sign-in:
 
 ```sh

@@ -5,8 +5,8 @@ import { AsyncResult } from "effect/reactivity";
 import { useMemo, type ComponentProps } from "react";
 import { Platform } from "react-native";
 
-import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
-import { ControlPillMenu } from "../../components/ControlPill";
+import { AndroidAnchoredMenu } from "../../components/ui/AndroidAnchoredMenu";
+import { Menu } from "../../components/ui/Menu";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
 import { environmentServerConfigsAtom } from "../../state/server";
@@ -16,7 +16,7 @@ import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 
 /**
- * A settings row that opens a menu of choices. iOS: `ControlPillMenu`'s
+ * A settings row that opens a menu of choices. iOS: `Menu`'s
  * native `MenuView` opens on the tap whatever the row does, so the row's
  * press is a no-op. Android: `AndroidAnchoredMenu` wraps a plain child in
  * its own Pressable, which the row's inner Pressable would swallow, so the
@@ -25,7 +25,7 @@ import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 function PickerRow(props: {
   readonly title: string;
   readonly actions: MenuAction[];
-  readonly onPressAction: NonNullable<ComponentProps<typeof ControlPillMenu>["onPressAction"]>;
+  readonly onPressAction: NonNullable<ComponentProps<typeof Menu>["onPressAction"]>;
   readonly icon: ComponentProps<typeof SettingsRow>["icon"];
   readonly label: string;
   readonly value: string;
@@ -52,13 +52,9 @@ function PickerRow(props: {
     );
   }
   return (
-    <ControlPillMenu
-      title={props.title}
-      actions={props.actions}
-      onPressAction={props.onPressAction}
-    >
+    <Menu title={props.title} actions={props.actions} onPressAction={props.onPressAction}>
       {row(() => {})}
-    </ControlPillMenu>
+    </Menu>
   );
 }
 

@@ -469,13 +469,13 @@ export function formatConnectReachable(
 export const T3_CONNECT_TROUBLESHOOTING_SECTIONS = [
   "the-hosts-tunnel-is-offline",
   "port-7844-is-blocked-on-the-host",
-  "the-tunnel-works-but-t3-code-does-not-answer",
-  "the-t3-connect-address-does-not-resolve-or-answer",
-  "this-device-cant-reach-t3-connect",
+  "the-tunnel-works-but-infinitus-does-not-answer",
+  "the-infinitus-connect-address-does-not-resolve-or-answer",
+  "this-device-cant-reach-infinitus-connect",
   "sign-in-account-or-link-problems",
   "the-clock-is-off",
-  "the-host-runs-an-older-t3-code",
-  "t3-connect-returned-an-error",
+  "the-host-runs-an-older-infinitus",
+  "infinitus-connect-returned-an-error",
 ] as const;
 export type InfinitusConnectTroubleshootingSection =
   (typeof T3_CONNECT_TROUBLESHOOTING_SECTIONS)[number];
@@ -484,7 +484,7 @@ export type InfinitusConnectTroubleshootingSection =
 export function t3ConnectTroubleshootingUrl(
   section: InfinitusConnectTroubleshootingSection,
 ): string {
-  return `https://github.com/pingdotgg/t3code/blob/main/docs/user/t3-connect-troubleshooting.md#${section}`;
+  return `https://github.com/deathemperor/infinitus/blob/main/docs/user/t3-connect-troubleshooting.md#${section}`;
 }
 
 const REACHABILITY_SECTION = {
@@ -493,10 +493,10 @@ const REACHABILITY_SECTION = {
   connector_not_ready: "the-hosts-tunnel-is-offline",
   no_connector: "the-hosts-tunnel-is-offline",
   edge_unreachable: "port-7844-is-blocked-on-the-host",
-  origin_unreachable: "the-tunnel-works-but-t3-code-does-not-answer",
-  unexpected_response: "the-tunnel-works-but-t3-code-does-not-answer",
-  dns_failed: "the-t3-connect-address-does-not-resolve-or-answer",
-  timeout: "the-t3-connect-address-does-not-resolve-or-answer",
+  origin_unreachable: "the-tunnel-works-but-infinitus-does-not-answer",
+  unexpected_response: "the-tunnel-works-but-infinitus-does-not-answer",
+  dns_failed: "the-infinitus-connect-address-does-not-resolve-or-answer",
+  timeout: "the-infinitus-connect-address-does-not-resolve-or-answer",
 } satisfies Record<EnvironmentConnectReachabilityCause, InfinitusConnectTroubleshootingSection>;
 
 export function connectReachabilityHelpUrl(cause: EnvironmentConnectReachabilityCause): string {

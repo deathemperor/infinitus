@@ -1556,7 +1556,10 @@ export function planComposerTurn(input: {
     shouldQueueBehindActiveRun:
       compactBeforeSend ||
       input.sendQueuesBehindSetup ||
-      (input.phase === "running" && input.dispatchMode === "queue"),
+      // Fork (#1318): a steer while a turn runs is queued on the server and sent
+      // at the turn's next step, so it is drawn as a queued row, not a sent turn.
+      (input.phase === "running" &&
+        (input.dispatchMode === "queue" || input.dispatchMode === "steer")),
   };
 }
 

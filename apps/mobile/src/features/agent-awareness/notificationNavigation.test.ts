@@ -117,6 +117,25 @@ describe("extractAgentNotificationDeepLink", () => {
     expect(extractAgentNotificationDeepLink(response)).toBe("/threads/env/thread");
   });
 
+  it("reads the relay's keys from the payload's body on the push trigger (#1375)", () => {
+    const response = {
+      notification: {
+        request: {
+          identifier: "notification-3",
+          trigger: {
+            type: "push",
+            payload: {
+              aps: { alert: {} },
+              body: { environmentId: "env", deepLink: "/settings/accounts" },
+            },
+          },
+          content: {},
+        },
+      },
+    };
+    expect(extractAgentNotificationDeepLink(response)).toBe("/settings/accounts");
+  });
+
   it("ignores malformed or external links", () => {
     expect(
       extractAgentNotificationDeepLink(responseWithData({ deepLink: "https://example.com" })),

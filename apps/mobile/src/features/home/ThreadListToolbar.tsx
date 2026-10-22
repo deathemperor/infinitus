@@ -9,6 +9,7 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import type { MenuAction } from "@react-native-menu/menu";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { AndroidHeaderIconButton } from "../../components/ui/AndroidScreenHeader";
 import { AndroidAnchoredMenu } from "../../components/ui/AndroidAnchoredMenu";
@@ -112,7 +113,7 @@ export function ThreadListToolbar(props: {
         onCloseSearch={closeSearch}
         onOpenSearch={openSearch}
         searchAccessibilityLabel="Search threads"
-        titleAccessibilityLabel="T3 Code, Threads"
+        titleAccessibilityLabel={`${PRODUCT_NAME}, Threads`}
         onOpenEnvironments={props.onOpenEnvironments}
         filter={filterButton}
       />

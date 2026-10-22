@@ -105,7 +105,9 @@ export const mcpToolSession = (
     if (!response.ok) {
       yield* discardResponseBody(response);
       return yield* Effect.fail(
-        new AcpMcpBridgeError(`${PRODUCT_NAME} MCP endpoint responded with HTTP ${response.status}.`),
+        new AcpMcpBridgeError(
+          `${PRODUCT_NAME} MCP endpoint responded with HTTP ${response.status}.`,
+        ),
       );
     }
     const payloads = yield* Stream.runCollect(responsePayloads(response, bridgeError));

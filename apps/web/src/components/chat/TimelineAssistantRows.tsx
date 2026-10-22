@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { shouldPreserveAssistantLineBreaks } from "@infinitus/shared/markdownPipeline";
 import { type RunId } from "@infinitus/contracts";
 import { canForkProjectedAssistantItem } from "@infinitus/client-runtime/state/thread-workflows";
@@ -30,7 +31,7 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
   return (
     <>
       <div className="relative min-w-0 px-1 py-0.5">
-        <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
+        <MessageAuthorHeading>{PRODUCT_NAME}</MessageAuthorHeading>
         <div data-thread-find-text="true">
           <AssistantCitationSource
             messageId={row.message.id}
