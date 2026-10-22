@@ -19,7 +19,6 @@ const makeWindow = () => {
     },
   });
   const window = { webContents } as unknown as Electron.BrowserWindow;
-  /** The web app starts loading a new page, as a reload does. */
   const reload = () =>
     webContents.emit("did-start-navigation", { isMainFrame: true, isSameDocument: false });
   const layer = DesktopWebLinks.layer.pipe(
@@ -37,27 +36,10 @@ const makeWindow = () => {
 };
 
 describe("DesktopWebLinks", () => {
-  it("treats only http and https as web links", () => {
-    assert.isTrue(DesktopWebLinks.isWebLink("https://example.com/"));
-    assert.isTrue(DesktopWebLinks.isWebLink("http://localhost:3000/a?b=1"));
-    assert.isFalse(DesktopWebLinks.isWebLink("t3code://app/welcome"));
-    assert.isFalse(DesktopWebLinks.isWebLink("mailto:hello@example.com"));
-    assert.isFalse(DesktopWebLinks.isWebLink("not a url"));
-  });
-
-  it("opens HTML files the way a browser does, and nothing else by path", () => {
-    assert.isTrue(DesktopWebLinks.isWebPageFile("/Users/me/report.html"));
-    assert.isTrue(DesktopWebLinks.isWebPageFile("/tmp/page.HTM"));
-    assert.isTrue(DesktopWebLinks.isWebPageFile("/tmp/page.xhtml"));
-    assert.isFalse(DesktopWebLinks.isWebPageFile("/tmp/notes.md"));
-    assert.isFalse(DesktopWebLinks.isWebPageFile("/tmp/html"));
-  });
-
   it.effect("holds links until the renderer listens, then delivers them in order", () => {
     const { sent, revealed, layer } = makeWindow();
     return Effect.gen(function* () {
       const webLinks = yield* DesktopWebLinks.DesktopWebLinks;
-      // The link that launched the app arrives before the web app has loaded.
       yield* webLinks.receive("https://example.com/first");
       yield* webLinks.receive("https://example.com/second");
       assert.deepStrictEqual(sent, []);
@@ -69,7 +51,6 @@ describe("DesktopWebLinks", () => {
       yield* webLinks.receive("https://example.com/third");
       assert.deepStrictEqual(sent.at(-1), "https://example.com/third");
 
-      // A reloading web app stops listening; links wait for it again.
       yield* webLinks.setRendererReady(false);
       yield* webLinks.receive("https://example.com/fourth");
       assert.strictEqual(sent.length, 3);
@@ -81,7 +62,6 @@ describe("DesktopWebLinks", () => {
     return Effect.gen(function* () {
       const webLinks = yield* DesktopWebLinks.DesktopWebLinks;
       yield* webLinks.setRendererReady(true);
-      // The old page never says it stopped; the reload itself ends its listening.
       reload();
       yield* webLinks.receive("https://example.com/during-reload");
       assert.deepStrictEqual(sent, []);

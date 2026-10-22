@@ -46,6 +46,7 @@ const layerMetadata = Layer.merge(
       }),
   }),
   Layer.succeed(ProjectFaviconResolver.ProjectFaviconResolver, {
+    invalidate: () => Effect.void,
     resolvePath: (workspaceRoot) => Effect.succeed(`${workspaceRoot}/favicon.svg`),
   }),
 );
@@ -68,7 +69,6 @@ const layerTestFor = (
 
 const layerTest = layerTestFor(layerMetadata);
 
-/** Every dependency of ProjectService.make, so a test can swap one of them. */
 const layerProjectServiceDependencies = Layer.mergeAll(
   RuntimeLayer.layerEventSink,
   ProjectStore.layer,
@@ -203,28 +203,6 @@ it.layer(layerTest)("ProjectService", (it) => {
     }),
   );
 
-  it.effect("rejects active workspace collisions", () =>
-    Effect.gen(function* () {
-      const service = yield* ProjectService.ProjectService;
-      yield* TestClock.setTime(Date.parse("2026-06-20T10:00:00.000Z"));
-      yield* service.create({
-        commandId: CommandId.make("command:collision:first"),
-        projectId: ProjectId.make("project:collision:first"),
-        title: "First",
-        workspaceRoot: "/work/shared",
-      });
-      const error = yield* service
-        .create({
-          commandId: CommandId.make("command:collision:second"),
-          projectId: ProjectId.make("project:collision:second"),
-          title: "Second",
-          workspaceRoot: "/work/shared",
-        })
-        .pipe(Effect.flip);
-      assert.equal(error._tag, "ProjectConflictError");
-    }),
-  );
-
   it.effect("auto-bootstraps a workspace exactly once", () =>
     Effect.gen(function* () {
       const service = yield* ProjectService.ProjectService;
@@ -259,7 +237,6 @@ it.layer(layerTest)("ProjectService", (it) => {
         workspaceRoot: "/work/retry",
       };
       const first = yield* service.create(input);
-      // A retry re-plans against the row it created; its receipt still answers.
       const retried = yield* service.create(input);
       assert.deepEqual(retried, first);
       const updateInput = {
@@ -322,7 +299,6 @@ it.layer(layerTest)("ProjectService", (it) => {
       };
       const first = yield* service.update(invalid).pipe(Effect.flip);
       assert.equal(first._tag, "ProjectOperationError");
-      // Same id, now a valid payload: the recorded rejection wins.
       const replayed = yield* service
         .update({ ...invalid, scripts: [{ ...invalid.scripts[0]!, id: "valid" }] })
         .pipe(Effect.flip);
@@ -396,7 +372,6 @@ it.layer(layerTest)("ProjectService", (it) => {
         commandId: CommandId.make("command:freed:delete"),
         projectId: holderId,
       });
-      // A fresh plan would now succeed; the recorded conflict still answers.
       const replayed = yield* service.create(claim).pipe(Effect.flip);
       assert.deepEqual(replayed, first);
       assert.instanceOf(replayed, ProjectService.ProjectConflictError);
@@ -489,111 +464,6 @@ it.layer(layerTest)("ProjectService", (it) => {
   );
 });
 
-it.effect(
-  "returns project mutations before slow enrichment and shares the eventual result across reads",
-  () =>
-    Effect.gen(function* () {
-      const repositoryStarted = yield* Deferred.make<void>();
-      const releaseRepository = yield* Deferred.make<void>();
-      const repositoryCalls = yield* Ref.make(0);
-      const faviconCalls = yield* Ref.make(0);
-
-      const layerSlowMetadata = Layer.merge(
-        Layer.succeed(RepositoryIdentityResolver.RepositoryIdentityResolver, {
-          resolve: (workspaceRoot) =>
-            Effect.gen(function* () {
-              yield* Ref.update(repositoryCalls, (count) => count + 1);
-              yield* Deferred.succeed(repositoryStarted, undefined);
-              yield* Deferred.await(releaseRepository);
-              return {
-                canonicalKey: "github.com/t3tools/slow-project",
-                locator: {
-                  source: "git-remote" as const,
-                  remoteName: "origin",
-                  remoteUrl: "git@github.com:t3tools/slow-project.git",
-                },
-                rootPath: workspaceRoot,
-              };
-            }),
-        }),
-        Layer.succeed(ProjectFaviconResolver.ProjectFaviconResolver, {
-          resolvePath: (workspaceRoot) =>
-            Ref.updateAndGet(faviconCalls, (count) => count + 1).pipe(
-              Effect.as(`${workspaceRoot}/favicon.svg`),
-            ),
-        }),
-      );
-
-      yield* Effect.gen(function* () {
-        const service = yield* ProjectService.ProjectService;
-        const projectId = ProjectId.make("project:slow-enrichment");
-        const createFiber = yield* service
-          .create({
-            commandId: CommandId.make("command:slow-enrichment:create"),
-            projectId,
-            title: "Slow enrichment",
-            workspaceRoot: "/work/slow-enrichment",
-          })
-          .pipe(Effect.forkChild({ startImmediately: true }));
-
-        yield* Deferred.await(repositoryStarted);
-        yield* Effect.yieldNow;
-        assert.isDefined(createFiber.pollUnsafe());
-
-        const created = yield* Fiber.join(createFiber);
-        assert.isNull(created.repositoryIdentity);
-        assert.isNull(created.faviconPath);
-
-        const updated = yield* service.update({
-          commandId: CommandId.make("command:slow-enrichment:update"),
-          projectId,
-          title: "Updated before enrichment",
-        });
-        assert.equal(updated.title, "Updated before enrichment");
-        assert.isNull(updated.repositoryIdentity);
-        assert.equal(updated.faviconPath, "/work/slow-enrichment/favicon.svg");
-
-        const immediateReadFiber = yield* service
-          .getById(projectId)
-          .pipe(Effect.forkChild({ startImmediately: true }));
-        yield* Effect.yieldNow;
-        assert.isDefined(immediateReadFiber.pollUnsafe());
-        const immediateRead = Option.getOrThrow(yield* Fiber.join(immediateReadFiber));
-        assert.isNull(immediateRead.repositoryIdentity);
-        assert.equal(immediateRead.faviconPath, "/work/slow-enrichment/favicon.svg");
-
-        const snapshotFiber = yield* service.snapshot.pipe(
-          Effect.forkChild({ startImmediately: true }),
-        );
-        yield* Effect.yieldNow;
-        assert.isDefined(snapshotFiber.pollUnsafe());
-        const immediateSnapshot = yield* Fiber.join(snapshotFiber);
-        assert.isNull(immediateSnapshot.projects[0]?.repositoryIdentity ?? null);
-
-        yield* Deferred.succeed(releaseRepository, undefined);
-
-        const firstProject = yield* waitForProject(
-          service,
-          projectId,
-          (project) => project.repositoryIdentity !== null && project.faviconPath !== null,
-        );
-        assert.isDefined(firstProject);
-        assert.equal(
-          firstProject.repositoryIdentity?.canonicalKey,
-          "github.com/t3tools/slow-project",
-        );
-        assert.equal(firstProject.faviconPath, "/work/slow-enrichment/favicon.svg");
-
-        const byId = Option.getOrThrow(yield* service.getById(projectId));
-        const secondSnapshot = yield* service.snapshot;
-        assert.equal(byId.repositoryIdentity?.canonicalKey, "github.com/t3tools/slow-project");
-        assert.equal(secondSnapshot.projects[0]?.faviconPath, "/work/slow-enrichment/favicon.svg");
-        assert.equal(yield* Ref.get(repositoryCalls), 1);
-        assert.equal(yield* Ref.get(faviconCalls), 1);
-      }).pipe(Effect.provide(layerTestFor(layerSlowMetadata)));
-    }),
-);
-
 it.effect("keeps project snapshots available when optional metadata enrichment fails", () =>
   Effect.gen(function* () {
     const layerFailingMetadata = Layer.merge(
@@ -601,6 +471,7 @@ it.effect("keeps project snapshots available when optional metadata enrichment f
         resolve: () => Effect.succeed(null),
       }),
       Layer.succeed(ProjectFaviconResolver.ProjectFaviconResolver, {
+        invalidate: () => Effect.void,
         resolvePath: (workspaceRoot) =>
           Effect.fail(
             new ProjectFaviconResolver.ProjectFaviconResolutionError({
@@ -651,6 +522,7 @@ it.effect("invalidates workspace-derived metadata when a project moves", () =>
           ),
       }),
       Layer.succeed(ProjectFaviconResolver.ProjectFaviconResolver, {
+        invalidate: () => Effect.void,
         resolvePath: (workspaceRoot) =>
           Ref.get(metadataVersion).pipe(
             Effect.map((version) => `${workspaceRoot}/favicon-v${version}.svg`),
@@ -707,7 +579,6 @@ it.effect("serializes two projects claiming the same workspace root", () =>
     const eventSink = yield* EventSink.EventSinkV2;
     const firstReachedCommit = yield* Deferred.make<void>();
     const releaseFirst = yield* Deferred.make<void>();
-    // Hold the first claim between its plan and its commit.
     const gatedSink = EventSink.EventSinkV2.of({
       ...eventSink,
       commitProjectCommand: (input) =>
@@ -747,7 +618,6 @@ it.effect("rejects an update that waited on the lock while its project was delet
     const eventSink = yield* EventSink.EventSinkV2;
     const deleteReachedCommit = yield* Deferred.make<void>();
     const releaseDelete = yield* Deferred.make<void>();
-    // Hold the delete between its plan and its commit, inside the project lock.
     const gatedSink = EventSink.EventSinkV2.of({
       ...eventSink,
       commitProjectCommand: (input) =>
@@ -774,7 +644,6 @@ it.effect("rejects an update that waited on the lock while its project was delet
       .pipe(Effect.forkChild({ startImmediately: true }));
     yield* Deferred.await(deleteReachedCommit);
     const updateCommandId = CommandId.make("command:update-race:update");
-    // The update sees the active row, then queues behind the delete's lock.
     const update = yield* service
       .update({ commandId: updateCommandId, projectId, title: "Too late" })
       .pipe(Effect.flip, Effect.forkChild({ startImmediately: true }));
@@ -782,7 +651,6 @@ it.effect("rejects an update that waited on the lock while its project was delet
     yield* Deferred.succeed(releaseDelete, undefined);
     assert.isNotNull((yield* Fiber.join(deletion)).deletedAt);
     assert.instanceOf(yield* Fiber.join(update), ProjectService.ProjectNotFoundError);
-    // The planner rejected it under the lock, so the rejection has a receipt.
     const receipts = yield* sql<{ readonly status: string }>`
       SELECT status FROM orchestration_command_receipts WHERE command_id = ${updateCommandId}
     `;

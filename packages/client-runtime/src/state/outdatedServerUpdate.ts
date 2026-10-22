@@ -6,7 +6,7 @@ import type * as HttpClient from "effect/http/HttpClient";
 import type { Atom } from "effect/reactivity";
 import type * as Socket from "effect/socket/Socket";
 
-import { updateOutdatedHost } from "../connection/outdatedHostUpdate.ts";
+import { describeOutdatedHost, updateOutdatedHost } from "../connection/outdatedHostUpdate.ts";
 import type * as ConnectionResolver from "../connection/resolver.ts";
 import type * as EnvironmentRegistry from "../connection/registry.ts";
 import type * as RelayEnvironmentDiscovery from "../relay/discovery.ts";
@@ -24,10 +24,19 @@ export interface OutdatedServerUpdateTarget {
   readonly fromVersion?: string;
 }
 
-/**
- * Updates a host too old for this client to connect to. Progress lands in the
- * same per-environment update state as a normal server update.
- */
+export function createOutdatedServerDescriptionCommand<E>(
+  runtime: Atom.AtomRuntime<
+    EnvironmentRegistry.EnvironmentRegistry | ConnectionResolver.ConnectionResolver,
+    E
+  >,
+) {
+  return createRuntimeCommand(runtime, {
+    label: "environment-data:server:describe-outdated-server",
+    execute: (environmentId: EnvironmentId) =>
+      describeOutdatedHost(environmentId).pipe(Effect.timeout("20 seconds")),
+  });
+}
+
 export function createOutdatedServerUpdateCommand<E>(
   runtime: Atom.AtomRuntime<
     | EnvironmentRegistry.EnvironmentRegistry

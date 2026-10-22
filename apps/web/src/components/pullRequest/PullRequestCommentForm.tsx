@@ -1,8 +1,4 @@
 import { useAtomCommand } from "~/state/use-atom-command";
-/**
- * The comment half of the floating composer: a remark on the pull request itself, optionally
- * the one that closes or reopens it. The popover around it belongs to PullRequestComposer.
- */
 import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@infinitus/contracts";
 import { SendIcon } from "lucide-react";
 import { useState, type RefObject } from "react";
@@ -13,6 +9,8 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
 import { PullRequestGlyph } from "./pullRequestIcons";
+import { pullRequestReviewKey } from "./pullRequestReviewStore";
+import { useInlineActionConfirm } from "./useInlineActionConfirm";
 
 export function PullRequestCommentForm({
   environmentId,
@@ -41,6 +39,7 @@ export function PullRequestCommentForm({
   const postComment = useAtomCommand(pullRequestEnvironment.comment, {
     reportFailure: false,
   });
+  const inlineConfirm = useInlineActionConfirm(pullRequestReviewKey(reference));
   const followUpAction =
     detail.state === "open" &&
     detail.capabilities.actions.includes("close") &&
@@ -115,20 +114,34 @@ export function PullRequestCommentForm({
             size="xs"
             variant={followUpAction === "close" ? "destructive-outline" : "outline"}
             disabled={body.trim().length === 0 || submitting !== null || actionPending}
-            onClick={() => void submit(followUpAction)}
+            {...(followUpAction === "close"
+              ? inlineConfirm.props("close", () => void submit("close"))
+              : { onClick: () => void submit("reopen") })}
           >
             {followUpAction === "close" ? (
               <PullRequestGlyph.closed className="size-3.5" />
             ) : (
               <PullRequestGlyph.reopen className="size-3.5" />
             )}
-            {submitting === followUpAction
-              ? followUpAction === "close"
-                ? "Closing..."
-                : "Reopening..."
-              : followUpAction === "close"
-                ? "Close with comment"
-                : "Reopen with comment"}
+            {followUpAction === "close" ? (
+              // The longest label holds the width, so the confirming click lands on the button.
+              <span className="inline-grid">
+                <span aria-hidden className="invisible col-start-1 row-start-1">
+                  Close with comment
+                </span>
+                <span className="col-start-1 row-start-1">
+                  {submitting === "close"
+                    ? "Closing..."
+                    : inlineConfirm.isArmed("close")
+                      ? "Confirm close?"
+                      : "Close with comment"}
+                </span>
+              </span>
+            ) : submitting === "reopen" ? (
+              "Reopening..."
+            ) : (
+              "Reopen with comment"
+            )}
           </Button>
         )}
         <Button

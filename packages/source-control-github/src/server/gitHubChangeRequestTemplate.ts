@@ -1,9 +1,3 @@
-/**
- * GitHub's pull request template convention: the first single template found at a known path,
- * or the only Markdown file in a template directory, read from the committed base tree.
- *
- * @module source-control-github/server/gitHubChangeRequestTemplate
- */
 import type { GitCommandError } from "@infinitus/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -98,13 +92,13 @@ type DirectoryTemplateResult =
   | { readonly _tag: "Ambiguous" }
   | { readonly _tag: "Template"; readonly template: string };
 
-function readTemplateDirectory(input: {
-  readonly cwd: string;
-  readonly executeGit: ExecuteGit;
-  readonly entries: ReadonlyArray<TemplateTreeEntry>;
-  readonly directory: string;
-}): Effect.Effect<DirectoryTemplateResult, GitCommandError> {
-  return Effect.gen(function* () {
+const readTemplateDirectory = Effect.fn("gitHubChangeRequestTemplate.readTemplateDirectory")(
+  function* (input: {
+    readonly cwd: string;
+    readonly executeGit: ExecuteGit;
+    readonly entries: ReadonlyArray<TemplateTreeEntry>;
+    readonly directory: string;
+  }): Effect.fn.Return<DirectoryTemplateResult, GitCommandError> {
     const prefix = `${input.directory}/`;
     const candidates = input.entries.filter((entry) => {
       if (!entry.path.startsWith(prefix)) {
@@ -128,8 +122,8 @@ function readTemplateDirectory(input: {
     return templates[0]
       ? ({ _tag: "Template", template: templates[0] } as const)
       : ({ _tag: "None" } as const);
-  });
-}
+  },
+);
 
 export const detect = Effect.fn("gitHubChangeRequestTemplate.detect")(function* (
   cwd: string,

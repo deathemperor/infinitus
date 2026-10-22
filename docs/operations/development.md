@@ -52,9 +52,21 @@ when changing this setup:
   chunks. Static imports can work on first load and fail after a route split.
 - Bundled dev rebuilds Tailwind through watched files. Its ordinary Vite hot-update hook expects
   a server/module graph that Rolldown does not provide.
+- The app and its routes are lazy chunks, built on first request. A plugin pre-bundles the
+  startup chain when the server starts. Renaming or moving a startup route or the app entry
+  silently drops it from that list.
 
-The workarounds live in the [web entry](../../apps/web/src/bootstrap.ts) and
-[Tailwind plugin](../../apps/web/vite/tailwind.ts).
+The workarounds live in the [web entry](../../apps/web/src/bootstrap.ts),
+[Tailwind plugin](../../apps/web/vite/tailwind.ts), and
+[startup warmup](../../apps/web/vite/warmBundledDev.ts).
+
+`vp run dev --share --built` skips the Vite dev server. It runs `vp build --watch` for the web
+app, and the backend serves `apps/web/dist` on the same tailnet URL and pairing flow. Use it when
+someone tests over a slow link or only needs to use the app: loads are production size, and the
+first load does not wait for dev bundling. There is no HMR. After an edit, wait for the
+`built in` line (about 6 s), then reload. Until the first build exists, the URL shows a page that
+reloads by itself. The license manifest is not generated in this mode. `--built` requires
+`--share` and the `dev` mode.
 
 #### Reusable dev credential
 
@@ -98,13 +110,24 @@ for the security model.
 
 ## Checks
 
-Run checks for the files and packages you changed:
+`vp run check:changed` runs CI's fast checks for your branch's changes: format and lint of the
+changed files, `knip:check` when code or a manifest changes, the generated GraphQL checks, typecheck
+of the affected packages and their dependents, and the test files beside the changed files. It maps
+files to packages with [ci-changes.cjs](../../.github/scripts/ci-changes.cjs), as CI does. It
+compares against the merge base with `origin/main`, or with a ref you pass. CI still runs the full
+test suites and the jobs the summary lists, so a local pass does not promise a green CI run.
+
+While you iterate, run single checks:
 
 ```sh
 vp test run <files>
 vp lint <files>
 vp run --filter <package> typecheck
 ```
+
+In `apps/web`, a test that renders React or touches the DOM is named `*.browser.test.{ts,tsx}`
+and runs in headless Chromium with the React Compiler on, like the app. There is no jsdom; other
+`*.test.ts` files run in Node.
 
 TypeScript workspaces typecheck with tsc-rs, which has Effect diagnostics built in.
 Keep `typescript`, `@effect/tsgo`, and the `effect-tsgo patch` prepare step: editors
