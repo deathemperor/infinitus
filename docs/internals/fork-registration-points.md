@@ -272,7 +272,8 @@ makeInfinitusServerLayers({ layerAuth, layerServerEnvironment, layerServerSettin
   usage, message context, title state, PR files viewed, auto-settle; their
   features left with #1627, but existing fork databases recorded them, so
   they are schema history, not live code) and upstream's `055`–`061`
-  (OrchestrationV2 onward) are renumbered `065`–`071` on every sync
+  (OrchestrationV2 onward) are renumbered `065`–`071`, its `062`–`067`
+  (ThreadFailureLookupIndex to WebhookDedupe) `072`–`077`, on every sync
   (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
   legacy/V2 boundary ids are the fork's. Upstream's `reconcileV2PreviewMigration` is not carried: no
