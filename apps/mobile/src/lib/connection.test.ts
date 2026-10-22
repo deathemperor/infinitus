@@ -2,8 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
-import { isRelayManagedConnection, toStableSavedRemoteConnection } from "./connection";
-import { authClientMetadata } from "./authClientMetadata";
+import { toStableSavedRemoteConnection } from "./connection";
 
 const mobilePlatform = vi.hoisted(() => ({ OS: "ios" as "ios" | "android" }));
 const mobileDevice = vi.hoisted(() => ({
@@ -39,6 +38,7 @@ describe("mobile remote connection records", () => {
     mobileDevice.modelName = "iPhone 15 Pro";
   });
 
+<<<<<<< HEAD
   it("identifies mobile token exchanges for authorized-client presentation", () => {
     expect(authClientMetadata()).toEqual({
       label: `${PRODUCT_NAME} Mobile`,
@@ -89,6 +89,8 @@ describe("mobile remote connection records", () => {
     expect(isRelayManagedConnection({ authenticationMethod: "bearer" })).toBe(false);
   });
 
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
   it("drops short-lived managed environment credentials from stable records", () => {
     const connection = {
       environmentId: EnvironmentId.make("environment-1"),

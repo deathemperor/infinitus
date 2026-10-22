@@ -7,6 +7,7 @@ import {
   PullRequestListResult,
   PullRequestChecks,
   PullRequestDiffResult,
+  PullRequestChangeBreakdown,
   PullRequestFilesViewedResult,
   PullRequestLinkedThreadsResult,
   type EnvironmentId,
@@ -54,7 +55,6 @@ export class EnvironmentHttpConnectionNotReadyError extends Data.TaggedError(
 
 const LINKED_PULL_REQUEST_IDLE_TTL_MS = 5_000;
 
-/** Keep confirmed edits on the same cached reference regardless of input property order. */
 function writableQueryFamily<A, E>(
   family: (target: {
     readonly environmentId: EnvironmentId;
@@ -115,7 +115,6 @@ function createPullRequestRefreshAtomFamily<R, E>(
   });
 }
 
-/** Refresh only the live fields a linked thread renders. */
 export function createLinkedPullRequestSummaryAtomFamily<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
   refreshes = createPullRequestRefreshAtomFamily(runtime),
@@ -129,10 +128,10 @@ export function createLinkedPullRequestSummaryAtomFamily<R, E>(
     refreshIntervalMs: 60_000,
     idleTtlMs: LINKED_PULL_REQUEST_IDLE_TTL_MS,
     refreshTrigger: ({ environmentId }) => refreshes({ environmentId, input: {} }),
+    isFinal: (summary) => summary.state === "merged",
   });
 }
 
-/** The host-native stack a pull request belongs to; null where it is not stacked. */
 export function createPullRequestStackAtomFamily<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
   refreshes = createPullRequestRefreshAtomFamily(runtime),
@@ -163,11 +162,6 @@ export function pullRequestDetailToVcsStatus(
   };
 }
 
-/**
- * Reopening a PR within a minute reuses detail and activity. Explicit refreshes and
- * turn notifications still revalidate. Mutations run serially per environment: actions on the same
- * pull request are order-sensitive. Confirmed label and reviewer edits update cached state.
- */
 export function createPullRequestEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<
     EnvironmentRegistry | PullRequestDiffLoader.PullRequestDiffLoader | R,
@@ -219,7 +213,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       staleTimeMs: 60_000,
     }),
   );
-  // The stored guide only changes when somebody generates one, which refreshes it below.
   const reviewGuide = writableQueryFamily(
     createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:pull-requests:review-guide",
@@ -238,6 +231,62 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       staleTimeMs: 60_000,
     }),
   );
+  const loadDiff = Effect.fn("PullRequests.loadDiff")(function* (input: PullRequestDiffInput) {
+    const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
+    const loader = yield* PullRequestDiffLoader.PullRequestDiffLoader;
+    const prepared = yield* SubscriptionRef.get(supervisor.prepared);
+    if (Option.isNone(prepared)) {
+      return yield* new EnvironmentHttpConnectionNotReadyError({
+        message: "The environment HTTP connection is not ready.",
+      });
+    }
+    return yield* loader.load(prepared.value, input);
+  });
+
+  const runAction = Effect.fn("PullRequests.runAction")(function* (
+    input: PullRequestActionInput & {
+      readonly resolveMergeMethod?: (detail: PullRequestDetail) => PullRequestMergeMethod;
+    },
+  ) {
+    const { resolveMergeMethod, ...actionInput } = input;
+    let preparedInput = actionInput;
+    if (actionInput.action === "merge" && resolveMergeMethod !== undefined) {
+      const { projectId, host, repository, number } = actionInput;
+      const reference = { projectId, host, repository, number, allowStale: false };
+      const detail = yield* routedRequest(WS_METHODS.pullRequestsDetail, reference);
+      if (
+        detail.state !== "open" ||
+        detail.isDraft ||
+        !detail.capabilities.actions.includes("merge") ||
+        !detail.viewerPermissions.actions.includes("merge")
+      ) {
+        return yield* new PullRequestOperationError({
+          operation: "runAction",
+          detail: "This pull request cannot be merged.",
+        });
+      }
+      if (detail.capabilities.stackActions) {
+        const stack = yield* routedRequest(WS_METHODS.pullRequestsStack, reference);
+        if (stack !== null) {
+          return yield* new PullRequestOperationError({
+            operation: "runAction",
+            detail: "Open this pull request to merge its stack.",
+          });
+        }
+      }
+      const mergeMethod = yield* Effect.try({
+        try: () => resolveMergeMethod(detail),
+        catch: (cause) =>
+          new PullRequestOperationError({
+            operation: "runAction",
+            detail: cause instanceof Error ? cause.message : "Could not choose a merge method.",
+          }),
+      });
+      preparedInput = { ...actionInput, mergeMethod };
+    }
+    return yield* routedRequest(WS_METHODS.pullRequestsRunAction, preparedInput);
+  });
+
   return {
     refreshes,
     linkedThreads: createEnvironmentRpcQueryAtomFamily(runtime, {
@@ -257,10 +306,9 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         input.cursors === undefined ? refreshes({ environmentId, input: {} }) : undefined,
     }),
     /**
-     * The line counts for rows the listing has already handed over. Its own query because the
-     * listing is quicker without them — measured over twelve repositories, ~4.0s against ~7.1s —
-     * so the rows arrive first and their stats a moment later. Kept longer than the listing:
-     * a change request's size only moves when somebody pushes to it.
+     * Its own query because the listing is quicker without them — measured over twelve
+     * repositories, ~4.0s against ~7.1s — so the rows arrive first and their stats a moment
+     * later.
      */
     listStats: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:pull-requests:list-stats",
@@ -295,18 +343,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       label: "environment-data:pull-requests:diff",
       persistence: persistQuery(PullRequestDiffResult),
       staleTimeMs: 60_000,
-      execute: (input: PullRequestDiffInput) =>
-        Effect.gen(function* () {
-          const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
-          const loader = yield* PullRequestDiffLoader.PullRequestDiffLoader;
-          const prepared = yield* SubscriptionRef.get(supervisor.prepared);
-          if (Option.isNone(prepared)) {
-            return yield* new EnvironmentHttpConnectionNotReadyError({
-              message: "The environment HTTP connection is not ready.",
-            });
-          }
-          return yield* loader.load(prepared.value, input);
-        }),
+      execute: loadDiff,
     }),
     diffFileContents: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:diff-file-contents",
@@ -336,6 +373,14 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       execute: (input) => routedRequest(WS_METHODS.pullRequestsFilesViewed, input),
       staleTimeMs: 15_000,
     }),
+    changeBreakdown: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:pull-requests:change-breakdown",
+      persistence: persistQuery(PullRequestChangeBreakdown),
+      tag: WS_METHODS.pullRequestsChangeBreakdown,
+      execute: (input) => routedRequest(WS_METHODS.pullRequestsChangeBreakdown, input),
+      staleTimeMs: 60_000,
+      refreshTrigger: ({ environmentId }) => refreshes({ environmentId, input: {} }),
+    }),
     /**
      * One write in flight per change request: the host applies these in order, and a reader
      * ticking down a file list faster than the round trip would otherwise race their own presses.
@@ -356,51 +401,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       label: "environment-data:pull-requests:run-action",
       // Preparation belongs to the write's lane. Refreshable queries would restart it after
       // every preceding action, and preparing outside the lane could reorder the clicks.
-      execute: (
-        input: PullRequestActionInput & {
-          readonly resolveMergeMethod?: (detail: PullRequestDetail) => PullRequestMergeMethod;
-        },
-      ) =>
-        Effect.gen(function* () {
-          const { resolveMergeMethod, ...actionInput } = input;
-          let preparedInput = actionInput;
-          if (actionInput.action === "merge" && resolveMergeMethod !== undefined) {
-            const { projectId, host, repository, number } = actionInput;
-            const reference = { projectId, host, repository, number, allowStale: false };
-            const detail = yield* routedRequest(WS_METHODS.pullRequestsDetail, reference);
-            if (
-              detail.state !== "open" ||
-              detail.isDraft ||
-              !detail.capabilities.actions.includes("merge") ||
-              !detail.viewerPermissions.actions.includes("merge")
-            ) {
-              return yield* new PullRequestOperationError({
-                operation: "runAction",
-                detail: "This pull request cannot be merged.",
-              });
-            }
-            if (detail.capabilities.stackActions) {
-              const stack = yield* routedRequest(WS_METHODS.pullRequestsStack, reference);
-              if (stack !== null) {
-                return yield* new PullRequestOperationError({
-                  operation: "runAction",
-                  detail: "Open this pull request to merge its stack.",
-                });
-              }
-            }
-            const mergeMethod = yield* Effect.try({
-              try: () => resolveMergeMethod(detail),
-              catch: (cause) =>
-                new PullRequestOperationError({
-                  operation: "runAction",
-                  detail:
-                    cause instanceof Error ? cause.message : "Could not choose a merge method.",
-                }),
-            });
-            preparedInput = { ...actionInput, mergeMethod };
-          }
-          return yield* routedRequest(WS_METHODS.pullRequestsRunAction, preparedInput);
-        }),
+      execute: runAction,
       onSuccess: ({ environmentId, input }, registry) =>
         Effect.sync(() => registry.refresh(preview({ environmentId, input }))),
       scheduler: commandScheduler,
@@ -451,12 +452,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       scheduler: commandScheduler,
       concurrency: serialPerEnvironment,
     }),
-    /**
-     * Its own query rather than part of the detail: the people who may be asked are only wanted
-     * once somebody opens the reviewer menu, so this atom is read then and not before. Kept fresh
-     * for a minute, because who has access to a repository changes far more slowly than the
-     * change request it is being read for.
-     */
     reviewerCandidates,
     requestReviewers: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:request-reviewers",
@@ -534,19 +529,15 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         }),
     }),
     reviewGuide,
-    /** Runs a model on the environment; never fired without the reader asking for it. */
     generateReviewGuide: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:generate-review-guide",
       tag: WS_METHODS.pullRequestsGenerateReviewGuide,
       execute: (input) => routedRequest(WS_METHODS.pullRequestsGenerateReviewGuide, input),
       onSuccess: (target, registry, result) =>
         Effect.sync(() => {
-          // The command returns the accepted run. Publish it before starting ends so readers
-          // never fall back to the empty/failed state while the follow-up query is in flight.
           updateCached(registry, reviewGuide(target), () => result, true);
         }),
     }),
-    /** Read when the label menu opens, and kept for a minute, like the reviewer candidates. */
     labelCandidates,
     setLabels: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:set-labels",
@@ -599,9 +590,8 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       concurrency: serialPerEnvironment,
     }),
     /**
-     * Explicit refresh: forget the server's cached answers, then re-run the reads. A separate
-     * request rather than a flag on a read, so only a person's refresh spends host requests
-     * while every silent re-read shares the cache.
+     * A separate request rather than a flag on a read, so only a person's refresh spends
+     * host requests while every silent re-read shares the cache.
      */
     invalidate: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:invalidate",

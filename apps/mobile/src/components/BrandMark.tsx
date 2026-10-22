@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { Image } from "expo-image";
 import { View } from "react-native";
 
+<<<<<<< HEAD
 import { AppText as Text } from "./AppText";
 import { resolveMobileBrandMarkVariant, resolveMobileStageLabel } from "../lib/mobileBranding";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
@@ -15,6 +16,14 @@ const BRAND_MARK_SOURCES = {
 } as const;
 const BRAND_MARK_SOURCE = BRAND_MARK_SOURCES[resolveMobileBrandMarkVariant(appVariant)];
 const DEFAULT_STAGE_LABEL = resolveMobileStageLabel(appVariant);
+=======
+import { AppText as Text } from "./ui/AppText";
+import { T3_CODE_BRAND_MARK_SOURCE } from "./brandAssets";
+
+const appVariant = Constants.expoConfig?.extra?.appVariant;
+const DEFAULT_STAGE_LABEL =
+  appVariant === "development" ? "Dev" : appVariant === "preview" ? "Preview" : "Beta";
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 
 export function BrandMark(props: { readonly compact?: boolean; readonly stageLabel?: string }) {
   const compact = props.compact ?? false;

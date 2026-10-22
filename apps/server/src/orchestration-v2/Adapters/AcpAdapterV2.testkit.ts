@@ -1,8 +1,19 @@
 import {
+  MessageId,
+  type ModelSelection,
+  NodeId,
+  ProjectId,
+  type ProviderInstanceId,
+  RunAttemptId,
+  RunId,
+  type OrchestrationV2ProviderThread,
+  type ThreadId,
   ProviderDriverKind,
   ProviderReplayEntry,
   type ProviderReplayTranscript,
 } from "@infinitus/contracts";
+import type * as DateTime from "effect/DateTime";
+import type * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 import * as Effect from "effect/Effect";
 import * as Crypto from "effect/Crypto";
 import * as FileSystem from "effect/FileSystem";
@@ -156,12 +167,6 @@ function acpReplayAgentArgs(scriptPath: string): ReadonlyArray<string> {
   return ["--experimental-strip-types", scriptPath];
 }
 
-/**
- * Holds the replay agent's inbound lines at a gate the scenario releases.
- * The agent writes one line per `emit_inbound` entry in transcript order, so
- * the Nth line it writes belongs to the Nth inbound entry and carries its
- * label. Lines after a held one wait with it, which keeps wire order.
- */
 function holdGatedReplayLines(
   transcript: AcpReplayTranscript,
   replayGate: ProviderReplayGate,
@@ -190,6 +195,7 @@ export function makeAcpReplayRuntime(input: {
   readonly scriptPath: string;
   readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
   readonly fileSystem: FileSystem.FileSystem;
+  readonly customModels?: AcpSessionRuntime.AcpSessionRuntimeOptions["customModels"];
   readonly cancelMeta?: AcpSessionRuntime.AcpSessionRuntimeOptions["cancelMeta"];
   readonly initializeMeta?: AcpSessionRuntime.AcpSessionRuntimeOptions["initializeMeta"];
   readonly replayGate?: ProviderReplayGate;
@@ -231,6 +237,7 @@ export function makeAcpReplayRuntime(input: {
             },
           },
           authMethodId: "replay",
+          ...(input.customModels === undefined ? {} : { customModels: input.customModels }),
           ...(input.cancelMeta === undefined ? {} : { cancelMeta: input.cancelMeta }),
           ...(input.initializeMeta === undefined ? {} : { initializeMeta: input.initializeMeta }),
           ...(input.replayGate === undefined
@@ -246,4 +253,67 @@ export function makeAcpReplayRuntime(input: {
         Effect.provide(context),
       );
     });
+}
+
+export function makeTurnInput(input: {
+  readonly threadId: ThreadId;
+  readonly providerThread: OrchestrationV2ProviderThread;
+  readonly instanceId: ProviderInstanceId;
+  readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+  readonly now: DateTime.Utc;
+  readonly ordinal?: number;
+  readonly modelSelection?: ModelSelection;
+  readonly messageCreatedBy?: "user" | "agent";
+  readonly messageCreationSource?: "web" | "mobile" | "mcp" | "provider" | "server";
+  readonly messageText?: string;
+}): ProviderAdapter.ProviderAdapterV2TurnInput {
+  const ordinal = input.ordinal ?? 1;
+  const suffix = `${input.threadId}:${ordinal}`;
+  const modelSelection =
+    input.modelSelection ?? ({ instanceId: input.instanceId, model: "default" } as const);
+  return {
+    appThread: {
+      createdBy: "user",
+      creationSource: "web",
+      id: input.threadId,
+      projectId: ProjectId.make(`project:${input.threadId}`),
+      title: "ACP adapter test",
+      providerInstanceId: input.instanceId,
+      modelSelection,
+      runtimeMode: "approval-required",
+      interactionMode: "default",
+      branch: null,
+      worktreePath: null,
+      activeProviderThreadId: input.providerThread.id,
+      lineage: {
+        parentThreadId: null,
+        relationshipToParent: null,
+        rootThreadId: input.threadId,
+      },
+      forkedFrom: null,
+      createdAt: input.now,
+      updatedAt: input.now,
+      archivedAt: null,
+      settledOverride: null,
+      settledAt: null,
+      lastVisitedAt: null,
+      deletedAt: null,
+    },
+    threadId: input.threadId,
+    runId: RunId.make(`run:${suffix}`),
+    runOrdinal: ordinal,
+    providerTurnOrdinal: ordinal,
+    attemptId: RunAttemptId.make(`attempt:${suffix}`),
+    rootNodeId: NodeId.make(`node:${suffix}`),
+    providerThread: input.providerThread,
+    message: {
+      createdBy: input.messageCreatedBy ?? "user",
+      creationSource: input.messageCreationSource ?? "web",
+      messageId: MessageId.make(`message:${suffix}`),
+      text: input.messageText ?? "test prompt",
+      attachments: [],
+    },
+    modelSelection,
+    runtimePolicy: input.runtimePolicy,
+  };
 }

@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { act, useEffect, useReducer } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { AsyncResult } from "effect/reactivity";
@@ -13,7 +12,6 @@ const harness = vi.hoisted(() => ({
   worktree: { selectedThreadCwd: "/repo" as string | null, selectedThreadWorktreePath: null },
   refreshStatusCalls: [] as Array<unknown>,
   renderCount: 0,
-  // Mirrors refreshStatus invalidating refs: settled refreshes rerender consumers.
   onRefreshSettled: () => {},
 }));
 
@@ -41,7 +39,6 @@ vi.mock("./session", () => ({
 }));
 vi.mock("./use-remote-environment-registry", () => ({ setPendingConnectionError: () => {} }));
 vi.mock("./use-vcs-action-state", () => ({ showGitActionResult: () => {} }));
-// Runs on every render: a refresh loop fails fast here instead of exhausting memory.
 vi.mock("./use-thread-selection", () => ({
   useThreadSelection: () => {
     harness.renderCount += 1;
@@ -60,8 +57,6 @@ import { useSelectedThreadGitActions } from "./use-selected-thread-git-actions";
 let root: Root | null = null;
 let rerender: () => void = () => {};
 
-// Stands in for a Git sheet: every settled refresh causes a rerender, as the
-// refs invalidation does on device.
 function Consumer() {
   const [, bump] = useReducer((count: number) => count + 1, 0);
   useEffect(() => {
@@ -103,88 +98,9 @@ describe("useSelectedThreadGitActions", () => {
     act(() => root!.render(<Consumer />));
     await flush();
 
-    // Shell updates replace the thread object without changing the selection.
     harness.selection = {
       selectedThread: { environmentId: "environment-1", id: "thread-1" },
       selectedThreadProject: { workspaceRoot: "/repo" },
-      selectedEnvironmentRuntime: { connectionState: "connected" },
-    };
-    act(() => rerender());
-    await flush();
-
-    expect(harness.refreshStatusCalls).toEqual([
-      { environmentId: "environment-1", input: { cwd: "/repo" } },
-    ]);
-  });
-
-  it("refreshes again when the selected thread or cwd changes", async () => {
-    root = createRoot(document.createElement("div"));
-    act(() => root!.render(<Consumer />));
-    await flush();
-
-    harness.selection = {
-      selectedThread: { environmentId: "environment-1", id: "thread-2" },
-      selectedThreadProject: { workspaceRoot: "/repo" },
-      selectedEnvironmentRuntime: { connectionState: "connected" },
-    };
-    act(() => rerender());
-    await flush();
-
-    harness.worktree = { selectedThreadCwd: "/repo/worktree", selectedThreadWorktreePath: null };
-    act(() => rerender());
-    await flush();
-
-    expect(harness.refreshStatusCalls).toEqual([
-      { environmentId: "environment-1", input: { cwd: "/repo" } },
-      { environmentId: "environment-1", input: { cwd: "/repo" } },
-      { environmentId: "environment-1", input: { cwd: "/repo/worktree" } },
-    ]);
-  });
-
-  it("refreshes once after the environment reconnects and not while it is away", async () => {
-    root = createRoot(document.createElement("div"));
-    act(() => root!.render(<Consumer />));
-    await flush();
-
-    for (const connectionState of ["reconnecting", "connecting", "offline"]) {
-      harness.selection = {
-        ...harness.selection,
-        selectedEnvironmentRuntime: { connectionState },
-      };
-      act(() => rerender());
-      await flush();
-    }
-    expect(harness.refreshStatusCalls).toHaveLength(1);
-
-    // The server's cached status can be stale after a long background, so the
-    // new session refreshes it once.
-    harness.selection = {
-      ...harness.selection,
-      selectedEnvironmentRuntime: { connectionState: "connected" },
-    };
-    act(() => rerender());
-    await flush();
-    act(() => rerender());
-    await flush();
-
-    expect(harness.refreshStatusCalls).toEqual([
-      { environmentId: "environment-1", input: { cwd: "/repo" } },
-      { environmentId: "environment-1", input: { cwd: "/repo" } },
-    ]);
-  });
-
-  it("waits for the environment to connect before the first refresh", async () => {
-    harness.selection = {
-      ...harness.selection,
-      selectedEnvironmentRuntime: { connectionState: "connecting" },
-    };
-    root = createRoot(document.createElement("div"));
-    act(() => root!.render(<Consumer />));
-    await flush();
-    expect(harness.refreshStatusCalls).toEqual([]);
-
-    harness.selection = {
-      ...harness.selection,
       selectedEnvironmentRuntime: { connectionState: "connected" },
     };
     act(() => rerender());

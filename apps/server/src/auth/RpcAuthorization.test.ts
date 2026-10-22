@@ -8,12 +8,8 @@ import {
   ProviderInstanceId,
   ThreadId,
   AuthOrchestrationOperateScope,
-  ORCHESTRATION_V2_WS_METHODS,
   AuthOrchestrationReadScope,
   AuthSourceControlWriteScope,
-  AuthPreviewOperateScope,
-  AuthRelayReadScope,
-  AuthRelayWriteScope,
   AuthTerminalReadScope,
   AuthTerminalOperateScope,
   WS_METHODS,
@@ -22,6 +18,7 @@ import {
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
 import * as RpcTest from "effect/rpc/RpcTest";
 
 import {
@@ -36,27 +33,6 @@ describe("RPC authorization scopes", () => {
     expect(new Set(Object.keys(RPC_REQUIRED_SCOPES))).toEqual(new Set(WsRpcGroup.requests.keys()));
   });
 
-  it("requires operate access to stop a workflow", () => {
-    expect(requiredScopeForRpcMethod(ORCHESTRATION_V2_WS_METHODS.stopWorkflow)).toBe(
-      AuthOrchestrationOperateScope,
-    );
-  });
-
-  it("authorizes background policy reporting and observation deliberately", () => {
-    expect(requiredScopeForRpcMethod(WS_METHODS.serverReportClientActivity)).toBe(
-      AuthOrchestrationReadScope,
-    );
-    expect(requiredScopeForRpcMethod(WS_METHODS.serverReportHostPowerState)).toBe(
-      AuthEnvironmentMaintainScope,
-    );
-    expect(requiredScopeForRpcMethod(WS_METHODS.serverGetBackgroundPolicy)).toBe(
-      AuthOrchestrationReadScope,
-    );
-    expect(requiredScopeForRpcMethod(WS_METHODS.subscribeBackgroundPolicy)).toBe(
-      AuthOrchestrationReadScope,
-    );
-  });
-
   it("keeps webhook delivery logs, which hold request bodies, behind operate scope", () => {
     for (const method of [
       WS_METHODS.scheduledTasksListWebhookDeliveries,
@@ -67,6 +43,7 @@ describe("RPC authorization scopes", () => {
     }
   });
 
+<<<<<<< HEAD
   it("allows relay status reads without granting relay installation access", () => {
     expect(requiredScopeForRpcMethod(WS_METHODS.cloudGetRelayClientStatus)).toBe(
       AuthRelayReadScope,
@@ -180,6 +157,8 @@ describe("RPC authorization scopes", () => {
     }
   });
 
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
   it("separates passive terminal observation from operations that can change a shell", () => {
     for (const method of [
       WS_METHODS.terminalObserve,
@@ -238,10 +217,6 @@ describe("RPC scope middleware", () => {
     {
       scopes: [AuthOrchestrationReadScope, AuthEnvironmentMaintainScope],
       missing: AuthDiagnosticsReadScope,
-    },
-    {
-      scopes: [AuthOrchestrationReadScope, AuthDiagnosticsReadScope],
-      missing: AuthEnvironmentMaintainScope,
     },
   ])("rejects telemetry retry without $missing before its handler runs", ({ scopes, missing }) =>
     Effect.gen(function* () {
@@ -375,6 +350,59 @@ it.effect("requires task permission before attaching a prepared worktree to a th
     expect(handled).toBe(false);
   }).pipe(Effect.scoped),
 );
+
+describe("thread context authorization", () => {
+  const group = WsRpcGroup.omit(
+    ...[...WsRpcGroup.requests.keys()].filter(
+      (
+        tag,
+      ): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, typeof WS_METHODS.gitRunStackedAction> =>
+        tag !== WS_METHODS.gitRunStackedAction,
+    ),
+  );
+
+  it.effect.each(["commit", "create_pr", "commit_push_pr"] as const)(
+    "%s needs thread read permission only when generating a PR from a thread",
+    (action) =>
+      Effect.gen(function* () {
+        const handled: string[] = [];
+        const handler = group.toLayerHandler(WS_METHODS.gitRunStackedAction, ({ actionId }) =>
+          Stream.fromEffect(Effect.sync(() => handled.push(actionId))).pipe(Stream.drain),
+        );
+        const client = yield* RpcTest.makeClient(group).pipe(
+          Effect.provide(
+            Layer.merge(handler, RpcAuthorization.layer([AuthSourceControlWriteScope])),
+          ),
+        );
+        const input = { actionId: "without-thread", cwd: "/repo", action };
+        const withThread = { ...input, actionId: "with-thread", threadId: ThreadId.make("thread") };
+        yield* Stream.runDrain(client[WS_METHODS.gitRunStackedAction](input));
+        if (action === "create_pr" || action === "commit_push_pr") {
+          expect(
+            yield* Stream.runDrain(client[WS_METHODS.gitRunStackedAction](withThread)).pipe(
+              Effect.flip,
+            ),
+          ).toMatchObject({ requiredPermission: AuthOrchestrationReadScope });
+          expect(handled).toEqual(["without-thread"]);
+        } else {
+          yield* Stream.runDrain(client[WS_METHODS.gitRunStackedAction](withThread));
+          expect(handled).toEqual(["without-thread", "with-thread"]);
+        }
+        const reader = yield* RpcTest.makeClient(group).pipe(
+          Effect.provide(
+            Layer.merge(
+              handler,
+              RpcAuthorization.layer([AuthSourceControlWriteScope, AuthOrchestrationReadScope]),
+            ),
+          ),
+        );
+        yield* Stream.runDrain(
+          reader[WS_METHODS.gitRunStackedAction]({ ...withThread, actionId: "allowed" }),
+        );
+        expect(handled.at(-1)).toBe("allowed");
+      }).pipe(Effect.scoped),
+  );
+});
 
 it.effect("separates host file URLs from readable attachment URLs", () =>
   Effect.gen(function* () {

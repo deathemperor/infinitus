@@ -3,7 +3,6 @@ import { assert, it } from "@effect/vitest";
 import { DESKTOP_USER_DATA_DIR_NAME } from "@infinitus/shared/desktopIdentity";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as Path from "effect/Path";
 
 import * as DesktopPreReadyFileSystem from "./DesktopPreReadyFileSystem.ts";
 import * as DesktopUserData from "./DesktopUserData.ts";
@@ -16,6 +15,7 @@ const resolveWindowsUserData = (appDataDirectory: string) =>
   }).pipe(Effect.provide(DesktopPreReadyFileSystem.layer));
 
 it.layer(NodeServices.layer)("DesktopPreReadyFileSystem", (it) => {
+<<<<<<< HEAD
   // Fork: upstream seeds its Windows profile from the pre-rename "T3 Code
   // (Alpha)" state here; the fork keeps its own directory and copies nothing.
   it.effect("keeps the fork's own Windows profile and never seeds it from a legacy one", () =>
@@ -35,4 +35,20 @@ it.layer(NodeServices.layer)("DesktopPreReadyFileSystem", (it) => {
 
   // Upstream also asserts that an unreadable legacy profile fails the resolve;
   // the fork never probes one (DesktopUserData.ts), so there is nothing to fail.
+=======
+  it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32" || process.getuid?.() === 0)(
+    "fails instead of treating an unreadable profile as missing",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-pre-ready-fs-" });
+        yield* fileSystem.chmod(root, 0o000);
+        yield* Effect.addFinalizer(() => fileSystem.chmod(root, 0o700).pipe(Effect.orDie));
+
+        const exit = yield* Effect.exit(resolveWindowsUserData(root));
+
+        assert.isTrue(Exit.isFailure(exit));
+      }),
+  );
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 });

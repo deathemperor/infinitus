@@ -8,7 +8,6 @@ import { EnvironmentId } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  isOnboardingRelayEnvironment,
   resolveOnboardingSetup,
   resolveOnboardingTargetEnvironment,
 } from "./targetEnvironment.logic";
@@ -115,28 +114,6 @@ describe("resolveOnboardingTargetEnvironment", () => {
     ).toBe(pairedRemote);
   });
 
-  it("waits for a newly paired machine that has not appeared in the catalog", () => {
-    expect(
-      resolveOnboardingTargetEnvironment({
-        mode: "direct",
-        environments: [primaryEnvironment, olderRelay],
-        primaryEnvironment,
-        pairedEnvironmentId: pairedRemote.environmentId,
-      }),
-    ).toBeNull();
-  });
-
-  it("uses the primary machine for local onboarding", () => {
-    expect(
-      resolveOnboardingTargetEnvironment({
-        mode: "local",
-        environments: [primaryEnvironment, olderRelay],
-        primaryEnvironment,
-        pairedEnvironmentId: null,
-      }),
-    ).toBe(primaryEnvironment);
-  });
-
   it("does not substitute a remote machine when the local primary is offline", () => {
     const offlinePrimary = { ...primaryEnvironment, connection: { phase: "disconnected" } };
 
@@ -188,6 +165,7 @@ describe("resolveOnboardingTargetEnvironment", () => {
       }),
     ).toBe(primaryEnvironment);
   });
+<<<<<<< HEAD
 
   it("falls back to the connected primary when no remote is available", () => {
     expect(
@@ -209,6 +187,8 @@ describe("isOnboardingRelayEnvironment", () => {
       ),
     ).toEqual([olderRelay]);
   });
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 });
 
 describe("resolveOnboardingSetup", () => {
@@ -248,6 +228,7 @@ describe("resolveOnboardingSetup", () => {
     ).toBe(false);
   });
 
+  // regression: #16887 onboarding Continue locked up on computers that won't connect
   it("is not ready without a connected selection", () => {
     expect(resolveOnboardingSetup([local], new Set()).ready).toBe(false);
     expect(

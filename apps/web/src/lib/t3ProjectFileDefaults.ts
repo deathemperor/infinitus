@@ -12,6 +12,7 @@ import {
 } from "~/components/files/projectFilesQueryState";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 
+<<<<<<< HEAD
 /**
  * Read and decode the project's checked-in `t3.json`.
  *
@@ -24,10 +25,13 @@ import { appAtomRegistry } from "~/rpc/atomRegistry";
  * `infinitus.json`, then upstream's `t3.json` — and the first file that reads
  * decides.
  */
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 export async function readT3ProjectFile(
   environmentId: EnvironmentId,
   workspaceRoot: string,
 ): Promise<T3ProjectFile | null> {
+<<<<<<< HEAD
   for (const fileName of T3_PROJECT_FILE_NAMES) {
     const result = await executeAtomQuery(
       appAtomRegistry,
@@ -45,4 +49,19 @@ export async function readT3ProjectFile(
     return parseT3ProjectFile(data.contents);
   }
   return null;
+=======
+  const result = await executeAtomQuery(
+    appAtomRegistry,
+    getProjectFileQueryAtom(environmentId, workspaceRoot, T3_PROJECT_FILE_NAME),
+    { reportDefect: false, reportFailure: false },
+  );
+  const data = resolveProjectFileQueryData(
+    environmentId,
+    workspaceRoot,
+    T3_PROJECT_FILE_NAME,
+    result._tag === "Success" ? result.value : null,
+  );
+  if (data === null || data.exists === false || data.truncated) return null;
+  return parseT3ProjectFile(data.contents);
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 }

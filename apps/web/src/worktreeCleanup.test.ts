@@ -3,12 +3,16 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE, type Thread } from "./types";
 import { makeThreadFixture } from "./test-fixtures";
+<<<<<<< HEAD
 import {
   branchDeletionPrompt,
   describeSavedWorktreeWork,
   formatWorktreePathForDisplay,
   getOrphanedWorktreePathForThread,
 } from "./worktreeCleanup";
+=======
+import { getOrphanedWorktreePathForThread } from "./worktreeCleanup";
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
 
@@ -41,23 +45,6 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
 }
 
 describe("getOrphanedWorktreePathForThread", () => {
-  it("returns null when the target thread does not exist", () => {
-    const result = getOrphanedWorktreePathForThread([], ThreadId.make("missing-thread"));
-    expect(result).toBeNull();
-  });
-
-  it("returns null when the target thread has no worktree", () => {
-    const threads = [makeThread()];
-    const result = getOrphanedWorktreePathForThread(threads, ThreadId.make("thread-1"));
-    expect(result).toBeNull();
-  });
-
-  it("returns the path when no other thread links to that worktree", () => {
-    const threads = [makeThread({ worktreePath: "/tmp/repo/worktrees/feature-a" })];
-    const result = getOrphanedWorktreePathForThread(threads, ThreadId.make("thread-1"));
-    expect(result).toBe("/tmp/repo/worktrees/feature-a");
-  });
-
   it("returns null when another thread links to the same worktree", () => {
     const threads = [
       makeThread({
@@ -88,6 +75,7 @@ describe("getOrphanedWorktreePathForThread", () => {
     expect(result).toBe("/tmp/repo/worktrees/feature-a");
   });
 });
+<<<<<<< HEAD
 
 describe("formatWorktreePathForDisplay", () => {
   it("shows only the last path segment for unix-like paths", () => {
@@ -146,3 +134,5 @@ describe("describeSavedWorktreeWork", () => {
     expect(toast?.description).not.toContain("0123456789abcdef0123456789abcdef01234567");
   });
 });
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed

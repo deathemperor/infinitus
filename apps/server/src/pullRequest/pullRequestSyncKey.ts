@@ -8,7 +8,6 @@ import {
 import { sourceControlRepositorySelector } from "@infinitus/shared/sourceControl";
 import { normalizeThreadPullRequestKey } from "@infinitus/shared/threadPullRequests";
 
-/** Convert checkout-scoped references to the host-level identity used by linked threads. */
 export function pullRequestSyncKey(
   reference: PullRequestRef,
   identity?: RepositoryIdentity | null,

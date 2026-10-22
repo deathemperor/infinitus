@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
+<<<<<<< HEAD
 import {
   buildPairingUrl,
   extractPairingUrlFromQrPayload,
@@ -7,6 +8,9 @@ import {
   PairingQrPayloadEmptyError,
   parsePairingUrl,
 } from "./pairing";
+=======
+import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 
 describe("missingPairingInput", () => {
   it("asks for the pairing code when only the host is filled (#669)", () => {
@@ -41,25 +45,12 @@ describe("buildPairingUrl", () => {
 });
 
 describe("extractPairingUrlFromQrPayload", () => {
-  it("trims raw pairing urls from qr payloads", () => {
-    expect(
-      extractPairingUrlFromQrPayload("  https://remote.example.com/pair#token=pairing-token  "),
-    ).toBe("https://remote.example.com/pair#token=pairing-token");
-  });
-
   it("unwraps mobile deep links that carry an encoded pairing url", () => {
     expect(
       extractPairingUrlFromQrPayload(
         "t3code://pair?pairingUrl=https%3A%2F%2Fremote.example.com%2Fpair%23token%3Dpairing-token",
       ),
     ).toBe("https://remote.example.com/pair#token=pairing-token");
-  });
-
-  it("rejects empty qr payloads", () => {
-    expect(() => extractPairingUrlFromQrPayload("   ")).toThrowError(PairingQrPayloadEmptyError);
-    expect(() => extractPairingUrlFromQrPayload("   ")).toThrowError(
-      "Scanned QR code did not contain a pairing URL.",
-    );
   });
 });
 

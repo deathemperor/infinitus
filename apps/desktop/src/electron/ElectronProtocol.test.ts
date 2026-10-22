@@ -1,11 +1,8 @@
 import { assert, describe, it } from "@effect/vitest";
-import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as TestClock from "effect/testing/TestClock";
 import { beforeEach, vi } from "vite-plus/test";
 
 const { handleMock, netFetchMock, unhandleMock } = vi.hoisted(() => ({
@@ -49,7 +46,6 @@ describe("ElectronProtocol", () => {
       const request = (pathname: string, init?: RequestInit) =>
         Effect.promise(() => handler!(new Request(`infinitus://app${pathname}`, init)));
 
-      // SPA routes fall back to index.html, including ones containing dots.
       const page = yield* request("/settings/connections");
       assert.equal(yield* Effect.promise(() => page.text()), "<html>app</html>");
       assert.include(page.headers.get("content-security-policy") ?? "", "default-src 'self'");
@@ -157,6 +153,7 @@ describe("ElectronProtocol", () => {
       assert.equal(netFetchMock.mock.calls.length, 0);
     }).pipe(Effect.provide(layerProtocol)),
   );
+<<<<<<< HEAD
 
   it.effect("retries transient renderer target failures", () =>
     Effect.gen(function* () {
@@ -325,4 +322,6 @@ describe("ElectronProtocol", () => {
     assert.deepEqual(directives["frame-src"], ["'self'", "blob:", "http:", "https:"]);
     assert.deepEqual(directives["font-src"], ["'self'", "infinitus:", "data:"]);
   });
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 });

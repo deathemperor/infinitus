@@ -15,7 +15,6 @@ import * as DesktopAssets from "./DesktopAssets.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DesktopConfig from "./DesktopConfig.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
-import * as DesktopUserData from "./DesktopUserData.ts";
 
 const defaultEnvironmentInput = {
   dirname: "/repo/apps/desktop/dist-electron",
@@ -45,6 +44,7 @@ const layerElectronApp = (calls: ElectronAppCalls) =>
     name: Effect.succeed("T3 Code"),
     systemLocale: Effect.succeed("en-US"),
     whenReady: Effect.void,
+    requestSingleInstanceLock: Effect.succeed(true),
     quit: Effect.void,
     exit: () => Effect.void,
     relaunch: () => Effect.void,
@@ -178,6 +178,7 @@ describe("DesktopAppIdentity", () => {
     ),
   );
 
+<<<<<<< HEAD
   it.effect("configures app identity from the environment commit override", () => {
     const calls: ElectronAppCalls = {
       setAboutPanelOptions: [],
@@ -215,6 +216,10 @@ describe("DesktopAppIdentity", () => {
     // A fork release carries no stage in its title (#823 layer 3); upstream's
     // nightly and a dev run keep theirs.
     { stage: "Alpha", environment: {}, applicationName: PRODUCT_NAME },
+=======
+  it.effect.each([
+    { stage: "Beta", environment: {} },
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     {
       stage: "Nightly",
       environment: { appVersion: "0.0.43-nightly.20260929.2428" },
@@ -239,6 +244,7 @@ describe("DesktopAppIdentity", () => {
           const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
           yield* identity.configure;
 
+<<<<<<< HEAD
           const runtimeName = calls.setName[0];
           assert.isDefined(runtimeName);
           assert.equal(runtimeName, `${PRODUCT_NAME} ${stage}`);
@@ -272,6 +278,15 @@ describe("DesktopAppIdentity", () => {
         environment: { isPackaged: false },
         pngIconPath: Option.some("/icon.png"),
       },
+=======
+        const runtimeName = calls.setName[0];
+        assert.isDefined(runtimeName);
+        assert.equal(runtimeName, `T3 Code ${stage}`);
+        assert.match(runtimeName.replaceAll(" ", ""), /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, `T3 Code (${stage})`);
+      }),
+      { calls, environment },
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     );
   });
 });

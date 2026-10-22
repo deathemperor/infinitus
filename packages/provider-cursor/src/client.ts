@@ -1,9 +1,3 @@
-/**
- * Cursor's client definition: settings form, label, sign-in environment
- * field, and glyph. Browser- and React Native-safe.
- *
- * @module provider-cursor/client
- */
 import { ProviderDriverKind } from "@infinitus/contracts";
 import { defineProviderClient } from "@infinitus/provider-core/client";
 

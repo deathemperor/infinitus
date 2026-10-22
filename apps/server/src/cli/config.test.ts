@@ -1,4 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off
+import * as NodeChildProcess from "node:child_process";
+import * as NodeEvents from "node:events";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 
@@ -10,6 +12,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import {
@@ -25,21 +28,6 @@ import { resolveServerConfig } from "./config.ts";
 
 const deriveExplicitServerPaths = (baseDir: string, devUrl: URL | undefined) =>
   deriveServerPaths(baseDir, devUrl, { baseDirIsExplicit: true });
-
-const minimalDesktopFlags = (baseDir: string) => ({
-  mode: Option.some("desktop" as const),
-  port: Option.some(4888),
-  host: Option.none<string>(),
-  baseDir: Option.some(baseDir),
-  cwd: Option.none<string>(),
-  devUrl: Option.none<URL>(),
-  noBrowser: Option.none<boolean>(),
-  bootstrapFd: Option.none<number>(),
-  autoBootstrapProjectFromCwd: Option.none<boolean>(),
-  logWebSocketEvents: Option.none<boolean>(),
-  tailscaleServeEnabled: Option.none<boolean>(),
-  tailscaleServePort: Option.none<number>(),
-});
 
 const encodeDesktopBootstrap = Schema.encodeEffect(Schema.fromJsonString(DesktopBackendBootstrap));
 const encodeUnknownJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
@@ -57,6 +45,22 @@ const makeDesktopBootstrap = (
   tailscaleServePort: 443,
   ...overrides,
 });
+
+const liveProcess = Effect.acquireRelease(
+  Effect.promise(async () => {
+    const child = NodeChildProcess.spawn(process.execPath, ["-e", "process.stdin.resume()"], {
+      stdio: ["pipe", "ignore", "ignore"],
+    });
+    await NodeEvents.EventEmitter.once(child, "spawn");
+    return child;
+  }),
+  (child) =>
+    Effect.promise(async () => {
+      const exited = NodeEvents.EventEmitter.once(child, "exit");
+      child.kill();
+      await exited;
+    }),
+);
 
 it.layer(NodeServices.layer)("cli config resolution", (it) => {
   const defaultObservabilityConfig = {
@@ -100,10 +104,13 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-preflight-" });
+      const child = yield* liveProcess;
+      assert(child.pid !== undefined);
       for (const [name, pid, mode, rejectRunningServer] of [
         ["stale", 2_147_483_647, "web", true],
-        ["desktop", process.pid, "desktop", true],
-        ["serve", process.pid, "web", false],
+        ["own-pid", process.pid, "web", true],
+        ["desktop", child.pid, "desktop", true],
+        ["serve", child.pid, "web", false],
       ] as const) {
         const baseDir = path.join(root, name);
         const stateDir = path.join(baseDir, "userdata");
@@ -119,7 +126,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           }),
         );
         const cwd = path.join(root, `${name}-project`);
-        const config = yield* resolveServerConfig(
+        const configResult = yield* resolveServerConfig(
           {
             ...minimalWebFlags(baseDir),
             mode: Option.some(mode),
@@ -135,11 +142,54 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
               ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
             ),
           ),
+          Effect.result,
         );
-        expect(config.cwd).toBe(cwd);
+        assert(Result.isSuccess(configResult));
+        expect(configResult.success.cwd).toBe(cwd);
         expect(yield* fs.exists(cwd)).toBe(true);
       }
     }),
+  );
+
+  it.effect(
+    "refuses a manual web launch when a runtime record belongs to another live process",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-preflight-live-" });
+        const child = yield* liveProcess;
+        assert(child.pid !== undefined);
+        const stateDir = path.join(baseDir, "userdata");
+        yield* fs.makeDirectory(stateDir, { recursive: true });
+        yield* fs.writeFileString(
+          path.join(stateDir, "server-runtime.json"),
+          yield* encodeUnknownJson({
+            version: 1,
+            pid: child.pid,
+            port: 3773,
+            origin: "http://127.0.0.1:3773",
+            startedAt: "2026-10-01T00:00:00.000Z",
+          }),
+        );
+        const cwd = path.join(baseDir, "project");
+        const error = yield* resolveServerConfig(
+          { ...minimalWebFlags(baseDir), cwd: Option.some(cwd) },
+          Option.none(),
+          { rejectRunningServer: true },
+        ).pipe(
+          Effect.provide(
+            Layer.merge(
+              NetService.layer,
+              ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+            ),
+          ),
+          Effect.flip,
+        );
+        expect(String(error)).toContain("A T3 Code server is already running");
+        expect(String(error)).toContain(`pid ${child.pid}`);
+        expect(yield* fs.exists(cwd)).toBe(false);
+      }),
   );
 
   it.effect("enables a trimmed reusable auth token only for web dev mode", () =>
@@ -229,149 +279,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     }),
   );
 
-  it.effect("falls back to effect/config values when flags are omitted", () =>
-    Effect.gen(function* () {
-      const { join } = yield* Path.Path;
-      const baseDir = join(NodeOS.tmpdir(), "t3-cli-config-env-base");
-      const derivedPaths = yield* deriveExplicitServerPaths(
-        baseDir,
-        new URL("http://127.0.0.1:5173"),
-      );
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.none(),
-          port: Option.none(),
-          host: Option.none(),
-          baseDir: Option.none(),
-          cwd: Option.none(),
-          devUrl: Option.none(),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({
-                env: {
-                  T3CODE_LOG_LEVEL: "Warn",
-                  T3CODE_MODE: "desktop",
-                  T3CODE_PORT: "4001",
-                  T3CODE_HOST: "0.0.0.0",
-                  T3CODE_HOME: baseDir,
-                  VITE_DEV_SERVER_URL: "http://127.0.0.1:5173",
-                  T3CODE_DEV_ALLOWED_ORIGINS:
-                    "https://host.example.ts.net, https://phone.example.ts.net ",
-                  T3CODE_NO_BROWSER: "true",
-                  T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD: "false",
-                  T3CODE_LOG_WS_EVENTS: "true",
-                },
-              }),
-            ),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect(resolved).toEqual({
-        logLevel: "Warn",
-        ...defaultObservabilityConfig,
-        mode: "desktop",
-        port: 4001,
-        cwd: process.cwd(),
-        baseDir,
-        ...derivedPaths,
-        host: "0.0.0.0",
-        staticDir: undefined,
-        devUrl: new URL("http://127.0.0.1:5173"),
-        devAllowedOrigins: ["https://host.example.ts.net", "https://phone.example.ts.net"],
-        noBrowser: true,
-        startupPresentation: "browser",
-        desktopBootstrapToken: undefined,
-        autoBootstrapProjectFromCwd: false,
-        logWebSocketEvents: true,
-        tailscaleServeEnabled: false,
-        tailscaleServePort: 443,
-      });
-      assert.equal(resolved.stateDir, join(baseDir, "userdata"));
-    }),
-  );
-
-  it.effect("uses CLI flags when provided", () =>
-    Effect.gen(function* () {
-      const { join } = yield* Path.Path;
-      const baseDir = join(NodeOS.tmpdir(), "t3-cli-config-flags-base");
-      const derivedPaths = yield* deriveExplicitServerPaths(
-        baseDir,
-        new URL("http://127.0.0.1:4173"),
-      );
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.some("web"),
-          port: Option.some(8788),
-          host: Option.some("127.0.0.1"),
-          baseDir: Option.some(baseDir),
-          cwd: Option.none(),
-          devUrl: Option.some(new URL("http://127.0.0.1:4173")),
-          noBrowser: Option.some(true),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.some(true),
-          logWebSocketEvents: Option.some(true),
-          tailscaleServeEnabled: Option.some(true),
-          tailscaleServePort: Option.some(8443),
-        },
-        Option.some("Debug"),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({
-                env: {
-                  T3CODE_LOG_LEVEL: "Warn",
-                  T3CODE_MODE: "desktop",
-                  T3CODE_PORT: "4001",
-                  T3CODE_HOST: "0.0.0.0",
-                  T3CODE_HOME: join(NodeOS.tmpdir(), "ignored-base"),
-                  VITE_DEV_SERVER_URL: "http://127.0.0.1:5173",
-                  T3CODE_NO_BROWSER: "false",
-                  T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD: "false",
-                  T3CODE_LOG_WS_EVENTS: "false",
-                },
-              }),
-            ),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect(resolved).toEqual({
-        logLevel: "Debug",
-        ...defaultObservabilityConfig,
-        mode: "web",
-        port: 8788,
-        cwd: process.cwd(),
-        baseDir,
-        ...derivedPaths,
-        host: "127.0.0.1",
-        staticDir: undefined,
-        devUrl: new URL("http://127.0.0.1:4173"),
-        noBrowser: true,
-        startupPresentation: "browser",
-        desktopBootstrapToken: undefined,
-        autoBootstrapProjectFromCwd: true,
-        logWebSocketEvents: true,
-        tailscaleServeEnabled: true,
-        tailscaleServePort: 8443,
-      });
-      assert.equal(resolved.dbPath, join(baseDir, "userdata", "statev2.sqlite"));
-    }),
-  );
-
   it.effect("preserves explicit false CLI boolean flags over env and bootstrap values", () =>
     Effect.gen(function* () {
       const { join } = yield* Path.Path;
@@ -441,170 +348,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         tailscaleServeEnabled: false,
         tailscaleServePort: 443,
       });
-    }),
-  );
-
-  it.effect("uses bootstrap envelope values as fallbacks when flags and env are absent", () =>
-    Effect.gen(function* () {
-      const { join, resolve } = yield* Path.Path;
-      // The resolver absolutises the configured home, so the expectation must
-      // carry the host's drive on Windows.
-      const baseDir = resolve("/tmp/t3-bootstrap-home");
-      const fd = yield* openBootstrapFd(
-        makeDesktopBootstrap({
-          port: 4888,
-          host: "127.0.0.2",
-          t3Home: "/tmp/t3-bootstrap-home",
-          noBrowser: true,
-          desktopBootstrapToken: "desktop-token",
-          desktopTelemetryFd: 4,
-          desktopTelemetryControlFd: 5,
-          tailscaleServeEnabled: false,
-          tailscaleServePort: 443,
-          otlpTracesUrl: "http://localhost:4318/v1/traces",
-          otlpMetricsUrl: "http://localhost:4318/v1/metrics",
-          otlpLogsUrl: "http://localhost:4318/v1/logs",
-        }),
-      );
-      const derivedPaths = yield* deriveServerPaths(baseDir, undefined);
-
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.none(),
-          port: Option.none(),
-          host: Option.none(),
-          baseDir: Option.none(),
-          cwd: Option.none(),
-          devUrl: Option.none(),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({
-                env: {
-                  T3CODE_BOOTSTRAP_FD: String(fd),
-                },
-              }),
-            ),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect(resolved).toEqual({
-        logLevel: "Info",
-        ...defaultObservabilityConfig,
-        otlpTracesUrl: "http://localhost:4318/v1/traces",
-        otlpMetricsUrl: "http://localhost:4318/v1/metrics",
-        otlpLogsUrl: "http://localhost:4318/v1/logs",
-        mode: "desktop",
-        port: 4888,
-        cwd: process.cwd(),
-        baseDir,
-        ...derivedPaths,
-        host: "127.0.0.2",
-        staticDir: resolved.staticDir,
-        devUrl: undefined,
-        noBrowser: true,
-        startupPresentation: "browser",
-        desktopBootstrapToken: "desktop-token",
-        desktopTelemetryFd: 4,
-        desktopTelemetryControlFd: 5,
-        resourceMonitorPath: undefined,
-        autoBootstrapProjectFromCwd: false,
-        logWebSocketEvents: false,
-        tailscaleServeEnabled: false,
-        tailscaleServePort: 443,
-      });
-      assert.equal(join(baseDir, "userdata"), resolved.stateDir);
-      assert.equal(resolved.desktopTelemetryFd, 4);
-      assert.equal(resolved.desktopTelemetryControlFd, 5);
-    }),
-  );
-
-  it.effect("carries the desktop's shell environment handoff only when the envelope sets it", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-config-shell-env-" });
-      const resolveWith = Effect.fn(function* (overrides: Partial<DesktopBackendBootstrapValue>) {
-        const fd = yield* openBootstrapFd(makeDesktopBootstrap(overrides));
-        return yield* resolveServerConfig(
-          {
-            ...minimalDesktopFlags(baseDir),
-            bootstrapFd: Option.some(fd),
-          },
-          Option.none(),
-        ).pipe(
-          Effect.provide(
-            Layer.mergeAll(
-              ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
-              NetService.layer,
-            ),
-          ),
-        );
-      });
-
-      assert.equal((yield* resolveWith({})).shellEnvironmentPrepared, undefined);
-      assert.equal(
-        (yield* resolveWith({ shellEnvironmentPrepared: true })).shellEnvironmentPrepared,
-        true,
-      );
-    }),
-  );
-
-  it.effect("creates derived runtime directories during config resolution", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-config-dirs-" });
-      const customCwd = path.join(baseDir, "nested", "project");
-
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.some("desktop"),
-          port: Option.some(4888),
-          host: Option.none(),
-          baseDir: Option.some(baseDir),
-          cwd: Option.some(customCwd),
-          devUrl: Option.some(new URL("http://127.0.0.1:5173")),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      for (const directory of [
-        customCwd,
-        resolved.stateDir,
-        resolved.logsDir,
-        resolved.providerLogsDir,
-        resolved.terminalLogsDir,
-        resolved.attachmentsDir,
-        resolved.worktreesDir,
-        path.dirname(resolved.serverTracePath),
-      ]) {
-        expect(yield* fs.exists(directory)).toBe(true);
-      }
-      expect(resolved.cwd).toBe(path.resolve(customCwd));
     }),
   );
 
@@ -686,77 +429,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     }),
   );
 
-  it.effect("falls back to persisted observability settings when env vars are absent", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-config-settings-" });
-      const derivedPaths = yield* deriveExplicitServerPaths(baseDir, undefined);
-      yield* fs.makeDirectory(path.dirname(derivedPaths.settingsPath), { recursive: true });
-      yield* fs.writeFileString(
-        derivedPaths.settingsPath,
-        `${JSON.stringify({
-          observability: {
-            otlpTracesUrl: "http://localhost:4318/v1/traces",
-            otlpMetricsUrl: "http://localhost:4318/v1/metrics",
-            otlpLogsUrl: "http://localhost:4318/v1/logs",
-          },
-        })}\n`,
-      );
-
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.some("desktop"),
-          port: Option.some(4888),
-          host: Option.none(),
-          baseDir: Option.some(baseDir),
-          cwd: Option.none(),
-          devUrl: Option.none(),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect(resolved.otlpTracesUrl).toBe("http://localhost:4318/v1/traces");
-      expect(resolved.otlpMetricsUrl).toBe("http://localhost:4318/v1/metrics");
-      expect(resolved.otlpLogsUrl).toBe("http://localhost:4318/v1/logs");
-      expect(resolved).toEqual({
-        logLevel: "Info",
-        ...defaultObservabilityConfig,
-        otlpTracesUrl: "http://localhost:4318/v1/traces",
-        otlpMetricsUrl: "http://localhost:4318/v1/metrics",
-        otlpLogsUrl: "http://localhost:4318/v1/logs",
-        mode: "desktop",
-        port: 4888,
-        cwd: process.cwd(),
-        baseDir,
-        ...derivedPaths,
-        host: "127.0.0.1",
-        staticDir: resolved.staticDir,
-        devUrl: undefined,
-        noBrowser: true,
-        startupPresentation: "browser",
-        desktopBootstrapToken: undefined,
-        autoBootstrapProjectFromCwd: false,
-        logWebSocketEvents: false,
-        tailscaleServeEnabled: false,
-        tailscaleServePort: 443,
-      });
-    }),
-  );
-
   it.effect("zeroes an endpoint stored in Settings when the SDK is disabled", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -800,7 +472,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         ),
       );
 
-      // The switch beats every source, including an endpoint stored in Settings.
       expect(resolved.otlpTracesUrl).toBeUndefined();
       expect(resolved.otlpMetricsUrl).toBeUndefined();
       expect(resolved.otlpLogsUrl).toBeUndefined();
@@ -921,49 +592,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     }),
   );
 
-  it.effect("decodes percent-encoded OTLP headers from env", () =>
-    Effect.gen(function* () {
-      const { join } = yield* Path.Path;
-      const baseDir = join(NodeOS.tmpdir(), "t3-cli-config-otlp-headers-base");
-
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.some("web"),
-          port: Option.some(3773),
-          host: Option.none(),
-          baseDir: Option.some(baseDir),
-          cwd: Option.none(),
-          devUrl: Option.none(),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({
-                env: {
-                  T3CODE_OTLP_HEADERS: "authorization=Basic%20abc%3D%3D,x-tenant=t3",
-                },
-              }),
-            ),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect(resolved.otlpTracesExport.headers).toEqual({
-        authorization: "Basic abc==",
-        "x-tenant": "t3",
-      });
-    }),
-  );
-
   it.effect("keeps whitespace-separated pairs and literal equals signs in OTLP headers", () =>
     Effect.gen(function* () {
       const { join } = yield* Path.Path;
@@ -1009,84 +637,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     }),
   );
 
-  it.effect("gives every signal the protocol named without one", () =>
-    Effect.gen(function* () {
-      const { join } = yield* Path.Path;
-      const baseDir = join(NodeOS.tmpdir(), "t3-cli-config-otlp-protocol-base");
-
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.some("web"),
-          port: Option.some(3773),
-          host: Option.none(),
-          baseDir: Option.some(baseDir),
-          cwd: Option.none(),
-          devUrl: Option.none(),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({ env: { T3CODE_OTLP_PROTOCOL: "http/protobuf" } }),
-            ),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect([
-        resolved.otlpTracesExport.protocol,
-        resolved.otlpMetricsExport.protocol,
-        resolved.otlpLogsExport.protocol,
-      ]).toEqual(["http/protobuf", "http/protobuf", "http/protobuf"]);
-    }),
-  );
-
-  it.effect("reads the OTLP logs URL from env", () =>
-    Effect.gen(function* () {
-      const { join } = yield* Path.Path;
-      const baseDir = join(NodeOS.tmpdir(), "t3-cli-config-otlp-logs-url-base");
-
-      const resolved = yield* resolveServerConfig(
-        {
-          mode: Option.some("web"),
-          port: Option.some(3773),
-          host: Option.none(),
-          baseDir: Option.some(baseDir),
-          cwd: Option.none(),
-          devUrl: Option.none(),
-          noBrowser: Option.none(),
-          bootstrapFd: Option.none(),
-          autoBootstrapProjectFromCwd: Option.none(),
-          logWebSocketEvents: Option.none(),
-          tailscaleServeEnabled: Option.none(),
-          tailscaleServePort: Option.none(),
-        },
-        Option.none(),
-      ).pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(
-              ConfigProvider.fromEnv({
-                env: { T3CODE_OTLP_LOGS_URL: "http://collector.internal:4318/v1/logs" },
-              }),
-            ),
-            NetService.layer,
-          ),
-        ),
-      );
-
-      expect(resolved.otlpLogsUrl).toBe("http://collector.internal:4318/v1/logs");
-    }),
-  );
-
   const minimalWebFlags = (baseDir: string) => ({
     mode: Option.some("web" as const),
     port: Option.some(3773),
@@ -1121,7 +671,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         const fd = yield* openBootstrapFd(
           makeDesktopBootstrap({
             otlpMetricsUrl: "http://bootstrap:4318/v1/metrics",
-            // Blank, not an endpoint: it must not stand in front of Settings.
             otlpLogsUrl: "",
           }),
         );
@@ -1153,21 +702,14 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           ),
         );
 
-        // T3CODE_OTLP_TRACES_URL wins over the OTEL variable for the same
-        // signal, and keeps T3 Code's own headers since T3 Code still owns it.
         expect(resolved.otlpTracesUrl).toBe("http://t3:4318/v1/traces");
         expect(resolved.otlpTracesExport.headers).toEqual({ "x-key": "secret" });
-        // Metrics named no T3CODE_OTLP_METRICS_URL, so the OTEL endpoint wins
-        // over the bootstrap envelope and brings the OTEL headers and protocol.
         expect(resolved.otlpMetricsUrl).toBe("http://otel-metrics:4318/custom");
         expect(resolved.otlpMetricsExport).toEqual({
           ...DEFAULT_SIGNAL_EXPORT,
           protocol: "http/protobuf",
           headers: { "x-key": "otel" },
         });
-        // Logs named no T3 or OTEL endpoint and a blank bootstrap value, so
-        // Settings answers, and logs keep the shared headers since no OTEL
-        // endpoint claimed them.
         expect(resolved.otlpLogsUrl).toBe("http://settings:4318/v1/logs");
         expect(resolved.otlpLogsExport.headers).toEqual({ "x-key": "secret" });
       }),
@@ -1218,10 +760,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           ),
         );
 
-        // T3CODE_OTLP_TRACES_URL still wins outright.
         expect(resolved.otlpTracesUrl).toBe("http://t3:4318/v1/traces");
-        // The OTEL endpoint claimed metrics and logs, so neither the bootstrap
-        // envelope nor Settings receives them with T3 Code's headers.
         expect(resolved.otlpMetricsUrl).toBeUndefined();
         expect(resolved.otlpLogsUrl).toBeUndefined();
       }),

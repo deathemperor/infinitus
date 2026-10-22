@@ -182,6 +182,28 @@ describe("remote thread lifecycle commands", () => {
       }),
   );
 
+  it.effect("restamps snoozedAt when re-snoozing to the same wake time", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness();
+      const earlierSnoozedAt = DateTime.makeUnsafe("2000-01-01T00:00:00.000Z");
+      h.registry.set(h.snapshotAtom(ENVIRONMENT_ID), {
+        ...SNAPSHOT,
+        threads: [{ ...SNAPSHOT.threads[0]!, snoozedUntil: FUTURE, snoozedAt: earlierSnoozedAt }],
+      });
+      const result = h.commands.snooze.run(h.registry, {
+        environmentId: ENVIRONMENT_ID,
+        input: { threadId: THREAD_ID, snoozedUntil: DateTime.formatIso(FUTURE) },
+      });
+      const snoozedAt = h.registry.get(h.visibleAtom)?.threads[0]?.snoozedAt;
+      expect(DateTime.toEpochMillis(snoozedAt!)).toBeGreaterThan(
+        DateTime.toEpochMillis(earlierSnoozedAt),
+      );
+      const request = yield* Queue.take(h.requests);
+      yield* Deferred.succeed(request.reply, { sequence: 2 });
+      expect((yield* Effect.promise(() => result))._tag).toBe("Success");
+    }),
+  );
+
   it.effect("keeps the preview after acknowledgement until the matching shell update arrives", () =>
     Effect.gen(function* () {
       const h = yield* makeHarness();
@@ -268,25 +290,6 @@ describe("remote thread lifecycle commands", () => {
       yield* Deferred.fail(request.reply, new Error("Thread removed"));
       yield* Effect.promise(() => result);
       expect(h.registry.get(h.visibleAtom)).toBe(removed);
-    }),
-  );
-
-  it.effect("keeps pending approvals visible while a lifecycle request is pending", () =>
-    Effect.gen(function* () {
-      const h = yield* makeHarness();
-      const blocked = {
-        ...SNAPSHOT,
-        threads: [{ ...SNAPSHOT.threads[0]!, pendingRuntimeRequest: APPROVAL }],
-      };
-      h.registry.set(h.snapshotAtom(ENVIRONMENT_ID), blocked);
-      const result = h.commands.settle.run(h.registry, {
-        environmentId: ENVIRONMENT_ID,
-        input: { threadId: THREAD_ID },
-      });
-      const request = yield* Queue.take(h.requests);
-      expect(h.registry.get(h.visibleAtom)?.threads[0]).toBe(blocked.threads[0]);
-      yield* Deferred.fail(request.reply, new Error("Approval pending"));
-      yield* Effect.promise(() => result);
     }),
   );
 

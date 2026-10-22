@@ -220,7 +220,17 @@ New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 $shim = Join-Path $binDir "infinitus.cmd"
 # UTF-8 without a BOM: cmd.exe reads the shim as-is, and ASCII would corrupt
 # non-ASCII characters in the user's home path.
+<<<<<<< HEAD
 [System.IO.File]::WriteAllText($shim, "@echo off`r`n`"$(Join-Path $targetDir 'infinitus.exe')`" %*", (New-Object System.Text.UTF8Encoding $false))
+=======
+[System.IO.File]::WriteAllText($shim, "@echo off`r`n`"$(Join-Path $targetDir 't3.exe')`" %*", (New-Object System.Text.UTF8Encoding $false))
+# Pruning keeps what this shim points at; a background service cannot see $binDir otherwise.
+$launchers = Join-Path $t3Home "runtime\launchers"
+$shimPath = (Resolve-Path $shim).Path
+if (-not ((Test-Path $launchers) -and ((Get-Content $launchers) -contains $shimPath))) {
+  [System.IO.File]::AppendAllText($launchers, "$shimPath`r`n", (New-Object System.Text.UTF8Encoding $false))
+}
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 if ($interactive) { [Console]::Error.Write("`r$esc[2K") }
 [Console]::Error.WriteLine("  ${green}Installed Infinitus $version$reset`n")
 if (($env:PATH -split ";") -notcontains $binDir) {

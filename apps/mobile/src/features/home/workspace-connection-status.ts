@@ -2,13 +2,17 @@ import type { WorkspaceState } from "../../state/workspaceModel";
 
 export interface WorkspaceConnectionStatusPresentation {
   readonly label: string;
+<<<<<<< HEAD
   /** True while the label describes work in flight (connecting/syncing) — render a spinner. False when the label says we cannot connect — render a wifi-slash icon. */
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
   readonly showsProgress: boolean;
 }
 
 function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
+  if (state.networkStatus === "offline") return true;
+  if (state.hasReadyEnvironment) return state.hasSyncingConnectedEnvironment;
   return (
-    state.networkStatus === "offline" ||
     state.connectionError !== null ||
     state.hasConnectingEnvironment ||
     state.hasPendingShellSnapshot ||
@@ -16,6 +20,7 @@ function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
   );
 }
 
+<<<<<<< HEAD
 /**
  * Label and icon are decided together so they can never disagree: a retry in
  * flight reads "Reconnecting" beside a spinner, and the wifi-slash icon is
@@ -25,6 +30,12 @@ function shouldShowWorkspaceConnectionStatus(state: WorkspaceState): boolean {
 function workspaceConnectionStatus(state: WorkspaceState): WorkspaceConnectionStatusPresentation {
   if (state.networkStatus === "offline") {
     return { label: "You are offline", showsProgress: false };
+=======
+function workspaceConnectionStatusLabel(state: WorkspaceState): string {
+  if (state.networkStatus === "offline") return "You are offline";
+  if (state.hasReadyEnvironment && state.hasSyncingConnectedEnvironment) {
+    return state.hasLoadedShellSnapshot ? "Syncing threads..." : "Loading threads...";
+>>>>>>> upstream-sync-43879d970-upstream-renamed
   }
   if (state.connectingEnvironments.length === 1) {
     return {
@@ -50,10 +61,19 @@ function workspaceConnectionStatus(state: WorkspaceState): WorkspaceConnectionSt
   return { label: "Not connected", showsProgress: false };
 }
 
-/** Header-title presentation of the connection state, or null while connected. */
 export function workspaceConnectionStatusPresentation(
   state: WorkspaceState,
 ): WorkspaceConnectionStatusPresentation | null {
   if (!shouldShowWorkspaceConnectionStatus(state)) return null;
+<<<<<<< HEAD
   return workspaceConnectionStatus(state);
+=======
+  return {
+    label: workspaceConnectionStatusLabel(state),
+    showsProgress:
+      state.networkStatus !== "offline" &&
+      (state.hasReadyEnvironment || state.connectionError === null) &&
+      (state.connectingEnvironments.length > 0 || state.hasPendingShellSnapshot),
+  };
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 }

@@ -3,6 +3,7 @@ import { it as effectIt } from "@effect/vitest";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+<<<<<<< HEAD
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
@@ -11,6 +12,11 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
+=======
+import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
+import { HttpClient, HttpClientResponse, UrlParams } from "effect/http";
+>>>>>>> upstream-sync-43879d970-upstream-renamed
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -306,6 +312,7 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
           success: outcome,
         });
       }
+<<<<<<< HEAD
       for (const [response, reason] of [
         [Response.json({ result: "cooldown" }), "coolingDown"],
         // Claude could not say whether the claim landed: the retry keeps the request id.
@@ -318,11 +325,36 @@ effectIt.layer(NodeServices.layer)("consumeClaudeResetCredit", (it) => {
           _tag: "Failure",
           failure: { reason },
         });
+=======
+      for (const client of [
+        respond(200, { result: "cooldown" }),
+        respond(429, {}),
+        respond(401, {}),
+      ]) {
+        const result = yield* consume(client);
+        expect(result).toMatchObject({ _tag: "Failure" });
+        if (result._tag === "Failure") {
+          expect(ClaudeResetCredits.isSettledClaudeResetCreditFailure(result.failure)).toBe(true);
+        }
+      }
+      for (const client of [respond(500, {}), respond(200, { result: "unavailable" })]) {
+        const unanswered = yield* consume(client);
+        expect(unanswered).toMatchObject({ _tag: "Failure" });
+        if (unanswered._tag === "Failure") {
+          expect(ClaudeResetCredits.isSettledClaudeResetCreditFailure(unanswered.failure)).toBe(
+            false,
+          );
+        }
+>>>>>>> upstream-sync-43879d970-upstream-renamed
       }
     }),
   );
 
+<<<<<<< HEAD
   it.effect("refuses without a login or an organization, and malformed ids before sending", () =>
+=======
+  it.effect("refuses malformed ids without sending anything", () =>
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     Effect.gen(function* () {
       for (const ids of [
         { grantId: "Bad Grant", requestId: "r-1" },

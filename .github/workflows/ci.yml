@@ -15,9 +15,50 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Lint, typecheck, and the desktop build each get a runner so they run side by
-  # side instead of one after another. The `Check` job at the end of this file
-  # passes only when every other job does.
+  # Skips jobs a pull request cannot affect: a web change does not run the
+  # server shards, a server change does not run the mobile tests, and the macOS
+  # lint (~6.7x a Linux minute) runs only for native mobile sources.
+  # .github/scripts/ci-changes.cjs maps changed files to workspace packages and
+  # their dependents. Pushes to main still run every Linux job. Detection fails
+  # open: if the diff cannot be resolved, everything runs.
+  changes:
+    name: Changes
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    outputs:
+      typecheck: ${{ steps.detect.outputs.typecheck }}
+      build: ${{ steps.detect.outputs.build }}
+      test: ${{ steps.detect.outputs.test }}
+      test_packages: ${{ steps.detect.outputs.test_packages }}
+      test_web: ${{ steps.detect.outputs.test_web }}
+      test_server: ${{ steps.detect.outputs.test_server }}
+      rust: ${{ steps.detect.outputs.rust }}
+      release_smoke: ${{ steps.detect.outputs.release_smoke }}
+      mobile_native: ${{ steps.detect.outputs.mobile_native }}
+    steps:
+      # Only the package manifests the script reads to build the dependency graph.
+      # Depth 2 brings the base commit the change is diffed against.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          sparse-checkout: |
+            /pnpm-workspace.yaml
+            /.github/scripts/ci-changes.cjs
+            /.github/actions/ci-changes/
+            /*/package.json
+            /*/*/package.json
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Detect affected jobs
+        id: detect
+        uses: ./.github/actions/ci-changes
+
+  # Lint and the desktop build each get a runner so they run side by side.
+  # Typecheck shares the build's install. Lint always runs: it formats every
+  # file, docs included. The `Check` job at the end of this file passes only
+  # when every other job passes or was skipped by `changes`.
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -29,6 +70,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Reject repository-owned PR assets
@@ -40,11 +82,15 @@ jobs:
           fi
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: ./.github/actions/setup-ci-deps
+
+      # electron's install.js (run by ensure:electron) reads this cache before it
+      # downloads from GitHub. The key changes only with the Electron version.
+      - name: Cache Electron download
+        uses: actions/cache@v6
         with:
-          node-version-file: package.json
-          cache: true
-          run-install: true
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node_modules/.pnpm/electron@*/node_modules/electron/package.json') }}
 
       - name: Ensure Electron runtime is installed
         run: vp run --filter @infinitus/desktop ensure:electron
@@ -53,9 +99,16 @@ jobs:
       - name: Check unused code
         run: vp run knip:check
 
+      - name: Check generated GitHub GraphQL operations
+        run: vp run --filter @infinitus/source-control-github generate --check
+
+      - name: Check generated Expo GraphQL operations
+        run: vp run --filter t3 generate --check
+
       - name: Check
         run: vp check
 
+<<<<<<< HEAD
       # The fork's identifier rename (#1368 C): fails while an old T3 name is in the tree.
       - name: Check identifier rename
         run: node scripts/infinitus-rename.ts --check
@@ -90,6 +143,14 @@ jobs:
     name: Build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+=======
+  build:
+    name: Build and Typecheck
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.outputs.build != 'false' || needs.changes.outputs.typecheck != 'false') }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 10
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -97,12 +158,15 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-apt-mirrors
+        if: needs.changes.outputs.build != 'false'
 
       # Runs in the background while Vite+ installs; the step before the build waits for it.
       - name: Start installing browser secret helper build libraries
+        if: needs.changes.outputs.build != 'false'
         run: |
           sudo sed -i 's|http://|https://|g' /etc/apt/blacksmith-ubuntu-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources
           (
@@ -112,16 +176,35 @@ jobs:
           ) > "$RUNNER_TEMP/apt.log" 2>&1 < /dev/null &
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: ./.github/actions/setup-ci-deps
+
+      # electron's install.js (run by ensure:electron) reads this cache before it
+      # downloads from GitHub. The key changes only with the Electron version.
+      - name: Cache Electron download
+        uses: actions/cache@v6
         with:
-          node-version-file: package.json
-          cache: true
-          run-install: true
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node_modules/.pnpm/electron@*/node_modules/electron/package.json') }}
 
       - name: Ensure Electron runtime is installed
+        id: electron
         run: vp run --filter @infinitus/desktop ensure:electron
 
+      # Runs in the background while the build runs, and reports in the last
+      # step: neither result hides the other.
+      - name: Start typecheck
+        id: typecheck
+        if: ${{ !cancelled() && steps.electron.outcome == 'success' && needs.changes.outputs.typecheck != 'false' }}
+        run: |
+          (
+            set +e
+            vpr typecheck
+            echo "$?" > "$RUNNER_TEMP/typecheck-status"
+          ) > "$RUNNER_TEMP/typecheck.log" 2>&1 < /dev/null &
+
       - name: Finish installing browser secret helper build libraries
+        id: apt
+        if: ${{ !cancelled() && needs.changes.outputs.build != 'false' }}
         timeout-minutes: 5
         run: |
           until test -s "$RUNNER_TEMP/apt-status"; do sleep 1; done
@@ -129,10 +212,21 @@ jobs:
           exit "$(cat "$RUNNER_TEMP/apt-status")"
 
       - name: Build desktop pipeline
+        id: build
+        if: ${{ !cancelled() && steps.electron.outcome == 'success' && steps.apt.outcome == 'success' && needs.changes.outputs.build != 'false' }}
         run: vp run build:desktop
 
       - name: Verify preload bundle output
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: node apps/desktop/scripts/verify-preload-bundle.mjs
+
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.typecheck.outcome == 'success' }}
+        timeout-minutes: 5
+        run: |
+          until test -s "$RUNNER_TEMP/typecheck-status"; do sleep 1; done
+          cat "$RUNNER_TEMP/typecheck.log"
+          exit "$(cat "$RUNNER_TEMP/typecheck-status")"
 
   # Everything except `t3` (apps/server) and the web app, which has its own job
   # below. `--parallel` drops the package dependency ordering that `vp run`
@@ -142,8 +236,15 @@ jobs:
   # per runner is unchanged.
   test:
     name: Test
+<<<<<<< HEAD
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+=======
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.test != 'false' }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 10
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -151,6 +252,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       # Blacksmith boots GitHub's Ubuntu runner image (gcc is usually present),
@@ -177,11 +279,15 @@ jobs:
           ) > "$RUNNER_TEMP/apt.log" 2>&1 < /dev/null &
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: ./.github/actions/setup-ci-deps
+
+      # electron's install.js (run by ensure:electron) reads this cache before it
+      # downloads from GitHub. The key changes only with the Electron version.
+      - name: Cache Electron download
+        uses: actions/cache@v6
         with:
-          node-version-file: package.json
-          cache: true
-          run-install: true
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node_modules/.pnpm/electron@*/node_modules/electron/package.json') }}
 
       - name: Ensure Electron runtime is installed
         run: vp run --filter @infinitus/desktop ensure:electron
@@ -189,8 +295,8 @@ jobs:
       - name: Test preview artifact validation
         run: python3 -B .github/scripts/stage-preview-bundle.test.py
 
-      - name: Test nightly release checks
-        run: node --test .github/scripts/check-nightly-release.test.cjs
+      - name: Test release checks
+        run: node --test .github/scripts/check-nightly-release.test.cjs .github/scripts/vercel-deployment-output.test.cjs
 
       - name: Finish installing browser secret helper build libraries
         timeout-minutes: 5
@@ -199,15 +305,32 @@ jobs:
           cat "$RUNNER_TEMP/apt.log"
           exit "$(cat "$RUNNER_TEMP/apt-status")"
 
+      # `changes` lists the affected packages, or nothing when all of them are.
       - name: Test
-        run: vp run --parallel --concurrency-limit 4 --filter '!t3' --filter '!@infinitus/monorepo' --filter '!@infinitus/web' test
+        env:
+          TEST_PACKAGES: ${{ needs.changes.outputs.test_packages }}
+        run: |
+          filters=(--filter '!t3' --filter '!@infinitus/monorepo' --filter '!@infinitus/web')
+          if [[ -n "$TEST_PACKAGES" ]]; then
+            filters=()
+            for package in $TEST_PACKAGES; do filters+=(--filter "$package"); done
+          fi
+          vp run --parallel --concurrency-limit 4 "${filters[@]}" test
 
   # The web suite is the largest outside the server. In the shared Test job it
   # started last and ran alone for about 40s after everything else finished.
+  # release.yml mirrors this test, test_web, and test_server split.
   test_web:
     name: Test Web
+<<<<<<< HEAD
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+=======
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.test_web != 'false' }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 10
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -215,14 +338,36 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: ./.github/actions/setup-ci-deps
+
+      # The browser project runs React tests in headless Chromium. Same cache key as
+      # test_server, so both jobs share one downloaded browser.
+      - name: Resolve Playwright version
+        id: playwright_version
+        run: echo "version=$(node -p "require('./apps/web/node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium
+        id: chromium_cache
+        uses: actions/cache@v6
         with:
-          node-version-file: package.json
-          cache: true
-          run-install: true
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-shell-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright_version.outputs.version }}
+
+      - name: Install Chromium for web browser tests
+        if: steps.chromium_cache.outputs.cache-hit != 'true'
+        run: node apps/web/node_modules/playwright/cli.js install --only-shell chromium
+
+      - name: Install missing Chromium system dependencies
+        run: |
+          browser=$(find "$HOME/.cache/ms-playwright" -name chrome-headless-shell -type f -print -quit)
+          test -n "$browser"
+          if ldd "$browser" | grep '=> not found'; then
+            node apps/web/node_modules/playwright/cli.js install-deps chromium
+          fi
 
       - name: Test
         run: vp run --filter @infinitus/web test
@@ -233,6 +378,8 @@ jobs:
   # isolation that flag buys is preserved exactly. One file at a time keeps
   # about 1.5 cores busy, so 4 vCPU runners lose nothing against 8. The shards
   # split files by recorded duration (apps/server/src/testUtils/weightedShardSequencer.ts).
+  # The shards are the longest jobs, so they gate themselves instead of waiting
+  # ~15s for `changes`: a shard the change cannot affect stops after checkout.
   test_server:
     name: Test Server ${{ matrix.shard }}
     runs-on: ubuntu-24.04
@@ -240,30 +387,59 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
+      # Depth 2 brings the base commit the change is diffed against.
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          fetch-depth: 2
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
+      - name: Detect affected jobs
+        id: changes
+        uses: ./.github/actions/ci-changes
+
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
-        with:
-          node-version-file: package.json
-          cache: true
-          run-install: true
+        if: steps.changes.outputs.test_server != 'false'
+        uses: ./.github/actions/setup-ci-deps
 
       # No Electron setup here: `t3` (apps/server) has no Electron dependency
       # and none of its tests touch the runtime. Only the non-server `test`
       # job, which covers @infinitus/desktop, needs the download.
+      # Cache the pinned browser and skip apt unless shared libraries are missing.
+      - name: Resolve Playwright version
+        id: playwright_version
+        if: steps.changes.outputs.test_server != 'false'
+        run: echo "version=$(node -p "require('./apps/server/node_modules/playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium
+        id: chromium_cache
+        if: steps.changes.outputs.test_server != 'false'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-shell-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright_version.outputs.version }}
+
       - name: Install Chromium for server browser integration tests
-        run: node apps/server/node_modules/playwright-core/cli.js install --with-deps --only-shell chromium
+        if: steps.changes.outputs.test_server != 'false' && steps.chromium_cache.outputs.cache-hit != 'true'
+        run: node apps/server/node_modules/playwright-core/cli.js install --only-shell chromium
+
+      - name: Install missing Chromium system dependencies
+        if: steps.changes.outputs.test_server != 'false'
+        run: |
+          browser=$(find "$HOME/.cache/ms-playwright" -name chrome-headless-shell -type f -print -quit)
+          test -n "$browser"
+          if ldd "$browser" | grep '=> not found'; then
+            node apps/server/node_modules/playwright-core/cli.js install-deps chromium
+          fi
 
       - name: Test
+        if: steps.changes.outputs.test_server != 'false'
         env:
           T3CODE_TRANSFER_BUDGET_REPORT_PATH: ${{ runner.temp }}/t3code-transfer-budget.md
           T3CODE_TRANSFER_BUDGET_RESULT_PATH: ${{ runner.temp }}/thread-transfer-result.json
@@ -301,6 +477,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+<<<<<<< HEAD
   transfer-report:
     name: Transfer report artifact
     needs: test_server
@@ -316,12 +493,21 @@ jobs:
           name: thread-transfer-results
           path: ${{ runner.temp }}/thread-transfer
 
+=======
+>>>>>>> upstream-sync-43879d970-upstream-renamed
   # Split out of Check and Test: both paid ~7-9s to install a Rust toolchain
   # for checks that take under 3s, on the critical path of every PR.
   rust:
     name: Rust
+<<<<<<< HEAD
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+=======
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -329,6 +515,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust
@@ -348,6 +535,7 @@ jobs:
             cargo test --locked --manifest-path "native/$crate/Cargo.toml"
           done
 
+<<<<<<< HEAD
   # The static analysis below needs a macOS runner, which bills ~6.7x a Linux
   # minute, so gate it on the native sources it actually lints instead of paying
   # for it on every push. Detection is API-only (no checkout) and fails open: if
@@ -434,6 +622,14 @@ jobs:
     if: ${{ !cancelled() && needs.mobile_native_changes.outputs.changed != 'false' }}
     runs-on: macos-latest
     timeout-minutes: 30
+=======
+  mobile_native_static_analysis:
+    name: Mobile Native Static Analysis
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.mobile_native != 'false' }}
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 10
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -460,8 +656,15 @@ jobs:
 
   release_smoke:
     name: Release Smoke
+<<<<<<< HEAD
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+=======
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.release_smoke != 'false' }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 10
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -469,16 +672,11 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
-        with:
-          node-version-file: package.json
-          cache: true
-          run-install: |
-            args:
-              - --filter=@infinitus/scripts...
+        uses: ./.github/actions/setup-ci-deps
 
       - name: Exercise release-only workflow steps
         run: node scripts/release-smoke.ts
@@ -493,15 +691,13 @@ jobs:
     if: ${{ always() }}
     needs:
       [
+        changes,
         lint,
-        typecheck,
         build,
         test,
         test_web,
         test_server,
-        transfer-report,
         rust,
-        mobile_native_changes,
         mobile_native_static_analysis,
         release_smoke,
       ]
@@ -513,6 +709,7 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+<<<<<<< HEAD
           # Only the macOS lint skips on purpose, when no native mobile code changed.
           echo "$RESULTS" | jq -e 'all(to_entries[];
             .value.result == "success"
@@ -676,3 +873,23 @@ jobs:
       # way (#1333): a hung runner fails the step with the partial log.
       - run: timeout -k 30s 20m swift test
         if: needs.mac_changes.outputs.changed != 'false'
+=======
+          # A job may skip only when `changes` said every gate it represents was
+          # not needed. Gates are keyed by job name, except merged Build and the
+          # macOS lint.
+          echo "$RESULTS" | jq -e '.changes.outputs as $gates
+            | {build: ["build", "typecheck"], mobile_native_static_analysis: ["mobile_native"]} as $renamed
+            | all(to_entries[];
+                .value.result == "success"
+                or (.value.result == "skipped"
+                  and (($renamed[.key] // [.key]) | all(.[]; $gates[.] == "false"))))' > /dev/null
+
+      # thread-transfer-report.yml reads this artifact after CI, so a run whose
+      # server tests ran must have produced it.
+      - name: Require transfer measurements
+        if: needs.test_server.result == 'success' && needs.changes.outputs.test_server != 'false'
+        uses: actions/download-artifact@v8
+        with:
+          name: thread-transfer-results
+          path: ${{ runner.temp }}/thread-transfer
+>>>>>>> upstream-sync-43879d970-upstream-renamed

@@ -37,7 +37,12 @@ concurrency:
 jobs:
   publish:
     name: Validate and publish
+<<<<<<< HEAD
     runs-on: ubuntu-24.04
+=======
+    if: github.repository == 'pingdotgg/t3code'
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+>>>>>>> upstream-sync-43879d970-upstream-renamed
     timeout-minutes: 30
     container:
       image: archlinux:base-devel
