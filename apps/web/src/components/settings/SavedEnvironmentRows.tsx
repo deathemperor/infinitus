@@ -433,12 +433,15 @@ export function SavedBackendListRow({
   );
 }
 
+// A module constant: the compiler cannot reorder a template literal default.
+const ENABLE_CONNECT_LABEL = `Enable ${CONNECT_NAME}`;
+
 function CloudLinkSwitch({
   checked,
   disabled,
   disabledReason,
   onCheckedChange,
-  ariaLabel = `Enable ${CONNECT_NAME}`,
+  ariaLabel = ENABLE_CONNECT_LABEL,
 }: {
   readonly checked: boolean;
   readonly disabled: boolean;

@@ -142,7 +142,11 @@ jobs:
           gh pr list --state open --json number,headRefName \
             --jq '.[] | select(.headRefName | startswith("upstream-sync-")) | select(.headRefName != "${{ steps.merge.outputs.branch }}") | .number' |
             while read -r stale; do
-              last=$(gh pr view "$stale" --json commits --jq '.commits[-1].authors[0].email')
+              # The head commit's author, not the PR's last listed commit:
+              # that list ends with upstream's own commits, so the check never
+              # matched and fourteen syncs piled up (#1686–#1700).
+              head=$(gh pr view "$stale" --json headRefOid --jq .headRefOid)
+              last=$(gh api "repos/$GH_REPO/commits/$head" --jq .commit.author.email)
               [ "$last" = "noreply@infinitus.run" ] || continue
               gh pr close "$stale" --delete-branch \
                 --comment "Superseded by the sync of upstream $sha, which contains these commits." || true

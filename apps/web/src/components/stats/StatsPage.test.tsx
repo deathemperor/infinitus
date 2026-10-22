@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../test/reactTestRenderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId, type StatsRequest, type StatsSnapshot } from "@infinitus/contracts";
 import { statsWindow } from "@infinitus/shared/stats";

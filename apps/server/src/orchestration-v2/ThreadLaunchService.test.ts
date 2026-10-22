@@ -514,26 +514,16 @@ it.effect("retains automation and sender attribution while a message waits in th
   }).pipe(Effect.provide(harness.layer));
 });
 
-// Fork (#269 H): the worktree-limit cases below wait on launches that finish in the background.
-function waitUntil<E, R>(predicate: () => Effect.Effect<boolean, E, R>): Effect.Effect<void, E, R> {
-  return Effect.gen(function* () {
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      if (yield* predicate()) return;
-      yield* Effect.promise(
-        () =>
-          new Promise<void>((resolve) => {
-            setImmediate(resolve);
-          }),
-      );
-    }
-    assert.fail("Condition was not reached before timeout.");
-  });
-}
-
 // Fork (#269 H): the worktree limit.
 it.effect("refuses a worktree launch at the limit before the thread exists (#269 H)", () =>
   Effect.gen(function* () {
-    const harness = makeHarness({ serverSettings: { worktreeMaxCount: 1 } });
+    // Setup runs after the worktree is recorded and its slot released.
+    const setupStarted = yield* Deferred.make<void>();
+    const harness = makeHarness({
+      serverSettings: { worktreeMaxCount: 1 },
+      runSetup: () =>
+        Deferred.succeed(setupStarted, undefined).pipe(Effect.as({ status: "no-script" as const })),
+    });
     yield* Effect.gen(function* () {
       const launches = yield* ThreadLaunch.ThreadLaunchService;
       const threads = yield* ThreadManagement.ThreadManagementService;
@@ -545,11 +535,7 @@ it.effect("refuses a worktree launch at the limit before the thread exists (#269
           workspace: { type: "worktree", baseRef: "main" },
         }),
       );
-      yield* waitUntil(() =>
-        threads
-          .getThreadProjection(first.threadId)
-          .pipe(Effect.map((projection) => projection.thread.worktreePath !== null)),
-      );
+      yield* Deferred.await(setupStarted);
       yield* threads.dispatch({
         type: "thread.archive",
         commandId: CommandId.make("command:cap:archive"),
@@ -591,14 +577,28 @@ it.effect("counts the worktrees launches started together are still creating (#2
   Effect.gen(function* () {
     const allowWorktree = yield* Deferred.make<void>();
     const entered = yield* Ref.make(0);
+    const bothEntered = yield* Deferred.make<void>();
+    const setUp = yield* Ref.make(0);
+    const bothSetUp = yield* Deferred.make<void>();
     const harness = makeHarness({
       serverSettings: { worktreeMaxCount: 2 },
       createWorktree: (input) =>
-        Ref.update(entered, (count) => count + 1).pipe(
+        Ref.updateAndGet(entered, (count) => count + 1).pipe(
+          Effect.tap((count) =>
+            count === 2 ? Deferred.succeed(bothEntered, undefined) : Effect.void,
+          ),
           Effect.andThen(Deferred.await(allowWorktree)),
           Effect.as({
             worktree: { path: "/repo-worktrees/shared", refName: input.newRefName, headSha: "abc" },
           } as never),
+        ),
+      // Setup runs after the worktree is recorded and its slot released.
+      runSetup: () =>
+        Ref.updateAndGet(setUp, (count) => count + 1).pipe(
+          Effect.tap((count) =>
+            count === 2 ? Deferred.succeed(bothSetUp, undefined) : Effect.void,
+          ),
+          Effect.as({ status: "no-script" as const }),
         ),
     });
     yield* Effect.gen(function* () {
@@ -613,24 +613,16 @@ it.effect("counts the worktrees launches started together are still creating (#2
             workspace: { type: "worktree", baseRef: "main" },
           }),
         );
-      const first = yield* launch("one");
-      const second = yield* launch("two");
-      yield* waitUntil(() => Ref.get(entered).pipe(Effect.map((count) => count === 2)));
+      yield* launch("one");
+      yield* launch("two");
+      yield* Deferred.await(bothEntered);
       // Neither worktree is in the projection yet; the reservations refuse a third.
       const refused = yield* launch("three").pipe(Effect.flip);
       assert.include(worktreeCapRefusalMessage(refused) ?? "", "2 of 2 worktrees are in use");
       assert.isNull(yield* threads.getThreadShell(ThreadId.make("thread:cap:three")));
 
       yield* Deferred.succeed(allowWorktree, undefined);
-      yield* waitUntil(() =>
-        Effect.forEach([first.threadId, second.threadId], (threadId) =>
-          threads.getThreadProjection(threadId),
-        ).pipe(
-          Effect.map((projections) =>
-            projections.every((projection) => projection.thread.worktreePath !== null),
-          ),
-        ),
-      );
+      yield* Deferred.await(bothSetUp);
       // Both landed on one path, so one worktree is in use and a slot is free again.
       const third = yield* launch("four");
       assert.equal(third.threadId, ThreadId.make("thread:cap:four"));

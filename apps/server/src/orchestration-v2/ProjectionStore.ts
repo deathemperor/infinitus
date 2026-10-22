@@ -6116,8 +6116,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
       );
 
-    const getWorktreeHolders: ProjectionStoreV2Shape["getWorktreeHolders"] = (limit) =>
-      Effect.gen(function* () {
+    const getWorktreeHolders: ProjectionStoreV2Shape["getWorktreeHolders"] = Effect.fn(
+      "ProjectionStore.getWorktreeHolders",
+    )(
+      function* (limit) {
         const counted = yield* sql<{ readonly count: number }>`
           SELECT COUNT(DISTINCT json_extract(payload_json, '$.worktreePath')) AS count
           FROM orchestration_v2_projection_threads
@@ -6140,7 +6142,9 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             archivedAt: row.archived_at,
           })),
         };
-      }).pipe(Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })));
+      },
+      Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
+    );
 
     const getThreadWorktreePaths: ProjectionStoreV2Shape["getThreadWorktreePaths"] = (options) =>
       sql<{ readonly thread_id: string; readonly worktree_path: string }>`

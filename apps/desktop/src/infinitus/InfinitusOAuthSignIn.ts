@@ -241,11 +241,12 @@ const make = Effect.gen(function* () {
     return outcome;
   });
 
-  const cancel: InfinitusOAuthSignInService["Service"]["cancel"] = (flowId) =>
-    Effect.gen(function* () {
-      flows.get(flowId)?.();
-      yield* signInWindow.close(flowId);
-    });
+  const cancel: InfinitusOAuthSignInService["Service"]["cancel"] = Effect.fn(
+    "infinitus.oauthSignIn.cancel",
+  )(function* (flowId) {
+    flows.get(flowId)?.();
+    yield* signInWindow.close(flowId);
+  });
 
   return { begin, cancel } satisfies InfinitusOAuthSignInService["Service"];
 });

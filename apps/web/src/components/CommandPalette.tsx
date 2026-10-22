@@ -89,6 +89,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { isDesktopLocalConnectionTarget } from "../connection/desktopLocal";
 import { useDesktopLocalBootstraps } from "../connection/useDesktopLocalBootstraps";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
+import { useInfinitusSupported } from "../hooks/useInfinitusSupported";
 import { useCapturesUiStore } from "./captures/capturesUiStore";
 import { useActiveProjectRef } from "./captures/useCaptures";
 import { useOpenPanelPullRequestUrl } from "../hooks/useOpenPanelPullRequestUrl";
@@ -274,12 +275,9 @@ export function CommandPalette({ children }: { children: ReactNode }) {
       ? selectActiveRightPanel(state.byThreadKey, routeThreadRef) === "preview"
       : false,
   );
-  const { environments } = useEnvironments();
   // Same gate as the sidebar item: one connected server running Infinitus is
   // enough, because the page picks the environment itself.
-  const accountsSupported = environments.some(
-    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
-  );
+  const accountsSupported = useInfinitusSupported();
 
   useEffect(() => {
     if (!state.open || state.mode === "command") return;
@@ -556,11 +554,7 @@ function OpenCommandPaletteDialog(props: {
     reportFailure: false,
   });
   const { environments } = useEnvironments();
-  // Same gate as the sidebar item: one connected server running Infinitus is
-  // enough, because the page picks the environment itself.
-  const accountsSupported = environments.some(
-    (environment) => environment.serverConfig?.environment.capabilities.infinitus === true,
-  );
+  const accountsSupported = useInfinitusSupported();
   // Captures (#433, fork) belong to the routed thread's project.
   const capturesProject = useActiveProjectRef();
   const desktopLocalBootstraps = useDesktopLocalBootstraps();

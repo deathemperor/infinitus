@@ -8,7 +8,7 @@
  */
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { InfinitusPref, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
-import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { useEffect, useReducer, useState, type ReactNode } from "react";
 
 import { usePrimaryEnvironment, type EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
@@ -239,66 +239,54 @@ export function InfinitusPrefsPanel({
     dispatch({ type: "snapshot", prefs: snapshot.prefs, available: snapshot.available });
   }, [snapshot]);
 
-  const write = useCallback(
-    async (pref: InfinitusPref, value: boolean | number | string) => {
-      if (environmentId === null) return;
-      const requiresRestart = pref.effect === "restart";
-      dispatch({ type: "submit", key: pref.key, value, requiresRestart });
-      const { command, args } = prefWriteArgs(pref, value);
-      const result = await runCommand({ environmentId, input: { command, args, options: {} } });
-      if (result._tag !== "Failure") return;
-      const failure = infinitusCommandFailure(result.cause);
-      dispatch({ type: "failed", key: pref.key, error: failure.message });
-      // A refused engine toggle (engine not installed, proxy key missing) never
-      // quit the app, so nothing is waiting for the socket.
-      if (requiresRestart && !failure.restarting) dispatch({ type: "relaunchAborted" });
-    },
-    [environmentId, runCommand],
-  );
+  const write = async (pref: InfinitusPref, value: boolean | number | string) => {
+    if (environmentId === null) return;
+    const requiresRestart = pref.effect === "restart";
+    dispatch({ type: "submit", key: pref.key, value, requiresRestart });
+    const { command, args } = prefWriteArgs(pref, value);
+    const result = await runCommand({ environmentId, input: { command, args, options: {} } });
+    if (result._tag !== "Failure") return;
+    const failure = infinitusCommandFailure(result.cause);
+    dispatch({ type: "failed", key: pref.key, error: failure.message });
+    // A refused engine toggle (engine not installed, proxy key missing) never
+    // quit the app, so nothing is waiting for the socket.
+    if (requiresRestart && !failure.restarting) dispatch({ type: "relaunchAborted" });
+  };
 
   const state = infinitusPrefsPanelState({ capability, snapshot });
   const prefs = snapshot?.prefs;
   // Rows are built from the value a row shows — the in-flight write's, else the
   // app's — so the "Default" hint and the reset affordance follow the edit.
-  const sections = useMemo(
-    () =>
-      prefs === undefined
-        ? []
-        : buildPrefSections(
-            {
-              ...prefs,
-              prefs: prefs.prefs.map((pref) => ({
-                ...pref,
-                value: displayValue(pref, writeState),
-              })),
-            },
-            sectionSlugs,
-          ),
-    [prefs, sectionSlugs, writeState],
-  );
-  const prefsByKey = useMemo(
-    () => new Map((prefs?.prefs ?? []).map((pref) => [pref.key, pref] as const)),
-    [prefs],
-  );
+  const sections =
+    prefs === undefined
+      ? []
+      : buildPrefSections(
+          {
+            ...prefs,
+            prefs: prefs.prefs.map((pref) => ({
+              ...pref,
+              value: displayValue(pref, writeState),
+            })),
+          },
+          sectionSlugs,
+        );
+  const prefsByKey = new Map((prefs?.prefs ?? []).map((pref) => [pref.key, pref] as const));
 
-  const submit = useCallback(
-    (pref: InfinitusPref, row: PrefRowModel, raw: string) => {
-      const parsed = parseControlInput(pref, raw);
-      if (!parsed.ok) {
-        dispatch({ type: "failed", key: pref.key, error: parsed.reason });
-        return;
-      }
-      // The app relaunches on a CHANGED restart-effect write, so an edit that
-      // lands back on the current value is not a write at all.
-      if (parsed.value === displayValue(pref, writeState)) return;
-      if (row.requiresRestart) {
-        setPendingRestart({ pref, label: row.label, value: parsed.value });
-        return;
-      }
-      void write(pref, parsed.value);
-    },
-    [write, writeState],
-  );
+  const submit = (pref: InfinitusPref, row: PrefRowModel, raw: string) => {
+    const parsed = parseControlInput(pref, raw);
+    if (!parsed.ok) {
+      dispatch({ type: "failed", key: pref.key, error: parsed.reason });
+      return;
+    }
+    // The app relaunches on a CHANGED restart-effect write, so an edit that
+    // lands back on the current value is not a write at all.
+    if (parsed.value === displayValue(pref, writeState)) return;
+    if (row.requiresRestart) {
+      setPendingRestart({ pref, label: row.label, value: parsed.value });
+      return;
+    }
+    void write(pref, parsed.value);
+  };
 
   if (state !== "ready") {
     return (

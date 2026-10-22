@@ -4,7 +4,7 @@ import { scopeThreadRef, scopedThreadKey } from "@infinitus/client-runtime/envir
 import { limitStopLine } from "@infinitus/client-runtime/state/infinitusLimitStops";
 import * as Schema from "effect/Schema";
 import { ChevronDownIcon } from "lucide-react";
-import { useCallback, useMemo, type MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
@@ -44,17 +44,13 @@ export function SidebarNeedsAttention(props: {
     true,
     Schema.Boolean,
   );
-  const toggle = useCallback(() => setExpanded((value) => !value), [setExpanded]);
+  const toggle = () => setExpanded((value) => !value);
   const limitStops = useAtomValue(infinitusLimitStopsAtom);
   const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
   const nowMinute = useNowMinute();
   const nowMs = Date.parse(nowMinute);
-  const entries = useMemo(
-    () =>
-      collectNeedsAttention(props.threads, limitStops, (stop) =>
-        limitStopLine(stop, (iso) => formatShortTimestamp(iso, timestampFormat), nowMs),
-      ),
-    [limitStops, nowMs, props.threads, timestampFormat],
+  const entries = collectNeedsAttention(props.threads, limitStops, (stop) =>
+    limitStopLine(stop, (iso) => formatShortTimestamp(iso, timestampFormat), nowMs),
   );
   if (entries.length === 0) return null;
   const showEnvironment = props.environmentLabelById.size > 1;

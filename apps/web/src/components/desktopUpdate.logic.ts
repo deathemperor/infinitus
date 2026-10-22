@@ -155,7 +155,6 @@ export function canCheckForUpdate(state: DesktopUpdateState | null): boolean {
   );
 }
 
-// ---------------------------------------------------------------------------
 // #829: installing the desktop update quits the app, and with it every local
 // backend's running turns. The count below is read from the same thread
 // shells the sidebar shows — never from process heuristics.

@@ -1,7 +1,8 @@
 import { InfinitusCommandFailed, type InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
-import { act, StrictMode } from "react";
+import { StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../../test/reactTestRenderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { fake } = vi.hoisted(() => ({
@@ -70,7 +71,6 @@ const ok = (result: unknown) => ({ _tag: "Success", value: { result } });
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fake.snapshot = snapshot();
   fake.copied = [];
   fake.copyThrows = false;
@@ -80,7 +80,6 @@ beforeEach(() => {
 afterEach(async () => {
   await act(() => renderer?.unmount());
   renderer = undefined;
-  vi.unstubAllGlobals();
 });
 
 async function renderCard() {

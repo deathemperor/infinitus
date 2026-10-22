@@ -1,6 +1,4 @@
 import type { PromptSnippet } from "@infinitus/contracts";
-import { useMemo } from "react";
-
 import { useClientSettings, useEnvironmentSettings } from "../../hooks/useSettings";
 import { derivePhysicalProjectKey, selectProjectGroupingSettings } from "../../logicalProject";
 import { buildPhysicalToLogicalProjectKeyMap } from "../../sidebarProjectGrouping";
@@ -22,21 +20,19 @@ export function useProjectPromptSnippets(project: ActiveProjectRef | null): {
   const projects = useProjects();
   const grouping = useClientSettings(selectProjectGroupingSettings);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  return useMemo(() => {
-    if (project === null) return { snippets: [], projectKey: null };
-    const record = projects.find(
-      (item) => item.environmentId === project.environmentId && item.id === project.projectId,
-    );
-    const projectKey =
-      record === undefined
-        ? null
-        : (buildPhysicalToLogicalProjectKeyMap({
-            projects,
-            settings: grouping,
-            primaryEnvironmentId,
-          }).get(derivePhysicalProjectKey(record)) ?? null);
-    return { snippets: snippetsForProject(settings, project.projectId), projectKey };
-  }, [grouping, primaryEnvironmentId, project, projects, settings]);
+  if (project === null) return { snippets: [], projectKey: null };
+  const record = projects.find(
+    (item) => item.environmentId === project.environmentId && item.id === project.projectId,
+  );
+  const projectKey =
+    record === undefined
+      ? null
+      : (buildPhysicalToLogicalProjectKeyMap({
+          projects,
+          settings: grouping,
+          primaryEnvironmentId,
+        }).get(derivePhysicalProjectKey(record)) ?? null);
+  return { snippets: snippetsForProject(settings, project.projectId), projectKey };
 }
 
 // `useEnvironmentSettings` needs an id every render; with no project the

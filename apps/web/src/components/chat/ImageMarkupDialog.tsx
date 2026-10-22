@@ -1,5 +1,5 @@
 import { ArrowUpRightIcon, PenLineIcon, SquareIcon, Undo2Icon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
@@ -74,7 +74,8 @@ export function ImageMarkupDialog(props: ImageMarkupDialogProps) {
     };
   }, [props.open, props.previewUrl]);
 
-  const paint = useCallback(() => {
+  useEffect(() => {
+    if (!ready) return;
     const canvas = canvasRef.current;
     const image = imageRef.current;
     if (!canvas || !image) return;
@@ -91,11 +92,7 @@ export function ImageMarkupDialog(props: ImageMarkupDialogProps) {
       drawing ? [...shapes, drawing] : shapes,
       strokeWidthFor(canvas.width, canvas.height),
     );
-  }, [drawing, shapes]);
-
-  useEffect(() => {
-    if (ready) paint();
-  }, [paint, ready]);
+  }, [drawing, ready, shapes]);
 
   const pointAt = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = event.currentTarget;

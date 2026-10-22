@@ -161,189 +161,188 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       { onlyIfMissing: true },
     );
 
-    const forget = (threadId: ThreadId) =>
-      Effect.gen(function* () {
-        if (!stops.delete(threadId)) return;
-        yield* publish;
-        // A proxy's stop (#1088) waits for nothing here: it keeps no poll alive.
-        if (![...stops.values()].some((stop) => stop.proxy === null)) yield* stopWatching;
-      });
+    const forget = Effect.fn("InfinitusResumeOnLimit.forget")(function* (threadId: ThreadId) {
+      if (!stops.delete(threadId)) return;
+      yield* publish;
+      // A proxy's stop (#1088) waits for nothing here: it keeps no poll alive.
+      if (![...stops.values()].some((stop) => stop.proxy === null)) yield* stopWatching;
+    });
 
     /** The stop recorded, published and reported. A repeat of a known stop
         (the SDK re-announcing a parked turn as its reset moves, or a parked
         turn ending the way the CLI ends it) keeps its account and its start,
         takes the newer window, and is not reported again. */
-    const record = (stop: LimitStop, options: { readonly report: boolean }): Effect.Effect<void> =>
-      Effect.gen(function* () {
-        const known = stops.get(stop.threadId);
-        const repeated = known !== undefined && known.runId === stop.runId;
-        // A stop restored at boot names nobody; the first refusal on it may.
-        const next: LimitStop = repeated
-          ? {
-              ...stop,
-              account: known.account ?? stop.account,
-              fleetKey: known.fleetKey ?? stop.fleetKey,
-              stoppedAt: known.stoppedAt,
-              resetsAt: stop.resetsAt ?? known.resetsAt,
-              limitType: stop.limitType ?? known.limitType,
-            }
-          : stop;
-        stops.set(next.threadId, next);
-        yield* publish;
-        yield* Effect.logInfo("infinitus.resume-on-limit.stopped", {
-          threadId: next.threadId,
-          runId: next.runId,
-          kind: next.kind,
-          summary: limitStopSummary(next),
-          proxy: next.proxy !== null,
-        });
-        if (next.proxy !== null) return;
-        if (
-          (!repeated || known.account === null) &&
-          options.report &&
-          next.account !== null &&
-          (yield* enabled)
-        ) {
-          // Quota reads lag refusals by minutes. Report the refusal directly
-          // instead of waiting for the usage endpoint to confirm it.
-          yield* swapd.reportLimit(
-            next.account,
-            next.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(next.resetsAt)),
-          );
-        }
-        yield* startWatching;
+    const record = Effect.fn("InfinitusResumeOnLimit.record")(function* (
+      stop: LimitStop,
+      options: { readonly report: boolean },
+    ): Effect.fn.Return<void> {
+      const known = stops.get(stop.threadId);
+      const repeated = known !== undefined && known.runId === stop.runId;
+      // A stop restored at boot names nobody; the first refusal on it may.
+      const next: LimitStop = repeated
+        ? {
+            ...stop,
+            account: known.account ?? stop.account,
+            fleetKey: known.fleetKey ?? stop.fleetKey,
+            stoppedAt: known.stoppedAt,
+            resetsAt: stop.resetsAt ?? known.resetsAt,
+            limitType: stop.limitType ?? known.limitType,
+          }
+        : stop;
+      stops.set(next.threadId, next);
+      yield* publish;
+      yield* Effect.logInfo("infinitus.resume-on-limit.stopped", {
+        threadId: next.threadId,
+        runId: next.runId,
+        kind: next.kind,
+        summary: limitStopSummary(next),
+        proxy: next.proxy !== null,
       });
-
-    const onRefusal = (refusal: ClaudeUsageLimitRefusal) =>
-      Effect.gen(function* () {
-        remember(refusals, REFUSALS_LIMIT, refusal.threadId, refusal);
-        if (resumed.has(refusal.runId)) return;
-        const shell = yield* shellOf(refusal.threadId);
-        // A settled thread's parked turn can still refuse; nobody waits on it.
-        if (shell === null || shell.archivedAt !== null || shell.settledOverride === "settled")
-          return;
-        const now = yield* nowMillis;
-        const proxy = yield* proxyFor(shell);
-        const base = {
-          threadId: refusal.threadId,
-          runId: refusal.runId,
-          kind: "parked" as const,
-          stoppedAt: now,
-          resetsAt: refusal.resetsAt,
-          limitType: refusal.rateLimitType,
-        };
-        if (proxy !== null) {
-          return yield* record(
-            { ...base, fleetKey: null, account: null, proxy },
-            { report: false },
-          );
-        }
-        const accounts = yield* withBackgroundAccounts(yield* infinitus.snapshot);
-        const refused = refusedAccount(refusal, accounts);
-        yield* record(
-          {
-            ...base,
-            fleetKey: refused?.fleetKey ?? null,
-            account: refused?.account ?? null,
-            proxy: null,
-          },
-          { report: true },
+      if (next.proxy !== null) return;
+      if (
+        (!repeated || known.account === null) &&
+        options.report &&
+        next.account !== null &&
+        (yield* enabled)
+      ) {
+        // Quota reads lag refusals by minutes. Report the refusal directly
+        // instead of waiting for the usage endpoint to confirm it.
+        yield* swapd.reportLimit(
+          next.account,
+          next.resetsAt === null ? null : DateTime.formatIso(DateTime.makeUnsafe(next.resetsAt)),
         );
-      });
+      }
+      yield* startWatching;
+    });
 
-    const onEvent = (event: OrchestrationV2DomainEvent) =>
-      Effect.gen(function* () {
-        const threadId = event.threadId;
-        if (threadId === undefined) return;
-        switch (event.type) {
-          case "thread.settled":
-          case "thread.archived":
-          case "thread.deleted":
-            return yield* forget(threadId);
-          case "run.updated": {
-            const run = event.payload;
-            const waiting = interrupted.get(run.id);
-            if (
-              waiting !== undefined &&
-              (run.status === "interrupted" ||
-                run.status === "failed" ||
-                run.status === "completed" ||
-                run.status === "cancelled")
-            ) {
-              yield* Deferred.succeed(waiting, undefined);
-            }
-            const known = stops.get(threadId);
-            if (run.status === "failed") {
-              if (resumed.has(run.id)) return;
-              const shell = yield* shellOf(threadId);
-              if (shell === null) return;
-              const refusal = refusals.get(threadId) ?? null;
-              const failed = failedStopFromShell(shell, yield* nowMillis, refusal);
-              if (failed === null || failed.runId !== run.id) {
-                // A run that failed for another reason moves the thread on:
-                // the stop's own parked turn ended off the limit, or a later
-                // run took the thread.
-                if (known !== undefined) yield* forget(threadId);
-                return;
-              }
-              if (known !== undefined && known.runId === run.id) {
-                // A parked turn ending the way the CLI ends it: one stop, the
-                // window kept, nothing reported twice.
-                return yield* record({ ...known, ...failed, kind: "failed" }, { report: false });
-              }
-              const proxy = yield* proxyFor(shell);
-              if (proxy !== null) {
-                return yield* record(
-                  { ...failed, fleetKey: null, account: null, proxy },
-                  { report: false },
-                );
-              }
-              const accounts = yield* withBackgroundAccounts(yield* infinitus.snapshot);
-              const refused = refusedAccount(
-                refusal !== null && refusal.runId === run.id
-                  ? refusal
-                  : { rateLimitType: null, resetsAt: failed.resetsAt },
-                accounts,
-              );
-              return yield* record(
-                {
-                  ...failed,
-                  fleetKey: refused?.fleetKey ?? null,
-                  account: refused?.account ?? null,
-                  proxy: null,
-                },
-                { report: true },
-              );
-            }
-            if (known === undefined) return;
-            if (known.runId !== run.id) {
-              // Another run on the thread: the user sent again, or the
-              // continuation went. The stop is no longer ours.
-              if (run.status !== "queued") yield* forget(threadId);
+    const onRefusal = Effect.fn("InfinitusResumeOnLimit.onRefusal")(function* (
+      refusal: ClaudeUsageLimitRefusal,
+    ) {
+      remember(refusals, REFUSALS_LIMIT, refusal.threadId, refusal);
+      if (resumed.has(refusal.runId)) return;
+      const shell = yield* shellOf(refusal.threadId);
+      // A settled thread's parked turn can still refuse; nobody waits on it.
+      if (shell === null || shell.archivedAt !== null || shell.settledOverride === "settled")
+        return;
+      const now = yield* nowMillis;
+      const proxy = yield* proxyFor(shell);
+      const base = {
+        threadId: refusal.threadId,
+        runId: refusal.runId,
+        kind: "parked" as const,
+        stoppedAt: now,
+        resetsAt: refusal.resetsAt,
+        limitType: refusal.rateLimitType,
+      };
+      if (proxy !== null) {
+        return yield* record({ ...base, fleetKey: null, account: null, proxy }, { report: false });
+      }
+      const accounts = yield* withBackgroundAccounts(yield* infinitus.snapshot);
+      const refused = refusedAccount(refusal, accounts);
+      yield* record(
+        {
+          ...base,
+          fleetKey: refused?.fleetKey ?? null,
+          account: refused?.account ?? null,
+          proxy: null,
+        },
+        { report: true },
+      );
+    });
+
+    // Runs for every run update on the live tail; avoid a per-event span.
+    const onEvent = Effect.fnUntraced(function* (event: OrchestrationV2DomainEvent) {
+      const threadId = event.threadId;
+      if (threadId === undefined) return;
+      switch (event.type) {
+        case "thread.settled":
+        case "thread.archived":
+        case "thread.deleted":
+          return yield* forget(threadId);
+        case "run.updated": {
+          const run = event.payload;
+          const waiting = interrupted.get(run.id);
+          if (
+            waiting !== undefined &&
+            (run.status === "interrupted" ||
+              run.status === "failed" ||
+              run.status === "completed" ||
+              run.status === "cancelled")
+          ) {
+            yield* Deferred.succeed(waiting, undefined);
+          }
+          const known = stops.get(threadId);
+          if (run.status === "failed") {
+            if (resumed.has(run.id)) return;
+            const shell = yield* shellOf(threadId);
+            if (shell === null) return;
+            const refusal = refusals.get(threadId) ?? null;
+            const failed = failedStopFromShell(shell, yield* nowMillis, refusal);
+            if (failed === null || failed.runId !== run.id) {
+              // A run that failed for another reason moves the thread on:
+              // the stop's own parked turn ended off the limit, or a later
+              // run took the thread.
+              if (known !== undefined) yield* forget(threadId);
               return;
             }
-            // The stop's own run ended some other way: a parked turn that
-            // completed did so on its own, or the user interrupted it.
-            if (
-              run.status === "completed" ||
-              run.status === "interrupted" ||
-              run.status === "cancelled"
-            ) {
-              yield* forget(threadId);
+            if (known !== undefined && known.runId === run.id) {
+              // A parked turn ending the way the CLI ends it: one stop, the
+              // window kept, nothing reported twice.
+              return yield* record({ ...known, ...failed, kind: "failed" }, { report: false });
             }
+            const proxy = yield* proxyFor(shell);
+            if (proxy !== null) {
+              return yield* record(
+                { ...failed, fleetKey: null, account: null, proxy },
+                { report: false },
+              );
+            }
+            const accounts = yield* withBackgroundAccounts(yield* infinitus.snapshot);
+            const refused = refusedAccount(
+              refusal !== null && refusal.runId === run.id
+                ? refusal
+                : { rateLimitType: null, resetsAt: failed.resetsAt },
+              accounts,
+            );
+            return yield* record(
+              {
+                ...failed,
+                fleetKey: refused?.fleetKey ?? null,
+                account: refused?.account ?? null,
+                proxy: null,
+              },
+              { report: true },
+            );
+          }
+          if (known === undefined) return;
+          if (known.runId !== run.id) {
+            // Another run on the thread: the user sent again, or the
+            // continuation went. The stop is no longer ours.
+            if (run.status !== "queued") yield* forget(threadId);
             return;
           }
-          default:
-            return;
+          // The stop's own run ended some other way: a parked turn that
+          // completed did so on its own, or the user interrupted it.
+          if (
+            run.status === "completed" ||
+            run.status === "interrupted" ||
+            run.status === "cancelled"
+          ) {
+            yield* forget(threadId);
+          }
+          return;
         }
-      });
+        default:
+          return;
+      }
+    });
 
     /** The replace-then-send, beside the worker: the interrupted run's end
         arrives through the worker, so waiting for it there would wait on
         itself. Each command re-reads the thread first, so a settle, an
         archive or the user's own send since the stop stands (#1522). */
-    const resume = (stop: LimitStop, target: ResumeTarget) =>
-      Effect.gen(function* () {
+    const resume = Effect.fn("InfinitusResumeOnLimit.resume")(
+      function* (stop: LimitStop, target: ResumeTarget) {
         const resumedAt = yield* nowMillis;
         const stillOurs = (shell: OrchestrationV2ThreadShell | null, parkedRunActive: boolean) =>
           shell !== null &&
@@ -400,40 +399,44 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           account: target.account,
           from: target.from,
         });
-      }).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning("infinitus.resume-on-limit.failed", {
-            threadId: stop.threadId,
-            runId: stop.runId,
-            cause: Cause.pretty(cause),
-          }),
+      },
+      (effect, stop) =>
+        effect.pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("infinitus.resume-on-limit.failed", {
+              threadId: stop.threadId,
+              runId: stop.runId,
+              cause: Cause.pretty(cause),
+            }),
+          ),
         ),
-      );
+    );
 
-    const onSnapshot = (snapshot: InfinitusSnapshot) =>
-      Effect.gen(function* () {
-        if (![...stops.values()].some((stop) => stop.proxy === null)) return;
-        const accounts = yield* withBackgroundAccounts(snapshot);
-        const now = yield* nowMillis;
-        // `forget` deletes the current entry mid-walk; Map iteration tolerates that.
-        for (const stop of stops.values()) {
-          const target = resumeTarget(stop, accounts, now);
-          if (target === null) continue;
-          const last = lastResumeAt.get(stop.threadId);
-          if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
-          if (!(yield* enabled)) continue;
-          // Claimed here, on the worker, so a refusal or a failure landing
-          // while the resume runs cannot record the same run again.
-          if (resumed.size >= RESUMED_LIMIT) {
-            const oldest = resumed.values().next().value;
-            if (oldest !== undefined) resumed.delete(oldest);
-          }
-          resumed.add(stop.runId);
-          lastResumeAt.set(stop.threadId, now);
-          yield* forget(stop.threadId);
-          yield* FiberMap.run(resumes, stop.threadId)(resume(stop, target));
+    const onSnapshot = Effect.fn("InfinitusResumeOnLimit.onSnapshot")(function* (
+      snapshot: InfinitusSnapshot,
+    ) {
+      if (![...stops.values()].some((stop) => stop.proxy === null)) return;
+      const accounts = yield* withBackgroundAccounts(snapshot);
+      const now = yield* nowMillis;
+      // `forget` deletes the current entry mid-walk; Map iteration tolerates that.
+      for (const stop of stops.values()) {
+        const target = resumeTarget(stop, accounts, now);
+        if (target === null) continue;
+        const last = lastResumeAt.get(stop.threadId);
+        if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
+        if (!(yield* enabled)) continue;
+        // Claimed here, on the worker, so a refusal or a failure landing
+        // while the resume runs cannot record the same run again.
+        if (resumed.size >= RESUMED_LIMIT) {
+          const oldest = resumed.values().next().value;
+          if (oldest !== undefined) resumed.delete(oldest);
         }
-      });
+        resumed.add(stop.runId);
+        lastResumeAt.set(stop.threadId, now);
+        yield* forget(stop.threadId);
+        yield* FiberMap.run(resumes, stop.threadId)(resume(stop, target));
+      }
+    });
 
     const restore = Effect.gen(function* () {
       const snapshot = yield* projections.getShellSnapshot();

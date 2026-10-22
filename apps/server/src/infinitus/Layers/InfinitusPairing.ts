@@ -91,15 +91,14 @@ const makeInfinitusPairing = Effect.gen(function* () {
   const pendingList = (current: ReadonlyMap<string, Entry>, now: DateTime.Utc) =>
     [...current.values()].filter((entry) => isPending(entry, now)).map(toRequest);
 
-  const live = (id: string) =>
-    Effect.gen(function* () {
-      const now = yield* DateTime.now;
-      const entry = (yield* SubscriptionRef.get(entries)).get(id);
-      return entry !== undefined && isLive(entry, now) ? entry : undefined;
-    });
+  const live = Effect.fn("InfinitusPairing.live")(function* (id: string) {
+    const now = yield* DateTime.now;
+    const entry = (yield* SubscriptionRef.get(entries)).get(id);
+    return entry !== undefined && isLive(entry, now) ? entry : undefined;
+  });
 
-  const create: InfinitusPairingShape["create"] = (input) =>
-    Effect.gen(function* () {
+  const create: InfinitusPairingShape["create"] = Effect.fn("InfinitusPairing.create")(
+    function* (input) {
       yield* sweep;
       const now = yield* DateTime.now;
       const current = yield* SubscriptionRef.get(entries);
@@ -130,17 +129,17 @@ const makeInfinitusPairing = Effect.gen(function* () {
       // The row leaves the desktop's list on its own when nobody decides.
       yield* Effect.sleep(PAIRING_APPROVAL_TTL).pipe(Effect.andThen(sweep), Effect.forkIn(scope));
       return { id, matchCode: entry.matchCode, expiresAt: entry.expiresAt };
-    });
+    },
+  );
 
-  const poll: InfinitusPairingShape["poll"] = (input) =>
-    Effect.gen(function* () {
-      const entry = yield* live(input.id);
-      const presented = hashSecret(input.secret);
-      if (entry === undefined || !NodeCrypto.timingSafeEqual(entry.secretHash, presented)) {
-        return yield* new PairingApprovalNotFound({});
-      }
-      return entry.decision satisfies PairingApprovalPollResult;
-    });
+  const poll: InfinitusPairingShape["poll"] = Effect.fn("InfinitusPairing.poll")(function* (input) {
+    const entry = yield* live(input.id);
+    const presented = hashSecret(input.secret);
+    if (entry === undefined || !NodeCrypto.timingSafeEqual(entry.secretHash, presented)) {
+      return yield* new PairingApprovalNotFound({});
+    }
+    return entry.decision satisfies PairingApprovalPollResult;
+  });
 
   /** Records a decision on a request that is still pending and still live;
       an expired one the sweep has not reached yet counts as gone. */
@@ -155,8 +154,8 @@ const makeInfinitusPairing = Effect.gen(function* () {
       ),
     );
 
-  const decide: InfinitusPairingShape["decide"] = (input) =>
-    Effect.gen(function* () {
+  const decide: InfinitusPairingShape["decide"] = Effect.fn("InfinitusPairing.decide")(
+    function* (input) {
       const entry = yield* live(input.id);
       if (entry === undefined || entry.decision.state !== "pending") return { decided: false };
       if (!input.approve) return { decided: yield* setDecision(input.id, { state: "denied" }) };
@@ -182,7 +181,8 @@ const makeInfinitusPairing = Effect.gen(function* () {
       // the credential has no taker, so it does not stay valid.
       if (!decided) yield* auth.revokePairingLink(issued.id).pipe(Effect.ignore);
       return { decided };
-    });
+    },
+  );
 
   const pending = SubscriptionRef.changes(entries).pipe(
     Stream.mapEffect((current) =>

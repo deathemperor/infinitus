@@ -11,7 +11,7 @@
  * @module InfinitusPairingRequestsCard
  */
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 import { usePrimaryEnvironment } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
@@ -37,24 +37,21 @@ export function InfinitusPairingRequestsCard() {
   const nowMs = useRelativeTimeTick(requests.length === 0 ? 60_000 : 1_000);
   const rows = pairingRequestRows(requests, nowMs);
 
-  const settle = useCallback(
-    async (id: string, approve: boolean) => {
-      if (environmentId === null) return;
-      setDeciding(id);
-      setNotice(null);
-      const result = await decide({ environmentId, input: { id, approve } });
-      setDeciding(null);
-      const outcome =
-        result._tag === "Success"
-          ? ({ kind: "decided", decided: result.value.decided } as const)
-          : ({
-              kind: "failed",
-              message: failureMessage(squashAtomCommandFailure(result)),
-            } as const);
-      setNotice(decisionNotice({ approve, outcome }));
-    },
-    [decide, environmentId],
-  );
+  const settle = async (id: string, approve: boolean) => {
+    if (environmentId === null) return;
+    setDeciding(id);
+    setNotice(null);
+    const result = await decide({ environmentId, input: { id, approve } });
+    setDeciding(null);
+    const outcome =
+      result._tag === "Success"
+        ? ({ kind: "decided", decided: result.value.decided } as const)
+        : ({
+            kind: "failed",
+            message: failureMessage(squashAtomCommandFailure(result)),
+          } as const);
+    setNotice(decisionNotice({ approve, outcome }));
+  };
 
   return (
     <SettingsSection id="infinitus-pairing-requests" title="Pairing requests">

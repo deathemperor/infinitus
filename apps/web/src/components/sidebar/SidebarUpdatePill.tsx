@@ -1,19 +1,12 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { DesktopBridge, DesktopUpdateState } from "@infinitus/contracts";
 import { TriangleAlertIcon } from "lucide-react";
-import {
-  type ComponentProps,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ComponentProps, useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import { isElectron } from "../../env";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useStableCallback } from "../../hooks/useStableCallback";
 import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
 import { desktopInstallWhenIdleAtom, useDesktopUpdateState } from "../../state/desktopUpdate";
@@ -218,13 +211,12 @@ function SidebarUpdateControl() {
   // #829: the turns an install would cut off, read from the thread shells
   // of the local backends. Null while a backend's shells are still
   // loading — a count of zero proves nothing then.
-  const runningLocalTurns = useMemo(() => {
-    if (!shellsBootstrapped) return null;
-    return countRunningLocalTurns(shells, (environmentId) => {
-      const presentation = presentationById.get(environmentId);
-      return presentation !== undefined && isLocalConnectionTarget(presentation.entry.target);
-    });
-  }, [presentationById, shells, shellsBootstrapped]);
+  const runningLocalTurns = shellsBootstrapped
+    ? countRunningLocalTurns(shells, (environmentId) => {
+        const presentation = presentationById.get(environmentId);
+        return presentation !== undefined && isLocalConnectionTarget(presentation.entry.target);
+      })
+    : null;
   const [isActionPending, setIsActionPending] = useState(false);
   const [runningTurnsDialog, setRunningTurnsDialog] =
     useState<DesktopUpdateRunningTurnsDialogRequest | null>(null);
@@ -311,24 +303,27 @@ function SidebarUpdateControl() {
 
   // #829: one install entry for the click, the running-turns dialog and the
   // armed "install when idle" wait; the toasts live in installLocalUpdate.
-  const installNow = useCallback(() => {
+  const installNow = () => {
     const bridge = window.desktopBridge;
     if (!bridge) return;
     setIsActionPending(true);
     void installLocalUpdate(bridge).finally(() => setIsActionPending(false));
-  }, []);
+  };
 
   // #829: "Install when they finish" — fire once the count reaches zero and
   // the install action is back. The wait survives the 4-minute poll reading
   // "checking" and a newer release replacing the downloaded one (#1037);
   // it is dropped only when nothing is left to install.
+  const endInstallWhenIdleWait = useStableCallback((install: boolean) => {
+    setInstallWhenIdle(false);
+    if (install) installNow();
+  });
   useEffect(() => {
     if (!installWhenIdle) return;
     const step = resolveInstallWhenIdleStep(state, action, runningLocalTurns);
     if (step === "wait") return;
-    setInstallWhenIdle(false);
-    if (step === "install") installNow();
-  }, [action, installNow, installWhenIdle, runningLocalTurns, setInstallWhenIdle, state]);
+    endInstallWhenIdleWait(step === "install");
+  }, [action, endInstallWhenIdleWait, installWhenIdle, runningLocalTurns, state]);
 
   const handleAction = async () => {
     const bridge = window.desktopBridge;

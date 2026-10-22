@@ -1,5 +1,5 @@
 import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Switch } from "../../ui/switch";
 import { SettingsRow, SettingsSection } from "../settingsLayout";
@@ -36,11 +36,10 @@ export function infinitusDesktopBridge(
  * the bridge rather than from the app's pref catalog.
  */
 export function InfinitusDesktopCard() {
-  // The bridge is a window global fixed for the page's life; memoised so the
-  // read effect runs once, not per render.
-  const bridge = useMemo(
-    () => infinitusDesktopBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
-    [],
+  // The bridge is a window global fixed for the page's life; read once per
+  // mount so the prefs effect runs once, not per render.
+  const [bridge] = useState(() =>
+    infinitusDesktopBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
   );
   const [prefs, setPrefs] = useState<InfinitusDesktopPrefs | null>(null);
   const [error, setError] = useState<string | null>(null);

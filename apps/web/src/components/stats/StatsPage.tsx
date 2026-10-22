@@ -19,7 +19,7 @@ import { runAtomCommand } from "@infinitus/client-runtime/state/runtime";
 import type { EnvironmentId, StatsRequest, UsageDay } from "@infinitus/contracts";
 import { mergeStats, statsDayFormatter } from "@infinitus/shared/stats";
 import * as Schema from "effect/Schema";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { isElectron } from "../../env";
@@ -71,18 +71,12 @@ export function StatsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const minute = useNowMinute();
   const today = reportDay(Date.parse(minute + ":00Z")) as UsageDay;
-  const request = useMemo<StatsRequest>(
-    () => ({ period, today, timeZone: REPORTING_TIME_ZONE }),
-    [period, today],
-  );
+  const request: StatsRequest = { period, today, timeZone: REPORTING_TIME_ZONE };
   const key = JSON.stringify({ request, selectedIds });
   const environments = useAtomValue(statsAtoms(key));
   const selected = environments.filter((e) => e.selected);
-  const snapshots = useMemo(
-    () => environments.flatMap((e) => (e.selected && e.snapshot ? [e.snapshot] : [])),
-    [environments],
-  );
-  const summary = useMemo(() => mergeStats(snapshots, request), [snapshots, request]);
+  const snapshots = environments.flatMap((e) => (e.selected && e.snapshot ? [e.snapshot] : []));
+  const summary = mergeStats(snapshots, request);
   const notes = [
     ...new Set(
       snapshots.flatMap((s) => [
@@ -165,25 +159,21 @@ export function StatsPage() {
   const missing = selected.filter((e) => e.status !== "ready");
   const refresh = async () => {
     setRefreshing(true);
-    try {
-      await Promise.all(
-        selected
-          .filter((e) => e.status === "ready" || e.status === "scanning" || e.status === "error")
-          .map(async (e) => {
-            await runAtomCommand(
-              appAtomRegistry,
-              serverEnvironment.refreshUsageRates,
-              { environmentId: e.environmentId, input: {} },
-              { reportFailure: false },
-            );
-            appAtomRegistry.refresh(
-              serverEnvironment.stats({ environmentId: e.environmentId, input: request }),
-            );
-          }),
-      );
-    } finally {
-      setRefreshing(false);
-    }
+    await Promise.all(
+      selected
+        .filter((e) => e.status === "ready" || e.status === "scanning" || e.status === "error")
+        .map(async (e) => {
+          await runAtomCommand(
+            appAtomRegistry,
+            serverEnvironment.refreshUsageRates,
+            { environmentId: e.environmentId, input: {} },
+            { reportFailure: false },
+          );
+          appAtomRegistry.refresh(
+            serverEnvironment.stats({ environmentId: e.environmentId, input: request }),
+          );
+        }),
+    ).finally(() => setRefreshing(false));
   };
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none isolate">

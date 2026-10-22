@@ -1,6 +1,6 @@
 import type { CaptureItem } from "@infinitus/contracts/captures";
 import { CheckIcon, CopyIcon, ListTodoIcon, SendIcon, XIcon } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
@@ -52,46 +52,40 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
   const rows = orderCaptures(list);
   const doneCount = list.length - rows.filter((item) => item.doneAt === null).length;
 
-  const run = useCallback(
-    async (command: Parameters<typeof apply>[0]["input"]["command"]) => {
-      if (project === null) return false;
-      const result = await apply({
-        environmentId: project.environmentId,
-        input: { projectId: project.projectId, command },
-      });
-      if (result._tag === "Success") return true;
-      toastManager.add({
-        type: "error",
-        title: "Captures not updated",
-        description: captureApplyFailureMessage(squashAtomCommandFailure(result)),
-      });
-      return false;
-    },
-    [apply, project],
-  );
+  const run = async (command: Parameters<typeof apply>[0]["input"]["command"]) => {
+    if (project === null) return false;
+    const result = await apply({
+      environmentId: project.environmentId,
+      input: { projectId: project.projectId, command },
+    });
+    if (result._tag === "Success") return true;
+    toastManager.add({
+      type: "error",
+      title: "Captures not updated",
+      description: captureApplyFailureMessage(squashAtomCommandFailure(result)),
+    });
+    return false;
+  };
 
-  const add = useCallback(async () => {
+  const add = async () => {
     const text = captureText(draft);
     if (text === null) return;
     if (await run({ type: "add", text })) setDraft("");
-  }, [draft, run]);
+  };
 
-  const send = useCallback(
-    (item: CaptureItem) => {
-      if (onSend(item.text)) {
-        onClose();
-        return;
-      }
-      toastManager.add({
-        type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
-      });
-    },
-    [onClose, onSend],
-  );
+  const send = (item: CaptureItem) => {
+    if (onSend(item.text)) {
+      onClose();
+      return;
+    }
+    toastManager.add({
+      type: "error",
+      title: "Unable to add to chat",
+      description: "The composer is busy; try again once it is ready.",
+    });
+  };
 
-  const copy = useCallback(async (item: CaptureItem) => {
+  const copy = async (item: CaptureItem) => {
     try {
       await writeTextToClipboard(item.text, "capture");
     } catch (cause) {
@@ -101,7 +95,7 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
         description: cause instanceof Error ? cause.message : "The clipboard refused the text.",
       });
     }
-  }, []);
+  };
 
   useEffect(() => {
     if (focusInputKey > 0) inputRef.current?.focus();

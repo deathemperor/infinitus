@@ -104,17 +104,16 @@ const make = Effect.gen(function* () {
   const storeError = (projectId: ProjectId) => (cause: { readonly message: string }) =>
     new CaptureStoreError({ projectId, detail: cause.message });
 
-  const load = (projectId: ProjectId) =>
-    Effect.gen(function* () {
-      const file = filePath(projectId);
-      if (!(yield* fs.exists(file).pipe(Effect.mapError(storeError(projectId))))) {
-        return [] as CaptureList;
-      }
-      const raw = yield* fs.readFileString(file).pipe(Effect.mapError(storeError(projectId)));
-      // A file this server cannot read stays as it is: the error names the
-      // issue, never the contents, and nothing overwrites the user's notes.
-      return yield* decodeCaptureList(raw).pipe(Effect.mapError(storeError(projectId)));
-    });
+  const load = Effect.fn("CaptureStore.load")(function* (projectId: ProjectId) {
+    const file = filePath(projectId);
+    if (!(yield* fs.exists(file).pipe(Effect.mapError(storeError(projectId))))) {
+      return [] as CaptureList;
+    }
+    const raw = yield* fs.readFileString(file).pipe(Effect.mapError(storeError(projectId)));
+    // A file this server cannot read stays as it is: the error names the
+    // issue, never the contents, and nothing overwrites the user's notes.
+    return yield* decodeCaptureList(raw).pipe(Effect.mapError(storeError(projectId)));
+  });
 
   /** The project's ref, loading its file the first time. Under the lock so
       two first callers share one load. */
@@ -132,8 +131,8 @@ const make = Effect.gen(function* () {
   const subscribe: CaptureStoreShape["subscribe"] = (projectId) =>
     ref(projectId).pipe(Effect.map((current) => SubscriptionRef.changes(current)));
 
-  const apply: CaptureStoreShape["apply"] = (projectId, command) =>
-    Effect.gen(function* () {
+  const apply: CaptureStoreShape["apply"] = Effect.fn("CaptureStore.apply")(
+    function* (projectId, command) {
       const current = yield* ref(projectId);
       yield* lock.withPermits(1)(
         Effect.gen(function* () {
@@ -155,7 +154,8 @@ const make = Effect.gen(function* () {
           yield* SubscriptionRef.set(current, next);
         }),
       );
-    });
+    },
+  );
 
   return { subscribe, apply } satisfies CaptureStoreShape;
 });

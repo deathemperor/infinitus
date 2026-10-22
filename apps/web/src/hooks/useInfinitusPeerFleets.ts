@@ -2,13 +2,14 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { InfinitusPeerSyncResult, InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import { infinitusEnvironment } from "../state/infinitus";
 import { useEnvironmentQuery } from "../state/query";
 import { environmentServerConfigsAtom } from "../state/server";
 import { useAtomCommand } from "../state/use-atom-command";
+import { useStableCallback } from "./useStableCallback";
 import {
   fleetFingerprint,
   forwardable,
@@ -56,18 +57,14 @@ export function useInfinitusPeerFleets(): {
   const primaryRunsInfinitus = primary?.serverConfig?.environment.capabilities.infinitus === true;
   const { environments } = useEnvironments();
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
-  const machines = useMemo(
-    () =>
-      primaryRunsInfinitus
-        ? peerMachines(
-            environments,
-            (environmentId) =>
-              serverConfigs.get(environmentId)?.environment.capabilities.infinitus === true,
-            primaryId,
-          )
-        : [],
-    [environments, primaryId, primaryRunsInfinitus, serverConfigs],
-  );
+  const machines = primaryRunsInfinitus
+    ? peerMachines(
+        environments,
+        (environmentId) =>
+          serverConfigs.get(environmentId)?.environment.capabilities.infinitus === true,
+        primaryId,
+      )
+    : [];
   const machinesKey = machines
     .map((machine) => `${machine.environmentId}:${machine.connected ? 1 : 0}`)
     .join(",");
@@ -84,81 +81,87 @@ export function useInfinitusPeerFleets(): {
   const fingerprints = useRef(new Map<EnvironmentId, string>());
   // Bumped when a row-visible field of any remote fleet changes.
   const [fleetsVersion, setFleetsVersion] = useState(0);
-  const report = useCallback((environmentId: EnvironmentId, snapshot: InfinitusSnapshot | null) => {
+  const report = (environmentId: EnvironmentId, snapshot: InfinitusSnapshot | null) => {
     snapshots.current.set(environmentId, snapshot);
     const fingerprint = snapshot?.available === true ? fleetFingerprint(snapshot.fleets) : "";
     if (fingerprints.current.get(environmentId) === fingerprint) return;
     fingerprints.current.set(environmentId, fingerprint);
     setFleetsVersion((version) => version + 1);
-  }, []);
+  };
 
   // One push at a time; a push asked for while one runs follows it.
   const inFlight = useRef(false);
   const again = useRef(false);
   const results = useRef<Array<InfinitusPeerSyncResult>>([]);
-  const machinesRef = useRef(machines);
-  machinesRef.current = machines;
+  // A push spans several awaits; each round reads the machines as they are then.
+  const readMachines = useStableCallback(() => machines);
 
-  const sync = useCallback(async () => {
+  // Pushes until no round leaves anything to report back.
+  const pushRounds = async (environmentId: EnvironmentId) => {
+    do {
+      again.current = false;
+      const body = peerSyncBody(readMachines(), snapshots.current, results.current);
+      results.current = [];
+      const answer = await runCommand({
+        environmentId,
+        input: { command: PEER_SYNC_COMMAND, args: [], options: { body: JSON.stringify(body) } },
+      });
+      if (answer._tag === "Failure") return;
+      const commands = peerSyncReply(answer.value.result);
+      for (const command of commands) {
+        const machine = readMachines().find((entry) => entry.environmentId === command.machine);
+        if (machine === undefined || !machine.connected) {
+          results.current.push(
+            peerCommandResult(command, { ok: false, error: "That machine is not connected." }),
+          );
+          continue;
+        }
+        if (!forwardable(command)) {
+          results.current.push(
+            peerCommandResult(command, {
+              ok: false,
+              error: `${command.command} cannot be run on another machine.`,
+            }),
+          );
+          continue;
+        }
+        const outcome = await runCommand({
+          environmentId: machine.environmentId,
+          input: { command: command.command, args: command.args, options: command.options },
+        });
+        results.current.push(
+          outcome._tag === "Success"
+            ? peerCommandResult(command, { ok: true })
+            : peerCommandResult(command, { ok: false, error: failureMessage(outcome.cause) }),
+        );
+      }
+      // Outcomes go back at once: a row is waiting on each.
+      if (results.current.length > 0) again.current = true;
+    } while (again.current);
+  };
+
+  // One identity for the effects below: a push is asked for on a change, not
+  // re-armed by one.
+  const sync = useStableCallback(async () => {
     if (primaryId === null) return;
     if (inFlight.current) {
       again.current = true;
       return;
     }
     inFlight.current = true;
-    try {
-      do {
-        again.current = false;
-        const body = peerSyncBody(machinesRef.current, snapshots.current, results.current);
-        results.current = [];
-        const answer = await runCommand({
-          environmentId: primaryId,
-          input: { command: PEER_SYNC_COMMAND, args: [], options: { body: JSON.stringify(body) } },
-        });
-        if (answer._tag === "Failure") return;
-        const commands = peerSyncReply(answer.value.result);
-        for (const command of commands) {
-          const machine = machinesRef.current.find(
-            (entry) => entry.environmentId === command.machine,
-          );
-          if (machine === undefined || !machine.connected) {
-            results.current.push(
-              peerCommandResult(command, { ok: false, error: "That machine is not connected." }),
-            );
-            continue;
-          }
-          if (!forwardable(command)) {
-            results.current.push(
-              peerCommandResult(command, {
-                ok: false,
-                error: `${command.command} cannot be run on another machine.`,
-              }),
-            );
-            continue;
-          }
-          const outcome = await runCommand({
-            environmentId: machine.environmentId,
-            input: { command: command.command, args: command.args, options: command.options },
-          });
-          results.current.push(
-            outcome._tag === "Success"
-              ? peerCommandResult(command, { ok: true })
-              : peerCommandResult(command, { ok: false, error: failureMessage(outcome.cause) }),
-          );
-        }
-        // Outcomes go back at once: a row is waiting on each.
-        if (results.current.length > 0) again.current = true;
-      } while (again.current);
-    } finally {
+    await pushRounds(primaryId).finally(() => {
       inFlight.current = false;
-    }
-  }, [primaryId, runCommand]);
+    });
+  });
 
-  // A change to push: the machine set, a connection, a row-visible field.
+  // A change to push: the primary, the machine set, a connection, a
+  // row-visible field.
+  const pushKey =
+    machines.length === 0 ? null : `${primaryId ?? ""}|${machinesKey}|${fleetsVersion}`;
   useEffect(() => {
-    if (machines.length === 0) return;
+    if (pushKey === null) return;
     void sync();
-  }, [machinesKey, fleetsVersion, machines.length, sync]);
+  }, [pushKey, sync]);
 
   // The app says a peer row is waiting: push now rather than on the clock.
   useEffect(() => {

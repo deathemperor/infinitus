@@ -406,7 +406,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `productName.guard.test.ts` fails on a new literal outside its allowlist (the
   GNOME extension's shipped name), and on a "T3 Connect" since #1368: the
   relay feature is `CONNECT_NAME` ("Infinitus Connect", user ruling
-  2026-09-16 — identifiers follow in #1368's later slices). Comments stay. Re-applied to upstream's new strings on every sync; this
+  2026-09-16 — identifiers follow in #1368's later slices). Comments stay. A
+  name in a parameter default goes through a module constant: a template
+  literal there bails the React Compiler (`SavedEnvironmentRows.tsx`). Re-applied to upstream's new strings on every sync; this
   one's: `cloud/useCloudLinkController.ts`, `components/NightlyMobileBeta.tsx`,
   `chat/McpAppFrame.tsx`, `chat/MessagesTimeline.tsx` + `.logic.ts`,
   `onboarding/WelcomeWizard.tsx`, `preview/PreviewView.tsx`,

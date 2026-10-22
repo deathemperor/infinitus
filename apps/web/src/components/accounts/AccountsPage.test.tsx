@@ -2,10 +2,11 @@ import { EnvironmentId } from "@infinitus/contracts";
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import * as Cause from "effect/Cause";
 import type { ReactNode } from "react";
-import { act, cloneElement, isValidElement, type ComponentProps } from "react";
+import { cloneElement, isValidElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as Redacted from "effect/Redacted";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act, fakeTimers } from "../../../test/reactTestRenderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const environmentId = EnvironmentId.make("test-environment");
@@ -32,10 +33,6 @@ const testEnvironment = (environmentId: string, label: string) => ({
 });
 
 vi.mock("../../env", () => ({ isElectron: false }));
-vi.mock("./signIn.logic", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./signIn.logic")>()),
-  SIGN_IN_POLL_MS: 0,
-}));
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () =>
     new Map(
@@ -100,6 +97,7 @@ vi.mock("../../state/query", () => ({
 vi.mock("../../state/server", () => ({ environmentServerConfigsAtom: { label: "configs-atom" } }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => testState.command }));
 const NOW_ISO = "2026-09-11T10:00:00.000Z";
+const NOW_SECONDS = Date.parse(NOW_ISO) / 1000;
 // The provider filter and the timeline's view persist in localStorage, which
 // the node suite has no window for.
 vi.mock("../../hooks/useLocalStorage", () => ({
@@ -145,6 +143,7 @@ vi.mock("../WorkspacePageContainer", () => ({ WorkspacePageContainer: "main" }))
 vi.mock("../WorkspacePageHeader", () => ({ WorkspacePageHeader: "header" }));
 
 import { AccountsPage } from "./AccountsPage";
+import { SIGN_IN_POLL_MS } from "./signIn.logic";
 
 const account = (overrides: Partial<InfinitusSnapshot["fleets"][number]["accounts"][number]>) => ({
   number: 1,
@@ -201,15 +200,14 @@ const readySnapshot: InfinitusSnapshot = {
   forecast: {
     forecast: {
       basis: "run rate",
-      computedAt: Date.now() / 1000 - 120,
-      allDeadAt: Date.now() / 1000 + 7_200,
+      computedAt: NOW_SECONDS - 120,
+      allDeadAt: NOW_SECONDS + 7_200,
       drainOrder: [1, 2],
     },
   },
 };
 
 beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   testState.snapshot = null;
   testState.remoteSnapshot = null;
   testState.environments = [testEnvironment("test-environment", "Test environment")];
@@ -717,6 +715,7 @@ describe("AccountsPage", () => {
   });
 
   it("without the shell, opens the page from a link and hands the code over infinitus.secret (#747)", async () => {
+    using _timers = fakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const restore = installBridge(undefined);
     testState.snapshot = signInSnapshot;
     const begun = {
@@ -725,20 +724,14 @@ describe("AccountsPage", () => {
       pasteCode: true,
       label: "Add account",
     };
-    // The poll keeps asking while the test looks at the page, so answer by verb:
-    // waiting for the code until it is submitted over the secret RPC, then done.
-    // The waiting answer takes a moment (#1241): with the poll interval mocked
-    // to 0 an instant answer re-queues a state update inside every `act`, and
-    // on node 25, where that 0 ms timer is ready by the time `act` checks its
-    // queue, `act` flushes forever and the test times out (node 24 wins the
-    // race and CI is green). A pending reply is not act's to wait for.
+    // Answer the poll by verb: waiting for the code until it is submitted over
+    // the secret RPC, then done.
     let codeSubmitted = false;
     testState.command = vi.fn().mockImplementation(async (call: { input: { command: string } }) => {
       switch (call.input.command) {
         case "signin-begin":
           return { _tag: "Success", value: { result: begun } };
         case "signin-status":
-          if (!codeSubmitted) await new Promise((resolve) => setTimeout(resolve, 20));
           return {
             _tag: "Success",
             value: {
@@ -764,20 +757,13 @@ describe("AccountsPage", () => {
     await act(async () => {
       button.props.onClick();
     });
-    // The page moves on the poll's answers, so wait for what it shows rather
-    // than a fixed time.
     const byLabel = (label: string) =>
       renderer.root.findAll((node) => node.props["aria-label"] === label)[0];
     const statusText = () =>
       renderer.root.findAll((node) => node.props.role === "status")[0]?.children.join("") ?? "";
-    const settle = async (ready: () => boolean) => {
-      for (let tick = 0; tick < 100 && !ready(); tick += 1) {
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        });
-      }
-    };
-    await settle(() => byLabel("Sign-in code: Claude (swapd)") !== undefined);
+    // The poll waits on a fake timer: each step is exactly one status read.
+    const nextPoll = () => act(() => vi.advanceTimersByTimeAsync(SIGN_IN_POLL_MS));
+    await nextPoll();
 
     // No shell: the page is a link for this device to open.
     const link = byLabel("Open the sign-in page: Claude (swapd)")!;
@@ -807,7 +793,7 @@ describe("AccountsPage", () => {
     const codeInput = { value: "the-code" };
     await submit(codeInput);
     expect(codeInput.value).toBe("");
-    await settle(() => statusText() === "Signed in as two@example.com.");
+    await nextPoll();
     const codeCall = testState.command.mock.calls.find(
       (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
     )![0] as { environmentId: string; input: { args: unknown; secret: Redacted.Redacted<string> } };
@@ -822,6 +808,7 @@ describe("AccountsPage", () => {
   });
 
   it("from another machine, takes the address a loopback sign-in ended on and hands it over infinitus.secret", async () => {
+    using _timers = fakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const restore = installBridge(undefined);
     testState.snapshot = signInSnapshot;
     // The engine on the Mac takes the redirect itself and listens there; this
@@ -840,7 +827,6 @@ describe("AccountsPage", () => {
         case "signin-begin":
           return { _tag: "Success", value: { result: begun } };
         case "signin-status":
-          if (!addressSubmitted) await new Promise((resolve) => setTimeout(resolve, 20));
           return {
             _tag: "Success",
             value: {
@@ -870,14 +856,9 @@ describe("AccountsPage", () => {
       renderer.root.findAll((node) => node.props["aria-label"] === label)[0];
     const statusText = () =>
       renderer.root.findAll((node) => node.props.role === "status")[0]?.children.join("") ?? "";
-    const settle = async (ready: () => boolean) => {
-      for (let tick = 0; tick < 100 && !ready(); tick += 1) {
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        });
-      }
-    };
-    await settle(() => byLabel("Sign-in address: Claude (swapd)") !== undefined);
+    // The poll waits on a fake timer: each step is exactly one status read.
+    const nextPoll = () => act(() => vi.advanceTimersByTimeAsync(SIGN_IN_POLL_MS));
+    await nextPoll();
 
     expect(byLabel("Open the sign-in page: Claude (swapd)")!.props.href).toBe(
       "https://claude.ai/oauth",
@@ -898,7 +879,7 @@ describe("AccountsPage", () => {
       });
     });
     expect(address.value).toBe("");
-    await settle(() => statusText() === "Signed in as two@example.com.");
+    await nextPoll();
     const codeCall = testState.command.mock.calls.find(
       (call) => (call[0] as { input: { command: string } }).input.command === "signin-code",
     )![0] as { input: { args: unknown; secret: Redacted.Redacted<string> } };
@@ -913,6 +894,7 @@ describe("AccountsPage", () => {
   });
 
   it("runs the sign-in inside the app: begin, the shell's window, the pasted code, done", async () => {
+    using _timers = fakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const bridge = bridgeStub();
     const restore = installBridge(bridge);
     testState.snapshot = signInSnapshot;
@@ -946,9 +928,8 @@ describe("AccountsPage", () => {
     await act(async () => {
       button.props.onClick();
     });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    });
+    // The poll waits on a fake timer: each step is exactly one status read.
+    await act(() => vi.advanceTimersByTimeAsync(SIGN_IN_POLL_MS));
 
     expect(testState.command).toHaveBeenNthCalledWith(1, {
       environmentId,
@@ -977,9 +958,7 @@ describe("AccountsPage", () => {
         });
       });
     }
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    });
+    await act(() => vi.advanceTimersByTimeAsync(SIGN_IN_POLL_MS));
     expect(bridge.closeInfinitusSignIn).toHaveBeenCalledWith("f1");
     expect(testState.command).toHaveBeenNthCalledWith(4, {
       environmentId,
@@ -1055,11 +1034,12 @@ describe("AccountsPage", () => {
   });
 
   it("lists every lapsed profile under the fleets, even on a host with no fleets", () => {
+    using _clock = fakeTimers({ now: Date.parse(NOW_ISO), toFake: ["Date"] });
     const awsLogins: NonNullable<InfinitusSnapshot["awsLogins"]> = [
       {
         profile: "dev",
         flow: "deviceCode",
-        failedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+        failedAt: new Date(Date.parse(NOW_ISO) - 2 * 3_600_000).toISOString(),
       },
       {
         profile: "me@example.com",

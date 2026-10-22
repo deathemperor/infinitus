@@ -27,7 +27,7 @@ import {
 import type { InfinitusUtilization } from "@infinitus/contracts/infinitus";
 import type { TimestampFormat } from "@infinitus/contracts/settings";
 import * as Schema from "effect/Schema";
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
@@ -90,7 +90,7 @@ export function UtilizationPage() {
   const hasVerb =
     snapshot?.available === true &&
     snapshot.commands.some((command) => command.name === "forecast");
-  const forecast = useMemo(() => (snapshot === null ? null : buildForecast(snapshot)), [snapshot]);
+  const forecast = snapshot === null ? null : buildForecast(snapshot);
   const [days, setDays] = useLocalStorage<(typeof DAYS_CHOICES)[number], string>(
     DAYS_KEY,
     "7",
@@ -101,17 +101,10 @@ export function UtilizationPage() {
   const hasHistoryVerb = statuses.some((status) => status.missing === null);
   const historyPending = statuses.some((status) => status.isPending);
   const historyWaiting = statuses.some((status) => status.waiting);
-  const utilization = useMemo(
-    () =>
-      mergeUtilization(
-        statuses.flatMap((status) => (status.utilization === null ? [] : [status.utilization])),
-      ),
-    [statuses],
+  const utilization = mergeUtilization(
+    statuses.flatMap((status) => (status.utilization === null ? [] : [status.utilization])),
   );
-  const labels = useMemo(
-    () => utilizationAliases([snapshot, ...statuses.map((status) => status.snapshot)]),
-    [snapshot, statuses],
-  );
+  const labels = utilizationAliases([snapshot, ...statuses.map((status) => status.snapshot)]);
 
   const topbarContent = (
     <div className="flex w-full min-w-0 items-center gap-x-3 py-2">
@@ -363,6 +356,18 @@ const LINE_COLORS = [
   "text-violet-500",
 ];
 
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+
+/** The clock, in seconds, read once per `utilization`: a history range ends
+    where the reply arrived, not wherever a later render happens to land. */
+function useReadAtSeconds(utilization: InfinitusUtilization): number {
+  const [readAt, setReadAt] = useState(() => ({ utilization, seconds: nowSeconds() }));
+  if (readAt.utilization !== utilization) {
+    setReadAt({ utilization, seconds: nowSeconds() });
+  }
+  return readAt.seconds;
+}
+
 function HistorySection({
   utilization,
   labels,
@@ -373,14 +378,8 @@ function HistorySection({
   const windows = utilizationWindows(utilization);
   const [chosen, setChosen] = useState("5h");
   const window = windows.includes(chosen) ? chosen : (windows[0] ?? "5h");
-  const lines = useMemo(
-    () => historyLines(utilization, window, labels),
-    [labels, utilization, window],
-  );
-  const range = useMemo(
-    () => historyRange(utilization, Math.floor(Date.now() / 1000)),
-    [utilization],
-  );
+  const lines = historyLines(utilization, window, labels);
+  const range = historyRange(utilization, useReadAtSeconds(utilization));
   return (
     <section className="flex flex-col gap-3" data-testid="utilization-history">
       <div className="flex flex-wrap items-center gap-2">
@@ -513,14 +512,8 @@ function FiveHourSection({
   readonly labels: Readonly<Record<string, string>>;
 }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const range = useMemo(
-    () => historyRange(utilization, Math.floor(Date.now() / 1000)),
-    [utilization],
-  );
-  const summary = useMemo(
-    () => fiveHourSummary(utilization, range, labels),
-    [labels, range, utilization],
-  );
+  const range = historyRange(utilization, useReadAtSeconds(utilization));
+  const summary = fiveHourSummary(utilization, range, labels);
   const replay = replayText(utilization);
   if (summary === null) {
     return null;
@@ -594,7 +587,7 @@ function WasteSection({
   readonly labels: Readonly<Record<string, string>>;
 }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const waste = useMemo(() => wasteRows(utilization, labels), [labels, utilization]);
+  const waste = wasteRows(utilization, labels);
   if (waste.length === 0) {
     return null;
   }

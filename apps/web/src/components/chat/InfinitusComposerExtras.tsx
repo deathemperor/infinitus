@@ -1,6 +1,6 @@
 import type { ResolvedKeybindingsConfig } from "@infinitus/contracts";
 import { PenLineIcon } from "lucide-react";
-import { useCallback, useState, type ComponentType, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 
 import { randomUUID } from "~/lib/utils";
 import { captures } from "~/state/captures";
@@ -59,10 +59,7 @@ export function useInfinitusComposerExtras(input: {
   const capturesOpen = useCapturesUiStore((store) => store.open);
   const capturesFocusInputKey = useCapturesUiStore((store) => store.focusInputKey);
   const promptsOpen = usePromptsUiStore((store) => store.open);
-  const slashItems = useCallback(
-    (query: string) => promptSnippetSlashItems(promptSnippets.snippets, query),
-    [promptSnippets.snippets],
-  );
+  const slashItems = (query: string) => promptSnippetSlashItems(promptSnippets.snippets, query);
   return { project, promptSnippets, slashItems, capturesOpen, capturesFocusInputKey, promptsOpen };
 }
 

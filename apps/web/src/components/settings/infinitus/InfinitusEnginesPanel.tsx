@@ -8,8 +8,9 @@
  * @module InfinitusEnginesPanel
  */
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useStableCallback } from "~/hooks/useStableCallback";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -110,7 +111,8 @@ function InfinitusEngineUpdateRow({
   const [busy, setBusy] = useState(false);
   const [relaunching, setRelaunching] = useState(false);
 
-  const check = useCallback(async () => {
+  // One identity, so the check effect re-runs on its inputs, not per render.
+  const check = useStableCallback(async () => {
     if (environmentId === null) return;
     const result = await runCommand({ environmentId, input: engineUpdateCheckInput("swapd") });
     if (result._tag === "Failure") {
@@ -126,14 +128,14 @@ function InfinitusEngineUpdateRow({
     }
     setLine(engineUpdateLine(parsed));
     setUpdatable(parsed.updatable);
-  }, [environmentId, runCommand]);
+  });
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- GitHub is asked once the row mounts; every set lands after the reply.
-    void check();
-  }, [check]);
+    // GitHub is asked once the row mounts; every set lands after the reply.
+    if (environmentId !== null) void check();
+  }, [check, environmentId]);
 
-  const update = useCallback(async () => {
+  const update = async () => {
     if (environmentId === null) return;
     setBusy(true);
     const result = await runCommand({ environmentId, input: engineUpdateInput("swapd") });
@@ -143,7 +145,7 @@ function InfinitusEngineUpdateRow({
       return;
     }
     setRelaunching(true);
-  }, [environmentId, runCommand]);
+  };
 
   return (
     <SettingsRow

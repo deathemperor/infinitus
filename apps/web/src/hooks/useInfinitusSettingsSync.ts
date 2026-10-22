@@ -1,7 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@infinitus/contracts";
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import { infinitusEnvironment } from "../state/infinitus";
@@ -16,6 +16,7 @@ import {
   type SyncMachine,
   type SyncState,
 } from "./settingsSync.logic";
+import { useStableCallback } from "./useStableCallback";
 
 /**
  * Display prefs and account names across machines, through the desktop: the
@@ -40,21 +41,15 @@ export function useInfinitusSettingsSync(): {
   const primaryRunsInfinitus = primary?.serverConfig?.environment.capabilities.infinitus === true;
   const { environments } = useEnvironments();
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
-  const machines = useMemo(
-    () =>
-      primaryRunsInfinitus
-        ? syncMachines(
-            environments,
-            (environmentId) =>
-              serverConfigs.get(environmentId)?.environment.capabilities.infinitus === true,
-          )
-        : [],
-    [environments, primaryRunsInfinitus, serverConfigs],
-  );
-  const machinesRef = useRef(machines);
-  useEffect(() => {
-    machinesRef.current = machines;
-  }, [machines]);
+  const machines = primaryRunsInfinitus
+    ? syncMachines(
+        environments,
+        (environmentId) =>
+          serverConfigs.get(environmentId)?.environment.capabilities.infinitus === true,
+      )
+    : [];
+  // A pass spans several awaits; each round reads the machines as they are then.
+  const readMachines = useStableCallback(() => machines);
 
   const runCommand = useAtomCommand(infinitusEnvironment.command, { reportFailure: false });
   const snapshots = useRef(new Map<EnvironmentId, InfinitusSnapshot | null>());
@@ -63,39 +58,37 @@ export function useInfinitusSettingsSync(): {
   // One pass at a time; a pass asked for while one runs follows it.
   const inFlight = useRef(false);
   const again = useRef(false);
-  const sync = useCallback(async () => {
+  const runPasses = async () => {
+    do {
+      again.current = false;
+      const pass = alignPass(state.current, readMachines(), snapshots.current);
+      state.current = pass.state;
+      for (const work of pass.work) {
+        for (const command of work.commands) {
+          await runCommand({
+            environmentId: work.environmentId,
+            input: { command: command.command, args: command.args, options: {} },
+          });
+        }
+      }
+    } while (again.current);
+  };
+  const sync = useStableCallback(async () => {
     if (inFlight.current) {
       again.current = true;
       return;
     }
     inFlight.current = true;
-    try {
-      do {
-        again.current = false;
-        const pass = alignPass(state.current, machinesRef.current, snapshots.current);
-        state.current = pass.state;
-        for (const work of pass.work) {
-          for (const command of work.commands) {
-            await runCommand({
-              environmentId: work.environmentId,
-              input: { command: command.command, args: command.args, options: {} },
-            });
-          }
-        }
-      } while (again.current);
-    } finally {
+    await runPasses().finally(() => {
       inFlight.current = false;
-    }
-  }, [runCommand]);
+    });
+  });
 
-  const report = useCallback(
-    (environmentId: EnvironmentId, snapshot: InfinitusSnapshot | null) => {
-      snapshots.current.set(environmentId, snapshot);
-      state.current = observe(state.current, environmentId, environmentId === primaryId, snapshot);
-      void sync();
-    },
-    [primaryId, sync],
-  );
+  const report = (environmentId: EnvironmentId, snapshot: InfinitusSnapshot | null) => {
+    snapshots.current.set(environmentId, snapshot);
+    state.current = observe(state.current, environmentId, environmentId === primaryId, snapshot);
+    void sync();
+  };
 
   // A machine that left the list starts over when it returns; one that
   // arrived or reconnected is aligned on the next pass.

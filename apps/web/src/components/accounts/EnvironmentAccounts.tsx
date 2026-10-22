@@ -26,7 +26,7 @@ import { Link } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
@@ -145,17 +145,14 @@ export function EnvironmentAccounts({
   /** Bumped on every start and on unmount: a poll from an earlier flow stops. */
   const signInRunRef = useRef(0);
   // The bridge is a window global fixed for the page's life.
-  const bridge = useMemo(
-    () => signInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
-    [],
+  const [bridge] = useState(() =>
+    signInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
   );
-  const oauthBridge = useMemo(
-    () => oauthSignInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
-    [],
+  const [oauthBridge] = useState(() =>
+    oauthSignInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
   );
-  const redirectBridge = useMemo(
-    () => redirectSignInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
-    [],
+  const [redirectBridge] = useState(() =>
+    redirectSignInBridge(typeof window === "undefined" ? undefined : window.desktopBridge),
   );
   // Each add/re-login gets a run number; a newer run or an unmount retires
   // the polling loop of the one before it.

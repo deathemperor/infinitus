@@ -1,6 +1,7 @@
 import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";
-import { act, StrictMode } from "react";
+import { StrictMode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../../../test/reactTestRenderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("../../ui/switch", () => ({

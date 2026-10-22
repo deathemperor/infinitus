@@ -1,7 +1,7 @@
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { EnvironmentId, ProjectId, ResolvedKeybindingsConfig } from "@infinitus/contracts";
 import { useParams } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { isCommandPaletteOpen } from "../../commandPaletteBus";
 import { useComposerDraftStore } from "../../composerDraftStore";
@@ -36,10 +36,7 @@ export function useActiveProjectRef(): ActiveProjectRef | null {
   const environmentId = useParams({ strict: false, select: (params) => params.environmentId });
   const threadId = useParams({ strict: false, select: (params) => params.threadId });
   const draftId = useParams({ strict: false, select: (params) => params.draftId });
-  const routeTarget = useMemo(
-    () => resolveThreadRouteTarget({ environmentId, threadId, draftId }),
-    [draftId, environmentId, threadId],
-  );
+  const routeTarget = resolveThreadRouteTarget({ environmentId, threadId, draftId });
   const activeThread = useThreadShell(
     routeTarget?.kind === "server" ? routeTarget.threadRef : null,
   );
@@ -58,24 +55,21 @@ export function useActiveProjectRef(): ActiveProjectRef | null {
 /** Adds one capture to a project, toasting a refusal. */
 export function useAddCapture() {
   const apply = useAtomCommand(captures.apply, { reportFailure: false });
-  return useCallback(
-    async (raw: string, project: ActiveProjectRef): Promise<boolean> => {
-      const text = captureText(raw);
-      if (text === null) return false;
-      const result = await apply({
-        environmentId: project.environmentId,
-        input: { projectId: project.projectId, command: { type: "add", text } },
-      });
-      if (result._tag === "Success") return true;
-      toastManager.add({
-        type: "error",
-        title: "Capture not saved",
-        description: captureApplyFailureMessage(squashAtomCommandFailure(result)),
-      });
-      return false;
-    },
-    [apply],
-  );
+  return async (raw: string, project: ActiveProjectRef): Promise<boolean> => {
+    const text = captureText(raw);
+    if (text === null) return false;
+    const result = await apply({
+      environmentId: project.environmentId,
+      input: { projectId: project.projectId, command: { type: "add", text } },
+    });
+    if (result._tag === "Success") return true;
+    toastManager.add({
+      type: "error",
+      title: "Capture not saved",
+      description: captureApplyFailureMessage(squashAtomCommandFailure(result)),
+    });
+    return false;
+  };
 }
 
 /** The current in-app selection, or null when nothing is selected. */

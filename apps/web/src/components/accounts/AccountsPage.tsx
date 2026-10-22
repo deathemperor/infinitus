@@ -4,7 +4,6 @@ import {
   infinitusCapabilityOf,
 } from "@infinitus/client-runtime/state/infinitusAccounts";
 import type { EnvironmentId } from "@infinitus/contracts";
-import { useMemo } from "react";
 
 import { isElectron } from "../../env";
 import {
@@ -31,13 +30,9 @@ export function AccountsPage() {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
 
-  const infinitusEnvironments = useMemo(
-    () =>
-      environments.filter(
-        (environment) =>
-          serverConfigs.get(environment.environmentId)?.environment.capabilities.infinitus === true,
-      ),
-    [environments, serverConfigs],
+  const infinitusEnvironments = environments.filter(
+    (environment) =>
+      serverConfigs.get(environment.environmentId)?.environment.capabilities.infinitus === true,
   );
   // Across every environment: a page that heard only `false` lacks the
   // adapter, one nobody has answered yet is still loading.

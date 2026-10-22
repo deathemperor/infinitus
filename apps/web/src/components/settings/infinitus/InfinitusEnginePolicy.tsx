@@ -9,8 +9,9 @@
  *
  * @module InfinitusEnginePolicy
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useStableCallback } from "~/hooks/useStableCallback";
 import type { EnvironmentPresentation } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -55,55 +56,51 @@ export function InfinitusEnginePolicy({
   // not on every snapshot poll.
   const fleetList = fleetKeys.join("\n");
 
-  const patch = useCallback((fleet: string, change: Partial<FleetPolicy>) => {
+  const patch = (fleet: string, change: Partial<FleetPolicy>) => {
     setPolicies((current) => ({
       ...current,
       [fleet]: { rows: [], error: null, busy: false, ...current[fleet], ...change },
     }));
-  }, []);
+  };
 
-  const read = useCallback(
-    async (fleet: string) => {
-      if (environmentId === null) return;
-      const result = await runCommand({ environmentId, input: policyReadInput(fleet) });
-      if (result._tag === "Failure") {
-        patch(fleet, { error: infinitusCommandFailure(result.cause).message, busy: false });
-        return;
-      }
-      const parsed = parsePolicy(result.value.result);
-      if (parsed === null) {
-        patch(fleet, {
-          error: "Infinitus answered policy with a shape this build cannot read.",
-          busy: false,
-        });
-        return;
-      }
-      patch(fleet, { rows: policyRows(parsed.settings), error: null, busy: false });
-    },
-    [environmentId, patch, runCommand],
-  );
+  // One identity, so the read effect re-runs on its inputs, not per render.
+  const read = useStableCallback(async (fleet: string) => {
+    if (environmentId === null) return;
+    const result = await runCommand({ environmentId, input: policyReadInput(fleet) });
+    if (result._tag === "Failure") {
+      patch(fleet, { error: infinitusCommandFailure(result.cause).message, busy: false });
+      return;
+    }
+    const parsed = parsePolicy(result.value.result);
+    if (parsed === null) {
+      patch(fleet, {
+        error: "Infinitus answered policy with a shape this build cannot read.",
+        busy: false,
+      });
+      return;
+    }
+    patch(fleet, { rows: policyRows(parsed.settings), error: null, busy: false });
+  });
 
-  const write = useCallback(
-    async (fleet: string, row: PolicyRow, value: string | null) => {
-      if (environmentId === null) return;
-      patch(fleet, { busy: true });
-      const input =
-        value === null ? policyUnsetInput(fleet, row.key) : policySetInput(fleet, row.key, value);
-      const result = await runCommand({ environmentId, input });
-      if (result._tag === "Failure") {
-        patch(fleet, { error: infinitusCommandFailure(result.cause).message, busy: false });
-        return;
-      }
-      await read(fleet);
-    },
-    [environmentId, patch, read, runCommand],
-  );
+  const write = async (fleet: string, row: PolicyRow, value: string | null) => {
+    if (environmentId === null) return;
+    patch(fleet, { busy: true });
+    const input =
+      value === null ? policyUnsetInput(fleet, row.key) : policySetInput(fleet, row.key, value);
+    const result = await runCommand({ environmentId, input });
+    if (result._tag === "Failure") {
+      patch(fleet, { error: infinitusCommandFailure(result.cause).message, busy: false });
+      return;
+    }
+    await read(fleet);
+  };
 
   useEffect(() => {
-    if (fleetList === "") return;
-    // oxlint-disable-next-line react/set-state-in-effect -- The engine is read over the socket once the fleets are known; every set lands after its reply.
+    if (fleetList === "" || environmentId === null) return;
+    // The engine is read over the socket once the fleets are known; every set
+    // lands after its reply.
     for (const fleet of fleetList.split("\n")) void read(fleet);
-  }, [fleetList, read]);
+  }, [environmentId, fleetList, read]);
 
   if (fleetKeys.length === 0) return null;
 

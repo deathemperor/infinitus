@@ -20,18 +20,17 @@ const toApiError = (error: TeamServiceError, traceId: string) =>
 
 /** The one mapping both team groups share: a `TeamRefused` is the caller's
     (409, its sentence verbatim); every store or link failure is the relay's
-    (500, `persistence_failed`). */
-export const mapTeamErrors = <A, R>(
+    (500, `persistence_failed`). Untraced: it runs inside each handler's span. */
+export const mapTeamErrors = Effect.fnUntraced(function* <A, R>(
   effect: Effect.Effect<A, TeamServiceError, R>,
-): Effect.Effect<A, RelayInfinitusTeamRefusedError | RelayInternalError, R> =>
-  Effect.gen(function* () {
-    const traceId = yield* currentTraceId;
-    return yield* effect.pipe(
-      Effect.tapError((error) =>
-        error._tag === "TeamRefused"
-          ? Effect.void
-          : Effect.logError("infinitus team request failed", { error }),
-      ),
-      Effect.mapError((error) => toApiError(error, traceId)),
-    );
-  });
+): Effect.fn.Return<A, RelayInfinitusTeamRefusedError | RelayInternalError, R> {
+  const traceId = yield* currentTraceId;
+  return yield* effect.pipe(
+    Effect.tapError((error) =>
+      error._tag === "TeamRefused"
+        ? Effect.void
+        : Effect.logError("infinitus team request failed", { error }),
+    ),
+    Effect.mapError((error) => toApiError(error, traceId)),
+  );
+});

@@ -1,8 +1,8 @@
 import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import type { PairingApprovalRequest } from "@infinitus/contracts/infinitusPairing";
 import * as DateTime from "effect/DateTime";
-import { act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
+import { act } from "../../test/reactTestRenderer";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const testState = vi.hoisted(() => ({
@@ -111,7 +111,6 @@ const pairingRequest = (id: string, deviceName = "Titan"): PairingApprovalReques
 });
 
 beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   testState.snapshot = null;
   testState.pairing = { kind: "loading" };
   testState.capability = true;

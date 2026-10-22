@@ -99,34 +99,33 @@ export const withUpdateIdleGate = (input: {
 }): ServerSelfUpdate["Service"] => {
   const desktopPolicies = new Map<string, ServerUpdateRunningTurnsPolicy>();
 
-  const awaitIdle = (
+  const awaitIdle = Effect.fn("selfUpdate.awaitIdle")(function* (
     policy: ServerUpdateRunningTurnsPolicy,
     reportProgress: (
       stage: ServerSelfUpdateProgressStage,
       runningTurns?: number,
     ) => Effect.Effect<void, ServerSelfUpdateError>,
-  ): Effect.Effect<void, ServerSelfUpdateError> =>
-    Effect.gen(function* () {
-      if (policy === "interrupt") return;
-      let announced = -1;
-      while (true) {
-        const running = yield* input.runningTurns;
-        if (running.length === 0) return;
-        if (policy === "refuse") {
-          return yield* Effect.fail(
-            new ServerSelfUpdateError({
-              reason: runningTurnsRefusal(running.length),
-              runningTurns: running,
-            }),
-          );
-        }
-        if (running.length !== announced) {
-          announced = running.length;
-          yield* reportProgress("waiting", running.length);
-        }
-        yield* Effect.sleep(RUNNING_TURNS_POLL);
+  ): Effect.fn.Return<void, ServerSelfUpdateError> {
+    if (policy === "interrupt") return;
+    let announced = -1;
+    while (true) {
+      const running = yield* input.runningTurns;
+      if (running.length === 0) return;
+      if (policy === "refuse") {
+        return yield* Effect.fail(
+          new ServerSelfUpdateError({
+            reason: runningTurnsRefusal(running.length),
+            runningTurns: running,
+          }),
+        );
       }
-    });
+      if (running.length !== announced) {
+        announced = running.length;
+        yield* reportProgress("waiting", running.length);
+      }
+      yield* Effect.sleep(RUNNING_TURNS_POLL);
+    }
+  });
 
   return ServerSelfUpdate.of({
     update: (request, reportProgress = () => Effect.void, onHandoffAccepted) => {
