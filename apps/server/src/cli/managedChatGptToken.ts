@@ -3,6 +3,7 @@ import * as NodeNet from "node:net";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Protocol from "../provider/CodexManagedTokenProtocol.ts";
 
 const decodeArguments = Schema.decodeUnknownEffect(
@@ -39,7 +40,7 @@ export async function runManagedChatGptTokenCli(args: ReadonlyArray<string>): Pr
   const result = await Effect.runPromiseExit(program);
   if (Exit.isFailure(result)) {
     process.stderr.write(
-      "Could not access the managed ChatGPT connection. Reconnect in T3 Code.\n",
+      `Could not access the managed ChatGPT connection. Reconnect in ${PRODUCT_NAME}.\n`,
     );
     process.exitCode = 1;
     return;

@@ -8,6 +8,7 @@ import * as ServerConfig from "../config.ts";
 import * as CodexManagedTokenBroker from "./CodexManagedTokenBroker.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { resolveSelfInvocation, selfInvocationArgs } from "@infinitus/shared/nodeRuntime";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as CodexInstallation from "./CodexInstallation.ts";
 import { makeCodexChatGptAuth } from "./CodexChatGptAuth.ts";
 import { COMMAND_TIMEOUT_MS } from "./CodexManagedTokenProtocol.ts";
@@ -66,8 +67,7 @@ export const makeCodexManagedRuntime = Effect.fn("makeCodexManagedRuntime")(func
           new ProviderSetupError({
             instanceId: options.instanceId,
             operation: "runtime",
-            detail:
-              "Could not prepare the private managed Codex token listener. Restart T3 and retry.",
+            detail: `Could not prepare the private managed Codex token listener. Restart ${PRODUCT_NAME} and retry.`,
             cause,
           }),
       ),
