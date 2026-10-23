@@ -4,6 +4,7 @@ import { TriangleAlertIcon } from "lucide-react";
 import { type ComponentProps, useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
+import { isDesktopLocalConnectionTarget } from "../../connection/desktopLocal";
 import { isElectron } from "../../env";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStableCallback } from "../../hooks/useStableCallback";
@@ -12,7 +13,6 @@ import { ensureLocalApi } from "../../localApi";
 import { desktopInstallWhenIdleAtom, useDesktopUpdateState } from "../../state/desktopUpdate";
 import { useAllEnvironmentShellsBootstrapped, useThreadShells } from "../../state/entities";
 import { useEnvironments } from "../../state/environments";
-import { isLocalConnectionTarget } from "../ProviderUpdateLaunchNotification.environments";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   canCheckForUpdate,
@@ -214,7 +214,9 @@ function SidebarUpdateControl() {
   const runningLocalTurns = shellsBootstrapped
     ? countRunningLocalTurns(shells, (environmentId) => {
         const presentation = presentationById.get(environmentId);
-        return presentation !== undefined && isLocalConnectionTarget(presentation.entry.target);
+        if (presentation === undefined) return false;
+        const target = presentation.entry.target;
+        return target._tag === "PrimaryConnectionTarget" || isDesktopLocalConnectionTarget(target);
       })
     : null;
   const [isActionPending, setIsActionPending] = useState(false);

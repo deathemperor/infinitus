@@ -7,6 +7,7 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import { PRODUCT_NAME } from "./productName.ts";
+import type { OtlpEndpointSource } from "@infinitus/contracts";
 
 import { OtlpHeadersFromString, OtlpProtocol, type SignalExport } from "./observability.ts";
 
@@ -17,6 +18,7 @@ export type OtelSignal = Data.TaggedEnum<{
   Off: {};
   Export: {
     readonly url: string;
+    readonly variable: string;
     readonly protocol: OtlpProtocol;
     readonly headers: Readonly<Record<string, string>> | undefined;
   };
@@ -241,6 +243,7 @@ const endpointSignal = (name: OtlpSignalName, own: Settings, generic: Settings):
   return {
     signal: OtelSignal.Export({
       url: url.toString(),
+      variable: ownEndpoint ? `OTEL_EXPORTER_OTLP_${name}_ENDPOINT` : "OTEL_EXPORTER_OTLP_ENDPOINT",
       protocol: protocol.value ?? "http/protobuf",
       headers: headers.value,
     }),
@@ -335,30 +338,44 @@ export type SignalName = "traces" | "metrics" | "logs";
 export interface SignalEndpoint {
   readonly url: string;
   readonly export: SignalExport;
+  readonly source: OtlpEndpointSource;
+  /** The environment variable that set the endpoint, when `source` is `environment`. */
+  readonly variable?: string;
 }
 
 export const resolveSignalEndpoint = (
   otel: OtelEnvironment,
   signal: SignalName,
   t3: { readonly url: string | undefined; readonly export: SignalExport },
-  ...fallbackUrls: ReadonlyArray<string | undefined>
+  fallback: { readonly bootstrapUrl: string | undefined; readonly settingsUrl: string | undefined },
 ): SignalEndpoint | undefined => {
   if (otel.disabled) {
     return undefined;
   }
   const t3Url = blankAsUnset(t3.url);
   if (t3Url !== undefined) {
-    return { url: t3Url, export: t3.export };
+    return {
+      url: t3Url,
+      export: t3.export,
+      source: "environment",
+      variable: `T3CODE_OTLP_${signal.toUpperCase()}_URL`,
+    };
   }
   return OtelSignal.$match(otel[signal], {
-    Export: ({ url, protocol, headers }): SignalEndpoint => ({
+    Export: ({ url, variable, protocol, headers }): SignalEndpoint => ({
       url,
       export: { protocol, headers, exportIntervalMs: t3.export.exportIntervalMs },
+      source: "environment",
+      variable,
     }),
     Off: () => undefined,
-    Unset: () => {
-      const url = fallbackUrls.map(blankAsUnset).find((candidate) => candidate !== undefined);
-      return url === undefined ? undefined : { url, export: t3.export };
+    Unset: (): SignalEndpoint | undefined => {
+      const settingsUrl = blankAsUnset(fallback.settingsUrl);
+      // The desktop forwards the saved setting as its bootstrap URL, so only a differing one is
+      // the desktop's own.
+      const url = blankAsUnset(fallback.bootstrapUrl) ?? settingsUrl;
+      if (url === undefined) return undefined;
+      return { url, export: t3.export, source: url === settingsUrl ? "settings" : "bootstrap" };
     },
   });
 };

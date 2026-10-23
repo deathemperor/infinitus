@@ -60,9 +60,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `desktopUpdate.logic.ts` (+ test; `countRunningLocalTurns`, the dialog
   copy, `resolveInstallWhenIdleStep`), `sidebar/SidebarUpdatePill.tsx` (the
   dialog instead of the plain confirm while turns run, the armed wait),
-  `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`),
-  `ProviderUpdateLaunchNotification.environments.ts` (`isLocalConnectionTarget`
-  exported for the count). The dialog itself is fork-owned
+  `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`). The dialog itself is fork-owned
   (`fork-only-files.md`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
   also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages

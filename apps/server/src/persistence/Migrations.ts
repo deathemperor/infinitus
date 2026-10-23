@@ -79,6 +79,7 @@ import Migration0074 from "./Migrations/074_CanonicalizeThreadPullRequestLinks.t
 import Migration0075 from "./Migrations/075_CodexUsageNativeTurnIndex.ts";
 import Migration0076 from "./Migrations/076_RepairClientSettlementTimestamps.ts";
 import Migration0077 from "./Migrations/077_WebhookDedupe.ts";
+import Migration0078 from "./Migrations/078_ShellStopRequestIndex.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -156,13 +157,14 @@ const migrationEntries = [
   [69, "McpAppModelContext", Migration0069],
   [70, "ThreadSnapshotWindowIndexes", Migration0070],
   [71, "PullRequestReviewGuides", Migration0071],
-  // Upstream's 62-67, renumbered after the fork's own range like the V2 migrations above.
+  // Upstream's 62-68, renumbered after the fork's own range like the V2 migrations above.
   [72, "ThreadFailureLookupIndex", Migration0072],
   [73, "DropUnusedV1Projections", Migration0073],
   [74, "CanonicalizeThreadPullRequestLinks", Migration0074],
   [75, "CodexUsageNativeTurnIndex", Migration0075],
   [76, "RepairClientSettlementTimestamps", Migration0076],
   [77, "WebhookDedupe", Migration0077],
+  [78, "ShellStopRequestIndex", Migration0078],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
