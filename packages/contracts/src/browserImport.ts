@@ -80,8 +80,14 @@ const BROWSER_IMPORT_UNAVAILABLE_COPY: Readonly<Record<BrowserImportUnavailableR
   notInstalled: "Not installed on this machine.",
   needsKeychainApproval: "Needs Keychain access to read its cookies.",
   keychainItemMissing:
+<<<<<<< HEAD
     "No encryption key in your Keychain — sign in to that browser once, then retry.",
   needsFullDiskAccess: `Give ${PRODUCT_NAME} Full Disk Access in System Settings → Privacy & Security, then retry.`,
+=======
+    "No encryption key in your Keychain. Sign in to that browser once, then retry.",
+  needsFullDiskAccess:
+    "Give T3 Code Full Disk Access in System Settings → Privacy & Security, then retry.",
+>>>>>>> upstream-sync-71a283aed-upstream-renamed
   browserRunning: "Quit the browser first so its cookie database can be read.",
   unsupportedPlatform: "Importing from this browser isn't possible on this platform.",
 };

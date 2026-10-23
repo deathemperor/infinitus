@@ -590,6 +590,7 @@ export const PullRequestDetail = Schema.Struct({
 export type PullRequestDetail = typeof PullRequestDetail.Type;
 
 export const PullRequestChecks = Schema.Struct({
+  observedAt: Schema.optional(Schema.Finite),
   state: PullRequestState,
   checks: Schema.Array(PullRequestCheck),
 });
