@@ -38,7 +38,7 @@ export class CloudflareApiPause extends Context.Service<
     readonly pausedUntilMillis: Effect.Effect<number>;
     readonly pauseUntil: (untilMillis: number) => Effect.Effect<void>;
   }
->()("t3code-relay/environments/CloudflareApiPause") {}
+>()("infinitus-relay/environments/CloudflareApiPause") {}
 
 export const make = Effect.gen(function* () {
   const db = yield* RelayDb.RelayDb;

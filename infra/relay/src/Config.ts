@@ -66,7 +66,7 @@ export class RelayConfiguration extends Context.Service<
     readonly legacyManagedEndpointCleanupMode?: ManagedEndpointCleanupMode;
     readonly legacyTunnelGraceMinutes?: number;
   }
->()("t3code-relay/Config/RelayConfiguration") {}
+>()("infinitus-relay/Config/RelayConfiguration") {}
 
 export const make = (configuration: RelayConfiguration["Service"]) =>
   RelayConfiguration.of(configuration);

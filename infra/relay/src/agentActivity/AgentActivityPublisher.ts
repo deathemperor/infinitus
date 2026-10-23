@@ -53,7 +53,7 @@ export class AgentActivityPublisher extends Context.Service<
       LiveActivities.LiveActivityIdleTargetListPersistenceError
     >;
   }
->()("t3code-relay/agentActivity/AgentActivityPublisher") {}
+>()("infinitus-relay/agentActivity/AgentActivityPublisher") {}
 
 export const make = Effect.gen(function* () {
   const rows = yield* AgentActivityRows.AgentActivityRows;
