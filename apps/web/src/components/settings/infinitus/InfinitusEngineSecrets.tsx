@@ -53,7 +53,7 @@ import { isAuthorizationFailure } from "./pairingAccess.logic";
 
 const UNSUPPORTED = "This Infinitus build has no engine secret commands (needs ≥ 4eaccb341c).";
 const FORBIDDEN = "Only the desktop app on this Mac can change engine secrets.";
-const RELAUNCHING = "Saved. Infinitus is relaunching — this page picks up again when it answers.";
+const RELAUNCHING = "Saved. Infinitus is relaunching. This page picks up again when it answers.";
 const TEST_UNAVAILABLE = "Test connection needs a newer Infinitus app.";
 
 type PerEngine<T> = Partial<Record<ProxyEngineKey, T>>;

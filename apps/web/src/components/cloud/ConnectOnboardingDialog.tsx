@@ -204,7 +204,7 @@ function ConfiguredConnectOnboardingDialog() {
           title={`Set up ${CONNECT_NAME}`}
           description={
             <>
-              Mesh your devices together — publish this environment and connect the rest, all in one
+              Mesh your devices together. Publish this environment and connect the rest, all in one
               place.
             </>
           }

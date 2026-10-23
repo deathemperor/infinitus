@@ -327,4 +327,4 @@ export function liveRateText(u: InfinitusUtilization | null): string | null {
 }
 
 export const RUN_RATE_NOTE =
-  "Read off Claude Code's own transcripts — an estimate at API list prices, not what the subscription costs.";
+  "Read off Claude Code's own transcripts: an estimate at API list prices, not what the subscription costs.";

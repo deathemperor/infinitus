@@ -143,10 +143,10 @@ describe("statsTileGroups", () => {
   it("shows an em dash where the denominator is zero", () => {
     const empty = statsTileGroups(summary({ total: {} }));
     const value = (id: string) => empty.flatMap((g) => g.tiles).find((t) => t.id === id)?.value;
-    expect(value("Per commit")).toBe("—");
-    expect(value("Per PR")).toBe("—");
-    expect(value("Tokens / line")).toBe("—");
-    expect(value("Mean hours to merge")).toBe("—");
+    expect(value("Per commit")).toBe("-");
+    expect(value("Per PR")).toBe("-");
+    expect(value("Tokens / line")).toBe("-");
+    expect(value("Mean hours to merge")).toBe("-");
   });
 });
 

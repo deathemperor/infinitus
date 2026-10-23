@@ -60,9 +60,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `desktopUpdate.logic.ts` (+ test; `countRunningLocalTurns`, the dialog
   copy, `resolveInstallWhenIdleStep`), `sidebar/SidebarUpdatePill.tsx` (the
   dialog instead of the plain confirm while turns run, the armed wait),
-  `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`),
-  `ProviderUpdateLaunchNotification.environments.ts` (`isLocalConnectionTarget`
-  exported for the count). The dialog itself is fork-owned
+  `state/desktopUpdate.ts` (`desktopInstallWhenIdleAtom`). The dialog itself is fork-owned
   (`fork-only-files.md`). Rules and traps: `docs/internals/update-idle-gate.md`.
 - `apps/web/src/components/sidebar/mainAppLocation.ts` — `isSidebarUtilityPage`
   also answers for `/accounts`, `/stats` and `/utilization`, the fork's pages
@@ -913,3 +911,4 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   next step.
 - `apps/server/src/preview/ServerBrowser.ts` (+ test) — the desktop `attached` handler also hands a tab that started headless (no panel showed it within `DESKTOP_ATTACH_TIMEOUT`) to the desktop's page once it mounts, so the agent drives the page the person sees, with their sign-ins; `dropTab`'s `handOff` sends streaming viewers `reconnect`. Port of upstream's closed #17336 for its open #16901. If upstream lands #18217 instead (it streams the headless page and keeps it), keep ours: the sign-in is the point.
 - `apps/web/package.json` — `react-test-renderer` and `@types/react-test-renderer` as devDependencies: upstream moved every React test into a real browser and dropped them (#20944), while the fork's component tests (`AccountsPage`, `StatsPage`, `ComposerCapturesMenu`, `InfinitusEventToasts`, `settings/infinitus/*`) still render with them.
+- `packages/source-control-forgejo/src/server/ForgejoSourceControlProvider.test.ts` — "reads Forgejo jobs that did not run as finished checks" (#16668) mocks `branches/main` as `{}`: upstream wrote it before its checks read began fetching the base branch's protection, so on upstream's own `main` the mock answers that read with `[]` and the test fails. Take upstream's version once it fixes the test.

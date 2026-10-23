@@ -47,7 +47,7 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     label: "Menu bar",
     marker: "Show the account name",
     // The theme picker's selected value, on this page since the Themes page folded in.
-    shows: ["Off — plain numbers"],
+    shows: ["Off: plain numbers"],
   },
   {
     route: "/settings/animations",
@@ -155,8 +155,8 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
       "Questions 1",
       "Sessions 2",
       "Longest unattended 1 tool calls",
-      "Accounts hit a limit —",
-      "Ignites —",
+      "Accounts hit a limit -",
+      "Ignites -",
       "Claude Code",
       "Codex CLI",
       "$0.02",

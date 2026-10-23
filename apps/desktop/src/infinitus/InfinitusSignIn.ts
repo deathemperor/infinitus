@@ -49,7 +49,7 @@ export const signInWindowOptions = (
   height: 720,
   minWidth: 400,
   minHeight: 500,
-  title: `${input.label} — ${PRODUCT_NAME}`,
+  title: `${input.label} - ${PRODUCT_NAME}`,
   autoHideMenuBar: true,
   ...(platform === "darwin" ? { titleBarStyle: "default" as const } : {}),
   webPreferences: {

@@ -24,7 +24,7 @@ import { decisionNotice, formatCountdown, pairingRequestRows } from "./pairingRe
 import { usePairingRequests } from "./usePairingRequests";
 
 const EMPTY_NOTICE =
-  "No phone is asking to pair. In the Infinitus app, add a connection, find this Mac on the network and choose “Ask to approve” — or scan a pairing link created under Settings › Connections.";
+  "No phone is asking to pair. In the Infinitus app, add a connection, find this Mac on the network and choose “Ask to approve”, or scan a pairing link created under Settings › Connections.";
 
 export function InfinitusPairingRequestsCard() {
   const environmentId = usePrimaryEnvironment()?.environmentId ?? null;

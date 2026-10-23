@@ -25,7 +25,7 @@ function kindFromIcon(icon: string): string | null {
  * on both sides.
  */
 function split(text: string): { title: string; description?: string } {
-  const at = text.indexOf(" — ");
+  const at = text.search(/ \u2014 /u);
   if (at === -1) return { title: text };
   return { title: text.slice(0, at), description: text.slice(at + 3) };
 }

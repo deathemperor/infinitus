@@ -667,7 +667,7 @@ describe("AccountsPage", () => {
       input: { command: "add", args: ["claude"], options: {} },
     });
     const status = renderer.root.findAll((node) => node.props.role === "status")[0]!;
-    expect(status.children.join("")).toBe("Sign-in running on the Mac — sign in as spare.");
+    expect(status.children.join("")).toBe("Sign-in running on the Mac. Sign in as spare.");
     renderer.unmount();
   });
 

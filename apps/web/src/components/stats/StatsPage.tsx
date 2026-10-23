@@ -310,7 +310,7 @@ function StatsBody({
   const groups = statsTileGroups(summary).map((group) => ({
     ...group,
     tiles: group.tiles.map((tile) =>
-      unavailable.has(tile.id) ? { ...tile, value: "—", delta: null, series: [] } : tile,
+      unavailable.has(tile.id) ? { ...tile, value: "-", delta: null, series: [] } : tile,
     ),
   }));
   const tables: ReadonlyArray<{ readonly title: string; readonly rows: ReadonlyArray<EffortRow> }> =

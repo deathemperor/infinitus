@@ -167,7 +167,7 @@ export type CommandLine =
   | { readonly ok: false; readonly error: string };
 
 const ABSOLUTE_PATH_ERROR =
-  "Start the command with the program's full path — this app does not inherit your shell's PATH.";
+  "Start the command with the program's full path. This app does not inherit your shell's PATH.";
 const EMPTY_COMMAND_ERROR = "No command to run.";
 const UNBALANCED_QUOTE_ERROR = "The command has an unclosed quote.";
 

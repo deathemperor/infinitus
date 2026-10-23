@@ -43,7 +43,7 @@ export function UsageAccountsSection({
 
   const attributedUsd = accounts.lines.reduce((sum, line) => sum + line.costUsd, 0);
   const share = (costUsd: number) =>
-    attributedUsd > 0 ? formatPercent(costUsd / attributedUsd, 0) : "—";
+    attributedUsd > 0 ? formatPercent(costUsd / attributedUsd, 0) : "-";
   const swaps = `${formatCount(accounts.switchesInWindow)} ${accounts.switchesInWindow === 1 ? "swap" : "swaps"} in this window`;
 
   const nothingToShow = accounts.lines.length === 0 && accounts.unattributed.records === 0;
@@ -111,7 +111,7 @@ export function UsageAccountsSection({
                   <td className="py-1.5 pr-3 text-right tabular-nums">
                     {formatUsd(accounts.unattributed.costUsd)}
                   </td>
-                  <td className="py-1.5 pr-3 text-right">—</td>
+                  <td className="py-1.5 pr-3 text-right">-</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums">
                     {formatTokens(totalTokens(accounts.unattributed.totals))}
                   </td>
@@ -126,8 +126,8 @@ export function UsageAccountsSection({
                   <td className="py-1.5 pr-3 text-right tabular-nums">
                     {formatUsd(accounts.notClaude.costUsd)}
                   </td>
-                  <td className="py-1.5 pr-3 text-right">—</td>
-                  <td className="py-1.5 pr-3 text-right">—</td>
+                  <td className="py-1.5 pr-3 text-right">-</td>
+                  <td className="py-1.5 pr-3 text-right">-</td>
                   <td className="py-1.5 text-right tabular-nums">
                     {formatCount(accounts.notClaude.records)}
                   </td>

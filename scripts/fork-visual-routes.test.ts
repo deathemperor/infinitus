@@ -26,7 +26,7 @@ const ALWAYS_ON_SCREEN = [
   "Activity",
   "Utilization",
   "Stats",
-  "Infinitus is not answering — it may be closed, or running on another machine.",
+  "Infinitus is not answering. It may be closed, or running on another machine.",
 ];
 
 describe("FORK_VISUAL_ROUTES", () => {

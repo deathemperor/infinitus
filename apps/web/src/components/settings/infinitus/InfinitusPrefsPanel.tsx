@@ -192,8 +192,8 @@ export function RestartConfirmDialog({
           <AlertDialogTitle>Relaunch Infinitus?</AlertDialogTitle>
           <AlertDialogDescription>
             “{pending.label}” only takes hold at the next launch, so Infinitus quits and comes
-            straight back. Threads keep running — they live on this server; this page reconnects on
-            its own.
+            straight back. Threads keep running (they live on this server), and this page reconnects
+            on its own.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -316,7 +316,7 @@ export function InfinitusPrefsPanel({
       {children}
       {writeState.relaunching ? (
         <p role="status" className="px-3 text-sm text-muted-foreground sm:px-4">
-          Infinitus is relaunching — this page picks up again when it answers.
+          Infinitus is relaunching. This page picks up again when it answers.
         </p>
       ) : null}
       {sections.length === 0 && children === undefined && footer === undefined ? (

@@ -215,7 +215,7 @@ function SignInCard(props: {
           : "Open the sign-in page in Safari; it ends with a code to paste back here."
         : item.phase === "waiting" && item.url !== null
           ? catchPort !== null
-            ? "Open the sign-in page here — this phone hands the result back to the Mac."
+            ? "Open the sign-in page here. This phone hands the result back to the Mac."
             : "Open the sign-in page; the Mac finishes by itself once you approve."
           : item.phase === "waiting"
             ? `${mac.label} is waiting for the sign-in to finish in its browser.`
