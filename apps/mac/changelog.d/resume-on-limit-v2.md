@@ -1,2 +1,0 @@
-Desktop: A Claude thread that hits a usage limit shows "Limited" in the sidebar again (with the account and the reset in its tooltip), is reported to swapd as that account's limit only when the refusal's reset matches the account's own window, and continues on the account Infinitus swaps to, on the new orchestrator; a context-window stop is no longer mistaken for a usage limit.
-Phone: The thread list labels a Claude thread parked on a usage limit "Limited" with the account on its detail line, and Settings › Threads gains the "Resume on another account" switch.

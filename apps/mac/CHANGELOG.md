@@ -10,6 +10,41 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.39
+
+### Mac
+- A dev server started with INFINITUS_PUBLISH_SERVER_PORT=1 takes the menu bar app's desktop slot, the app keeps the slot for that environment while it runs, and `infinitusctl desktop release` or quitting hands it back to the installed desktop within a minute.
+- infinitusctl thread send, new and interrupt refuse a desktop of another environment than T3_ENVIRONMENT_ID, like rename.
+- infinitusctl's "thread release" verb and the held/paused thread statuses are gone with the desktop's session holds, which left in the orchestrator-v2 merge.
+- the busy-thread count the battle plan reads from the desktop is back; it had answered 404 since the orchestrator-v2 update.
+
+### Desktop
+- The sidebar's Needs attention section is back on the new engine, listing every thread waiting for an approval, an answer or an account swap across projects and machines, and mod+shift+u jumps to the thread needing you next.
+- The worktree limit is back on the new engine: a send that would create a worktree past Settings → General → Worktree limit is refused before the thread exists, and threads started together count each other.
+- a thread whose agent finished under a different turn id no longer reads "Working" forever; the run settles when the agent's answer lands.
+- a Claude instance's advisor model setting is back after the orchestrator update.
+- an agent's browser tab opened while you were on another thread now moves onto the page you see in the Browser panel, sign-ins included, instead of staying a separate signed-out copy.
+- A Claude thread that hits a usage limit shows "Limited" in the sidebar again (with the account and the reset in its tooltip), is reported to swapd as that account's limit only when the refusal's reset matches the account's own window, and continues on the account Infinitus swaps to, on the new orchestrator; a context-window stop is no longer mistaken for a usage limit.
+- only the installed desktop's own server hands the menu bar app its port and infinitusctl credential; dev and showcase servers no longer overwrite it every minute.
+- Importing sessions no longer offers the app's own worktree sandboxes when the Infinitus home sits behind a symlink.
+- A thread's usage is back on orchestrator v2 — the composer footer shows each completed turn's cost, tokens, models, tool calls and time working, rolled up over the thread, and threads imported from before get their old rollup or a transcript estimate.
+- updating while threads run asks again — Later, Install now, or Install when they finish — as it did before the orchestrator update.
+- Three weeks of upstream improvements — faster streaming replies, right-to-left text, HTTPS retry for clones and smaller SSH host installs.
+- More from upstream — messages from other agents fold into one-line rows, thread title instructions in Settings, faster thread lists on large databases, and provider updates no longer pop a toast on launch.
+- the Utilization page adds up every connected machine's usage history, each machine on its own row.
+- A message sent in steer mode while the agent works now reaches it at its next step, once the current tool call finishes, instead of mid-tool; until then it waits above the composer, marked "at next step", where you can edit, remove or send it right away.
+- A thread the server holds or pauses for headroom reads "Held" / "Paused" in the sidebar again, and the Priority settings page is back; the holds themselves follow once the new engine's turn-start gate lands.
+
+### Phone
+- a queued reply can be deleted from under its bubble, even while its attachments are still uploading; only the moment the send itself is in flight is off limits.
+- The thread list labels a Claude thread parked on a usage limit "Limited" with the account on its detail line, and Settings › Threads gains the "Resume on another account" switch.
+- A large screenshot shared from another app or pasted from the clipboard is downscaled before it is queued, like one picked from the photo library, so it uploads over the relay instead of timing out.
+- A thread's settings sheet lists its usage: turns, tool calls, duration, tokens, models and cost.
+- Upstream's mobile fixes — steadier drafts and composer, swipe-to-discard drafts, and attachment images that no longer re-download on reconnect.
+- Android undo toasts sit above the bottom bar with their action on one row, and Android composer text is centred.
+- Steering a running thread waits for its next step the same way; the queue sheet marks such a message "Next step".
+- A thread the Mac holds or paused for headroom reads "Held" / "Paused" in the list, as on the desktop.
+
 ## 0.5.0-alpha.38
 
 ### Desktop

@@ -1,1 +1,0 @@
-Desktop: The worktree limit is back on the new engine: a send that would create a worktree past Settings → General → Worktree limit is refused before the thread exists, and threads started together count each other.
