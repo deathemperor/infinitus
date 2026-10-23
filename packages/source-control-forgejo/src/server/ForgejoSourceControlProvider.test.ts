@@ -301,6 +301,9 @@ it.effect("reads Forgejo jobs that did not run as finished checks", () =>
     Effect.provide(
       Layer.mock(ForgejoCli.ForgejoCli)({
         api: (input) => {
+          if (input.path.endsWith("branches/main")) {
+            return encodeJsonEffect({}).pipe(Effect.orDie, Effect.map(processOutput));
+          }
           const status = (context: string, state: string) => ({
             context,
             status: state,
@@ -308,30 +311,32 @@ it.effect("reads Forgejo jobs that did not run as finished checks", () =>
             target_url: null,
             updated_at: "2026-10-11T00:00:00Z",
           });
-          const body = input.path.endsWith("pulls/1")
-            ? {
-                number: 1,
-                title: "Checks",
-                body: "",
-                html_url: "https://forgejo.test/acme/web/pulls/1",
-                user: null,
-                state: "open",
-                merged: false,
-                head: { ref: "feature", sha: "head", repo: null },
-                base: { ref: "main", sha: "base", repo: null },
-                created_at: "2026-10-11T00:00:00Z",
-                updated_at: "2026-10-11T00:00:00Z",
-                closed_at: null,
-                merged_at: null,
-                labels: [],
-              }
-            : input.path.endsWith("page=1")
-              ? [
-                  status("deploy", "skipped"),
-                  status("audit", "warning"),
-                  status("docs", "future-state"),
-                ]
-              : [];
+          const body = input.path.endsWith("branches/main")
+            ? {}
+            : input.path.endsWith("pulls/1")
+              ? {
+                  number: 1,
+                  title: "Checks",
+                  body: "",
+                  html_url: "https://forgejo.test/acme/web/pulls/1",
+                  user: null,
+                  state: "open",
+                  merged: false,
+                  head: { ref: "feature", sha: "head", repo: null },
+                  base: { ref: "main", sha: "base", repo: null },
+                  created_at: "2026-10-11T00:00:00Z",
+                  updated_at: "2026-10-11T00:00:00Z",
+                  closed_at: null,
+                  merged_at: null,
+                  labels: [],
+                }
+              : input.path.endsWith("page=1")
+                ? [
+                    status("deploy", "skipped"),
+                    status("audit", "warning"),
+                    status("docs", "future-state"),
+                  ]
+                : [];
           return encodeJsonEffect(body).pipe(Effect.orDie, Effect.map(processOutput));
         },
       }),
