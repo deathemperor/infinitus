@@ -178,7 +178,7 @@ export function makeEngineSupervisor(deps: EngineSupervisorDeps) {
       run.error =
         resolution.mode === "service"
           ? null
-          : "No command for this engine — set one to run it from here.";
+          : "No command for this engine. Set one to run it from here.";
       publish();
       return;
     }

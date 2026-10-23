@@ -124,7 +124,7 @@ function ratioTile(s: StatsSummary, id: string, read: DayRatio): StatsTile {
   const previous = read(s.previous);
   return {
     id,
-    value: value === null ? "—" : value.toFixed(1),
+    value: value === null ? "-" : value.toFixed(1),
     delta: value === null || previous === null ? null : deltaText(value, previous),
     series: bucketed(
       s.daily.map((point) => read(point.day) ?? 0),
@@ -140,7 +140,7 @@ function moneyRatioTile(s: StatsSummary, id: string, read: DayRatio): StatsTile 
   const value = read(s.total);
   return {
     id,
-    value: value === null ? "—" : `$${value.toFixed(2)}`,
+    value: value === null ? "-" : `$${value.toFixed(2)}`,
     delta: null,
     series: bucketed(
       s.daily.map((point) => read(point.day) ?? 0),
@@ -153,7 +153,7 @@ function percentTile(s: StatsSummary, id: string, read: DayRatio): StatsTile {
   const value = read(s.total);
   return {
     id,
-    value: value === null ? "—" : `${Math.floor(value * 100)}%`,
+    value: value === null ? "-" : `${Math.floor(value * 100)}%`,
     delta: null,
     series: bucketed(
       s.daily.map((point) => (read(point.day) ?? 0) * 100),
@@ -432,6 +432,6 @@ export const effortText = {
   },
   minutes: (minutes: number): string =>
     minutes >= 120 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m` : `${minutes} min`,
-  cached: (share: number | null): string => (share === null ? "—" : `${Math.round(share * 100)}%`),
+  cached: (share: number | null): string => (share === null ? "-" : `${Math.round(share * 100)}%`),
   share: (share: number): string => `${Math.round(share * 100)}%`,
 };

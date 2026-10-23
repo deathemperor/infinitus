@@ -153,7 +153,9 @@ export function ActivityPage() {
   } else if (days.length === 0) {
     body = (
       <p className="text-muted-foreground text-sm">
-        {hiddenPolls === 0 ? "Nothing logged yet." : "Only polls so far — Show polls to see them."}
+        {hiddenPolls === 0
+          ? "Nothing logged yet."
+          : "Only polls so far. Turn on Show polls to see them."}
       </p>
     );
   } else {

@@ -59,11 +59,11 @@ export const TEAM_KINDS: ReadonlyArray<{
   readonly kind: "now" | "threads" | "transcripts" | "stats" | "fleet";
   readonly label: string;
 }> = [
-  { kind: "now", label: "Now — what this machine is on, blockers" },
-  { kind: "threads", label: "Threads — the index of your threads" },
-  { kind: "transcripts", label: "Transcripts — your threads' conversations, redacted" },
-  { kind: "stats", label: "Stats — messages, tokens, cost per day" },
-  { kind: "fleet", label: "Fleet — every account's headroom" },
+  { kind: "now", label: "Now: what this machine is on, blockers" },
+  { kind: "threads", label: "Threads: the index of your threads" },
+  { kind: "transcripts", label: "Transcripts: your threads' conversations, redacted" },
+  { kind: "stats", label: "Stats: messages, tokens, cost per day" },
+  { kind: "fleet", label: "Fleet: every account's headroom" },
 ];
 
 export const TEAM_SHARE_TARGETS: ReadonlyArray<{

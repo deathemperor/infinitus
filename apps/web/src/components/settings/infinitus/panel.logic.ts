@@ -46,7 +46,7 @@ export function infinitusPanelMessage(
       return "Reading the Infinitus app…";
     case "unavailable":
       return unavailableReason === undefined || unavailableReason === ""
-        ? "Infinitus is not answering — it may be closed, or running on another machine."
+        ? "Infinitus is not answering. It may be closed, or running on another machine."
         : `Infinitus is not answering: ${unavailableReason}`;
     case "empty":
       return emptyMessage;

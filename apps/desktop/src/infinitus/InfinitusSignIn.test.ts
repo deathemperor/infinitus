@@ -25,7 +25,7 @@ describe("signInWindowOptions", () => {
       webviewTag: false,
     });
     expect(options.webPreferences?.preload).toBeUndefined();
-    expect(options.title).toBe("Add account — Infinitus");
+    expect(options.title).toBe("Add account - Infinitus");
   });
 });
 

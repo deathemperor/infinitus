@@ -69,7 +69,7 @@ describe("addAccountStatus", () => {
     );
     expect(addAccountStatus(flow({ kind: "waiting" }), true)).toBe("Sign-in running on the Mac…");
     expect(addAccountStatus(flow({ kind: "waiting" }, "golf"), true)).toBe(
-      "Sign-in running on the Mac — sign in as golf.",
+      "Sign-in running on the Mac. Sign in as golf.",
     );
     expect(addAccountStatus(flow({ kind: "done" }), false)).toBe("Sign-in finished.");
     expect(addAccountStatus(flow({ kind: "failed", message: "Login cancelled." }), false)).toBe(

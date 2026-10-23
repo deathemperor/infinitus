@@ -218,7 +218,7 @@ function ForecastSection({ forecast }: { readonly forecast: ForecastModel | null
         <h2 className="font-medium text-foreground text-sm">Forecast</h2>
         {forecast === null || forecast.accounts.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No projection yet — needs an active account and ten minutes of polls.
+            No projection yet. It needs an active account and ten minutes of polls.
           </p>
         ) : (
           forecast.accounts.map((line) => (
@@ -403,7 +403,7 @@ function HistorySection({
       </div>
       {lines.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No history yet. Samples build up while Infinitus runs — come back after a few polls.
+          No history yet. Samples build up while Infinitus runs, so come back after a few polls.
         </p>
       ) : (
         <>
@@ -534,7 +534,7 @@ function FiveHourSection({
       {replay !== null ? <p className="text-muted-foreground text-xs">{replay}</p> : null}
       <p className="text-muted-foreground text-xs">
         A window starts on the first request after the last one expired, so the peak is what it was
-        used for — the rest idled rather than leaking.
+        used for. The rest idled rather than leaking.
       </p>
     </section>
   );
@@ -653,7 +653,7 @@ function RunRateSection({ utilization }: { readonly utilization: InfinitusUtiliz
       <h2 className="font-medium text-foreground text-sm">Run rate</h2>
       {rows === null ? (
         <p className="text-muted-foreground text-sm">
-          Scanning transcripts — the run rate shows once the Mac has read a week of them.
+          Scanning transcripts. The run rate shows once the Mac has read a week of them.
         </p>
       ) : (
         <div className="overflow-x-auto">

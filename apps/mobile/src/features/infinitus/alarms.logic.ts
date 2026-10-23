@@ -125,7 +125,7 @@ export function swapAlarm(
     id: `infinitus-swap-${fleet.key}`,
     fireAt: null,
     title: `swapped to ${infinitusAccountLabel(account)}`,
-    body: `account ${current} is live — sessions ride it now`,
+    body: `account ${current} is live, so sessions ride it now`,
   };
 }
 

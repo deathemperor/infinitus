@@ -79,7 +79,7 @@ export function addAccountStatus(
     case "waiting":
       return flow.target === null
         ? "Sign-in running on the Mac…"
-        : `Sign-in running on the Mac — sign in as ${flow.target}.`;
+        : `Sign-in running on the Mac. Sign in as ${flow.target}.`;
     case "done":
       return "Sign-in finished.";
     case "failed":

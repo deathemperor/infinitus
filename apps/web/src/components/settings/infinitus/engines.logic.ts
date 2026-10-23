@@ -170,7 +170,7 @@ export function routingNotes(strategy: string | null, affinity: boolean | null):
         ? "Requests rotate in proportion to each credential's priority."
         : strategy === null
           ? "Read from the proxy on the next refresh."
-          : "Highest priority wins until it is rate-limited — consume-first. Switch on the Accounts page raises a credential to the top.";
+          : "Highest priority wins until it is rate-limited (consume-first). Switch on the Accounts page raises a credential to the top.";
   if (strategy === null || strategy === "fill-first") return { explainer, note: null };
   const note =
     affinity === null

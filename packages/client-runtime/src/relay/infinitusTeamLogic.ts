@@ -140,7 +140,7 @@ export function pendingSummary(pending: TeamPendingCommand, nowMs: number): stri
   const text =
     pending.text === undefined || pending.text.length === 0
       ? ""
-      : ` — “${pending.text.slice(0, 80)}”`;
+      : `: “${pending.text.slice(0, 80)}”`;
   const left = Math.max(0, Math.round((Date.parse(pending.expiresAt) - nowMs) / 1000));
   return `${pending.action} on ${target}${text} · ${left}s left`;
 }

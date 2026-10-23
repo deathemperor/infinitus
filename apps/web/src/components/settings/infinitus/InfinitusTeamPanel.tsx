@@ -676,7 +676,7 @@ function InvitesSection({
       await navigator.clipboard.writeText(what === "token" ? minted : buildJoinLink(minted));
       setCopied(what);
     } catch {
-      setCopyError("Copy failed — select the token and copy it by hand.");
+      setCopyError("Copy failed. Select the token and copy it by hand.");
     }
   };
 
@@ -768,7 +768,7 @@ function InvitesSection({
       ))}
       <SettingsRow
         title="Who may request to join"
-        description="With a reusable invite, anyone holding one; off, nobody — one-use invites still join."
+        description="With a reusable invite, anyone holding one; off, nobody. One-use invites still join."
         control={
           <Select
             disabled={busy !== null}

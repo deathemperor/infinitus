@@ -363,9 +363,9 @@ describe("parseControlInput", () => {
       kind: "select",
       value: "hades",
       options: [
-        { value: "off", label: "Off — plain numbers" },
-        { value: "rpg", label: "RPG — HP/MP gauges + gold" },
-        { value: "hades", label: "Hades — blades & darkness" },
+        { value: "off", label: "Off: plain numbers" },
+        { value: "rpg", label: "RPG: HP/MP gauges + gold" },
+        { value: "hades", label: "Hades: blades & darkness" },
         { value: "custom-1", label: "My theme" },
         { value: "bare", label: "bare" },
       ],
@@ -390,9 +390,9 @@ describe("parseControlInput", () => {
       kind: "select",
       value: "hold",
       options: [
-        { value: "off", label: "Off — every thread runs" },
-        { value: "hold", label: "Hold — new turns wait for headroom" },
-        { value: "interrupt", label: "Interrupt — running turns pause too" },
+        { value: "off", label: "Off: every thread runs" },
+        { value: "hold", label: "Hold: new turns wait for headroom" },
+        { value: "interrupt", label: "Interrupt: running turns pause too" },
       ],
     });
   });

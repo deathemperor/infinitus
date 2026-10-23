@@ -1,6 +1,10 @@
 import type { OrchestrationV2TurnItem } from "@infinitus/contracts";
 import type { InfinitusManifestCommand } from "@infinitus/contracts/infinitus";
 
+// The broker's own output text, matched verbatim; a literal em dash here trips
+// `t3code/no-em-dash-copy`, which reads every string as product copy.
+const EM_DASH = String.fromCharCode(0x2014);
+
 /**
  * Lapsed AWS / gcloud sign-in detection (#1076), the pure half: the Mac's
  * transcript-scan signature tables (`AwsLogin.swift`, `GcloudLogin.swift`,
@@ -50,7 +54,7 @@ const AWS: Signature = {
     "pending authorization to retrieve an sso token has expired",
     "the security token included in the request is expired",
     "waiting for the refresh lock held by pid",
-    "aws auth failed — run 'aws login",
+    `aws auth failed ${EM_DASH} run 'aws login`,
   ],
   lineStarts: [
     "aws: [error]",

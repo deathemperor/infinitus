@@ -94,7 +94,7 @@ function InfinitusEngineStatusList({
   );
 }
 
-const UPDATING = "Installing. Infinitus is relaunching — this page picks up again when it answers.";
+const UPDATING = "Installing. Infinitus is relaunching. This page picks up again when it answers.";
 
 /** The engine's newest release against the one running (#1577): read once
     the row mounts, installed on the owning Mac by a restart verb, so the row
