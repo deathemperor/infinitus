@@ -1,1 +1,0 @@
-Phone: A large screenshot shared from another app or pasted from the clipboard is downscaled before it is queued, like one picked from the photo library, so it uploads over the relay instead of timing out.
