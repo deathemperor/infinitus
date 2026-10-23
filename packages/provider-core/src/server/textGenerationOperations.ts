@@ -153,6 +153,7 @@ export function fromRunner(name: string, run: Runner): ProviderTextGeneration {
         previousTitle: input.previousTitle,
         linkedContext: input.linkedContext,
         attachments: input.attachments,
+        instructions: input.instructions,
       }),
     });
     return {

@@ -50,7 +50,7 @@ export class HeldHooks extends Context.Service<
       readonly environmentPublicKey: string;
     }) => Effect.Effect<boolean, PersistenceError | HookInbox.HookInboxError>;
   }
->()("t3code-relay/hooks/HeldHooks") {}
+>()("infinitus-relay/hooks/HeldHooks") {}
 
 const make = Effect.gen(function* () {
   const links = yield* EnvironmentLinks.EnvironmentLinks;
