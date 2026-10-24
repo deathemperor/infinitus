@@ -9,6 +9,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createStaticNavigation, getStateFromPath } from "@react-navigation/native";
 
 import { RegistryContext } from "@effect/atom-react";
+import { ProjectChipIconRasterizer } from "./native/ProjectChipIconImages";
 import { ThreadArrangementHost } from "./features/threads/ThreadArrangementSheet";
 import * as Dialog from "./components/ui/Dialog";
 import { InfinitusAppMounts } from "./features/infinitus/InfinitusAppMounts";
@@ -122,7 +123,11 @@ function AppContent() {
                   </IncomingShareProvider>
                   <Dialog.Host />
                   <ThreadArrangementHost />
+<<<<<<< HEAD
                   <InfinitusAppMounts />
+=======
+                  <ProjectChipIconRasterizer />
+>>>>>>> upstream-sync-aaf4a901c-upstream-renamed
                 </NativeLayoutMetricsProvider>
               </GlobalVoiceInputControl>
               {/* Anchored-menu overlays render here — in-window, so the
