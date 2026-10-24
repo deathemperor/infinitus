@@ -5,8 +5,10 @@ import * as Schema from "effect/Schema";
 import { randomUuidV4 } from "@infinitus/provider-core/server/randomUuid";
 import {
   NonNegativeInt,
+  resolvePullRequestAuthorFilter,
   TrimmedNonEmptyString,
   type PullRequestCapabilities,
+  type PullRequestListFilters,
   type PullRequestStackHead,
 } from "@infinitus/contracts";
 import {
@@ -45,6 +47,13 @@ const CAPABILITIES: PullRequestCapabilities = {
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10;
+/**
+ * Pages read looking for a GitHub-synced author before a listing filtered by them gives up. The
+ * login only appears on their pull requests, so one older than this many is out of reach.
+ */
+const AUTHOR_DISCOVERY_PAGES = 5;
+/** Bounds the logins remembered from listings; a repository's authors fit many times over. */
+const KNOWN_AUTHORS_LIMIT = 10_000;
 /** GitCafe's cap on paths per `/diff-files` read, and so one diff page. */
 const DIFF_FILES_BATCH = 64;
 /**
@@ -74,6 +83,7 @@ const Id = TrimmedNonEmptyString.check(Schema.isPattern(/^[A-Za-z0-9_-]+$/u));
 const isId = Schema.is(Id);
 const isApiError = Schema.is(GitCafeApi.GitCafeApiError);
 const Principal = Schema.Struct({ actorId: TrimmedNonEmptyString, handle: TrimmedNonEmptyString });
+const User = Schema.Struct({ actorId: TrimmedNonEmptyString });
 const Written = Schema.Struct({ id: Id });
 const Versioned = Schema.Struct({ version: NonNegativeInt });
 const CommentDetail = Schema.Struct({ id: Id, version: NonNegativeInt });
@@ -104,7 +114,7 @@ const Listed = Schema.Struct({
   items: Schema.Array(Schema.Struct({ id: TrimmedNonEmptyString })),
   next: Schema.NullOr(Schema.String),
 });
-const encodeActorIds = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema.String)));
+const encodeIds = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema.String)));
 const BranchCommit = Schema.Struct({ oid: TrimmedNonEmptyString });
 const Snapshot = {
   version: NonNegativeInt,
@@ -165,6 +175,13 @@ function stackHeadsCurrent(
   );
 }
 
+const POSITION = /^(.+)~(\d+)$/u;
+const parsePosition = (raw: string | undefined) => {
+  const match = raw === undefined ? null : POSITION.exec(raw);
+  const created = match === null ? Number.NaN : Date.parse(match[1]!);
+  return match === null || Number.isNaN(created) ? null : { created, number: Number(match[2]) };
+};
+
 const withDetails = (
   files: ReadonlyArray<Json.GitCafeDiffFile>,
   details: ReadonlyArray<Json.GitCafeDiffFile>,
@@ -176,6 +193,18 @@ const withDetails = (
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const api = yield* GitCafeApi.GitCafeApi;
+  // GitCafe filters by actor id and has no lookup from a GitHub login to the actor sync made for
+  // it, so the pairs are learned from the pull requests every listing reads.
+  const knownAuthors = new Map<string, string>();
+  const authorKey = (host: string, login: string) =>
+    `${host.toLowerCase()}\n${login.toLowerCase()}`;
+  const learnAuthors = (host: string, pulls: ReadonlyArray<Json.GitCafePull>) => {
+    for (const { author } of pulls) {
+      if (author.kind !== "github") continue;
+      if (knownAuthors.size >= KNOWN_AUTHORS_LIMIT) knownAuthors.clear();
+      knownAuthors.set(authorKey(host, author.login), author.actorId);
+    }
+  };
 
   const failure = (operation: string, detail: string, cause?: unknown) =>
     new PullRequestProviderError({
@@ -257,6 +286,73 @@ export const make = Effect.gen(function* () {
       if (next === null || next === previous || batch.items.length === 0) break;
     }
     return { items, next };
+  });
+
+  /**
+   * GitCafe filters by ids, so label names and the author's handle are looked up first. A label it
+   * cannot resolve is left out, and the service narrows the rows by name instead. An author it
+   * cannot resolve comes back as `unresolvedAuthor` for the listing to find.
+   */
+  const listFilterParams = Effect.fn("GitCafePullRequestProvider.listFilterParams")(function* (
+    input: ProviderRepositoryRef & {
+      readonly filters?: PullRequestListFilters | undefined;
+      readonly authorNarrowed: boolean;
+      readonly viewer: string;
+    },
+    base: string,
+  ) {
+    const filters = input.filters;
+    const params: Array<readonly [string, string]> = [];
+    if (filters === undefined) return { params, unresolvedAuthor: null };
+    if (filters.draft !== undefined)
+      params.push([filters.draft === "only" ? "states" : "stateNots", encodeIds(["draft"])]);
+    const groups = filters.labels ?? [];
+    const excluded = filters.excludedLabels ?? [];
+    if (groups.length > 0 || excluded.length > 0) {
+      const labels = yield* readPages(
+        "listChangeRequests",
+        input,
+        `${base}/labels`,
+        Json.GitCafeLabels,
+      );
+      const ids = new Map(labels.items.map((label) => [label.name.toLowerCase(), label.id]));
+      const idsOf = (names: ReadonlyArray<string>) =>
+        names.flatMap((name) => {
+          const id = ids.get(name.trim().toLowerCase());
+          return id === undefined ? [] : [id];
+        });
+      // Several ids in `labels` match a pull request holding any one of them, which is exactly
+      // one group; the remaining groups are the service's to narrow.
+      const group = groups.find((names) => idsOf(names).length === names.length);
+      if (group !== undefined) params.push(["labels", encodeIds(idsOf(group))]);
+      const excludedIds = idsOf(excluded);
+      if (excludedIds.length > 0) params.push(["labelNots", encodeIds(excludedIds)]);
+    }
+    if (filters.author !== undefined && !input.authorNarrowed) {
+      const handle = resolvePullRequestAuthorFilter(filters.author, input.viewer);
+      // A profile matches what GitHub sync authored for it too. A GitHub-synced author with no
+      // profile is known only by the actor on their pull requests.
+      const user = yield* read(
+        "listChangeRequests",
+        input,
+        { path: `/users/${encodeURIComponent(handle)}` },
+        User,
+      ).pipe(
+        Effect.map(Option.some),
+        Effect.catchTags({
+          PullRequestProviderError: (error) =>
+            error.reason === "unauthenticated" || error.reason === "rate-limited"
+              ? Effect.fail(error)
+              : Effect.succeed(Option.none()),
+        }),
+      );
+      const actorId = Option.isSome(user)
+        ? user.value.actorId
+        : knownAuthors.get(authorKey(input.host, handle));
+      if (actorId === undefined) return { params, unresolvedAuthor: handle };
+      params.push(["authors", encodeIds([actorId])]);
+    }
+    return { params, unresolvedAuthor: null };
   });
 
   const readComments = (operation: string, input: PullRef) =>
@@ -570,33 +666,71 @@ export const make = Effect.gen(function* () {
             actorId = principal.value.actorId;
           }
         }
-        const limit = Math.max(1, input.limit);
-        const items: Array<Json.GitCafePull> = [];
-        let next: string | null = null;
-        do {
-          const query = new URLSearchParams({
-            limit: String(Math.min(PAGE_SIZE, limit - items.length)),
-            sort: "newest",
-          });
+        const { params: filterParams, unresolvedAuthor } = yield* listFilterParams(
+          { ...input, authorNarrowed: actorId !== undefined && input.involvement === "authored" },
+          base,
+        );
+        const readPage = (rows: number, after: string | null) => {
+          const query = new URLSearchParams({ limit: String(rows), sort: "newest" });
           if (input.state !== "all") query.set("state", input.state);
           if (input.query?.trim()) query.set("q", input.query.trim());
+          for (const [key, value] of filterParams) query.set(key, value);
           if (actorId !== undefined)
             query.set(
               input.involvement === "reviewing" ? "reviewers" : "authors",
-              encodeActorIds([actorId]),
+              encodeIds([actorId]),
             );
-          if (next !== null) query.set("after", next);
-          const page: typeof Json.GitCafePulls.Type = yield* read(
+          if (after !== null) query.set("after", after);
+          return read(
             "listChangeRequests",
             input,
             { path: `${base}/pulls?${query}` },
             Json.GitCafePulls,
+          ).pipe(Effect.tap((page) => Effect.sync(() => learnAuthors(input.host, page.items))));
+        };
+        if (unresolvedAuthor !== null) {
+          // Rows are only ever handed out narrowed by actor, so a continuation always carries on
+          // the same narrowed listing.
+          const key = authorKey(input.host, unresolvedAuthor);
+          let after: string | null = null;
+          let pages = 0;
+          do {
+            const page: typeof Json.GitCafePulls.Type = yield* readPage(PAGE_SIZE, after);
+            pages += 1;
+            after = page.items.length === 0 ? null : page.next;
+          } while (!knownAuthors.has(key) && after !== null && pages < AUTHOR_DISCOVERY_PAGES);
+          const found = knownAuthors.get(key);
+          if (found === undefined)
+            return { items: [], truncated: after !== null, continues: false };
+          filterParams.push(["authors", encodeIds([found])]);
+        }
+        const limit = Math.max(1, input.limit);
+        const items: Array<Json.GitCafePull> = [];
+        // GitCafe pages by an opaque token and orders by creation, so a continuation reads from the
+        // top and keeps only the rows created after the last one delivered. A count of rows would
+        // skip one for every row above it that closed in between.
+        const resume = parsePosition(input.cursor?.resumeAfter);
+        const isNew = (pull: Json.GitCafePull) => {
+          if (resume === null) return true;
+          const created = Date.parse(pull.createdAt);
+          return (
+            created < resume.created || (created === resume.created && pull.number < resume.number)
           );
-          items.push(...page.items);
+        };
+        let next: string | null = null;
+        do {
+          const page: typeof Json.GitCafePulls.Type = yield* readPage(
+            resume === null ? Math.min(PAGE_SIZE, limit - items.length) : PAGE_SIZE,
+            next,
+          );
+          items.push(...page.items.filter(isNew));
           next = page.items.length === 0 ? null : page.next;
         } while (next !== null && items.length < limit);
+        const delivered = items.slice(0, limit);
+        const last = delivered.at(-1);
         return {
-          items: items.slice(0, limit).map((pull) => {
+          ...(last === undefined ? {} : { resumeAfter: `${last.createdAt}~${last.number}` }),
+          items: delivered.map((pull) => {
             const item = Json.toChangeRequest(pull, input);
             return input.involvement === "reviewing" && actorId !== undefined
               ? {
@@ -605,8 +739,8 @@ export const make = Effect.gen(function* () {
                 }
               : item;
           }),
-          truncated: next !== null,
-          continues: false,
+          truncated: next !== null || items.length > limit,
+          continues: true,
         };
       },
     ),
@@ -937,6 +1071,30 @@ export const make = Effect.gen(function* () {
           })),
           truncated: labels.next !== null,
         };
+      },
+    ),
+    listRepositoryLabels: Effect.fn("GitCafePullRequestProvider.listRepositoryLabels")(
+      function* (input) {
+        const operation = "listRepositoryLabels";
+        const base = yield* repositoryPath(operation, input);
+        const labels = yield* readPages(operation, input, `${base}/labels`, Json.GitCafeLabels);
+        return {
+          items: labels.items.map((label) => ({ name: label.name, color: label.color })),
+          truncated: labels.next !== null,
+        };
+      },
+    ),
+    searchRepositoryAuthors: Effect.fn("GitCafePullRequestProvider.searchRepositoryAuthors")(
+      function* (input) {
+        const operation = "searchRepositoryAuthors";
+        const query = input.query?.trim() ?? "";
+        // User search needs two characters; before that the repository's own people stand in.
+        const path =
+          query.length < 2
+            ? `${yield* repositoryPath(operation, input)}/collaborators?${new URLSearchParams({ limit: "50" })}`
+            : `/users?${new URLSearchParams({ q: query, limit: "50" })}`;
+        const people = yield* read(operation, input, { path }, Json.GitCafePeople);
+        return { items: Json.toPeople(people, input.host), truncated: people.next !== null };
       },
     ),
     setLabels: Effect.fn("GitCafePullRequestProvider.setLabels")(function* (input) {

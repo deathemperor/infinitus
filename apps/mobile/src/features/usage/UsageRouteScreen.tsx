@@ -7,7 +7,7 @@ import {
   USAGE_CONTRACT_VERSION,
   type UsageProviderKind,
 } from "@infinitus/contracts";
-import { type RouteProp, useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
+import { type RouteProp, useIsFocused, useRoute } from "@react-navigation/native";
 import { cursorKeychainAccessEnvironments } from "@infinitus/client-runtime/state/usage";
 import {
   updatingProvidersLabel,
@@ -59,6 +59,7 @@ import { useRefreshLimits } from "./UsageLimitsSection";
 import { UsageLimitsSection } from "./UsageLimitsPooled";
 import { Menu } from "../../components/ui/Menu";
 import { SymbolView } from "../../components/ui/AppSymbol";
+import { NativeStackScreenOptions } from "../../native/StackHeader";
 import type { UsageChartMetric } from "./usageChartData";
 import { PROVIDER_LABEL, useProviderColors, useUsageMixColors } from "./usageProviders";
 
@@ -84,22 +85,28 @@ const CHART_HEIGHT = 180;
 const providerLabel = (provider: UsageProviderKind) => PROVIDER_LABEL[provider];
 const CURSOR_KEYCHAIN_COPY = "Requires access to your Cursor login in macOS Keychain.";
 
-export function UsageRouteScreen() {
+export function UsageRouteScreen(props: { readonly workspace?: boolean }) {
   const route = useRoute<RouteProp<{ Usage: { tab?: string } | undefined }, "Usage">>();
-  const navigation = useNavigation();
+  return <UsageScreen workspace={props.workspace} tabParam={route.params?.tab} />;
+}
+
+function UsageScreen(props: {
+  readonly workspace?: boolean;
+  readonly tabParam: string | undefined;
+}) {
   const insets = useSafeAreaInsets();
   const [selection, setSelection] = useState(() => ({
-    params: route.params,
-    tab: (route.params?.tab === "usage" ? "usage" : "limits") as UsageTab,
+    params: props.tabParam,
+    tab: (props.tabParam === "usage" ? "usage" : "limits") as UsageTab,
   }));
-  if (selection.params !== route.params) {
+  if (selection.params !== props.tabParam) {
     setSelection({
-      params: route.params,
-      tab: route.params?.tab === "usage" ? "usage" : "limits",
+      params: props.tabParam,
+      tab: props.tabParam === "usage" ? "usage" : "limits",
     });
   }
   const { tab } = selection;
-  const setTab = (tab: UsageTab) => setSelection({ params: route.params, tab });
+  const setTab = (tab: UsageTab) => setSelection({ params: props.tabParam, tab });
   const [windowSelection, setWindowSelection] = useState(() => ({
     days: 30,
     window: makeWindow(30),
@@ -238,14 +245,14 @@ export function UsageRouteScreen() {
     </Menu>
   ) : null;
 
-  useLayoutEffect(() => {
-    if (Platform.OS === "ios") {
-      navigation.setOptions({ headerRight: () => environmentFilter });
-    }
-  }, [navigation, environmentFilter]);
-
   return (
-    <SettingsScreen title="Usage" trailing={environmentFilter}>
+    <SettingsScreen title="Usage" trailing={environmentFilter} workspaceRoot={props.workspace}>
+      {Platform.OS === "ios" ? (
+        <NativeStackScreenOptions
+          optionsVersion={environmentFilter}
+          options={{ headerRight: () => environmentFilter }}
+        />
+      ) : null}
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}

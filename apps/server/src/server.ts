@@ -170,6 +170,7 @@ import * as ResourceMonitorBinary from "./resourceTelemetry/ResourceMonitorBinar
 import * as ProcessGroupMetrics from "./resourceTelemetry/ProcessGroupMetrics.ts";
 import * as ResourceTelemetry from "./resourceTelemetry/ResourceTelemetry.ts";
 import * as AntigravityUsage from "./provider/Drivers/AntigravityUsage.ts";
+import { MuseUsageHome } from "@infinitus/provider-muse/server";
 import * as CursorAccountReader from "@infinitus/provider-cursor/server/CursorAccountReader";
 import * as CursorKeychain from "@infinitus/provider-cursor/server/CursorKeychain";
 import * as CursorUsageAccounts from "@infinitus/provider-cursor/server/CursorUsageAccounts";
@@ -269,6 +270,23 @@ const layerBackground = BackgroundPolicy.layer.pipe(
   Layer.provideMerge(layerServerSettings),
 );
 
+<<<<<<< HEAD
+=======
+const layerUsage = UsageService.layer.pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      AntigravityUsage.layer,
+      MuseUsageHome.layer,
+      CodexUsageHistory.layer,
+      CursorUsageAccounts.layer.pipe(
+        Layer.provide(CursorAccountReader.layer.pipe(Layer.provide(CursorKeychain.layer))),
+      ),
+    ).pipe(Layer.provide(ProviderHostLive.layer.pipe(Layer.provide(ServerSecretStore.layer)))),
+  ),
+  Layer.provide(layerServerSettings),
+);
+
+>>>>>>> upstream-sync-b24e8ce2d-upstream-renamed
 const layerResourceDiagnostics = Layer.mergeAll(
   HostResources.layer,
   layerResourceTelemetry,

@@ -1,3 +1,7 @@
+import { WorkspaceNoTabs } from "./WorkspaceNoTabs";
+import { WORKSPACE_TAB_LABELS, useEnabledNavigationTabs } from "./navigation-tabs";
+import { WorkspaceExtraTab } from "./WorkspaceExtraTab";
+import { WorkspaceSectionToolbar } from "./WorkspaceSectionToolbar";
 import { useNavigation } from "@react-navigation/native";
 import { use, useCallback, useMemo } from "react";
 import { Platform, View, useWindowDimensions } from "react-native";
@@ -5,10 +9,12 @@ import { useKeyboardState } from "react-native-keyboard-controller";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CompactBrandTitle } from "../../components/CompactBrandTitle";
-import { isDuoDevice } from "../../lib/device-type";
 import { AndroidScreenHeader } from "../../components/ui/AndroidScreenHeader";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { NativePrimaryColumnContext } from "../../native/v5-workspace-context";
+import { isDuoDevice } from "../../lib/device-type";
+import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
+import { useWorkspaceSurface } from "./useWorkspaceSurface";
 import {
   useDeviceType,
   useDuoBottomBarInset,
@@ -26,27 +32,42 @@ import {
   useWorkspaceTabs,
 } from "./WorkspaceTabsContext";
 import { WorkspaceToolbar } from "./WorkspaceToolbar";
-import { WORKSPACE_DOCK, WORKSPACE_TOOLBAR, workspaceToolbarHeight } from "./workspace-tabs-state";
+import {
+  WORKSPACE_DOCK,
+  workspaceSearchBottomClearance,
+  workspaceDockBottomClearance,
+  workspaceToolbarHeight,
+} from "./workspace-tabs-state";
 import { WorkspaceSidebarTabs } from "./WorkspaceSidebarTabs";
+<<<<<<< HEAD
 import { useSidebarWorkspaceTabs, useSystemWorkspaceTabBar } from "./useSystemWorkspaceTabBar";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import {
+  useCompactWorkspaceTabs,
+  useSidebarWorkspaceTabs,
+  useSystemWorkspaceTabBar,
+} from "./useSystemWorkspaceTabBar";
+>>>>>>> upstream-sync-b24e8ce2d-upstream-renamed
 
-const TAB_TITLES = {
-  threads: "Threads",
-  pullRequests: "Pull requests",
-};
+const TAB_TITLES = WORKSPACE_TAB_LABELS;
 
 function WorkspaceRootTitle(props: {
   readonly maxWidth: number;
   readonly onOpenEnvironments: () => void;
 }) {
   const { state } = useWorkspaceTabs()!;
+  const enabled = useEnabledNavigationTabs();
   return (
     <View style={{ width: props.maxWidth, minHeight: 32, justifyContent: "center" }}>
       <WorkspaceConnectionTitle
         brand={
           <CompactBrandTitle
+<<<<<<< HEAD
             accessibilityLabel={`${PRODUCT_NAME}, ${TAB_TITLES[state.selectedTab]}`}
+=======
+            accessibilityLabel={`T3 Code, ${enabled.length ? TAB_TITLES[state.selectedTab] : "Navigation"}`}
+>>>>>>> upstream-sync-b24e8ce2d-upstream-renamed
           />
         }
         maxWidth={props.maxWidth}
@@ -64,9 +85,12 @@ function WorkspaceRootContent() {
   const columnMetrics = useNativeColumnLayoutMetrics();
   const nativeMetrics = useNativeLayoutMetrics();
   const deviceType = useDeviceType();
+  const surface = useWorkspaceSurface();
   const systemTabBar = useSystemWorkspaceTabBar();
+  const compactTabs = useCompactWorkspaceTabs();
+  const enabled = useEnabledNavigationTabs();
   const sidebarTabs = useSidebarWorkspaceTabs();
-  const sidebarPicker = sidebarTabs === "picker";
+  const sidebarPicker = sidebarTabs === "picker" || (deviceType === "pad" && layout.usesSplitView);
   const sidebarNavigation =
     primaryColumn !== null &&
     (layout.usesSplitView ||
@@ -78,6 +102,7 @@ function WorkspaceRootContent() {
   const keyboardHeight = useKeyboardState((keyboard) => keyboard.height);
   const workspace = useWorkspaceTabs()!;
   const { state } = workspace;
+  const solidHeader = deviceType === "duo-folded" || state.selectedTab === "usage";
   const renderHeaderTitle = useCallback(
     () => (
       <WorkspaceRootTitle
@@ -94,36 +119,61 @@ function WorkspaceRootContent() {
   );
   const tab = state.tabs[state.selectedTab];
   const bottomClearance =
-    Platform.OS === "ios" && isDuoDevice(deviceType)
-      ? Math.max(bottomBarInset ?? Math.max(insets.bottom, 12), keyboardHeight + 8) +
-        WORKSPACE_TOOLBAR.height +
-        16
-      : Platform.OS === "ios"
-        ? Math.max(insets.bottom, keyboardHeight) +
-          (systemTabBar || sidebarTabs || tab.searchMode !== "resting"
-            ? sidebarPicker
-              ? 80
-              : 16
-            : WORKSPACE_DOCK.height + WORKSPACE_DOCK.bottomGap + 16)
-        : keyboardHeight > 0 && tab.searchMode !== "resting"
-          ? keyboardHeight + 64
-          : Math.max(insets.bottom, 12) + workspaceToolbarHeight(tab.searchMode) + 16;
+    layout.primarySidebarOverlaysContent && state.selectedTab === "usage"
+      ? workspaceDockBottomClearance({ bottomInset: insets.bottom, keyboardHeight })
+      : Platform.OS === "ios" && isDuoDevice(deviceType)
+        ? workspaceSearchBottomClearance({
+            bottomInset: insets.bottom,
+            bottomBarInset,
+            keyboardHeight,
+          })
+        : compactTabs || deviceType === "pad"
+          ? workspaceDockBottomClearance({ bottomInset: insets.bottom, keyboardHeight })
+          : Platform.OS === "ios"
+            ? Math.max(insets.bottom, keyboardHeight) +
+              (systemTabBar || sidebarTabs || tab.searchMode !== "resting"
+                ? sidebarPicker
+                  ? 80
+                  : 16
+                : WORKSPACE_DOCK.height + WORKSPACE_DOCK.bottomGap + 16)
+            : keyboardHeight > 0 && tab.searchMode !== "resting"
+              ? keyboardHeight + 64
+              : Math.max(insets.bottom, 12) + workspaceToolbarHeight(tab.searchMode) + 16;
   const context = useMemo(() => ({ ...workspace, bottomClearance }), [workspace, bottomClearance]);
 
   return (
     <WorkspaceTabsContext value={context}>
       <View
-        className={sidebarPicker ? "flex-1 bg-drawer" : "flex-1 bg-screen"}
+        className={`flex-1 ${sidebarPicker ? "bg-drawer" : surface.className}`}
         style={sidebarPicker ? { paddingTop: insets.top } : undefined}
       >
         {Platform.OS === "ios" ? (
           <NativeStackScreenOptions
-            optionsVersion={[state.selectedTab, state.selectionRevision, width, sidebarNavigation]}
+            optionsVersion={[
+              state.selectedTab,
+              state.selectionRevision,
+              width,
+              sidebarNavigation,
+              enabled.length,
+            ]}
             options={{
-              title: TAB_TITLES[state.selectedTab],
+              title: enabled.length ? TAB_TITLES[state.selectedTab] : "Navigation",
               headerShown: true,
+              headerTransparent: solidHeader ? false : NATIVE_LIQUID_GLASS_SUPPORTED,
+              headerStyle: solidHeader
+                ? { backgroundColor: surface.backgroundColor }
+                : NATIVE_LIQUID_GLASS_SUPPORTED
+                  ? { backgroundColor: "transparent" }
+                  : undefined,
+              contentStyle: solidHeader ? { backgroundColor: surface.backgroundColor } : undefined,
+              ...(state.selectedTab !== "usage" || enabled.length === 0
+                ? { headerRight: undefined }
+                : {}),
+              ...(enabled.length === 0
+                ? { headerSearchBarOptions: undefined, unstable_headerRightItems: () => [] }
+                : {}),
               unstable_headerLeftItems: () => [],
-              headerTitle: renderHeaderTitle,
+              headerTitle: state.selectedTab === "usage" ? undefined : renderHeaderTitle,
             }}
           />
         ) : (
@@ -131,14 +181,18 @@ function WorkspaceRootContent() {
             title={PRODUCT_NAME}
             titleContent={renderHeaderTitle()}
             actions={[
-              {
-                accessibilityLabel:
-                  state.selectedTab === "threads" ? "Search threads" : "Search pull requests",
-                icon: "magnifyingglass",
-                onPress: () => {
-                  dispatchHardwareKeyboardCommand("focusSearch");
-                },
-              },
+              ...(state.selectedTab === "threads" || state.selectedTab === "pullRequests"
+                ? [
+                    {
+                      accessibilityLabel:
+                        state.selectedTab === "threads" ? "Search threads" : "Search pull requests",
+                      icon: "magnifyingglass" as const,
+                      onPress: () => {
+                        dispatchHardwareKeyboardCommand("focusSearch");
+                      },
+                    },
+                  ]
+                : []),
               {
                 accessibilityLabel: "Settings",
                 icon: "gearshape",
@@ -151,11 +205,33 @@ function WorkspaceRootContent() {
             ]}
           />
         )}
-        <SafeAreaInsetsContext value={sidebarPicker ? { ...insets, top: 0 } : insets}>
-          {state.selectedTab === "threads" ? <HomeRouteScreen /> : <PullRequestsScreen />}
+        <SafeAreaInsetsContext
+          value={
+            sidebarPicker ? { ...insets, top: 0 } : compactTabs ? { ...insets, bottom: 0 } : insets
+          }
+        >
+          {enabled.length === 0 ? (
+            <WorkspaceNoTabs />
+          ) : state.selectedTab === "threads" ? (
+            <HomeRouteScreen />
+          ) : state.selectedTab === "pullRequests" ? (
+            <PullRequestsScreen />
+          ) : (
+            <WorkspaceExtraTab tab={state.selectedTab} />
+          )}
         </SafeAreaInsetsContext>
-        {sidebarPicker ? <WorkspaceSidebarTabs /> : null}
-        <WorkspaceToolbar sidebar={sidebarNavigation} onNewTask={startNewTask} />
+        {deviceType !== "pad" && deviceType !== "phone" && sidebarPicker ? (
+          <WorkspaceSidebarTabs />
+        ) : null}
+        {enabled.length === 0 ? null : state.selectedTab === "threads" ||
+          state.selectedTab === "pullRequests" ? (
+          <WorkspaceToolbar sidebar={sidebarNavigation} onNewTask={startNewTask} />
+        ) : (
+          <WorkspaceSectionToolbar
+            onNewTask={startNewTask}
+            showCompose={state.selectedTab !== "usage"}
+          />
+        )}
       </View>
     </WorkspaceTabsContext>
   );
