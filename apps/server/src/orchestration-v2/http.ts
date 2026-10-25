@@ -30,7 +30,11 @@ import {
 } from "./threadHistoryPaging.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ProjectStore from "./ProjectStore.ts";
-import { buildActiveShellSnapshot, loadShellSnapshotParts } from "./ShellStream.ts";
+import {
+  buildActiveShellSnapshot,
+  loadShellSnapshotParts,
+  omitIdleSubagentShells,
+} from "./ShellStream.ts";
 import { boundedSnapshotResponseFields } from "./ThreadStream.ts";
 import { projectThreadProjectionForWire } from "./WireProjection.ts";
 
@@ -62,9 +66,7 @@ export const layer = HttpApiBuilder.group(
         Effect.forEach(
           projects,
           (project) =>
-            // Use immediately available enrichment only. Awaiting git-backed
-            // identity resolution can exceed the client shell-snapshot budget
-            // (ProcessRunner allows probes up to one minute).
+            // Use available enrichment only; git probes can take a minute and exceed shell-snapshot budgets.
             projectEnrichment.getAvailable(project.workspaceRoot).pipe(
               Effect.map((enrichment) => ({
                 ...project,
@@ -75,7 +77,9 @@ export const layer = HttpApiBuilder.group(
         ),
     );
 
-    const loadShellSnapshot = Effect.fn("http.orchestration.loadShellSnapshot")(function* () {
+    const loadShellSnapshot = Effect.fn("http.orchestration.loadShellSnapshot")(function* (
+      omitIdleSubagents: boolean,
+    ) {
       const base = buildActiveShellSnapshot(
         yield* loadShellSnapshotParts({
           sql,
@@ -85,7 +89,11 @@ export const layer = HttpApiBuilder.group(
         }),
       );
       const projects = yield* enrichProjectShells(base.projects);
-      return { ...base, projects };
+      return {
+        ...base,
+        threads: omitIdleSubagents ? omitIdleSubagentShells(base.threads) : base.threads,
+        projects,
+      };
     });
 
     const loadThreadSnapshot = Effect.fn("http.orchestration.loadThreadSnapshot")(function* (
@@ -154,7 +162,7 @@ export const layer = HttpApiBuilder.group(
         Effect.fn("environment.orchestration.shellSnapshot")(function* (args) {
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthOrchestrationReadScope);
-          return yield* loadShellSnapshot().pipe(
+          return yield* loadShellSnapshot(args.query.omitIdleSubagents === "1").pipe(
             traceLocalHandlerWork,
             Effect.catch((cause) =>
               failEnvironmentInternal("orchestration_snapshot_failed", cause),
@@ -219,6 +227,8 @@ export const layer = HttpApiBuilder.group(
             ...boundedSnapshotResponseFields({
               bounded,
               compactTurnItems: args.query.compactTurnItems === "1",
+              dedupeBodies: args.query.dedupeBodies === "1",
+              compactIds: args.query.compactIds === "1",
             }),
           };
         }),
@@ -243,6 +253,9 @@ export const layer = HttpApiBuilder.group(
               args.query.view === "conversation",
             )
             .pipe(
+              Effect.map((page) =>
+                args.query.compactIds === "1" ? { ...page, idTable: true as const } : page,
+              ),
               traceLocalHandlerWork,
               Effect.catch(
                 Effect.fnUntraced(function* (cause) {

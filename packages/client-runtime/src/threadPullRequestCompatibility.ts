@@ -4,7 +4,7 @@ import type {
   ThreadId,
   ThreadPullRequestKey,
 } from "@infinitus/contracts";
-import { normalizeThreadPullRequestKey } from "@infinitus/shared/threadPullRequests";
+import { normalizeThreadPullRequestKey } from "./threadPullRequests.ts";
 
 type LinkingCapabilities = Pick<
   ExecutionEnvironmentCapabilities,

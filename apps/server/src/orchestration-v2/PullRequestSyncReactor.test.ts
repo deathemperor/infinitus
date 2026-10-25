@@ -859,7 +859,6 @@ describe("PullRequestSyncReactor", () => {
         yield* Effect.gen(function* () {
           const reactor = yield* startAndSweep(fixture);
           const firstSweep = yield* Ref.get(fixture.syncCommands);
-          // The held merged summary is dropped so the read reaches the host.
           assert.deepStrictEqual(yield* Ref.get(invalidated), [1]);
           assert.strictEqual(firstSweep.at(-1)?.snapshot.mergedAt, "2026-08-27T00:00:00.000Z");
           yield* Ref.update(fixture.snapshots, (snapshot) => applySync(snapshot, firstSweep));
@@ -1337,7 +1336,11 @@ describe("PullRequestSyncReactor", () => {
     ),
   );
 
-  it.effect("reads open links fresh only when a run that ran a merge command ends", () =>
+  it.effect.each([
+    "gh pr merge 7 --squash 2>&1 | tail -3",
+    "cafe pr merge 7 --squash",
+    "az repos pr update --id 7 --status completed",
+  ])("reads open links fresh only when a run that ran `%s` ends", (mergeCommand) =>
     Effect.scoped(
       Effect.gen(function* () {
         yield* TestClock.setTime(Date.parse(NOW));
@@ -1366,7 +1369,7 @@ describe("PullRequestSyncReactor", () => {
           yield* Queue.offerAll(fixture.domainEvents, [
             commandRan(ThreadId.make("other"), "gh pr view 9"),
             runUpdated(ThreadId.make("other"), "completed"),
-            commandRan(ThreadId.make("agent"), "gh pr merge 7 --squash 2>&1 | tail -3"),
+            commandRan(ThreadId.make("agent"), mergeCommand),
             runUpdated(ThreadId.make("agent"), "completed"),
           ]);
           yield* Queue.take(fixture.snapshotReads);

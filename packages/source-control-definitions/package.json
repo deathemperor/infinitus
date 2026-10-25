@@ -1,0 +1,23 @@
+{
+  "name": "@infinitus/source-control-definitions",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./registry": {
+      "types": "./src/registry.ts",
+      "import": "./src/registry.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@infinitus/source-control-azure-devops": "workspace:*",
+    "@infinitus/source-control-bitbucket": "workspace:*",
+    "@infinitus/source-control-core": "workspace:*",
+    "@infinitus/source-control-forgejo": "workspace:*",
+    "@infinitus/source-control-gitcafe": "workspace:*",
+    "@infinitus/source-control-github": "workspace:*",
+    "@infinitus/source-control-gitlab": "workspace:*"
+  }
+}

@@ -1,3 +1,4 @@
+import { threadSearchMatchKey } from "@infinitus/client-runtime/state/thread-search";
 import { presentThreadShell } from "@infinitus/client-runtime/state/models";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -99,12 +100,25 @@ describe("resolveThreadListV2Status", () => {
     );
   });
 
+  it("shows a waiting guest message as Request, after the agent's own requests", () => {
+    const thread = presentThreadShell(
+      environmentId,
+      decodeThreadShell(makeRawThreadShell({ status: "running" })),
+    );
+    const guest = { ...thread, pendingGuestMessageCount: 1 };
+
+    expect(resolveThreadListV2Status(guest)).toBe("request");
+    expect(resolveThreadListV2Status({ ...guest, hasPendingUserInput: true })).toBe("input");
+    expect(resolveThreadListV2Status({ ...guest, hasPendingApprovals: true })).toBe("approval");
+  });
+
   it.each([
-    { kind: "command", status: "ready" },
-    { kind: "monitor", status: "waiting" },
+    { roster: "dev server", task: { kind: "command" }, status: "ready" },
+    { roster: "dev server watchdog", task: { kind: "monitor" }, status: "ready" },
+    { roster: "awaited command", task: { kind: "command", awaited: true }, status: "waiting" },
   ] as const)(
-    "presents an unseen completion with a $kind roster as $status",
-    ({ kind, status }) => {
+    "presents an unseen completion with a $roster roster as $status",
+    ({ task, status }) => {
       const thread = presentThreadShell(
         environmentId,
         makeRawThreadShell({
@@ -112,7 +126,7 @@ describe("resolveThreadListV2Status", () => {
           status: "completed",
           latestRunCompletedAt: DateTime.makeUnsafe(NOW),
           lastVisitedAt: DateTime.makeUnsafe("2026-06-01T23:59:00.000Z"),
-          pendingBackgroundTasks: [{ taskId: "background-work", kind }],
+          pendingBackgroundTasks: [{ taskId: "background-work", ...task }],
         }),
       );
 
@@ -148,6 +162,33 @@ describe("queued messages keep a settled thread active", () => {
       ["settled", "slim"],
     ]);
     expect(layout.settledCount).toBe(1);
+  });
+});
+
+describe("search lists ranked matches", () => {
+  const matchKey = (id: string) =>
+    threadSearchMatchKey({ environmentId, threadId: ThreadId.make(id) });
+
+  it("lists matches by rank across shelves, then threads listed for their messages", () => {
+    const layout = buildThreadListV2Items({
+      threads: [
+        makeThread({ id: ThreadId.make("notes"), title: "Deploy notes" }),
+        makeThread({ id: ThreadId.make("mentioned"), title: "Weekly notes" }),
+        makeThread({ id: ThreadId.make("exact"), title: "Deploy", settledOverride: "settled" }),
+      ],
+      environmentId: null,
+      searchQuery: "deploy",
+      matchedThreadKeys: new Set([matchKey("mentioned"), matchKey("notes")]),
+      settledShelfExpanded: false,
+      now: NOW,
+    });
+    // The exact title leads even from a collapsed Settled shelf, and keeps its look.
+    expect(layout.items.map((item) => [item.thread.id, item.variant])).toEqual([
+      ["exact", "slim"],
+      ["notes", "card"],
+      ["mentioned", "card"],
+    ]);
+    expect([...layout.contentOnlyThreadKeys]).toEqual([matchKey("mentioned")]);
   });
 });
 
@@ -426,6 +467,20 @@ describe("buildThreadListV2Items", () => {
       ["match", "card"],
       ["settled", "slim"],
     ]);
+  });
+
+  it("forgives a typo even when a hidden thread matches the query exactly", () => {
+    const { items } = buildThreadListV2Items({
+      threads: [
+        makeThread({ id: ThreadId.make("visible"), title: "Restore drag handles" }),
+        makeThread({ id: ThreadId.make("archived"), title: "Drga notes", archivedAt: NOW }),
+      ],
+      environmentId: null,
+      searchQuery: "drga",
+      now: NOW,
+    });
+
+    expect(items.map((item) => item.thread.id)).toEqual(["visible"]);
   });
 
   it("scopes the flat list to every environment member of a logical project", () => {

@@ -1,6 +1,10 @@
 import { MISSING_FILE_ACCESS_MESSAGE } from "@infinitus/client-runtime/state/assets";
 import { mediaFileReference, mediaUrlReference } from "@infinitus/client-runtime/media-reference";
-import type { AssetResource, EnvironmentId } from "@infinitus/contracts";
+import type {
+  AssetResource,
+  EnvironmentId,
+  SOURCE_CONTROL_MEDIA_ASSET,
+} from "@infinitus/contracts";
 import { TriangleAlertIcon } from "lucide-react";
 import {
   createContext,
@@ -312,7 +316,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
         | "attachment"
         | "workspace-file"
         | "media-file"
-        | "github-media"
+        | typeof SOURCE_CONTROL_MEDIA_ASSET
         | "tool-output-image";
     }
   >;
