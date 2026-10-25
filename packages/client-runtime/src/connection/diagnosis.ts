@@ -124,7 +124,7 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
         ? `${CONNECT_NAME} did not accept this device's sign-in`
         : `This device can't reach ${CONNECT_NAME}`;
     case "tunnel":
-      // The relay already reached the host when this device fails on its own (#17629).
+      // The relay already reached the host when this device fails on its own.
       return failure?.reason === "network" ||
         failure?.reason === "transport" ||
         failure?.reason === "timeout"

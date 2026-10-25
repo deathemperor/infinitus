@@ -36,8 +36,14 @@ import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
 import { splitEnvironmentSections } from "./environmentSections";
+<<<<<<< HEAD
 import { routePairingPrefill } from "./pairPrefill.logic";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+=======
+import { openSettings } from "../settings/settings-navigation";
+import { leaveSettingsPage } from "../settings/settings-navigation";
+import { workspaceHasColumns } from "../workspace/workspace-selection-store";
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;
@@ -58,6 +64,7 @@ export function ConnectionsNewRouteScreen({
   const navigation = useNavigation();
   const routeName = useRoute().name;
   const params = route.params ?? {};
+<<<<<<< HEAD
   // Deep-link prefill: development, and the Infinitus variant's scanned QR
   // (#724); auto-connect stays development-only. See pairPrefill.logic.
   const { pairingUrl: routePairingUrl, autoConnect: shouldAutoConnect } = routePairingPrefill({
@@ -65,6 +72,14 @@ export function ConnectionsNewRouteScreen({
     dev: __DEV__,
     appVariant: Constants.expoConfig?.extra?.appVariant,
   });
+=======
+  // Dev-only prefill prevents production links from supplying an attacker-chosen host and token.
+  const routePairingUrl = __DEV__ ? (params.pairingUrl?.trim() ?? "") : "";
+  const shouldAutoConnect =
+    __DEV__ &&
+    routePairingUrl.length > 0 &&
+    (params.autoConnect === "1" || params.autoConnect === "true");
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
   const insets = useSafeAreaInsets();
   const [hostInput, setHostInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
@@ -177,12 +192,12 @@ export function ConnectionsNewRouteScreen({
         : Haptics.NotificationFeedbackType.Error,
     );
     if (AsyncResult.isSuccess(result)) {
-      // Return to whatever opened the sheet. Replacing it with Home would
-      // nest Home inside any sheet still below it.
+      // Replacing with Home would nest it inside any sheet below; return to the opener.
       if (!navigation.canGoBack()) {
         navigation.dispatch(StackActions.replace("Home"));
       } else {
-        navigation.goBack();
+        // Added from the Settings list, the new environment shows on Environments.
+        leaveSettingsPage(navigation, workspaceHasColumns(), "SettingsEnvironments");
       }
     }
   };
@@ -421,7 +436,7 @@ function InfinitusConnectSection() {
           label={`Sign in to ${CONNECT_NAME}`}
           description="Reach your machines from anywhere, no network setup."
           disabled={!isLoaded}
-          onPress={() => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" })}
+          onPress={() => navigation.navigate("SettingsAuth")}
         />
       )}
     </View>

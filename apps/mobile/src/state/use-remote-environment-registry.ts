@@ -176,8 +176,13 @@ export function useRemoteConnections() {
           [
             { text: "Cancel", style: "cancel" },
             {
+<<<<<<< HEAD
               text: `Open ${PRODUCT_NAME} Account`,
               onPress: () => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" }),
+=======
+              text: "Open T3 Account",
+              onPress: () => navigation.navigate("SettingsAuth"),
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
             },
             remove,
           ],

@@ -19,6 +19,7 @@ import { Image, Platform, StyleSheet } from "react-native";
 import {
   composerChipSizeSuffix,
   contextChipIcon,
+  contextChipAccent,
   contextChipPresentation,
   contextRecordFileName,
 } from "../lib/composerChipPresentation";
@@ -134,9 +135,7 @@ export function ComposerEditor({
   const mostRecentEventCountRef = useRef(0);
   const [mostRecentEventCount, setMostRecentEventCount] = useState(0);
   const [, forceNativeEventRender] = useState(0);
-  // The native editor mounts empty, so the snapshot history starts empty: the
-  // first controlled payload must be a non-echo so a restored draft (or a
-  // recycled native view) is applied rather than skipped.
+  // Start history empty so restored drafts or recycled views receive a non-echo controlled payload.
   const nativeEventSnapshotsRef = useRef<ComposerNativeEventSnapshot[]>([]);
   const [initialConfirmedTokens] = useState(() => collectComposerInlineTokens(props.value));
   const confirmedTokensRef = useRef(initialConfirmedTokens);
@@ -155,6 +154,7 @@ export function ComposerEditor({
   );
 
   const skillLabels = useMemo(() => composerSkillLabels(skills), [skills]);
+  const chipTextColor = createNativeComposerTheme(theme).text;
   const tokensJson = useMemo(() => {
     const tokens = collectComposerInlineTokens(props.value, {
       preserveTrailingFrom: confirmedTokensRef.current,
@@ -179,7 +179,7 @@ export function ComposerEditor({
           source: token.source,
           start: token.start,
           end: token.end,
-          accent: presentation.accent,
+          accent: contextChipAccent(presentation.accent, theme, chipTextColor),
           label:
             token.type === "skill"
               ? (skillLabels.get(token.value) ?? token.value)
@@ -192,7 +192,7 @@ export function ComposerEditor({
         };
       }),
     );
-  }, [props.value, props.context, skillLabels]);
+  }, [props.value, props.context, skillLabels, theme, chipTextColor]);
   // Every render resolves against the snapshot history, so a render whose
   // (value, selection) lags the acknowledged native state is stamped behind
   // the native revision and rejected by the editor instead of re-applying a
@@ -227,9 +227,7 @@ export function ComposerEditor({
   }, [acknowledgesLatestNativeEvent, mostRecentEventCount]);
   const assumedValue = props.value;
   useEffect(() => {
-    // A native event that arrived after this render was committed moves the
-    // acknowledged revision forward; the editor rejects this payload, so the
-    // snapshot history must not assume it applied.
+    // Newer native events make this payload stale; do not record it as applied.
     if (isNativeEcho || controlledEventCount !== mostRecentEventCountRef.current) return;
     nativeEventSnapshotsRef.current = assumeComposerControlledState(
       nativeEventSnapshotsRef.current,
@@ -316,11 +314,7 @@ export function ComposerEditor({
             event.nativeEvent.selection,
           );
           if (acknowledgedEventCount === false) return;
-          // Android emits the selection change mid-mutation, before the change
-          // event, so the payload can carry post-edit text. It must reach the
-          // parent alongside the acknowledged revision, or the next render
-          // stamps the stale draft at that revision and can re-apply it over
-          // the newer native text.
+          // Android selection events may precede text changes; publish text and revision together to reject stale drafts.
           if (event.nativeEvent.value !== props.value) {
             onChangeText(event.nativeEvent.value);
           }
@@ -352,8 +346,7 @@ export function ComposerEditor({
             paste.selection,
           );
           if (acknowledgedEventCount === false) return;
-          // Synchronize the draft before an async paste captures its insertion target.
-          // React props can still precede the last native keystroke.
+          // Sync before capturing async paste targets; props may lag the last native keystroke.
           onChangeText(paste.value);
           onSelectionChange?.(paste.selection);
           onPasteText?.(paste);

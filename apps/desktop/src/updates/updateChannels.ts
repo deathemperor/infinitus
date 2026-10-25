@@ -1,10 +1,16 @@
 import type { DesktopUpdateChannel } from "@infinitus/contracts";
 
+<<<<<<< HEAD
 /** The version's first prerelease id (`alpha` for `0.5.0-alpha.1`), or
     undefined for a plain version. electron-updater and electron-builder key
     the GitHub feed on it (#924), so every rule here reads it and never a
     substring: `0.5.0-alpha.6-infinitus-nightly.20260913.42` is an `alpha`. */
 const PRERELEASE_ID_PATTERN = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/;
+=======
+const NIGHTLY_VERSION_PATTERN = /^[^-+]+-nightly\.\d{8}\.\d+$/;
+// Preview builds share nightly branding but ship without an update feed.
+const PRERELEASE_VERSION_PATTERN = /^[^-+]+-(?:nightly|preview)\.\d{8}\.\d+$/;
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
 
 function resolvePrereleaseId(version: string): string | undefined {
   return PRERELEASE_ID_PATTERN.exec(version)?.[1];

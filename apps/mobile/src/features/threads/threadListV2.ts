@@ -1,4 +1,3 @@
-import { threadPullRequestSearchTerms } from "@infinitus/shared/threadPullRequests";
 import {
   canSnooze,
   effectiveSnoozed,
@@ -11,7 +10,15 @@ import {
 import type { SnoozePreset } from "@infinitus/client-runtime/state/thread-settled";
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import { resolveThreadProviderStack } from "@infinitus/client-runtime/state/models";
-import { threadSearchMatchKey } from "@infinitus/client-runtime/state/thread-search";
+import {
+  threadSearchMatchKey,
+  threadSearchSubject,
+} from "@infinitus/client-runtime/state/thread-search";
+import {
+  foldSearchQuery,
+  rankSearchItems,
+  scoreThreadSearch,
+} from "@infinitus/shared/paletteSearch";
 import {
   createInboxReturnTracker,
   isThreadWorking,
@@ -61,8 +68,12 @@ export function resolveThreadListV2ProviderDrivers(
 export type ThreadListV2Status =
   | "approval"
   | "input"
+<<<<<<< HEAD
   | "held"
   | "paused"
+=======
+  | "request"
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
   | "working"
   | "waiting"
   | "failed"
@@ -174,6 +185,7 @@ export function resolveThreadListV2Status(
     | "hasPendingApprovals"
     | "hasPendingUserInput"
     | "pendingSubagentRequest"
+    | "pendingGuestMessageCount"
     | "runtime"
     | "blockedOnThreadWait"
   >,
@@ -193,11 +205,17 @@ export function resolveThreadListV2Status(
   if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
     return "input";
   }
+<<<<<<< HEAD
   if (options?.limitStopped === true) {
     return "limited";
   }
   if (options?.hold === "held" || options?.hold === "paused") {
     return options.hold;
+=======
+  // A guest is waiting on the owner; the agent's own requests come first.
+  if ((thread.pendingGuestMessageCount ?? 0) > 0) {
+    return "request";
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
   }
   if (thread.runtime?.status === "running" && thread.blockedOnThreadWait === true) {
     return "waiting";
@@ -291,11 +309,10 @@ export interface ThreadListV2Layout {
   readonly snoozedShelfHeaderIndex: number | null;
   readonly settledCount: number;
   readonly settledShelfHeaderIndex: number | null;
-  /**
-   * Callers arm a timeout at this boundary so the list re-partitions the moment
-   * a snooze expires instead of on the next minute tick.
-   */
+  /** Arm a timeout here to repartition at snooze expiry rather than the next minute tick. */
   readonly nextSnoozeWakeAt: string | null;
+  /** Threads listed only because their messages match the search. */
+  readonly contentOnlyThreadKeys: ReadonlySet<string>;
 }
 
 export interface ThreadListV2ThreadListItem {
@@ -306,11 +323,7 @@ export interface ThreadListV2ThreadListItem {
   readonly timeLabel: string;
   readonly snoozePresetMinute: string | undefined;
   readonly showTrailingDivider: boolean;
-  /**
-   * Carried on the item so an outbox write (which never touches the thread
-   * shell) reaches the row through recycled-list equality instead of leaving a
-   * stale icon.
-   */
+  /** Include queued state in item equality; outbox writes do not update thread shells. */
   readonly hasQueuedMessages: boolean;
   readonly canMoveUp: boolean;
   readonly canMoveDown: boolean;
@@ -337,11 +350,7 @@ export interface ThreadListV2SnoozedShelfListItem {
   readonly key: "v2-snoozed-shelf";
   readonly count: number;
   readonly expanded: boolean;
-  /**
-   * Carried on the item because a recycled cell ignores the render closure —
-   * without it the header would stay visibly disabled (or enabled too early)
-   * after the preference load lands.
-   */
+  /** Include disabled state in item equality; recycled cells ignore render-closure updates. */
   readonly disabled: boolean;
 }
 
@@ -372,11 +381,7 @@ export function isThreadListV2ListItem(value: {
   );
 }
 
-/**
- * Item objects are rebuilt on every minute tick and every partition run;
- * without this the lists would consider every mounted row changed and re-render
- * all of them (each carrying a swipeable + a PR subscription).
- */
+/** Compare rebuilt items by content so minute ticks and partition runs do not re-render every mounted row. */
 export function threadListV2ListItemsAreEqual(
   previous: ThreadListV2ListItem,
   item: ThreadListV2ListItem,
@@ -475,9 +480,7 @@ export function buildThreadListV2ListItems(input: {
       item.snoozed && item.thread.snoozedUntil != null && input.snoozeLabelNow !== undefined
         ? snoozeWakeLabel(item.thread.snoozedUntil, { now: input.snoozeLabelNow })
         : undefined;
-    // The minute clock belongs on the item, not the list's extraData, so the
-    // recycler's equality can confine the per-minute re-render to rows whose
-    // snooze menu actually shows preset times.
+    // Put the clock on items so recycler equality limits ticks to rows displaying snooze preset times.
     const snoozePresetMinute =
       !item.snoozed &&
       input.snoozeLabelNow !== undefined &&
@@ -562,8 +565,7 @@ export function buildThreadListV2ListItems(input: {
   });
 }
 
-// Shells are immutable and the settled sort reads only their own fields, so an
-// element-identical input has an identical output.
+// Immutable shells and field-only sorting make element-identical inputs produce identical output.
 let lastSettledInput: ReadonlyArray<EnvironmentThreadShell> = [];
 let lastSettledOutput: ReadonlyArray<EnvironmentThreadShell> = [];
 
@@ -601,6 +603,7 @@ export function buildThreadListV2Items(input: {
   readonly now: string;
   readonly workingShelfEnabled?: boolean;
   readonly workingShelfExpanded?: boolean;
+  readonly isWorking?: (thread: EnvironmentThreadShell) => boolean;
   readonly inboxReturnAt?: (thread: EnvironmentThreadShell) => number | undefined;
   readonly snoozedShelfExpanded?: boolean;
   readonly settledShelfExpanded?: boolean;
@@ -619,7 +622,8 @@ export function buildThreadListV2Items(input: {
             pendingOrder: null,
           }),
         );
-  const query = input.searchQuery.trim().toLocaleLowerCase();
+  const query = foldSearchQuery(input.searchQuery);
+  const nowMs = Date.parse(now);
   const projectKeys = input.projectRefs
     ? new Set(input.projectRefs.map((ref) => `${ref.environmentId}:${ref.projectId}`))
     : null;
@@ -632,26 +636,36 @@ export function buildThreadListV2Items(input: {
   const snoozed: EnvironmentThreadShell[] = [];
   let nextSnoozeWakeAt: string | null = null;
   const queuedThreadKeys = input.queuedThreadKeys?.size ? input.queuedThreadKeys : undefined;
-  for (const thread of input.threads) {
-    if (thread.archivedAt !== null || thread.lineage.relationshipToParent === "subagent") continue;
-    if (input.environmentId !== null && thread.environmentId !== input.environmentId) continue;
-    if (projectKeys !== null && !projectKeys.has(`${thread.environmentId}:${thread.projectId}`)) {
-      continue;
-    }
-    if (
-      query.length > 0 &&
-      !thread.title.toLocaleLowerCase().includes(query) &&
-      !threadPullRequestSearchTerms(thread).some((term) =>
-        term.toLocaleLowerCase().includes(query),
-      ) &&
-      input.matchedThreadKeys?.has(
-        threadSearchMatchKey({
-          environmentId: thread.environmentId,
-          threadId: thread.id,
-        }),
-      ) !== true
-    ) {
-      continue;
+  const listedThreads = input.threads.filter(
+    (thread) =>
+      thread.archivedAt === null &&
+      thread.lineage.relationshipToParent !== "subagent" &&
+      (input.environmentId === null || thread.environmentId === input.environmentId) &&
+      (projectKeys === null || projectKeys.has(`${thread.environmentId}:${thread.projectId}`)),
+  );
+  // The same matches as the command palette, typo fallback included. Only
+  // listed threads are ranked: a hidden exact match must not turn typos off.
+  const rankedMatches =
+    query.length > 0
+      ? rankSearchItems(listedThreads, (thread, options) =>
+          scoreThreadSearch(query, threadSearchSubject(thread, null), nowMs, {
+            ...options,
+            picks: false,
+          }),
+        ).map(({ item }) => item)
+      : null;
+  const matchingThreads = rankedMatches === null ? null : new Set(rankedMatches);
+  // Threads listed only because their messages match; only their rows show
+  // the message and open at it.
+  const contentOnlyThreadKeys = new Set<string>();
+  for (const thread of listedThreads) {
+    if (matchingThreads !== null && !matchingThreads.has(thread)) {
+      const key = threadSearchMatchKey({
+        environmentId: thread.environmentId,
+        threadId: thread.id,
+      });
+      if (input.matchedThreadKeys?.has(key) !== true) continue;
+      contentOnlyThreadKeys.add(key);
     }
     const supportsSettlement = input.settlementEnvironmentIds?.has(thread.environmentId) ?? true;
     const supportsSnooze = input.snoozeEnvironmentIds?.has(thread.environmentId) ?? true;
@@ -672,11 +686,50 @@ export function buildThreadListV2Items(input: {
       settled.push(thread);
     } else if (thread.pinnedAt != null) {
       pinned.push(thread);
-    } else if (workingShelfEnabled && isThreadWorking(thread)) {
+    } else if (workingShelfEnabled && (input.isWorking ?? isThreadWorking)(thread)) {
       working.push(thread);
     } else {
       active.push(thread);
     }
+  }
+
+  if (rankedMatches !== null) {
+    // Searching lists every match by rank across shelves, as the palette and
+    // the web sidebar do, then threads listed for their messages in the
+    // server's order. Each row keeps its shelf's look.
+    const slim = new Set([...snoozed, ...settled]);
+    const snoozedThreads = new Set(snoozed);
+    const pinnedThreads = new Set(pinned);
+    const threadByKey = new Map(
+      listedThreads.map((thread) => [
+        threadSearchMatchKey({ environmentId: thread.environmentId, threadId: thread.id }),
+        thread,
+      ]),
+    );
+    const contentOnly = [...(input.matchedThreadKeys ?? [])].flatMap((key) => {
+      const thread = contentOnlyThreadKeys.has(key) ? threadByKey.get(key) : undefined;
+      return thread ? [thread] : [];
+    });
+    const results = [...rankedMatches, ...contentOnly];
+    return {
+      items: results.map((thread, index) => ({
+        thread,
+        variant: slim.has(thread) ? "slim" : "card",
+        snoozed: snoozedThreads.has(thread),
+        pinned: pinnedThreads.has(thread),
+        wokeAt: slim.has(thread) ? null : resolveThreadListV2WokeAt(thread, { now }),
+        isLast: index === results.length - 1,
+      })),
+      hiddenSettledCount: 0,
+      workingCount: 0,
+      workingShelfHeaderIndex: null,
+      snoozedCount: 0,
+      snoozedShelfHeaderIndex: null,
+      settledCount: 0,
+      settledShelfHeaderIndex: null,
+      nextSnoozeWakeAt,
+      contentOnlyThreadKeys,
+    };
   }
 
   const orderedActive = workingShelfEnabled
@@ -791,5 +844,6 @@ export function buildThreadListV2Items(input: {
     settledCount: orderedSettled.length,
     settledShelfHeaderIndex,
     nextSnoozeWakeAt,
+    contentOnlyThreadKeys,
   };
 }

@@ -10,6 +10,7 @@ import { WorkspaceListToolbarRow } from "../workspace/WorkspaceListToolbarRow";
 import { useWorkspaceTabs } from "../workspace/WorkspaceTabsContext";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { usePullRequestFilterMenu } from "./PullRequestFilterMenuContext";
+import { openSettings } from "../settings/settings-navigation";
 
 /** PR search shares the thread list's Android header row. */
 export function PullRequestToolbar(props: { readonly onRequestVisibility?: () => void }) {
@@ -71,6 +72,7 @@ export function PullRequestToolbar(props: { readonly onRequestVisibility?: () =>
         onCloseSearch={closeSearch}
         onOpenSearch={openSearch}
         searchAccessibilityLabel="Search pull requests"
+<<<<<<< HEAD
         titleAccessibilityLabel={`${PRODUCT_NAME}, Pull requests`}
         onOpenEnvironments={() =>
           navigation.navigate("SettingsSheet", {
@@ -78,6 +80,10 @@ export function PullRequestToolbar(props: { readonly onRequestVisibility?: () =>
             params: { screen: "SettingsEnvironments" },
           })
         }
+=======
+        titleAccessibilityLabel="T3 Code, Pull requests"
+        onOpenEnvironments={() => openSettings(navigation, "SettingsEnvironments")}
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
         filter={
           filters ? (
             <AndroidAnchoredMenu

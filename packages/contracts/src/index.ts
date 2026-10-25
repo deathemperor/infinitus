@@ -37,7 +37,12 @@ export * from "./pullRequestReviewGuide.ts";
 export * from "./orchestrationDispatch.ts";
 export * from "./orchestrationProject.ts";
 export * from "./orchestrationV2.ts";
+<<<<<<< HEAD
 export * from "./threadUsage.ts";
+=======
+export * from "./guestShare.ts";
+export * from "./guestStream.ts";
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
 export * from "./applicationEvent.ts";
 export * from "./orchestratorMcp.ts";
 export * from "./threadMetadataMcp.ts";

@@ -42,6 +42,7 @@ function AppSettingsSection() {
   const updateInFlight = useRef(false);
   const hiddenUpdateTapCount = useRef(0);
 
+<<<<<<< HEAD
   // The product version (root VERSION, #823) when the build carries it; the
   // store's marketing version otherwise.
   const productVersion = Constants.expoConfig?.extra?.productVersion as string | undefined;
@@ -57,6 +58,10 @@ function AppSettingsSection() {
       : null;
   // Fall back to "production" to match resolveAppVariant in app.config.ts, so a
   // missing variant never mislabels a production build as development.
+=======
+  const version = Constants.expoConfig?.version ?? "0.0.0";
+  // Match app.config.ts's production fallback to avoid mislabeling builds as development.
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
   const variant = (Constants.expoConfig?.extra?.appVariant as string | undefined) ?? "production";
   const variantLabel = variant === "production" ? "" : capitalize(variant);
   const versionLabel = variantLabel ? `${version} · ${variantLabel}` : version;
@@ -71,8 +76,7 @@ function AppSettingsSection() {
   }, [updateState]);
 
   async function checkForUpdate() {
-    // `disabled={busy}` only takes effect on the next render, so two taps in the
-    // same frame would both get through. The ref closes that window.
+    // disabled updates next render; the ref blocks same-frame double taps.
     if (updateInFlight.current) return;
     updateInFlight.current = true;
     // Failures arrive through onFailure; the settled result only matters for unlocking.

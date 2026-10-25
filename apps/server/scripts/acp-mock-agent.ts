@@ -429,8 +429,7 @@ function modeState(): AcpCompat.SessionModeState {
   };
 }
 
-// Mirrors the real Grok ACP: it advertises versioned model ids, never the CLI's own
-// "grok-build" product name.
+// Grok ACP advertises versioned model ids, never the CLI product name.
 const grokAcpModels: ReadonlyArray<AcpCompat.ModelInfo> = [
   {
     modelId: process.env.T3_ACP_GROK_MODEL ?? "grok-4.6",
@@ -600,8 +599,7 @@ const program = Effect.gen(function* () {
     }),
   );
 
-  // Mirrors the real Antigravity agent: the API key method reads
-  // GEMINI_API_KEY from the process environment and rejects when it is missing.
+  // Antigravity requires GEMINI_API_KEY for API key authentication.
   yield* agent.handleAuthenticate((request) =>
     Effect.gen(function* () {
       if (antigravityProfile) {
@@ -962,6 +960,124 @@ const program = Effect.gen(function* () {
       const requestedSessionId = String(request.sessionId ?? sessionId);
       beginAcpMockPrompt(cancelledSessions, requestedSessionId);
       promptCount += 1;
+      const idleError = process.env.T3_ACP_IDLE_ERROR;
+      if (idleError === "grok-background" && promptCount === 1) {
+        // The structured completion lands before the prompt settles, so it is buffered.
+        const taskId = "call-idle-error-background";
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "tool_call",
+            toolCallId: taskId,
+            title: "run_terminal_command",
+            kind: "execute",
+            status: "in_progress",
+            rawInput: { command: "sleep 1; echo done" },
+          },
+        });
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: taskId,
+            status: "completed",
+            rawOutput: {
+              type: "BackgroundTaskStarted",
+              task_id: taskId,
+              task_type: "bash",
+              status: "running",
+              command: "sleep 1; echo done",
+            },
+          },
+        });
+        writeJsonRpcNotification("_x.ai/task_completed", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "task_completed",
+            task_snapshot: { task_id: taskId, kind: "bash", exit_code: 0, output: "done\n" },
+          },
+        });
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: { sessionUpdate: "state_update", state: "idle", stopReason: "error" },
+        });
+        return {};
+      }
+      if (idleError !== undefined && promptCount === 1) {
+        const toolCallId = "tool-call-idle-error-1";
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId,
+            title: "Terminal",
+            kind: "execute",
+            status: "in_progress",
+            rawInput: { command: ["long-running-tool"] },
+          },
+        });
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "tool-call-idle-error-monitor",
+            title: "Monitor",
+            kind: "execute",
+            status: "in_progress",
+            rawInput: { command: ["background-monitor"] },
+          },
+        });
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "tool-call-idle-error-subagent",
+            title: "Subagent",
+            kind: "other",
+            status: "in_progress",
+            rawInput: {},
+          },
+        });
+        writeJsonRpcNotification("session/update", {
+          sessionId: "mock-child-session-idle-error",
+          update: {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "tool-call-idle-error-child",
+            title: "Child tool",
+            kind: "execute",
+            status: "in_progress",
+            rawInput: { command: ["child-tool"] },
+          },
+        });
+        writeJsonRpcNotification("session/update", {
+          sessionId: requestedSessionId,
+          update: {
+            sessionUpdate: "state_update",
+            state: "idle",
+            stopReason: "error",
+            ...(idleError === "details"
+              ? { error: { code: -32000, message: "Missing Authentication header" } }
+              : {}),
+          },
+        });
+        // The agent outlives the failed prompt, so its subagent finishes afterwards.
+        yield* Effect.sleep("50 millis").pipe(
+          Effect.andThen(
+            Effect.sync(() =>
+              writeJsonRpcNotification("session/update", {
+                sessionId: requestedSessionId,
+                update: {
+                  sessionUpdate: "tool_call_update",
+                  toolCallId: "tool-call-idle-error-subagent",
+                  status: "completed",
+                },
+              }),
+            ),
+          ),
+          Effect.forkDetach,
+        );
+        return {};
+      }
       if (
         process.env.T3_ACP_CRASH_PROMPT === "1" &&
         request.prompt.some((part) => part.type === "text" && part.text === "crash now")
@@ -1464,11 +1580,9 @@ const program = Effect.gen(function* () {
             const detachedCommand = runningCommandIgnoresTerm
               ? 'trap "" TERM; bash -c \'trap "" TERM; while :; do sleep 1; done\' & child=$!; printf "%s %s %s\n" "$PPID" "$$" "$child" > "$1"; echo published; wait "$child"'
               : 'sleep 120 & child=$!; printf "%s %s %s\n" "$PPID" "$$" "$child" > "$1"; echo published; wait "$child"';
-            // Nested bash publishes "$PPID $$ $child" once it starts. Do not
-            // write the launcher PID alone here: that races with bash and can
-            // clobber the triple that interrupt tests wait for. It then prints a
-            // line, so an agent that exits after launch only exits once the
-            // triple exists instead of racing a slow launcher start.
+            // Only nested bash writes the "$PPID $$ $child" triple; writing the launcher PID
+            // here would race it. The launcher's printed line keeps the agent alive until the
+            // triple exists.
             const detachedLauncher = NodeChildProcess.spawn(
               process.execPath,
               ["-e", launcher, "bash", "-c", detachedCommand, "bash", runningCommandPidPath],
@@ -2322,7 +2436,7 @@ const program = Effect.gen(function* () {
       }
 
       if (emitXAiPlanMdWrite) {
-        // Match Grok's real session layout so isGrokPlanMarkdownPath accepts it.
+        // isGrokPlanMarkdownPath requires Grok's session layout.
         const planRoot = process.env.T3_ACP_PLAN_ROOT ?? "/tmp/mock-home/.grok";
         const planPath = `${planRoot}/sessions/${requestedSessionId}/plan.md`;
         const planBody = "# Mock plan\n\n- Write the feature\n- Add a test\n- Ship it\n";

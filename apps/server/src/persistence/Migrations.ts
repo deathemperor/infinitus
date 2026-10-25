@@ -52,6 +52,7 @@ import Migration0047 from "./Migrations/047_ProjectionProjectIcon.ts";
 import Migration0048 from "./Migrations/048_ProjectionThreadBranchPullRequest.ts";
 import Migration0049 from "./Migrations/049_ProjectionThreadsActiveOrderKey.ts";
 import Migration0050 from "./Migrations/050_ProjectionThreadPullRequests.ts";
+<<<<<<< HEAD
 import Migration0051 from "./Migrations/051_ProjectionThreadQueuedTurns.ts";
 import Migration0052 from "./Migrations/052_ProjectionThreadsBabysit.ts";
 import Migration0053 from "./Migrations/053_ProjectionThreadsSideOf.ts";
@@ -80,6 +81,27 @@ import Migration0075 from "./Migrations/075_CodexUsageNativeTurnIndex.ts";
 import Migration0076 from "./Migrations/076_RepairClientSettlementTimestamps.ts";
 import Migration0077 from "./Migrations/077_WebhookDedupe.ts";
 import Migration0078 from "./Migrations/078_ShellStopRequestIndex.ts";
+=======
+import Migration0051 from "./Migrations/051_ProjectionThreadMessageContext.ts";
+import Migration0052 from "./Migrations/052_ProjectionThreadTitleState.ts";
+import Migration0053 from "./Migrations/053_PullRequestFilesViewed.ts";
+import Migration0054 from "./Migrations/054_ProjectionThreadsAutoSettleDisabledAt.ts";
+import Migration0055 from "./Migrations/055_OrchestrationV2.ts";
+import Migration0056 from "./Migrations/056_RemoveRedundantProjectionIndexes.ts";
+import Migration0057 from "./Migrations/057_ScheduledTaskWebhooks.ts";
+import Migration0058 from "./Migrations/058_WebhookRelayDeliveries.ts";
+import Migration0059 from "./Migrations/059_McpAppModelContext.ts";
+import Migration0060 from "./Migrations/060_ThreadSnapshotWindowIndexes.ts";
+import Migration0061 from "./Migrations/061_PullRequestReviewGuides.ts";
+import Migration0062 from "./Migrations/062_ThreadFailureLookupIndex.ts";
+import Migration0063 from "./Migrations/063_DropUnusedV1Projections.ts";
+import Migration0064 from "./Migrations/064_CanonicalizeThreadPullRequestLinks.ts";
+import Migration0065 from "./Migrations/065_CodexUsageNativeTurnIndex.ts";
+import Migration0066 from "./Migrations/066_RepairClientSettlementTimestamps.ts";
+import Migration0067 from "./Migrations/067_WebhookDedupe.ts";
+import Migration0068 from "./Migrations/068_ShellStopRequestIndex.ts";
+import Migration0069 from "./Migrations/069_ThreadMessageSearch.ts";
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -150,6 +172,7 @@ const migrationEntries = [
   // reconcileV2PreviewMigration (OrchestrationV2 released as 53 and 54 in its previews)
   // is not carried: no fork database ever recorded those, and 53 and 54 are taken here.
   // Preserve this migration's schema. Future V2 schema changes need new migrations.
+<<<<<<< HEAD
   [65, "OrchestrationV2", Migration0065],
   [66, "RemoveRedundantProjectionIndexes", Migration0066],
   [67, "ScheduledTaskWebhooks", Migration0067],
@@ -165,6 +188,23 @@ const migrationEntries = [
   [76, "RepairClientSettlementTimestamps", Migration0076],
   [77, "WebhookDedupe", Migration0077],
   [78, "ShellStopRequestIndex", Migration0078],
+=======
+  [55, "OrchestrationV2", Migration0055],
+  [56, "RemoveRedundantProjectionIndexes", Migration0056],
+  [57, "ScheduledTaskWebhooks", Migration0057],
+  [58, "WebhookRelayDeliveries", Migration0058],
+  [59, "McpAppModelContext", Migration0059],
+  [60, "ThreadSnapshotWindowIndexes", Migration0060],
+  [61, "PullRequestReviewGuides", Migration0061],
+  [62, "ThreadFailureLookupIndex", Migration0062],
+  [63, "DropUnusedV1Projections", Migration0063],
+  [64, "CanonicalizeThreadPullRequestLinks", Migration0064],
+  [65, "CodexUsageNativeTurnIndex", Migration0065],
+  [66, "RepairClientSettlementTimestamps", Migration0066],
+  [67, "WebhookDedupe", Migration0067],
+  [68, "ShellStopRequestIndex", Migration0068],
+  [69, "ThreadMessageSearch", Migration0069],
+>>>>>>> upstream-sync-5398be0d4-upstream-renamed
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -181,12 +221,7 @@ const makeMigrationLoader = (throughId?: number) =>
 // V2's schema migrations start at 55 upstream; the fork's own 51-64 push them to 65 (INFINITUS.md).
 const FIRST_V2_MIGRATION_ID = 65;
 
-/**
- * Fail before migrating when the migrator would skip one of V2's own
- * migrations. It skips every id up to the highest recorded one, whatever name
- * was recorded, so a database that took a V2 id for another migration would
- * start without V2's schema and fail on first use.
- */
+// Migrators skip ids up to the highest recorded; reject collisions that would skip V2 schema.
 const assertV2MigrationsCanRun = Effect.fn("assertV2MigrationsCanRun")(function* (
   throughId?: number,
 ) {

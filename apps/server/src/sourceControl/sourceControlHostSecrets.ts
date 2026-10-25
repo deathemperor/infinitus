@@ -1,26 +1,12 @@
 import { secretSettingsFields } from "@infinitus/contracts";
-import * as AzureDevOps from "@infinitus/source-control-azure-devops/client/definition";
-import * as Bitbucket from "@infinitus/source-control-bitbucket/client/definition";
-import type { SourceControlClientDefinition } from "@infinitus/source-control-core/client/definition";
-import * as Forgejo from "@infinitus/source-control-forgejo/client/definition";
-import * as GitCafe from "@infinitus/source-control-gitcafe/client/definition";
-import * as GitHub from "@infinitus/source-control-github/client/definition";
-import * as GitLab from "@infinitus/source-control-gitlab/client/definition";
 
-const definitions: ReadonlyArray<SourceControlClientDefinition> = [
-  GitHub.definition,
-  GitLab.definition,
-  AzureDevOps.definition,
-  Bitbucket.definition,
-  Forgejo.definition,
-  GitCafe.definition,
-];
+import { sourceControlDefinitions } from "./sourceControlDefinitions.ts";
 
 export const SOURCE_CONTROL_HOST_SECRET_FIELDS: ReadonlyMap<
   string,
   ReadonlyArray<string>
 > = new Map(
-  definitions.flatMap((definition) => {
+  sourceControlDefinitions.definitions.flatMap((definition) => {
     const fields = definition.settings ? secretSettingsFields(definition.settings) : [];
     return fields.length > 0 ? [[definition.kind, fields] as const] : [];
   }),
