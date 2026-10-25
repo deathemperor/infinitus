@@ -153,9 +153,7 @@ export class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCredit
 
 const isClaudeResetCreditError = Schema.is(ClaudeResetCreditError);
 
-/**
- * An unanswered or unconfirmed claim retries with the same request id.
- */
+/** Retry unanswered or unconfirmed claims with the same request ID. */
 export const isSettledClaudeResetCreditFailure = (error: unknown) =>
   isClaudeResetCreditError(error) &&
   error.reason !== "requestFailed" &&
@@ -368,11 +366,15 @@ const CLAIM_OUTCOMES = {
   ineligible: "noCredit",
 } as const satisfies Record<string, ProviderConsumeResetCreditOutcome>;
 
+<<<<<<< HEAD
 /**
  * Claims `grantId`. `requestId` is the idempotency key: a retry with the same
  * id is the same claim, which is why the coordinator keeps it until Claude
  * answers. Ids are checked before anything is sent.
  */
+=======
+/** requestId is the claim's idempotency key. */
+>>>>>>> upstream-sync-c79ef8c45-upstream-renamed
 export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(function* (input: {
   readonly login: ClaudeLoginLocation;
   readonly version: string;
@@ -426,8 +428,7 @@ export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(fu
   if (body.result === "cooldown") {
     return yield* new ClaudeResetCreditError({ reason: "coolingDown" });
   }
-  // Claude could not say whether the claim landed, so, like the CLI, keep the
-  // request id and let the retry ask about the same claim.
+  // Unknown outcomes retain the request ID so retries address the same claim.
   if (body.result === "unavailable") {
     return yield* new ClaudeResetCreditError({ reason: "unconfirmed" });
   }

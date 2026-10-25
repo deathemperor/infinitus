@@ -26,6 +26,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
 import * as ProjectStore from "./ProjectStore.ts";
+import { sourceControlDefinitions } from "../sourceControl/sourceControlDefinitions.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 
@@ -51,18 +52,6 @@ function latestMillis(values: ReadonlyArray<number | null>): number | null {
   return latest;
 }
 
-function canonicalRepositoryKey(key: string): string {
-  return key
-    .replace(
-      /^(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)\/v3\/([^/]+)\/([^/]+)\/([^/]+)$/u,
-      "dev.azure.com/$1/$2/_git/$3",
-    )
-    .replace(
-      /^([^.]+)\.visualstudio\.com\/(?:defaultcollection\/)?([^/]+)\/_git\/([^/]+)$/u,
-      "dev.azure.com/$1/$2/_git/$3",
-    );
-}
-
 function pullRequestMatchesProject(
   pullRequest: GitManager.GitBranchPullRequest,
   project: {
@@ -72,8 +61,8 @@ function pullRequestMatchesProject(
   return (
     pullRequest.repositoryKey !== null &&
     project.repositoryIdentity != null &&
-    canonicalRepositoryKey(pullRequest.repositoryKey) ===
-      canonicalRepositoryKey(project.repositoryIdentity.canonicalKey)
+    sourceControlDefinitions.canonicalRepositoryKey(pullRequest.repositoryKey) ===
+      sourceControlDefinitions.canonicalRepositoryKey(project.repositoryIdentity.canonicalKey)
   );
 }
 
@@ -89,12 +78,7 @@ function linkTerminalAtMs(link: SettlementPullRequestLink): number {
   return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
 }
 
-/**
- * The links whose outcome the thread waits on. A link made after its pull
- * request had already merged or closed records work the thread did, such as an
- * agent merging pull requests it was asked to merge, so it cannot settle the
- * thread.
- */
+/** Exclude links added after merge or close; they record completed work rather than outcomes this thread awaits. */
 function settlementPullRequestLinks(
   links: ReadonlyArray<SettlementPullRequestLink>,
 ): ReadonlyArray<SettlementPullRequestLink> {
@@ -105,10 +89,7 @@ function settlementPullRequestLinks(
   });
 }
 
-/**
- * Absolute age bounds client clock skew in both directions and stops stale
- * pre-adoption data from blocking the thread forever.
- */
+/** Absolute age bounds clock skew in both directions and expires stale pre-adoption data. */
 export function threadHasQueuedTurnStart(
   thread: Pick<
     OrchestrationV2ThreadShell,
@@ -163,6 +144,8 @@ export function isAutoSettlementCandidate(
   if (thread.archivedAt !== null || thread.settledOverride !== null) return false;
   if (thread.pinnedAt != null || thread.autoSettleDisabledAt != null) return false;
   if (thread.pendingRuntimeRequest !== null) return false;
+  // A guest is waiting on the owner; settling would hide the Request.
+  if ((thread.pendingGuestMessageCount ?? 0) > 0) return false;
   if (thread.activityRunStatus != null) return false;
   if (backgroundWorkHoldsCompletion(thread.pendingBackgroundTasks ?? [])) return false;
   if (threadHasQueuedTurnStart(thread, nowMs)) return false;
@@ -170,20 +153,24 @@ export function isAutoSettlementCandidate(
   return !isSnoozed(thread, nowMs);
 }
 
-/**
- * Server twin of the client's `effectiveSnoozed`, so agents and the sidebar agree on what is
- * snoozed.
- */
+/** Match client effectiveSnoozed so agents and sidebar agree. */
 export function isSnoozed(
   thread: Pick<
     ProjectionStore.ProjectionSettlementCandidate,
-    "snoozedUntil" | "snoozedAt" | "latestRunCompletedAt" | "status" | "pendingRuntimeRequest"
+    | "snoozedUntil"
+    | "snoozedAt"
+    | "latestRunCompletedAt"
+    | "status"
+    | "pendingRuntimeRequest"
+    | "pendingGuestMessageCount"
   >,
   nowMs: number,
 ): boolean {
   const snoozedUntilMs = toMillis(thread.snoozedUntil);
   if (snoozedUntilMs === null || snoozedUntilMs <= nowMs) return false;
   if (thread.pendingRuntimeRequest !== null) return false;
+  // Same as the client: a waiting guest message wakes the thread, and the snooze stays stored.
+  if ((thread.pendingGuestMessageCount ?? 0) > 0) return false;
   const snoozedAtMs = toMillis(thread.snoozedAt);
   const completedAtMs = toMillis(thread.latestRunCompletedAt);
   const wokeOnError =
@@ -203,8 +190,13 @@ export function resolveAutoSettlementAt(input: {
   const { thread } = input;
   let pullRequest = input.pullRequest;
   const links = settlementPullRequestLinks(thread.pullRequests ?? []);
-  if (links.some((link) => link.snapshot === null || link.snapshot.state === "open")) return null;
-  if (links.length > 0) {
+  if (links.some((link) => link.snapshot === null)) return null;
+  // An open link means the pull request has not finished, so only inactivity
+  // can settle the thread, never a merged or closed lookup.
+  const hasOpenLink = links.some((link) => link.snapshot?.state === "open");
+  if (hasOpenLink) {
+    pullRequest = null;
+  } else if (links.length > 0) {
     const latest = links.reduce((current, candidate) =>
       linkTerminalAtMs(candidate) > linkTerminalAtMs(current) ? candidate : current,
     );
@@ -229,7 +221,10 @@ export function resolveAutoSettlementAt(input: {
     return DateTime.makeUnsafe(activityAtMs);
   }
   const hasPullRequest =
-    pullRequest !== null || thread.linkedPullRequest != null || thread.branchPullRequest != null;
+    hasOpenLink ||
+    pullRequest !== null ||
+    thread.linkedPullRequest != null ||
+    thread.branchPullRequest != null;
   if (input.autoSettleKeepPullRequests === true && hasPullRequest) return null;
   if (input.autoSettleAfterDays === null) return null;
   const snoozedUntilMs = toMillis(thread.snoozedUntil);
@@ -301,8 +296,7 @@ export const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const terminals = yield* TerminalManager.TerminalManager;
   const projectScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
-  // Settling a settled thread re-emits thread.settled with the same settledAt,
-  // so this keeps the settle action to one run per settlement.
+  // Repeated thread.settled retains settledAt; run the action only once per settlement.
   const settleActionRunAt = new Map<ThreadId, number>();
 
   const sweep = Effect.fn("ThreadSettlementServiceV2.sweep")(function* (
@@ -318,10 +312,7 @@ export const make = Effect.gen(function* () {
     const projectShells = yield* projectStore.listShells();
     const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
     const projects = new Map(projectShells.map((project) => [project.id, project]));
-    // A merge event re-sweeps every candidate, not just the threads linked to
-    // the merged pull request: most threads carry no link and settle from
-    // their branch lookup, which would otherwise wait for the next minute's
-    // sweep on a possibly stale cached answer.
+    // Merge events resweep all candidates because unlinked threads settle through branch lookup.
     const candidates = threads.filter((thread) => isAutoSettlementCandidate(thread, nowMs));
 
     const settleThread = Effect.fn("ThreadSettlementServiceV2.settleThread")(
@@ -390,10 +381,7 @@ export const make = Effect.gen(function* () {
       { concurrency: 8, discard: true },
     );
     if (mergedPullRequest !== null) {
-      // The merge just confirmed a terminal state the lookup caches can still
-      // call open (branch answers live two minutes, the sweep runs every
-      // minute). Drop the swept checkouts' cached answers so the merge settles
-      // its branch threads now instead of on a later sweep.
+      // Invalidate checkout caches on merge; cached open branches would delay settlement beyond this sweep.
       const cwds = [...new Set(lookupCwdByThreadId.values())];
       yield* Effect.forEach(cwds, (cwd) => git.invalidateStatus(cwd), {
         concurrency: 8,
@@ -447,11 +435,7 @@ export const make = Effect.gen(function* () {
       const thread = group[0]!;
       const reference = thread.linkedPullRequest ?? thread.branchPullRequest;
       if (reference != null) {
-        // The event carries the merged state, so only the threads linked to
-        // that exact pull request settle from it. Every other linked thread
-        // falls through to a fresh summary lookup below: the merge sweep
-        // covers all candidates, and an unrelated merge must never settle
-        // them.
+        // Only matching PR links settle from this merge event; unrelated links require fresh lookup.
         const matchesMerge =
           mergedPullRequest !== null &&
           reference.projectId === mergedPullRequest.projectId &&
@@ -545,9 +529,7 @@ export const make = Effect.gen(function* () {
     runSweep(null, threadId),
   );
 
-  // Then the project's settle script runs in the thread's own worktree; a
-  // thread in the shared checkout skips it, because other threads may still be
-  // working there.
+  // Skip settle scripts in shared checkouts where other threads may still work.
   const cleanUpSettledThread = Effect.fn("ThreadSettlementServiceV2.cleanUpSettledThread")(
     function* (threadId: ThreadId) {
       const settled = yield* projections.getThread(threadId);
@@ -555,8 +537,7 @@ export const make = Effect.gen(function* () {
       yield* terminals.closeIdle({ threadId });
       const worktreePath = settled.worktreePath;
       if (worktreePath === null || !(yield* fileSystem.exists(worktreePath))) return;
-      // Closing and the worktree check wait on I/O. A thread re-engaged
-      // meanwhile is working again, so its worktree is no place for cleanup.
+      // Recheck after closing and worktree I/O; re-engaged threads must not be cleaned up.
       const thread = yield* projections.getThread(threadId);
       if (thread.settledOverride !== "settled") return;
       const settledAtMs = toMillis(thread.settledAt);

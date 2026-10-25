@@ -3,6 +3,7 @@ import type { RelayDeviceRegistrationRequest } from "@infinitus/contracts/relay"
 import type { Preferences } from "../../persistence/mobile-preferences";
 import { supportsAgentAwarenessPush } from "./capabilities";
 
+<<<<<<< HEAD
 // Development builds are Xcode-signed and receive sandbox APNs tokens;
 // preview and production builds are distribution-signed and use production
 // APNs. The relay routes each device's pushes accordingly.
@@ -14,6 +15,10 @@ export function resolveApsEnvironment(
   override?: unknown,
 ): "sandbox" | "production" {
   if (override === "sandbox" || override === "production") return override;
+=======
+// Development builds use sandbox APNs; distribution builds use production APNs.
+export function resolveApsEnvironment(appVariant: unknown): "sandbox" | "production" {
+>>>>>>> upstream-sync-c79ef8c45-upstream-renamed
   return appVariant === "development" ? "sandbox" : "production";
 }
 

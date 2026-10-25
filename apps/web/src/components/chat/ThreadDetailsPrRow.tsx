@@ -1,10 +1,14 @@
+import { resolvePullRequestDetailChecks } from "@infinitus/client-runtime/pull-request-checks";
+import {
+  capitalizeTerm,
+  sourceControlClients,
+} from "@infinitus/client-runtime/source-control-clients";
 import { PullRequestChangeBreakdownRows } from "../pullRequest/PullRequestChangeBreakdownStat";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { selectEnvironmentQueryData } from "@infinitus/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@infinitus/client-runtime/state/shell";
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@infinitus/contracts";
-import { sourceControlRepositorySelector } from "@infinitus/shared/sourceControl";
 import {
   ArrowUpRightIcon,
   EyeIcon,
@@ -32,7 +36,6 @@ import {
   buildFixFindingsHandoff,
   buildResolveConflictsPrompt,
   classifyPullRequestChecks,
-  resolvePullRequestDetailChecks,
   describePullRequestChecks,
   isPullRequestConflicting,
   resolvePullRequestMergeMethod,
@@ -74,7 +77,7 @@ import {
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
 } from "./threadDetailsPanelStyles";
 
-// A server without checks for this pull request answers null; polling it again finds nothing new.
+// A null checks response is settled; polling cannot find checks.
 const isSettledWithoutChecks = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
   result._tag === "Success" && result.value === null;
 
@@ -106,7 +109,7 @@ export function ThreadDetailsPrRow({
   const serverConfigs = useServerConfigs();
   const supportsPullRequests =
     serverConfigs.get(environmentId)?.environment.capabilities.pullRequests === true;
-  const repository = sourceControlRepositorySelector(project?.repositoryIdentity);
+  const repository = sourceControlClients.repositorySelector(project?.repositoryIdentity);
   const reference: PullRequestRef | null =
     supportsPullRequests && project !== null
       ? linkedReference
@@ -122,8 +125,7 @@ export function ThreadDetailsPrRow({
           environmentId,
           input: { ...reference, allowStale: false },
         });
-  // Read the queries part by part: every poll publishes a new result (a new
-  // timestamp, `waiting` on and off) even when nothing in it changed.
+  // Select query parts because polling rebuilds unchanged results.
   const detailData = useEnvironmentQuerySelector(detailAtom, selectEnvironmentQueryData);
   const detailQuery = useEnvironmentQueryRefresh(detailAtom);
   const supportsChecks =
@@ -137,6 +139,9 @@ export function ThreadDetailsPrRow({
   const checksQuery = useEnvironmentQueryRefresh(checksAtom);
   const checksAreNewer = useEnvironmentQueryIsNewer(checksAtom, detailAtom);
   const detail = resolvePullRequestDetailChecks(detailData, checksData, checksAreNewer);
+  const terminology = sourceControlClients.get(
+    detail?.provider ?? project?.repositoryIdentity?.provider,
+  ).changeRequest;
   const open = reference !== null && (detail?.state ?? pr?.state) === "open";
   const refreshKey = `${environmentId}:${project?.id}:${reference?.host}:${reference?.repository}:${number}`;
   useLiveRefresh(
@@ -157,6 +162,7 @@ export function ThreadDetailsPrRow({
   const { actionPending, perform } = usePullRequestActionRunner({
     environmentId,
     reference,
+    terminology,
     onSuccess: () => {
       detailQuery.refresh();
       checksQuery.refresh();
@@ -238,7 +244,9 @@ export function ThreadDetailsPrRow({
 
   const rowTooltip =
     detail === null || statePresentation === null ? (
-      <TooltipPopup side="top">{status?.tooltip ?? `Pull request #${number}`}</TooltipPopup>
+      <TooltipPopup side="top">
+        {status?.tooltip ?? `${capitalizeTerm(terminology.singular)} #${number}`}
+      </TooltipPopup>
     ) : (
       <TooltipPopup
         side="top"
@@ -328,7 +336,7 @@ export function ThreadDetailsPrRow({
             pending: actionPending,
             destructive: false,
             suffix: null,
-            tooltip: "Mark this pull request as ready for review",
+            tooltip: `Mark this ${terminology.singular} as ready for review`,
             onClick: () => void perform("ready"),
           }
         : rowAction === "fix"
@@ -348,7 +356,7 @@ export function ThreadDetailsPrRow({
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: `Merge this pull request (${selectedMergeMethod})`,
+                tooltip: `Merge this ${terminology.singular} (${selectedMergeMethod})`,
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -421,7 +429,7 @@ export function ThreadDetailsPrRow({
       {detail !== null && (showChecks || trailingAction !== null || watching) ? (
         <div className="pb-2">
           {openRow(detail.title, "row")}
-          <div className="-mt-1 flex h-6 min-w-0 items-center gap-0.5 ps-9 pe-1 text-xs text-muted-foreground">
+          <div className="flex h-6 min-w-0 items-center gap-0.5 ps-9 pe-1 text-xs text-muted-foreground">
             <span className="me-1 shrink-0 tabular-nums">#{number}</span>
             {showChecks && checksRollup !== null ? (
               <PullRequestChecksPopover
@@ -469,7 +477,7 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>Merge pull request?</AlertDialogTitle>
+              <AlertDialogTitle>Merge {terminology.singular}?</AlertDialogTitle>
               <AlertDialogDescription>
                 This merges #{number} using {selectedMergeMethod}.
               </AlertDialogDescription>

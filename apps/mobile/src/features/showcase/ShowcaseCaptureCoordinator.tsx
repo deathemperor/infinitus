@@ -33,6 +33,8 @@ import {
   subscribeToShowcaseRenderSignal,
 } from "./showcaseRenderSignal";
 import { stageShowcaseAgentActivity } from "./stageShowcaseAgentActivity";
+import { openSettings } from "../settings/settings-navigation";
+import { selectWorkspaceDetail } from "../workspace/workspace-detail-selection";
 
 const SHOWCASE_ENABLED = process.env.EXPO_PUBLIC_SHOWCASE === "1";
 const SHOWCASE_THREAD_ID = "remote-command-center";
@@ -89,8 +91,7 @@ function EnabledShowcaseCaptureCoordinator(props: { readonly pathname: string })
   const [orientationSettled, setOrientationSettled] = useState(false);
   const [agentActivityStaged, setAgentActivityStaged] = useState(false);
   const requestedSceneRef = useRef<ShowcaseScene | null>(null);
-  // Staging reads the latest entities without restarting on every shell
-  // update, which would re-enter a permission prompt that is still open.
+  // Read current entities without restarting on shell updates and re-entering open permission prompts.
   const entitiesRef = useRef({ threads, projects });
   useEffect(() => {
     entitiesRef.current = { threads, projects };
@@ -141,8 +142,7 @@ function EnabledShowcaseCaptureCoordinator(props: { readonly pathname: string })
       const value = getNativeShowcaseScene();
       if (!value || requestedSceneRef.current === value) return;
       requestedSceneRef.current = value;
-      // A native draw belongs only to the scene request that produced it. In
-      // particular, revisiting review must wait for its newly mounted surface.
+      // Draws belong to their scene request; revisiting review must wait for its new surface.
       clearShowcaseRenderSignal();
       setAgentActivityStaged(false);
       setRequestedScene(value);
@@ -243,12 +243,7 @@ function EnabledShowcaseCaptureCoordinator(props: { readonly pathname: string })
       return;
     }
     if (requestedScene === "environments") {
-      navigation.dispatch(
-        CommonActions.navigate("SettingsSheet", {
-          screen: "SettingsContent",
-          params: { screen: "SettingsEnvironments" },
-        }),
-      );
+      openSettings(navigation, "SettingsEnvironments");
     } else if (requestedScene === "terminal") {
       navigation.dispatch(
         CommonActions.navigate("ThreadTerminal", { ...params, terminalId: "term-1" }),
@@ -256,7 +251,7 @@ function EnabledShowcaseCaptureCoordinator(props: { readonly pathname: string })
     } else if (requestedScene === "review") {
       navigation.dispatch(CommonActions.navigate("ThreadReview", params));
     } else {
-      navigation.dispatch(CommonActions.navigate("Thread", params));
+      navigation.dispatch(selectWorkspaceDetail({ name: "Thread", params }));
     }
   }, [hasFixture, navigation, requestedScene, scene, showcaseThread]);
 

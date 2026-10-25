@@ -214,6 +214,8 @@ export function useComposerCommandMenu({
   readonly onUsageLimits?: () => void;
 }) {
   const [selection, setSelection] = useState(() => composerSelectionAtEnd(draftMessage));
+  // Thread mentions rank by recency as of when the composer mounted.
+  const [now] = useState(() => Date.now());
   const previousOwnerKeyRef = useRef(ownerKey);
   const onSelectionChange = (nextSelection: ComposerEditorSelection) => {
     setSelection(nextSelection);
@@ -253,8 +255,7 @@ export function useComposerCommandMenu({
     selectedProviderStatus,
     projectCwd,
   );
-  // The last scan this composer asked for. A request inside the TTL is not
-  // repeated, so a client clock ahead of the server's cannot loop rescans.
+  // Record client request time to enforce TTL even when the client clock runs ahead of the server.
   const workspaceRefreshKeyRef = useRef<{ key: string; requestedAt: number } | null>(null);
   const [workspaceRefreshRetry, setWorkspaceRefreshRetry] = useState<{
     key: string;
@@ -510,6 +511,7 @@ export function useComposerCommandMenu({
             environmentId,
             excludeThreadId: currentThreadId,
             query: trigger.query,
+            now,
           })
         : [];
       return [

@@ -32,8 +32,7 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
  */
 const MAX_THEME_FILE_BYTES = 256 * 1024;
 
-/** Highlighting rebuilds the whole markup on every keystroke, so oversized
- *  pastes fall back to plain text instead of freezing the editor. */
+/** Highlighting rebuilds markup per keystroke; fall back to plain text for oversized pastes. */
 const MAX_HIGHLIGHTED_JSON_LENGTH = 20_000;
 
 function formatByteSize(bytes: number): string {
@@ -171,7 +170,6 @@ export function ThemeImportDialog({
       setConflicts(null);
     }
   }
-  // Opening or closing drops any read still in flight.
   useEffect(() => {
     if (!open) return;
     importRequestRef.current += 1;

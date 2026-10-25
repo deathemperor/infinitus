@@ -152,6 +152,7 @@ fi
 channel="${T3CODE_CHANNEL:-stable}"
 version="${T3CODE_VERSION:-}"
 if [ -z "$version" ]; then
+<<<<<<< HEAD
   # Tags are v<semver>; the channel is the prerelease identifier, or none for
   # stable. Only tags of the requested train are considered, so a stable
   # install can never pick up a nightly or preview build by accident.
@@ -160,6 +161,8 @@ if [ -z "$version" ]; then
   # its nightly is the rolling `nightly` tag and ships no server archive, and
   # it cuts no previews. So only stable resolves, and a versioned tag counts
   # unless it carries a nightly or preview suffix.
+=======
+>>>>>>> upstream-sync-c79ef8c45-upstream-renamed
   case "$channel" in
     stable) ;;
     nightly | preview) fail "Infinitus publishes no ${channel} server archive; leave T3CODE_CHANNEL unset, or set T3CODE_VERSION to pin a release" ;;
