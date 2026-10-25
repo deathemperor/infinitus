@@ -240,6 +240,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-diff-deletion-foreground: var(--diff-deletion-foreground);
   --color-info-foreground: var(--info-foreground);
   --color-info: var(--info);
+  --color-guest: var(--guest);
+  --color-guest-foreground: var(--guest-foreground);
+  --color-guest-surface: var(--guest-surface);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-ring: var(--ring);
   --color-input: var(--contrast-input);
@@ -1132,6 +1135,10 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --destructive-foreground: var(--error-foreground);
   --info: var(--color-blue-500);
   --info-foreground: var(--color-blue-700);
+  /* Messages from a guest link, and the sidebar Request status. */
+  --guest: var(--color-fuchsia-500);
+  --guest-foreground: var(--color-fuchsia-600);
+  --guest-surface: color-mix(in srgb, var(--guest) 14%, var(--message-surface));
   --success: var(--color-emerald-500);
   --success-foreground: var(--color-emerald-700);
   --warning: var(--color-amber-500);
@@ -1183,6 +1190,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --border: --alpha(var(--color-white) / 6%);
     --input: --alpha(var(--color-white) / 8%);
     --info-foreground: var(--color-blue-400);
+    --guest-foreground: var(--color-fuchsia-300);
     --success-foreground: var(--color-emerald-400);
     --warning-foreground: var(--color-amber-400);
     --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
@@ -1713,7 +1721,7 @@ code {
    inherited sizes on unrelated pre surfaces (terminal previews, approvals).
    Inline code stays relative to its sentence so it never towers over prose;
    diffs and file previews take the size through --diffs-font-size. */
-.chat-markdown .chat-markdown-shiki .shiki,
+.chat-markdown .chat-markdown-shiki :is(.shiki, .diffs),
 .chat-markdown .chat-markdown-codeblock pre,
 :is(.chat-markdown, .composer-tiptap) pre code {
   font-size: var(--font-size-code, inherit);
@@ -1980,16 +1988,13 @@ code {
 }
 
 :is(.chat-markdown, .composer-tiptap) blockquote {
-  border-inline-start: 2px solid var(--contrast-border);
+  border-inline-start: 2px solid color-mix(in srgb, currentcolor 35%, transparent);
   padding-inline-start: 0.8rem;
-  color: var(--contrast-muted-foreground);
+  color: inherit;
 }
 
-/* A quote in the composer is text the user is still writing; muting it reads
-   as disabled in an input, so the border alone carries the quote. */
 .composer-tiptap blockquote {
   margin: 0.65rem 0;
-  color: var(--foreground);
 }
 
 /* Preflight already draws the 1px rule, as it does in chat; only the block
@@ -2095,7 +2100,7 @@ code {
   overflow-wrap: anywhere;
 }
 
-:is(.chat-markdown, .composer-tiptap) .chat-markdown-shiki .shiki {
+:is(.chat-markdown, .composer-tiptap) .chat-markdown-shiki :is(.shiki, .diffs) {
   background: transparent !important;
 }
 

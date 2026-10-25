@@ -118,12 +118,14 @@ open.
 
 ### Fold working threads (beta)
 
-Turn on **Settings → General → Working section (beta)** on web and desktop, or **Settings →
+Turn on **Settings → Beta → Working section** on web and desktop, or **Settings →
 Thread behavior → Working section** on iOS and Android, to move threads that are working or
-monitoring into a collapsed **Working** section below the active list. A thread returns to the top
-of the active list when it finishes, fails, or needs an approval or answer. The Working section
-lists the thread you last sent work to first. Pinned threads stay in the pinned section. Each
-device keeps its own choice.
+waiting on work they will resume from into a collapsed **Working** section below the active list.
+That includes subagents, watched pull requests, and background commands or monitors the agent
+says it is waiting on. A dev server or other process an agent leaves running does not keep a thread
+there. A thread returns to the top of the active list when it finishes, fails, or needs an approval or
+answer. The Working section lists the thread you last sent work to first. Pinned threads stay in
+the pinned section. Each device keeps its own choice.
 
 While this is on, the active list is ordered by when each thread last came back to you, so you
 cannot drag or move threads within it. Your saved order returns when you turn it off.
@@ -153,8 +155,8 @@ Press `Escape` while dragging to cancel.
 By default, environments settle inactive threads after three days and settle
 threads whose pull request merged. A closed pull request can also settle an idle
 thread. An empty thread's inactivity counts from when it was created.
-Work in progress, pending questions or approvals, and live background work
-prevent automatic settlement. An open pull request does not prevent inactivity
+Work in progress, pending questions or approvals, and background work the agent
+is waiting on prevent automatic settlement. An open pull request does not prevent inactivity
 settlement unless you turn on **Keep threads with a PR** in **Settings → General**,
 but an old closed or merged pull request does not settle work you
 resumed after it closed. Only your own messages count as resuming. A turn that
@@ -187,8 +189,15 @@ The linked pull request participates in automatic settlement.
 ## Find and reference work
 
 On web and desktop, open the command palette with `Cmd/Ctrl+K` to search threads
-across connected environments. Message search starts after two characters and
-includes your messages and final agent responses.
+across connected environments by title, branch, pull request, or project.
+Threads you open often or recently rank higher, and for three weeks the thread
+you last picked for a query ranks higher when you type that query again.
+Threads whose messages contain all your words appear below, under **In
+messages**, and open at the matching message. Message search needs at least
+one word of three or more letters, or two for Chinese, Japanese, and Korean.
+On mobile, the thread list search also lists message matches and opens them at
+the matching message; on an iPad with a keyboard, `Cmd+K` opens the same
+palette.
 
 Use **Settings → Keybindings** to find or customize shortcuts for searching files
 and copying a thread reference. A copied reference uses the thread's pull request

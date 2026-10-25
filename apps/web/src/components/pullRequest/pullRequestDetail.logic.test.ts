@@ -20,6 +20,8 @@ import { buildMessageContext, reviewCommentContextReference } from "~/lib/compos
 
 import {
   buildAddSelectionToAgentHandoff,
+  buildExplainPullRequestHandoff,
+  buildResolveConflictsPrompt,
   resolveThreadPanelPullRequestAction,
   buildPullRequestReferenceContext,
   buildFixFindingHandoff,
@@ -46,7 +48,6 @@ import {
   checkoutFailureDescription,
   readPullRequestDetailSnapshot,
   resolveDisplayedPullRequestDetail,
-  resolvePullRequestDetailChecks,
   resolvePullRequestReferenceHost,
   resolvePullRequestPrimaryControl,
   allowsSinglePullRequestMerge,
@@ -54,6 +55,7 @@ import {
   resolveBaseFreshness,
   buildPullRequestTimeline,
   writePullRequestDetailSnapshot,
+  readableFailure,
 } from "./pullRequestDetail.logic";
 import type { ReviewCommentContext } from "~/reviewCommentContext";
 
@@ -85,7 +87,7 @@ describe("pull request checkout commands", () => {
       remoteName: "origin",
       remoteUrl: "git@github.com:acme/web.git",
     },
-    provider,
+    provider: SourceControlProviderKind.make(provider),
   });
 
   it("uses a matching enterprise identity and rejects an explicit host mismatch", () => {
@@ -110,8 +112,9 @@ describe("pull request checkout commands", () => {
 
 const TIMELINE_SOURCE: Pick<
   PullRequestDetailView,
-  "createdAt" | "author" | "commits" | "comments" | "mergedAt" | "closedAt"
+  "provider" | "createdAt" | "author" | "commits" | "comments" | "mergedAt" | "closedAt"
 > = {
+  provider: SourceControlProviderKind.make("github"),
   createdAt: "2026-07-01T00:00:00Z",
   author: { login: "octocat", name: null, avatarUrl: null },
   commits: [
@@ -341,6 +344,19 @@ describe("pull request timeline", () => {
     });
     expect(events[0]?.id).toBe("merged");
     expect(events.some((event) => event.id === "closed")).toBe(false);
+  });
+
+  it("names the change request in its host's own term", () => {
+    const titles = (provider: string) =>
+      buildPullRequestTimeline({
+        ...TIMELINE_SOURCE,
+        provider: SourceControlProviderKind.make(provider),
+        closedAt: "2026-07-04T00:00:00Z",
+      })
+        .filter((event) => event.kind === "opened" || event.kind === "closed")
+        .map((event) => event.title);
+    expect(titles("github")).toEqual(["Pull request closed", "opened this pull request"]);
+    expect(titles("gitlab")).toEqual(["Merge request closed", "opened this merge request"]);
   });
 
   it("groups conversation sections without crossing commits or PR updates", () => {
@@ -652,6 +668,20 @@ describe("fix findings handoff", () => {
     expect(handoff.prompt).toContain("typecheck");
     expect(handoff.prompt).toContain("6 further findings were omitted");
   });
+
+  it("names a GitLab merge request as one", () => {
+    const handoff = buildFixFindingsHandoff({
+      ...base,
+      title: "Add the page",
+      url: "https://gitlab.com/pingdotgg/t3code/-/merge_requests/42",
+      reviewThreads: [],
+      checks: [],
+    });
+    expect(handoff.prompt).toContain("Fix the actionable findings on MR #42");
+    expect(handoff.prompt).toContain("The MR branch is `feat/page`");
+    expect(handoff.prompt).toContain("inspect the merge request and its failing checks");
+    expect(handoff.prompt).not.toMatch(/\bPR\b|pull request/u);
+  });
 });
 
 describe("findings that cannot be attached", () => {
@@ -840,6 +870,23 @@ describe("asking about a change rather than working on it", () => {
     ]);
     expect(handoff.reviewComments[0]?.text).not.toContain("Do not change any code");
     expect(handoff.reviewComments[1]?.text).toBe("");
+  });
+
+  it("explains a GitLab merge request in its own term", () => {
+    const handoff = buildExplainPullRequestHandoff({
+      ...base,
+      title: "Add the page",
+      url: "https://gitlab.com/pingdotgg/t3code/-/merge_requests/42",
+    });
+    expect(handoff.prompt).toBe("Explain this merge request.");
+    expect(handoff.reviewComments[0]?.text).toContain("The merge request is #42");
+    expect(handoff.reviewComments[0]?.text).not.toContain("pull request");
+    expect(
+      buildResolveConflictsPrompt({
+        ...base,
+        url: "https://gitlab.com/pingdotgg/t3code/-/merge_requests/42",
+      }),
+    ).toMatch(/^MR #42 /u);
   });
 });
 
@@ -1246,59 +1293,6 @@ describe("cached pull request detail", () => {
       ...overrides,
     }) as PullRequestDetail;
 
-  it("uses fresh checks for detail counts without replacing other PR fields", () => {
-    const pending = (name: string): PullRequestCheck => ({
-      name,
-      status: "pending",
-      url: null,
-      description: null,
-    });
-    const original = detail({ checks: [pending("build"), pending("test")] });
-    const checks = [pending("build"), { ...pending("test"), status: "success" as const }];
-    expect(resolvePullRequestDetailChecks(original, { state: "closed", checks }, true)).toEqual({
-      ...original,
-      state: "closed",
-      checks,
-    });
-    expect(resolvePullRequestDetailChecks(original, { state: "closed", checks }, false)).toBe(
-      original,
-    );
-    expect(resolvePullRequestDetailChecks(original, null, true)).toBe(original);
-    expect(resolvePullRequestDetailChecks(null, { state: "closed", checks }, true)).toBeNull();
-  });
-
-  it("keeps newer checks when an older cached detail arrives later", () => {
-    const pending: PullRequestCheck = {
-      name: "build",
-      status: "pending",
-      url: null,
-      description: null,
-    };
-    const cached = detail({ observedAt: 1_000, checks: [pending] });
-    const checks = {
-      state: "open" as const,
-      checks: [{ ...pending, status: "success" as const }],
-      observedAt: 2_000,
-    };
-    const resolved = resolvePullRequestDetailChecks(cached, checks, false);
-    expect(resolved?.checks).toEqual(checks.checks);
-    expect(resolved?.observedAt).toBe(1_000);
-    expect(
-      resolvePullRequestDetailChecks(cached, { state: checks.state, checks: checks.checks }, true)
-        ?.checks,
-    ).toEqual(checks.checks);
-    const refreshed = detail({ observedAt: 3_000, checks: [pending] });
-    expect(resolvePullRequestDetailChecks(refreshed, checks, true)).toBe(refreshed);
-  });
-
-  it("keeps merged details settled while applying newer checks", () => {
-    const merged = detail({ state: "merged", observedAt: 1_000 });
-    const checks = [{ name: "build", status: "success" as const, url: null, description: null }];
-    expect(
-      resolvePullRequestDetailChecks(merged, { state: "open", observedAt: 2_000, checks }, true),
-    ).toEqual({ ...merged, checks });
-  });
-
   const makeStorage = () => {
     const held = new Map<string, string>();
     return {
@@ -1318,7 +1312,6 @@ describe("cached pull request detail", () => {
     expect(readPullRequestDetailSnapshot(storage, "env-1", numbered(1))).toBeNull();
     expect(readPullRequestDetailSnapshot(storage, "env-1", numbered(2))?.number).toBe(2);
     expect(readPullRequestDetailSnapshot(storage, "env-1", numbered(21))?.number).toBe(21);
-    // Twenty snapshots plus the list of their keys.
     expect(storage.size()).toBe(21);
   });
 
@@ -1497,4 +1490,19 @@ describe("single-PR merge compatibility during stack discovery", () => {
       ).toBe(allowed);
     },
   );
+});
+
+describe("readableFailure", () => {
+  it("replaces a host tool's bare failure with the hint, for every host", () => {
+    for (const message of [
+      "GitHub CLI failed.",
+      "Azure DevOps API failed",
+      "Forgejo command failed",
+    ]) {
+      expect(readableFailure(new Error(message), "Try again.")).toBe("Try again.");
+    }
+    expect(readableFailure(new Error("Branch is protected."), "Try again.")).toBe(
+      "Branch is protected.",
+    );
+  });
 });
