@@ -385,7 +385,9 @@ export default defineConfig(() => {
               },
               {
                 name: "icons",
-                test: /\/(?:components\/chat\/PierreEntryIcon\.tsx|pierre-icons\.ts|mediaPreview\.ts)$/,
+                // mediaPreview's shared imports ride along: left in the shared chunk that imports
+                // mediaPreview, they close a cycle and the icon table reads them undefined at boot.
+                test: /\/(?:components\/chat\/PierreEntryIcon\.tsx|pierre-icons\.ts|mediaPreview\.ts|shared\/src\/(?:video|image)\.ts)$/,
                 includeDependenciesRecursively: false,
               },
             ],
