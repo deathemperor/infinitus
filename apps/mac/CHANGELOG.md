@@ -10,6 +10,16 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.40
+
+### Desktop
+- From upstream — previews for Office files, PDFs, fonts, Mermaid, archives, SQLite, notebooks and EPUBs, inline audio, Settings and Usage as large windows over your thread, and the sidebar's Working section on by default.
+- Agents get leaner instructions and can link pull requests they open from the shell, and PDFs reach Claude as documents.
+- The Infinitus Connect sign-in page shows the product name instead of a literal placeholder.
+
+### Phone
+- From upstream — inline audio, shared files open in the viewer, a resizable iOS inspector, and an "Ask anything" composer.
+
 ## 0.5.0-alpha.39
 
 ### Mac
