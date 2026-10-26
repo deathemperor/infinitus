@@ -122,6 +122,7 @@ describe("searchSettings", () => {
       "auto-settle-inactive-threads",
       "auto-settle-merged-threads",
       "days-before-auto-settle",
+<<<<<<< HEAD
       "sidebar-project-icon-colors",
       "infinitus-preferences",
       "infinitus-themes",
@@ -131,6 +132,8 @@ describe("searchSettings", () => {
       "infinitus-push",
       "infinitus-devices",
       "infinitus-engines",
+=======
+>>>>>>> upstream-sync-433837752-upstream-renamed
     ]);
     expect(available.map((item) => item.id).filter((id) => gatedIds.has(id))).toEqual([]);
   });

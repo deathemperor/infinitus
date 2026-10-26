@@ -4017,8 +4017,9 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         },
       );
       return run.pipe(
-        Effect.flatMap((result) =>
-          result.exitCode !== 0 && isRefLockFailure(result.stderr) ? run : Effect.succeed(result),
+        Effect.filterOrElse(
+          (result) => !(result.exitCode !== 0 && isRefLockFailure(result.stderr)),
+          (_result) => run,
         ),
       );
     };
