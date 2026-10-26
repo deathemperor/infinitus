@@ -100,8 +100,12 @@ const layerHttpPlatformNotSupported = Layer.succeed(HttpPlatform.HttpPlatform, {
     algorithms: new Set<HttpPlatform.CompressionAlgorithm>(),
     compressResponse: (response) => Effect.succeed(response),
   },
-  fileResponse: () => Effect.die("Relay API does not serve filesystem responses"),
-  fileWebResponse: () => Effect.die("Relay API does not serve file responses"),
+  fileResponse: Effect.fn("HttpPlatform.fileResponse")(function () {
+    return Effect.die("Relay API does not serve filesystem responses");
+  }),
+  fileWebResponse: Effect.fn("HttpPlatform.fileWebResponse")(function () {
+    return Effect.die("Relay API does not serve file responses");
+  }),
 });
 
 const layerRelayApi = Layer.mergeAll(
@@ -256,12 +260,21 @@ export const layer = Api.make(
           ),
         );
     const layerHookInbox = Layer.succeed(HookInbox.HookInbox, {
-      hold: ({ endpointKey, baseUrl, hook }) =>
-        hookInboxes.getByName(endpointKey).hold(hook, baseUrl).pipe(inboxCall("hold", endpointKey)),
-      wake: ({ endpointKey, baseUrl }) =>
-        hookInboxes.getByName(endpointKey).wake(baseUrl).pipe(inboxCall("wake", endpointKey)),
-      clear: ({ endpointKey }) =>
-        hookInboxes.getByName(endpointKey).clear().pipe(inboxCall("clear", endpointKey)),
+      hold: Effect.fn("HookInbox.hold")(function ({ endpointKey, baseUrl, hook }) {
+        return hookInboxes
+          .getByName(endpointKey)
+          .hold(hook, baseUrl)
+          .pipe(inboxCall("hold", endpointKey));
+      }),
+      wake: Effect.fn("HookInbox.wake")(function ({ endpointKey, baseUrl }) {
+        return hookInboxes
+          .getByName(endpointKey)
+          .wake(baseUrl)
+          .pipe(inboxCall("wake", endpointKey));
+      }),
+      clear: Effect.fn("HookInbox.clear")(function ({ endpointKey }) {
+        return hookInboxes.getByName(endpointKey).clear().pipe(inboxCall("clear", endpointKey));
+      }),
     });
 
     // Fork (#1375): the alert publisher sends to the FCM queue itself, so it
@@ -310,7 +323,20 @@ export const layer = Api.make(
       Layer.provideMerge(ApnsDeliveries.layer),
       Layer.provideMerge(
         FcmDeliveries.layer.pipe(
+<<<<<<< HEAD
           Layer.provide(fcmDeliveryQueueSenderLayer),
+=======
+          Layer.provide(
+            Layer.succeed(FcmDeliveryQueueSender.FcmDeliveryQueueSender, {
+              send: Effect.fn("FcmDeliveryQueueSender.send")(
+                function* (body) {
+                  return yield* fcmDeliveryQueueSender.send(body);
+                },
+                Effect.provideService(Alchemy.RuntimeContext, alchemyRuntimeContext),
+              ),
+            }),
+          ),
+>>>>>>> upstream-sync-cc0b86ddf-upstream-renamed
           Layer.provideMerge(
             FcmClient.layer.pipe(
               Layer.provide(FcmAssertionSigner.layer),

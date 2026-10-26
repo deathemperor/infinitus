@@ -1,4 +1,3 @@
-import { PermissionUpdateNotice } from "../components/PermissionUpdateNotice";
 import { type ServerLifecycleWelcomePayload } from "@infinitus/contracts";
 import { scopedProjectKey, scopeProjectRef } from "@infinitus/client-runtime/environment";
 import {
@@ -31,19 +30,13 @@ import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAp
 import { InfinitusRootMounts } from "../components/InfinitusRootMounts";
 import { DesktopWebLinkCoordinator } from "../components/desktop/DesktopWebLinkCoordinator";
 import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
-import { DesktopUpdateLaunchNotice } from "../components/sidebar/updateEverythingRun";
-import { LegacyThreadMigrationToast } from "../components/LegacyThreadMigrationToast";
-import { ThreadNotificationCoordinator } from "../components/ThreadNotificationCoordinator";
 import { ReopenClosedViewShortcut } from "../components/ReopenClosedViewShortcut";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { PullRequestGuideRunCoordinator } from "../components/pullRequest/guide/PullRequestGuideRunCoordinator";
-import { HostFreezeToastCoordinator } from "../components/HostFreezeToastCoordinator";
 import { SlowRpcRequestToastCoordinator } from "../components/SlowRpcRequestToastCoordinator";
 import { ChatGptWelcomeCoordinator } from "../components/settings/ChatGptWelcomeCoordinator";
-import { ProviderAuthCallbackCoordinator } from "../components/settings/ProviderAuthCallbackCoordinator";
 import { ThemeEditorHost } from "../components/settings/ThemeEditorHost";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
-import { useDefaultThemeAdoption } from "../hooks/useDefaultTheme";
 import { useEnvironmentThemeSync } from "../hooks/useEnvironmentTheme";
 import { Button } from "../components/ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
@@ -152,6 +145,18 @@ function RootRouteNotFoundView() {
 }
 
 function RootRouteView() {
+  // Above every branch: app services raise toasts for the whole page, so the surface they write to
+  // must not unmount when the root switches branches (for example /welcome to the app shell).
+  return (
+    <ToastProvider>
+      <AnchoredToastProvider>
+        <RootRouteBranch />
+      </AnchoredToastProvider>
+    </ToastProvider>
+  );
+}
+
+function RootRouteBranch() {
   useEffect(() => installDesktopPasteAsText(window.desktopBridge, window), []);
   const pathname = useLocation({ select: (location) => location.pathname });
   const { authGateState } = Route.useRouteContext();
@@ -186,20 +191,17 @@ function RootRouteView() {
 
   if (pathname === "/welcome") {
     return (
-      <ToastProvider>
-        <AnchoredToastProvider>
-          <BrowserChromeThemeSync key={pathname} />
-          <EnvironmentThemeSync />
-          <ProviderAuthCallbackCoordinator />
-          <CustomSnoozeDialogHost />
-          <GuestShareDialogHost />
-          <CommandPalette>
-            <AppSidebarLayout>
-              <Outlet />
-            </AppSidebarLayout>
-          </CommandPalette>
-        </AnchoredToastProvider>
-      </ToastProvider>
+      <>
+        <BrowserChromeThemeSync key={pathname} />
+        <EnvironmentThemeSync />
+        <CustomSnoozeDialogHost />
+        <GuestShareDialogHost />
+        <CommandPalette>
+          <AppSidebarLayout>
+            <Outlet />
+          </AppSidebarLayout>
+        </CommandPalette>
+      </>
     );
   }
 
@@ -221,6 +223,7 @@ function RootRouteView() {
   );
 
   return (
+<<<<<<< HEAD
     <ToastProvider>
       <AnchoredToastProvider>
         <BrowserChromeThemeSync key={pathname} />
@@ -263,13 +266,46 @@ function RootRouteView() {
         </FirstRunGate>
       </AnchoredToastProvider>
     </ToastProvider>
+=======
+    <>
+      <BrowserChromeThemeSync key={pathname} />
+      <EnvironmentThemeSync />
+      <ChatGptWelcomeCoordinator />
+      <FirstRunGate
+        enabled={primaryEnvironmentAuthenticated}
+        hostedStatic={authGateState.status === "hosted-static"}
+      >
+        {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
+        {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
+        {primaryEnvironmentAuthenticated ? <DesktopWebLinkCoordinator /> : null}
+        {isElectron ? <RunningThreadKeepAlive /> : null}
+        <RelayClientInstallDialog />
+        <ConnectOnboardingDialog />
+        <SshPasswordPromptDialog />
+        <SnapShotCoordinator />
+        <ReopenClosedViewShortcut />
+        <ConfirmDialogHost />
+        <CustomSnoozeDialogHost />
+        <GuestShareDialogHost />
+        <SlowRpcRequestToastCoordinator />
+        <ProjectCloneToastCoordinator />
+        <AddProjectToMachineDialogHost />
+        <PullRequestGuideRunCoordinator />
+        <HostedStaticEnvironmentBootstrap />
+        {primaryEnvironmentAuthenticated ? (
+          <EventRouter skipInitialBootstrapNavigation={returningFromWelcome} />
+        ) : null}
+        {appShell}
+        {/* Keep the theme editor above the router so drafts survive navigation. */}
+        <ThemeEditorHost />
+      </FirstRunGate>
+    </>
+>>>>>>> upstream-sync-cc0b86ddf-upstream-renamed
   );
 }
 
 function EnvironmentThemeSync() {
   useEnvironmentThemeSync();
-  // Sync palettes before adopting the environment theme so it is already in the library.
-  useDefaultThemeAdoption();
   return null;
 }
 

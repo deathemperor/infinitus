@@ -1121,7 +1121,7 @@ function OpenCommandPaletteDialog(props: {
               }
             />
             <TooltipPopup align="end" side="left">
-              {disabledHint ?? "Open Settings -> Source Control to configure this provider."}
+              {disabledHint ?? "Open Settings -> Source control to configure this provider."}
             </TooltipPopup>
           </Tooltip>
         </span>
@@ -2178,6 +2178,7 @@ function OpenCommandPaletteDialog(props: {
       input: {
         projectId,
         title: inferProjectTitleFromPath(destinationPath),
+        // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
         createdAt: new Date().toISOString(),
         remoteUrl: addProjectCloneFlow.remoteUrl,
         destinationPath,
