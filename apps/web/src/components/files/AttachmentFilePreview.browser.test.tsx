@@ -1888,7 +1888,8 @@ describe("standalone Mermaid previews", () => {
   });
 });
 
-it("reloads a workspace Word file after a preview remount", async () => {
+// quarantine: #1711 times out in 15 s on GitHub-hosted runners (2 of 3 runs on #1716)
+it.skip("reloads a workspace Word file after a preview remount", async () => {
   const { default: JSZip } = await import("jszip");
   let heading = "Original outlook";
   using _fetch = stubGlobal(
