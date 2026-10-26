@@ -163,7 +163,9 @@ describe("scoreThreadSearch", () => {
 
   it("finds a branch pasted with the app's worktree prefix", () => {
     const subject = thread("Cmd+K search", { branch: "infinitus/cmdk-search-v2" });
-    expect(scoreThreadSearch(foldSearchQuery("infinitus/cmdk-search-v2"), subject, NOW)).not.toBeNull();
+    expect(
+      scoreThreadSearch(foldSearchQuery("infinitus/cmdk-search-v2"), subject, NOW),
+    ).not.toBeNull();
     expect(scoreThreadSearch(foldSearchQuery("infinitus/cmdk"), subject, NOW)).not.toBeNull();
   });
 
