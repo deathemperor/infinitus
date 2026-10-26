@@ -418,7 +418,30 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
       yield* h.emit(runUpdated(one, runTwo, "failed"));
       expect((yield* h.stopped).map((stop) => stop.account)).toEqual(["hiep1"]);
       expect(yield* h.reports).toHaveLength(1);
-      // The user's own send still ends it.
+      // The swap resumes it, continuing the wake: the latest executed run.
+      yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
+      expect(yield* h.commands).toEqual([
+        {
+          type: "message.dispatch",
+          threadId: one,
+          source: runTwo,
+          text: "Continue where you left off.",
+        },
+      ]);
+    }),
+  );
+
+  effectIt.effect("the user's own send after a wake still ends the stop", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({
+        shells: [shell(one)],
+        snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
+        wakeRuns: [runTwo],
+      });
+      yield* h.refuse(refusal(one, runOne));
+      yield* h.emit(runUpdated(one, runTwo, "running"));
+      yield* h.emit(runUpdated(one, runTwo, "completed"));
+      expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([one]);
       yield* h.emit(runUpdated(one, runThree, "running"));
       expect(yield* h.stopped).toEqual([]);
     }),

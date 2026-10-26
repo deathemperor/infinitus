@@ -281,8 +281,10 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               known !== undefined &&
               (known.runId === run.id || wakes.get(threadId)?.runId === run.id)
             ) {
-              // A parked turn ending the way the CLI ends it: one stop, the
-              // window kept, nothing reported twice.
+              // A parked turn ending the way the CLI ends it, or a wake failing on
+              // the limit again: one stop, the window kept, nothing reported twice.
+              // A failed wake becomes the stop's run, the one the orchestrator continues.
+              wakes.delete(threadId);
               return yield* record({ ...known, ...failed, kind: "failed" }, { report: false });
             }
             const proxy = yield* proxyFor(shell);
