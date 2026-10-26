@@ -30,6 +30,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as CursorAccountReader from "@infinitus/provider-cursor/server/CursorAccountReader";
 import * as CursorKeychain from "@infinitus/provider-cursor/server/CursorKeychain";
 import * as CursorUsageAccounts from "@infinitus/provider-cursor/server/CursorUsageAccounts";
+import { MuseUsageHome } from "@infinitus/provider-muse/server";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AntigravityUsage from "../provider/Drivers/AntigravityUsage.ts";
@@ -102,48 +103,46 @@ const layerService = (input: {
   readonly environment?: NodeJS.ProcessEnv;
   readonly platform?: NodeJS.Platform;
 }) =>
-  Layer.fresh(CursorUsageAccounts.layer)
-    .pipe(Layer.provide(CursorAccountReader.layer.pipe(Layer.provide(CursorKeychain.layer))))
-    .pipe(
-      Layer.provideMerge(AntigravityUsage.layer),
-      Layer.provideMerge(ProviderHostLive.layer),
-      Layer.provideMerge(CodexUsageHistory.layer.pipe(Layer.provideMerge(Sqlite.layerMemory))),
-      Layer.provideMerge(Layer.mock(BackgroundPolicy.BackgroundPolicy)({})),
-      Layer.provideMerge(Layer.mock(ServerSecretStore.ServerSecretStore)({})),
-      Layer.provideMerge(
-        ServerConfig.layerTest(process.cwd(), NodePath.join(input.home, input.prefix)),
-      ),
-    )
-    .pipe(
-      Layer.provideMerge(NodeServices.layer),
-      Layer.provideMerge(Layer.succeed(HostProcess.Platform, input.platform ?? "linux")),
-      Layer.provideMerge(ServerSettings.layerTest(input.settings)),
-      Layer.provideMerge(
-        Layer.succeed(
-          HttpClient.HttpClient,
-          HttpClient.make((request) =>
-            Effect.sync(() => {
-              input.onRatesFetch?.();
-              // Unparsable rates: every scan retries the fetch, which makes the
-              // fetch count a boundary-level observation of how many scans ran.
-              return HttpClientResponse.fromWeb(request, Response.json(input.ratesDocument ?? {}));
-            }),
-          ),
+  Layer.fresh(CursorUsageAccounts.layer).pipe(
+    Layer.provide(CursorAccountReader.layer.pipe(Layer.provide(CursorKeychain.layer))),
+    Layer.provideMerge(AntigravityUsage.layer),
+    Layer.provideMerge(MuseUsageHome.layer),
+    Layer.provideMerge(ProviderHostLive.layer),
+    Layer.provideMerge(CodexUsageHistory.layer.pipe(Layer.provideMerge(Sqlite.layerMemory))),
+    Layer.provideMerge(Layer.mock(BackgroundPolicy.BackgroundPolicy)({})),
+    Layer.provideMerge(Layer.mock(ServerSecretStore.ServerSecretStore)({})),
+    Layer.provideMerge(
+      ServerConfig.layerTest(process.cwd(), NodePath.join(input.home, input.prefix)),
+    ),
+    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.succeed(HostProcess.Platform, input.platform ?? "linux")),
+    Layer.provideMerge(ServerSettings.layerTest(input.settings)),
+    Layer.provideMerge(
+      Layer.succeed(
+        HttpClient.HttpClient,
+        HttpClient.make((request) =>
+          Effect.sync(() => {
+            input.onRatesFetch?.();
+            // Unparsable rates: every scan retries the fetch, which makes the
+            // fetch count a boundary-level observation of how many scans ran.
+            return HttpClientResponse.fromWeb(request, Response.json(input.ratesDocument ?? {}));
+          }),
         ),
       ),
-      Layer.provideMerge(
-        Layer.succeed(HostProcess.Environment, {
-          HOME: input.home,
-          GROK_HOME: NodePath.join(input.home, "grok"),
-          PI_CODING_AGENT_DIR: NodePath.join(input.home, "pi"),
-          OPENCODE_DATA_DIR: NodePath.join(input.home, "opencode"),
-          ANTIGRAVITY_DATA_DIR: NodePath.join(input.home, "antigravity"),
-          XDG_CONFIG_HOME: NodePath.join(input.home, "config"),
-          APPDATA: NodePath.join(input.home, "config"),
-          ...input.environment,
-        }),
-      ),
-    );
+    ),
+    Layer.provideMerge(
+      Layer.succeed(HostProcess.Environment, {
+        HOME: input.home,
+        GROK_HOME: NodePath.join(input.home, "grok"),
+        PI_CODING_AGENT_DIR: NodePath.join(input.home, "pi"),
+        OPENCODE_DATA_DIR: NodePath.join(input.home, "opencode"),
+        ANTIGRAVITY_DATA_DIR: NodePath.join(input.home, "antigravity"),
+        XDG_CONFIG_HOME: NodePath.join(input.home, "config"),
+        APPDATA: NodePath.join(input.home, "config"),
+        ...input.environment,
+      }),
+    ),
+  );
 
 function totalOutputTokens(summary: { buckets: readonly { totals: { outputTokens: number } }[] }) {
   return summary.buckets.reduce((sum, bucket) => sum + bucket.totals.outputTokens, 0);

@@ -111,8 +111,7 @@ export function androidAlertForAggregate(input: {
     };
   }
   return {
-    // Every contributing queue job identifies the same group, including after
-    // retries or a different database row order. The native handler deduplicates it.
+    // Stable group IDs let the native handler deduplicate across jobs, retries, and row orders.
     alert_id: JSON.stringify(
       activities
         .map((row) => [row.environmentId, row.threadId, row.phase, row.updatedAt])
@@ -120,8 +119,7 @@ export function androidAlertForAggregate(input: {
     ),
     alert_title: alert.title,
     alert_body: alert.body,
-    // A multi-thread alert targets the overview so one visible thread cannot
-    // suppress notifications for the other threads in the group.
+    // Target the overview so one visible thread cannot suppress other threads' alerts.
     alert_path: "/",
   };
 }
@@ -213,8 +211,7 @@ export const make = Effect.gen(function* () {
       if (Option.isNone(preferences)) return;
       if (job.alert && !preferences.value.notificationsEnabled) return;
 
-      // Re-read links and state when consuming: queued messages must honor
-      // sign-out, token rotation, disabled publishing, and newer thread states.
+      // Re-read at consumption to honor current links, tokens, preferences, and thread states.
       const states = preferences.value.liveActivitiesEnabled
         ? yield* rows.listForUser({ userId: job.userId })
         : [];
@@ -228,8 +225,7 @@ export const make = Effect.gen(function* () {
         : null;
       let alert: ReturnType<typeof androidAlertForState | typeof androidAlertForAggregate> =
         job.alert ?? null;
-      // Deletion jobs can observe another thread's newly completed state. They
-      // update the card, but must leave that transition for its own alert job.
+      // Deletions update the card but must not consume another thread's pending completion alert.
       let acknowledgeAggregate = job.state !== null || job.replay === true || aggregate === null;
       if (job.state && preferences.value.notificationsEnabled) {
         const state = yield* rows.getForUserThread({
@@ -253,8 +249,7 @@ export const make = Effect.gen(function* () {
             })
           : [];
         const deliveryUser = deliveryUsers.find((user) => user.userId === job.userId);
-        // A notification-only job must not acknowledge transitions on another
-        // environment's live card before that environment's own job can alert.
+        // Notification-only jobs must not acknowledge another environment's pending card transitions.
         acknowledgeAggregate =
           deliveryUser?.liveActivitiesEnabled === true || !preferences.value.liveActivitiesEnabled;
         if (
@@ -314,8 +309,7 @@ export const make = Effect.gen(function* () {
         ...alert,
       };
       if (alert) {
-        // Group identities can contain five sets of IDs. Hash the full,
-        // stable identity rather than spending the payload budget on it.
+        // Hash the full stable group identity to stay within the payload budget.
         const digest = yield* crypto.digest("SHA-256", new TextEncoder().encode(alert.alert_id));
         data.alert_id = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
       }
@@ -346,8 +340,7 @@ export const make = Effect.gen(function* () {
           userId: job.userId,
           deviceId: job.deviceId,
           kind: active ? "live_activity_update" : "live_activity_end",
-          // Keep the delivered terminal rows as the next transition baseline,
-          // so replaying the finished card cannot alert again.
+          // Retain terminal rows as the baseline so finished-card replays cannot alert again.
           aggregate: preferences.value.liveActivitiesEnabled ? aggregate : null,
           deliveredAt: DateTime.formatIso(now),
         });

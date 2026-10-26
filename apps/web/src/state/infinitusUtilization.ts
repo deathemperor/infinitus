@@ -39,11 +39,10 @@ const utilizationInput = (days: string) =>
   ({ command: "utilization", args: [], options: { days } }) as const;
 
 /**
- * Every connected environment that runs Infinitus, each asked `utilization`
- * for the range, the way the Usage page reads every environment's summary
- * (`state/usage.ts`). One atom per range, so switching ranges keeps the
- * other's replies warm; the environments' own query atoms are shared with
- * any other reader of the same range.
+ * Every connected environment that runs Infinitus, each asked `utilization` for the range, like the
+ * Usage page reads every environment's summary (`state/usage.ts`). One atom per range keeps the
+ * other's replies warm; the environments' query atoms are shared with any other reader of the
+ * range.
  */
 const utilizationByDaysAtom = Atom.family((days: string) =>
   Atom.make((get): ReadonlyArray<EnvironmentUtilizationStatus> => {

@@ -3,12 +3,10 @@ import * as Cause from "effect/Cause";
 import type { AsyncResult } from "effect/reactivity";
 
 /**
- * What the pairing-requests stream tells this client (#730). Only an
- * administrative session — the desktop app on the Mac itself — holds the
- * `access:read` / `access:write` scopes the stream and the decision need; a
- * client paired through a QR or `t3 pair` link does not, and its stream fails
- * at once with `EnvironmentAuthorizationError`. That client must be told who
- * can approve, not shown the empty state as if nothing were pending.
+ * What the pairing-requests stream tells this client (#730). Only an administrative session (the
+ * desktop app on the Mac itself) holds the `access:read` / `access:write` scopes the stream and
+ * decision need; any other client's stream fails at once with `EnvironmentAuthorizationError`. It
+ * must be told who can approve, not shown the empty state.
  */
 export type PairingAccess =
   | { readonly kind: "loading" }

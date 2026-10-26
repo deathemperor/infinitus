@@ -7,7 +7,7 @@ import {
   type ProjectCloneSnapshot,
   WS_METHODS,
 } from "@infinitus/contracts";
-import { mediaMimeTypeFromExtension } from "@infinitus/shared/filePreview";
+import { mediaMimeTypeFromExtension } from "@infinitus/shared/mediaPreview";
 import { isWindowsAbsolutePath } from "@infinitus/shared/path";
 import {
   getProjectFaviconResourceKey,

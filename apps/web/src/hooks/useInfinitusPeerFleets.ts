@@ -36,17 +36,10 @@ function failureMessage(cause: Cause.Cause<unknown>): string {
 }
 
 /**
- * The menu bar popup's other machines (#1545). The desktop is the one place
- * that holds every paired environment, so it feeds this Mac's app: each
- * remote machine's fleets go over `peer-sync` when a row would change, on a
- * heartbeat inside the app's silence window, and at once when the app's
- * status says a peer row is waiting on a command. The reply carries the row
- * actions the popup queued for those machines; each is forwarded verbatim
- * to that machine's server and its outcome pushed straight back.
- *
- * Returns the machines to feed: the caller mounts one `PeerSnapshotFeeder`
- * per machine (hooks cannot loop) and reports each snapshot through
- * `report`.
+ * The menu bar popup's other machines (#1545). The desktop holds every paired environment, so it
+ * feeds this Mac's app each remote machine's fleets over `peer-sync` when a row would change or a
+ * peer row awaits a command. Queued row actions in the reply are forwarded verbatim to that server.
+ * Returns the machines to feed, one `PeerSnapshotFeeder` each (hooks cannot loop).
  */
 export function useInfinitusPeerFleets(): {
   readonly machines: ReadonlyArray<PeerMachine>;

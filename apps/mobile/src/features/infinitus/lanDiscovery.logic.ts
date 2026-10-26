@@ -1,12 +1,8 @@
 /**
- * Finding Infinitus desktop servers on the phone's own Wi‑Fi (#651), as pure
- * pieces: which addresses to try, and what a reply has to look like. The
- * probe itself (fetch, timeouts, concurrency) lives in `lanDiscovery.ts`.
- *
- * No Bonjour: that needs a native module the Expo build does not carry. The
- * desktop server already answers `/.well-known/t3/environment` without auth
- * on every interface once Network access is on, so a sweep of the phone's
- * /24 on the fork's server port finds it in a few seconds.
+ * Finding Infinitus desktop servers on the phone's Wi‑Fi (#651), pure pieces. No Bonjour
+ * (the Expo build lacks the native module): the server answers
+ * `/.well-known/t3/environment` unauthenticated once Network access is on, so a /24 sweep
+ * finds it. The probe lives in `lanDiscovery.ts`.
  */
 
 /** The desktop app's server port; the Devices card's `fork_server_port` default. */
@@ -85,11 +81,9 @@ export function subnetLabel(ownIp: string | null): string | null {
 }
 
 /**
- * What one sweep did, for the line under the button (#787): with the
- * counts a report says which suspect it is — an address the sweep will not
- * touch (link-local `169.254.x`, a tailnet `100.x`), a port nobody answers
- * on, or a batch of timeouts. Addresses and counts only, never a server's
- * label or id.
+ * What one sweep did, for the line under the button (#787): counts say which suspect it
+ * is (an address the sweep skips, a silent port, timeouts). Addresses and counts only,
+ * never a server's label or id.
  */
 export interface SweepReport {
   /** The address expo-network gave, the last `en*` IPv4 on iOS. */
@@ -118,12 +112,9 @@ export interface SweepReport {
 export const SWEEP_RETRY_DELAY_MS = 2_000;
 
 /**
- * Whether to sweep once more before saying "No Mac answered" (#787): the
- * session's first sweep on iOS runs while the Local Network prompt is still
- * settling, and every probe it sent before the grant is a miss for good. So
- * a first sweep that probed something, was not stopped, and heard from no
- * server gets one more try after `SWEEP_RETRY_DELAY_MS`; a later sweep, an
- * empty one, or one that found a Mac does not.
+ * Whether to sweep once more before saying "No Mac answered" (#787): on iOS the first
+ * sweep runs while the Local Network prompt settles, so its probes miss for good. Only a
+ * first sweep that probed something, was not stopped, and heard nothing retries.
  */
 export function shouldRetrySweep(input: {
   readonly report: SweepReport;

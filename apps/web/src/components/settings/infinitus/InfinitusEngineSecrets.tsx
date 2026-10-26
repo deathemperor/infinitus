@@ -1,12 +1,7 @@
 /**
- * Settings › Engines (#1177): the two proxy engines' base URL and
- * secret, the form the Mac's engine panes drew. The secret is a password
- * field, autocomplete off, cleared the moment it is submitted and gone with
- * the component; it travels once, as a `Redacted` value over
- * `infinitus.secret`, and is never interpolated into any message. Saving
- * relaunches the app (`proxy-key` / `9router-password` are restart verbs),
- * so the prefs panel around this form goes quiet until the Mac answers again
- * and this form re-reads then.
+ * Settings › Engines (#1177): the proxy engines' base URL and secret. The secret is cleared on
+ * submit, sent once as a `Redacted` over `infinitus.secret` and never interpolated into a message.
+ * Saving relaunches the app, so this form re-reads when the Mac answers again.
  *
  * @module InfinitusEngineSecrets
  */

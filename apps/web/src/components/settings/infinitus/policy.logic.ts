@@ -9,13 +9,10 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * Settings › Engines › Switching policy: an engine's own policy knobs (swapd
- * `config`), read over `infinitus.command` as `policy <fleet>` and written as
- * `policy-set <fleet> <key> <value>` / `policy-unset <fleet> <key>`. The app
- * sets policy and never runs one of its own, so the rows are the engine's
- * list, in its order, with its help lines: a knob a newer engine adds draws
- * as a text field without a build in between. Pure so the section only
- * renders.
+ * Settings › Engines › Switching policy: an engine's own policy knobs (swapd `config`), read over
+ * `infinitus.command` as `policy <fleet>` and written as `policy-set <fleet> <key> <value>` /
+ * `policy-unset <fleet> <key>`. The app sets policy and never runs one, so rows are the engine's
+ * list with its help lines; a knob a newer engine adds draws as a text field.
  */
 
 const READ_VERB = "policy";

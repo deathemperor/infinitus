@@ -36,13 +36,9 @@ export class DesktopUserDataInitializationError extends Schema.TaggedError<Deskt
 }
 
 /**
- * Select Electron's profile independently of the server's home directory.
- *
- * Fork: the directory is the fork's own (`@infinitus/shared/desktopIdentity`)
- * and no legacy directory is ever probed or seeded. Upstream adopts its
- * pre-rename `T3 Code (Alpha)` / `t3code` profiles here; those belong to the
- * installed T3 Code app, whose live state the fork must leave alone, and the
- * fork has never shipped under another name, so there is nothing to migrate.
+ * Select Electron's profile independently of the server's home directory. Fork: the
+ * directory is the fork's own and no legacy one is probed or seeded; upstream's
+ * `T3 Code (Alpha)` / `t3code` profiles belong to the installed T3 Code app.
  */
 export const resolveUserDataPath = Effect.fn("desktop.userData.resolveUserDataPath")(
   function* (input: {

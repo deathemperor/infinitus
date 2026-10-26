@@ -8,14 +8,10 @@ import {
 } from "./infinitusAccounts.ts";
 
 /**
- * The all-accounts-exhausted band (#659): the pop-out's reviver band, kept
- * pure so web and mobile draw the same verdict from one fleet. A port of the
- * native `AccountVitals.isDead` / `RecoveryMath.revival` rules: an account is
- * exhausted when any usage window (5h, 7d or per-model) is at its limit and
- * has not rolled yet; its revival is the LAST reset among those windows (it
- * is usable only once all of them roll); the fleet's next revival is the
- * EARLIEST account revival. Display-only — the engine's own switching policy
- * decides what happens next.
+ * The all-accounts-exhausted band (#659), pure so web and mobile draw one verdict.
+ * A port of native `AccountVitals.isDead` / `RecoveryMath.revival`: an account is
+ * exhausted when any usage window is at its limit and unrolled; its revival is
+ * the LAST reset among them, the fleet's the EARLIEST. Display-only.
  */
 
 /** Nothing legitimate resets later than a weekly window; a reset further out

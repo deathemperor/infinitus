@@ -20,12 +20,10 @@ import type { ActiveProjectRef } from "./useCaptures";
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 
 /**
- * The composer's Captures popover (#433): the project's list, an input that
- * adds on Enter (a multi-line paste is one capture), and per item Send to
- * composer, Copy, done, remove; "Clear done" at the foot. Opened by the
- * shoulder badge, `captures.toggle` or `captures.add`; closed by Escape, a
- * pointer outside, or a Send that landed. Drawn in the composer's anchored
- * layer like the stash menu.
+ * The composer's Captures popover (#433): the project's list, an input that adds on Enter (a
+ * multi-line paste is one capture), and per item Send to composer, Copy, done, remove; "Clear done"
+ * at the foot. Opened by the badge, `captures.toggle` or `captures.add`; closed by Escape, a
+ * pointer outside, or a landed Send. Drawn in the composer's anchored layer.
  */
 export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
   project: ActiveProjectRef | null;

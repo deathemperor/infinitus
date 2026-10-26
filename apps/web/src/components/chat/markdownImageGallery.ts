@@ -1,4 +1,4 @@
-import { mediaKindFromPath } from "@infinitus/shared/filePreview";
+import { mediaKindFromPath } from "@infinitus/shared/mediaPreview";
 import { mediaUrlReference } from "@infinitus/client-runtime/media-reference";
 import type { ExpandedImageItem, ExpandedImagePreview } from "./ExpandedImagePreview";
 import { resolveExternalWebLinkHost } from "./externalLinkContextMenu";

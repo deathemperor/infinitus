@@ -41,11 +41,10 @@ export interface PromptSnippetTarget {
 }
 
 /**
- * Settings › Projects › Prompts (#270 G): the project's saved snippets with
- * add, edit and remove, stored in server settings under
- * `projectPromptSnippets`. The list is read from the representative checkout
- * and every save fans out to each member of the group, like the panel's
- * boolean overrides, so a thread on any checkout sees the same list.
+ * Settings › Projects › Prompts (#270 G): the project's saved snippets with add, edit and remove,
+ * stored in server settings under `projectPromptSnippets`. The list is read from the representative
+ * checkout and every save fans out to each member of the group, so a thread on any checkout sees
+ * the same list.
  */
 export function ProjectPromptSnippetsSection(props: {
   representative: PromptSnippetTarget;

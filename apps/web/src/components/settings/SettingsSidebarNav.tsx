@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   ArchiveIcon,
+  FlaskConicalIcon,
   BlocksIcon,
   BotIcon,
   createLucideIcon,
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
+import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Kbd } from "../ui/kbd";
 import {
@@ -34,10 +36,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
   SidebarInput,
 } from "../ui/sidebar";
-import { SidebarUtilityMenu } from "../sidebar/SidebarChrome";
 import { INFINITUS_SECTION_ICONS, useInfinitusSectionFilter } from "./infinitus/settingsNav";
 import { scrollToSettingsTarget } from "./settingsLayout";
 import {
@@ -89,6 +89,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/source-control": GitBranchIcon,
   "/settings/storage": HardDriveIcon,
   "/settings/connections": Link2Icon,
+  "/settings/beta": FlaskConicalIcon,
   "/settings/archived": ArchiveIcon,
   ...INFINITUS_SECTION_ICONS,
 };
@@ -107,7 +108,7 @@ const SETTINGS_NAV_ITEMS: ReadonlyArray<{
 
 function SettingsSectionIcon({ to }: { to: SettingsPath }) {
   const Icon = SETTINGS_SECTION_ICONS[to];
-  return <Icon className="size-3.5 h-5 shrink-0 text-sidebar-muted-foreground/60" />;
+  return <Icon className="size-4 shrink-0 text-(--sidebar-icon-color)" />;
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
@@ -119,9 +120,10 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const navItems = SETTINGS_NAV_ITEMS.filter(
     (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
   ).filter(showsInfinitusSection);
-  const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  // Below md the nav is an icon rail; searching expands it over the page.
+  const [compactSearchOpen, setCompactSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems(scopeSearch);
   const results = searchSettings(query, searchableItems);
@@ -161,31 +163,26 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
             target.tagName === "TEXTAREA" ||
             target.isContentEditable)) ||
           target.closest(
-            '[role="dialog"], [aria-modal="true"], [data-slot$="popup"], [data-keybinding-capture]',
+            '[role="dialog"]:not([data-app-modal]), [aria-modal="true"]:not([data-app-modal]), [data-slot$="popup"]:not([data-app-modal]), [data-keybinding-capture]',
           ) !== null)
       ) {
         return;
       }
 
       event.preventDefault();
-      if (isMobile) {
-        setOpenMobile(true);
-      } else if (!open) {
-        setOpen(true);
-      }
-      requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      });
+      setCompactSearchOpen(true);
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isMobile, open, setOpen, setOpenMobile]);
+  }, []);
+
+  useEffect(() => {
+    if (compactSearchOpen) searchInputRef.current?.focus();
+  }, [compactSearchOpen]);
 
   const handleSectionClick = (to: SettingsPath) => {
-    if (isMobile) {
-      setOpenMobile(false);
-    }
     void navigate({
       to,
       hash: "",
@@ -200,9 +197,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   };
   const handleSearchResultClick = (item: SettingsSearchItem) => {
     clearSearch();
-    if (isMobile) {
-      setOpenMobile(false);
-    }
+    setCompactSearchOpen(false);
     const targetId = item.targetId ?? item.id;
     if (pathname === item.to && currentHash.replace(/^#/, "") === targetId) {
       scrollToSettingsTarget(targetId);
@@ -243,11 +238,23 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   };
 
   return (
-    <>
+    <nav
+      aria-label="Settings sections"
+      className={cn(
+        "flex w-60 shrink-0 flex-col border-e bg-sidebar text-sidebar-foreground max-md:w-14",
+        compactSearchOpen &&
+          "max-md:absolute max-md:inset-y-0 max-md:start-0 max-md:z-10 max-md:w-full",
+      )}
+    >
       <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>
           <div className="flex flex-col gap-2">
-            <div className="flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+            <div
+              className={cn(
+                "flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+                !compactSearchOpen && "max-md:hidden",
+              )}
+            >
               <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
               <SidebarInput
                 ref={searchInputRef}
@@ -259,6 +266,10 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   setActiveResultIndex(0);
                 }}
                 onKeyDown={handleSearchKeyDown}
+                onFocus={() => setCompactSearchOpen(true)}
+                onBlur={() => {
+                  if (!isSearching) setCompactSearchOpen(false);
+                }}
                 placeholder="Search"
                 aria-label="Search settings"
                 role="combobox"
@@ -332,6 +343,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
               </SidebarMenu>
             ) : (
               <SidebarMenu>
+                {compactSearchOpen ? null : (
+                  <SidebarMenuItem className="md:hidden">
+                    <SidebarMenuButton
+                      aria-label="Search settings"
+                      onClick={() => setCompactSearchOpen(true)}
+                    >
+                      <SearchIcon />
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isGeneralDetailPage =
@@ -346,7 +367,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                         onClick={() => handleSectionClick(item.to)}
                       >
                         <Icon />
-                        <span className="truncate">{item.label}</span>
+                        <span className={cn("truncate", !compactSearchOpen && "max-md:sr-only")}>
+                          {item.label}
+                        </span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -356,19 +379,14 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
           </div>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="max-md:hidden">
         <Suspense fallback={null}>
           <InfinitusConnectSidebarSignIn />
         </Suspense>
-        <div className="flex items-center gap-1">
-          <div className="min-w-0 flex-1">
-            <SidebarUtilityMenu />
-          </div>
-          <Suspense fallback={null}>
-            <InfinitusConnectSidebarAvatar />
-          </Suspense>
-        </div>
+        <Suspense fallback={null}>
+          <InfinitusConnectSidebarAvatar />
+        </Suspense>
       </SidebarFooter>
-    </>
+    </nav>
   );
 }

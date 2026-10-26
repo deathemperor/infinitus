@@ -10,12 +10,9 @@ interface InfinitusLoopbackCatchModule {
   stop(): Promise<void>;
 }
 
-/** The fork's `InfinitusLoopbackCatch` module
-    (apps/mobile/modules/infinitus-loopback-catch): the phone answers the sign-in
-    redirect the AWS and gcloud CLIs send to a loopback port, so a relay login
-    started on the Mac can be finished from the phone with nothing to paste.
-    Null on Android and on an iOS build made before the module existed, where the
-    sign-in page opens in the system browser as before. */
+/** The fork's `InfinitusLoopbackCatch` module: the phone answers the sign-in redirect the
+    AWS and gcloud CLIs send to a loopback port. Null on Android and on an older iOS
+    build, where the sign-in page opens in the system browser. */
 const native: InfinitusLoopbackCatchModule | null =
   Platform.OS === "ios"
     ? requireOptionalNativeModule<InfinitusLoopbackCatchModule>("InfinitusLoopbackCatch")

@@ -1,19 +1,8 @@
 /**
- * Deep links (#270 D): `<scheme>://thread/<environmentId>/<threadId>` routes
- * to a thread, `<scheme>://new?project=<id|title|folder>&prompt=<text>` opens
- * the composer on that project with the prompt prefilled, never sent,
- * `<scheme>://settings/<page>` opens a Settings page (the menu bar app's ⌘,).
- * The scheme is the renderer's own (`infinitus` / `infinitus-dev`), so the
- * `app` host stays the renderer origin and the Clerk bridge's OAuth callback;
- * the `thread`, `new`, `join` (#1313: a team invite, the whole link is the
- * code) and `settings` hosts are claimed here.
- *
- * Two halves: an intake attached before Electron is ready (macOS delivers a
- * cold launch's `open-url` before `ready`, Windows and Linux put the URL in
- * argv and in `second-instance`), and the service that parses what the intake
- * caught, keeps the latest link, and pings the renderer. The renderer pulls
- * the link over IPC once its environment is connected, so a link that lands
- * during startup is never lost to a page that has not mounted yet.
+ * Deep links (#270 D): `<scheme>://thread/<environmentId>/<threadId>`,
+ * `<scheme>://new?project=…&prompt=…` (prefilled, never sent), `join` (#1313) and
+ * `settings/<page>`. The `app` host stays the renderer origin and Clerk callback. macOS
+ * delivers a cold launch's `open-url` before `ready`, so the renderer pulls the latest link.
  */
 import type { DesktopDeepLink } from "@infinitus/contracts";
 import * as Context from "effect/Context";

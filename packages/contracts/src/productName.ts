@@ -14,11 +14,9 @@ export const PRODUCT_NAME = "Infinitus";
 export const CONNECT_NAME = `${PRODUCT_NAME} Connect`;
 
 /**
- * Upstream attribution (#1426 follow-up). Infinitus is a fork of T3 Code and
- * ships its MIT-licensed source, so the licenses screen credits it in its own
- * section rather than leaving the notice buried among the npm packages. The
- * formal notice itself is the "T3 Code" entry in
- * `third-party-licenses.config.json`; this is the human-readable credit.
+ * Upstream attribution (#1426 follow-up). Infinitus is a fork of T3 Code and ships
+ * its MIT-licensed source, so the licenses screen credits it in its own section.
+ * The formal notice is the "T3 Code" entry in `third-party-licenses.config.json`.
  */
 export const UPSTREAM_PRODUCT_NAME = "T3 Code";
 export const UPSTREAM_PUBLISHER_NAME = "T3 Tools, Inc.";

@@ -37,11 +37,10 @@ export const INFINITUS_CATEGORY_SCOPES: Readonly<
 };
 
 /**
- * The fork's searchable settings, spread into upstream's `SETTINGS_SEARCH_ITEMS`
- * in this order: the rows the fork adds to General (resume on limit #648,
- * send mode, worktree limit, keep awake #1075) and the Infinitus pages, each
- * indexed once by its destination (the panes are drawn from the native app's
- * own preference catalog) with `targetId` the first section it renders.
+ * The fork's searchable settings, spread into upstream's `SETTINGS_SEARCH_ITEMS` in this order: the
+ * rows the fork adds to General (resume on limit #648, send mode, worktree limit, keep awake #1075)
+ * and the Infinitus pages, each indexed once by its destination with `targetId` the first section
+ * it renders.
  */
 export const INFINITUS_SETTINGS_SEARCH_ITEMS = [
   {
@@ -155,12 +154,9 @@ export const INFINITUS_SETTINGS_SEARCH_ITEMS = [
     to: "/settings/devices",
     targetId: "infinitus-devices",
     infinitusOnly: true,
-    // "live activity" went with the Mac's cards and the phone mirror with its
-    // server (#1041), the push key with #1375, the Cloudflare tunnel with
-    // Infinitus Connect, the "Pair a phone" QR with Connections' own pairing
-    // link; the page is this Mac's name, the server's port, the settings
-    // sync switches, the pairing requests a phone sends and the Mac's crash
-    // reports.
+    // "live activity", the phone mirror (#1041), the push key (#1375), the Cloudflare tunnel and
+    // the "Pair a phone" QR are gone from this page; it is this Mac's name, the server's port, the
+    // sync switches, pairing requests and crash reports.
     searchTerms: ["phone pair port name", "machine sync crash hang report"],
   },
   {

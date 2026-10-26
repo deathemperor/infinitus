@@ -11,11 +11,9 @@ const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
   typeof (value as { then?: unknown }).then === "function";
 
 /**
- * React's act() for the fork's react-test-renderer unit tests, which run outside the
- * browser runner that apps/web/test/render.tsx serves. Like that helper's act, it turns
- * IS_REACT_ACT_ENVIRONMENT on only while the callback runs (nested calls restore the outer
- * value); unlike it, a synchronous callback still flushes synchronously, so a sync mount
- * helper can return the renderer it created.
+ * React's act() for the fork's react-test-renderer tests, outside the browser runner. It sets
+ * IS_REACT_ACT_ENVIRONMENT only while the callback runs (nested calls restore it), and a sync
+ * callback flushes synchronously so a sync mount helper can return its renderer.
  */
 export const act = actWithEnvironment as typeof reactAct;
 

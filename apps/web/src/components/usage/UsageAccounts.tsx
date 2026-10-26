@@ -19,11 +19,9 @@ const totalTokens = (totals: UsageAccountAttribution["lines"][number]["totals"])
   totals.outputTokens;
 
 /**
- * Claude spend split by the account that was active when each record was
- * written (#779), from the swap engine's own history read through the app.
- * Primary environment only, since the timeline is one Mac's; hidden unless
- * that server answered with one, so an app without the verb shows nothing
- * rather than an empty table.
+ * Claude spend split by the account active when each record was written (#779), from the swap
+ * engine's history read through the app. Primary environment only, since the timeline is one Mac's;
+ * hidden unless that server answered with one.
  */
 export function UsageAccountsSection({
   environments,

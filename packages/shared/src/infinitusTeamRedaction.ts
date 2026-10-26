@@ -1,9 +1,7 @@
 /**
- * What leaves the machine for a team is redacted first (#1592; the port of
- * the Mac's `TeamRedaction.swift`, rule for rule). One regex pass per JSONL
- * line; every replacement is plain ASCII without quotes or backslashes, so a
- * JSON line stays JSON. The rules fail safe, not exact: prose containing a
- * literal `Authorization:` or a path under `/Users/x` can over-redact, and
+ * What leaves the machine for a team is redacted first (#1592; a port of the Mac's
+ * `TeamRedaction.swift`). One regex pass per JSONL line, with replacements that
+ * keep a JSON line JSON. Rules fail safe, not exact: prose can over-redact, and
  * leaking a secret is worse than mangling a sentence.
  */
 export interface TeamRedactionOptions {
@@ -14,12 +12,9 @@ export interface TeamRedactionOptions {
 }
 
 /**
- * A transcript line is JSON, so a multi-line tool result is one physical
- * line where real newlines and tabs are the two-character escapes `\n`,
- * `\t`, `\r`: a secret can sit right after one of those instead of after
- * a word-boundary character. `B` is a leading boundary that accepts
- * either, captured as `$1` and replayed at the front of the replacement so
- * the escape survives.
+ * A transcript line is JSON, so real newlines and tabs are the escapes `\n`, `\t`,
+ * `\r`, and a secret can sit right after one. `B` is a leading boundary accepting
+ * either, captured as `$1` and replayed in the replacement so the escape survives.
  */
 const B = String.raw`(^|[^A-Za-z0-9_]|\\[nrt])`;
 

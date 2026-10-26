@@ -3,11 +3,9 @@ import type { PromptSnippet } from "@infinitus/contracts";
 import type { ComposerCommandItem } from "./ComposerCommandPopover";
 
 /**
- * The phone's read-only half of per-project prompt snippets (#270 G): the
- * list lives in the project's server settings (`projectPromptSnippets`, saved
- * from the desktop's Settings › Projects › Prompts) and reaches the composer's
- * `/` menu through `useProjectPromptSnippets`; editing stays on the desktop.
- * Pure rows here, so the menu hook's tests stay clear of the state modules.
+ * The phone's read-only half of per-project prompt snippets (#270 G): the list lives in
+ * the project's server settings and feeds the composer's `/` menu; editing stays on the
+ * desktop. Pure rows here, so the menu hook's tests avoid the state modules.
  */
 
 /** The first line of the body, cut for the row's description. */

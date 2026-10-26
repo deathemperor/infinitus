@@ -5,15 +5,10 @@ import { describe, expect, it } from "vite-plus/test";
 import { PREF_COPY } from "./prefsForm.logic";
 
 /**
- * `PREF_COPY` and the Mac's `PrefCatalog` are one list seen from two sides, and
- * neither side fails loudly when they drift: a catalog key with no copy still
- * draws a row, labelled by `humaniseKey` with its raw choice codes in the
- * select ("Intro style" / "top"), and a copy entry with no catalog key draws
- * nothing at all. The visual pass checks one marker per route, so a regression
- * on any other row of the same page is invisible to it. This test is the check.
- *
- * The ordering rule it enforces (#1041, stated in #1068): a key's copy is
- * removed in the same PR that removes it from the catalog, never earlier.
+ * `PREF_COPY` and the Mac's `PrefCatalog` are one list seen from two sides, and neither fails
+ * loudly on drift: a key with no copy still draws a row labelled by `humaniseKey` with raw choice
+ * codes, and copy with no key draws nothing. Ordering rule (#1041, #1068): a key's copy is removed
+ * in the same PR that removes it from the catalog, never earlier.
  */
 
 const CATALOG = NodeURL.fileURLToPath(

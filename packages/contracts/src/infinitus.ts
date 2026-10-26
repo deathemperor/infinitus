@@ -4,12 +4,10 @@ import * as Schema from "effect/Schema";
 import { ForwardCompatibleOptional, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * Wire contracts for the Infinitus control socket: one JSON line per request,
- * one per reply, one request per connection. The native app's command table is
- * a runtime manifest whose `replyShape` is prose, so every reply schema here is
- * hand-written and validated at the boundary. Structs are left open on purpose
- * — Effect's default `onExcessProperty` drops unknown keys instead of failing,
- * so a field added on the native side never breaks decoding here.
+ * Wire contracts for the Infinitus control socket: one JSON line per request and
+ * reply. The command table's `replyShape` is prose, so reply schemas are
+ * hand-written. Structs are left open on purpose: Effect drops unknown keys
+ * instead of failing, so a field added on the native side never breaks decoding.
  */
 
 /** One request line: `infinitusctl <command> <args…>`, options keyed without
@@ -56,10 +54,9 @@ export const InfinitusManifestCommand = Schema.Struct({
   summary: Schema.String,
   replyShape: Schema.String,
   /** What the request line's `secret` field carries for this verb (#747):
-      `"secret"` (stdin material: a code, a token, a key), `"payload"` (a
-      message or hook body), absent or null for none. A string rather than
-      literals so a value a newer app adds decodes; only `"secret"` opens
-      `infinitus.secret`. */
+        `"secret"` (a code, token or key), `"payload"` (a message or hook body), or
+        absent/null. A string so a value a newer app adds decodes; only `"secret"`
+        opens `infinitus.secret`. */
   stdin: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type InfinitusManifestCommand = typeof InfinitusManifestCommand.Type;
@@ -72,11 +69,10 @@ export const InfinitusManifest = Schema.Struct({
 });
 export type InfinitusManifest = typeof InfinitusManifest.Type;
 
-/** One engine's line in the `status` reply. `keyPresent` only exists for the
-    engines that hold a key (cliproxy, 9router); `binaryPath` and `daemon`
-    (stopped | running | backingOff | refused | schemaMismatch, kept a string
-    so a word a newer build adds costs nothing) only for swapd; `error` is the
-    engine's own last error, verbatim (#1235). */
+/** One engine's line in the `status` reply. `keyPresent` only exists for engines
+    that hold a key; `binaryPath` and `daemon` only for swapd (`daemon` is a
+    string so a newer build's word costs nothing); `error` is the engine's own
+    last error, verbatim (#1235). */
 export const InfinitusEngineState = Schema.Struct({
   enabled: Schema.Boolean,
   registered: Schema.Boolean,
@@ -180,11 +176,10 @@ export const InfinitusAccount = Schema.Struct({
 });
 export type InfinitusAccount = typeof InfinitusAccount.Type;
 
-/** The app's headroom verdict for one fleet (#616, session priority mode):
-    `low` and `critical` both hold background threads, `abundant` releases
-    them. Native computes it with its own hysteresis and forecast; the fork
-    never recomputes. `window` names the binding usage window, `pct` its used
-    percent, `reason` a line for people. Omitted while the mode is off. */
+/** The app's headroom verdict for one fleet (#616): `low` and `critical` hold
+    background threads, `abundant` releases them. Native computes it with its
+    own hysteresis and forecast; the fork never recomputes. `window` names the
+    binding window, `pct` its used percent. Omitted while the mode is off. */
 export const InfinitusHeadroomState = Schema.Literals(["abundant", "low", "critical"]);
 export type InfinitusHeadroomState = typeof InfinitusHeadroomState.Type;
 
@@ -215,11 +210,10 @@ export const InfinitusFleet = Schema.Struct({
 });
 export type InfinitusFleet = typeof InfinitusFleet.Type;
 
-/** One knob of an engine's switching policy as the `policy` verb answers it
-    (swapd `config list --json`, the engine's own JSON untouched): `value` and
-    `default` are the knob's JSON — a boolean, a number, a string or a list of
-    strings — and `help` the engine's own line for it. `key` carries the
-    provider prefix (`claude.strategy`); `policy-set` takes the bare key. */
+/** One knob of an engine's switching policy as the `policy` verb answers it (the
+    engine's own JSON, untouched): `value` and `default` are the knob's JSON and
+    `help` the engine's line. `key` carries the provider prefix
+    (`claude.strategy`); `policy-set` takes the bare key. */
 export const InfinitusPolicySetting = Schema.Struct({
   key: Schema.String,
   value: Schema.Unknown,
@@ -237,11 +231,10 @@ export const InfinitusPolicy = Schema.Struct({
 });
 export type InfinitusPolicy = typeof InfinitusPolicy.Type;
 
-/** The `forecast` command's reply: a run-rate projection, `null` when the app
-    has nothing to project. The inner lines stay opaque for v1 — only the
-    top-level keys are pinned, and all but `computedAt` and `basis` are absent
-    when there is no active account or no measurable pace. Estimates, never
-    billing truth. */
+/** The `forecast` reply: a run-rate projection, `null` when the app has nothing
+    to project. Inner lines stay opaque; only top-level keys are pinned, and all
+    but `computedAt` and `basis` are absent without an active account or
+    measurable pace. Estimates, never billing truth. */
 export const InfinitusForecast = Schema.Struct({
   forecast: Schema.NullOr(
     Schema.Struct({
@@ -333,18 +326,10 @@ export const InfinitusUtilizationTotals = Schema.Struct({
 });
 export type InfinitusUtilizationTotals = typeof InfinitusUtilizationTotals.Type;
 
-/** The `utilization --days n` reply (#747): the recorded usage samples of the
-    range, downsampled to `bucketSeconds`, the window names and accounts they
-    carry, the window telemetry the Mac reconstructs (the weekly waste
-    generations and the five-hour windows, both off the FULL history since a
-    reset may predate the range; the replay of what the fleet did over the
-    range), the transcript run rate (`rates`, absent until the Mac has scanned)
-    and the popup's live output rate. The rows are each decoded on their own
-    (`Schema.Unknown` arrays folded by `infinitusUtilization.ts`), so a build
-    that words one of them differently loses that row, not the page. The
-    planner's dry run travels opaque: it proposes steps only the Mac can take,
-    and its action enum carries a Swift-shaped payload.
-    Estimates read off the Mac, never billing truth. */
+/** The `utilization --days n` reply (#747): usage samples downsampled to
+    `bucketSeconds`, plus the Mac's window telemetry, run rates and live output
+    rate. Rows decode on their own (folded by `infinitusUtilization.ts`), so a
+    reworded row loses that row, not the page. Estimates, never billing truth. */
 export const InfinitusUtilization = Schema.Struct({
   days: Schema.Finite,
   bucketSeconds: Schema.optionalKey(Schema.Finite),
@@ -426,20 +411,16 @@ export const InfinitusPrefs = Schema.Struct({
 export type InfinitusPrefs = typeof InfinitusPrefs.Type;
 
 /*
- * `aws-logins` (#572 task 7): the AWS profiles and gcloud accounts whose
- * sign-in lapsed, each with the flow the phone would start and any login in
- * flight. Structs are open
- * and their enums plain strings, so a flow or phase the app adds later still
- * decodes. Native: `AwsLogin.Item` / `AwsLogin.State`.
+ * `aws-logins` (#572 task 7): the AWS profiles and gcloud accounts whose sign-in
+ * lapsed, with the flow the phone would start and any login in flight. Structs
+ * are open and enums plain strings, so a later flow or phase still decodes.
+ * Native: `AwsLogin.Item` / `AwsLogin.State`.
  */
 
 /** A login in flight: `flow` is `relay`, `deviceCode`, `remote` or `local`;
-    `phase` walks `starting` → `waitingForBrowser` / `waitingForCode` → `done`
-    / `failed`; `url` and `userCode` are what a person opens and types on
-    another device; `startedAt` is epoch seconds. Its `pid` was the session
-    that needed the login, never the login process's own
-    (`AwsLogin.State`: "The session that needed it, if the login was started
-    for one."), and left with the item's `pid` / `sessionLabel` (#1041). */
+    `phase` walks `starting` → `waitingForBrowser` / `waitingForCode` → `done` /
+    `failed`; `url` and `userCode` are what a person opens and types elsewhere;
+    `startedAt` is epoch seconds. Its session `pid` left with #1041. */
 export const InfinitusAwsLoginState = Schema.Struct({
   profile: Schema.String,
   flow: Schema.String,
@@ -463,11 +444,9 @@ export const InfinitusAwsLoginAccount = Schema.Struct({
 export type InfinitusAwsLoginAccount = typeof InfinitusAwsLoginAccount.Type;
 
 /** One lapsed sign-in: the profile (an account for gcloud), which CLI
-    (`provider` is `gcloud` for gcloud items and absent for AWS), and the login
-    running for it, if any. `account` is the page's account id and user name
-    when the config names them. The session that hit it — `pid` and
-    `sessionLabel` — left with the Mac's session tracker (#1041); the struct is
-    open, so an older app still sending them decodes unchanged. */
+    (`provider` is `gcloud` for gcloud items, absent for AWS), and the login
+    running for it. `account` is the page's account id and user name. The struct
+    is open, so an older app still sending `pid` / `sessionLabel` (#1041) decodes. */
 export const InfinitusAwsLogin = Schema.Struct({
   profile: Schema.String,
   provider: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -501,15 +480,10 @@ export const InfinitusTeamExclusions = Schema.Struct({
 });
 export type InfinitusTeamExclusions = typeof InfinitusTeamExclusions.Type;
 
-/** One row of the `events` reply — the app's event log as the Activity pane
-    shows it: `at` ISO 8601, `icon` an SF Symbol name, `text` the line. Since
-    native #630 (#615) a row also carries `id`, the app's own UUID for the
-    entry (stable per app run), and `kind`, the durable log's vocabulary
-    (switch, limit, revival, resume, nudge, team, team-control, hook, pairing,
-    alert, notice, other). Both are absent on older builds, where a client
-    falls back to the icon and text. `alert` and `notice` are the app's own
-    announcements: it logs the line instead of banner-ing it whenever a client
-    holds a `fleets` lease, so the row IS the notification. */
+/** One row of the `events` reply: `at` ISO 8601, `icon` an SF Symbol name, `text`
+    the line. Since native #630 (#615) a row also carries `id` and `kind` (the
+    durable log's vocabulary); both are absent on older builds, where a client
+    falls back to icon and text. `alert` / `notice` rows ARE the notification. */
 export const InfinitusEventRow = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   at: Schema.String,
@@ -591,12 +565,10 @@ export const InfinitusSignInCodeResult = Schema.Struct({
 });
 export type InfinitusSignInCodeResult = typeof InfinitusSignInCodeResult.Type;
 
-/** Fork: the engine's loopback listener stood in for on this machine. A
-    sign-in the Mac's engine finishes itself ends on `http://localhost:<port>/
-    callback`, and when this desktop looks at another Mac's environment the
-    page opens in this machine's browser — so the shell binds `port` here,
-    opens `url`, answers the browser, and hands the address back for the page
-    to send over `signin-code`. */
+/** Fork: the engine's loopback listener stood in for on this machine. A sign-in
+    the Mac's engine finishes itself ends on `http://localhost:<port>/callback`,
+    so when this desktop looks at another Mac's environment the shell binds
+    `port` here, opens `url`, and hands the address back for `signin-code`. */
 export const InfinitusSignInRedirectListenInput = Schema.Struct({
   flowId: Schema.String,
   port: Schema.Number,
@@ -614,17 +586,10 @@ export const InfinitusSignInRedirectResult = Schema.Struct({
 });
 export type InfinitusSignInRedirectResult = typeof InfinitusSignInRedirectResult.Type;
 
-/** Fork (#1213): a sign-in the desktop shell runs itself, through the engine's
-    own `add-oauth` verb — swapd is the OAuth client, so its loopback listener
-    catches the redirect and there is no code to paste. `provider` is the
-    engine's own provider name (`swapd --provider <p>`); the page opens in a
-    private window of the system browser. No slot: `add-oauth` resolves the
-    account from the sign-in itself and lands a known address back in its own
-    slot, so signing in again just works. `fleet` and `relogin` are the
-    fleet's id and the address being signed in again, for the shell to hand
-    the sign-in to the menu-bar app (`signin-begin --window`) when the
-    browser has no private window to give — the Mac's own sheet then shows
-    it, passkeys and all. */
+/** Fork (#1213): a sign-in the desktop shell runs through the engine's `add-oauth`
+    verb; swapd catches the redirect, so there is no code to paste. No slot:
+    `add-oauth` resolves the account itself. `fleet` and `relogin` let the shell
+    hand off to the menu-bar app (`signin-begin --window`) with no private window. */
 export const InfinitusOAuthSignInInput = Schema.Struct({
   flowId: Schema.String,
   provider: Schema.String,
@@ -653,15 +618,9 @@ export type InfinitusEngineKey = typeof InfinitusEngineKey.Type;
 
 /**
  * How an engine is run on this machine, which the shell detects rather than
- * assumes:
- *
- * - `child` — the shell owns the process: it starts it, restarts it when it
- *   exits unexpectedly, and takes it down with the app.
- * - `service` — something else already owns it (CLIProxyAPI under Homebrew's
- *   launchd job). The shell says so and stays out of the way; a second
- *   supervisor on top of launchd would only fight it.
- * - `unknown` — no command was detected and none was typed, so there is
- *   nothing to run.
+ * assumes: `child` (the shell owns the process and restarts it), `service`
+ * (something else owns it, e.g. Homebrew's launchd job; the shell stays out of
+ * the way), `unknown` (no command detected or typed, so nothing to run).
  */
 export const InfinitusEngineMode = Schema.Literals(["child", "service", "unknown"]);
 export type InfinitusEngineMode = typeof InfinitusEngineMode.Type;
@@ -746,12 +705,8 @@ export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefs.Type;
 /*
  * Phone-only writes (#572). The native mirror's `POST /client-activity` and
  * `POST /crashes` bodies, carried unchanged as the `--body` option of the
- * `client-activity` and `crash-report` control commands so a paired phone
- * reaches them through `infinitus.command`. Every schema mirrors the Swift
- * struct the native decoder reads (LeaseTable.swift, CrashReport.swift);
- * dates are ISO 8601 strings because those decoders use `.iso8601`. The
- * `activities-token` registration left with #1375: the phone's alerts and
- * thread card ride Infinitus Connect.
+ * `client-activity` and `crash-report` commands. Schemas mirror the Swift structs
+ * the native decoder reads; dates are ISO 8601 strings (`.iso8601` decoders).
  */
 
 /** What a client is looking at: the fleet, or the stats. The Mac only does
@@ -793,11 +748,10 @@ export const InfinitusCrashReport = Schema.Struct({
 });
 export type InfinitusCrashReport = typeof InfinitusCrashReport.Type;
 
-/** What a snapshot subscriber needs beyond the fast set (#587 step 2, #659):
-    `stats` puts the `stats` scope in the server's lease while at least one
-    subscriber asks for it, which moves the Mac's transcript rescan from every
-    30 min to every 5 — the one heavy job over there (#625), so it runs only
-    while a Stats page is actually mounted. */
+/** What a snapshot subscriber needs beyond the fast set (#587, #659): `stats` puts
+    the `stats` scope in the server's lease while a subscriber asks for it, which
+    moves the Mac's transcript rescan from every 30 min to every 5, so it runs
+    only while a Stats page is mounted. */
 export const InfinitusNeed = Schema.Literals(["stats"]);
 export type InfinitusNeed = typeof InfinitusNeed.Type;
 
@@ -806,14 +760,10 @@ export const InfinitusSubscribeInput = Schema.Struct({
 });
 export type InfinitusSubscribeInput = typeof InfinitusSubscribeInput.Type;
 
-/** One thread whose turn a Claude usage limit stopped on this server (#648,
-    #1627), as `subscribeInfinitusLimitStops` lists it until the turn resumes
-    or moves on. `parked`: the SDK holds the turn open and retries it when the
-    window resets; `failed`: the CLI ended the turn with the limit as its
-    error. `account` is the swapd account whose window refused the turn, when
-    the refusal's reset matched one (#1486); `resetsAt` the window's reset as
-    the SDK reported it; `proxy` the proxied instance (#1088) whose own
-    upstream limit it was, which no account on the Mac lifts. */
+/** One thread whose turn a Claude usage limit stopped (#648, #1627), listed until
+    it resumes. `parked`: the SDK holds the turn and retries at reset; `failed`:
+    the CLI ended it with the limit as its error. `account` is the swapd account
+    whose window refused it (#1486); `proxy` the proxied instance (#1088) at limit. */
 export const InfinitusLimitStop = Schema.Struct({
   threadId: ThreadId,
   kind: Schema.Literals(["parked", "failed"]),
@@ -896,12 +846,10 @@ export const InfinitusSecretArg = TrimmedNonEmptyString.check(
   Schema.isPattern(/^\P{Cc}*$/u),
 );
 
-/** The fork's one secret-carrying path (#747): `secret` rides the request
-    line's `secret` field to `command`, and only to a verb whose manifest entry
-    says `stdin: "secret"`. `args` is keyed by the manifest's argument and
-    option names for that verb (a positional by its name, an option by its
-    bare name); the server orders them. The value decodes into a `Redacted`
-    the moment it arrives, so nothing that prints the input can show it. */
+/** The fork's one secret-carrying path (#747): `secret` rides the request line's
+    `secret` field to `command`, only to a verb whose manifest entry says
+    `stdin: "secret"`. `args` is keyed by the manifest's argument and option
+    names; the server orders them. The value decodes into a `Redacted` at once. */
 export const InfinitusSecretInput = Schema.Struct({
   command: Schema.String,
   args: Schema.Record(Schema.String, InfinitusSecretArg),
@@ -916,12 +864,10 @@ export const InfinitusSecretResult = Schema.Struct({
 });
 export type InfinitusSecretResult = typeof InfinitusSecretResult.Type;
 
-/** Why a secret call never reached the socket: the manifest has not been
-    read, the verb takes no secret, an argument the verb does not name (or one
-    it needs is missing), this session asked too often, or the session's scopes
-    do not reach the verb (`scope`: a standard client — a phone, a `t3 pair`
-    browser — may feed a sign-in code or callback, or a team invite code;
-    every other secret verb needs `access:write`). */
+/** Why a secret call never reached the socket: manifest unread, the verb takes no
+    secret, an argument is unknown or missing, too many asks this session, or the
+    session's scopes do not reach the verb (`scope`: a standard client may feed a
+    sign-in code, callback or team invite code; every other secret verb needs `access:write`). */
 export const InfinitusSecretRefusal = Schema.Literals([
   "no_manifest",
   "no_secret",

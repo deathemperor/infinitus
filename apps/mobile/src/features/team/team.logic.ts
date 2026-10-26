@@ -2,7 +2,7 @@ import { InfinitusTeamError } from "@infinitus/client-runtime/relay/infinitusTea
 
 /**
  * Settings › Team on Infinitus Connect (#1592), the phone's own bits: the
- * site's invite link (App.tsx rewrites it into the `team?code=` route), the
+ * site's invite link (App.tsx rewrites it into the `settings/team?code=` route), the
  * roster name and what a failed relay call says. The fold shared with the
  * web pane is `@infinitus/client-runtime/relay/infinitusTeamLogic`.
  */

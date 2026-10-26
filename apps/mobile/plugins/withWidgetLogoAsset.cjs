@@ -1,9 +1,6 @@
 "use strict";
 
-// ORDERING: must be listed BEFORE "expo-widgets" in the plugins array. That
-// matters twice: expo-widgets' dangerous mod rmSync's ios/ExpoWidgetsTarget/
-// (deleting any catalog written before it), and its xcodeproj mod is what
-// creates the widget target.
+// Precede expo-widgets so its reverse-ordered mods create and wipe the target before assets are added.
 
 const path = require("path");
 const fs = require("fs");
@@ -15,11 +12,9 @@ const CATALOG_NAME = "Assets.xcassets";
 const IMAGE_SET = "T3Mark.imageset";
 const SVG_NAME = "T3Mark.svg";
 
-// The fork's builds carry the Infinitus twin loop, the upstream variants the
-// T3 mark — they build the real T3 Code side by side. Only the artwork copied
-// in changes: the catalog entry keeps the name AgentActivity.tsx asks for, and
-// both marks are drawn at the 3:2 the widget frames them at, so neither is
-// stretched and the widget file stays upstream's.
+// The fork's builds carry the Infinitus loop, upstream variants the T3 mark. Only the
+// artwork changes: the catalog entry keeps the name AgentActivity.tsx asks for, and both
+// marks are drawn at the widget's 3:2 so neither stretches.
 const SOURCE_BY_VARIANT = { infinitus: "InfinitusMark.svg" };
 
 const CATALOG_CONTENTS = JSON.stringify({ info: { author: "expo", version: 1 } }, null, 2) + "\n";

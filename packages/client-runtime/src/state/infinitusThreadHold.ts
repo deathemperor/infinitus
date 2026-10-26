@@ -1,13 +1,10 @@
 import type { ThreadId } from "@infinitus/contracts";
 import type { InfinitusHeldThread } from "@infinitus/contracts/infinitus";
 
-/** What the server's holds stream says about one thread, for a list row or
-    a banner: `held` for headroom (#741) or `paused` for it mid-turn (#743),
-    with the row's line — or null when it says nothing, or has not said yet
-    (the stream is still connecting, or the server predates it). Absent is
-    never held: a hold is never assumed. An entry without `kind` comes from a
-    server before the kinds joined the stream: held. Web and phone rows
-    resolve their status from this the same way. */
+/** What the server's holds stream says about one thread: `held` for headroom
+    (#741) or `paused` mid-turn (#743), or null when it says nothing yet. Absent
+    is never held. An entry without `kind` is from a server before kinds joined
+    the stream: held. Web and phone rows resolve status from this alike. */
 export function heldEntryFor(
   holds: ReadonlyArray<InfinitusHeldThread> | null | undefined,
   threadId: ThreadId,

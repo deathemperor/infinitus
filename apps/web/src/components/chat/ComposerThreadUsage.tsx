@@ -18,14 +18,10 @@ import {
 } from "./threadUsage.logic";
 
 /**
- * Fork (#834): the thread's usage in the composer footer, beside the context
- * meter. The badge reads the thread's estimated cost (or its turn count
- * when no turn carried one); the popover leads with that cost and lists
- * what the thread did, the tokens by kind, the models and the last turn
- * under it. Drawn only for a thread with a rollup: an empty card on every
- * thread that recorded nothing would be a lying affordance. The rollup is
- * folded from the projection the client already holds, so nothing extra
- * crosses the wire for it.
+ * Fork (#834): the thread's usage in the composer footer, beside the context meter: a badge of
+ * estimated cost (or turn count when no turn carried one) and a popover with tokens by kind, models
+ * and the last turn. Drawn only for a thread with a rollup, never an empty card; folded from the
+ * projection the client already holds.
  */
 export function ComposerThreadUsage({ usage }: { usage: ThreadUsageRollup }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);

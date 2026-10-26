@@ -1,10 +1,7 @@
 /**
- * Keep the computer awake while a thread's turn runs (#1075). The renderer
- * decides — it already holds every thread's session state — and tells the
- * shell over `setKeepAwake`; this side only holds one
- * `powerSaveBlocker('prevent-app-suspension')` while asked to, idempotent
- * both ways, released when the layer's scope closes with the app. Sleep is
- * never held for a remote environment: those turns run on another machine.
+ * Keep the computer awake while a thread's turn runs (#1075). The renderer decides and
+ * calls `setKeepAwake`; this side holds one idempotent `powerSaveBlocker`, released when
+ * the scope closes. Sleep is never held for a remote environment.
  */
 import * as Electron from "electron";
 import * as Context from "effect/Context";

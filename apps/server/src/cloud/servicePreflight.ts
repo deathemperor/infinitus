@@ -24,7 +24,15 @@ export function runServicePreflight(input: {
     return {
       status: "blocked",
       version,
-      reason: `This release requires a newer ${PRODUCT_NAME} service launcher. Update it on the server machine.`,
+      // A stale `infinitus` earlier on PATH (an old npm/nvm global) makes `infinitus service install`
+      // reinstall itself and report success, so name the exact install and the path check. The
+      // installer is not pinned to `version`: that is the server package's, not the release's.
+      reason: [
+        `The installed service launcher speaks protocol ${input.launcherProtocol}, but infinitus ${version} requires protocol ${SERVICE_LAUNCHER_PROTOCOL}.`,
+        "On the server machine, install the current CLI: `curl -fsSL https://infinitus.run/install.sh | sh`.",
+        `Check that \`infinitus --version\` prints ${version} and that \`which -a infinitus\` lists no older infinitus (such as an npm or nvm install) first, then run \`~/.local/bin/infinitus service install\` (the installer's default path).`,
+        `Updating the ${PRODUCT_NAME} desktop app does not update this CLI, and \`infinitus service update\` only repairs the service with whichever CLI runs it.`,
+      ].join(" "),
     };
   }
 

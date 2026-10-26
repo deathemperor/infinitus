@@ -6,13 +6,10 @@ import * as NodeProcess from "node:process";
 import * as NodeURL from "node:url";
 
 /**
- * Where infinitus.run serves the Linux install script from: a static asset
- * of the site worker (`apps/mac/site`), so `curl -fsSL
- * https://infinitus.run/install.sh | sh` works. The site has no build step
- * and the script's one source of truth is `scripts/install.sh` (an upstream
- * file, a registration point), so the copy is checked in here; the test
- * beside this file fails when the two drift, and `--check` does the same in
- * a shell. The Windows script is not served: no Windows archive exists yet.
+ * Where infinitus.run serves the Linux install script from: a static asset of the
+ * site worker (`apps/mac/site`). The site has no build step and the source of truth
+ * is `scripts/install.sh`, so the copy is checked in; the test beside this file and
+ * `--check` fail when the two drift. The Windows script is not served.
  */
 export const INSTALL_SCRIPT_SOURCE = "scripts/install.sh";
 export const INSTALL_SCRIPT_ASSET = "apps/mac/site/public/install.sh";

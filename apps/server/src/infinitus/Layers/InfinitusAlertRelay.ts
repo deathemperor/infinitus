@@ -34,13 +34,9 @@ export const INFINITUS_ALERT_DEEP_LINK = "/settings/accounts";
 export const INFINITUS_HOME_DEEP_LINK = "/";
 
 /**
- * The server half of an account alert (#1375): the Mac posts one line to
- * `POST /api/infinitus/alert`, this layer signs it with the environment's
- * link key — the same key and claims `AgentAwarenessRelay` publishes thread
- * activity with, the alert in place of the state — and hands it to the
- * relay's alert route, which pushes it with the relay's own APNs key. The
- * link is read on every call, as the activity publisher reads it, so
- * linking or unlinking takes effect at the next alert; unlinked answers
+ * The server half of an account alert (#1375): signs the Mac's `POST /api/infinitus/alert` line
+ * with the environment's link key (as `AgentAwarenessRelay` does) and hands it to the relay's alert
+ * route, which pushes it. The link is read on every call; unlinked answers
  * `InfinitusAlertRelayUnlinked` and the Mac keeps the notice local.
  */
 export const InfinitusAlertRelayLive = Layer.effect(

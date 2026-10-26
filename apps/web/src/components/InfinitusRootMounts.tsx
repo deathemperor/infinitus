@@ -9,12 +9,10 @@ import { InfinitusPeerFleets } from "./InfinitusPeerFleets";
 import { InfinitusSettingsSync } from "./InfinitusSettingsSync";
 
 /**
- * The fork's headless coordinators, mounted once from the root route beside
- * upstream's: deep links (#270 D), the notification-mode migration, the dock
- * badge and keep-awake (`docs/internals/notifications.md`,
- * `desktop-keep-awake.md`), the capture gesture (#433), the event toasts,
- * and, Electron only, the peer fleets (#1545) and settings sync
- * (`docs/internals/settings-sync.md`). None of them renders anything.
+ * The fork's headless coordinators, mounted once from the root route beside upstream's: deep links
+ * (#270 D), notification-mode migration, dock badge and keep-awake
+ * (`docs/internals/notifications.md`, `desktop-keep-awake.md`), capture gesture (#433), event
+ * toasts, and, Electron only, peer fleets (#1545) and settings sync. None renders anything.
  */
 export function InfinitusRootMounts({ authenticated }: { authenticated: boolean }) {
   return (

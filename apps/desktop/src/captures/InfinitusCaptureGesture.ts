@@ -1,17 +1,8 @@
 /**
- * The capture gesture (#433 slice 2): with the knob on, a double tap of Shift
- * in any app reads that app's selected text and hands it to the renderer,
- * which adds it to the active project's captures. macOS only. The poller
- * starts with the knob and stops with it; one read runs at a time; the text
- * never reaches a log or a span, only its length. Turning the knob on asks
- * for the Accessibility grant (the same one SnapShot's context uses); a
- * launch with the knob already on checks it silently.
- *
- * Slice 3: the renderer pulls. A read is queued here and the page pinged;
- * the coordinator drains the queue on mount and on every ping, so a read
- * that lands while a fresh window is still loading — or after its load but
- * before the coordinator mounts — waits here instead of being sent to a
- * page with nobody listening.
+ * The capture gesture (#433): with the knob on, a double tap of Shift in any app reads its
+ * selected text for the active project's captures. macOS only; one read at a time; the
+ * text never reaches a log or span, only its length. The renderer pulls: reads queue here
+ * and the coordinator drains on mount and each ping, so none is sent to an unmounted page.
  */
 import type { DesktopCaptureGestureEvent } from "@infinitus/contracts";
 import type { InfinitusDesktopPrefs } from "@infinitus/contracts/infinitus";

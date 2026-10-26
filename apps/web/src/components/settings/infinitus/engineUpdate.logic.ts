@@ -7,11 +7,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * Settings › Engines › engine updates (#1577): `engine-update-check swapd`
- * reads the running version against the newest release for that Mac, and
- * `engine-update swapd` installs it there and relaunches the app. Both run on
- * the environment the page manages, so another machine's engine is updated
- * from this desktop. Pure so the row only renders.
+ * Settings › Engines › engine updates (#1577): `engine-update-check swapd` reads the running
+ * version against the newest release for that Mac, and `engine-update swapd` installs it there and
+ * relaunches the app. Both run on the environment the page manages. Pure so the row only renders.
  */
 
 const CHECK_VERB = "engine-update-check";

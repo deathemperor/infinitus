@@ -78,14 +78,10 @@ export const BUNDLED_CLAUDE_MODEL_CATALOG = resolveClaudeModelCatalog(
 );
 
 /**
- * Scope the catalog to one instance's settings: custom model slugs stay opaque
- * (a built-in alias they shadow is dropped, canonical slugs and capabilities
- * are preserved), and custom entries that declare their own capabilities are
- * appended so the adapter resolves effort / fast mode / thinking against the
- * user's descriptors instead of the empty default. Option values pass through
- * to Claude Code verbatim, with one exception: a context window choice means
- * nothing to the CLI as a value, only as a token count and a wire form, so
- * `customClaudeRuntime` gives a custom entry that much of a runtime profile.
+ * Scope the catalog to one instance's settings: custom model slugs stay opaque (a shadowed built-in
+ * alias is dropped), and custom entries declaring capabilities are appended so the adapter resolves
+ * effort / fast mode / thinking against the user's descriptors. Option values reach Claude Code
+ * verbatim, except a context window choice, which `customClaudeRuntime` maps.
  */
 export function scopeClaudeModelCatalog(
   catalog: ClaudeModelCatalog,
@@ -127,13 +123,10 @@ export function scopeClaudeModelCatalog(
 }
 
 /**
- * The window each `contextWindow` choice buys, by the option ids the manifest's
- * own Claude profiles use. A custom entry carries descriptors but no runtime
- * profile, so a `contextWindow` choice it declares would resolve no token count
- * and no wire syntax: the adapter would neither send the long-context beta on a
- * proxied instance nor append the suffix on a direct one, leaving the control
- * inert. Recognised ids get the manifest's own mapping; any other id stays
- * unmapped, as every custom option value does.
+ * The window each `contextWindow` choice buys, by the option ids the manifest's Claude profiles
+ * use. A custom entry has no runtime profile, so its `contextWindow` choice would resolve no token
+ * count or wire syntax and the control would be inert. Recognised ids get the manifest's mapping;
+ * others stay unmapped.
  */
 const CUSTOM_CONTEXT_WINDOW_TOKENS: Readonly<Record<string, number>> = {
   "200k": 200_000,

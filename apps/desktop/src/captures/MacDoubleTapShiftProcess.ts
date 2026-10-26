@@ -3,15 +3,10 @@
 import * as NodeChildProcess from "node:child_process";
 
 /**
- * The capture gesture's trigger on macOS (#433 slice 2): Shift tapped twice.
- * A sibling of the SnapShot modifier-pair poller — the same `osascript`
- * child sampling `CGEventSourceFlagsState` at 30 Hz, the same stderr
- * protocol (`ready`, then one `trigger` per gesture) — with a stricter
- * read of the samples: two presses each shorter than the window, the
- * second within the window of the first release, and no character typed
- * between them (`CGEventSourceCounterForEventType` for key-downs; modifier
- * presses are flags-changed events, so they do not count). Both Shifts held
- * at once — SnapShot's own `shift` pair — has no release, so never fires.
+ * The capture gesture's trigger on macOS (#433): Shift tapped twice. An `osascript` child
+ * samples `CGEventSourceFlagsState` at 30 Hz (stderr: `ready`, then one `trigger` per
+ * gesture): two short presses, the second within the window of the first release, and no
+ * key-down between them. Both Shifts held at once never fires.
  */
 
 /** Both Shift keys' device flags in `CGEventSourceFlagsState`. */

@@ -58,11 +58,9 @@ function parseInstant(value: string | null | undefined): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-/** The window that governs an exhausted account's return: of every window
-    at or over its limit, the one resetting LAST (all of them must lift). The
-    spend cap is deliberately not a cause — spent credit leaves the
-    subscription windows usable. Null for a live account or one whose blocking
-    window carries no reset instant. */
+/** The window that governs an exhausted account's return: of every window at or over its
+    limit, the one resetting LAST. The spend cap is not a cause. Null for a live account
+    or one whose blocking window has no reset instant. */
 function governingReset(account: InfinitusAccount): { at: number; window: string } | null {
   if (account.usage === undefined) return null;
   const decoded = decodeUsage(account.usage);

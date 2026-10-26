@@ -39,37 +39,10 @@ const alertRelay = () =>
 const runningTurns = () => InfinitusRunningTurnsLive.pipe(Layer.provide(ProjectionStoreV2.layer));
 
 /**
- * The fork's server layers, composed once from `server.ts` with the two
- * upstream compositions they depend on (generic in those layers' types, so
- * the requirements resolve at the call site exactly as inline code would):
- *
- * - `infinitus`: `InfinitusLive` with the control client private to it (the
- *   only thing that polls the socket), the port layer (writes one pref once
- *   the server listens and again when a watched app comes back; it also
- *   mints infinitusctl's session, #822, hence `layerAuth`, and names this
- *   environment to the app, #1487, hence `layerServerEnvironment`), the companion
- *   (opens the app when the socket stays quiet and on `infinitus.launch`),
- *   `InfinitusSecretLive` (#747, the one secret-carrying path) and
- *   `InfinitusUsageAttributionLive` (#779, the `history` verb per usage
- *   scan). Provided to `UsageService` and merged into the runtime.
- * - `reactors`: the sign-in lapse watcher (#1076, #1627: a lapsed AWS /
- *   gcloud sign-in in a tool's output starts the Mac's login and rings the
- *   phones; its own control client, `ps` / `kill` through `ProcessRunner`)
- *   and resume-on-limit (#648, #1627: failed limit runs and the Claude
- *   adapter's rejected windows, the swapd probe for the accounts while the
- *   menu bar app is away), the idle session-holds layer (#616, #743) and
- *   the usage backfill (#834, needs `UsageService` from the chain) and
- *   the tool-boundary steer (#1318, #1627: a queued steer goes into the
- *   running turn at its next finished tool call; reads the projection store).
- *   Merged beside upstream's reactors, where the
- *   chain hands them `OrchestratorV2` and `ServerEnvironment`.
- * - `runtime`: `infinitus`, the limit-stop list (#648: one instance for the
- *   resume layer, the Claude driver's refusal hook and the `ws.ts` stream)
- *   and the pairing-approval store (#710, minting through the same auth
- *   service as the QR flow). Merged into `layerRuntimeDependencies`.
- * - `httpApi`: the phone's pairing routes and the Mac's alert (#1375) and
- *   running-turns (#829) routes, for the `EnvironmentHttpApi` builder.
- * - `runningTurns`: for the update idle gate (#829).
+ * The fork's server layers, composed once from `server.ts` with the upstream compositions they
+ * depend on (generic in their types, so requirements resolve at the call site). `reactors` merge
+ * beside upstream's, where the chain hands them `OrchestratorV2` and `ServerEnvironment`; the usage
+ * backfill needs `UsageService`, to which `infinitus` is provided.
  */
 export function makeInfinitusServerLayers<
   ROutAuth,

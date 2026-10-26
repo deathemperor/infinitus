@@ -22,12 +22,10 @@ import { onNextAttentionThreadRequest } from "./nextAttentionBus";
 import { resolveAttentionRank, resolveNextAttentionThreadId } from "./sidebarNeedsAttention.logic";
 
 /**
- * Fork (#270 C): the `thread.nextAttention` key and the palette's "Jump to
- * next waiting thread" action. Both rank the rendered list at press time
- * (approval, input, limit, failure, then an unseen completion, ties in
- * sidebar order after the current thread) and navigate to the winner; a
- * press with nothing waiting is a no-op. The sidebar mounts this once beside
- * its own key handling and hands over what only it holds.
+ * Fork (#270 C): the `thread.nextAttention` key and the palette's "Jump to next waiting thread"
+ * action. Both rank the rendered list at press time (approval, input, limit, failure, unseen
+ * completion; ties in sidebar order after the current thread) and navigate to the winner; nothing
+ * waiting is a no-op. Mounted once by the sidebar, which hands over what only it holds.
  */
 export function useNextAttentionKey(input: {
   readonly orderedThreads: ReadonlyArray<SidebarThreadSummary>;

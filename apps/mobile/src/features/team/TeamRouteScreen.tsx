@@ -35,11 +35,9 @@ export type TeamRouteParams = {
 const INPUT =
   "rounded-[14px] border border-input-border bg-input px-4 py-3.5 text-base text-foreground";
 
-/** Settings › Team on Infinitus Connect (#1592): the teams the signed-in
-    user is in, read and changed on the relay as that user, no Mac in the
-    loop. Members with their machines and live threads, the leader's
-    requests, what is waiting for the user's Allow, and Join. Creating,
-    sharing, grants, transcripts and leaving are the desktop's. */
+/** Settings › Team on Infinitus Connect (#1592): the signed-in user's teams, read and
+    changed on the relay as that user, no Mac in the loop. Creating, sharing, grants,
+    transcripts and leaving are the desktop's. */
 export function TeamRouteScreen({ route }: StaticScreenProps<TeamRouteParams | undefined>) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -84,7 +82,7 @@ function ConnectedTeam(props: { readonly code: string }) {
         title={`Sign in to ${CONNECT_NAME}`}
         detail="Teams live on your account: join from here, and every machine you sign in on shares with them."
         actionLabel="Sign in"
-        onAction={() => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" })}
+        onAction={() => navigation.navigate("SettingsAuth")}
       />
     );
   }

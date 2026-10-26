@@ -38,6 +38,8 @@ import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
 import { splitEnvironmentSections } from "./environmentSections";
 import { routePairingPrefill } from "./pairPrefill.logic";
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { leaveSettingsPage } from "../settings/settings-navigation";
+import { workspaceHasColumns } from "../workspace/workspace-selection-store";
 
 type ConnectionsNewRouteParams = {
   readonly mode?: string;
@@ -177,12 +179,12 @@ export function ConnectionsNewRouteScreen({
         : Haptics.NotificationFeedbackType.Error,
     );
     if (AsyncResult.isSuccess(result)) {
-      // Return to whatever opened the sheet. Replacing it with Home would
-      // nest Home inside any sheet still below it.
+      // Replacing with Home would nest it inside any sheet below; return to the opener.
       if (!navigation.canGoBack()) {
         navigation.dispatch(StackActions.replace("Home"));
       } else {
-        navigation.goBack();
+        // Added from the Settings list, the new environment shows on Environments.
+        leaveSettingsPage(navigation, workspaceHasColumns(), "SettingsEnvironments");
       }
     }
   };
@@ -421,7 +423,7 @@ function InfinitusConnectSection() {
           label={`Sign in to ${CONNECT_NAME}`}
           description="Reach your machines from anywhere, no network setup."
           disabled={!isLoaded}
-          onPress={() => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" })}
+          onPress={() => navigation.navigate("SettingsAuth")}
         />
       )}
     </View>

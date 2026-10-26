@@ -697,21 +697,24 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the 3:2 the widget's `renderLogo` frames it at, so the glyph is not
   stretched and upstream's widget file needs no edit. The plugin's ordering
   rule (listed BEFORE `expo-widgets`) is unchanged and still load-bearing.
-- `apps/mobile/src/Stack.tsx` — `...INFINITUS_SETTINGS_SCREENS` spread into
-  the settings stack and `...infinitusNewTaskScreens(GLASS_HEADER_OPTIONS)`
+- `apps/mobile/src/Stack.tsx` — `...infinitusSettingsScreens(SETTINGS_PAGE_OPTIONS)`
+  spread into upstream's root `SETTINGS_SCREENS` (each Settings page is a root
+  route since upstream #24524) and `...infinitusNewTaskScreens(GLASS_HEADER_OPTIONS)`
   into the root stack beside upstream's `NewTaskProject` (upstream flattened
   the new-task sheet, #23467; both `features/infinitus/stackScreens.ts`:
   Settings › Accounts, Settings › Team #1313, the share-to-thread route), one
   `discardDismissedShare(transition, discardShare)` call in `RootStackLayout`'s
   share effect, whose `isShareSheetPresented` reads `isShareFlowRoute`
   (`features/sharing/share-to-thread.ts`), and `PRODUCT_NAME` / `CONNECT_NAME` in two titles.
-- `apps/mobile/src/features/settings/components/settings-sheet-targets.ts` —
-  `SettingsAccounts` and `SettingsTeam` in the settings target union.
+- `apps/mobile/src/features/settings/components/settings-page-targets.ts` —
+  `SettingsAccounts` and `SettingsTeam` in the settings page list.
 - `apps/mobile/src/features/settings/SettingsRouteScreen.tsx` — the rows of
   `SettingsInfinitusRows.tsx`, spread over upstream's sections (no
   "Infinitus" section: the whole app is Infinitus): Accounts, Team and the
   reset alarms toggle at the end of Connections in both the local and the
-  configured screen (`InfinitusFleetRows`, `InfinitusAlarmsRow`). The Account
+  configured screen (`useInfinitusFleetRows()` row data, and
+  `InfinitusAlarmsRow` in the Connections section's `footer` slot, the one
+  edit to upstream's section shape: a switch is not row data). The Account
   and About rows say the product name; `SettingsAboutRouteScreen.tsx` and
   `SettingsNotificationsRouteScreen.tsx` (upstream's split of this screen)
   carry the product-name strings and the product version.
@@ -776,11 +779,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `InfinitusSignIns` (lapsed AWS / gcloud sign-ins of paired Macs).
 - `apps/mobile/src/components/CompactBrandTitle.tsx` — the iOS header's brand
   slot shows `PRODUCT_NAME` where upstream draws the T3 glyph + "Code" (#601).
-- `apps/mobile/src/features/review/shikiReviewHighlighter.ts`,
-  `apps/mobile/src/features/diffs/nativeReviewDiffHighlighter.ts` — an
-  explicit `tokenizeTimeLimit` (5 s) on both `codeToTokensBase` calls: shiki's
-  500 ms default is spent by a cold JavaScript regex engine compiling its
-  patterns, which fused the first line into one token on loaded CI (#610).
 - `apps/web/src/components/Sidebar.logic.ts` and `sidebar/SidebarThreadRow.tsx` — the `held`
   / `paused` statuses (#741, #743): the resolver takes the holds stream's
   kind for the thread (from `sidebar/useInfinitusHeldSummary.ts`), above
@@ -912,3 +910,5 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/server/src/preview/ServerBrowser.ts` (+ test) — the desktop `attached` handler also hands a tab that started headless (no panel showed it within `DESKTOP_ATTACH_TIMEOUT`) to the desktop's page once it mounts, so the agent drives the page the person sees, with their sign-ins; `dropTab`'s `handOff` sends streaming viewers `reconnect`. Port of upstream's closed #17336 for its open #16901. If upstream lands #18217 instead (it streams the headless page and keeps it), keep ours: the sign-in is the point.
 - `apps/web/package.json` — `react-test-renderer` and `@types/react-test-renderer` as devDependencies: upstream moved every React test into a real browser and dropped them (#20944), while the fork's component tests (`AccountsPage`, `StatsPage`, `ComposerCapturesMenu`, `InfinitusEventToasts`, `settings/infinitus/*`) still render with them.
 - `packages/source-control-forgejo/src/server/ForgejoSourceControlProvider.test.ts` — "reads Forgejo jobs that did not run as finished checks" (#16668) mocks `branches/main` as `{}`: upstream wrote it before its checks read began fetching the base branch's protection, so on upstream's own `main` the mock answers that read with `[]` and the test fails. Take upstream's version once it fixes the test.
+- `oxlint-plugin-t3code/rules/no-low-value-comments.ts` — `CHECK_BARE_ISSUE_REFS = false`: upstream's rule (#21514) rejects a bare `#123` in a comment as history git already keeps, but the fork's comments cite this repository's issues as the design record (INFINITUS.md), so that one check is off and the rule's others stand.
+- `oxlint-plugin-t3code/rules/react-effect-budget.ts` — merges `scripts/effect-budget.infinitus.json` over upstream's `scripts/effect-budget.json`: fork files and upstream files the fork adds effects to budget there, so upstream's list merges without conflicts. A new fork effect still needs its reason or a budget bump in the fork's file.

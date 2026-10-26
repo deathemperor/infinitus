@@ -7,12 +7,10 @@ import { useThreadShells } from "../../state/entities";
 import { primaryEnvironmentIdAtom } from "../../state/primaryEnvironment";
 
 /**
- * Keeps the desktop shell's power-save blocker in step with the threads
- * (#1075): held while any thread on this window's own server has a turn
- * starting or running, released when the last one ends, on unmount, and
- * once on mount (a reload leaves the shell holding whatever the last page
- * asked for). Mounted once from `__root.tsx`; nothing rendered; nothing on
- * a shell without the bridge.
+ * Keeps the desktop shell's power-save blocker in step with the threads (#1075): held while any
+ * thread on this window's own server has a turn starting or running, released when the last ends,
+ * on unmount, and once on mount (a reload leaves the shell holding the last request). Mounted once
+ * from `__root.tsx`; renders nothing; inert without the bridge.
  */
 export function DesktopKeepAwakeCoordinator() {
   const setKeepAwake = window.desktopBridge?.setKeepAwake;

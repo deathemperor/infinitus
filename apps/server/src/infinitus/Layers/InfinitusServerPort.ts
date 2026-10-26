@@ -54,11 +54,9 @@ export const publishOptedIn = (value: string | undefined): boolean =>
   ["1", "true", "yes"].includes((value ?? "").trim().toLowerCase());
 
 /**
- * How the app answers a publish while another environment's server holds its
- * slot (#1487): the same words `ForkServerProbe.heldReply` in `apps/mac`
- * opens with. The installed desktop's heartbeat meets this once a minute for
- * as long as an opted-in dev server runs, so it is a line of information,
- * not a warning.
+ * How the app answers a publish while another environment's server holds its slot (#1487): the
+ * words `ForkServerProbe.heldReply` in `apps/mac` opens with. The desktop's heartbeat meets it
+ * every minute while an opted-in dev server runs, so it is information, not a warning.
  */
 export const HELD_REPLY_PREFIX = "held by environment ";
 
@@ -73,16 +71,10 @@ const decodePrefs = Schema.decodeUnknownEffect(InfinitusPrefs);
 const HEARTBEAT_INTERVAL = Duration.seconds(60);
 
 /**
- * The port the app's catalog names for `fork_server_port`, or undefined when
- * it names none we can compare. A value that is not ours is the signal that
- * another server published over us and, if it has since died, left the tunnel
- * pointing at a closed port (#1137).
- *
- * Two cases deliberately answer undefined, because a false positive here
- * republishes every minute and each publish rotates the `infinitusctl`
- * credential: a catalog without the pref at all (an app that has no such
- * setting), and a value that is not a port number (an app reporting something
- * we cannot compare). Neither is a port we can claim is stale.
+ * The port the app's catalog names for `fork_server_port`, or undefined when none is comparable. A
+ * foreign value means another server published over us and may have left the tunnel on a closed
+ * port (#1137). A missing pref or a non-port value answers undefined: a false positive would
+ * republish every minute, and each publish rotates the `infinitusctl` credential.
  */
 export const publishedPort = (prefs: typeof InfinitusPrefs.Type): number | undefined => {
   const pref = prefs.prefs.find((entry) => entry.key === PORT_PREF);
@@ -128,15 +120,10 @@ interface HeldCredential {
 }
 
 /**
- * Hands the app the session `infinitusctl` uses against this server, on the
- * `secret` field (#822). The session this publisher minted before is handed
- * over again while it is still active — a republish after a port drift
- * (#1137) must not add a Devices row or rotate a token a CLI holds — and only
- * when none is (first publish, or the user revoked it in Settings › Devices)
- * is a new one minted, after revoking any other `infinitusctl` row so Settings
- * shows one. A write the app refuses revokes a freshly minted session again —
- * no orphan row — and logs; the token itself reaches no log, no span, no
- * error.
+ * Hands the app the session `infinitusctl` uses against this server, on the `secret` field (#822).
+ * The session minted before is handed over again while active, so a republish after a port drift
+ * (#1137) rotates no token; a new one is minted only when none is, after revoking other
+ * `infinitusctl` rows. A refused write revokes a fresh one; the token is never logged.
  */
 const publishDesktopCredential = Effect.fn("Infinitus.publishDesktopCredential")(
   function* (input: {
@@ -217,20 +204,15 @@ const publishDesktopCredential = Effect.fn("Infinitus.publishDesktopCredential")
 
 export interface ServerPortPublisher {
   /**
-   * Tells Infinitus which port this server bound, so the tunnel it can run
-   * for the pairing QR fronts the right one, and — on an app whose manifest
-   * takes it — the credential `infinitusctl` drives this server with (#822).
-   * Once, fire-and-forget: no Infinitus, an old manifest, a refused write —
-   * each logs at most one line and never fails. Answers whether the app was
-   * there to hear it.
+   * Tells Infinitus which port this server bound, so the pairing-QR tunnel fronts the right one,
+   * and (if the manifest takes it) the `infinitusctl` credential (#822). Once, fire-and-forget:
+   * every failure logs at most one line. Answers whether the app was there to hear it.
    */
   readonly publish: Effect.Effect<boolean>;
   /**
-   * One heartbeat check (#1137): reads the app's own catalog and republishes
-   * only when the port it names is not ours. A read, not a blind write —
-   * republishing on a timer would hand the credential over every minute.
-   * Never fails: an app that is away, or a reply that will not decode, is
-   * next minute's problem.
+   * One heartbeat check (#1137): republishes only when the app's catalog names a port that is not
+   * ours. A read, not a blind write: republishing on a timer would hand the credential over every
+   * minute. Never fails; an away app or undecodable reply is next minute's problem.
    */
   readonly republishIfPortDrifted: Effect.Effect<void>;
 }
@@ -322,12 +304,9 @@ export const publishServerPort = (port: number) =>
   Effect.flatMap(makeServerPortPublisher(port), (publisher) => publisher.publish);
 
 /**
- * The startup publish, then one more each time the app comes back — as seen
- * by whichever client is polling, since this never polls itself — and, from
- * #1137, a slow heartbeat of its own. The edge alone was not enough: a server
- * nobody is watching polls nothing, so when another server published over its
- * port and died, the tunnel fronted a closed port until someone relaunched the
- * app. The heartbeat is the one thing here that does not need a watcher.
+ * The startup publish, then one each time the app comes back (seen by whichever client polls; this
+ * never polls) and a slow heartbeat (#1137): a server nobody watches polls nothing, so after
+ * another server published over its port and died, the tunnel fronted a closed port.
  */
 export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublished")(function* (
   port: number,
@@ -337,11 +316,9 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
   const infinitus = yield* InfinitusService;
   const publisher = yield* makeServerPortPublisher(port);
   const heard = yield* publisher.publish;
-  // The came-back edge and the heartbeat are two independent callers of a
-  // publish that is read-modify-write on the credential (list, mint or
-  // reuse, hand over). Interleaved, the app can end up holding a token the
-  // other call already revoked, and the heartbeat — seeing the port match —
-  // would never repair it. One permit keeps them in line.
+  // The came-back edge and the heartbeat both run a publish that is read-modify-write on the
+  // credential; interleaved, the app can hold a token the other call already revoked and the
+  // heartbeat, seeing the port match, would never repair it. One permit keeps them in line.
   const publishing = yield* Semaphore.make(1);
   const onReturn = infinitus.observed.pipe(
     // Only the edge: an app the startup publish reached is not "back" on the
@@ -362,21 +339,10 @@ export const keepServerPortPublished = Effect.fn("Infinitus.keepServerPortPublis
 });
 
 /**
- * Why a server keeps its port to itself, or undefined for the installed one.
- * The pref names the server the phone's tunnel fronts, and the installed
- * desktop's bundled server is the one that should own it: a dev-runner server
- * (it serves the web app from Vite, so it carries a dev URL) or any server
- * whose home is a worktree-local `.t3` would otherwise take the tunnel with
- * it, last writer wins (#640). An `INFINITUS_CONTROL_SOCKET` override is an
- * isolated instance by definition (every dev instance runs with one): it
- * neither publishes its port nor opens the installed app. Those three name
- * the usual dev shapes; the fail-safe is the runtime mode (#1487): only the
- * desktop's own bundled server runs as `desktop`, so a `web` server — a
- * showcase on a temp home, `dev:server` without Vite, a `--home-dir`
- * elsewhere — stays quiet whatever its home, instead of rotating the
- * installed desktop's credential every minute.
- * `INFINITUS_PUBLISH_SERVER_PORT=1` overrides every reason: that server is the
- * one the user picked, and it says so to the app (`takeover`).
+ * Why a server keeps its port to itself, or undefined for the installed one. The pref names the
+ * server the phone's tunnel fronts, which must be the desktop's bundled one: a dev-runner server, a
+ * worktree-local `.t3` home or an `INFINITUS_CONTROL_SOCKET` override must not take it (#640), nor
+ * any non-`desktop` runtime mode (#1487). `INFINITUS_PUBLISH_SERVER_PORT=1` overrides every reason.
  */
 export const serverPortWithheldReason = (input: {
   readonly mode: RuntimeMode;

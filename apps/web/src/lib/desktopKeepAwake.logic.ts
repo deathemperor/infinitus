@@ -1,11 +1,9 @@
 import type { EnvironmentId, OrchestrationV2RunStatus } from "@infinitus/contracts";
 
 /**
- * Fork (#1075): whether the desktop shell should hold off sleep. True while
- * the setting is on and any thread on the primary environment — the server
- * this window runs — has a turn starting or running, the sidebar's
- * "working" reading. Remote environments never count: their turns run on
- * another machine.
+ * Fork (#1075): whether the desktop shell should hold off sleep: the setting is on and any thread
+ * on the primary environment (this window's server) has a turn starting or running. Remote
+ * environments never count; their turns run on another machine.
  */
 export function keepAwakeWanted(input: {
   readonly enabled: boolean;

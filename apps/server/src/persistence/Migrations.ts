@@ -80,6 +80,7 @@ import Migration0075 from "./Migrations/075_CodexUsageNativeTurnIndex.ts";
 import Migration0076 from "./Migrations/076_RepairClientSettlementTimestamps.ts";
 import Migration0077 from "./Migrations/077_WebhookDedupe.ts";
 import Migration0078 from "./Migrations/078_ShellStopRequestIndex.ts";
+import Migration0079 from "./Migrations/079_ThreadMessageSearch.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -157,7 +158,7 @@ const migrationEntries = [
   [69, "McpAppModelContext", Migration0069],
   [70, "ThreadSnapshotWindowIndexes", Migration0070],
   [71, "PullRequestReviewGuides", Migration0071],
-  // Upstream's 62-68, renumbered after the fork's own range like the V2 migrations above.
+  // Upstream's 62-69, renumbered after the fork's own range like the V2 migrations above.
   [72, "ThreadFailureLookupIndex", Migration0072],
   [73, "DropUnusedV1Projections", Migration0073],
   [74, "CanonicalizeThreadPullRequestLinks", Migration0074],
@@ -165,6 +166,7 @@ const migrationEntries = [
   [76, "RepairClientSettlementTimestamps", Migration0076],
   [77, "WebhookDedupe", Migration0077],
   [78, "ShellStopRequestIndex", Migration0078],
+  [79, "ThreadMessageSearch", Migration0079],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -181,12 +183,7 @@ const makeMigrationLoader = (throughId?: number) =>
 // V2's schema migrations start at 55 upstream; the fork's own 51-64 push them to 65 (INFINITUS.md).
 const FIRST_V2_MIGRATION_ID = 65;
 
-/**
- * Fail before migrating when the migrator would skip one of V2's own
- * migrations. It skips every id up to the highest recorded one, whatever name
- * was recorded, so a database that took a V2 id for another migration would
- * start without V2's schema and fail on first use.
- */
+// Migrators skip ids up to the highest recorded; reject collisions that would skip V2 schema.
 const assertV2MigrationsCanRun = Effect.fn("assertV2MigrationsCanRun")(function* (
   throughId?: number,
 ) {

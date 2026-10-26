@@ -12,7 +12,7 @@ export class ElectronNotification extends Context.Service<
   }
 >()("@infinitus/desktop/electron/ElectronNotification") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = ElectronNotification.of({
   setBadgeCount: (count) =>
     Effect.sync(() => {

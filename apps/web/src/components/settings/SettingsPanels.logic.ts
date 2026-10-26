@@ -296,11 +296,9 @@ const INFINITUS_TRACK_OPTIONS = [
 ] as const satisfies DesktopUpdateTrackRow["options"];
 
 /**
- * The Update-track row of an installed desktop build. A fork build follows the
- * `infinitus` channel, whose releases only this repository publishes, or its
- * nightly (#1042: last night's build of main, every day); upstream's Stable
- * and Nightly tracks would hand it the real T3 Code on the next update, with
- * no way back, so the fork's select offers only its own two.
+ * The Update-track row of an installed desktop build. A fork build follows the `infinitus` channel
+ * or its nightly (#1042); upstream's Stable and Nightly tracks would hand it the real T3 Code on
+ * the next update with no way back, so the select offers only the fork's own two.
  */
 export function resolveDesktopUpdateTrackRow(
   channel: DesktopUpdateChannel | null,

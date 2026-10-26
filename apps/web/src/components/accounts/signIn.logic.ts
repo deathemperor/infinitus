@@ -14,14 +14,10 @@ import type {
 import * as Schema from "effect/Schema";
 
 /**
- * A fleet's sign-in inside this app (#677): the menu-bar app runs the flow
- * with no window (`signin-begin`), the provider's page opens in the desktop
- * shell's child window or, on any other client, from a link in a new tab
- * (#747), and this page shows where it stands, takes the code from the
- * success page, and says how it ended. The code reaches the app through the
- * shell where there is one, else through `infinitus.secret` as `signin-code
- * <flowId>` with the code on the secret channel. Pure — the page keeps one
- * `SignInFlow` and renders these words.
+ * A fleet's sign-in inside this app (#677): the menu-bar app runs the flow with no window
+ * (`signin-begin`); the provider's page opens in the desktop shell's child window or a new tab
+ * (#747), and this page shows where it stands and takes the code. The code reaches the app through
+ * the shell, else through `infinitus.secret` as `signin-code <flowId>`. Pure.
  */
 
 const BEGIN_COMMAND = "signin-begin";
@@ -58,12 +54,10 @@ export interface SignInFlow {
       it; null while the shell has it or before the app answered. */
   readonly url: string | null;
   readonly pasteCode: boolean;
-  /** The loopback port the engine on the Mac listens on for the OAuth
-      redirect, when the sign-in ends on one. A browser on this device is sent
-      to ITS localhost, where nothing listens: the page takes the address that
-      browser ended on and hands it to the Mac over `signin-code`, which
-      replays it against the listener. Null for a paste-code flow, and for a
-      build that never says. */
+  /** The loopback port the Mac's engine listens on for the OAuth redirect, when the sign-in ends on
+      one. A browser on this device is sent to ITS localhost, so the page hands the address that
+      browser ended on to the Mac over `signin-code`, which replays it against the listener. Null
+      for a paste-code flow. */
   readonly redirectPort: number | null;
   /** The desktop shell stands in for that listener on this machine: it took
       the port, opened the page, and will hand the address on itself — nothing
@@ -78,11 +72,9 @@ export interface SignInFlow {
   readonly codeBusy: boolean;
 }
 
-/** What the fleet's field takes while a flow waits on this device: the code
-    from the success page (#747), the loopback address the browser ended on
-    (a redirect the Mac's engine takes, shown from a link here), or nothing.
-    A flow the shell's window shows (`url` null) reaches the listener itself,
-    so it never asks for the address. */
+/** What the fleet's field takes while a flow waits on this device: the code from the success page
+    (#747), the loopback address the browser ended on, or nothing. A flow the shell's window shows
+    (`url` null) reaches the listener itself, so it never asks for the address. */
 export type SignInPasteField = "code" | "address";
 
 export function signInPasteField(flow: SignInFlow | null): SignInPasteField | null {
@@ -165,11 +157,10 @@ export function oauthSignInBridge(
   return { begin: bridge.beginInfinitusOAuthSignIn, cancel: bridge.cancelInfinitusOAuthSignIn };
 }
 
-/** Which sign-in a fleet's section draws. `inApp` is a flow this client runs —
-    the shell's own `add-oauth` (#1213) or the app's in-app sign-in (#677) —
-    and `canAdd` the older hand-off to the Mac (#672). The shell's path asks the
-    app for nothing, so the `addOAuth` capability does not gate it: a fleet that
-    never advertised it is the case #1213 exists for. */
+/** Which sign-in a fleet's section draws. `inApp` is a flow this client runs (the shell's
+    `add-oauth` #1213 or the app's in-app sign-in #677); `canAdd` the older hand-off to the Mac
+    (#672). The shell's path asks the app for nothing, so the `addOAuth` capability does not gate
+    it. */
 export function fleetSignInGate(input: {
   /** This shell can run this fleet's own `add-oauth`. */
   readonly shellOAuth: boolean;

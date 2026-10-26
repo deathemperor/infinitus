@@ -7,7 +7,9 @@ import { teamJoinLinkCode, UNIVERSAL_LINK_HOST } from "../team/team.logic";
 const rewriteIncomingUrl = (url: string | null): string | null => {
   if (url === null) return null;
   const teamCode = teamJoinLinkCode(url);
-  return teamCode === null ? url : Linking.createURL("team", { queryParams: { code: teamCode } });
+  return teamCode === null
+    ? url
+    : Linking.createURL("settings/team", { queryParams: { code: teamCode } });
 };
 
 /**

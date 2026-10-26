@@ -8,11 +8,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * The pure half of Settings › Team on Infinitus Connect (#1592), shared by
- * the web pane and the phone: the join link's shapes, what a member row
- * says, and how the machines' `now` documents, the threads index and a
- * transcript chunk are read — every one defensively, since the relay keeps
- * them opaque.
+ * The pure half of Settings › Team (#1592), shared by web and phone: join link
+ * shapes, member rows, and reading the machines' `now` documents, threads index
+ * and transcript chunks defensively, since the relay keeps them opaque.
  */
 
 const JOIN_LINK_ORIGIN = "https://infinitus.run/join";

@@ -21,16 +21,10 @@ export interface ActiveProjectRef {
 }
 
 /**
- * The project the routed thread — or the draft, once a project is chosen —
- * belongs to. Null on a draft with no project yet.
- *
- * Reads the route as three strings rather than through `useHandleNewThread`:
- * that hook's `useParams` selector builds a new target object on every
- * render, which React counts as a changed store snapshot.
- * A component reading it can then never bail out of a same-state update,
- * and the composer's every-render layout measure turned that into a
- * synchronous update loop (#821). Chat-route components read this hook
- * once and pass the ref down.
+ * The project the routed thread (or the draft, once a project is chosen) belongs to. Null on a
+ * draft with no project yet. Reads the route as three strings rather than through
+ * `useHandleNewThread`, whose `useParams` selector builds a new object every render, which turned
+ * the composer's every-render layout measure into a synchronous update loop (#821).
  */
 export function useActiveProjectRef(): ActiveProjectRef | null {
   const environmentId = useParams({ strict: false, select: (params) => params.environmentId });

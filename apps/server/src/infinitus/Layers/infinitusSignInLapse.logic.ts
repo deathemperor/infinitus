@@ -6,15 +6,10 @@ import type { InfinitusManifestCommand } from "@infinitus/contracts/infinitus";
 const EM_DASH = String.fromCharCode(0x2014);
 
 /**
- * Lapsed AWS / gcloud sign-in detection (#1076), the pure half: the Mac's
- * transcript-scan signature tables (`AwsLogin.swift`, `GcloudLogin.swift`,
- * ported verbatim) applied to a `command_execution` turn item the
- * orchestrator just stored (#1627: every provider's shell tool, normalized).
- * A hit names the profile the failed command addressed — the error text's
- * own `--profile` when it prints one, else the Bash command's `--profile` /
- * `AWS_PROFILE` (`--account` / `CLOUDSDK_CORE_ACCOUNT` for gcloud), else
- * `default`; gcloud's Application Default Credentials are the
- * `application-default` account, whatever the command named.
+ * Lapsed AWS / gcloud sign-in detection (#1076), the pure half: the Mac's transcript-scan signature
+ * tables (ported verbatim) applied to a stored `command_execution` item (#1627). A hit names the
+ * profile the failed command addressed (error text, else command `--profile` / `AWS_PROFILE` /
+ * `--account`, else `default`); gcloud ADC is always `application-default`.
  */
 
 export type SignInProvider = "aws" | "gcloud";
@@ -34,11 +29,9 @@ const SCAN_TAIL_BYTES = 16 * 1024;
 interface Signature {
   /** Any of these anywhere in the (lowercased) text means "lapsed"… */
   readonly markers: ReadonlyArray<string>;
-  /** …provided one of these OPENS a line: the CLIs print at column 0 and
-      the broker's advisory is indented by exactly two spaces, while the
-      same words quoted from a source file, a grep hit or a line-numbered
-      Read don't — the sessions working on this feature lit up as needing
-      a login (Mac, 2026-09-03). */
+  /** …provided one of these OPENS a line: the CLIs print at column 0 and the broker's advisory is
+      indented two spaces, while the same words quoted from a source file, grep hit or numbered Read
+      don't (sessions working on this feature lit up as needing a login, Mac 2026-09-03). */
   readonly lineStarts: ReadonlyArray<string>;
 }
 
@@ -138,13 +131,10 @@ const GCLOUD_LOGIN_ACCOUNT = /\blogin\s+([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)/;
 const AGENT_LOGIN_RUN = /\bagent-login\.ts\s+(aws|gcp)\b/;
 
 /**
- * The sign-in a Bash command is itself running, or null: an agent that types
- * `aws login` blocks on a browser nobody is shown, and prints no lapse
- * signature at all. Only a login that OPENS a command counts — quoted spans
- * are flattened to one word and the rest split on the shell's separators —
- * so a grep for the words, an echo of them or a commit message stays quiet
- * (same incident as `lineStarts`). A heredoc body line that opens with the
- * command still matches; accepted.
+ * The sign-in a Bash command is itself running, or null: `aws login` blocks on a browser nobody
+ * sees and prints no lapse signature. Only a login that OPENS a command counts (quoted spans
+ * flattened, the rest split on separators), so a grep, echo or commit message stays quiet (same
+ * incident as `lineStarts`). A heredoc body line opening with the command still matches; accepted.
  */
 export function signInRun(command: string): SignInLapse | null {
   // A quoted span keeps its name characters (a quoted profile still reads)
@@ -179,13 +169,9 @@ export function signInRun(command: string): SignInLapse | null {
 }
 
 /**
- * What a `command_execution` turn item says about a sign-in, or null for any
- * other item. The adapters normalize every provider's shell tool into one:
- * `input` is the command as typed, `output` its stdout and stderr once it
- * has run — absent while it runs, and for a run that printed nothing. A
- * running item with no output is the command's start, read for a login the
- * agent runs itself (`signInRun`: it blocks on a browser nobody is shown and
- * prints no signature at all); an item with output is read for a lapse
+ * What a `command_execution` item says about a sign-in, or null. `input` is the command, `output`
+ * its stdout and stderr once run (absent while running, or if nothing printed). A running item with
+ * no output is read for a login the agent runs itself (`signInRun`); one with output for a lapse
  * signature. A finished command that printed nothing is neither.
  */
 export function signInFromTurnItem(
@@ -279,12 +265,10 @@ function loginProcess(command: string): SignInLapse | null {
 }
 
 /**
- * The logins an agent is still blocked on once the Mac's login for the same
- * credential lands: descendants of `rootPid` (this server — every provider
- * CLI and the shells its tools open run under it) whose argv is that CLI's
- * login for one of `profiles`, read off `ps -eo pid=,ppid=,args=`.
- * Never a process outside this server's tree, so the Mac's own login (the
- * app's child) and another server's agents are out of reach.
+ * The logins an agent is still blocked on once the Mac's login for the same credential lands:
+ * descendants of `rootPid` (this server) whose argv is that CLI's login for one of `profiles`, read
+ * off `ps -eo pid=,ppid=,args=`. Never a process outside this server's tree, so the Mac's own login
+ * and another server's agents are out of reach.
  */
 export function agentLoginPids(
   ps: string,

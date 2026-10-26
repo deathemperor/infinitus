@@ -1,9 +1,7 @@
 /**
- * Worktree limit (#269 H; Cursor's max worktrees). A launch that would
- * create a worktree is refused once `worktreeMaxCount` worktrees are held by
- * live threads — before the thread is created, so the send costs nothing.
- * Archived threads keep their worktree until they are deleted, so the
- * refusal names the oldest of those: deleting one frees a worktree.
+ * Worktree limit (#269 H). A launch that would create a worktree is refused once `worktreeMaxCount`
+ * worktrees are held by live threads, before the thread is created. Archived threads keep theirs
+ * until deleted, so the refusal names the oldest of those: deleting one frees a worktree.
  */
 
 export interface WorktreeHolders {

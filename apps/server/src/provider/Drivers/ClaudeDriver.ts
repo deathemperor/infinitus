@@ -366,12 +366,10 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       ),
     );
 
-    // Same rules as Codex: serialised on the config directory that holds
-    // the login, one request id kept until Claude answers (a cooldown or
-    // rate limit is an answer), then a re-probe so the snapshot says what
-    // the reset did. The windows live in the capabilities cache, so it is
-    // dropped first or the re-probe would republish the pre-reset bars for
-    // the rest of the TTL.
+    // Same rules as Codex: serialised on the config directory holding the login, one request id
+    // kept until Claude answers (a cooldown or rate limit is an answer), then a re-probe. The
+    // windows live in the capabilities cache, dropped first or the re-probe would republish the
+    // pre-reset bars for the rest of the TTL.
     const consumeResetCredit: NonNullable<ProviderInstance["consumeResetCredit"]> = Effect.fn(
       "ClaudeDriver.consumeResetCredit",
     )(

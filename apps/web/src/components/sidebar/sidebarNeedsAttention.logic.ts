@@ -9,14 +9,10 @@ import {
 } from "../Sidebar.logic";
 
 /**
- * Fork (#269 D, #270 C; re-ported onto orchestrator v2 under #1627): the
- * threads blocked on the user, across every project and environment, for the
- * section above the sidebar's list and the next-attention key. Blocked means
- * the thread waits for something only the user can give: an approval, an
- * answer, or an account swap (a usage limit, #270 I / #648). A failed or
- * unread thread is not blocked and stays where it is. The statuses are v2's
- * own (`resolveSidebarThreadStatus` over the shell's pending requests and run
- * state), so this file adds no signal, only the cross-project view.
+ * Fork (#269 D, #270 C, #1627): the threads blocked on the user across every project and
+ * environment: an approval, an answer, or an account swap (usage limit, #270 I / #648). A failed or
+ * unread thread is not blocked. Statuses are v2's own (`resolveSidebarThreadStatus`); this file
+ * adds only the cross-project view.
  */
 export type NeedsAttentionStatus = "approval" | "input" | "limited";
 
@@ -36,12 +32,9 @@ const STATUS_ORDER: Record<NeedsAttentionStatus, number> = {
 };
 
 /**
- * The blocked threads in the order the user should take them: approvals,
- * then questions, then limits, the longest wait first within each. A thread
- * waiting on an approval or an answer has had no change since the request
- * landed, so its `updatedAt` is when the wait began. Takes every shell: the
- * section ignores the sidebar's project scope and skips archived threads
- * and subagents itself.
+ * The blocked threads in the order the user should take them: approvals, then questions, then
+ * limits, longest wait first within each (`updatedAt` is when the wait began). Takes every shell:
+ * the section ignores the sidebar's project scope and skips archived threads and subagents itself.
  */
 export function collectNeedsAttention(
   threads: ReadonlyArray<SidebarThreadSummary>,
@@ -68,11 +61,9 @@ export function collectNeedsAttention(
 }
 
 /**
- * Where a thread sits in the "needs you next" order (#270 C): the rank the
- * keybinding minimises, or null when the thread asks nothing of the user.
- * Approval outranks input outranks a limit outranks a failed run (the status
- * resolver's own precedence); an unseen completion trails them all. Working,
- * waiting and read rows never qualify.
+ * Where a thread sits in the "needs you next" order (#270 C): the rank the keybinding minimises, or
+ * null when the thread asks nothing of the user. Approval outranks input outranks a limit outranks
+ * a failed run (the status resolver's precedence); an unseen completion trails them all.
  */
 export function resolveAttentionRank(input: {
   readonly status: SidebarThreadStatus;
@@ -95,11 +86,9 @@ export function resolveAttentionRank(input: {
 }
 
 /**
- * The thread the next-attention key lands on: the lowest rank among the
- * entries, ties broken by sidebar order starting just after the current
- * thread and wrapping, so repeated presses walk every waiting thread of one
- * rank before dropping to the next. The current thread is never the answer
- * (nothing to jump to) and the order is never changed (the sort's rule).
+ * The thread the next-attention key lands on: the lowest rank, ties broken by sidebar order
+ * starting just after the current thread and wrapping. The current thread is never the answer and
+ * the order is never changed.
  */
 export function resolveNextAttentionThreadId<T>(input: {
   readonly entries: ReadonlyArray<{ readonly id: T; readonly rank: number | null }>;

@@ -1,19 +1,12 @@
 /**
- * The pure half of the shell's own OAuth sign-in (#1213): where the engine's
- * binary lives, and what its two `add-oauth --json` lines mean.
- *
- * The engine is swapd, and this is the one place in the desktop tree that
- * knows its name. `add-oauth` makes swapd the OAuth client — it holds the PKCE
- * verifier and its own loopback listener catches the redirect — so the shell
- * only opens a URL and reads an envelope. The menu-bar app is not in the flow,
- * which is the whole point: this app can add an account on its own.
+ * The pure half of the shell's own OAuth sign-in (#1213): where the engine's binary lives
+ * and what its two `add-oauth --json` lines mean. swapd is the OAuth client (PKCE,
+ * loopback listener), so this is the one desktop place that knows its name.
  */
 
-/** Where `swapd` lives, checked in order; first hit wins. The list mirrors the
-    Mac app's `SwapdLocator`, so both find the same binary on one machine: the
-    bundle's own copy first — the engine the release was pinned to, which a
-    stale `cargo install` on PATH used to shadow (#1530) — then the PATH dirs
-    a source build relies on. */
+/** Where `swapd` lives, checked in order; first hit wins. Mirrors the Mac app's
+    `SwapdLocator`: the bundle's copy first (the pinned engine, which a stale
+    `cargo install` on PATH used to shadow, #1530), then the PATH dirs a source build uses. */
 export interface SwapdBinaryInput {
   readonly env: Record<string, string | undefined>;
   readonly homeDirectory: string;

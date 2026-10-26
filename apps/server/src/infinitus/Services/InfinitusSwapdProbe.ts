@@ -112,7 +112,7 @@ export const InfinitusSwapdProbeLive = Layer.effect(
           })),
         })),
       } satisfies InfinitusSnapshot;
-    }).pipe(Effect.catch(() => Effect.succeed(unavailable)));
+    }).pipe(Effect.orElseSucceed(() => unavailable));
     const reportLimit = Effect.fn("InfinitusSwapdProbe.reportLimit")(
       function* (account: string, resetsAt: string | null) {
         if (platform !== "darwin" || binary === "") return;

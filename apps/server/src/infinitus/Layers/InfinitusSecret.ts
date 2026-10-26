@@ -25,14 +25,10 @@ import { isNotPolled } from "./Infinitus.ts";
     refused call holds nothing. */
 export const SECRET_ATTEMPTS_PER_MINUTE = 5;
 
-/** The secret verbs a standard client may reach: a code the user was handed
-    out of band and the Mac validates — a sign-in's code or callback, for a
-    login the client can start over `infinitus.command` anyway. Every other
-    secret verb (an engine key, the desktop credential) is the Mac's
-    configuration and keeps needing `access:write`. A default pairing carries
-    it since upstream folded access and relay management into the standard
-    scopes (#20432); only a grant narrowed below it is refused. (The team invite
-    code left with the git-store Team, #1592: a team is joined on the relay.) */
+/** The secret verbs a standard client may reach: a code the user was handed out of band and the Mac
+    validates (a sign-in's code or callback). Every other secret verb (an engine key, the desktop
+    credential) is the Mac's configuration and keeps needing `access:write`. A default pairing
+    carries it (#20432); only a narrower grant is refused. */
 const STANDARD_CLIENT_SECRET_VERBS: ReadonlySet<string> = new Set([
   "aws-login-code",
   "gcloud-login-code",
@@ -41,11 +37,9 @@ const STANDARD_CLIENT_SECRET_VERBS: ReadonlySet<string> = new Set([
 ]);
 const ATTEMPT_WINDOW_MS = 60_000;
 
-/** The manifest spells a positional `<flowId>` and an option as its usage
-    line, `--url <base URL, …>`; the caller's `args` keys are the bare names,
-    `flowId` and `url`, which is also how the request line names an option. A
-    positional spelled as a choice, `<account|default|application-default>`
-    (`gcloud-login-code`), goes by its first alternative, `account`. */
+/** The manifest spells a positional `<flowId>` and an option as usage text (`--url <base URL, …>`);
+    the caller's `args` keys are the bare names (`flowId`, `url`). A positional spelled as a choice,
+    `<account|default|application-default>`, goes by its first alternative. */
 const argName = (spec: string): string => spec.replace(/^<(.*)>$/, "$1").split("|", 1)[0] ?? spec;
 const optionName = (spec: string): string => spec.replace(/^-+/, "").split(/\s+/, 1)[0] ?? spec;
 
@@ -79,15 +73,10 @@ const requestFor = (
 };
 
 /**
- * The fork's one secret-carrying path (#747). `forward` puts the value on the
- * request line's `secret` field — where stdin material always travels — for a
- * verb whose manifest entry says `stdin: "secret"`, and nothing else: no
- * manifest yet, another verb, an argument the verb does not name, or a sixth
- * attempt inside a minute is refused before the socket is touched. The value
- * is a `Redacted` until the request is built (so a log line, a span or a
- * pretty-printed cause shows `<redacted>`), lives in that one request, and is
- * kept nowhere. The reply passes through opaque; that it never echoes the
- * secret is the verb's own contract.
+ * The fork's one secret-carrying path (#747). `forward` puts the value on the request line's
+ * `secret` field, only for a verb whose manifest entry says `stdin: "secret"`; no manifest, another
+ * verb, an unnamed argument or a sixth attempt inside a minute is refused before the socket. The
+ * value is `Redacted` until the request is built and kept nowhere; the reply passes through opaque.
  */
 export const InfinitusSecretLive = Layer.effect(
   InfinitusSecret,

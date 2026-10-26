@@ -39,7 +39,7 @@ const clientLayer = (
 ) =>
   Layer.succeed(InfinitusControlClient, {
     socketPath,
-    request: (input) =>
+    request: () =>
       Effect.gen(function* () {
         if (yield* Ref.get(available)) return { version: "0.5.0" };
         return yield* new InfinitusUnavailable({ path: SOCKET, cause });

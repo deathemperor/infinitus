@@ -28,22 +28,11 @@ interface Watched {
 }
 
 /**
- * Turns the Infinitus host's new events into the app's notifications: an
- * account switch, every account exhausted, and the app's own announcements
- * (#1032 finished — the menu bar app stays quiet whenever this is running,
- * so these are the account banners, not a second copy of them). Each gets
- * one Open action to /accounts. Nothing from the first snapshot after mount
- * (no replay on reload), nothing twice (by the server's id), and a line the
- * app re-emits unchanged only once. It is the web's one always-on snapshot
- * subscriber, so it is what keeps the fast poll and the client-activity
- * lease running whatever page is open.
+ * Turns the host's new events into notifications (#1032), one Open action to /accounts each; no
+ * replay of the first snapshot, nothing twice. As the web's one always-on snapshot subscriber it
+ * keeps the fast poll and client-activity lease running.
  *
- * An urgent line — the fleet out of accounts, the last one nearly gone, a
- * crash — reaches the user where they are: a toast in the window, and a real
- * OS banner under `notificationMode` when the window is not in front. The
- * rest (a switch, an account back) stay toasts. Same two rules as a thread's
- * banner (`ThreadNotificationCoordinator`): the sound is the settings', and
- * the banner only fires when the window is away.
+ * Urgent lines get a toast plus an OS banner (`notificationMode`) when the window is away.
  */
 export function useInfinitusEventToasts(): void {
   const environment = usePrimaryEnvironment();
@@ -97,12 +86,10 @@ export function useInfinitusEventToasts(): void {
         }),
       );
       if (!toast.urgent) continue;
-      // The fleet is out and nothing is running — the one piece of account
-      // news worth a bell and a banner away from the window.
-      // `input` of the two bundled sounds: this waits on the user the way an
-      // approval does. The audio context is unlocked by the gesture listeners
-      // `ThreadNotificationCoordinator` installs, and the settings are re-read
-      // at play time there, so a mode turned off mid-decode stays silent.
+      // Fleet out and nothing running: the one piece of account news worth a bell and banner away
+      // from the window. Uses `input` of the two bundled sounds, as this waits on the user like an
+      // approval. `ThreadNotificationCoordinator` unlocks audio and re-reads settings at play time,
+      // so a mode turned off mid-decode stays silent.
       if (hasNotificationSound(mode)) {
         void playNotificationSound("input", () =>
           hasNotificationSound(getClientSettings().notificationMode),

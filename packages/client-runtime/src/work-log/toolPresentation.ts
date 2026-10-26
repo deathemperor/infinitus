@@ -1,4 +1,4 @@
-import { isWorkspaceImagePreviewPath } from "@infinitus/shared/filePreview";
+import { isWorkspaceImagePreviewPath } from "@infinitus/shared/mediaPreview";
 import { COMPUTER_USE_TOOL_SOURCE, dynamicToolSurface } from "@infinitus/shared/toolActivity";
 import type {
   ToolActivityIcon,

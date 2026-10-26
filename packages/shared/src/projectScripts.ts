@@ -50,12 +50,10 @@ export function projectScriptCwd(input: {
 }
 
 /**
- * Ten ports per checkout (#270 J): a dev server started by a script binds
- * `$T3CODE_PORT`, so the same script on two worktrees never fights over
- * 3000. The block is derived from the worktree path (the project root for a
- * local-checkout thread), so a worktree keeps its ports across threads and
- * restarts. Blocks live in 10000–29999: below Linux's ephemeral range
- * (32768+) and clear of the usual 3000 / 5173 / 8080 defaults.
+ * Ten ports per checkout (#270 J): a dev server binds `$T3CODE_PORT`, so the same
+ * script on two worktrees never fights over 3000. The block is derived from the
+ * worktree path, so it is stable across threads and restarts. Blocks live in
+ * 10000–29999: below Linux's ephemeral range and clear of 3000 / 5173 / 8080.
  */
 export const PROJECT_SCRIPT_PORT_BLOCK_SIZE = 10;
 const PORT_BLOCK_FIRST = 10_000;

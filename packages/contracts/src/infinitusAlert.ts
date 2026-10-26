@@ -3,12 +3,10 @@ import * as Schema from "effect/Schema";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * An account alert the Mac app hands the desktop server to push to the
- * phones (#1375): `POST /api/infinitus/alert`, bearer-authenticated with
- * the desktop credential the server mints for the Mac. The server signs it
- * for the relay's alert route and answers how many phones were addressed.
- * Both fields are capped: an alert is one line, and the relay truncates
- * longer ones anyway.
+ * An account alert the Mac app hands the desktop server to push to the phones
+ * (#1375): `POST /api/infinitus/alert`, bearer-authenticated with the desktop
+ * credential. The server signs it for the relay and answers how many phones
+ * were addressed. Both fields are capped: an alert is one line.
  */
 export const InfinitusAlertInput = Schema.Struct({
   title: TrimmedNonEmptyString.check(Schema.isMaxLength(120)),

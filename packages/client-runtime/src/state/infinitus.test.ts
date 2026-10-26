@@ -1,4 +1,4 @@
-import { EnvironmentId, ThreadId, WS_METHODS } from "@infinitus/contracts";
+import { EnvironmentId, WS_METHODS } from "@infinitus/contracts";
 import type {
   InfinitusAccount,
   InfinitusCommandInput,

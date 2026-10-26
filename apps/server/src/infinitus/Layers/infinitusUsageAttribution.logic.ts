@@ -1,10 +1,8 @@
 /**
- * The pure half of per-account spend attribution (#779): the swap engine's
- * history (`swapd history --json --provider claude`, read through the app's
- * `history` verb) becomes a timeline, and a timeline answers "which account
- * was active at this instant". Emails are the join key: slots renumber when
- * the engine compacts, emails do not. Nothing here logs; the callers keep the
- * emails out of spans and log lines.
+ * The pure half of per-account spend attribution (#779): the swap engine's history becomes a
+ * timeline that answers "which account was active at this instant". Emails are the join key (slots
+ * renumber on compaction, emails do not). Nothing here logs; callers keep emails out of spans and
+ * log lines.
  */
 import type { InfinitusAccount } from "@infinitus/contracts/infinitus";
 

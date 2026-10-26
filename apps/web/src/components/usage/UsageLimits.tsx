@@ -264,11 +264,8 @@ export function useResetCredit(
   return { canManageProviders, confirming, setConfirming, busy, status, redeem };
 }
 
-/**
- * Redeeming spends a credit the provider granted the user, so it never fires on a bare click.
- * Mount it outside any popover that holds the button: dialogs stack under popovers, and closing
- * the popover would unmount a dialog rendered inside it.
- */
+/** Require confirmation because redemption spends credits. Mount outside popovers, which stack above
+ * dialogs and unmount on close. */
 export function ResetCreditDialog({
   open,
   onOpenChange,
@@ -321,7 +318,7 @@ export function resetCreditsSummary(
  * Why the next credit waits, for the held button: Claude's resets work only
  * at a limit and cool down between claims. Null when it can be used now.
  */
-export function resetHoldText(credits: ServerProviderResetCredits, now: number): string | null {
+function resetHoldText(credits: ServerProviderResetCredits, now: number): string | null {
   const hold = credits.nextHold;
   if (!hold || credits.availableCount === 0) return null;
   switch (hold.reason) {
@@ -385,10 +382,7 @@ export function ResetCredits({
   );
 }
 
-/**
- * The page advances `now` on explicit refresh rather than ticking: a live clock would repaint the
- * page for no decision-changing gain.
- */
+/** Advance now only on explicit refresh to avoid page repaints from ticking. */
 export function UsageLimitsSection({
   selectedEnvironmentIds,
   hiddenProviders,

@@ -11,18 +11,10 @@ import { forkParked } from "../../serverActivation.ts";
 import { toolBoundaryOf, toolBoundarySteerCandidate } from "./infinitusToolBoundarySteer.logic.ts";
 
 /**
- * Fork (#1318, #1627): the half of steer mode that watches the running turn.
- * The orchestrator queues a steer as a run with `sendAt: "tool_boundary"`
- * (`Orchestrator.ts`, `message.dispatch`); this layer tails the domain events
- * and, when a tool call of a running turn finishes, promotes the first such
- * row to a steer through the same `queued-message.promote-to-steer` command
- * the row's own "Steer" button sends — one row per boundary, under the
- * thread's dispatch lock, so a row the user sent, edited or removed
- * meanwhile is refused there rather than sent twice. The command id is the
- * tool item's, so a tool whose completion is projected twice is one
- * boundary. A refusal is normal (the turn ended, the row went) and is logged
- * at debug only. If the turn ends first, the idle drain takes the row as an
- * ordinary queued message.
+ * Fork (#1318, #1627): the half of steer mode that watches the running turn. A steer is queued as a
+ * run with `sendAt: "tool_boundary"`; when a tool call of the running turn finishes, the first such
+ * row is promoted via `queued-message.promote-to-steer`, one row per boundary under the dispatch
+ * lock. The command id is the tool item's, so a twice-projected completion is one boundary.
  */
 export const InfinitusToolBoundarySteerLive = Layer.effectDiscard(
   Effect.gen(function* () {

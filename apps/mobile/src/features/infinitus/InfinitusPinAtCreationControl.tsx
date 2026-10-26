@@ -7,11 +7,9 @@ import { environmentServerConfigsAtom } from "../../state/server";
 import { PIN_AT_CREATION_HINT, pinAtCreationEnabled } from "./pinAtCreation.logic";
 
 /**
- * The new-task composer's "Pin" pill (#742, the web's "Pin on create" of
- * #753): session priority mode holds background threads for headroom and
- * pinned threads never wait, so a task the user wants running from its first
- * turn is pinned the moment the server creates it. A per-phone preference,
- * off by default; only shown for a project whose server pins threads.
+ * The new-task composer's "Pin" pill (#742): session priority mode holds background
+ * threads for headroom and pinned ones never wait. A per-phone preference, off by
+ * default; shown only for a project whose server pins threads.
  */
 export function InfinitusPinAtCreationControl(props: {
   readonly environmentId: EnvironmentId | null;

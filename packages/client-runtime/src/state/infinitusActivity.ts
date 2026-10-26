@@ -19,25 +19,10 @@ export interface ActivityRow {
 }
 
 /**
- * The durable log's vocabulary, as short chips; `other` shows none.
- *
- * The Mac's own list is `AppModel.logEvent`'s doc comment plus the engine
- * kinds `AppModel.eventKind` folds in. Two of them are near-twins and are
- * worded here the way Stats words its tiles, so a row says which it is:
- * `death` is one account hitting its limit ("Accounts hit a limit"),
- * `limit` is the fleet with nothing left ("Minutes lost, all out").
- *
- * `events.jsonl` keeps months of history, so kinds whose subsystem the Mac
- * has since deleted — `team` / `team-control` (#1061), `hook` (#1064),
- * `nudge` (#1079) — keep their chips: those rows are still in the log the
- * page reads, and dropping the label would only strip them of their label,
- * not of the row.
- *
- * `alert` and `notice` are the app's own announcements (`AppModel.announce`),
- * the rows this app turns into notifications now that the menu bar app has
- * stopped posting its own: a row says what was SAID, beside the `death` /
- * `revival` rows saying what the fleet DID. Both sit outside StatsEvents'
- * vocabulary on purpose, so an announcement never lands in a tally.
+ * The durable log's vocabulary, as short chips; `other` shows none. Two kinds are
+ * near-twins worded like Stats' tiles: `death` is one account hitting its limit,
+ * `limit` the fleet with nothing left. Kinds whose subsystem the Mac deleted
+ * (`team`, `hook`, `nudge`) keep their chips: those rows are still in the log.
  */
 export const ACTIVITY_KIND_LABELS: Readonly<Record<string, string>> = {
   switch: "switch",
@@ -56,12 +41,10 @@ export const ACTIVITY_KIND_LABELS: Readonly<Record<string, string>> = {
   hook: "hook",
 };
 
-/** The engine poller's two lines a minute — `poll` and `no switch — <reason>`
-    — which bury the switches, tunnel and pairing events the page exists for
-    (#696). Native logs every engine event other than switch, all-exhausted
-    and session-resumed as kind `other` (AppModel.eventKind, native 273b1f848),
-    so the text decides; the icon cannot, since `hand.raised` is also the
-    "session is waiting for an answer" row. */
+/** The engine poller's two lines a minute (`poll`, `no switch — <reason>`) bury
+    the switches, tunnel and pairing events the page exists for (#696). Native
+    logs those engine events as kind `other`, so the text decides; the icon
+    cannot, since `hand.raised` is also the "waiting for an answer" row. */
 export function isPollRow(row: Pick<ActivityRow, "kind" | "text">): boolean {
   return row.kind === "other" && (row.text === "poll" || row.text.startsWith("no switch"));
 }

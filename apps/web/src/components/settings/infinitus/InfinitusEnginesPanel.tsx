@@ -1,9 +1,7 @@
 /**
- * The Engines pane: what each engine is doing right now, the toggles that
- * turn them on, and the proxy engines' base URL and secret (#1177,
- * `InfinitusEngineSecrets`) — the form the Mac's own engine panes drew. A key
- * travels once, over `infinitus.secret`; the status list only says whether
- * the app has one.
+ * The Engines pane: what each engine is doing, the toggles that turn them on, and the proxy
+ * engines' base URL and secret (#1177, `InfinitusEngineSecrets`). A key travels once, over
+ * `infinitus.secret`; the status list only says whether the app has one.
  *
  * @module InfinitusEnginesPanel
  */

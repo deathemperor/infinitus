@@ -1,33 +1,8 @@
 /**
- * A fleet's sign-in this app runs itself (#1213). Where #677 asks the menu-bar
- * app to drive the flow and pastes the code back, this one runs the account
- * engine's `add-oauth` here: swapd is the OAuth client, so its own loopback
- * listener catches the provider's redirect and there is no code — the shell
- * opens the URL the engine printed and reads the envelope it prints once the
- * account is stored. Nothing leaves this process but the URL.
- *
- * The URL opens in a private window of the default browser where it has a
- * switch for one (the Chromium family, on an empty profile): a passkey sign-in
- * never completed in a child window (the platform authenticator, as far as we
- * can tell, is the browser's to use and not an Electron window's), and a
- * browser is where a user's passkeys already are. A browser with no such
- * switch (Safari) must not get the page in its signed-in profile — that
- * offered the account already there and made the user switch accounts to add
- * one (2026-09-21) — and a child window of ours has no passkeys, which the
- * user needs too. So that case is handed to the menu-bar app on this same Mac
- * (`signin-begin --window`): its ephemeral system sheet is private AND has
- * passkeys, and the engine it runs takes the redirect, so this shell only
- * polls `signin-status` for the outcome. The child window (#677's, a fresh
- * in-memory partition) is the last resort, when the menu-bar app is not
- * running. Decided before the engine is spawned: two listeners cannot share
- * the loopback port.
- *
- * It bends the fork's "one API" rule, which is about talking to the menu-bar
- * app: this spawns the engine's CLI directly, so `apps/desktop` knows the name
- * of one engine (`infinitusSwapd.logic.ts`). The alternative — the Mac app
- * running the verb while this shell only shows the window — is the placement
- * the user ruled out, since it leaves the desktop unable to add an account on
- * a machine where the menu-bar app is not running.
+ * A fleet's sign-in this app runs itself (#1213): swapd's `add-oauth` runs here and
+ * catches the redirect on its own loopback listener. The URL opens in a private window of
+ * the default browser (passkeys never completed in a child window), else the menu-bar
+ * app's sheet, last the child window; decided before spawn. Bends the "one API" rule.
  */
 import {
   type InfinitusOAuthSignInInput,
@@ -137,7 +112,7 @@ const make = Effect.gen(function* () {
         InfinitusCommandFailed: (failure) =>
           Effect.succeed({ kind: "refused" as const, error: failure.error }),
       }),
-      Effect.catch(() => Effect.succeed({ kind: "unavailable" as const })),
+      Effect.orElseSucceed(() => ({ kind: "unavailable" as const })),
     );
     if (begun.kind === "unavailable") return null;
     if (begun.kind === "refused") return { ok: false, error: begun.error };
@@ -161,7 +136,7 @@ const make = Effect.gen(function* () {
         STATUS_TIMEOUT_MS,
       ).pipe(
         Effect.flatMap(decodeStatus),
-        Effect.catch(() => Effect.succeed(null)),
+        Effect.orElseSucceed(() => null),
       );
       if (status === null) continue;
       if (status.phase === "done") {

@@ -11,11 +11,9 @@ import * as InfinitusQuitWithApp from "./InfinitusQuitWithApp.ts";
 import * as InfinitusSignIn from "./InfinitusSignIn.ts";
 import * as InfinitusSignInRedirect from "./InfinitusSignInRedirect.ts";
 
-/** Everything the fork adds to the desktop shell for the menu-bar app: the
-    prefs file, the quit-with-app hook that reads it, the in-app sign-in
-    window (#677), the sign-in the shell runs itself (#1213), the capture
-    gesture (#433 slice 2), the deep links (#270 D), the keep-awake
-    blocker (#1075) and the proxy engines this shell runs. */
+/** Everything the fork adds to the desktop shell for the menu-bar app: the prefs file,
+    quit-with-app, the sign-in window (#677) and the shell's own sign-in (#1213), the
+    capture gesture, deep links, the keep-awake blocker and the proxy engines. */
 export const layer = Layer.mergeAll(
   InfinitusQuitWithApp.layer,
   InfinitusSignIn.layer,

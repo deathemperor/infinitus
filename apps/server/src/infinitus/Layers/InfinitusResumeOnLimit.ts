@@ -56,32 +56,10 @@ type Input =
   | { readonly source: "snapshot"; readonly snapshot: InfinitusSnapshot };
 
 /**
- * Resumes a thread's turn on a live account after a usage limit stopped it
- * (#648), on orchestrator v2 (#1627) — the fork's counterpart to native's
- * terminal nudge. Two things record a stop: the Claude adapter's report of a
- * rejected window on a running turn (`InfinitusLimitStops.refusals`, the
- * parked case: the SDK holds the turn open), and a `run.updated` whose thread
- * shell then reads `lastErrorClass: "usage_limit"` (the failed case: the CLI
- * gave up). Each stop joins the `stopped` list the clients read as the
- * sidebar's "Limited" pill, and is reported to swapd as `limit-hit` for the
- * account whose window the refusal's reset matches (#1486) — never for a
- * proxied instance (#1088), whose limit no account on the Mac lifts. While
- * any plain stop is open the layer subscribes to the Infinitus snapshot (that
- * subscription is what makes the server poll — nothing is stopped, nothing
- * polls) and waits for an account that reads `ok` from a probe taken after
- * the stop with room in the stop's window. Then a parked turn is interrupted
- * (the adapter closes its CLI, which keeps the login it started on for
- * minutes after a swap) and, once the orchestrator records the run as ended,
- * the thread continues with upstream's own continuation prompt as a manual
- * continuation of that run; a failed run is continued the same way at once,
- * its CLI replaced by the adapter on the next prompt. Everything runs through
- * one sequential worker: one record per thread, a stop resumed once, resumes
- * spaced by a cooldown, and a thread that moved on (a newer run, a settle, an
- * archive) is forgotten. The resume itself runs beside the worker, since it
- * waits on an event the worker delivers; it re-reads the thread before each
- * command, so a settle or a user's own send in between stands (#1522). Off
- * by the `infinitusResumeOnLimit` server setting, which keeps the pill and
- * drops the report and the resume.
+ * Resumes a turn on a live account after a usage limit stopped it (#648, #1627). A stop (the
+ * adapter's rejected window, or a shell reading `usage_limit`) joins `stopped` and is reported to
+ * swapd as `limit-hit`, never for a proxied instance (#1088). One sequential worker waits for an
+ * account probing `ok` with room, then continues the turn once (#1522).
  */
 export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -118,7 +96,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const enabled = settings.getSettings.pipe(
       Effect.map((current) => current.infinitusResumeOnLimit),
       // Unreadable settings never block a resume the user did not turn off.
-      Effect.catch(() => Effect.succeed(true)),
+      Effect.orElseSucceed(() => true),
     );
 
     const nowMillis = DateTime.now.pipe(Effect.map(DateTime.toEpochMillis));
@@ -140,7 +118,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         Effect.map((current) =>
           proxyInstanceLabel(current.providerInstances, shell.modelSelection),
         ),
-        Effect.catch(() => Effect.succeed(null)),
+        Effect.orElseSucceed(() => null),
       );
 
     const remember = <K, V>(map: Map<K, V>, limit: number, key: K, value: V) => {

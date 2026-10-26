@@ -4,20 +4,10 @@ import { splitNullSeparatedGitStdoutPaths } from "./GitVcsDriverCore.ts";
 import type * as VcsDriver from "./VcsDriver.ts";
 
 /**
- * Restricts a checkpoint-to-checkpoint diff to the paths the thread still
- * changes against its base branch (#1403).
- *
- * A rebase inside a turn puts every commit that landed on the base branch
- * into that turn's checkpoint, so the turn's diff and files list attribute
- * them to the thread. The pathspec keeps a path only when it changed during
- * the turn and its content in the `to` checkpoint still differs from the
- * base tip, re-resolved on every call. A file the agent and the base both
- * touched keeps its whole from→to hunks: a pathspec cannot split hunks.
- *
- * Returns `null` when no base branch resolves (detached HEAD, the thread
- * works on the base branch itself, or a listing fails) or the paths would
- * not fit the command line (git diff takes no pathspec file), which leaves
- * the diff unrestricted.
+ * Restricts a checkpoint-to-checkpoint diff to the paths the thread still changes against its base
+ * branch (#1403). A rebase inside a turn puts the base's new commits into that turn's checkpoint; a
+ * path is kept only if it changed during the turn and its `to` content still differs from the base
+ * tip. `null` (unrestricted) when no base resolves or the paths would not fit the command line.
  */
 export const resolveCheckpointDiffPathspec = Effect.fn("resolveCheckpointDiffPathspec")(function* (
   execute: VcsDriver.VcsDriver["Service"]["execute"],
@@ -59,11 +49,9 @@ const PATHSPEC_ARGV_BUDGET_BYTES = 400_000;
 const DEFAULT_BASE_BRANCH_CANDIDATES = ["main", "master"] as const;
 
 /**
- * The base the branch scope diffs against, as a full ref: the branch's
- * `gh-merge-base`, then origin's default branch, then `main` / `master`,
- * each preferred as `origin/<name>` over the local branch. Mirrors
- * `resolveBaseBranchForNoUpstream` in GitVcsDriverCore without its
- * layer requirements.
+ * The base the branch scope diffs against, as a full ref: the branch's `gh-merge-base`, then
+ * origin's default branch, then `main` / `master`, each preferring `origin/<name>`. Mirrors
+ * `resolveBaseBranchForNoUpstream` in GitVcsDriverCore without its layer requirements.
  */
 const resolveCheckpointDiffBase = Effect.fn("resolveCheckpointDiffBase")(function* (
   execute: VcsDriver.VcsDriver["Service"]["execute"],

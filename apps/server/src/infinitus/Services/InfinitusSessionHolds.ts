@@ -9,11 +9,9 @@ import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 
 /**
- * Session priority mode's face to the clients (#616, #743, on v2 per
- * #1627): what `subscribeInfinitusHolds` streams and what
- * `infinitus.releaseThread` does. The policies that fill it — the hold at
- * the turn-start gate and the interrupt of running turns — land with the
- * queue lane's gate; until then `InfinitusSessionHoldsIdle` holds nothing.
+ * Session priority mode's face to the clients (#616, #743, #1627): what `subscribeInfinitusHolds`
+ * streams and `infinitus.releaseThread` does. The policies that fill it land with the queue lane's
+ * gate; until then `InfinitusSessionHoldsIdle` holds nothing.
  */
 export interface InfinitusSessionHoldsShape {
   /** The threads held or paused right now, oldest first: the whole list on

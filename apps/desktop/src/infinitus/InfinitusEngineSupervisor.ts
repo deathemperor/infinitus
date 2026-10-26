@@ -3,17 +3,9 @@
 // @effect-diagnostics globalDate:off -- Same seam: how long a run lasted is measured at the child-process callback boundary.
 
 /**
- * Run the proxy engines for as long as this app does (#1177 follow-up).
- *
- * A thread on a proxied Claude instance fails with `ConnectionRefused` when its
- * engine is not running, and until now the Engines page could only say so. The
- * shell starts the engine instead, restarts it when it dies, and takes it down
- * with the app.
- *
- * Only a `child` engine is ours to run — `infinitusEngines.logic.ts` decides
- * that, and one already owned by launchd through Homebrew is left to it. A
- * child dies with this process: an engine that must outlive the app belongs in
- * a service manager, not in an Electron shell.
+ * Run the proxy engines for as long as this app does (#1177): start, restart on death,
+ * stop with the app. Only a `child` engine is ours (`infinitusEngines.logic.ts`); one
+ * owned by launchd is left to it, and an engine that must outlive the app belongs there.
  */
 import * as NodeChildProcess from "node:child_process";
 

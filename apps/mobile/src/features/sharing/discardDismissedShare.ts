@@ -1,11 +1,9 @@
 import type { IncomingSharePresentationTransition } from "./incoming-share-presentation";
 
 /**
- * Fork: the new-task sheet closing over an unimported share declines it. Any
- * navigation away counts, a notification tap included: nothing else surfaces
- * the inbox, so keeping the item would only replay the sheet on the next cold
- * launch. Called from `Stack.tsx`'s share effect with the provider's
- * `discardShare`.
+ * Fork: the new-task sheet closing over an unimported share declines it. Any navigation
+ * away counts, a notification tap included: keeping it would replay the sheet on the next
+ * cold launch. Called from `Stack.tsx`'s share effect with `discardShare`.
  */
 export function discardDismissedShare(
   transition: IncomingSharePresentationTransition,

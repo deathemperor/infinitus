@@ -35,6 +35,7 @@ import {
   AuthEnvironmentScope,
   AuthTokenExchangeRequest,
   AuthSessionState,
+  AuthWebSocketTicketParams,
   AuthWebSocketTicketResult,
   ServerAuthSessionMethod,
 } from "./auth.ts";
@@ -575,6 +576,14 @@ class EnvironmentAuthHttpApi extends HttpApiGroup.make("auth")
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
+    HttpApiEndpoint.post("webSocketTicketFor", "/api/auth/websocket-ticket/:use", {
+      headers: OptionalBearerHeaders,
+      params: AuthWebSocketTicketParams,
+      success: AuthWebSocketTicketResult,
+      error: [EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
     HttpApiEndpoint.post("pairingCredential", "/api/auth/pairing-token", {
       headers: OptionalBearerHeaders,
       payload: AuthCreatePairingCredentialInput,
@@ -670,14 +679,22 @@ const EnvironmentOrchestrationThreadSnapshotParams = Schema.Struct({
   threadId: ThreadId,
 });
 
+const EnvironmentOrchestrationShellSnapshotQuery = Schema.Struct({
+  omitIdleSubagents: Schema.optionalKey(Schema.String),
+  omitOlderSettled: Schema.optionalKey(Schema.String),
+});
+
 const EnvironmentOrchestrationThreadBoundedSnapshotQuery = Schema.Struct({
   compactTurnItems: Schema.optionalKey(Schema.String),
+  dedupeBodies: Schema.optionalKey(Schema.String),
+  compactIds: Schema.optionalKey(Schema.String),
 });
 
 const EnvironmentOrchestrationThreadHistoryQuery = Schema.Struct({
   cursor: TrimmedNonEmptyString,
   throughEntryId: Schema.optional(TrimmedNonEmptyString),
   view: Schema.optional(Schema.Literals(["conversation", "activity"])),
+  compactIds: Schema.optionalKey(Schema.String),
 });
 
 const EnvironmentOrchestrationThreadHistoryErrors = [
@@ -691,6 +708,7 @@ class EnvironmentOrchestrationHttpApi extends HttpApiGroup.make("orchestration")
   .add(
     HttpApiEndpoint.get("shellSnapshot", "/api/orchestration/shell", {
       headers: OrchestrationProtocolHeaders,
+      query: EnvironmentOrchestrationShellSnapshotQuery,
       success: OrchestrationV2ShellSnapshot,
       error: EnvironmentOrchestrationSnapshotErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
@@ -830,11 +848,7 @@ class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
     }),
   ) {}
 
-/**
- * Public entry point for webhook tasks. Unauthenticated by design: the token
- * in the path, and an optional body signature, are the credential. The handler
- * reads the raw body itself so a signature is checked over the exact bytes.
- */
+// Path tokens and optional body signatures authenticate webhooks; read raw bytes to verify signatures.
 const WebhookParams = Schema.Struct({
   hookId: TrimmedNonEmptyString,
   token: TrimmedNonEmptyString,
@@ -854,11 +868,9 @@ class EnvironmentWebhooksHttpApi extends HttpApiGroup.make("webhooks")
   .add(HttpApiEndpoint.patch("webhookPatch", WEBHOOK_PATH, webhookEndpoint))
   .add(HttpApiEndpoint.get("webhookGet", WEBHOOK_PATH, webhookEndpoint)) {}
 
-/** #1315: the model `infinitusctl thread new` creates a thread on — resolved
-    as the composer resolves it (`resolveProjectSettings`: the project's
-    override in the server settings, the project row's own default until the
-    fold, then the environment's default), which no other HTTP route exposes:
-    the composer reads the settings over the WebSocket config. */
+/** #1315: the model `infinitusctl thread new` creates a thread on, resolved as
+    the composer resolves it (`resolveProjectSettings`). No other HTTP route
+    exposes it: the composer reads the settings over the WebSocket config. */
 export const InfinitusThreadDefaultsQuery = Schema.Struct({
   projectId: Schema.optional(ProjectId),
 });
@@ -867,12 +879,10 @@ export const InfinitusThreadDefaults = Schema.Struct({
 });
 export type InfinitusThreadDefaults = typeof InfinitusThreadDefaults.Type;
 
-/** #829 on orchestrator v2 (#1627): a thread whose run is live — its
-    highest-ordinal run in `preparing | starting | running | waiting`, the
-    thread shell's `activityRunStatus`. `turnId` is that run's id (the shell
-    carries no provider turn id): `activeRunId` while the run is interruptible,
-    the thread's `latestRunId` while it waits, since the shell names no run for
-    that state. Archived threads are not counted. The Mac counts rows. */
+/** #829 on orchestrator v2 (#1627): a thread whose run is live (highest-ordinal
+    run in `preparing | starting | running | waiting`). `turnId` is that run's id:
+    `activeRunId` while interruptible, `latestRunId` while it waits. Archived
+    threads are not counted. */
 export const InfinitusRunningTurn = Schema.Struct({ threadId: ThreadId, turnId: RunId });
 export type InfinitusRunningTurn = typeof InfinitusRunningTurn.Type;
 

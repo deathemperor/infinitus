@@ -6,15 +6,9 @@ import type {
   InfinitusSnapshot,
 } from "@infinitus/contracts/infinitus";
 
-/** One lapsed sign-in as the phone shows it (#572 task 7). Every one of the
-    Mac's flows reaches the phone: `--remote` (the page opens in Safari and
-    ends with an authorization code pasted back here, then to the Mac over
-    `infinitus.secret` — the phone's default, as on the old native phone:
-    Safari serves passkeys), the device-code flow (the Mac prints a URL and a
-    code, finishes by itself once approved on any device), the relay flow
-    (the CLI redirects to a loopback port, which this phone binds itself —
-    see `loopbackCatch.ts` — and hands back the same way), and `--local` (the
-    Mac opens its own browser). */
+/** One lapsed sign-in as the phone shows it (#572). Every Mac flow reaches the phone:
+    `--remote` (code pasted back, the default: Safari serves passkeys), device-code, relay
+    (this phone binds the loopback port, `loopbackCatch.ts`) and `--local`. */
 export interface SignInModel {
   readonly key: string;
   readonly profile: string;
@@ -61,12 +55,9 @@ function accountOf(account: InfinitusAwsLoginAccount | null | undefined): SignIn
   return { accountId: account.accountId, userName: account.userName || null };
 }
 
-/** Which of a profile's entries to draw: a running login first, then anything
-    still lapsed, and a finished one last. A `done` entry must never displace an
-    idle one — `phaseOf` reads a missing state as idle and a finished login has
-    one, so ranking by "has a state" would let the finished entry win and the
-    filter below would then drop the profile out of the list entirely, with the
-    credentials still expired and no way left to start the login. */
+/** Which of a profile's entries to draw: a running login first, then anything still
+    lapsed, a finished one last. A `done` entry must never displace an idle one, or the
+    filter would drop a profile whose credentials are still expired. */
 const foldRank = (item: InfinitusAwsLogin) => {
   const phase = phaseOf(item);
   if (phase === "starting" || phase === "waiting") return 0;
@@ -92,13 +83,9 @@ export function signInModel(item: InfinitusAwsLogin): SignInModel {
   };
 }
 
-/** The sign-ins a snapshot asks for, finished ones dropped. Empty when the
-    build has no `aws-logins` (the field is absent) or nothing lapsed.
-    One row per tool and profile, as the web's list is: the session that hit a
-    profile is gone with the Mac's tracker (#1041), so the same profile can
-    appear twice with nothing left to tell the rows apart. A group is drawn
-    from its running login when one of them has it, else from any entry still
-    lapsed, and only from a finished one when that is all there is. */
+/** The sign-ins a snapshot asks for, finished ones dropped; empty when the build has no
+    `aws-logins`. One row per tool and profile (#1041): a group draws from its running
+    login, else any lapsed entry, and a finished one only when that is all there is. */
 export function lapsedSignIns(snapshot: InfinitusSnapshot | null): ReadonlyArray<SignInModel> {
   if (snapshot === null || !snapshot.available || snapshot.awsLogins === undefined) return [];
   const byProfile = new Map<string, InfinitusAwsLogin>();
@@ -117,11 +104,9 @@ export function signInHeadline(item: SignInModel): string {
   return `Expired ${item.providerLabel} credentials for ${item.profile}.`;
 }
 
-/** How the phone starts a login. `code`: `--remote`, the page ends with a
-    code pasted back here (the Mac keeps an SSO profile on the device-code
-    flow whatever is asked). `catch`: no flag, the Mac's own flow — the relay
-    one for gcloud and a plain AWS profile, with this phone answering the
-    loopback redirect, or the device-code one for an SSO profile. */
+/** How the phone starts a login. `code`: `--remote`, the code is pasted back here (an SSO
+    profile stays on device-code regardless). `catch`: no flag, the Mac's own flow, with
+    this phone answering the loopback redirect for the relay one. */
 export type SignInStartMode = "code" | "catch";
 
 /** Start the sign-in: `aws-login <profile>` (`gcloud-login` for gcloud). */
@@ -169,10 +154,8 @@ export function signInCallbackPort(item: SignInModel): number | null {
   return port;
 }
 
-/** Hand the intercepted redirect to the Mac: `aws-login-callback <profile>`
-    with the whole URL on stdin (one verb for both CLIs — the Mac reads the
-    outstanding login to know whose listener to replay it against). The URL
-    carries the authorization code, which is why it travels as a secret and
+/** Hand the intercepted redirect to the Mac: `aws-login-callback <profile>` with the whole
+    URL on stdin. The URL carries the authorization code, so it travels as a secret and
     never as an argument. */
 export function signInCallbackSecretArgs(item: SignInModel): Omit<InfinitusSecretInput, "secret"> {
   return { command: "aws-login-callback", args: { profile: item.profile } };

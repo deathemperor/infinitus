@@ -1,11 +1,7 @@
 /**
- * Settings › Engines › Switching policy: one section per fleet whose engine
- * has policy knobs (swapd `config`), each knob a row drawn from the engine's
- * own list — its help line, its default, and a control its value's type calls
- * for. A write is one `policy-set` / `policy-unset` over `infinitus.command`
- * on the environment this page manages, so another machine's knobs are set
- * from here too; the engine's refusal (a value off the knob's range) is shown
- * in its own words, and the list is re-read after every write.
+ * Settings › Engines › Switching policy: a section per fleet whose engine has policy knobs (swapd
+ * `config`), each a row drawn from the engine's own list. A write is one `policy-set` /
+ * `policy-unset` on the environment this page manages; the engine's refusal is shown verbatim.
  *
  * @module InfinitusEnginePolicy
  */

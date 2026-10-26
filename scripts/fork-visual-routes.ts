@@ -1,13 +1,8 @@
 /**
- * The fork visual pass's route table: every fork page, the one text marker
- * that proves it rendered its populated state against the CI fixture
- * (`fork-visual-fixture.mjs`), and the phrases that must not appear. A marker
- * is a string only the ready render shows — never a nav label or a card title,
- * which the not-answering and loading branches print too.
- *
- * `fork-visual-check.ts` reads the `text-<route>.txt` files
- * `fork-visual-pass.mjs` writes and applies this table; the workflow fails on
- * the first route that misses.
+ * The fork visual pass's route table: every fork page, the one text marker that
+ * proves it rendered its populated state against the CI fixture, and the phrases
+ * that must not appear. A marker is a string only the ready render shows, never a
+ * nav label or card title, which loading branches print too.
  */
 
 export interface ForkVisualRoute {
@@ -112,12 +107,10 @@ export const FORK_VISUAL_ROUTES: ReadonlyArray<ForkVisualRoute> = [
     absent: ["no engine reports accounts"],
   },
   {
-    // The fixture's log carries one row of every kind the Mac logs, so every
-    // chip is on screen. Each phrase here is a chip followed by the start of
-    // its own row's text — the capture joins a row's spans with a space — so
-    // a kind that lost its chip fails here, on the exact row, instead of
-    // reaching a screen unlabelled (#1111).
-    // Moved under Engines in #1446; the standalone /activity route is gone.
+    // The fixture's log carries one row of every kind, so every chip is on screen.
+    // Each phrase is a chip followed by the start of its row's text (the capture
+    // joins a row's spans with a space), so a kind that lost its chip fails on the
+    // exact row (#1111). Moved under Engines in #1446.
     route: "/settings/engines/activity",
     label: "Activity",
     marker: "all out all exhausted",

@@ -120,11 +120,9 @@ describe("resolveElectronUpdaterFeed", () => {
     });
   });
 
-  // Upstream's preview train (#11372), merged in: a preview brands as a
-  // nightly but follows no feed, so upstream defaults it to `latest`. Here it
-  // defaults to `infinitus` instead — this repo never defaults to `latest`,
-  // upstream's stable channel — and the strict nightly check keeps an
-  // upstream preview off the nightly track all the same.
+  // Upstream's preview train (#11372) brands as a nightly but follows no feed, so upstream
+  // defaults it to `latest`. Here it defaults to `infinitus` (never `latest`), and the
+  // strict nightly check keeps it off the nightly track.
   it("brands an upstream preview as a nightly without putting it on that track", () => {
     expect(isNightlyDesktopVersion("0.0.41-preview.20260911.7")).toBe(true);
     expect(resolveDefaultDesktopUpdateChannel("0.0.41-preview.20260911.7")).toBe("infinitus");

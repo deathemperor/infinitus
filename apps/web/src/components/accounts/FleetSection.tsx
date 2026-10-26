@@ -73,14 +73,10 @@ export function FleetSection({
   /** Starts the fleet's sign-in: a new account, or the row to sign in again as. */
   readonly onAdd: (target: AccountRowModel | null) => void;
 }) {
-  // The sign-in this shell runs through the engine itself outranks them all
-  // (#1213: no code to paste, no app build to wait for, no capability to
-  // advertise). Then the in-app sign-in when the build has it (#677; every
-  // client since #747: the shell's window, or a link and the code over the
-  // secret RPC); an older build keeps the sign-in on the Mac (#672). The first
-  // two share this fleet's flow and render the same way, so they share the
-  // branch. `signInRunning` is the app's word about a flow of its own, so it
-  // does not bind the shell's either.
+  // The shell's own engine sign-in outranks all (#1213: no code to paste, no app build to wait
+  // for). Then the in-app sign-in when the build has it (#677, every client since #747); an older
+  // build keeps the sign-in on the Mac (#672). The first two share this fleet's flow and render the
+  // same way, so share the branch; `signInRunning` is the app's word about its own flow.
   const { inApp, canAdd } = fleetSignInGate({
     shellOAuth: signIn.shellOAuth,
     offers: signIn.offers,

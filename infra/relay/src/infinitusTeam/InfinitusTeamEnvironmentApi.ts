@@ -16,11 +16,9 @@ const currentTraceId = Effect.currentParentSpan.pipe(
 );
 
 /**
- * The `infinitusTeamEnvironment` group (#1592): what the desktop server
- * publishes and runs with its environment credential. The principal is the
- * environment; the user it acts for comes in the payload or the
- * `x-infinitus-user` header, and the service refuses unless that user's link
- * to this environment and key is live.
+ * The `infinitusTeamEnvironment` group (#1592): what the desktop server publishes
+ * with its environment credential. The principal is the environment; the service
+ * refuses unless the acting user's link to this environment and key is live.
  */
 export const infinitusTeamEnvironmentApi = HttpApiBuilder.group(
   RelayApi,

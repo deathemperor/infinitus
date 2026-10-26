@@ -1,19 +1,9 @@
 #!/usr/bin/env node
 /**
- * An Infinitus control socket for the fork's visual pass in CI: one Node net
- * server that speaks the control protocol (one JSON line in, one JSON line
- * out, then the connection closes) and answers the read verbs the web pages
- * poll with canned data, so every fork route can render its populated state
- * on a runner that has no menu-bar app.
- *
- *   node scripts/fork-visual-fixture.mjs --socket /tmp/inf-vp.sock
- *
- * The manifest and the preference catalog in `fork-visual-fixture.data.json`
- * are `infinitusctl manifest --json` / `prefs --json` captures with every
- * pref value reset to its default; the accounts, the forecast and the stats
- * are made up. Secrets: none — every write verb
- * and every unknown verb is refused with `ok: false`, and only verb names are
- * logged. No dependencies; node ≥ 22.
+ * An Infinitus control socket for the fork's visual pass in CI: a Node net server
+ * speaking the control protocol with canned data for the read verbs, so every fork
+ * route renders on a runner with no menu-bar app. Every write and unknown verb is
+ * refused with `ok: false`; only verb names are logged.
  */
 import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";

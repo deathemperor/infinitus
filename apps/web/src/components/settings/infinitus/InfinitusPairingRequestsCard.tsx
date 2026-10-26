@@ -1,24 +1,20 @@
 /**
- * "Pairing requests" on Settings › Devices (#710): every phone
- * currently asking this server to let it in, each with the match code the
- * user compares against the phone's screen, its time left, and Approve /
- * Deny. Approving mints the one-time credential the phone then collects by
- * polling; nothing about it reaches this page — the stream carries the
- * request's metadata and the match code only. Only the desktop app's own
- * administrative session may read the stream and decide; any other client
- * is told so instead of seeing the empty state (#730).
+ * Pairing requests on Settings › Devices (#710): every phone asking this server in, with the match
+ * code to compare against the phone's screen, its time left, and Approve / Deny. Only the desktop
+ * app's administrative session may read the stream and decide; any other client is told so (#730).
  *
  * @module InfinitusPairingRequestsCard
  */
 import { squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import { useState } from "react";
 
+import { useNowSecond } from "~/hooks/useNowSecond";
 import { usePrimaryEnvironment } from "~/state/environments";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { Button } from "../../ui/button";
-import { SettingsSection, useRelativeTimeTick } from "../settingsLayout";
+import { SettingsSection } from "../settingsLayout";
 import { FORBIDDEN_NOTICE } from "./pairingAccess.logic";
 import { decisionNotice, formatCountdown, pairingRequestRows } from "./pairingRequests.logic";
 import { usePairingRequests } from "./usePairingRequests";
@@ -33,8 +29,7 @@ export function InfinitusPairingRequestsCard() {
   const decide = useAtomCommand(infinitusEnvironment.pairingDecide, { reportFailure: false });
   const [deciding, setDeciding] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // The countdowns tick only while there is one to draw.
-  const nowMs = useRelativeTimeTick(requests.length === 0 ? 60_000 : 1_000);
+  const nowMs = useNowSecond();
   const rows = pairingRequestRows(requests, nowMs);
 
   const settle = async (id: string, approve: boolean) => {

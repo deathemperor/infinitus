@@ -81,14 +81,10 @@ function runningTurnsRefusal(count: number): string {
 }
 
 /**
- * Fork (#829): the update idle gate, over the service that does the update.
- * `interrupt` passes, `refuse` fails naming the turns, `wait` polls until
- * none runs, reporting each change of count. An update refuses at its entry
- * (nothing downloaded for nothing) and waits at the install hook, after the
- * download; in desktop mode the install is the commit, which
- * `commitDesktopUpdate` gates under the policy the preparation used (an
- * unknown token = `refuse`; the desktop app's own update run is bounded by
- * a timeout, so no wait happens inside it).
+ * Fork (#829): the update idle gate. `interrupt` passes, `refuse` fails naming the turns, `wait`
+ * polls until none runs. An update refuses at entry and waits at the install hook; in desktop mode
+ * the install is the commit, gated by `commitDesktopUpdate` under the preparation's policy (unknown
+ * token = `refuse`; no wait inside the desktop's timeout-bounded run).
  */
 export const withUpdateIdleGate = (input: {
   readonly mode: ServerConfig.RuntimeMode;
@@ -112,12 +108,10 @@ export const withUpdateIdleGate = (input: {
       const running = yield* input.runningTurns;
       if (running.length === 0) return;
       if (policy === "refuse") {
-        return yield* Effect.fail(
-          new ServerSelfUpdateError({
-            reason: runningTurnsRefusal(running.length),
-            runningTurns: running,
-          }),
-        );
+        return yield* new ServerSelfUpdateError({
+          reason: runningTurnsRefusal(running.length),
+          runningTurns: running,
+        });
       }
       if (running.length !== announced) {
         announced = running.length;
@@ -479,9 +473,7 @@ export const layer = Layer.effect(
   }),
 ).pipe(Layer.provide(ProcessRunner.layer));
 
-// The RPC stream used to own this fiber, so a dropped client socket interrupted
-// the download. Offers after the queue shuts down are ignored; the update
-// still finishes, and the in-flight guard stays as it was.
+// The update outlives client sockets; progress offers to a closed queue are ignored.
 export const updateProgressStream = (
   selfUpdate: ServerSelfUpdate["Service"],
   input: ServerSelfUpdateInput,

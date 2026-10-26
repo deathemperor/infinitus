@@ -34,12 +34,9 @@ const EVENTS_INPUT = { command: "events", args: [], options: { limit: "100" } } 
 const SHOW_POLLS_KEY = "infinitus.activityShowPolls";
 
 /**
- * Settings › Engines › Activity (#659): the pop-out's Activity
- * pane, in the fork — every account change Infinitus made, newest first,
- * reached from swapd's row on the Engines page. `events --limit 100` is read
- * once through the events query atom (dropped a minute after the page
- * leaves); everything after arrives as the snapshot subscription's deltas,
- * the same stream the toasts read, so the page never polls on its own.
+ * Settings › Engines › Activity (#659): every account change Infinitus made, newest first, reached
+ * from swapd's row on the Engines page. `events --limit 100` is read once through the events query
+ * atom; later changes arrive as the snapshot subscription's deltas, so the page never polls.
  * Primary environment only.
  */
 export function ActivityPage() {

@@ -1,12 +1,7 @@
 /**
- * CaptureStore — a project's capture list (#433), kept as one JSON file per
- * project under the server's state directory and streamed whole to every
- * client of the project after each change.
- *
- * Never in the workspace: a file there would show in every `git status`,
- * in the diff panels, and in each worktree separately. Loaded on first use,
- * written atomically, changed under one lock.
- *
+ * A project's capture list (#433): one JSON file per project under the server's state directory,
+ * streamed whole to the project's clients after each change. Never in the workspace, where it would
+ * show in every `git status`, diff panel and worktree.
  * @module CaptureStore
  */
 import type { ProjectId } from "@infinitus/contracts";
