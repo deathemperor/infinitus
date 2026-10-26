@@ -5,11 +5,12 @@ import {
   resolveThreadPullRequestChains,
   threadPullRequestKeyOf,
   visibleThreadPullRequests,
-} from "@infinitus/shared/threadPullRequests";
+} from "@infinitus/client-runtime/thread-pull-requests";
 import { Minus, Plus } from "lucide";
 import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
 
-import { findProjectOnChangeRequestHost, parseChangeRequestUrl } from "~/lib/openPullRequestLink";
+import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
+import { findProjectOnChangeRequestHost } from "@infinitus/client-runtime/change-request-links";
 
 import { useProjects } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
@@ -34,9 +35,9 @@ function ThreadDetailsPrLinkRow({
   onStopWatching?: (() => void) | undefined;
 }) {
   const projects = useProjects();
-  const parsed = parseChangeRequestUrl(link.url);
+  const parsed = sourceControlClients.parseChangeRequestUrl(link.url)?.link;
   const project =
-    parsed === null
+    parsed === undefined
       ? null
       : (findProjectOnChangeRequestHost(
           projects.filter((candidate) => candidate.environmentId === environmentId),

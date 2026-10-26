@@ -148,14 +148,12 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       description={
         isProjectScope
           ? "Model for new threads in this project."
-          : "Default model for new threads. Projects can override it."
-      }
-      status={
-        unavailable || mixedModel || modelSource === "project"
-          ? undefined
-          : settings.defaultModelSelection === null
-            ? "Automatic"
-            : undefined
+          : !unavailable &&
+              !mixedModel &&
+              modelSource !== "project" &&
+              settings.defaultModelSelection === null
+            ? "Default model for new threads, selected automatically. Projects can override it."
+            : "Default model for new threads. Projects can override it."
       }
       resetAction={
         settings.defaultModelSelection !== null ? (
@@ -413,7 +411,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             settingKeys={["removeAgentCreditsOnMerge"]}
             mixed={mixedAgentCredits}
             {...searchableSetting("remove-agent-credits-on-merge")}
-            description="Remove recognized agent credit lines from GitHub merge and squash messages, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
+            description="Remove recognized agent credit lines from merge and squash messages on hosts that support it, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
             resetAction={
               settings.removeAgentCreditsOnMerge ? (
                 <SettingResetButton

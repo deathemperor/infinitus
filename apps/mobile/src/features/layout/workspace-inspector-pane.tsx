@@ -12,10 +12,7 @@ import { RenderErrorBoundary, RenderFailureView } from "../../components/RenderE
 import { WORKSPACE_PANE_TIMING } from "./workspace-pane-animation";
 import { WorkspacePaneDivider } from "./workspace-pane-divider";
 
-/**
- * Receives the pane layout via props (not the workspace context hook) so this module stays
- * import-cycle-free with AdaptiveWorkspaceLayout.
- */
+/** Pass layout props to avoid an import cycle with AdaptiveWorkspaceLayout. */
 export function WorkspaceInspectorPane(props: {
   readonly pathname: string;
   readonly renderedInspectorWidth: SharedValue<number>;
@@ -39,14 +36,12 @@ export function WorkspaceInspectorPane(props: {
 
   const onClosed = props.onClosed;
   useEffect(() => {
-    inspectorProgress.value = withTiming(
-      inspectorVisible ? 1 : 0,
-      WORKSPACE_PANE_TIMING,
-      (finished) => {
+    inspectorProgress.set(
+      withTiming(inspectorVisible ? 1 : 0, WORKSPACE_PANE_TIMING, (finished) => {
         if (finished === true && !inspectorVisible && onClosed !== undefined) {
           runOnJS(onClosed)();
         }
-      },
+      }),
     );
     const targetWidth = inspectorVisible ? (inspectorWidth ?? 0) : 0;
     renderedInspectorWidth.set(
@@ -64,10 +59,10 @@ export function WorkspaceInspectorPane(props: {
   useEffect(() => {
     const targetWidth = inspectorWidth ?? 0;
     if (!inspectorVisible || resizing) {
-      renderedContentWidth.value = targetWidth;
+      renderedContentWidth.set(targetWidth);
       return;
     }
-    renderedContentWidth.value = withTiming(targetWidth, WORKSPACE_PANE_TIMING);
+    renderedContentWidth.set(withTiming(targetWidth, WORKSPACE_PANE_TIMING));
   }, [inspectorVisible, inspectorWidth, renderedContentWidth, resizing]);
 
   const inspectorStyle = useAnimatedStyle(
@@ -132,8 +127,6 @@ export function WorkspaceInspectorPane(props: {
   );
 }
 
-// The render callback must run inside the boundary's child, not while its
-// parent constructs the boundary element.
 function InspectorRenderer(props: { readonly render?: () => ReactNode }) {
   return <>{props.render?.()}</>;
 }

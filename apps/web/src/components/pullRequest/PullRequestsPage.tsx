@@ -1,3 +1,4 @@
+import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
 import { applyPullRequestDraftFilterChange } from "@infinitus/client-runtime/pull-request-query";
 import { Spinner } from "~/components/ui/spinner";
 import type { PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
@@ -5,7 +6,7 @@ import { usePullRequestCloseBatch } from "~/components/pullRequest/usePullReques
 import { SidebarPointerSensor } from "~/components/Sidebar.pointer";
 import { resolveSidebarSweepKeys } from "~/components/Sidebar.logic";
 import { sortProjectsByGroupOrder } from "@infinitus/client-runtime/state/project-grouping";
-import { pullRequestHostOf, resolveEnvironmentMachineKind } from "@infinitus/contracts";
+import { resolveEnvironmentMachineKind } from "@infinitus/contracts";
 import type {
   EnvironmentId,
   ProjectId,
@@ -15,7 +16,6 @@ import type {
   PullRequestListInput,
   PullRequestListResult,
   PullRequestListState,
-  SourceControlProviderKind,
 } from "@infinitus/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
@@ -26,6 +26,7 @@ import {
   collectPullRequestListFacets,
   narrowPullRequestsToFilters,
   mergePullRequestDiffStats,
+  pullRequestDiffStatKey,
   pullRequestEntryKey,
   rankPullRequestMatches,
   readPullRequestListSnapshot,
@@ -104,6 +105,7 @@ import {
   usePullRequestList,
   usePullRequestListStats,
   usePullRequestTurnRefreshes,
+  useSharedPullRequestSummary,
   type EnvironmentQueryTarget,
 } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -195,6 +197,15 @@ export function PullRequestsPage() {
     (renderedPullRequestSurface?.environmentId as EnvironmentId | undefined) ??
     selectedProject?.environmentId ??
     null;
+  const panelSummary = useSharedPullRequestSummary(
+    panelEnvironmentId,
+    renderedPullRequestSurface === null
+      ? null
+      : {
+          ...renderedPullRequestSurface,
+          projectId: renderedPullRequestSurface.projectId as ProjectId,
+        },
+  );
   const updateSearch = (patch: {
     [Key in keyof PullRequestsSearch]?: PullRequestsSearch[Key] | undefined;
   }) =>
@@ -248,6 +259,7 @@ export function PullRequestsPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const {
     sentQuery,
+    submitQuery,
     querySettled,
     typedParsed,
     sentParsed,
@@ -348,6 +360,14 @@ export function PullRequestsPage() {
     }));
   })();
   const facetQuery = usePullRequestList(facetTargets);
+  const filterOptionScope = environmentQueries.map(({ environmentId, projectIds }) => ({
+    environmentId,
+    input: {
+      ...(scopedProjectId ? { projectId: scopedProjectId } : {}),
+      ...(projectIds ? { projectIds } : {}),
+      ...(search.host ? { host: search.host } : {}),
+    },
+  }));
   const partitionsWanted = search.involvement === "all" && typedQuery.length === 0;
   const partitionTargets = (() => {
     // The main list goes first. Besides putting the visible rows on screen sooner, it proves
@@ -702,6 +722,22 @@ export function PullRequestsPage() {
 
   const visibleStatsKeys = useRef({ key: filterKey, values: new Set<string>() });
   const [statsByRow, setStatsByRow] = useState<PullRequestDiffStats>(() => new Map());
+  if (
+    panelEnvironmentId !== null &&
+    panelSummary?.additions !== undefined &&
+    panelSummary.deletions !== undefined
+  ) {
+    const stat = {
+      ...panelSummary,
+      environmentId: panelEnvironmentId,
+      additions: panelSummary.additions,
+      deletions: panelSummary.deletions,
+    };
+    const previous = statsByRow.get(pullRequestDiffStatKey(stat));
+    if (previous?.additions !== stat.additions || previous.deletions !== stat.deletions) {
+      setStatsByRow(mergePullRequestDiffStats(statsByRow, [stat]));
+    }
+  }
   const [statsTargetState, setStatsTargetState] = useState<{
     readonly key: string;
     readonly batches: ReadonlyArray<PullRequestStatsBatch>;
@@ -1006,9 +1042,9 @@ export function PullRequestsPage() {
           host:
             activePullRequestSurface.host ??
             (selectedProject?.repositoryIdentity
-              ? pullRequestHostOf(
+              ? sourceControlClients.changeRequestHost(
                   selectedProject.repositoryIdentity,
-                  selectedProject.repositoryIdentity.provider as SourceControlProviderKind,
+                  selectedProject.repositoryIdentity.provider,
                 )
               : undefined),
         }
@@ -1068,6 +1104,7 @@ export function PullRequestsPage() {
       value={search.q ?? ""}
       busy={typedQuery.length > 0 && (!querySettled || showingCarried)}
       onChange={(query) => updateListScope({ q: query || undefined })}
+      onSubmit={submitQuery}
     />
   );
   const panelToggleControls = (
@@ -1258,6 +1295,7 @@ export function PullRequestsPage() {
       }}
       authorOptions={facets.authors}
       labelOptions={facets.labels}
+      optionScope={filterOptionScope}
       host={search.host}
       hostOptions={hostMenuOptions}
       onHost={(host) => updateListScope({ host })}
@@ -1362,15 +1400,22 @@ export function PullRequestsPage() {
     event.stopPropagation();
     if (event.repeat) return;
     const url = openPanelPullRequestUrl;
-    void writeTextToClipboard(url, "pull request link").then(
+    const { shortLabel, singular } = (
+      sourceControlClients.findByChangeRequestUrl(url) ?? sourceControlClients.get(undefined)
+    ).changeRequest;
+    void writeTextToClipboard(url, `${singular} link`).then(
       (didCopy) => {
         if (didCopy)
-          toastManager.add({ type: "success", title: "PR link copied", description: url });
+          toastManager.add({
+            type: "success",
+            title: `${shortLabel} link copied`,
+            description: url,
+          });
       },
       (error) => {
         toastManager.add({
           type: "error",
-          title: "Failed to copy PR link",
+          title: `Failed to copy ${shortLabel} link`,
           description: error instanceof Error ? error.message : "An error occurred.",
         });
       },

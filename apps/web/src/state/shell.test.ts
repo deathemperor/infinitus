@@ -3,7 +3,10 @@ import {
   PrimaryConnectionTarget,
 } from "@infinitus/client-runtime/connection";
 import type { EnvironmentCatalogState } from "@infinitus/client-runtime/state/connections";
-import type { EnvironmentShellState } from "@infinitus/client-runtime/state/shell";
+import {
+  EMPTY_SHELL_STATE,
+  type EnvironmentShellState,
+} from "@infinitus/client-runtime/state/shell";
 import { EnvironmentId } from "@infinitus/contracts";
 import * as Option from "effect/Option";
 import { Atom, AtomRegistry } from "effect/reactivity";
@@ -16,6 +19,7 @@ const REMOTE = EnvironmentId.make("remote");
 
 function shellState(status: EnvironmentShellState["status"]): EnvironmentShellState {
   return {
+    ...EMPTY_SHELL_STATE,
     status,
     snapshot:
       status === "empty"

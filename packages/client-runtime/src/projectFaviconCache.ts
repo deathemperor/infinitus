@@ -1,5 +1,5 @@
 import { EnvironmentId } from "@infinitus/contracts";
-import { mediaMimeType } from "@infinitus/shared/filePreview";
+import { mediaMimeType } from "@infinitus/shared/mediaPreview";
 import {
   getProjectFaviconCacheKey,
   getProjectFaviconResourceKey,

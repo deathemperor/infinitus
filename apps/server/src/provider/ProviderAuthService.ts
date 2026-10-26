@@ -12,7 +12,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Function from "effect/Function";
 import * as Layer from "effect/Layer";
-import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as Semaphore from "effect/Semaphore";
 
@@ -88,9 +87,7 @@ export const makeProviderAuthService = Effect.gen(function* () {
     return instance.auth;
   });
 
-  // Native sessions may still belong to the previous provider after the
-  // selected model changes. Read session bindings, not the selected model,
-  // when invalidating credentials for sign-in or sign-out.
+  // Invalidate credentials using session bindings; model selection may already point to another provider.
   const stopSessions = Effect.fn("ProviderAuthService.stopSessions")(function* (
     instanceId: ProviderInstanceId,
     binding: ProviderAuthController["credentialBinding"],

@@ -28,7 +28,8 @@ import type {
 } from "@infinitus/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { RegistryContext } from "@effect/atom-react";
+import { useContext, useRef, useState, type ReactNode } from "react";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -809,6 +810,18 @@ export function ResourceTelemetryDiagnostics({
 }: {
   environmentId: EnvironmentId | null;
 }) {
+  // Pending signals and retries belong to one environment, so a switch starts fresh.
+  return (
+    <ResourceTelemetryDiagnosticsBody key={environmentId ?? ""} environmentId={environmentId} />
+  );
+}
+
+function ResourceTelemetryDiagnosticsBody({
+  environmentId,
+}: {
+  environmentId: EnvironmentId | null;
+}) {
+  const registry = useContext(RegistryContext);
   const [windowMs, setWindowMs] = useState(15 * 60_000);
   const selectedWindow =
     HISTORY_WINDOWS.find((option) => option.windowMs === windowMs) ?? HISTORY_WINDOWS[1];
@@ -827,19 +840,12 @@ export function ResourceTelemetryDiagnostics({
   });
   const [signalingKeys, setSignalingKeys] = useState<ReadonlySet<string>>(() => new Set());
   const signalingKeysRef = useRef<ReadonlySet<string>>(new Set());
-  const environmentIdRef = useRef(environmentId);
-  useEffect(() => {
-    environmentIdRef.current = environmentId;
-    return () => {
-      environmentIdRef.current = null;
-    };
-  }, [environmentId]);
   const [isRetrying, setIsRetrying] = useState(false);
   const snapshot = telemetry.data;
   const allT3 = snapshot?.groups.allT3;
 
   const signalProcess = async (process: ResourceTelemetryProcess, signal: ServerProcessSignal) => {
-    const targetEnvironmentId = environmentIdRef.current;
+    const targetEnvironmentId = environmentId;
     if (
       targetEnvironmentId === null ||
       !readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)
@@ -878,10 +884,7 @@ export function ResourceTelemetryDiagnostics({
         return;
       }
     }
-    if (
-      environmentIdRef.current !== targetEnvironmentId ||
-      !readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)
-    ) {
+    if (!readEnvironmentScope(targetEnvironmentId, AuthEnvironmentMaintainScope)) {
       clearSignaling();
       return;
     }
@@ -921,7 +924,6 @@ export function ResourceTelemetryDiagnostics({
   };
 
   const retryCollector = () => {
-    const environmentId = environmentIdRef.current;
     if (
       environmentId === null ||
       !readEnvironmentScope(environmentId, AuthEnvironmentMaintainScope)
@@ -929,6 +931,18 @@ export function ResourceTelemetryDiagnostics({
       return;
     setIsRetrying(true);
     void retryTelemetry()
+      .then(() => {
+        // The user can pick another window while the retry runs; refreshing every window
+        // re-reads the one on screen and only invalidates the rest.
+        for (const option of HISTORY_WINDOWS) {
+          registry.refresh(
+            serverEnvironment.resourceTelemetryHistory({
+              environmentId,
+              input: { windowMs: option.windowMs, bucketMs: option.bucketMs },
+            }),
+          );
+        }
+      })
       .catch((error: unknown) => {
         toastManager.add({
           type: "error",

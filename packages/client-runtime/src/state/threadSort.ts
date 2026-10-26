@@ -4,8 +4,6 @@ import type {
   SidebarThreadSortOrder,
 } from "@infinitus/contracts/settings";
 import type { EnvironmentThreadShell } from "./models.ts";
-import * as Arr from "effect/Array";
-import * as Order from "effect/Order";
 
 export interface ThreadSortInput {
   readonly createdAt: string;
@@ -61,7 +59,9 @@ export function sortSettledThreads<T extends SettledThreadTimestampInput & { rea
     })
     .sort(
       (left, right) =>
-        right.timestampMs - left.timestampMs || left.thread.id.localeCompare(right.thread.id),
+        right.timestampMs - left.timestampMs ||
+        // Plain order, as the server pages ties (ids mix upper and lower case).
+        (left.thread.id < right.thread.id ? -1 : left.thread.id > right.thread.id ? 1 : 0),
     )
     .map(({ thread }) => thread);
 }
