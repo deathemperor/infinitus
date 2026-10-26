@@ -10,6 +10,11 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.41
+
+### Desktop
+- The app loads again instead of stopping at "Infinitus could not load." on start.
+
 ## 0.5.0-alpha.40
 
 ### Desktop
