@@ -455,6 +455,7 @@ export function ReviewSheet(props: ReviewSheetProps) {
 
   useEffect(() => {
     showAuxiliaryPane("inspector");
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Opening review for another thread reselects its inspector pane.
   }, [environmentId, showAuxiliaryPane, threadId]);
   const {
     error,
@@ -463,7 +464,6 @@ export function ReviewSheet(props: ReviewSheetProps) {
     refreshSelectedSection,
     selectSection,
     isSelectedSectionPending,
-    diffPreviewRevision,
   } = useReviewSections({
     enabled: isEnvironmentReady,
     environmentId,
@@ -487,7 +487,6 @@ export function ReviewSheet(props: ReviewSheetProps) {
     environmentId,
     cwd: selectedThreadCwd,
     selectedSection,
-    revision: diffPreviewRevision,
     draftMessage,
   });
   // Expo may return null before registration or in older binaries; use the fallback.

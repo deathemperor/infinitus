@@ -220,6 +220,7 @@ export function useComposerCommandMenu({
   useEffect(() => {
     const inserted = ownerKey ? readComposerDraftSelection(ownerKey, draftMessage) : null;
     if (inserted) {
+      // oxlint-disable-next-line react/set-state-in-effect -- Applies a selection inserted into the draft store by another surface.
       setSelection((current) =>
         current.start === inserted.start && current.end === inserted.end ? current : inserted,
       );
@@ -301,6 +302,7 @@ export function useComposerCommandMenu({
     )
       return;
     if (hasCurrentProviderWorkspaceSnapshot(selectedProviderStatus, projectCwd, now)) {
+      // oxlint-disable-next-line react/set-state-in-effect -- A current provider workspace snapshot clears the pending refresh retry.
       setWorkspaceRefreshRetry(null);
       return;
     }
@@ -337,6 +339,7 @@ export function useComposerCommandMenu({
       else failedRefreshesRef.current = null;
     }, retryLater);
   }, [
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Typing in the draft re-checks whether the provider workspace snapshot needs refreshing.
     draftMessage,
     environmentId,
     projectCwd,

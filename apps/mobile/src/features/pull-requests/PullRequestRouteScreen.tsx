@@ -387,9 +387,10 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
     if (!guidesEnabled && section === "guide") {
       requestedSection.current = "overview";
       currentScrollOffset.current = scrollOffsets.current.overview ?? -insets.top;
+      // oxlint-disable-next-line react/set-state-in-effect -- When guides turn off, the tab and its saved scroll offset must switch to overview together.
       setSection("overview");
     }
-  }, [guidesEnabled, section, insets.top]);
+  }, [guidesEnabled, section, insets.top, currentScrollOffset, requestedSection, scrollOffsets]);
   const tabContent = activityContent;
   const filesY = useRef(0);
   const descriptionY = useRef(0);
