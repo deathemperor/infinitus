@@ -1008,12 +1008,9 @@ describe("ClaudeAdapterV2 approval cancellation", () => {
         decision: ProviderApprovalDecision;
         feedback?: string;
       }>();
-      const controller = new AbortController();
-      controller.abort();
-
       const result = yield* ClaudeAdapterV2.awaitClaudeApprovalDecision(
         decision,
-        controller.signal,
+        AbortSignal.abort(),
       );
 
       assert.deepEqual(result, { decision: "cancel" });
@@ -1364,14 +1361,14 @@ describe("ClaudeAdapterV2 resume compaction", () => {
           Stream.runHead,
           Effect.forkScoped,
         );
-        const controller = new AbortController();
+        const signal = yield* Effect.abortSignal;
         const dialog = yield* Effect.promise(() =>
           callback!(
             {
               dialogKind: "resume_return",
               payload: { sessionAgeMinutes: 90, estimatedTokens: 120000 },
             },
-            { signal: controller.signal, requestId: "dialog-resume-1" },
+            { signal, requestId: "dialog-resume-1" },
           ),
         ).pipe(Effect.forkScoped);
         const event = yield* Fiber.join(requestEvent);
@@ -1387,8 +1384,6 @@ describe("ClaudeAdapterV2 resume compaction", () => {
         });
         assert.deepEqual(yield* Fiber.join(dialog), { behavior: "completed", result: "compact" });
 
-        const cancelledController = new AbortController();
-        cancelledController.abort();
         assert.deepEqual(
           yield* Effect.promise(() =>
             callback!(
@@ -1396,7 +1391,7 @@ describe("ClaudeAdapterV2 resume compaction", () => {
                 dialogKind: "resume_return",
                 payload: { sessionAgeMinutes: 90, estimatedTokens: 120000 },
               },
-              { signal: cancelledController.signal, requestId: "dialog-resume-2" },
+              { signal: AbortSignal.abort(), requestId: "dialog-resume-2" },
             ),
           ),
           { behavior: "cancelled" },
@@ -14522,6 +14517,55 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           status: "active",
           checks: 2,
         });
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(
+          Layer.mergeAll(IdAllocator.layer, McpProviderSessions.layer, NodeServices.layer),
+        ),
+      ),
+    );
+
+    it.effect("keeps the CLI's goal confirmation out of the conversation", () =>
+      Effect.gen(function* () {
+        const harness = yield* makeWakeHarness;
+        const condition = "all tests pass";
+        yield* harness.runtime.startTurn(
+          makeClaudeTestTurnInput({
+            threadId: harness.threadId,
+            providerThread: {
+              ...harness.providerThread,
+              goal: { objective: condition, status: "active", checks: 1 },
+            },
+            now: yield* DateTime.now,
+            attemptId: RunAttemptId.make("goal-clear-attempt"),
+            text: "/goal clear",
+            attachments: [],
+          }),
+        );
+        yield* Queue.offer(
+          harness.sdkMessages,
+          syntheticFrame("goal-clear", `Goal cleared: ${condition}`),
+        );
+        yield* Queue.offer(
+          harness.sdkMessages,
+          makeResultFrame({
+            uuid: "goal-clear-result",
+            result: `Goal cleared: ${condition}\n`,
+            numTurns: 0,
+          }),
+        );
+        yield* Queue.take(harness.terminalReceipts);
+        assert.isTrue(
+          harness.events.some(
+            (event) =>
+              event.type === "provider_thread.updated" && event.providerThread.goal === null,
+          ),
+        );
+        assert.isFalse(
+          harness.events.some(
+            (event) => event.type === "message.updated" && event.message.role === "assistant",
+          ),
+        );
       }).pipe(
         Effect.scoped,
         Effect.provide(
