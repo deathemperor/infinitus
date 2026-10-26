@@ -83,7 +83,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const interrupted = new Map<RunId, Deferred.Deferred<void>>();
     /** The provider wake run over a stop, per thread: a background-task
         delivery the CLI starts after the limit, not the user moving on. */
-    const wakes = new Map<ThreadId, RunId>();
+    const wakes = new Map<ThreadId, { readonly runId: RunId; readonly ended: boolean }>();
     const watch = yield* FiberHandle.make();
     const resumes = yield* FiberMap.make<ThreadId>();
 
@@ -277,7 +277,10 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               if (known !== undefined) yield* forget(threadId);
               return;
             }
-            if (known !== undefined && (known.runId === run.id || wakes.get(threadId) === run.id)) {
+            if (
+              known !== undefined &&
+              (known.runId === run.id || wakes.get(threadId)?.runId === run.id)
+            ) {
               // A parked turn ending the way the CLI ends it: one stop, the
               // window kept, nothing reported twice.
               return yield* record({ ...known, ...failed, kind: "failed" }, { report: false });
@@ -311,8 +314,17 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
             if (run.status === "queued") return;
             // The CLI delivering background work the limit also stopped: it
             // runs on the spent login and ends at once, masking the stop.
-            if (wakes.get(threadId) === run.id || (yield* isProviderWake(threadId, run.id))) {
-              wakes.set(threadId, run.id);
+            if (
+              wakes.get(threadId)?.runId === run.id ||
+              (yield* isProviderWake(threadId, run.id))
+            ) {
+              wakes.set(threadId, {
+                runId: run.id,
+                ended:
+                  run.status === "completed" ||
+                  run.status === "interrupted" ||
+                  run.status === "cancelled",
+              });
               return;
             }
             // Another run on the thread: the user sent again, or the
@@ -427,6 +439,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       for (const stop of stops.values()) {
         const target = resumeTarget(stop, accounts, now);
         if (target === null) continue;
+        // A running wake would read as the thread moving on; the next probe retries.
+        const wake = wakes.get(stop.threadId);
+        if (wake !== undefined && !wake.ended) continue;
         const last = lastResumeAt.get(stop.threadId);
         if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
         if (!(yield* enabled)) continue;
@@ -438,9 +453,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         }
         resumed.add(stop.runId);
         lastResumeAt.set(stop.threadId, now);
-        const wake = wakes.get(stop.threadId);
         yield* forget(stop.threadId);
-        yield* FiberMap.run(resumes, stop.threadId)(resume(stop, target, wake));
+        yield* FiberMap.run(resumes, stop.threadId)(resume(stop, target, wake?.runId));
       }
     });
 

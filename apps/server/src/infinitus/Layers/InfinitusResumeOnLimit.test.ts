@@ -371,11 +371,14 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           shell(one, { status: "completed", latestRunId: runTwo, activeRunId: null }),
         );
         yield* h.emit(runUpdated(one, runTwo, "running"));
+        // The swap lands while the wake still runs: the resume waits for it.
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
+        expect(yield* h.commands).toEqual([]);
         yield* h.emit(runUpdated(one, runTwo, "completed"));
         expect((yield* h.stopped).map((stop) => [stop.threadId, stop.account])).toEqual([
           [one, "hiep1"],
         ]);
-        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 6 } } })));
         expect(yield* h.commands).toEqual([
           {
             type: "message.dispatch",
