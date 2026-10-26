@@ -92,11 +92,9 @@ export async function askForApproval(input: {
 }
 
 /**
- * Polls until the Mac decides, the request expires (the server's 404, or the
- * deadline with nothing answering), or `signal` aborts. A poll that fails to
- * reach the server is retried on the next tick: Wi‑Fi hiccups are the normal
- * case, and the server keeps the decision until the request expires. Never
- * throws.
+ * Polls until the Mac decides, the request expires (the server's 404 or the deadline), or
+ * `signal` aborts. A poll that fails to reach the server is retried next tick, since the
+ * server keeps the decision until expiry. Never throws.
  */
 export async function waitForDecision(input: {
   readonly origin: string;

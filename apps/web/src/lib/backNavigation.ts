@@ -32,13 +32,9 @@ export function mouseHistoryIntent(button: number, pathname: string): MouseHisto
   return null;
 }
 
-/** The two directions of macOS's navigate-back/forward gesture: a trackpad's
-    "Swipe between pages", or a mouse driver (Logi Options+) that maps the
-    mouse's back/forward buttons to it instead of to Chromium buttons 3/4
-    (#1250). Left = back, right = forward: #1250 guessed the opposite and was
-    never checked on hardware, so the back button read as forward and did
-    nothing. Every gesture Options+ sent for the back button arrived as
-    `left`. */
+/** The two directions of macOS's navigate-back/forward gesture: a trackpad swipe, or a mouse driver
+    (Logi Options+) mapping back/forward buttons to it instead of Chromium buttons 3/4 (#1250). Left
+    = back, right = forward: Options+ sent `left` for the back button. */
 export type HistoryGestureDirection = "left" | "right";
 
 /** What a navigation gesture asks of the app's history: the mouse buttons'

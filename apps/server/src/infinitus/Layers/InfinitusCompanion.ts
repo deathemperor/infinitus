@@ -77,12 +77,10 @@ export interface InfinitusLaunchDeps {
   readonly nested: InfinitusNestedHelper | null;
 }
 
-/** What one `status` probe found. Any reply — a failed command included —
-    means the app is there (`answering`). An unreachable socket is `gone` when
-    the path does not exist (ENOENT) and `refusing` when it does but nobody
-    listens (ECONNREFUSED, a hang-up, EACCES): the app never unlinks its
-    socket, so a quitting or relaunching Infinitus leaves the file behind
-    until the next instance rebinds it (#637). */
+/** What one `status` probe found. Any reply, a failed command included, means `answering`. An
+    unreachable socket is `gone` when the path does not exist (ENOENT) and `refusing` when it does
+    but nobody listens: the app never unlinks its socket, so a relaunching Infinitus leaves the file
+    behind until the next instance rebinds it (#637). */
 type Probe =
   | { readonly state: "answering"; readonly reply: unknown }
   | { readonly state: "gone" }
@@ -100,7 +98,7 @@ const probeInfinitus = Effect.fn("Infinitus.probe")(function* () {
             : { state: "refusing", path: error.path, cause: error.cause },
         ),
     }),
-    Effect.catch(() => Effect.succeed<Probe>({ state: "answering", reply: undefined })),
+    Effect.orElseSucceed((): Probe => ({ state: "answering", reply: undefined })),
   );
 });
 
@@ -158,15 +156,10 @@ const readStatusIdentity = (reply: unknown): { version?: string; bundlePath?: st
 };
 
 /**
- * The desktop updater installs by moving bundles, so a helper started from
- * the nested bundle keeps running on the old version after an update, at a
- * path that now holds the new one (#777). When the answering helper says it
- * came from our nested bundle and its version is not the one we ship, it is
- * quit (the existing verb), the socket is re-probed until it stops answering
- * (a second `open` on top of a shutting-down app is the #637 race), and the
- * nested bundle is opened by path. A standalone Infinitus (a brew-cask copy,
- * #7) is left alone whatever its version, and a helper that predates
- * `bundlePath` only gets its skew logged: the rule is not armed on a guess.
+ * A helper started from the nested bundle outlives a desktop update on the old version (#777). If
+ * it came from our bundle with a version we do not ship, quit it, re-probe until the socket stops
+ * answering (a second `open` mid-shutdown is the #637 race), then open the bundle. Standalone
+ * copies (#7) are left alone, and a helper without `bundlePath` only gets its skew logged.
  */
 const reconcileNestedHelper = Effect.fn("Infinitus.reconcile")(function* (
   deps: InfinitusLaunchDeps,
@@ -231,11 +224,9 @@ export const launchInfinitus = Effect.fn("Infinitus.launch")(function* (
   return yield* openInfinitus(deps);
 });
 
-/** Waits out a socket file that refuses: an Infinitus mid-relaunch (its own
-    reopen shell runs `open` once the old pid exits; a second `open` on top is
-    the race of #637/#756) rebinds within seconds, so the file is re-probed
-    until it answers, vanishes, or the window runs out — then it is a crash's
-    stale leftover and the app is as gone as with no file at all. */
+/** Waits out a socket file that refuses: a mid-relaunch Infinitus rebinds within seconds (a second
+    `open` on top is the #637/#756 race), so re-probe until it answers, vanishes, or the window runs
+    out, when it is a crash's stale leftover and the app is as gone as with no file. */
 const awaitRelaunch = Effect.fn("Infinitus.awaitRelaunch")(function* (
   first: Extract<Probe, { state: "refusing" }>,
 ): Effect.fn.Return<Probe, never, InfinitusControlClient> {
@@ -255,11 +246,9 @@ const awaitRelaunch = Effect.fn("Infinitus.awaitRelaunch")(function* (
 });
 
 /**
- * The startup companion: a socket still quiet after `STARTUP_GRACE` gets the
- * app opened once, with one log line either way. No retry, no loop — a user
- * who quits the menu-bar app afterwards keeps it quit (that is what the
- * "Launch Infinitus" button is for). A socket file that refuses gets the
- * relaunch window first (`awaitRelaunch`).
+ * The startup companion: a socket still quiet after `STARTUP_GRACE` gets the app opened once, with
+ * one log line. No retry, no loop: a user who quits the menu-bar app keeps it quit. A socket file
+ * that refuses gets the relaunch window first (`awaitRelaunch`).
  */
 export const launchInfinitusAtStartup = Effect.fn("Infinitus.launchAtStartup")(function* (
   deps: InfinitusLaunchDeps,

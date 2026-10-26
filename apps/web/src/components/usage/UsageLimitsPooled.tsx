@@ -44,7 +44,6 @@ import {
   barColor,
   usePaceMark,
   resetCreditsSummary,
-  resetHoldText,
   useResetCredit,
 } from "./UsageLimits";
 

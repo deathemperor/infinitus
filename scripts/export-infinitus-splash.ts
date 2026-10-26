@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 
-// Renders the Infinitus phone's splash artwork (fork). Run: `node scripts/export-infinitus-splash.ts`.
-//
-// The app icon is an opaque square (App Store icons carry no alpha), so shown
-// as-is on the splash it sits as a hard-edged tile. iOS gets the icon under the
-// home screen's rounded silhouette; Android 12+ masks its splash icon to a
-// circle over the central two thirds of a 288dp canvas, so its image is the
-// icon's gradient with the twin-loop mark kept inside that circle.
+// Renders the Infinitus phone's splash artwork (fork): `node scripts/export-infinitus-splash.ts`.
+// The app icon is an opaque square, so iOS gets it under the home screen's rounded
+// silhouette; Android 12+ masks its splash icon to a circle over the central two
+// thirds of a 288dp canvas, so that image keeps the mark inside it.
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";

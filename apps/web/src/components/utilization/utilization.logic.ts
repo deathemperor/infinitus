@@ -9,16 +9,10 @@ import {
 import * as Schema from "effect/Schema";
 
 /**
- * The Utilization page across machines (#1581): every connected environment
- * answers `utilization --days n` for the Mac it runs on, and the page adds
- * the replies up here. One reply passes through untouched, so a single
- * machine reads exactly as it did. Several merge as follows: the run rate
- * and the live rate are sums (each Mac's transcripts are its own); the
- * samples, the weekly generations and the five-hour windows are unions — a
- * percentage is of one account's quota, and an account signed in on two
- * Macs reports the same one — deduplicated on the keys the page's rows use,
- * since both Macs saw the same reset; the replay sums its counts. The
- * planner's dry run is one Mac's and is dropped.
+ * The Utilization page across machines (#1581): each environment answers `utilization --days n` for
+ * its Mac and the page adds the replies up. One reply passes through untouched. Run rate and live
+ * rate are sums; samples, weekly generations and five-hour windows are unions deduplicated on the
+ * rows' keys (an account on two Macs is one quota); the planner's dry run is dropped.
  */
 
 const decodeGeneration = Schema.decodeUnknownOption(InfinitusUtilizationGeneration);

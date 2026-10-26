@@ -51,13 +51,10 @@ function position(ms: number, range: QuotaTimelineRange): number {
 }
 
 /**
- * Every account's usage windows on one calendar (the CLIProxyAPI "Quota
- * windows" view): a lane per account, a bar per window from when it opened to
- * when it resets, filled to the share spent. The now line crosses each running
- * bar at the share of its time gone, so a fill past the line is ahead of pace.
- * Rolled windows come from the Mac's `utilization` telemetry (the last
- * reading of each week, the peak of each 5h window); without that verb the
- * lanes show the running window and the ones ahead only.
+ * Every account's usage windows on one calendar (CLIProxyAPI "Quota windows"): a lane per account,
+ * a bar per window from open to reset, filled to the share spent. The now line marks the share of
+ * time gone, so a fill past it is ahead of pace. Rolled windows come from the Mac's `utilization`
+ * telemetry; without that verb only the running and upcoming windows show.
  */
 export function QuotaTimeline({
   environmentId,

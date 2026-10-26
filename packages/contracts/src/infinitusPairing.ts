@@ -5,14 +5,10 @@ import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * Approve-on-Mac pairing (#710). A phone that found the server on the LAN asks
- * to be let in; the desktop approves; the phone collects the same one-time
- * pairing credential a QR code would have carried and runs the ordinary
- * `/oauth/token` exchange. The requester secret is the phone's proof that a
- * poll comes from the device that asked; the match code is what the user
- * compares between the two screens. Neither ever appears in a log, a span or
- * the Infinitus snapshot; the desktop's stream carries the match code because
- * showing it is the point.
+ * Approve-on-Mac pairing (#710): a phone that found the server on the LAN asks to
+ * be let in; the desktop approves; the phone collects the one-time pairing
+ * credential and runs the ordinary `/oauth/token` exchange. The requester secret
+ * and match code never appear in a log or span; the desktop stream carries the match code.
  */
 
 /** Opaque id the server assigns to one pending request. */

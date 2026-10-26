@@ -17,11 +17,9 @@ import type { ConnectionAttemptError } from "./model.ts";
 export const ROAM_PROBE_TIMEOUT_MS = 3_000;
 
 /**
- * The server's alternates in the phone's own shape: each normalized the way a
- * paired host is (`normalizeHttpBaseUrl` — scheme, host, port, a bare `/`),
- * so `https://code.infinitus.run` and the paired `https://code.infinitus.run/`
- * are one host; the paired host itself and anything unparsable left out; no
- * repeats.
+ * The server's alternates in the phone's shape: normalized like a paired host
+ * (`normalizeHttpBaseUrl`) so trailing-slash variants are one host; the paired
+ * host itself, unparsable entries and repeats are left out.
  */
 export function normalizedAlternates(
   alternates: ReadonlyArray<string> | undefined,
@@ -74,13 +72,10 @@ function isQuickTunnelHost(httpBaseUrl: string): boolean {
   }
 }
 
-/** The hosts to try, in order: every public host before every private one —
-    a phone that knows the Mac's domain dials it from anywhere, on the Wi‑Fi
-    too, and a LAN address is only what is left when no tunnel answers.
-    Within each class, the one that worked last, then the paired one, then
-    the alternates. No repeats, and only hosts the profile still names — a
-    last-good host the server has since dropped is not this environment's
-    any more and is not tried. */
+/** The hosts to try, in order: every public host before every private one (a
+    LAN address is only what is left when no tunnel answers). Within a class:
+    last-good, then paired, then alternates. Only hosts the profile still names
+    are tried; a last-good host the server has dropped is not. */
 export function bearerHostOrder(
   profile: Pick<
     BearerConnectionProfile,
@@ -97,12 +92,10 @@ export function bearerHostOrder(
   return [...order.filter(isPublicHost), ...order.filter((host) => !isPublicHost(host))];
 }
 
-/** Whether a failed host is one to walk past: the Mac is not there. Nothing
-    answered (network, timeout), something else did (a café router's page —
-    `remote-unavailable` for a non-answer or no JSON; `configuration` for a
-    404 or another environment's id). A host that refused the credential
-    (authentication, permission) ends the walk — a hop must never hide a
-    real refusal. */
+/** Whether a failed host is one to walk past: the Mac is not there (nothing
+    answered, or something else did: `remote-unavailable` for a non-answer,
+    `configuration` for a 404 or another environment). A refused credential
+    (authentication, permission) ends the walk; a hop must not hide it. */
 export function roamsPast(error: ConnectionAttemptError): boolean {
   switch (error._tag) {
     case "ConnectionTransientError":
@@ -117,16 +110,10 @@ export function roamsPast(error: ConnectionAttemptError): boolean {
 }
 
 /**
- * The profile after a connect landed on `liveHttpBaseUrl` and read
- * `descriptor`: the live host remembered, the alternates replaced by what the
- * server names now (the paired host itself never listed among them). The
- * server is the authority on its own doors — but it names the tunnel only
- * while the tunnel is up, and a Wi‑Fi connect while the Mac is restarting
- * must not make the phone forget the domain it dials from everywhere else.
- * So a descriptor naming nothing keeps the alternates we have, except a
- * quick-tunnel hostname: one the server no longer holds can be handed to
- * anyone, and the bearer token must never follow it. Null when nothing
- * changed, so the store is not written on every connect.
+ * The profile after a connect landed on `liveHttpBaseUrl` and read `descriptor`:
+ * live host remembered, alternates replaced by what the server names now. A
+ * descriptor naming nothing keeps the alternates (the tunnel is named only while
+ * up), except a quick-tunnel hostname the bearer token must never follow.
  */
 export function learnedBearerProfile(
   profile: BearerConnectionProfile,

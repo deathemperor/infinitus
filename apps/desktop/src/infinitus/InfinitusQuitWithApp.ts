@@ -1,9 +1,7 @@
 /**
- * Quit the menu-bar app with this window (#654 step 1). On the app's
- * `before-quit`, when the pref is on, the shell sends Infinitus its `quit`
- * verb over the control socket — gated on the running app's manifest listing
- * the verb, never on a version. One send per process; an updater-driven quit
- * (the app is about to come back) is left alone.
+ * Quit the menu-bar app with this window (#654): on `before-quit`, when the pref is on,
+ * send its `quit` verb only if the running app's manifest lists it, never by version.
+ * One send per process; an updater-driven quit is left alone.
  */
 import * as NodeOS from "node:os";
 
@@ -45,7 +43,7 @@ export const quitInfinitusIfListed = Effect.fn("infinitus.quitIfListed")(functio
     return "sent" as const;
   }).pipe(
     Effect.catchTags({ InfinitusUnavailable: () => Effect.succeed("unavailable" as const) }),
-    Effect.catch(() => Effect.succeed("failed" as const)),
+    Effect.orElseSucceed(() => "failed" as const),
   );
 });
 

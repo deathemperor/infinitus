@@ -15,15 +15,10 @@ import { resolveDeepLinkProject, settingsDeepLinkTarget } from "./deepLink.logic
 import { usePendingTeamJoinStore } from "./pendingTeamJoin";
 
 /**
- * Mounted once in the app shell (#270 D): the link the desktop was opened
- * with. The shell keeps only the latest one; this pulls it once the primary
- * environment is connected, and again on every ping, so a link that landed
- * during startup and one that lands while the window is up take the same
- * path. `thread` navigates; `new` opens the composer on the project's
- * default env mode with the prompt prefilled and never sends it; `join`
- * (#1313) parks the team code for the Team page's Join field and never
- * joins on its own; `settings` opens a listed Settings section (the menu
- * bar app's ⌘,) and ignores any other path.
+ * Mounted once in the app shell (#270 D): pulls the link the desktop was opened with once the
+ * primary environment is connected, and on every ping. `thread` navigates; `new` opens the composer
+ * with the prompt prefilled and never sends it; `join` (#1313) parks the team code for the Team
+ * page and never joins; `settings` opens a listed section, any other path is ignored.
  */
 export function DeepLinkCoordinator() {
   const primaryEnvironment = usePrimaryEnvironment();

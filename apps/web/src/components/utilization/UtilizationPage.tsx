@@ -60,22 +60,17 @@ const DEFAULT_BASIS =
 
 const DAYS_KEY = "infinitus.utilizationDays";
 const DAYS_CHOICES = ["1", "7", "30"] as const;
+const DAYS_SCHEMA = Schema.Literals(DAYS_CHOICES);
 const DAYS_LABELS: Record<(typeof DAYS_CHOICES)[number], string> = {
   "1": "24 hours",
   "7": "7 days",
   "30": "30 days",
 };
 /**
- * `/utilization` (#747): the native Utilization pane in the fork. The
- * forecast section reads off the `forecast` reply the primary environment's
- * snapshot already carries (every account's projection at its own measured
- * pace); History (every account's percentage of one window over 1 / 7 / 30
- * days), the window telemetry and Run rate (tokens, API-equivalent $ and
- * messages over the last hour / day / week, plus the live output rate) read
- * `utilization --days n` from every connected environment that runs
- * Infinitus (#1581), each held and re-read every 5 min only while this page
- * is mounted, and add the replies up (`utilization.logic.ts`); with more
- * than one machine, a Machines section names each and what it answered.
+ * `/utilization` (#747). The forecast reads off the `forecast` reply the primary environment's
+ * snapshot carries; History, window telemetry and Run rate read `utilization --days n` from every
+ * connected Infinitus environment (#1581), held and re-read every 5 min only while mounted, and are
+ * added up by `utilization.logic.ts`. More than one machine adds a Machines section.
  */
 export function UtilizationPage() {
   const environmentId = usePrimaryEnvironmentId();
@@ -94,7 +89,7 @@ export function UtilizationPage() {
   const [days, setDays] = useLocalStorage<(typeof DAYS_CHOICES)[number], string>(
     DAYS_KEY,
     "7",
-    Schema.Literals(DAYS_CHOICES),
+    DAYS_SCHEMA,
   );
   const { statuses, refresh: refreshUtilizations } = useEnvironmentUtilizations(days);
   // Any machine that can be asked unlocks the range; one away is left out.

@@ -3,11 +3,9 @@ import * as Schema from "effect/Schema";
 import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * An account alert an Infinitus environment asks the relay to push to every
- * phone linked to it (#1375): the Mac app's limit / switch / revival /
- * AWS-login lines, which used to ride the Mac's own APNs key. Thread-less,
- * so it is its own route beside `publishAgentActivity`; the proof is the
- * same environment-signed JWT shape with the alert in place of the state.
+ * An account alert an Infinitus environment asks the relay to push to every phone
+ * linked to it (#1375). Thread-less, so its own route beside
+ * `publishAgentActivity`; the proof is the same environment-signed JWT shape.
  */
 export const RELAY_INFINITUS_ALERT_TYP = "infinitus-env-alert+jwt";
 

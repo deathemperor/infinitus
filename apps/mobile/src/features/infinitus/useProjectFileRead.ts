@@ -9,11 +9,9 @@ import { projectEnvironment } from "../../state/projects";
 import { useEnvironmentQuery } from "../../state/query";
 
 /**
- * Fork (#823 layer 1): the project's checked-in file under both names,
- * `infinitus.json` first and `t3.json` as the legacy fallback, read in the
- * server's order; the first one that exists decides. Both are optional, so a
- * missing file answers `exists: false` instead of failing. Stands in for upstream's
- * single `readFile` query in `new-task-flow-provider.tsx` with the same shape.
+ * Fork (#823): the project's checked-in file under both names, `infinitus.json` first and
+ * `t3.json` as the legacy fallback; the first that exists decides. Both are optional, so
+ * a missing file answers `exists: false`. Stands in for upstream's `readFile` query.
  */
 export function useProjectFileRead(
   project: { readonly environmentId: EnvironmentId; readonly workspaceRoot: string } | null,

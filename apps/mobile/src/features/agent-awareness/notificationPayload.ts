@@ -21,12 +21,9 @@ function dataFromNotificationResponse(response: unknown): Record<string, unknown
   return pushPayloadFromRequest(request);
 }
 
-/** Infinitus (fork, #1375): the relay's keys (`environmentId`, `threadId`,
-    `deepLink`) off the push trigger, which carries the whole `userInfo` as
-    `payload`. The relay now nests them under `body`, which expo-notifications
-    on iOS also copies into `content.data`; relays deployed before that sent
-    them at the top level beside `aps`, leaving `data` empty, so a payload
-    without a `body` object is read as is. */
+/** Infinitus (fork, #1375): the relay's keys (`environmentId`, `threadId`, `deepLink`) off
+    the push trigger's `payload`. Relays now nest them under `body`; older ones sent them
+    at the top level, so a payload without a `body` object is read as is. */
 export function pushPayloadFromRequest(request: unknown): Record<string, unknown> | null {
   if (typeof request !== "object" || request === null) {
     return null;

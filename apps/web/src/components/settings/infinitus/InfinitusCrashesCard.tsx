@@ -1,11 +1,7 @@
 /**
- * "Crash reports" on Settings › Devices: the crashes and hangs the
- * Mac recorded — the phone's, filed over `crash-report` from MetricKit, and
- * the Mac app's own diagnostic reports — read over `infinitus.command`'s
- * `crashes` verb. Nothing leaves that Mac unless you copy a report: the list
- * carries no raw diagnostic, and Copy asks for the one report's transcript
- * when it is pressed. Read-only — the Mac keeps the newest 50 and prunes
- * itself.
+ * Crash reports on Settings › Devices: the crashes and hangs the Mac recorded (the phone's, filed
+ * over `crash-report`, and the Mac app's own), read via the `crashes` verb. Nothing leaves that Mac
+ * unless you copy a report; the list carries no raw diagnostic. Read-only.
  *
  * @module InfinitusCrashesCard
  */

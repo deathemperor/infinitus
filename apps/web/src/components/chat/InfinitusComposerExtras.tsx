@@ -28,12 +28,10 @@ import { ImageMarkupDialog } from "./ImageMarkupDialog";
 import { markedFileName } from "./imageMarkup.logic";
 
 /**
- * The fork's composer features (#1565), owned here so `ChatComposer.tsx`
- * keeps one registration line per site: the Captures popover, badge and
- * shortcuts (#433), the Prompts popover, badge and `/` menu rows (#270 G),
- * and the draw-on-image button (#875). `useInfinitusComposerExtras` is
- * called once, unconditionally, before the composer derives its command
- * menu; the components below take its result.
+ * The fork's composer features (#1565), owned here so `ChatComposer.tsx` keeps one registration
+ * line per site: Captures (#433), Prompts (#270 G) and draw-on-image (#875).
+ * `useInfinitusComposerExtras` is called once, unconditionally, before the composer derives its
+ * command menu; the components below take its result.
  */
 interface InfinitusComposerExtras {
   /** The routed project; null on a draft without one. */

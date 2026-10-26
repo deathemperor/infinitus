@@ -19,18 +19,11 @@ import {
 import { useStableCallback } from "./useStableCallback";
 
 /**
- * Display prefs and account names across machines, through the desktop: the
- * one process that holds every paired environment. Each machine's snapshot
- * already carries its prefs and its fleets, and `prefs set` and `rename`
- * already exist, so nothing new crosses the socket. The rules live in
- * `settingsSync.logic.ts` (`observe`, `alignPass`), where two desktops can be
- * replayed against the same machines; this hook only feeds them snapshots and
- * runs the commands they hand back. The switches are the primary Mac's
- * `sync_settings` and `sync_account_names`. Rules and traps:
- * `docs/internals/settings-sync.md`.
+ * Display prefs and account names across machines, via the desktop, the one process holding every
+ * paired environment. Rules: `settingsSync.logic.ts`; traps: `docs/internals/settings-sync.md`.
  *
- * Returns the machines to watch: the caller mounts one feeder per machine
- * (hooks cannot loop) and reports each snapshot through `report`.
+ * Returns the machines to watch: the caller mounts one feeder per machine (hooks cannot loop) and
+ * reports snapshots through `report`.
  */
 export function useInfinitusSettingsSync(): {
   readonly machines: ReadonlyArray<SyncMachine>;

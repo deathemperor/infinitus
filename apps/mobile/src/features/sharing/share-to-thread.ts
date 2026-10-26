@@ -44,11 +44,9 @@ export function selectShareTargetThreads(input: {
 }
 
 /**
- * Whether a root-stack route belongs to the new-task flow a share opens: the
- * draft thread and the pickers pushed over it. `Stack.tsx` counts the share as
- * still presented while one of these is on top, so opening the project picker
- * does not read as closing the draft (which discards the share), and the
- * share-to-thread screen pops all of them when it opens the chosen thread.
+ * Whether a root-stack route belongs to the new-task flow a share opens. `Stack.tsx`
+ * counts the share as presented while one is on top, so opening the project picker does
+ * not read as closing the draft (which discards the share).
  */
 export function isShareFlowRoute(
   route: { readonly name: string; readonly params?: object } | undefined,

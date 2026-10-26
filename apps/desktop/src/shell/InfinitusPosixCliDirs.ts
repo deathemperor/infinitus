@@ -4,12 +4,9 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 
 /**
- * Known CLI install directories for the desktop's PATH on macOS (#1078), the
- * POSIX sibling of upstream's `knownWindowsCliDirs`. The login-shell probe in
- * DesktopShellEnvironment stays the first choice: these only join PATH when
- * that probe answered nothing (a `.zshrc` slower than its 5 s timeout leaves
- * the backend on launchd's bare PATH) or answered a PATH with no `claude` on
- * it, and then after the probe's own entries, so a user's PATH still wins.
+ * Known CLI install directories for the desktop's PATH on macOS (#1078). The login-shell
+ * probe stays first; these join PATH only when it answered nothing or no `claude`, and
+ * after its entries, so a user's PATH still wins.
  */
 
 /** Why the known directories were consulted. */

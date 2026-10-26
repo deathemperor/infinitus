@@ -10,12 +10,10 @@ import {
 import * as Schema from "effect/Schema";
 
 /**
- * The Utilization page's history read model (#747): the `utilization --days
- * n` reply decoded defensively and folded into the lines the retired native
- * pane charted — every account's percentage of one window over the range —
- * its run-rate table, and the window telemetry the Mac reconstructs beside
- * them (weekly waste, the five-hour windows, the range's replay). Estimates
- * the Mac read off its own history and transcripts, never billing truth.
+ * The Utilization page's history read model (#747): the `utilization --days n`
+ * reply decoded defensively and folded into per-account lines, a run-rate table
+ * and the Mac's window telemetry. Estimates off the Mac's own history, never
+ * billing truth.
  */
 
 const decode = Schema.decodeUnknownOption(InfinitusUtilization);
@@ -242,12 +240,10 @@ export function fiveHourSummary(
   };
 }
 
-/** One sentence on what the fleet did over the range: how often it switched
-    account, how many of those landed on an account with no window ticking
-    (which a warm-up request could have started ahead of time), and how long
-    the active account sat at its 5h limit. Null when the reply carries no
-    replay, or when the history is older than the `active` flag, where no
-    switch can be seen at all. */
+/** One sentence on what the fleet did over the range: switches, how many landed
+    on an account with no window ticking, and how long the active account sat at
+    its 5h limit. Null when the reply carries no replay, or the history predates
+    the `active` flag. */
 export function replayText(u: InfinitusUtilization): string | null {
   const decoded = decodeReplay(u.replay);
   if (decoded._tag === "None") return null;
@@ -307,14 +303,10 @@ export function formatCount(value: number): string {
 }
 
 /**
- * The live line: a five-minute output rate.
- *
- * This server's own rate (#1127) wins whenever it has turns behind it. It
- * counts the threads running HERE, where the Mac's `liveRate` tails the
- * terminal transcripts the session sweep (#1041) retires — after which the
- * Mac's field is always null and only this one is left. A server rate with no
- * turns in the window is not zero but unknown, so it stands aside and lets a
- * Mac that still reports one speak.
+ * The live line: a five-minute output rate. This server's own rate (#1127) wins
+ * whenever it has turns behind it; the Mac's `liveRate` tails transcripts the
+ * session sweep (#1041) retires. A server rate with no turns is unknown, not
+ * zero, so it stands aside for a Mac that still reports one.
  */
 export function liveRateText(u: InfinitusUtilization | null): string | null {
   const live = u === null ? null : u.liveRate;

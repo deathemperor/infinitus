@@ -3,16 +3,10 @@ import * as Schema from "effect/Schema";
 import { IsoDateTime, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * Fork (#834, on orchestrator v2 #1627): a thread's completed turns summed.
- * The per-turn figures live on the provider turns the orchestrator already
- * stores (`OrchestrationV2ProviderTurn.turnTokenUsage`, plus the fork's
- * `turnCostUsd`, `turnModels` and `toolCalls`); clients fold them with
- * `@infinitus/shared/threadUsage`. The only rollup that crosses the wire is a
- * thread's `usageBaseline`: an estimate for turns that ran before this server
- * recorded usage (the v1 rollup an import carried, or the Claude transcript's
- * total), which the fold adds the recorded turns to. `runtime` rollups come
- * from the turns this server ran; `transcript` ones were estimated after the
- * fact. Estimates, never billing truth — show them as such.
+ * Fork (#834, on orchestrator v2 #1627): a thread's completed turns summed by
+ * `@infinitus/shared/threadUsage`. The only rollup on the wire is `usageBaseline`,
+ * an estimate for turns before this server recorded usage; `runtime` rollups come
+ * from turns it ran, `transcript` ones are after-the-fact. Never billing truth.
  */
 export const ThreadUsageSource = Schema.Literals(["runtime", "transcript"]);
 export type ThreadUsageSource = typeof ThreadUsageSource.Type;

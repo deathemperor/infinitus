@@ -8,11 +8,10 @@ function finiteNonNegativeInteger(value: unknown): number | undefined {
 }
 
 /**
- * Fork (#1557): the prompt-cache TTL a Claude turn's writes bought. The
- * result's `usage.cache_creation` splits the writes into
- * `ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; one account's
- * sessions write both, so never assume a constant. 1 hour wins a mixed turn
- * (the main thread's writes); undefined when the turn wrote nothing.
+ * Fork (#1557): the prompt-cache TTL a Claude turn's writes bought, from the result's
+ * `usage.cache_creation` split (`ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`); one
+ * account writes both, so never assume a constant. 1 hour wins a mixed turn; undefined when nothing
+ * was written.
  */
 export function claudeCacheTtlSeconds(value: unknown): number | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -38,8 +37,7 @@ function addKnownCount(finalCount: unknown, earlierCounts: ReadonlyArray<unknown
   );
 }
 
-// A steer ends the running segment with an aborted result, and the SDK scopes
-// each result's usage to its own segment.
+// Steering aborts the current segment; each SDK result reports only that segment's usage.
 function withEarlierSegmentUsage(
   usage: Record<string, unknown>,
   earlierSegmentUsage: ReadonlyArray<unknown>,

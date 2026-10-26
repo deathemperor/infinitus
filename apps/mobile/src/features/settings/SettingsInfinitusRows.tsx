@@ -1,84 +1,31 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import type { MenuAction } from "@react-native-menu/menu";
 import * as Effect from "effect/Effect";
 import { AsyncResult } from "effect/reactivity";
-import { useMemo, type ComponentProps } from "react";
-import { Platform } from "react-native";
+import { useMemo } from "react";
 
-import { AndroidAnchoredMenu } from "../../components/ui/AndroidAnchoredMenu";
-import { Menu } from "../../components/ui/Menu";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { environmentPresentations } from "../../state/presentation";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { infinitusMacs } from "../accounts/accountsRoute.logic";
 import { requestAgentNotificationPermission } from "../agent-awareness/notificationPermissions";
-import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 
-/**
- * A settings row that opens a menu of choices. iOS: `Menu`'s
- * native `MenuView` opens on the tap whatever the row does, so the row's
- * press is a no-op. Android: `AndroidAnchoredMenu` wraps a plain child in
- * its own Pressable, which the row's inner Pressable would swallow, so the
- * row is handed `open` to call from its own press instead.
- */
-function PickerRow(props: {
-  readonly title: string;
-  readonly actions: MenuAction[];
-  readonly onPressAction: NonNullable<ComponentProps<typeof Menu>["onPressAction"]>;
-  readonly icon: ComponentProps<typeof SettingsRow>["icon"];
-  readonly label: string;
-  readonly value: string;
-  readonly disabled?: boolean;
-}) {
-  const row = (open: () => void) => (
-    <SettingsRow
-      icon={props.icon}
-      label={props.label}
-      value={props.value}
-      disabled={props.disabled}
-      onPress={open}
-    />
-  );
-  if (Platform.OS === "android") {
-    return (
-      <AndroidAnchoredMenu
-        title={props.title}
-        actions={props.actions}
-        onPressAction={props.onPressAction}
-      >
-        {row}
-      </AndroidAnchoredMenu>
-    );
-  }
-  return (
-    <Menu title={props.title} actions={props.actions} onPressAction={props.onPressAction}>
-      {row(() => {})}
-    </Menu>
-  );
-}
-
-/** The fork's rows in Settings (#572): Accounts and Team beside Environments,
-    the reset / swap alarms toggle (it asks for the notification permission)
-    after the notification switches, the sending mode under General. All
-    absent until a paired Mac runs Infinitus, so plain T3 users never see
-    them. A Mac's account alerts and the lock-screen thread card ride
-    Infinitus Connect's own Device Notifications and Live Activity switches
-    (#1375). */
+/** The fork's rows in Settings (#572): Accounts and Team, the reset / swap alarms toggle,
+    and the sending mode. All absent until a paired Mac runs Infinitus, so plain T3 users
+    never see them. */
 function useInfinitusMacPresent() {
   const configs = useAtomValue(environmentServerConfigsAtom);
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   return useMemo(() => infinitusMacs(configs, presentations).length > 0, [configs, presentations]);
 }
 
-export function InfinitusFleetRows() {
-  if (!useInfinitusMacPresent()) return null;
-  return (
-    <>
-      <SettingsRow icon="person.2" label="Accounts" target="SettingsAccounts" />
-      <SettingsRow icon="person.3" label="Team" target="SettingsTeam" />
-    </>
-  );
+/** Accounts and Team as rows of upstream's searchable Settings list. */
+export function useInfinitusFleetRows() {
+  if (!useInfinitusMacPresent()) return [];
+  return [
+    { id: "SettingsAccounts", icon: "person.2", label: "Accounts", target: "SettingsAccounts" },
+    { id: "SettingsTeam", icon: "person.3", label: "Team", target: "SettingsTeam" },
+  ] as const;
 }
 
 export function InfinitusAlarmsRow() {

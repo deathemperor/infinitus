@@ -19,12 +19,10 @@ const PRIVATE_IPV4 = /^(10\.\d+|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d+\.\d+$/;
 const LINK_LOCAL_IPV4 = /^169\.254\./;
 
 /**
- * The base URLs a phone on the Mac's own network can dial (#651): the
- * listening port on every non-internal IPv4 address of the host while the
- * server listens beyond loopback. A loopback bind, a port not yet known
- * (0) or a host with no such address yields none. Private addresses come
- * first — the Devices card encodes the first one; anything link-local is
- * left out (nothing routes to it). Plain http: the LAN has no certificate.
+ * The base URLs a phone on the Mac's own network can dial (#651): the listening port on every
+ * non-internal IPv4 address while the server listens beyond loopback; none otherwise. Private
+ * addresses come first (the Devices card encodes the first one); link-local ones are left out.
+ * Plain http: the LAN has no certificate.
  */
 export function lanHttpBaseUrls(input: {
   readonly host: string | undefined;

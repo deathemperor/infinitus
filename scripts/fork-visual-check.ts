@@ -1,12 +1,9 @@
 // @effect-diagnostics nodeBuiltinImport:off - A plain CLI over files the harness wrote; no Effect runtime here.
 /**
- * The visual pass's verdict: applies `fork-visual-routes.ts` to the
- * `text-<route>.txt` captures `fork-visual-pass.mjs` wrote and exits 1 on the
- * first route that misses its marker or shows an empty state.
- *
- *   node scripts/fork-visual-check.ts --out <dir>   check the captures in <dir>
- *   node scripts/fork-visual-check.ts --routes      print the routes, space-separated,
- *                                                   for the harness's argument list
+ * The visual pass's verdict: applies `fork-visual-routes.ts` to the captures
+ * `fork-visual-pass.mjs` wrote and exits 1 on the first route that misses its
+ * marker or shows an empty state. `--out <dir>` checks <dir>; `--routes` prints
+ * the routes, space-separated, for the harness's argument list.
  */
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";

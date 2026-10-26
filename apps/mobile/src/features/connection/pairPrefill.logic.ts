@@ -1,11 +1,8 @@
 /**
- * What the add-connection screen takes from its deep link (#724). Upstream
- * honours `pairingUrl` / `autoConnect` in development builds only: a
- * production link must not arrive with attacker-chosen host and token filled
- * in. The Infinitus variant pairs with its own Mac by QR, so a scanned link
- * that reaches the app lands on the sheet with host and code filled — the
- * user still reads both and taps Add. Auto-connect stays development-only:
- * nothing pairs without that tap.
+ * What the add-connection screen takes from its deep link (#724). Upstream honours
+ * `pairingUrl` / `autoConnect` in development builds only, since a production link must
+ * not carry attacker-chosen host and token. Infinitus pairs by QR, so a scanned link
+ * fills host and code; the user still taps Add. Auto-connect stays development-only.
  */
 
 export interface PairingPrefill {

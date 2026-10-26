@@ -3,22 +3,10 @@ import * as Effect from "effect/Effect";
 import * as Logger from "effect/Logger";
 
 /**
- * The backend's own log file (#1182).
- *
- * Upstream persists a server's log lines only through whoever started it: a
- * boot service redirects stdout into `server.log` (`cloud/bootService.ts`),
- * and the desktop's Electron main process drains the child's pipes into
- * `server-child.log`. A packaged desktop backend gets neither in practice, so
- * every `Effect.log*` line — a withheld push, a stale port, a tunnel that
- * never came up — lived only on a pipe and was gone by the time anyone
- * looked. The trace file next to this one keeps spans, and `tracerLogger`
- * records a log as a span event only while a sampled span is open, which is
- * the minority of them.
- *
- * So the backend writes its own, whoever spawned it: one NDJSON record per
- * line, rotated by the same sink the trace file uses. It is a separate file
- * from the boot service's log on purpose — that one is redirected stdout,
- * and writing both would put every line in that file twice, in two formats.
+ * The backend's own log file (#1182). Upstream persists log lines only through whoever started the
+ * server, and a packaged desktop backend gets neither, so lines lived on a pipe and vanished. This
+ * writes one NDJSON record per line whoever spawned it, rotated by the trace file's sink; separate
+ * from the boot service's redirected-stdout `server.log` so no line lands twice in two formats.
  */
 const SERVER_LOG_FILE_MAX_BYTES = 10 * 1024 * 1024;
 const SERVER_LOG_FILE_MAX_FILES = 10;

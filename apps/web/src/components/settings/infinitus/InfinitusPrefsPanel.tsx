@@ -1,8 +1,7 @@
 /**
- * The Infinitus preference panes. Every row is drawn from the native app's own
- * `prefs` catalog rather than from anything declared here, so a pref the app
- * adds shows up without a fork release; the pane only picks the control, sends
- * `prefs set <key> <json>` over the control socket, and says what came back.
+ * The Infinitus preference panes. Every row is drawn from the native app's `prefs` catalog, so a
+ * pref the app adds shows up without a fork release; the pane only picks the control, sends `prefs
+ * set <key> <json>` over the control socket, and says what came back.
  *
  * @module InfinitusPrefsPanel
  */

@@ -14,11 +14,9 @@ import { markUpImage, markupSupported } from "./markup";
 import { markedUpAttachment, markupSourceUri, replaceAttachment } from "./markupAttachment.logic";
 
 /**
- * "Mark up" on a draft image (#269 I): Quick Look's editor over a copy of the bytes;
- * when the person saves, the flattened file replaces the attachment in the thread's
- * draft under a new id, so it uploads again and the row's thumbnail updates. Undefined
- * where the native module is missing (Android, an older build), and the composer
- * shows no pencil.
+ * "Mark up" on a draft image (#269 I): Quick Look's editor over a copy of the bytes; the
+ * flattened file replaces the attachment under a new id so it uploads again. Undefined
+ * where the native module is missing, and the composer shows no pencil.
  */
 export function useMarkUpDraftImage(
   environmentId: EnvironmentId,

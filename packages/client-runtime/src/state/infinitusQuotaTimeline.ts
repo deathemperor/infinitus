@@ -7,12 +7,9 @@ import * as DateTime from "effect/DateTime";
 import type { FleetSectionModel, UsageWindowBar } from "./infinitusAccounts.ts";
 
 /**
- * The Accounts page's quota-window timeline: every account a lane, every
- * usage window a bar from when it opened to when it resets, so the lanes
- * whose windows end together — the ones that compete for the same days —
- * line up on screen. Built from the rows the page already derives plus the
- * window telemetry `utilization` ships; the clock is an argument, so the same
- * inputs always draw the same bars. Instants are epoch milliseconds.
+ * The Accounts page's quota-window timeline: every account a lane, every usage
+ * window a bar from open to reset. The clock is an argument, so the same inputs
+ * always draw the same bars. Instants are epoch milliseconds.
  */
 
 export type QuotaTimelineView = "weekly" | "fiveHour";
@@ -40,11 +37,10 @@ export interface QuotaTimelineRange {
 type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
- * Weekly: two weeks from the start of the local week holding `now`; each
- * `offset` step moves one week. Five-hour: a day around `now`, twelve hours
- * back from the current hour, each step twelve hours. Days are stepped on the
- * calendar, not in 24 h blocks, so a DST night still starts at midnight.
- * `timeZone` is the machine's own unless a test names one.
+ * Weekly: two weeks from the start of the local week holding `now`. Five-hour: a
+ * day around `now`, twelve hours back from the current hour. Each `offset` step
+ * moves one period, stepped on the calendar so a DST night still starts at
+ * midnight. `timeZone` is the machine's own unless a test names one.
  */
 export function quotaTimelineRange(
   view: QuotaTimelineView,
@@ -112,16 +108,10 @@ function instant(iso: string | null): number | null {
 }
 
 /**
- * One lane's bars for a view.
- *
- * A window opens on the first request after the one before it expired, so
- * the bar ahead of a reset is only the earliest the next window can run. That
- * holds for a week, where an account in rotation is back within the day; a
- * 5h window sits cold for hours between uses, so upcoming 5h bars are drawn
- * only for an account kept warm, whose window the engine restarts as soon as
- * it goes cold. Rolled windows come from the Mac's history, never from
- * stepping back from the current one: a spent banked reset or an idle gap
- * makes the past irregular.
+ * One lane's bars for a view. A window opens on the first request after the last
+ * expired, so a bar ahead of a reset is only the earliest the next can run:
+ * upcoming 5h bars are drawn only for an account kept warm. Rolled windows come
+ * from the Mac's history, not by stepping back: banked resets make the past irregular.
  */
 function laneSegments(input: {
   readonly view: QuotaTimelineView;

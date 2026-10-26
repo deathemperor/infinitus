@@ -1,21 +1,10 @@
 // @effect-diagnostics nodeBuiltinImport:off -- This platform boundary binds the loopback port the OAuth redirect names.
 
 /**
- * The engine's loopback listener, stood in for on this machine. A sign-in an
- * engine finishes itself (swapd's `add-oauth`, the proxy) ends on
- * `http://localhost:<port>/callback?code=…&state=…`, and the engine listens
- * there — on the Mac that owns it. When this desktop looks at ANOTHER Mac's
- * environment, the page opens in this machine's browser, so the redirect
- * comes to this machine's loopback instead. This service takes that port
- * for the flow's lifetime, answers the browser's one request the way the
- * engine would, and hands the address it carried back to the page, which
- * sends it over `signin-code` for the Mac to replay on its own listener.
- * Nothing to copy: the browser shows "Signed in" and the account lands.
- *
- * The address carries the code, so it goes to the renderer over IPC and on
- * to the server as a secret, the way the pasted one does; it reaches no log.
- * A port already held (an engine of this Mac's own is signing in, a proxy
- * sits on 54545) answers `ok: false`, and the page falls back to the field.
+ * The engine's loopback listener, stood in for on this machine. When this desktop looks at
+ * ANOTHER Mac's environment, the redirect lands here: this takes the port for the flow
+ * and hands the address to the page, which sends it over `signin-code` for the Mac to
+ * replay. A held port answers `ok: false`. The address carries the code: IPC only.
  */
 import * as NodeHttp from "node:http";
 
@@ -35,12 +24,9 @@ import { openInPrivateWindow } from "./InfinitusSwapdProcess.ts";
 /** The engine's own path; anything else on the port is not the redirect. */
 const CALLBACK_PATH = "/callback";
 
-/** What the stand-in answers one request with: the engine's own words for
-    the callback (swapd's `serve`), so the browser tab reads the same whether
-    the redirect landed here or there. `redirect` is the address to hand on —
-    only for the callback path; a favicon probe or a stray hit is answered
-    and ignored. The provider's refusal (`error=`) is handed on too: the Mac
-    reads it off the query and words it. */
+/** What the stand-in answers one request with: the engine's own words, so the tab reads
+    the same wherever the redirect landed. `redirect` is set only for the callback path;
+    a provider's refusal (`error=`) is handed on too. */
 export function signInRedirectResponse(requestUrl: string): {
   readonly status: number;
   readonly body: string;
@@ -152,18 +138,16 @@ const make = Effect.gen(function* () {
     const listener = listenForSignInRedirect({ port: input.port });
     flows.set(input.flowId, listener.stop);
 
-    // The page opens the way the shell's own sign-in does (#1213): a private
-    // window of the default browser, so no signed-in account gets in the
-    // way; the plain default browser where it has no such window (Safari).
-    // Never the child window — a passkey sign-in never completes there —
-    // and the redirect comes to this machine either way, where we listen.
+    // Opens as the shell's own sign-in does (#1213): a private window of the default
+    // browser, plain where it has none (Safari). Never the child window: a passkey
+    // sign-in never completes there.
     const privateWindow =
       environment.platform === "darwin" &&
       (yield* Effect.promise(() => openInPrivateWindow(input.url)));
     if (!privateWindow) {
-      yield* Effect.promise(() => Electron.shell.openExternal(input.url)).pipe(
+      yield* Effect.tryPromise(() => Electron.shell.openExternal(input.url)).pipe(
         Effect.tapError((error) => logWarning("the browser did not open", { error })),
-        Effect.catch(() => Effect.void),
+        Effect.ignore,
       );
     }
     yield* logInfo("listening for the sign-in redirect", {

@@ -16,12 +16,9 @@ type Phase =
   | { readonly kind: "waiting"; readonly host: string; readonly matchCode: string };
 
 /**
- * "Ask this Mac to approve" on the add-connection form (#710): instead of
- * typing the Devices card's code, the phone files a request with the server at
- * the Host field's address and shows a four-character match code; the Mac's
- * Devices card lists the request beside the same code, and its Approve hands
- * the phone the one-time credential, which `onCredential` pairs with as if it
- * had been typed. The secret the phone made up stays in this component.
+ * "Ask this Mac to approve" on the add-connection form (#710): the phone files a request
+ * at the Host field's address and shows a match code; the Mac's Approve hands back the
+ * one-time credential for `onCredential`. The phone's secret stays in this component.
  */
 export function InfinitusAskToApprove(props: {
   readonly host: string;

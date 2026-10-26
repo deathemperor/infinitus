@@ -11,12 +11,9 @@ export function limitStopKey(environmentId: EnvironmentId, threadId: ThreadId): 
 
 /**
  * The threads a Claude usage limit stopped, over every connected environment
- * (#648, #1627): one subscription per environment (`subscribeInfinitusLimitStops`),
- * folded into one map the sidebar and the phone's thread list read per row.
- * An environment whose stream is still loading, refused or gone contributes
- * nothing — a plain server has no limit stops to show. The map is only
- * replaced when a stop appears, leaves or changes, so rows do not re-render
- * on every snapshot tick.
+ * (#648, #1627), folded into one map the sidebar and phone list read per row. An
+ * environment that is loading, refused or gone contributes nothing. The map is
+ * replaced only when a stop appears, leaves or changes, to avoid re-render churn.
  */
 export function createInfinitusLimitStopsAtom(input: {
   readonly catalogValueAtom: Atom.Atom<EnvironmentCatalogState>;

@@ -1,23 +1,14 @@
-// Fork registration point (INFINITUS.md, #1192): this repo's releases, not
-// upstream's. Every runtime installer derives its download URLs and its
-// "what is newest" lookup from this one constant, so upstream's value here
-// means an Infinitus desktop asks pingdotgg for a `v0.5.0-alpha.N` archive
-// that cannot exist (404), and `infinitus update` on an Infinitus CLI resolves
-// upstream's newest build and installs T3 Code over it. Re-flipped after
-// every upstream sync.
+// Fork registration point (INFINITUS.md, #1192): this repo's releases, not upstream's.
+// Installers derive download URLs and the "what is newest" lookup from this
+// constant, so upstream's value makes `infinitus update` install T3 Code over an
+// Infinitus CLI. Re-flipped after every upstream sync.
 const CLI_RELEASE_REPOSITORY = "deathemperor/infinitus";
 export const CLI_RELEASES_PAGE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases`;
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
 
-/**
- * Kept in step with the build_linux_cli matrix, build_windows_arm64_cli, and
- * the `cli_archive` rows in .github/workflows/release.yml: a key here without a
- * build there produces download URLs that 404, and a build there without a key
- * here is unreachable from every installer.
- */
-// No darwin-x64: Node single-executables are unsupported on x64 macOS (the
-// SEA docs list macOS as arm64 only) and the binary segfaults on start.
+// Keep archive keys aligned with the Linux matrix, Windows ARM64 build, and cli_archive rows in release.yml.
+// Node single-executables do not support darwin-x64 and segfault at startup.
 const CLI_ARCHIVE_PLATFORM_KEYS = [
   "darwin-arm64",
   "linux-arm64",
@@ -35,11 +26,7 @@ export function cliArchivePlatformKey(
   return CLI_ARCHIVE_PLATFORM_KEYS.find((candidate) => candidate === key);
 }
 
-/**
- * Windows ships bsdtar in System32, which reads both formats; a Git-for-Windows
- * GNU tar earlier on PATH cannot open the zip, so the system copy is named by
- * absolute path.
- */
+/** Use System32 bsdtar on Windows; Git-for-Windows GNU tar cannot open zip archives. */
 export function cliArchiveTarCommand(
   platform: NodeJS.Platform,
   env: Readonly<Record<string, string | undefined>>,
@@ -81,12 +68,9 @@ export const CLI_RELEASE_CHANNELS: ReadonlyArray<CliReleaseChannel> = [
 ];
 
 /**
- * The release train a version was published on, derived from its prerelease
- * tag. This repo's nightly (#1042) carries its line's own id first —
- * `0.5.0-alpha.7-infinitus-nightly.20260913.42` — so upstream's rule, which
- * wants the train immediately after the version core, reads it as `stable`
- * and would answer a nightly CLI with a stable lookup. The second arm reads
- * the fork's suffix wherever the line's id left it.
+ * The release train a version was published on, from its prerelease tag. This
+ * repo's nightly (#1042) carries its line's id first, so upstream's rule reads it
+ * as `stable`; the second arm reads the fork's suffix wherever the id left it.
  */
 export function cliReleaseChannelOf(version: string): CliReleaseChannel {
   if (/-infinitus-nightly\.\d{8}\.\d+$/.test(version)) return "nightly";
@@ -94,17 +78,12 @@ export function cliReleaseChannelOf(version: string): CliReleaseChannel {
   return channel === "nightly" || channel === "preview" ? channel : "stable";
 }
 
-/**
- * Callers walk pages until a channel match turns up; a busy nightly train can push the newest
- * preview or stable release past any single page.
- */
+/** Page until the channel matches; nightlies can push preview/stable releases past the first page. */
 export function cliReleaseIndexPageUrl(page: number): string {
   return `https://api.github.com/repos/${CLI_RELEASE_REPOSITORY}/releases?per_page=100&page=${page}`;
 }
 
-/**
- * Drafts are skipped because their assets are not downloadable.
- */
+/** Draft assets are not downloadable. */
 export function newestCliReleaseVersion(
   releases: ReadonlyArray<{
     readonly tag_name: string;

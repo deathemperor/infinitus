@@ -20,12 +20,9 @@ import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
 import { InfinitusRunningTurns } from "../Services/InfinitusRunningTurns.ts";
 
 /**
- * Fork: `infinitusctl`'s reads over plain HTTP. `runningTurns` (#829) is the
- * Mac's busy-session count, read from the thread shells' activity run on
- * orchestrator v2; `threadDefaults` (#1315) is the composer's own model
- * resolution; `alert` (#1375) is the Mac's account alert on its way to the
- * phones. The holds and release reads left with the engine-bound session
- * gates (#1627), as did the update idle gate's server half.
+ * Fork: `infinitusctl`'s reads over plain HTTP. `runningTurns` (#829) is the Mac's busy-session
+ * count from the thread shells' activity run; `threadDefaults` (#1315) is the composer's model
+ * resolution; `alert` (#1375) is the Mac's account alert on its way to the phones.
  */
 export const infinitusHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,

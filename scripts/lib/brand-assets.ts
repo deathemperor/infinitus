@@ -51,11 +51,10 @@ export function resolveWebAssetBrandForChannel(channel: WebAssetChannel): WebAss
   return channel === "nightly" ? "nightly" : "production";
 }
 
-/** Every build of this repo wears the Infinitus brand, its own nightly
-    (`-infinitus-nightly.<date>.<run>`, #1042) included; only an upstream
-    nightly or preview — first prerelease id `nightly` / `preview` — keeps
-    its own (#823). The fork cuts no preview builds, so that arm is
-    upstream's alone; it is kept so the test stays theirs verbatim. */
+/** Every build of this repo wears the Infinitus brand, its own nightly (#1042)
+    included; only an upstream nightly or preview (first prerelease id `nightly` /
+    `preview`, #823) keeps its own. The fork cuts no previews; that arm is kept so
+    the test stays upstream's verbatim. */
 export function resolveWebAssetBrandForPackageVersion(version: string): WebAssetBrand {
   return /^[^-+]+-(?:nightly|preview)\./.test(version) ? "nightly" : "infinitus";
 }

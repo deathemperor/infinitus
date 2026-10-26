@@ -1,14 +1,8 @@
 /**
- * Fork (#834): per-turn cost from the Claude SDK's cumulative totals. A
- * result's `total_cost_usd` and `modelUsage` are running totals for the
- * query() session ("read the latest result rather than summing"), so one
- * turn's share is the difference from the previous result. A total that
- * went down means the session started over (a reconnect, `/clear`, a
- * zeroed crash result), and the new total is the whole turn's. A restart
- * whose first result already exceeds the old total is not detected, and
- * that one turn is under-counted by the old total; the adapter keeps the
- * totals on the live query context, so a reopened process starts over,
- * which covers the common case.
+ * Fork (#834): per-turn cost from the Claude SDK's cumulative totals. `total_cost_usd` and
+ * `modelUsage` are running totals for the query() session, so a turn's share is the difference from
+ * the previous result; a total that went down means the session restarted and the new total is the
+ * whole turn's. A restart whose first result exceeds the old total goes undetected (under-counted).
  */
 
 export interface ClaudeResultTotals {
@@ -86,14 +80,10 @@ export function claudeTurnUsageDelta(
 }
 
 /**
- * No prompt cache (#974): a proxy or endpoint that never serves a cache
- * read makes every call re-send the whole context at full price and full
- * latency, and nothing on screen says so. Counted per CLI process from the
- * assistant messages' `usage`: a call whose input is large and neither read
- * nor wrote the cache is a miss, a call that read or wrote it is a hit and
- * clears the run, a small call is neither. One notice per process, at
- * `PROMPT_CACHE_MISS_RUN` misses in a row. A snapshot repeating a message
- * id counts once.
+ * No prompt cache (#974): a proxy that never serves a cache read makes every call re-send the whole
+ * context at full price, silently. Counted per CLI process from assistant `usage`: a large call
+ * that neither read nor wrote the cache is a miss, a read or write is a hit and clears the run. One
+ * notice per process at `PROMPT_CACHE_MISS_RUN` misses in a row; a repeated message id counts once.
  */
 export const PROMPT_CACHE_MISS_RUN = 5;
 const PROMPT_CACHE_MIN_INPUT_TOKENS = 10_000;

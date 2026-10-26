@@ -19,15 +19,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 /**
- * The usage scan's swap timeline (#779), read from the app's `history <fleet>`
- * verb: `{fleet, history: <the engine's own switch log, whole, unstripped>}`,
- * emails included, they are the join key. Asked of the Claude fleet whose
- * engine has the `history` capability, since the app refuses the others.
- * Reads the socket through the client directly, like the secret layer,
- * because `InfinitusService.command` runs a poll cycle after every verb and a
- * usage scan must not poll the app. Anything short of a reply — no app, an
- * older build without the verb, a refused or malformed answer — is "no
- * timeline", never a failed scan. Nothing here logs the reply.
+ * The usage scan's swap timeline (#779), read from the app's `history <fleet>` verb (emails are the
+ * join key). Reads the socket through the client directly: `InfinitusService.command` polls after
+ * every verb and a usage scan must not poll the app. Anything short of a reply is "no timeline",
+ * never a failed scan. Nothing here logs the reply.
  */
 export const InfinitusUsageAttributionLive = Layer.effect(
   UsageAttribution,

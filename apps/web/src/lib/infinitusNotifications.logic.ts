@@ -3,11 +3,10 @@ import type { ClientSettings } from "@infinitus/contracts";
 import type { SidebarThreadStatus } from "../components/Sidebar.logic";
 
 /**
- * The fork's half of thread notifications (#1032, on upstream #11481): the
- * two states upstream has no title for, the quiet rule for the thread on
- * screen, the Dock badge's count and the queue rule (#270 B), and the
- * one-time mapping of the old #270 B toggles and #270 H sound onto
- * upstream's `notificationMode`.
+ * The fork's half of thread notifications (#1032, on upstream #11481): the two states upstream has
+ * no title for, the quiet rule for the thread on screen, the Dock badge's count and queue rule
+ * (#270 B), and the one-time mapping of the old #270 B toggles and #270 H sound onto
+ * `notificationMode`.
  */
 const ATTENTION_TITLES: Partial<Record<SidebarThreadStatus, string>> = {
   approval: "Approval needed",
@@ -41,12 +40,10 @@ export interface ThreadNotificationRecord {
 }
 
 /**
- * What to ring for a thread whose record changed. A new wait on the user
- * always rings: the queue cannot drain past an approval or a question. A
- * later completion rings only while nothing is queued (#270 B): the drain
- * sends the next row the moment the turn ends, so the thread is not done.
- * The completion still counts as seen, so a queued row the user removes
- * afterwards rings nothing for it.
+ * What to ring for a thread whose record changed. A new wait on the user always rings: the queue
+ * cannot drain past an approval or a question. A later completion rings only while nothing is
+ * queued (#270 B), since the drain sends the next row at once. It still counts as seen, so a
+ * removed queued row rings nothing.
  */
 export function notificationKind(
   prior: ThreadNotificationRecord,

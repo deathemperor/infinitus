@@ -35,36 +35,10 @@ const SEEN_LIMIT = 500;
 const WATCH_INTERVAL = Duration.seconds(3);
 
 /**
- * Lapsed AWS / gcloud sign-ins for the threads this server runs (#1076),
- * the fork's counterpart to the Mac's transcript scan (retired with the
- * terminal-session features, #1041), on orchestrator v2 (#1627). Every
- * `command_execution` turn item the orchestrator stores — the adapters
- * normalize every provider's shell tool into one, so this is no longer
- * Claude's alone — is read for the CLIs' expired-credentials signatures once
- * it carries its output, and as it starts (running, no output yet) for a
- * login the agent runs itself (`aws login`, `gcloud auth login`: it blocks
- * on a browser no client shows). A hit, on an app whose manifest lists the
- * verb, starts the Mac's own `aws-login <profile>` / `gcloud-login <account>`
- * flow — through `InfinitusService.command`, whose post-write poll re-reads
- * `aws-logins`, so the started login reaches the web's Sign-ins section and
- * the phone at once rather than at the next scheduled cycle — and rings the
- * phones once through the relay. (The v1 work-log row on the thread left
- * with the port: v2 has no row a reactor can leave, and no client drew it.)
- * A login the snapshot's `aws-logins` already shows in flight is left alone:
- * it is waiting on a person at a browser, and starting a second one would
- * take its place. Once per thread per profile per hour: a session that
- * keeps retrying the same call is one need, while a second profile that
- * lapses in the same hour is its own, and so is every login the agent runs
- * itself (once per tool call). Everything runs on one sequential worker off
- * the event stream, so the turn is never waited on; an unreachable Mac or a
- * refused verb is logged. A login the agent runs itself waits on its own
- * browser tab, which signing in through the Mac's card never answers, so
- * its Bash call would sit until its timeout: the Mac's login is watched
- * until it ends, and once it is `done` the agent's login processes for that
- * credential — under this server's process tree only — are ended, and the
- * agent's next call finds the Mac's credentials. The output text and the
- * command reach no log, span or payload — only the thread id, the provider
- * and the profile.
+ * Lapsed AWS / gcloud sign-ins (#1076, #1627): a `command_execution` item with a lapse signature,
+ * or an agent-run login (it blocks on a browser nobody sees), starts the Mac's login flow and rings
+ * the phones, once per thread per profile per hour, unless that login is in flight. When the Mac's
+ * login is `done`, the agent's login processes under this server are ended. Output is never logged.
  */
 export const InfinitusSignInLapseLive = Layer.effectDiscard(
   Effect.gen(function* () {

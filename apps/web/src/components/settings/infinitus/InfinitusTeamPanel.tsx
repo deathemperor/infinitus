@@ -1,14 +1,7 @@
 /**
- * Settings › Team on Infinitus Connect (#1592): the teams the signed-in
- * user is in, read and changed on the relay with the user's Clerk token.
- * Signed out, one card offers the sign-in the sidebar offers. Signed in:
- * a team picker when in several; Members (a leader's Promote / Demote /
- * Remove; a row expands to the member's threads index, a thread to its
- * transcript rows), Requests, Invites (minted once, shown once, with Copy
- * and Copy link), Sharing, Policy, Grants and Waiting for you, Leave; then
- * Join (the bare token or either link shape) and Create. Private projects
- * stay the Mac's, over its `team-exclusions` / `team-exclude` verbs. Every
- * relay error is its reason verbatim.
+ * Settings › Team on Infinitus Connect (#1592): the signed-in user's teams, read and changed on the
+ * relay with the Clerk token (signed out, one card offers the sidebar's sign-in). Private projects
+ * stay the Mac's, over `team-exclusions` / `team-exclude`; every relay error is shown verbatim.
  *
  * @module InfinitusTeamPanel
  */
@@ -39,6 +32,7 @@ import type {
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { useEffect, useRef, useState } from "react";
 
+import { useNowMinute } from "~/hooks/useNowMinute";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { infinitusEnvironment } from "~/state/infinitus";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -59,12 +53,7 @@ import { Button } from "../../ui/button";
 import { Checkbox } from "../../ui/checkbox";
 import { Input } from "../../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../../ui/select";
-import {
-  SettingsPageContainer,
-  SettingsRow,
-  SettingsSection,
-  useRelativeTimeTick,
-} from "../settingsLayout";
+import { SettingsPageContainer, SettingsRow, SettingsSection } from "../settingsLayout";
 import { InfinitusPanelNotice, useInfinitusEnvironment } from "./InfinitusPrefsPanel";
 import { infinitusCommandFailure } from "./panel.logic";
 import {
@@ -137,7 +126,8 @@ type Busy = string | null;
 
 function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
   const { environmentId } = useInfinitusEnvironment();
-  const nowMs = useRelativeTimeTick(30_000);
+  const nowMinute = useNowMinute();
+  const nowMs = Date.parse(`${nowMinute}:00.000Z`);
   /** `undefined` before the first read. */
   const [teams, setTeams] = useState<ReadonlyArray<TeamListRow> | undefined>(undefined);
   const [teamId, setTeamId] = useState<string | null>(null);

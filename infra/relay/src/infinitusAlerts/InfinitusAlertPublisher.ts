@@ -24,15 +24,10 @@ import * as RelayConfiguration from "../Config.ts";
 import * as EnvironmentLinks from "../environments/EnvironmentLinks.ts";
 
 /**
- * An Infinitus environment's account alerts (#1375): the Mac app's limit /
- * switch / revival / AWS-login lines, pushed with the relay's key to every
- * phone of every user linked to the environment with notifications on.
- * Thread-less, so it is its own route and publisher beside the agent
- * activity ones; the proof check is `EnvironmentPublishSignatures.verify`
- * without the thread, and the nonce goes into the same replay table under
- * its own thumbprint prefix. iOS rides the APNs notification queue with no
- * `threadId`; Android rides the FCM queue as an `alert` job the consumer
- * sends over whatever card it is showing.
+ * An environment's account alerts (#1375), pushed with the relay's key to every
+ * linked phone with notifications on. Thread-less, so its own route; the nonce
+ * shares the replay table under its own thumbprint prefix. iOS uses the APNs
+ * queue with no `threadId`; Android an FCM `alert` job over whatever card shows.
  */
 export class InfinitusAlertProofExpired extends Schema.TaggedError<InfinitusAlertProofExpired>()(
   "InfinitusAlertProofExpired",

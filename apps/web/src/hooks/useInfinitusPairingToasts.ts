@@ -20,15 +20,10 @@ interface Watched {
 }
 
 /**
- * A toast for every phone that asks to pair (#710): its device name and one
- * Open action to the Devices card. Every request the desktop has not toasted
- * is news, including those already pending when the app loads — a request
- * lives two minutes and needs the user. Each id is toasted once per
- * environment; the request's match code and the phone's secret stay off
- * the toast (the code is compared on the card, the secret never leaves the
- * server). A client without the administrative scopes is refused the stream
- * and toasts nothing — the Devices card says who can approve (#730); any
- * other failure is logged once.
+ * A toast for every phone that asks to pair (#710): its device name and one Open action to the
+ * Devices card. Every request not yet toasted is news, including those pending at load; each id is
+ * toasted once per environment. The match code and the phone's secret stay off the toast. A client
+ * without the administrative scopes toasts nothing (#730); other failures are logged once.
  */
 export function useInfinitusPairingToasts(): void {
   const environmentId = usePrimaryEnvironment()?.environmentId ?? null;

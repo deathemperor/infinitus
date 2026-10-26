@@ -1,12 +1,9 @@
 import type { OrchestrationV2ProviderTurn, OrchestrationV2TurnItem } from "@infinitus/contracts";
 
 /**
- * Fork (#834, #927): the tool calls of a provider turn, counted on the turn
- * items the adapters normalize (every provider's shell, file, search and
- * dynamic tools, and the subagents it launched), provider-agnostic. The
- * ingestor stamps the count on the terminal `provider-turn.updated` so the
- * rollup never needs the items themselves — a client's bounded snapshot
- * holds only a recent window of them.
+ * Fork (#834, #927): the tool calls of a provider turn, counted on the normalized turn items,
+ * provider-agnostic. The ingestor stamps the count on the terminal `provider-turn.updated` so the
+ * rollup never needs the items: a client's bounded snapshot holds only a recent window of them.
  */
 export const TOOL_CALL_TURN_ITEM_TYPES: ReadonlySet<OrchestrationV2TurnItem["type"]> = new Set<
   OrchestrationV2TurnItem["type"]

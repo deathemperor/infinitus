@@ -1,22 +1,8 @@
 /**
- * Fork visual pass: drives one headless Chrome over CDP against a running
- * web app — pairs, clicks through the first-run wizard, then screenshots each
- * route and prints its page text.
- *
- *   node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> [/route …]
- *
- *   --base-url <origin>   where routes are opened (default: the pair URL's origin)
- *   --cdp-port <n>        Chrome's remote-debugging port (default 9345; a port
- *                         another Chrome holds is fine — the browser we spawned
- *                         is found by its own endpoint, never by the port)
- *   --profile <dir>       Chrome user-data dir (default: a temp dir, removed on exit)
- *   --settle-ms <n>       wait after a route mounts before the shot (default 15000)
- *   --mount-timeout-ms <n> give up waiting for a route to mount (default 90000; a
- *                         dev server compiling a cold route chunk can take a while)
- *   CHROME_BIN            Chrome binary (default: the macOS Google Chrome path)
- *
- * The pair URL carries the token; it is never printed. Node ≥ 22 (global
- * fetch + WebSocket), no dependencies.
+ * Fork visual pass: drives one headless Chrome over CDP against a running web app
+ * (pair, first-run wizard, then screenshot and page text per route). Usage:
+ * `node scripts/fork-visual-pass.mjs --pair-url <url> --out <dir> [/route …]`.
+ * The pair URL carries the token and is never printed.
  */
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -73,13 +59,10 @@ async function launchChrome({ cdpPort, profile }) {
     ],
     { stdio: ["ignore", "ignore", "pipe"] },
   );
-  // Chrome's last lines of stderr, for the error when the port never opens —
-  // and for the endpoint it actually listens on, which is the only way to know
-  // the browser answering the port is ours. A second Chrome asked for a port
-  // another one already holds does not fail: it binds the same number on the
-  // other address family (IPv4 vs IPv6) and logs `bind() failed`, so probing
-  // `127.0.0.1:<port>` can hand us a concurrent run's browser and both passes
-  // then drive one page, shifting every capture onto the wrong route.
+  // Chrome's last stderr lines, for the error when the port never opens and for
+  // the endpoint it actually listens on: a second Chrome asked for a held port binds
+  // the other address family and logs `bind() failed`, so probing `127.0.0.1:<port>`
+  // can hand us a concurrent run's browser and shift every capture onto the wrong route.
   let stderr = "";
   const endpoint = new Promise((resolve) => {
     child.stderr.on("data", (chunk) => {
@@ -182,17 +165,10 @@ await send("Emulation.setDeviceMetricsOverride", {
 });
 
 /**
- * What the page shows, fields included. `innerText` leaves out every form
- * control's value, so a port rendered as "3,773", a stale hostname or an empty
- * required field reached no check and the route still passed — yet the values
- * are what these pages exist to show. Each field contributes `[label: value]`
- * where it sits, so a marker or a forbidden phrase can name one.
- *
- * Only fields carrying a real accessible name are taken: base-ui puts a hidden
- * twin behind every switch and number field, and those have none, so this
- * skips them and reads the named widget the user actually sees — one entry per
- * control, keyed by a name a route table can be written against rather than a
- * generated id. Password values never travel.
+ * What the page shows, fields included. `innerText` omits form control values, so a
+ * stale hostname or empty field reached no check; each field contributes
+ * `[label: value]` where it sits. Only fields with a real accessible name are taken
+ * (base-ui's hidden twins have none), and password values never travel.
  */
 const FIELD_VALUES = `(() => {
   const nameOf = (el) => {
@@ -251,13 +227,10 @@ const FIELD_VALUES = `(() => {
 const pageText = async () => ((await evaluate(FIELD_VALUES)) ?? "").replace(/\s+/g, " ");
 
 /**
- * Until the app tree is mounted on `expectPath`; reloads on the stalled
- * connection gate. The path is half the wait on purpose: the page still on
- * screen shows the same `APP_MOUNTED` markers the next one will, so mount
- * alone is satisfied by a navigation that has not committed yet — and a run
- * slow enough for that to repeat drifts whole routes behind, writing each
- * capture under an earlier route's name. Pass no path for a navigation that
- * lands somewhere of its own (pairing redirects to the app root).
+ * Until the app tree is mounted on `expectPath`; reloads on the stalled connection
+ * gate. The path is half the wait on purpose: the page still on screen shows the
+ * same `APP_MOUNTED` markers, so mount alone is satisfied before navigation commits
+ * and captures drift under an earlier route's name. No path: pairing redirects to root.
  */
 const waitForApp = async (label, expectPath) => {
   const deadline = Date.now() + options.mountTimeoutMs;

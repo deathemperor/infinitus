@@ -1,14 +1,8 @@
 /**
- * Approve-on-Mac pairing (#710), the pure pieces: where the phone's two
- * unauthenticated requests go, what their replies have to look like, and the
- * words for each way the wait can end. The wire itself (fetch, the poll loop,
- * timers) lives in `pairingApproval.ts`.
- *
- * The phone never types a code. It asks the desktop server for approval with a
- * secret it made up, shows the short match code the server answered with, and
- * polls until the Mac's Devices card approves or denies the request. Approval
- * hands over the same one-time pairing credential a typed code would carry, so
- * the rest of the flow is the existing `connectAndClose`.
+ * Approve-on-Mac pairing (#710), the pure pieces: where the two unauthenticated requests
+ * go, what replies must look like, and the words for each way the wait ends. The phone
+ * asks with a secret it made up and polls; approval hands over the usual one-time
+ * credential. The wire lives in `pairingApproval.ts`.
  */
 import {
   PairingApprovalCreated,

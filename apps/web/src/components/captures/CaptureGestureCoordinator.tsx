@@ -8,14 +8,10 @@ import { captureSnippet } from "./captures.logic";
 import { type ActiveProjectRef, useActiveProjectRef, useAddCapture } from "./useCaptures";
 
 /**
- * Mounted once in the app shell: the desktop's double-tap-Shift gesture
- * (#433 slice 2) as captures. The text goes to the routed thread's project,
- * else to the last project a gesture reached, else it is held until a
- * thread with a project is open — never dropped. The shell queues the reads
- * and pings; this pulls on mount and on every ping, so a read that beat the
- * mount of a freshly opened window is still delivered (slice 3). Nothing
- * here reveals the window; the shell's beep is the confirmation, the toasts
- * wait for the user to come back.
+ * Mounted once in the app shell: the desktop's double-tap-Shift gesture (#433) as captures. The
+ * text goes to the routed thread's project, else the last project a gesture reached, else is held
+ * until a thread with a project is open, never dropped. Pulls on mount and on every ping so a read
+ * that beat the window's mount is still delivered.
  */
 export function CaptureGestureCoordinator() {
   const project = useActiveProjectRef();

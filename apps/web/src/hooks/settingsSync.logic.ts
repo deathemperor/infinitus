@@ -4,14 +4,10 @@ import type { InfinitusSnapshot } from "@infinitus/contracts/infinitus";
 import { prefWriteArgs } from "../components/settings/infinitus/prefsForm.logic";
 
 /**
- * The prefs that travel between machines: the popup's look, the title, the
- * pushes. The Mac's retired iCloud sync list carried forward (`sort_headroom`
- * became `popup_sort`), with the animations and `push_revived` that were
- * added after it joined. Per-machine state stays home: the status item's
- * own switches, the ports, the engines, the priority knobs, and the two sync
- * switches themselves. `settingsSync.logic.test.ts` checks every key against
- * the Mac's catalog, so a retired key fails there instead of being sent to
- * every machine as an unknown pref.
+ * The prefs that travel between machines: the popup's look, the title, the pushes (the Mac's
+ * retired iCloud sync list, plus the animations and `push_revived`). Per-machine state stays home:
+ * status item switches, ports, engines, priority knobs, the sync switches.
+ * `settingsSync.logic.test.ts` checks every key against the Mac's catalog.
  */
 export const SYNCED_PREF_KEYS: ReadonlyArray<string> = [
   "show_account_name",
@@ -127,14 +123,10 @@ export function syncDoc(
 }
 
 /**
- * The shared doc after one observation of a machine. A key counts as written
- * by that machine only when its value differs from BOTH what was last
- * observed there AND the shared value: that one rule keeps the echo of our
- * own push, a snapshot taken mid-push, and a write the machine refused from
- * reading as edits. A key seen for the first time (a machine's first sight,
- * a new account) joins only where the shared doc has nothing, so a newcomer
- * never overrides what the others agree on. Returns `shared` itself when
- * nothing changed.
+ * The shared doc after one observation of a machine. A key counts as written there only when its
+ * value differs from BOTH the last observation AND the shared value, so the echo of our own push, a
+ * mid-push snapshot and a refused write never read as edits. A key seen for the first time joins
+ * only where the shared doc has nothing. Returns `shared` itself when nothing changed.
  */
 export function adopt(shared: SyncDoc, observed: SyncDoc | null, current: SyncDoc): SyncDoc {
   const prefs = adoptPart(shared.prefs, observed?.prefs ?? null, current.prefs);
@@ -204,11 +196,10 @@ export interface SyncState {
   readonly switches: SyncSwitches;
   /** The primary's switches have been read once; a later change is a flip. */
   readonly switchesRead: boolean;
-  /** Since a flip: a machine's first sight is aligned to the doc, not just
-      baselined. Off at startup, so a desktop coming up with a stale primary
-      never pushes that staleness over the others — with two desktops each
-      aligning on sight from a different seed, the machines would take turns
-      adopting what the other desktop just pushed, forever. */
+  /** Since a flip: a machine's first sight is aligned to the doc, not just baselined. Off at
+      startup, so a desktop coming up with a stale primary never pushes that staleness over the
+      others (two desktops aligning on sight from different seeds would adopt each other's pushes
+      forever). */
   readonly alignOnSight: boolean;
   readonly shared: SyncDoc;
   readonly version: number;
@@ -251,12 +242,10 @@ export function forget(state: SyncState, environmentId: EnvironmentId): SyncStat
 }
 
 /**
- * One machine's snapshot arriving. The primary's carries the switches: the
- * first read only records them, a later change starts over (the primary
- * seeds again, and every machine's next sight aligns it). A machine's first
- * sight, and a machine coming back, is a baseline: its edits travel from
- * here on, but what it shows now is not pushed over the others' — unless a
- * flip asked for that.
+ * One machine's snapshot arriving. The primary's carries the switches: the first read only records
+ * them, a later change starts over (the primary seeds again, every machine's next sight aligns). A
+ * machine's first sight, or its return, is a baseline: its edits travel from here on, but what it
+ * shows now is not pushed over the others' unless a flip asked.
  */
 export function observe(
   state: SyncState,

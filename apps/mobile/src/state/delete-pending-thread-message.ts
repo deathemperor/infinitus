@@ -4,15 +4,9 @@ import { removeThreadOutboxMessage } from "./thread-outbox-removal";
 import { holdEditingQueuedMessage, releaseEditingQueuedMessage } from "./use-thread-outbox";
 
 /**
- * Deletes a queued reply from under its bubble (#1501). An upload in flight
- * is aborted first; false once the send itself is in flight, when the turn
- * may already be the server's. The drain removes its own delivered rows
- * through `removeThreadOutboxMessage` directly, so the guard lives here.
- *
- * The hold is taken before the abort and before any await, the same way an
- * edit takes it: the aborted attempt releases the drain, whose next pass
- * would otherwise find the row still at the head of the queue while its
- * removal is in flight. A held id is skipped there.
+ * Deletes a queued reply from under its bubble (#1501). An upload in flight is aborted
+ * first; false once the send is in flight. The hold is taken before the abort and any
+ * await, as an edit does, so the released drain does not find the row still at the head.
  */
 export async function deletePendingThreadMessage(message: QueuedThreadMessage): Promise<boolean> {
   holdEditingQueuedMessage(message.messageId);

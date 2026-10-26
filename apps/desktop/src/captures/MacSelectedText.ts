@@ -6,13 +6,10 @@ import { MAX_CAPTURE_TEXT_LENGTH } from "@infinitus/contracts/captures";
 import * as NodeChildProcess from "node:child_process";
 
 /**
- * The front app's selected text on macOS (#433 slice 2), read once per
- * gesture through the Accessibility API: the frontmost app's focused element
- * and its `AXSelectedText`. A short `osascript` child, so a hung or crashed
- * bridge call cannot take the shell with it; its stdout is one JSON line,
- * the text already cut to the capture cap. The Accessibility grant is the
- * app's own, the one SnapShot's setup asks for; the child inherits it. The
- * text is never logged here or downstream — only its length.
+ * The front app's selected text on macOS (#433), read once per gesture through the
+ * Accessibility API (`AXSelectedText`) in a short `osascript` child, so a hung bridge
+ * call cannot take the shell down. Stdout is one JSON line, already cut to the capture
+ * cap. The text is never logged here or downstream, only its length.
  */
 
 const READ_TIMEOUT_MS = 3_000;

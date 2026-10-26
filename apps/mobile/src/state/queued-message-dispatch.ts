@@ -4,12 +4,9 @@ import { Atom } from "effect/reactivity";
 import { appAtomRegistry } from "./atom-registry";
 
 /**
- * The queued message the outbox drain is delivering, and how far it got
- * (#1501). `uploading` covers everything before the send RPC: settings sync
- * and the attachment transfers. The user may still edit or delete the message
- * then; `reclaimQueuedMessageFromDispatch` aborts the transfer and the drain
- * abandons the attempt. Once `sending`, the turn may already be the server's,
- * so neither control is offered until the drain finishes.
+ * The queued message the outbox drain is delivering, and how far it got (#1501).
+ * `uploading` (before the send RPC) still allows edit or delete, which aborts the
+ * transfer. Once `sending`, the turn may already be the server's, so neither is offered.
  */
 export type DispatchingQueuedMessage = {
   readonly messageId: MessageId;

@@ -3,15 +3,10 @@ import type { ThreadId, ThreadUsageRollup } from "@infinitus/contracts";
 import type { SessionUsage } from "../usage/UsageService.ts";
 
 /**
- * Usage backfill (#834, on orchestrator v2 #1627): the pure half. A thread
- * whose turns ran before this server recorded usage gets one baseline on
- * its app thread (`usageBaseline`), which the client fold adds the recorded
- * turns to. Two sources, the exact one first: the rollup the fork's v1
- * engine recorded on the thread before the v2 import (`v1Usage`, its own
- * `source` kept), else the Claude transcript's total. Transcripts do not
- * delimit turns, so that estimate is thread-level: the turn count comes from
- * the orchestrator's completed runs, the tokens and cost from the
- * transcript, and `source: "transcript"` says so.
+ * Usage backfill (#834, #1627): the pure half. A thread whose turns ran before this server recorded
+ * usage gets one baseline on its app thread (`usageBaseline`): the fork's v1 rollup (`v1Usage`) if
+ * any, else the Claude transcript total. Transcripts do not delimit turns, so that estimate is
+ * thread-level (turn count from completed runs) and `source: "transcript"` says so.
  */
 export interface ThreadUsageBackfillCandidate {
   readonly threadId: ThreadId;
@@ -30,11 +25,10 @@ export interface ThreadUsageBackfillCandidate {
 }
 
 /**
- * Whether a candidate's turns all predate this server's boot. A turn this
- * server ran is recorded by the orchestrator (or was interrupted or errored,
- * with its usage half-written to the transcript), so a candidate whose
- * newest run postdates boot is not legacy: reading the transcript on top
- * would count that turn twice, or count a turn that never completed.
+ * Whether a candidate's turns all predate this server's boot. A turn this server ran is recorded by
+ * the orchestrator (or was interrupted, with usage half-written to the transcript), so a candidate
+ * whose newest run postdates boot is not legacy: reading the transcript would count that turn
+ * twice.
  */
 export function isLegacyCandidate(
   candidate: Pick<ThreadUsageBackfillCandidate, "lastTurnAt">,

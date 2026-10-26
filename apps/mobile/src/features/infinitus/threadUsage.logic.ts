@@ -10,17 +10,10 @@ export interface ThreadUsageRow {
 }
 
 /**
- * Fork (#834): the phone's thread usage rows from the rollup the client folds
- * off the projection, worded like the web's composer popover. Every number
- * is the provider's own estimate, so each value carries "≈" itself rather
- * than a caption a reader can skip; a token share that is zero is left out;
- * a rollup no turn of which carried a cost says so instead of showing $0.00
- * (Codex turns record tokens and no cost). Tool calls and the time working
- * (#927) show only when the server counted them — absent, never zero. A
- * thread no recorded turn of which reported usage (a Cursor or Grok thread,
- * `threadUsageReported` false) keeps those counts and the last turn; its zero
- * tokens and missing cost are not figures, so the token and cost rows go and
- * the first note says so (#1026).
+ * Fork (#834): the phone's thread usage rows from the client's rollup. Every number is the
+ * provider's estimate, so each carries "≈"; no cost-bearing turn says so instead of $0.00.
+ * Tool calls and time working (#927) show only when counted. A thread that reported no
+ * usage (`threadUsageReported` false) drops the token and cost rows (#1026).
  */
 export function threadUsageRows(usage: ThreadUsageRollup): ReadonlyArray<ThreadUsageRow> {
   const reported = threadUsageReported(usage);

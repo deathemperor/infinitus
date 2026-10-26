@@ -34,9 +34,9 @@ import {
   profileMissingError,
 } from "./errors.ts";
 import {
-  GitHubRoutingPermissions,
-  gitHubRoutingConnectionKey,
-} from "./githubRoutingPermissions.ts";
+  PullRequestRoutingPermissions,
+  pullRequestRoutingConnectionKey,
+} from "./pullRequestRoutingPermissions.ts";
 import type {
   BearerConnectionTarget,
   ConnectionTarget,
@@ -175,11 +175,10 @@ const makeBearerBroker = Effect.fn("clientRuntime.connection.broker.makeBearer")
     if (!isBearerCredential(credential)) {
       return yield* credentialMissingError(target.connectionId);
     }
-    // Fork (#663): the Mac's public hosts — its tunnel — first, its LAN
-    // address only when none of them can be reached at all. A host that
-    // answers and refuses ends the walk. A LAN address gets the short
-    // descriptor wait wherever it stands: on the Wi‑Fi it answers at once,
-    // off it nothing ever does, and the default wait would hang the walk.
+    // Fork (#663): the Mac's public hosts (its tunnel) first, its LAN address
+    // only when none can be reached. A host that answers and refuses ends the
+    // walk. A LAN address gets the short descriptor wait: off the Wi‑Fi nothing
+    // answers, and the default wait would hang the walk.
     const hosts = bearerHostOrder(profile);
     let authorized: AuthorizedRemoteEnvironment | undefined;
     for (const [index, httpBaseUrl] of hosts.entries()) {
@@ -287,10 +286,10 @@ const makeSshBroker = Effect.fn("clientRuntime.connection.broker.makeSsh")(funct
       target: prepared.bootstrap.target,
     });
     if (
-      gitHubRoutingConnectionKey(entry) !==
-      gitHubRoutingConnectionKey({ ...entry, profile: Option.some(preparedProfile) })
+      pullRequestRoutingConnectionKey(entry) !==
+      pullRequestRoutingConnectionKey({ ...entry, profile: Option.some(preparedProfile) })
     ) {
-      const permissions = yield* GitHubRoutingPermissions;
+      const permissions = yield* PullRequestRoutingPermissions;
       yield* permissions.forget(target.environmentId);
     }
     yield* profiles.put(preparedProfile);
@@ -312,7 +311,7 @@ const makeSshBroker = Effect.fn("clientRuntime.connection.broker.makeSsh")(funct
   });
 });
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* () {
   const primary = yield* makePrimaryBroker();
   const bearer = yield* makeBearerBroker();

@@ -14,15 +14,12 @@ import {
 
 describe("authorization grants", () => {
   it("decodes legacy review credentials without offering them in new grants", () => {
-    expect(Schema.decodeUnknownSync(AuthEnvironmentScopes)(["review:write"])).toEqual([
-      "review:write",
-    ]);
+    expect(Schema.decodeSync(AuthEnvironmentScopes)(["review:write"])).toEqual(["review:write"]);
     expect(() => Schema.decodeUnknownSync(AuthGrantScopes)(["review:write"])).toThrow();
     expect(AuthStandardClientScopes).not.toContain("review:write");
   });
 
-  // Frozen vocabulary from the client before granular scopes shipped. Do not
-  // derive it from the current enum: that would hide compatibility regressions.
+  // Keep the pre-granular vocabulary frozen to expose compatibility regressions.
   const oldScopes = Schema.Array(
     Schema.Literals([
       "orchestration:read",

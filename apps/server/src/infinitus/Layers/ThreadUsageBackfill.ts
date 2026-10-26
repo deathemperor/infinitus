@@ -36,16 +36,10 @@ interface CandidateRow {
 }
 
 /**
- * Threads the backfill may give a baseline (#834): not deleted, no baseline
- * yet, no run pending or running (a turn mid-flight would be read half-way
- * and then recorded on top), and either a v1 rollup the import left in the
- * fork's `projection_threads.usage_json` (the thread ids survive the
- * import unchanged) or a root Claude session to read the transcript of —
- * the provider thread's native ref, else the v1 session binding's resume
- * cursor. `turns` counts the completed runs; `last_turn_at` is the newest
- * mark on any run, whatever its state, for the caller to tell a legacy
- * thread from one whose turns this server already records; `recorded_usage`
- * says whether any provider turn already carries usage.
+ * Threads the backfill may give a baseline (#834): not deleted, no baseline, no run pending or
+ * running (a mid-flight turn would be read half-way), and either a v1 rollup in
+ * `projection_threads.usage_json` or a root Claude session with a transcript. `turns`,
+ * `last_turn_at` and `recorded_usage` tell a legacy thread from one this server already records.
  */
 export const listThreadUsageBackfillCandidates = Effect.fn("ThreadUsageBackfill.listCandidates")(
   function* (input: { readonly threadId?: ThreadId; readonly limit: number }) {
@@ -122,18 +116,10 @@ export const listThreadUsageBackfillCandidates = Effect.fn("ThreadUsageBackfill.
 );
 
 /**
- * Fork (#834): the usage backfill, on orchestrator v2 (#1627). Threads whose
- * turns ran before this server recorded usage get one baseline on their app
- * thread, through `thread.metadata.update`'s `usageBaseline`, which the
- * client fold adds the recorded turns to: the v1 rollup the import left
- * (exact, its own source) or, for a legacy Claude thread, the transcript's
- * total. A boot sweep (parked until activation) covers the backlog; a v1
- * import landing later (`thread.created` with `historyOrigin: "v1_import"`)
- * re-checks that one thread. Codex is not estimated.
- *
- * A thread is attempted at most once per process: a session with no
- * transcript is not re-read on every trigger. Only thread ids and counts
- * are logged.
+ * Fork (#834): the usage backfill, on v2 (#1627). Threads whose turns ran before this server
+ * recorded usage get one baseline (`usageBaseline`) from the v1 rollup or, for a legacy Claude
+ * thread, the transcript total. A boot sweep covers the backlog; a later v1 import re-checks its
+ * thread. Each thread is attempted once per process. Only ids and counts are logged.
  */
 export const ThreadUsageBackfillLive = Layer.effectDiscard(
   Effect.gen(function* () {

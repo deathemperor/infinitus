@@ -213,11 +213,9 @@ function freshnessLabel(account: InfinitusAccount): string | null {
 }
 
 /**
- * What this row may ask for, read off the fleet's capabilities alone — never
- * off the engine's identity. Switching to the account already in use is not
- * offered, hold and unhold are the two halves of one capability, and the
- * pick-first star is hidden on an engine whose accounts carry no `preferred`
- * knob (the control socket refuses `prefer` there).
+ * What this row may ask for, read off the fleet's capabilities alone, never the
+ * engine's identity. Switching to the account in use is not offered, and the
+ * pick-first star is hidden where accounts carry no `preferred` knob.
  */
 function rowActions(
   fleet: InfinitusFleet,
@@ -242,12 +240,9 @@ function rowActions(
 }
 
 /** The capabilities the native `add <fleet>` and `signin-begin` verbs act on
-    (#1213): `addOAuth` is the engine-driven OAuth sign-in (swapd's `add-oauth`
-    and the proxy; a headless run relays the redirect from another machine),
-    `addCurrent` the claude CLI's own flow whose code is pasted back (an
-    engine without `addOAuth`). Either way the Mac runs it and the page only
-    watches. A fleet with only `addToken`
-    pastes a token in the Mac app and is not offered here. */
+    (#1213): `addOAuth` is the engine-driven sign-in, `addCurrent` the claude
+    CLI's own flow with the code pasted back. The Mac runs either and the page
+    only watches; a fleet with only `addToken` is not offered here. */
 const ADD_CAPABILITIES: ReadonlySet<string> = new Set(["addOAuth", "addCurrent"]);
 
 /** The usage status the engines report for a stored sign-in that expired. */
@@ -529,10 +524,8 @@ export function buildForecast(snapshot: InfinitusSnapshot): ForecastModel | null
 
 /**
  * The control-socket call a row's button makes. `prefer` is a toggle and takes
- * the side it is switching to, which is what the socket's
- * `prefer <fleet> <n> on|off` expects; `remove` carries the `--yes` the socket
- * refuses it without (the row confirmed already); the others take the
- * account alone.
+ * the side it is switching to; `remove` carries the `--yes` the socket refuses
+ * it without (the row confirmed already); the others take the account alone.
  */
 export function accountCommandArgs(
   fleetKey: string,
@@ -562,11 +555,10 @@ export function accountCommandArgs(
 }
 
 /**
- * The side a toggle press lands on, drawn on the row before the engine
- * confirms it (#1481: the flame did not move for the seconds the engine took,
- * then a timeout said the app was gone). `field` is the row flag the press
- * sets and `to` its new value. A flip the snapshot has caught up with draws
- * nothing, so the caller retires it on a timer or when the command fails.
+ * The side a toggle press lands on, drawn before the engine confirms it (#1481:
+ * the flame did not move while the engine took seconds). A flip the snapshot
+ * has caught up with draws nothing, so the caller retires it on a timer or
+ * when the command fails.
  */
 export interface RowFlip {
   readonly number: number;
@@ -681,11 +673,10 @@ export type SignInTool = "aws" | "gcloud";
     build adds. */
 export type SignInPhase = "idle" | "starting" | "waiting" | "done" | "failed";
 
-/** One lapsed profile. `deviceCode` says the flag-less flow finishes by
-    itself once the code is approved on any device; other flows need the Mac's
-    own browser. `url`, `userCode` and `message` are what the running login
-    printed. The Mac's terminal sessions are not read any more (#1041): which
-    session lapsed, and the `--pid` scope, left with them. */
+/** One lapsed profile. `deviceCode` says the flag-less flow finishes by itself
+    once the code is approved on any device; other flows need the Mac's own
+    browser. `url`, `userCode` and `message` are what the running login
+    printed. */
 export interface SignInRowModel {
   readonly key: string;
   readonly tool: SignInTool;
@@ -751,10 +742,9 @@ export function buildSignInRows(snapshot: InfinitusSnapshot): ReadonlyArray<Sign
 
 /**
  * The control-socket call that starts a row's sign-in. A device-code profile
- * runs its natural flow (`aws-login <profile>`): the app prints a URL and a
- * code and finishes by itself once they are approved anywhere. Every other
- * flow takes `--local`, so the Mac opens its own browser — the relay and
- * `--remote` flows finish over stdin, which the fork's RPC never carries.
+ * runs its natural flow (finishes by itself once approved anywhere); every
+ * other flow takes `--local`, since relay and `--remote` flows finish over
+ * stdin, which the fork's RPC never carries.
  */
 /** Whether the Mac's `aws-login` takes `--dismiss` (the failed card's
     Dismiss); an older build would read the option as a plain start. */

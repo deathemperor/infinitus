@@ -1,18 +1,8 @@
 /**
- * The pure half of the shell's engine supervision (#1177 follow-up): where an
- * engine's binary lives, what command runs it, and how fast to try again when
- * it dies.
- *
- * The desktop runs the engines rather than the menu-bar app, the placement the
- * user ruled for #1213 and again for this: a shell that cannot start an engine
- * is helpless on a machine where the menu-bar app is not running, which is
- * exactly the machine that needs it. `InfinitusOAuthSignIn.ts` records the same
- * ruling.
- *
- * Detection decides the MODE, never the user. An engine already owned by a
- * service manager is left alone — a second supervisor on top of launchd only
- * fights it — and one we can run ourselves becomes a child of this process. A
- * typed command is always ours to run, which is how a takeover is expressed.
+ * The pure half of the shell's engine supervision (#1177): where an engine's binary lives,
+ * what runs it, and how fast to retry. The desktop runs the engines, not the menu-bar app
+ * (user ruling, #1213), which may not be running. Detection decides the MODE: an engine
+ * owned by a service manager is left alone; a typed command is always ours to run.
  */
 
 import type { InfinitusEngineKey, InfinitusEngineMode } from "@infinitus/contracts/infinitus";
@@ -37,11 +27,8 @@ export interface EngineDefinition {
   /** The executable's name in the directories searched. */
   readonly binary: string;
   /**
-   * Arguments the child is started with. 9Router needs `-t` (tray): without it
-   * the CLI is a terminal menu, and a child has no terminal — the menu reads
-   * that as "Exit" and takes the server down seconds after it came up. Tray
-   * mode stays in the foreground and exits cleanly on SIGTERM, which is all a
-   * supervisor needs.
+   * Arguments the child is started with. 9Router needs `-t` (tray): without it the CLI is
+   * a terminal menu, reads no terminal as "Exit", and takes the server down.
    */
   readonly args: ReadonlyArray<string>;
   /** The Homebrew formula whose launchd job means this engine is already
@@ -70,11 +57,9 @@ const NVM_VERSIONS_DIR = ".nvm/versions/node";
 const BREW_BINARIES = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
 
 /**
- * The directories an engine binary may live in, newest nvm version first. Kept
- * beside `knownPosixCliDirCandidates` in `../shell/InfinitusPosixCliDirs.ts`
- * rather than shared with it: that list exists to repair the backend's PATH and
- * is ordered for finding `claude`, and tying an engine's lookup to it would
- * make either list unsafe to reorder for its own reason.
+ * The directories an engine binary may live in, newest nvm version first. Kept apart from
+ * `knownPosixCliDirCandidates`: that list repairs the backend's PATH for `claude`, and
+ * sharing it would make either unsafe to reorder.
  */
 export const engineBinaryDirs = (
   input: Pick<EngineDetectionInput, "homeDirectory" | "listDirectory">,

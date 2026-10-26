@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 // Folds apps/mac/changelog.d/*.md fragments and the `## Unreleased` block of
-// apps/mac/CHANGELOG.md into a new `## <version>` section, leaving an empty
-// Unreleased above it and deleting the fragments. Run at a release cut:
-//
-//   node scripts/fold-changelog.mjs 0.5.0-alpha.9
-//
-// A fragment is one file per PR, any name, each non-empty line
-// `<Surface>: <one sentence>` where Surface is Mac, Desktop, Phone or Linux.
-// Lines already sitting under `### <Surface>` in Unreleased are kept and the
-// fragment lines are appended after them, so both conventions coexist.
+// apps/mac/CHANGELOG.md into a new `## <version>` section and deletes the
+// fragments. Run at a release cut: node scripts/fold-changelog.mjs 0.5.0-alpha.9
+// Fragment lines are `<Surface>: <sentence>` (Mac, Desktop, Phone or Linux).
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 

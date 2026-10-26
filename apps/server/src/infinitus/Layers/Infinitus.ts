@@ -52,14 +52,10 @@ const AWS_LOGINS_COMMAND = "aws-logins";
     gate. Only what is new since the previous poll reaches the snapshot. */
 const EVENTS_COMMAND = "events";
 /**
- * The lease (#572 task 6). The app only computes session progress and scans
- * stats while some client holds a lease on them; this service is that client
- * for everyone subscribed through it. Only `fleets` (#1041: the fork reads no
- * sessions any more): nothing in the fork reads stats, and a `stats` lease is
- * what moves the app's transcript rescan from every 30 min to every 5 (#587). Re-sent every 25 s with a 45 s TTL — the
- * cadence and slack T3's own client-activity reporter uses — and released with
- * a zero TTL when the last subscriber leaves. Absent from the manifest on
- * builds before the verb: then nothing is sent.
+ * The lease (#572 task 6): the app scans stats and computes session progress only while a client
+ * holds a lease. Only `fleets` is leased (#1041; a `stats` lease moves the transcript rescan from
+ * 30 to 5 min, #587). Re-sent every 25 s with a 45 s TTL, released with zero TTL when the last
+ * subscriber leaves; not sent on builds before the verb.
  */
 const LEASE_COMMAND = "client-activity";
 const LEASE_INTERVAL = Duration.seconds(25);
@@ -157,13 +153,10 @@ const makeInfinitus = Effect.gen(function* () {
       manifest, because the app that came back may not be the one that left. */
   const manifestStale = yield* Ref.make(true);
   const nextSlowAtMillis = yield* Ref.make(0);
-  /** Where the event log was last read to. On a build whose rows carry ids
-      (native #630): every id in the previous reply, so the next reply's rows
-      outside it are the new ones. On an older build: the newest `at` seen and
-      every `icon|text` at that second, so the tail past it is what is new
-      (`ISO8601DateFormatter` output is fixed-width, which is what makes the
-      string comparison safe). `None` until the first reply seeds it (after the
-      app is sighted), so history is never published. */
+  /** Where the event log was last read to. With row ids (native #630): every id in the previous
+      reply, so rows outside it are new. Without: the newest `at` seen and every `icon|text` at that
+      second (fixed-width ISO8601, so string comparison is safe). `None` until the first reply seeds
+      it, so history is never published. */
   const eventCursor = yield* Ref.make<Option.Option<EventCursor>>(Option.none());
   /** Counts every event published; with `at` it makes the id. */
   const eventSequence = yield* Ref.make(0);

@@ -6,13 +6,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * Settings › Devices, "Crash reports": what the card sends over
- * `infinitus.command` and how it reads the `crashes` reply. The reports are
- * the Mac's own — the phone files its MetricKit crashes there over
- * `crash-report`, the Mac reads its own diagnostic reports — and this is the
- * only place they are shown since the Mac's settings window stopped drawing
- * them. Read-only: the store keeps the newest 50 and prunes itself, so there
- * is nothing to delete here.
+ * Settings › Devices, "Crash reports": what the card sends over `infinitus.command` and how it
+ * reads the `crashes` reply. The reports are the Mac's own (the phone files MetricKit crashes there
+ * over `crash-report`). Read-only: the store keeps the newest 50 and prunes itself.
  */
 
 const CRASHES_VERB = "crashes";

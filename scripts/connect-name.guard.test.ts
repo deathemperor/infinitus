@@ -5,11 +5,9 @@ import * as NodeURL from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 
 /**
- * The relay feature is `CONNECT_NAME` ("Infinitus Connect") on every surface
- * (#1368 slice A). The web and desktop `productName.guard.test.ts` cover
- * their own trees; this one covers the server, the phone, the shared
- * packages and the relay, where no product-name guard existed. Comments are
- * free to say "T3 Connect"; a string that still does is a regression.
+ * The relay feature is `CONNECT_NAME` ("Infinitus Connect") on every surface (#1368
+ * slice A). This covers the server, phone, shared packages and relay, where no
+ * product-name guard existed. Comments may say "T3 Connect"; a string must not.
  */
 /** Lines that keep a bare "T3", with the reason. */
 const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [

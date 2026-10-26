@@ -3,11 +3,10 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 
 /**
- * Turns the native app's preference catalog (`infinitusctl prefs`) into rows a
- * settings pane can render, and back into the `prefs set` command a write
- * sends. Pure on purpose: the pane picks controls and dispatches, this file
- * decides what each pref looks like, what a typed edit means, and which
- * optimistic writes are still in flight.
+ * Turns the native app's preference catalog (`infinitusctl prefs`) into rows a settings pane can
+ * render, and back into the `prefs set` command a write sends. Pure: the pane picks controls and
+ * dispatches; this file decides what each pref looks like, what a typed edit means, and which
+ * optimistic writes are in flight.
  */
 
 /** Which control edits a pref. A pref with `choices` is always a select, no
@@ -36,11 +35,9 @@ export interface PrefSectionModel {
 }
 
 /**
- * User-facing wording for every key the native `PrefCatalog` lists today,
- * taken from the Mac Settings panes that own each pref so both surfaces read
- * the same. `choices` renames the values that are codes rather than words; a
- * key missing from here falls back to a humanised key, and a choice missing
- * from `choices` shows its own value.
+ * User-facing wording for every key the native `PrefCatalog` lists, taken from the Mac Settings
+ * panes that own each pref. `choices` renames values that are codes; a key missing here falls back
+ * to a humanised key, and a choice missing from `choices` shows its own value.
  */
 export const PREF_COPY: Readonly<
   Record<
@@ -362,11 +359,9 @@ export function prefWriteArgs(
 }
 
 /**
- * A control's raw string turned into the pref's own type, or the reason it is
- * not a value this pref can take. Rejection is the point: an int pref must not
- * accept "1.5" or "" (which `Number` reads as 0), and a pref with `choices`
- * must not accept anything outside them, nor a bounded number outside its
- * `min`/`max`.
+ * A control's raw string turned into the pref's own type, or the reason it is not a value this pref
+ * can take. Rejection is the point: an int pref must not accept "1.5" or "" (which `Number` reads
+ * as 0), a pref with `choices` nothing outside them, a bounded number nothing outside `min`/`max`.
  */
 export function parseControlInput(
   pref: InfinitusPref,
@@ -423,12 +418,10 @@ export function parseControlInput(
 }
 
 /**
- * One section's in-flight writes. `pending` holds the value each key was last
- * set to and drops it when a snapshot reports that value, so a row shows the
- * edit right away without ever disagreeing with the app for long. `relaunching`
- * covers a restart-effect write: `sawUnavailable` is the extra bookkeeping that
- * makes it clear only after the socket has actually gone away and come back,
- * not on the snapshot that arrives before the app has quit.
+ * One section's in-flight writes. `pending` holds the value each key was last set to and drops it
+ * when a snapshot reports that value. `relaunching` covers a restart-effect write: `sawUnavailable`
+ * makes it clear only after the socket has gone away and come back, not on a snapshot arriving
+ * before the app quits.
  */
 export type PrefWriteState = {
   readonly pending: ReadonlyMap<string, boolean | number | string>;

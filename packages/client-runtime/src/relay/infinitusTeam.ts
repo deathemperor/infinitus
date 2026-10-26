@@ -25,11 +25,10 @@ import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import { findErrorTraceId } from "../errors/errorTrace.ts";
 
 /**
- * The relay's `infinitusTeam` group for the web and the phone (#1592): one
- * client over `RelayApi` with the user's Clerk token read per call, so a
- * signed-out user gets `signedOut` rather than a 401, and the relay's
- * refusal sentence travels verbatim as `refused`. Promises, since both
- * panes are React and neither runs an Effect runtime of its own.
+ * The relay's `infinitusTeam` group for web and phone (#1592): one client over
+ * `RelayApi` with the Clerk token read per call, so a signed-out user gets
+ * `signedOut` rather than a 401 and the relay's refusal travels verbatim as
+ * `refused`. Promises, since neither pane runs an Effect runtime.
  */
 export type InfinitusTeamErrorKind = "signedOut" | "refused" | "failed";
 

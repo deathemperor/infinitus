@@ -7,12 +7,10 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * Settings › Engines (#1177): the two proxy engines' base URL and
- * secret, read over `infinitus.command` (`proxy` / `9router`) and written over
- * `infinitus.secret` (`proxy-key` / `9router-password`, whose only argument
- * besides the stdin secret is `--url`). Pure so the pane only renders; the
- * secret itself never enters this module — the pane hands it to the atom as a
- * `Redacted` value and this module only names the verb and its url.
+ * Settings › Engines (#1177): the two proxy engines' base URL and secret, read over
+ * `infinitus.command` (`proxy` / `9router`) and written over `infinitus.secret` (`proxy-key` /
+ * `9router-password`, with `--url` besides the stdin secret). The secret never enters this module:
+ * the pane hands it to the atom as a `Redacted` value.
  */
 
 export type ProxyEngineKey = "cliproxy" | "9router";

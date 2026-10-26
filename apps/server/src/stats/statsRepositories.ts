@@ -77,7 +77,7 @@ export function makeStatsRepositoryScanner(runner: ProcessRunner["Service"]) {
         Effect.map((result) =>
           result.code === 0 && !result.stdoutTruncated ? result.stdout.trim() : null,
         ),
-        Effect.catch(() => Effect.succeed(null)),
+        Effect.orElseSucceed(() => null),
       );
   });
   return Effect.fn("Stats.repositories.scan")(function* (

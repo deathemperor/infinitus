@@ -6,13 +6,10 @@ import type {
 } from "@infinitus/contracts/infinitus";
 
 /**
- * The pure half of the Engines page's process controls: the bridge this shell
- * offers, and what one engine's supervision reads as.
- *
- * The controls run engines on THIS machine, so they belong to the desktop
- * shell rather than the app's control socket — the placement ruled for #1213
- * and again here. A browser, the phone and an older shell have no bridge and
- * therefore no controls.
+ * The pure half of the Engines page's process controls: the bridge this shell offers, and what one
+ * engine's supervision reads as. The controls run engines on THIS machine, so they belong to the
+ * desktop shell, not the app's control socket (#1213). A browser, the phone and an older shell have
+ * no bridge and no controls.
  */
 
 export interface InfinitusEngineBridge {

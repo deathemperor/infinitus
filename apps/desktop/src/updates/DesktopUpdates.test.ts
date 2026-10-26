@@ -127,11 +127,9 @@ describe("DesktopUpdates", () => {
   it.effect(
     "reads the rolling nightly release on the nightly track and app-update.yml's feed back on the release track (#1042)",
     () => {
-      // The GitHub provider takes only semver-tagged releases, so the nightly
-      // track is the generic provider at releases/download/nightly; leaving
-      // it puts the updater back on the file's provider, following the
-      // build's own line with downgrades on (semver ranks the line's newest
-      // release below a nightly of it).
+      // The GitHub provider takes only semver-tagged releases, so the nightly track is the
+      // generic provider at releases/download/nightly; leaving it returns the updater to
+      // the file's provider, following the build's own line with downgrades on.
       const resourcesPath = `/tmp/t3-desktop-updates-feed-${process.pid}`;
       const harness = makeHarness({
         appVersion: "0.5.0-alpha.7-infinitus-nightly.20260913.42",
@@ -508,11 +506,9 @@ describe("DesktopUpdates", () => {
   });
 
   it.effect("logs a failed check's cause code and HTTP status beside the tag", () => {
-    // The alpha.13 cut logged two check failures with only the error tag and
-    // the generic sentence, so the tag window could not be diagnosed from the
-    // files. The cause's own code (electron-updater's ERR_UPDATER_*) and an
-    // HttpError's status now ride along; its message never does (the test
-    // above: it quotes the feed URL).
+    // The failure's own code (electron-updater's ERR_UPDATER_*) and an HttpError's status
+    // ride along with the error tag; its message never does (the test above: it quotes
+    // the feed URL).
     const cause = Object.assign(
       new Error(
         "Unable to find latest version on GitHub (https://github.com/o/r/releases.atom?token=abc), please ensure a production release exists",

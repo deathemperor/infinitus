@@ -36,11 +36,10 @@ export function toolBoundaryOf(event: OrchestrationV2DomainEvent): Orchestration
 }
 
 /**
- * The queued run to send into `targetRunId` at this boundary: the first
- * `tool_boundary` row in queue order, past any idle rows ahead of it (head-only
- * would hold a steer behind an idle row until the turn ends, which is what
- * steer exists to avoid). Nothing while the target is not running — a stale
- * event, or the next turn's tool — or while the queue is held.
+ * The queued run to send into `targetRunId` at this boundary: the first `tool_boundary` row in
+ * queue order, past idle rows ahead of it (head-only would hold a steer behind an idle row until
+ * the turn ends). Nothing while the target is not running (a stale event, or the next turn's tool)
+ * or the queue is held.
  */
 export function toolBoundarySteerCandidate(
   runs: ReadonlyArray<OrchestrationV2Run>,

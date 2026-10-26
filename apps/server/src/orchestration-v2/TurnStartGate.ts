@@ -6,21 +6,10 @@ import * as Layer from "effect/Layer";
 import * as EffectOutbox from "./EffectOutbox.ts";
 
 /**
- * Fork (#720, #1627): the one place a provider turn start passes before it
- * reaches the provider. `ProviderTurnStartService.start` hands every start
- * here — the first turn, a drained queued run, a restart continuation, a
- * provider switch — so session holds and the worktree cap have a single seam
- * and upstream's start path stays one line. The gate either runs the start
- * now (`started`) or keeps it (`held`). The passthrough below is the
- * server's default; a holding gate replaces it in `server.ts`.
- *
- * The contract a holding gate must keep, and why, is
- * `docs/internals/turn-start-gate.md`. In short: answer `held` at once (the
- * call runs inside the effect worker's per-thread lane, so blocking here
- * blocks the thread's interrupts too), leave the run alone (its `starting`
- * status is the lease: nothing else starts on the thread while it stands),
- * and release through `releaseTurnStart`, never by running `start` later
- * outside the lane.
+ * Fork (#720, #1627): the one place a provider turn start passes before reaching the provider, so
+ * session holds and the worktree cap share one seam. The gate runs the start (`started`) or keeps
+ * it (`held`); a holding gate replaces the passthrough in `server.ts`. Contract:
+ * `docs/internals/turn-start-gate.md`.
  */
 export interface TurnStartInput<E> {
   readonly threadId: ThreadId;
@@ -49,11 +38,10 @@ export const TurnStartGatePassthrough = Layer.succeed(TurnStartGate)({
 });
 
 /**
- * Lets a held run go: a fresh `provider-turn.start` effect for it, which the
- * effect worker runs in the thread's lane like the one the gate kept. The
- * start re-reads the run, so a run that stopped being `starting` meanwhile
- * (Stop, a restart) is a no-op. `releaseId` must be fresh per release of the
- * same run: effect ids are unique, so the outbox refuses a repeat.
+ * Lets a held run go: a fresh `provider-turn.start` effect, run in the thread's lane. The start
+ * re-reads the run, so one that stopped being `starting` meanwhile (Stop, a restart) is a no-op.
+ * `releaseId` must be fresh per release of the same run: effect ids are unique, so the outbox
+ * refuses a repeat.
  */
 export const releaseTurnStart = Effect.fn("TurnStartGate.releaseTurnStart")(function* (input: {
   readonly threadId: ThreadId;

@@ -7,14 +7,10 @@ import { EnvironmentId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts
 import type { RelayInternalError } from "./relay.ts";
 
 /**
- * Team on Infinitus Connect (#1592): a team is a relay row, a member a Clerk
- * user, an invite a one-use or reusable token the relay checks, what a member
- * shares a document the desktop server publishes with its environment
- * credential. Schemas and the two route groups only; `relay.ts` builds the
- * groups with its internal error class and attaches the auth middleware where
- * it adds them to `RelayApi`, so this file never imports a value from
- * `relay.ts` (which imports it). The bearer header schema is inlined for the
- * same reason.
+ * Team on Infinitus Connect (#1592): schemas and the two route groups only.
+ * `relay.ts` builds the groups with its internal error class and attaches the auth
+ * middleware, so this file never imports a value from `relay.ts` (which imports
+ * it); the bearer header schema is inlined for the same reason.
  */
 
 export const TeamId = TrimmedNonEmptyString.pipe(Schema.brand("TeamId"));

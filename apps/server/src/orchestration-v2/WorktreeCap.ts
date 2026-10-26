@@ -12,11 +12,10 @@ import {
 } from "./worktreeCap.logic.ts";
 
 /**
- * Worktree limit (#269 H): the gate a launch passes before it creates a
- * worktree. A reservation counts against launches started in the same
- * instant (a multi-model send starts its threads together) until the
- * projection records the worktree or the launch gives up, so a batch cannot
- * land over the limit. The verdict itself is `worktreeCapRefusal`.
+ * Worktree limit (#269 H): the gate a launch passes before creating a worktree. A reservation
+ * counts against launches started in the same instant (a multi-model send) until the projection
+ * records the worktree or the launch gives up, so a batch cannot land over the limit. The verdict
+ * is `worktreeCapRefusal`.
  */
 export class WorktreeCapGate extends Context.Service<
   WorktreeCapGate,

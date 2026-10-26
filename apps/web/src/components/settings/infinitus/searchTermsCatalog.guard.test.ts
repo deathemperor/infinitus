@@ -6,21 +6,10 @@ import { SETTINGS_SEARCH_ITEMS, type SettingsSearchItem } from "../settingsSearc
 import { PREF_COPY } from "./prefsForm.logic";
 
 /**
- * A settings-search term is a promise: type the word, land on a page that has
- * the row you meant. The Infinitus pages draw their rows from the Mac's own
- * `PrefCatalog`, so a key the Mac retires takes its row away — and any term
- * that only that row justified becomes a word that navigates to a page which
- * no longer answers for it. Nothing fails when that happens: the item still
- * matches, the page still renders, the row is simply not there.
- *
- * That is how "waiting" and "aws sign-in" (`push_waiting`, `push_aws_login`)
- * and "live activity" (`live_activity_rate_seconds`) outlived their rows
- * through the sessions sweep (#1041). This test grounds every term of a
- * catalog-drawn page in that page's own sections — their keys, the Mac's
- * section names, and the wording `PREF_COPY` gives each row — so the next
- * retirement fails here instead of shipping a dead word.
- *
- * Companion to `prefCopyCatalog.guard.test.ts`, which grounds the wording.
+ * A settings-search term is a promise: type the word, land on a page with the row you meant. A key
+ * the Mac retires takes its row from a `PrefCatalog`-drawn page and strands terms only it
+ * justified, with nothing failing ("live activity" outlived its row, #1041). This test grounds
+ * every term in the page's own keys, section names and `PREF_COPY` wording.
  */
 
 const CATALOG = NodeURL.fileURLToPath(

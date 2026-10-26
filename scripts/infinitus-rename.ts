@@ -6,30 +6,10 @@ import * as NodePath from "node:path";
 import * as NodeProcess from "node:process";
 
 /**
- * The identifier codemod (#1368 slice C): every T3 name the fork owns
- * outright becomes an Infinitus one, by one idempotent table, so the
- * rename is a script run and not a hand edit — and so every upstream sync
- * can re-run it. The merge rule that makes this cheap: on each sync,
- * branch from `upstream/main`, run this script THERE, commit, then merge
- * that branch into `main`. Both sides then carry the same names and the
- * merge's conflicts collapse to real changes. Never "take upstream's file
- * and re-run": that drops the fork's registration-point edits in the file.
- * Narrative and the compat-read list: `docs/internals/infinitus-rename.md`.
- *
- * What the table covers is the issue's "safe to rename outright" set:
- * names nothing outside this tree persists or reads. Everything a user's
- * disk, an installed unit, a shipped build or an external service holds
- * (`T3CODE_*` env vars, `t3code:` storage keys, the `t3` binary, the
- * `t3-code` MCP id, service labels, wire formats) is NOT here: those take a
- * legacy read at each site, one slice each (#1368 C–E), never a blind
- * rewrite. Nor are the server's `t3/…` service tags: the Effect language
- * service's `deterministicKeys` rule derives them from the package name,
- * so they rename with `apps/server`'s `t3` package (slice D). `--check` fails while any old name is still in the tree, which
- * is the guard once the rename has landed.
- *
- *   node scripts/infinitus-rename.ts            rewrite and `git mv` in place
- *   node scripts/infinitus-rename.ts --dry-run  list what would change
- *   node scripts/infinitus-rename.ts --check    exit 1 while an old name remains
+ * The identifier codemod (#1368 slice C): renames every T3 name the fork owns
+ * outright, idempotently. On each upstream sync, run it on a branch from
+ * `upstream/main`, then merge that into `main`; never "take upstream's file and
+ * re-run". `docs/internals/infinitus-rename.md`; `--dry-run` lists, `--check` exits 1.
  */
 
 export interface Rename {
@@ -168,11 +148,10 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
 ];
 
 /**
- * Left alone, by path prefix: vendored references, and this script's own
- * tests and page (they quote the old names). The mobile native modules
- * under `modules/t3-*` keep their directory names (upstream-variant ids)
- * but their package names and imports are `@t3tools/*` like everything
- * else's, so they are rewritten.
+ * Left alone, by path prefix: vendored references, and this script's own tests and
+ * page (they quote the old names). Mobile native modules under `modules/t3-*` keep
+ * their directory names (upstream-variant ids), but their package names and
+ * imports are rewritten like everything else's.
  */
 export const EXCLUDED_PREFIXES: ReadonlyArray<string> = [
   ".repos/",

@@ -1,10 +1,8 @@
 /**
- * Fractional order keys (base-26 strings sorted by plain string comparison).
- * Pinned and active threads carry one (`pinOrderKey`, `activeOrderKey`); the
- * server-side message queue (#806) orders its rows with the same alphabet so
- * the decider can validate and default a key without the client. One key is
- * written to one row per move, so neighbours living on other servers are
- * never touched and every client converges on the same order.
+ * Fractional order keys (base-26 strings sorted by plain string comparison) for
+ * pinned and active threads and the server-side message queue (#806), so the
+ * decider can validate and default a key without the client. One key is written
+ * per move, so other servers' neighbours are never touched.
  */
 const ORDER_KEY_DIGITS = "abcdefghijklmnopqrstuvwxyz";
 

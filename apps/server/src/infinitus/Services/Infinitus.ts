@@ -19,16 +19,10 @@ export interface InfinitusServiceShape {
    */
   readonly snapshot: Effect.Effect<InfinitusSnapshot>;
   /**
-   * The current snapshot, then every change to it. Subscribing is what makes
-   * the service poll: the first subscriber starts the loop and the last one to
-   * leave stops it, so an idle server never touches the socket. `needs` names
-   * the lease scopes beyond the fast set this subscriber wants held (`stats`):
-   * a scope is in the lease body while at least one subscriber needs it.
-   *
-   * The first emission is a polled snapshot, never the pre-poll placeholder:
-   * a subscriber waits for the first cycle rather than flashing an offline
-   * state, and an app that really is unreachable arrives as `available: false`
-   * once that cycle has probed for it.
+   * The current snapshot, then every change. Subscribing is what makes the service poll: the first
+   * subscriber starts the loop, the last to leave stops it. `needs` names lease scopes beyond the
+   * fast set (`stats`). The first emission is a polled snapshot, never the pre-poll placeholder, so
+   * a subscriber does not flash an offline state.
    */
   readonly changes: (input?: InfinitusSubscribeInput) => Stream.Stream<InfinitusSnapshot>;
   /**

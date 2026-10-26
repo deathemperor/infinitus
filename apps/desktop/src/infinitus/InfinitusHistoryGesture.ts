@@ -1,14 +1,7 @@
 /**
- * macOS's navigate-back/forward gesture, forwarded to the renderer (#1250).
- * Logi Options+ maps a mouse's back and forward buttons to that gesture
- * (`OSX_GESTURE_BACK` / `_FORWARD`), not to Chromium buttons 3/4, so the
- * renderer's mouse listener (#841) never sees them; Chrome turns the gesture
- * into history navigation itself, Electron drops it unless a window listens.
- * This attaches `swipe` to every window as it is created and forwards the
- * direction from the main window only (a sign-in child has no preload); the
- * renderer applies the same backable-page rule as the mouse buttons. One log
- * line per gesture, direction only, is the device check: it says whether the
- * driver's gesture reached Electron at all.
+ * macOS's navigate-back/forward gesture, forwarded to the renderer (#1250). Logi Options+
+ * sends it instead of Chromium buttons 3/4, and Electron drops it unless a window listens.
+ * Forwarded from the main window only (a sign-in child has no preload).
  */
 import * as Electron from "electron";
 import * as Effect from "effect/Effect";

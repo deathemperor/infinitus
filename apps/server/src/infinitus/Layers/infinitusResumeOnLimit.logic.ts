@@ -16,12 +16,10 @@ import * as Schema from "effect/Schema";
 import type { ClaudeUsageLimitRefusal } from "../../orchestration-v2/Adapters/ClaudeAdapterV2.ts";
 
 /**
- * Resume-on-limit for the threads this server runs (#648, on orchestrator v2
- * #1627): the pure half. When the Claude account behind a thread's turn hits
- * its usage limit and the engine swaps (or the account comes back), the turn
- * is re-issued on whatever account is live now. The rules are native's
- * terminal nudge's (ResumeService / ResumeGate): once per stop, alive only as
- * fresh as the probe, spaced by a cooldown.
+ * Resume-on-limit (#648, #1627): the pure half. When the account behind a thread's turn hits its
+ * limit and the engine swaps (or the account returns), the turn is re-issued on the live account,
+ * by native's ResumeService / ResumeGate rules: once per stop, as fresh as the probe, spaced by a
+ * cooldown.
  */
 
 /** Fleets whose accounts are Claude ones, whatever engine runs them. */
@@ -42,11 +40,9 @@ const PROXY_BASE_URL_VARIABLE = "ANTHROPIC_BASE_URL";
     cannot chain them. Native's ResumeGate spaces its nudges the same way. */
 export const RESUME_COOLDOWN_MS = 120_000;
 
-/** How far a refusal's reset may sit from an account's reading of the same
-    window and still be that account's (#1486). The API states both to the
-    second, so this is slack for a reading the engine rounded, not for two
-    accounts whose windows happen to end near each other: a 5h window's reset
-    moves with its first request, a weekly one is fixed days apart. */
+/** How far a refusal's reset may sit from an account's reading of the same window and still be that
+    account's (#1486). The API states both to the second: this is slack for engine rounding, not for
+    accounts whose windows end near each other (a 5h reset moves with its first request). */
 export const RESET_MATCH_MS = 5 * 60_000;
 
 /** What the resumed turn is told — upstream's own continuation prompt (the one
@@ -88,11 +84,9 @@ function claudeFleets(snapshot: InfinitusSnapshot): ReadonlyArray<InfinitusFleet
   );
 }
 
-/** The engine's usage payload, opaque in the contract; read leniently, as the
-    Accounts page does, so an odd shape is "no reading" rather than a throw.
-    `resetsAt` is the window's reset as the engine wrote it: an ISO string
-    from the Mac and from swapd's own list, epoch seconds in a recorded
-    sample. */
+/** The engine's usage payload, opaque in the contract; read leniently so an odd shape is "no
+    reading", not a throw. `resetsAt` is an ISO string from the Mac and swapd's list, epoch seconds
+    in a recorded sample. */
 const UsageWindow = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   pct: Schema.Finite,
@@ -157,11 +151,9 @@ function stopWindow(limitType: string | null, account: Account): UsageWindow | n
 }
 
 /**
- * Whether a reading shows the account with room in every window it carries;
- * false for a reading with no windows, which is no evidence. The test a
- * failed stop without a window gets: the CLI ended the turn with its
- * synthetic rate-limit error and no window event, so the stop names no
- * window and no reset.
+ * Whether a reading shows the account with room in every window it carries; false for one with no
+ * windows, which is no evidence. The test for a failed stop without a window (the CLI ended the
+ * turn with its synthetic rate-limit error and no window event).
  */
 function everyWindowUnderFull(account: Account): boolean {
   const windows = usageWindows(account);
@@ -176,15 +168,10 @@ export interface RefusedAccount {
 }
 
 /**
- * Whose limit a refusal is (#1486). Normally the active account's. A CLI
- * keeps the login it started on for a while after a swap, so a refusal
- * seconds after one is the previous account's, and blaming the live account
- * reported a healthy one to the engine as spent until a weekly reset five
- * days off. The refusal names its own window and reset, so they decide
- * against each account's reading of that window: the active account when its
- * reading agrees (or nothing can be compared: no reset on the refusal, no
- * reading, no such window), else the one other account whose reading does,
- * else nobody — and an unnamed stop reports nothing to the engine.
+ * Whose limit a refusal is (#1486). A CLI keeps the login it started on after a swap, so a refusal
+ * seconds later is the previous account's; blaming the live one reported a healthy account as
+ * spent. The refusal's window and reset are compared to each account's reading: the active account
+ * when it agrees (or nothing is comparable), else the one other account that does, else nobody.
  */
 export function refusedAccount(
   refusal: Pick<ClaudeUsageLimitRefusal, "rateLimitType" | "resetsAt">,
@@ -224,11 +211,9 @@ export function proxyInstanceLabel(
   return proxied ? (instance.displayName ?? selection.instanceId) : null;
 }
 
-/** The stop a thread shell records once its run failed on a usage limit:
-    upstream's adapter classes the failure `usage_limit` and carries the
-    window's reset on the shell; the window's name comes from the refusal the
-    adapter reported for the same run, when the turn was parked first. Null
-    for a shell that is not a failed limit. */
+/** The stop a thread shell records once its run failed on a usage limit: the adapter classes the
+    failure `usage_limit` and the shell carries the window's reset; the window's name comes from the
+    refusal reported for the same run, if the turn was parked first. Null otherwise. */
 export function failedStopFromShell(
   shell: Pick<
     OrchestrationV2ThreadShell,
@@ -273,23 +258,10 @@ export interface ResumeTarget {
 }
 
 /**
- * Native's ResumeGate, with headroom read where the engine reports it: an
- * active account of the CLI-credentials fleet whose credentials read `ok`
- * from a probe taken after the stop — a probe from before it would only
- * repeat the account that just ran out. A different account than the one at
- * the stop needs no newer probe: its reading says nothing of the account that
- * ran out, and the engine rations the usage endpoint, so an idle account the
- * swap lands on is next read minutes later. `ok` alone is not headroom (the
- * account that hit the limit reads `ok` on the very next poll, which is how a
- * turn was resumed on it every cooldown until its window reset), so: a
- * reading that carries the stop's window decides — under 100 % counts, full
- * does not, whichever account it is; without one, a different account
- * counts, and the same account only once the stop's reset has passed. A
- * stop that names no window lets the same account — or any account, for a
- * stop that names nobody, as one restored at boot does — count once a probe
- * after the stop reads every window under full (a thread sat two hours past
- * its reset on an account reading 20 %). An engine that reports no probe
- * time gets the weaker test, a different account than the one at the stop.
+ * Native's ResumeGate with headroom read where the engine reports it. `ok` alone is not headroom
+ * (the account that just hit the limit reads `ok` on the next poll, which resumed a turn on it
+ * every cooldown), so a reading carrying the stop's window decides (under 100 %). Without one, a
+ * different account counts, the same one only after the stop's reset.
  */
 export function resumeTarget(
   stop: LimitStop,

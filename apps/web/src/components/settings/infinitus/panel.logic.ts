@@ -54,11 +54,9 @@ export function infinitusPanelMessage(
 }
 
 /**
- * What a failed `infinitus.command` says and whether the app is quitting
- * anyway. `InfinitusCommandFailed.error` is the native app's own text (down to
- * "refresh_interval must be one of 30, 60, 300, not 45"), so it is shown
- * verbatim; `restarting: false` means a restart-effect write was refused and
- * nothing is waiting for the socket to come back.
+ * What a failed `infinitus.command` says and whether the app is quitting anyway.
+ * `InfinitusCommandFailed.error` is the native app's own text, shown verbatim; `restarting: false`
+ * means a restart-effect write was refused and nothing is waiting for the socket to come back.
  */
 export function infinitusCommandFailure(cause: Cause.Cause<unknown>): {
   readonly message: string;

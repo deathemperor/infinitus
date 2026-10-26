@@ -9,19 +9,10 @@ import * as NodeURL from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 
 /**
- * `fork-visual-fixture.data.json` is an `infinitusctl` capture: it plays the
- * Mac the visual pass renders against. A capture drifts silently. A command
- * it still claims after the Mac dropped it hands every capability gate in the
- * web a `true` no real build gives — the pane renders in CI and is gone on the
- * user's Mac — and a pref key it still carries draws a settings row the same
- * way, which is how the session-era rows stayed on screen in CI until #1122.
- *
- * The same ordering rule holds as for `PREF_COPY` (#1041, stated in #1068):
- * the fixture loses a verb or a key in the PR that removes it from the Mac.
- *
- * One direction only for commands: the fixture answers just the read verbs the
- * pass exercises, so a command the Mac has and the fixture omits is normal.
- * A command the fixture claims and the Mac lacks is the lie.
+ * `fork-visual-fixture.data.json` is an `infinitusctl` capture playing the Mac for
+ * the visual pass. A command or pref key it still carries after the Mac dropped it
+ * gives the web a gate or row no real build has (#1122), so the fixture loses a verb
+ * or key in the PR that removes it from the Mac (#1041, #1068). Commands: one way only.
  */
 
 const read = (path: string) => NodeFS.readFileSync(new URL(path, import.meta.url), "utf8");
@@ -128,12 +119,10 @@ async function fixtureReply(command: string): Promise<ForecastReply> {
 
 describe("the visual-pass fixture's forecast", () => {
   /**
-   * The Mac projects a window's `hitsAt` itself and drops it when the reset
-   * lands first (`UsageForecast.project`: `if let reset = w.resetsAt, reset
-   * <= at { hits = nil }`), which is what makes the web print "Resets before
-   * it fills". The fixture used to hand the active account a 5h window that
-   * fills three hours after it resets, so the visual pass photographed "Out
-   * 10:34 PM · Resets 7:44 PM" — a line no real build can produce.
+   * The Mac drops a window's `hitsAt` when the reset lands first
+   * (`UsageForecast.project`), which makes the web print "Resets before it
+   * fills". The fixture must not hand the active account a 5h window that fills
+   * after it resets: no real build produces that line.
    */
   it("projects nothing a real Mac would not", async () => {
     const reply = await fixtureReply("forecast");

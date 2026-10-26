@@ -53,14 +53,10 @@ const TERMINAL_STATUSES: ReadonlySet<OrchestrationV2ProviderTurn["status"]> = ne
 ]);
 
 /**
- * The usage record of a terminal provider turn, or undefined for a turn
- * with nothing to record. The tokens are the adapter's normalized
- * `turnTokenUsage`; cost, models and tool calls are the fork's fields on the
- * same turn. A turn whose provider reported no usage is still recorded when
- * it completed, as zero tokens with `usageUnavailable`, so its tool calls and
- * wall time survive and the rollup knows those zeros are "not reported". An
- * interrupted or failed turn without usage, or a cancelled one, is not a
- * turn the rollup should count.
+ * The usage record of a terminal provider turn, or undefined when there is nothing
+ * to record. A completed turn whose provider reported no usage is recorded as zero
+ * tokens with `usageUnavailable`, so tool calls and wall time survive. Interrupted
+ * or failed turns without usage, and cancelled ones, are not counted.
  */
 export function turnUsageFromProviderTurn(
   turn: OrchestrationV2ProviderTurn,
@@ -94,12 +90,10 @@ export function turnUsageFromProviderTurn(
 }
 
 /**
- * The thread's rollup from its projection: the terminal turns of its root
- * provider threads (a subagent's provider thread has an owner node and is
- * the subagent's own conversation), minus the runs a rollback removed,
- * folded onto the thread's `usageBaseline` (the transcript or v1 estimate
- * the backfill left). Undefined for a thread with nothing recorded and no
- * baseline: absence, never zero.
+ * The thread's rollup from its projection: terminal turns of its root provider
+ * threads (subagents have an owner node), minus runs a rollback removed, folded
+ * onto `usageBaseline`. Undefined with nothing recorded and no baseline: absence,
+ * never zero.
  */
 export function threadUsageFromProjection(
   projection: Pick<
@@ -233,18 +227,10 @@ export function foldTurnUsage(
 }
 
 /**
- * Whether the thread's prompt cache is still warm, from the rollup's
- * `cacheExpiresAt` (the last turn's completion plus the TTL its writes
- * bought). `expiring` covers the last fifth of the TTL, at most five
- * minutes. Null when the last turn said nothing about the cache.
- *
- * `sessionAlive` (`promptCacheWriterAlive`) is whether the provider process
- * that wrote the cache is still up. A Stop, the idle reaper, an error, a
- * server restart or a runtime-mode change ends or replaces it, and the next
- * message runs on a resumed CLI whose prompt prefix usually differs (git
- * status, tool and MCP deltas), so the whole context is written again inside
- * the TTL (pingdotgg/t3code#10955, #10600): that reads `cold` with reason
- * `restart`, never warm.
+ * Whether the thread's prompt cache is still warm, from `cacheExpiresAt`;
+ * `expiring` is the last fifth of the TTL. `sessionAlive` is whether the provider
+ * process that wrote the cache is up: once it ends, the resumed CLI's prompt
+ * prefix usually differs and the cache is rewritten (pingdotgg/t3code#10955), so `cold`.
  */
 export type PromptCacheState =
   | { readonly kind: "warm" | "expiring"; readonly remainingMs: number; readonly ttlMs: number }
@@ -267,11 +253,9 @@ export function promptCacheState(
 }
 
 /**
- * Whether the process that wrote the last turn's cache still runs: the
- * thread's provider session is `ready` and has not changed since that turn
- * (the turn's completion sets `ready` at the same instant; any later stop,
- * reap, error or restart moves `updatedAt` past it). A second of grace for
- * ordering.
+ * Whether the process that wrote the last turn's cache still runs: the provider
+ * session is `ready` and unchanged since that turn (any later stop, reap, error
+ * or restart moves `updatedAt` past it). A second of grace for ordering.
  */
 export function promptCacheWriterAlive(
   session: Pick<OrchestrationV2ProviderSession, "status" | "updatedAt"> | null | undefined,

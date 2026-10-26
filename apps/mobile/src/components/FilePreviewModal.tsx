@@ -14,6 +14,11 @@ import { Keyboard, Platform } from "react-native";
 
 import { loadLocalAttachmentPreview } from "../lib/localAttachmentPreview";
 import { reusablePreviewUrl } from "../features/infinitus/previewUrlReuse.logic";
+import {
+  downloadAndShareAttachment,
+  nativeViewerErrorMessage,
+  shareLocalAttachment,
+} from "../lib/attachmentDownload";
 import { useRefreshAssetUrl } from "../state/assets";
 import { filePreviewGallery, filePreviewKey, filePreviewName } from "../lib/filePreviewGallery";
 import { FilePreviewGallery } from "./FilePreviewGallery";
@@ -69,8 +74,7 @@ function PreviewItemResolver(props: {
   useEffect(() => {
     if (environmentId === null || uri !== null) return;
     let cancelled = false;
-    // A cached URL may have expired while the app was suspended. Await reauthorization
-    // before handing a URL to Quick Look or ACTION_VIEW, which retain that URL.
+    // Refresh expired URLs before handing them to Quick Look or ACTION_VIEW, which retain them.
     void refreshAssetUrl()
       .then((url) => {
         if (cancelled) return;
@@ -159,6 +163,32 @@ function ResolvedFilePreview(props: {
     [items, resolved],
   );
   const ready = selected && gallery.length === items.length;
+  const onOpenError = (error: unknown) => {
+    if (props.onOpenError) return props.onOpenError(error);
+    Dialog.alert("Could not open preview", nativeViewerErrorMessage(error), [
+      { text: "Cancel", style: "cancel" },
+      ...(selected?.kind === "document"
+        ? [
+            {
+              text: "Save or share",
+              onPress: () => {
+                const input = {
+                  attachment: {
+                    name: filePreviewName(selected),
+                    mimeType: selected.mimeType ?? "application/octet-stream",
+                  },
+                  signal: new AbortController().signal,
+                };
+                const sharing = /^(file|content):/.test(selected.uri)
+                  ? shareLocalAttachment({ ...input, uri: selected.uri })
+                  : downloadAndShareAttachment({ ...input, url: selected.uri });
+                void sharing.catch(() => Dialog.alert("Could not share file", "Please try again."));
+              },
+            },
+          ]
+        : []),
+    ]);
+  };
   return (
     <>
       {items.map((item) => {
@@ -183,7 +213,7 @@ function ResolvedFilePreview(props: {
             if (retrying.current) retrying.current = false;
             else props.onRequestClose();
           }}
-          onOpenError={reusedSelectedUrl ? retryWithFreshUrl : props.onOpenError}
+          onOpenError={reusedSelectedUrl ? retryWithFreshUrl : onOpenError}
         />
       ) : null}
     </>
@@ -219,8 +249,7 @@ export function FilePreviewModal(props: {
     },
     [navigation],
   );
-  // The v5 card host sits inside a legacy presentation envelope whose focus context
-  // can describe a different route. The preview belongs to this navigation route.
+  // The legacy envelope's focus context may describe a different route than this v5 card.
   const isFocused = useSyncExternalStore(
     subscribeToFocus,
     navigation.isFocused,

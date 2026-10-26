@@ -1,15 +1,7 @@
 /**
- * Claude banked resets (the CLI's `cedar_ember` program, Claude Code 2.1.280).
- * The CLI reads the grants from the OAuth usage endpoint and claims one
- * against the organization; this module sends the same two requests with the
- * login the CLI keeps — the macOS login keychain, or `.credentials.json` in
- * its config directory elsewhere — and never refreshes a token itself: the
- * status probe's `get_usage` runs first and leaves a fresh one behind.
- *
- * Request shapes, id patterns, the claim timeout and the keychain service
- * name are read off the CLI binary, not documented anywhere; a read failure
- * only hides the control.
- *
+ * Claude banked resets (the CLI's `cedar_ember` program). Sends the CLI's two requests (read
+ * grants, claim one) with the login the CLI keeps; never refreshes a token itself, since the status
+ * probe's `get_usage` runs first. Request shapes are read off the CLI binary.
  * @module provider/claudeResetCredits
  */
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no sha256 digest.
@@ -51,11 +43,9 @@ export interface ClaudeLoginLocation {
 }
 
 /**
- * The keychain item the CLI stores its OAuth login under: `Claude
- * Code-credentials`, suffixed with the first eight hex digits of the config
- * directory's sha256 when `CLAUDE_CONFIG_DIR` is set, so two config
- * directories never share a login. `configDirEnv` is the exact value the CLI
- * sees, since the hash is over that string.
+ * The keychain item the CLI stores its OAuth login under: `Claude Code-credentials`, suffixed with
+ * the first eight hex digits of the config directory's sha256 when `CLAUDE_CONFIG_DIR` is set.
+ * `configDirEnv` is the exact value the CLI sees, since the hash is over that string.
  */
 export function claudeKeychainService(configDirEnv: string | undefined): string {
   const base = "Claude Code-credentials";
@@ -153,9 +143,7 @@ export class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCredit
 
 const isClaudeResetCreditError = Schema.is(ClaudeResetCreditError);
 
-/**
- * An unanswered or unconfirmed claim retries with the same request id.
- */
+/** Retry unanswered or unconfirmed claims with the same request ID. */
 export const isSettledClaudeResetCreditFailure = (error: unknown) =>
   isClaudeResetCreditError(error) &&
   error.reason !== "requestFailed" &&
@@ -175,11 +163,10 @@ const isPast = (value: string | null | undefined, nowMs: number): boolean => {
 };
 
 /**
- * The `cedar_ember` block as the contract. Paused, ended and malformed
- * grants do not count. The grant the server names as next is the one a
- * claim targets; when it cannot be used this moment the hold says why, so a
- * client shows the balance and waits the button instead of spending a click
- * on a `not_limited` answer.
+ * The `cedar_ember` block as the contract. Paused, ended and malformed grants do not count. The
+ * grant the server names as next is the one a claim targets; when it cannot be used now the hold
+ * says why, so a client shows the balance and waits the button instead of spending a click on
+ * `not_limited`.
  */
 export function claudeResetCreditsToContract(
   block: unknown,
@@ -257,7 +244,7 @@ const readAccessToken = Effect.fn("readClaudeAccessToken")(function* (login: Cla
           return yield* fs.readFileString(path.join(login.configDir, ".credentials.json")).pipe(
             Effect.catchTags({
               PlatformError: (error) =>
-                error.reason._tag === "NotFound" ? Effect.succeed(undefined) : Effect.fail(error),
+                error.reason._tag === "NotFound" ? Effect.void : Effect.fail(error),
             }),
           );
         });
@@ -305,7 +292,7 @@ export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
     );
   },
   Effect.timeout(READ_TIMEOUT),
-  Effect.catch(() => Effect.succeed(undefined)),
+  Effect.orElseSucceed(() => undefined),
 );
 
 /**
@@ -426,8 +413,7 @@ export const consumeClaudeResetCredit = Effect.fn("consumeClaudeResetCredit")(fu
   if (body.result === "cooldown") {
     return yield* new ClaudeResetCreditError({ reason: "coolingDown" });
   }
-  // Claude could not say whether the claim landed, so, like the CLI, keep the
-  // request id and let the retry ask about the same claim.
+  // Unknown outcomes retain the request ID so retries address the same claim.
   if (body.result === "unavailable") {
     return yield* new ClaudeResetCreditError({ reason: "unconfirmed" });
   }

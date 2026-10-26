@@ -112,12 +112,10 @@ function commandErrorMessage(cause: Cause.Cause<unknown>): string {
 }
 
 /**
- * One machine's accounts: every fleet its engines report, one section per
- * fleet, under a heading that names the machine. The row model does the
- * deriving (`@infinitus/client-runtime/state/infinitusAccounts`); this
- * component owns the machine's snapshot and the flows in flight against it,
- * and forwards each button to that machine's control socket. The page draws
- * one of these per connected environment that runs Infinitus.
+ * One machine's accounts: every fleet its engines report, one section per fleet, under a heading
+ * naming the machine. The row model derives (`@infinitus/client-runtime/state/infinitusAccounts`);
+ * this component owns the machine's snapshot and flows in flight and forwards each button to its
+ * control socket. The page draws one per connected Infinitus environment.
  */
 export function EnvironmentAccounts({
   environment,
@@ -298,19 +296,15 @@ export function EnvironmentAccounts({
     }
   };
 
-  // The in-app sign-in (#677): `signin-begin` on the app, the provider's page
-  // in the shell's child window, `signin-status` every two seconds until the
-  // app says it ended. Only this Mac's own app can show the window, so the
-  // shell path exists for the primary environment in the desktop client;
-  // every other client opens the page from a link and hands the code over
-  // `infinitus.secret` (#747).
+  // The in-app sign-in (#677): `signin-begin` on the app, the provider's page in the shell's child
+  // window, `signin-status` every two seconds until it ends. Only this Mac's own app can show the
+  // window, so the shell path is for the primary environment in the desktop client; other clients
+  // open a link and hand the code over `infinitus.secret` (#747).
   const shellSignIn = bridge !== null && primary ? bridge : null;
 
-  // The engine's loopback listener stood in for on this machine: for another
-  // Mac's environment the page opens in this machine's browser, so the
-  // redirect comes here, and the shell takes the port, catches it and hands
-  // the address on — nothing to paste. Never on the primary environment,
-  // where the engine itself holds that port.
+  // The engine's loopback listener stood in for on this machine: for another Mac's environment the
+  // page opens in this machine's browser, so the shell takes the redirect's port, catches it and
+  // hands the address on. Never on the primary environment, where the engine holds that port.
   const redirectSignIn = redirectBridge !== null && !primary ? redirectBridge : null;
 
   // The sign-in this shell runs itself (#1213): the engine's own `add-oauth`,
@@ -444,11 +438,9 @@ export function EnvironmentAccounts({
     }
   };
 
-  // The shell's own sign-in (#1213): one call for the whole flow. The shell
-  // opens the provider's page as soon as the engine prints its URL, so the
-  // flow waits for the provider from the moment it starts — there is no
-  // status to poll and no code to paste, and the page runs in the system
-  // browser, so only Cancel here or the engine's timeout ends it.
+  // The shell's own sign-in (#1213): one call for the whole flow. The shell opens the provider's
+  // page once the engine prints its URL, so there is no status to poll and no code to paste; it
+  // runs in the system browser, so only Cancel here or the engine's timeout ends it.
   const startShellOAuthSignIn = async (
     fleetKey: string,
     provider: string,

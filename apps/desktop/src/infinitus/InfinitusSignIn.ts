@@ -1,12 +1,8 @@
 /**
- * A fleet's sign-in inside this app (#677). The menu-bar app runs the flow
- * with no window of its own (`signin-begin`); this shell shows the provider's
- * page in a child window per flow — a fresh in-memory partition, so one
- * account's cookies never meet another's, gone when the window closes — and
- * hands the code from the success page to the app over its control socket as
- * the request's `secret`, the way stdin material always travels. The code
- * never crosses an RPC, the server or the tunnel: only this process can send
- * it, which is the whole of the "desktop only" rule.
+ * A fleet's sign-in inside this app (#677): the provider's page in a child window per
+ * flow on a fresh in-memory partition (cookies never mix), the code handed to the
+ * menu-bar app over its control socket as the request's `secret`. It never crosses an
+ * RPC, the server or the tunnel: only this process can send it.
  */
 import * as NodeOS from "node:os";
 
@@ -61,12 +57,9 @@ export const signInWindowOptions = (
   },
 });
 
-/** The products a stock Chromium user agent names. Electron's default adds the
-    app's own (`Infinitus/0.5.0`) and `Electron/44.1.0`, and Google's sign-in
-    reads those as an embedded browser: it answers a request carrying them with
-    `flowName=GeneralOAuthLite` and its legacy consent page, which cannot finish
-    a federated login here. Everything kept is Chromium's own — which is what
-    the page is really running. */
+/** The products a stock Chromium user agent names. Electron's default adds the app's own
+    and `Electron/x`, which Google's sign-in reads as an embedded browser and answers
+    with a legacy consent page that cannot finish a federated login. */
 const CHROMIUM_USER_AGENT_PRODUCTS = new Set(["Mozilla", "AppleWebKit", "Chrome", "Safari"]);
 
 /** The sign-in window's user agent: the default with every non-Chromium product
@@ -81,13 +74,9 @@ export const signInUserAgent = (defaultUserAgent: string): string =>
     })
     .join(" ");
 
-/** What a provider's page may open from a sign-in window.
- *
- * A federated sign-in (Google, Apple) runs in a `window.open` child that
- * `postMessage`s its result back to the opener, and a denied open returns
- * `null` — which the page reports as "There was an error logging you in". The
- * child keeps the opener and the flow's partition, so it stays in this flow's
- * jar. A URL that is not a page is never a sign-in, and stays denied. */
+/** What a provider's page may open from a sign-in window. A federated sign-in runs in a
+ * `window.open` child that `postMessage`s back, and a denied open fails the login. The
+ * child keeps the flow's partition; a URL that is not a page stays denied. */
 export const signInWindowOpenAction = (details: { readonly url: string }): "popup" | "deny" =>
   /^https?:\/\//i.test(details.url) ? "popup" : "deny";
 
@@ -102,14 +91,10 @@ const SIGN_IN_POPUP_WINDOW_OPTIONS = {
   },
 } satisfies Electron.BrowserWindowConstructorOptions;
 
-/** The browser a sign-in window and everything it opens present to the
-    provider.
- *
- * The agent goes on the flow's session as well as this window: a pop-up is
- * navigating by the time `did-create-window` could reach it, and the request
- * that decides which flow Google serves is its first one. `parent` makes the
- * pop-up this window's child, so it cannot outlive the flow holding the jar it
- * was opened in. */
+/** The browser a sign-in window and everything it opens present to the provider. The
+ * agent goes on the flow's session too: a pop-up is navigating before
+ * `did-create-window`, and Google decides the flow on its first request. `parent` keeps
+ * the pop-up from outliving the flow holding its jar. */
 const prepareSignInWindow = (window: Electron.BrowserWindow): void => {
   const userAgent = signInUserAgent(window.webContents.getUserAgent());
   // Session-wide covers what is opened next; this window's contents already
@@ -147,9 +132,7 @@ export const submitSignInCode = Effect.fn("infinitus.submitSignInCode")(function
       InfinitusUnavailable: () =>
         Effect.succeed({ ok: false, error: `${PRODUCT_NAME} is not running on this Mac.` }),
     }),
-    Effect.catch(() =>
-      Effect.succeed({ ok: false, error: `${PRODUCT_NAME} did not answer the code.` }),
-    ),
+    Effect.orElseSucceed(() => ({ ok: false, error: `${PRODUCT_NAME} did not answer the code.` })),
   );
 });
 
@@ -189,7 +172,7 @@ const make = Effect.gen(function* () {
         .create(signInWindowOptions(input, environment.platform))
         .pipe(
           Effect.tapError((error) => logWarning("sign-in window failed", { error })),
-          Effect.catch(() => Effect.succeed(null)),
+          Effect.orElseSucceed(() => null),
         );
       if (window === null) return;
       windows.set(input.flowId, window);

@@ -8,13 +8,10 @@ import {
 } from "../lib/backNavigation";
 
 /**
- * Fork (#840, #1250): a mouse's back button (Chromium `button` 3) goes back
- * on the pages whose header shows the back arrow; its forward button (4)
- * goes forward anywhere. Electron hands them to the renderer as plain mouse
- * events with no default action. A driver that maps those buttons to macOS's
- * navigation gesture instead (Logi Options+ does) never produces a mouse
- * event: the shell forwards the gesture over `onHistoryGesture` and the same
- * rule runs. Mounted once, by the app's sidebar layout.
+ * Fork (#840, #1250): a mouse's back button (Chromium `button` 3) goes back on pages whose header
+ * shows the back arrow; forward (4) goes forward anywhere. A driver mapping those buttons to
+ * macOS's navigation gesture (Logi Options+) sends no mouse event, so the shell forwards it over
+ * `onHistoryGesture` and the same rule runs. Mounted once, by the sidebar layout.
  */
 export function useHistoryNavigation(pathname: string): void {
   const navigate = useNavigate();

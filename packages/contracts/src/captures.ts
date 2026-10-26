@@ -3,12 +3,10 @@ import * as Schema from "effect/Schema";
 import { ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /**
- * Captures (#433): one small list per project of things the user typed,
- * pasted or selected on the way to a prompt — a note, a snippet, a todo —
- * each sendable to the composer and checkable off. Kept by the server in a
- * file under its state directory (never in the workspace), streamed whole to
- * every client of the project. No kinds, tags or attachments: "send to
- * composer" is the only thing a capture is for.
+ * Captures (#433): one small list per project of things typed, pasted or selected
+ * on the way to a prompt, each sendable to the composer and checkable off. Kept by
+ * the server under its state directory (never the workspace), streamed whole to
+ * every client. No kinds, tags or attachments.
  */
 
 export const CaptureId = TrimmedNonEmptyString.pipe(Schema.brand("CaptureId"));

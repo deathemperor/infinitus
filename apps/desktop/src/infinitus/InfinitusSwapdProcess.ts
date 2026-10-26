@@ -67,20 +67,10 @@ export async function privateWindowBrowser(
 }
 
 /**
- * The sign-in page in a private window of a browser instance of its own, on
- * an empty profile, so the browser's signed-in account never meets the one
- * being added. `false` when there is no such window to open — no default
- * browser, one with no private switch — and the caller opens the URL the
- * plain way.
- *
- * `open -na <browser> --args <flag> --user-data-dir=<fresh> <url>`: a running
- * browser gets a URL over Apple Events and ignores launch arguments, and a
- * second instance handing `--incognito` to the running one was seen to open
- * the page in the signed-in profile (user 2026-09-21, Chrome 153). A
- * different `--user-data-dir` is what makes the Chromium family start a
- * separate process instead of handing off, and the profile is wiped before
- * every launch, so the page opens signed in to nothing (the Mac app's
- * `openInDefaultBrowser`). macOS only: the caller asks.
+ * The sign-in page in a private window of a browser instance of its own, on an empty
+ * profile; `false` when there is none, and the caller opens the URL plainly. A separate
+ * `--user-data-dir` makes the Chromium family start its own process; `--incognito` handed
+ * to a running one opened the signed-in profile (2026-09-21). macOS only.
  */
 export async function openInPrivateWindow(url: string): Promise<boolean> {
   const browser = await privateWindowBrowser(url);
@@ -102,11 +92,9 @@ export async function openInPrivateWindow(url: string): Promise<boolean> {
 }
 
 /**
- * One `swapd --json --provider <p> add-oauth` run (#1213). The verb prints two
- * lines: the URL to open, flushed the moment its loopback listener is up, then
- * the `add` envelope once the sign-in has been redeemed and stored. `onUrl`
- * takes the first, the promise settles on the second; cancelling is killing
- * the process, which takes its listener with it.
+ * One `swapd --json --provider <p> add-oauth` run (#1213). It prints the URL to open once
+ * its loopback listener is up, then the `add` envelope once stored. `onUrl` takes the
+ * first, the promise settles on the second; cancelling kills the process and listener.
  */
 
 /** swapd's own default is five minutes; the shell asks for no more. */
@@ -183,11 +171,9 @@ export function startSwapdAddOAuth(input: {
     finish({ ok: false, error: error.message });
   });
 
-  // `close`, not `exit`: the engine prints its envelope and exits at once, and
-  // `exit` can win the race against stdout's last chunk — which would refuse a
-  // sign-in whose account the engine had already stored. `close` waits for the
-  // pipes, so by here every line has been read; the remainder is whatever had
-  // no newline after it.
+  // `close`, not `exit`: `exit` can win the race against stdout's last chunk and refuse a
+  // sign-in whose account was already stored. `close` waits for the pipes, so the
+  // remainder is whatever had no newline after it.
   child.once("close", (code) => {
     if (stopped) return;
     if (buffered.length > 0) {

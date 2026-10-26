@@ -33,12 +33,9 @@ function split(text: string): { title: string; description?: string } {
 /**
  * What an event is worth interrupting for, or null.
  *
- * Two families. `alert` / `notice` are the app's own announcements
- * (`AppModel.announce`): the Mac decided — under its Notifications prefs and
- * its once-per-episode latches — that this line is worth saying, and stays
- * quiet itself while a desktop is watching, so the row IS the notification
- * and its text is already banner-shaped. `limit` / `switch` are observations
- * the fork has toasted since before that (#630), kept as they were.
+ * `alert` / `notice` are the app's own announcements (`AppModel.announce`): the Mac already decided
+ * they merit saying and stays quiet while a desktop watches, so the row is the notification.
+ * `limit` / `switch` are older observations (#630).
  */
 export function eventToast(
   event: Pick<InfinitusEventRow, "icon" | "text" | "kind">,

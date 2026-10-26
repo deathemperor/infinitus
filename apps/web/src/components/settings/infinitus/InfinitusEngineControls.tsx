@@ -1,14 +1,7 @@
 /**
- * Start and stop the proxy engines from the Engines page.
- *
- * A thread on a proxied Claude instance dies with `ConnectionRefused` when its
- * engine is down, and the page could only report it. The desktop shell runs the
- * engine instead — it is the app on the machine the engine runs on, and unlike
- * the menu-bar app it is the one the user is already looking at.
- *
- * Drawn inside each engine's own section, under its connection rows, only in
- * the desktop shell and only for this computer: the buttons act on the machine
- * running this window, never on a named remote environment.
+ * Start and stop the proxy engines from the Engines page: a proxied thread dies with
+ * `ConnectionRefused` while its engine is down. Drawn only in the desktop shell and only for this
+ * computer; the buttons act on the machine running this window, never a remote environment.
  *
  * @module InfinitusEngineControls
  */

@@ -176,10 +176,8 @@ const WsInfinitusSecretRpc = Rpc.make(INFINITUS_WS_METHODS.infinitusSecret, {
 
 /**
  * The fork's RPCs as their own group. `rpc.ts` adds the scope middleware and
- * merges it into `WsRpcGroup`; the server builds its handlers apart from
- * upstream's, which keeps upstream's handler object at upstream's size (one
- * `toLayer` over every RPC exceeds TypeScript's instantiation limit, and the
- * resulting `any` leaks into `runServer`).
+ * merges it into `WsRpcGroup`; handlers are built apart from upstream's because
+ * one `toLayer` over every RPC exceeds TypeScript's instantiation limit.
  */
 export const InfinitusRpcs = RpcGroup.make(
   WsServerGetStatsRpc,

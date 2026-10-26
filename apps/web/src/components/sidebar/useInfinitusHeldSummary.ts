@@ -7,12 +7,10 @@ import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 
 /**
- * Whether the server holds this thread's turn start for headroom (#616,
- * #741), paused its turn for it (#743), or has it parked on a usage limit
- * (#270 I): the row's kind and line, or null. Every row on one environment
- * shares the one `subscribeInfinitusHolds` stream through the atom family;
- * an environment without the Infinitus capability subscribes to nothing.
- * The capability reads through a selector so a row wakes only when it flips.
+ * Whether the server holds this thread's turn start for headroom (#616, #741), paused its turn for
+ * it (#743), or parked it on a usage limit (#270 I): the row's kind and line, or null. Rows on one
+ * environment share one `subscribeInfinitusHolds` stream through the atom family; the capability
+ * reads through a selector so a row wakes only when it flips.
  */
 export function useInfinitusHeldSummary(
   environmentId: EnvironmentId,

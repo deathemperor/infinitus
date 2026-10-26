@@ -8,12 +8,9 @@ import { useThreadProjection } from "../../state/use-thread-detail";
 import { threadUsageNotes, threadUsageRows } from "./threadUsage.logic";
 
 /**
- * Fork (#834): a thread's usage under the options of its settings sheet —
- * the completed turns' tokens, cost, models, tool calls and time working,
- * folded by the client from the live projection it already holds, so
- * nothing is requested for it. Mounted only by the existing-thread host (a
- * draft or a scheduled task has no turns), and drawn only once a turn was
- * recorded: an empty card would be a lying affordance.
+ * Fork (#834): a thread's usage under its settings sheet's options, folded by the client
+ * from the live projection. Drawn only once a turn was recorded (a draft or scheduled
+ * task has none): an empty card would be a lying affordance.
  */
 export function InfinitusThreadUsageRows(props: {
   readonly environmentId: EnvironmentId;
