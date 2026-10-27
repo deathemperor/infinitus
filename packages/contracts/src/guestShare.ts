@@ -66,8 +66,13 @@ export const GuestShareCreateResult = Schema.Struct({
 export type GuestShareCreateResult = typeof GuestShareCreateResult.Type;
 
 const GUEST_SHARE_CREATE_MESSAGES = {
+<<<<<<< HEAD
   disabled: "Guest links are off. Turn them on in Settings > Beta.",
   connect_unavailable: `Guest links need a running ${CONNECT_NAME} tunnel.`,
+=======
+  disabled: "Guest links are off. Turn them on in Settings > Labs.",
+  connect_unavailable: "Guest links need a running T3 Connect tunnel.",
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
   thread_unavailable: "This thread cannot be shared.",
   read_failed: "Failed to read the shared thread.",
   changed: "The guest link changed while it was being created.",

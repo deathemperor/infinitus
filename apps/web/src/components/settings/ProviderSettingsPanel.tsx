@@ -104,6 +104,7 @@ import { CodexSetupSection, CodexManagedRuntimeFields } from "./CodexSetupSectio
 import { readCodexSetupMode } from "./CodexSetupSection.logic";
 import { providerClients } from "./providerDriverMeta";
 import { searchableSetting } from "./settingsSearch";
+import { CompactIdleThreadsRow } from "./SettingsPanels";
 import {
   backgroundActivityOverrideSettings,
   buildProviderInstanceUpdatePatch,
@@ -984,7 +985,8 @@ export function EnvironmentProviderSettings({
           ) : null
         }
         headerAction={
-          <div className="flex min-w-0 items-center gap-2">
+          // The ghost button's padding would inset its label; the New design aligns the text to the card edge.
+          <div className="flex min-w-0 items-center gap-2 redesign:-me-2">
             <ProviderUpdatesAction />
             <Tooltip>
               <TooltipTrigger
@@ -1053,10 +1055,13 @@ export function EnvironmentProviderSettings({
             </ScrollArea>
           </div>
 
-          <div className="min-w-0 @min-[48rem]/providers:min-h-0">
+          <div data-provider-detail className="min-w-0 @min-[48rem]/providers:min-h-0">
             {selectedRow ? (
               <ScrollArea scrollFade chainVerticalScroll className="@min-[48rem]/providers:h-full">
-                <div className="space-y-6 p-4">{renderProviderInstance(selectedRow, "editor")}</div>
+                {/* Flat sections run dividers edge to edge and inset text like the list beside them. */}
+                <div className="space-y-6 p-4 redesign:px-0">
+                  {renderProviderInstance(selectedRow, "editor")}
+                </div>
               </ScrollArea>
             ) : (
               <div className="p-6 text-sm text-muted-foreground">
@@ -1080,7 +1085,7 @@ export function EnvironmentProviderSettings({
               <PolicyTooltip>
                 This interval is configured here, then the shared Background activity policy decides
                 whether provider probes may run when the timer fires. Custom intervals appear as
-                Advanced in General settings.
+                Advanced in Maintenance settings.
               </PolicyTooltip>
             </span>
           }
@@ -1145,6 +1150,7 @@ export function EnvironmentProviderSettings({
             </div>
           }
         />
+        <CompactIdleThreadsRow />
       </SettingsSection>
 
       {isAddInstanceDialogOpen && !readOnly ? (

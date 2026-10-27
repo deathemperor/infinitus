@@ -6,6 +6,7 @@ import { AntigravityDriver, type AntigravityDriverEnv } from "./Drivers/Antigrav
 import { ClaudeDriver, type ClaudeDriverEnv } from "./Drivers/ClaudeDriver.ts";
 import { CodexDriver, type CodexDriverEnv } from "./Drivers/CodexDriver.ts";
 import { CursorDriver, type CursorDriverEnv } from "@infinitus/provider-cursor/server";
+import { FxDriver, type FxDriverEnv } from "@infinitus/provider-fx/server";
 import { GrokDriver, type GrokDriverEnv } from "@infinitus/provider-grok/server";
 import { OpenCodeDriver, type OpenCodeDriverEnv } from "@infinitus/provider-opencode/server";
 import { MuseDriver, type MuseDriverEnv } from "@infinitus/provider-muse/server";
@@ -21,6 +22,7 @@ export type BuiltInDriversEnv =
   | ClaudeDriverEnv
   | CodexDriverEnv
   | CursorDriverEnv
+  | FxDriverEnv
   | GrokDriverEnv
   | OpenCodeDriverEnv
   | PiDriverEnv
@@ -31,6 +33,7 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
   ClaudeDriver,
   CursorDriver,
   GrokDriver,
+  FxDriver,
   OpenCodeDriver,
   AntigravityDriver,
   PiDriver,

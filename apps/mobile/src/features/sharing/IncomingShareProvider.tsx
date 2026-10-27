@@ -9,8 +9,8 @@ import {
   type ResolvedSharePayload,
   type SharePayload,
 } from "expo-sharing";
-import React, { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { useSyncExternalStore } from "react";
+import { Platform } from "react-native";
 
 import {
   buildIncomingShareDraft,
@@ -20,14 +20,28 @@ import {
 } from "./incoming-share-model";
 import { createIncomingSharePayloadReader } from "./incoming-share-native";
 import { IncomingShareInbox } from "./incoming-share-inbox";
+<<<<<<< HEAD
 import { persistComposerAttachmentFile, renderPhotoAsJpeg } from "../../lib/composerImages";
 import { scheduleUnusedComposerAttachmentCleanup } from "../../state/use-composer-drafts";
+=======
+import { persistComposerAttachmentFile } from "../../lib/composerImages";
+import { subscribeAppActive } from "../../lib/appState";
+import { coalescedRun } from "../../lib/coalescedRun";
+import { rootNavigationRef } from "../../lib/rootNavigation";
+import { selectWorkspaceDetail } from "../workspace/workspace-detail-selection";
+import { isDraftThreadRoute } from "../threads/thread-route-state";
+import {
+  EMPTY_INCOMING_SHARE_PRESENTATION_STATE,
+  transitionIncomingSharePresentation,
+} from "./incoming-share-presentation";
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
 import {
   loadIncomingShareDrafts,
   removeIncomingShareDraft,
   writeIncomingShareDraft,
 } from "./incoming-share-storage";
 
+<<<<<<< HEAD
 type IncomingShareContextValue = {
   readonly pendingShare: IncomingShareDraft | null;
   readonly isLoading: boolean;
@@ -46,6 +60,8 @@ type IncomingShareContextValue = {
 
 const IncomingShareContext = React.createContext<IncomingShareContextValue | null>(null);
 
+=======
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
 function receiveSharingEnabled(): boolean {
   if (Platform.OS === "android") {
     return true;
@@ -202,8 +218,45 @@ const incomingShareInbox = new IncomingShareInbox({
   },
 });
 
-export function IncomingShareProvider(props: React.PropsWithChildren) {
+interface IncomingShareSnapshot {
+  readonly drafts: ReadonlyArray<IncomingShareDraft>;
+  readonly isLoading: boolean;
+}
+
+let snapshot: IncomingShareSnapshot = { drafts: [], isLoading: true };
+const snapshotListeners = new Set<() => void>();
+let presentation = EMPTY_INCOMING_SHARE_PRESENTATION_STATE;
+
+function publish(drafts: ReadonlyArray<IncomingShareDraft>) {
+  snapshot = { drafts, isLoading: false };
+  for (const listener of snapshotListeners) listener();
+  presentPendingIncomingShare();
+}
+
+function subscribeIncomingShares(onChange: () => void) {
+  snapshotListeners.add(onChange);
+  return () => {
+    snapshotListeners.delete(onChange);
+  };
+}
+
+function getIncomingShareSnapshot() {
+  return snapshot;
+}
+
+function reportRefreshFailure(cause: unknown) {
+  const error = cause instanceof Error ? cause : new Error("Could not import shared content.");
+  Dialog.alert("Could not import shared content", error.message, [
+    { text: "Dismiss", style: "cancel" },
+    { text: "Retry", onPress: () => void refreshIncomingShares() },
+  ]);
+}
+
+// A resume while a refresh runs may carry a native handoff that refresh already
+// passed, so it queues one more refresh instead of joining the running one.
+const refreshIncomingShares = coalescedRun(async () => {
   const enabled = receiveSharingEnabled();
+<<<<<<< HEAD
   const [drafts, setDrafts] = useState<ReadonlyArray<IncomingShareDraft>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -363,6 +416,73 @@ export function useIncomingShare(): IncomingShareContextValue {
   const value = React.use(IncomingShareContext);
   if (value === null) {
     throw new Error("useIncomingShare must be used within IncomingShareProvider.");
+=======
+  try {
+    publish(await incomingShareInbox.refresh({ ingestNative: enabled }));
+  } catch (cause) {
+    const persisted = await incomingShareInbox.refresh({ ingestNative: false }).catch(() => null);
+    publish(persisted ?? snapshot.drafts);
+    reportRefreshFailure(cause);
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
   }
-  return value;
+});
+
+/**
+ * Opens the oldest pending share as a new-task draft unless the user already
+ * dismissed it. Runs whenever the inbox or the root navigation state changes.
+ */
+export function presentPendingIncomingShare(): void {
+  if (!rootNavigationRef.isReady()) return;
+  const state = rootNavigationRef.getRootState();
+  if (!state) return;
+  const transition = transitionIncomingSharePresentation(presentation, {
+    isShareSheetPresented: isDraftThreadRoute(state.routes[state.index]),
+    pendingShareId: snapshot.drafts[0]?.id ?? null,
+  });
+  presentation = transition.state;
+  if (!transition.shareIdToPresent) return;
+  rootNavigationRef.dispatch(
+    selectWorkspaceDetail({
+      name: "Thread",
+      params: { draft: { incomingShareId: transition.shareIdToPresent } },
+    }),
+  );
+}
+
+/** App-lifetime: loads the inbox and re-ingests native handoffs on every resume. */
+export function startIncomingShareInbox(): () => void {
+  void refreshIncomingShares();
+  return receiveSharingEnabled()
+    ? subscribeAppActive(() => void refreshIncomingShares())
+    : () => {};
+}
+
+async function consumeShare(shareId: string) {
+  publish(await incomingShareInbox.consume(shareId));
+}
+
+async function reserveShare(shareId: string, destination: IncomingShareDestination) {
+  publish(await incomingShareInbox.reserve(shareId, destination));
+}
+
+async function releaseShareReservation(
+  shareId: string,
+  expectedDestination: IncomingShareDestination,
+) {
+  publish(await incomingShareInbox.releaseReservation(shareId, expectedDestination));
+}
+
+export function useIncomingShare() {
+  const { drafts, isLoading } = useSyncExternalStore(
+    subscribeIncomingShares,
+    getIncomingShareSnapshot,
+  );
+  return {
+    pendingShare: drafts[0] ?? null,
+    isLoading,
+    getShare: (shareId: string) => drafts.find((draft) => draft.id === shareId) ?? null,
+    reserveShare,
+    releaseShareReservation,
+    consumeShare,
+  };
 }

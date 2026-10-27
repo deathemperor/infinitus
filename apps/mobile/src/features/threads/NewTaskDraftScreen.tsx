@@ -36,6 +36,7 @@ import {
 
 import { ComposerEditor, type ComposerEditorHandle } from "../../components/ComposerEditor";
 import { composerContextImportsAtom } from "../../state/use-composer-drafts";
+import { abortComposerDraftOperations } from "../../state/composerDraftOperations";
 import { composerContextSendBlockReason } from "../../lib/composerContext";
 import { ComposerInlineControl } from "../../components/ComposerToolbar";
 import { InfinitusPinAtCreationControl } from "../infinitus/InfinitusPinAtCreationControl";
@@ -88,7 +89,6 @@ import { resolveDraftProjectSelection } from "./new-task-project-selection";
 import {
   resolveNewTaskBranchLabel,
   resolveNewTaskWorkspaceLabel,
-  resolveNewTaskWorkspaceSelection,
 } from "./new-task-context-presentation";
 import { useIncomingShare } from "../sharing/IncomingShareProvider";
 import { selectIncomingShareAttachmentsForServer } from "../sharing/incoming-share-model";
@@ -150,7 +150,6 @@ export function NewTaskDraftScreen(props: {
     readonly worktreePath?: string | null;
     readonly cloning?: boolean;
   };
-  readonly pendingTaskId?: string;
   readonly draftId?: string;
   readonly incomingShareId?: string;
 }) {
@@ -356,6 +355,7 @@ export function NewTaskDraftScreen(props: {
       return;
     }
     if (requestedInitialProjectAvailable) {
+      // oxlint-disable-next-line react/set-state-in-effect -- Ends the return-to-picker flow once the requested project arrives from the catalog.
       setIsReturningToProjectPicker(false);
       return;
     }
@@ -385,11 +385,11 @@ export function NewTaskDraftScreen(props: {
     };
   }, []);
 
-  const { beginEditingPendingTask, cancelEditingPendingTask, editingPendingTask, openDraft } = flow;
+  const { openDraft } = flow;
   // Cold launches load drafts and projects separately; wait for hydration and retry while shells load.
   const attemptedDraftIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!props.draftId || props.pendingTaskId) {
+    if (!props.draftId) {
       return;
     }
     const draftId = props.draftId;
@@ -414,34 +414,12 @@ export function NewTaskDraftScreen(props: {
     return () => {
       cancelled = true;
     };
-  }, [navigation, openDraft, projects, props.draftId, props.pendingTaskId]);
-
-  const attemptedPendingTaskIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!props.pendingTaskId || editingPendingTask?.messageId === props.pendingTaskId) {
-      return;
-    }
-    if (attemptedPendingTaskIdRef.current === props.pendingTaskId) {
-      return;
-    }
-    attemptedPendingTaskIdRef.current = props.pendingTaskId;
-    if (!beginEditingPendingTask(props.pendingTaskId)) {
-      navigation.dispatch(CommonActions.navigate("NewTaskProject"));
-    }
-  }, [beginEditingPendingTask, editingPendingTask?.messageId, navigation, props.pendingTaskId]);
-
-  useEffect(() => {
-    if (!props.pendingTaskId) return;
-    return () => {
-      attemptedPendingTaskIdRef.current = null;
-      cancelEditingPendingTask();
-    };
-  }, [props.pendingTaskId, cancelEditingPendingTask]);
+  }, [navigation, openDraft, projects, props.draftId]);
 
   const lastInitialProjectRefRef = useRef(props.initialProjectRef);
 
   useEffect(() => {
-    if (props.pendingTaskId || props.draftId) {
+    if (props.draftId) {
       return;
     }
     if (lastInitialProjectRefRef.current !== props.initialProjectRef) {
@@ -494,6 +472,7 @@ export function NewTaskDraftScreen(props: {
       }
 
       if (projects.length > 0) {
+        // oxlint-disable-next-line react/set-state-in-effect -- Route-driven project resolution starts the return-to-picker flow when no project matches.
         setIsReturningToProjectPicker(true);
       }
       return;
@@ -514,8 +493,8 @@ export function NewTaskDraftScreen(props: {
     projects,
     flow.draftKey,
     props.initialProjectRef,
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Opening a draft from a share or draft id re-resolves its project.
     props.incomingShareId,
-    props.pendingTaskId,
     props.draftId,
     navigation,
     selectedProject,
@@ -523,6 +502,7 @@ export function NewTaskDraftScreen(props: {
     setProject,
   ]);
 
+  const { loadBranches } = flow;
   useEffect(() => {
     if (!selectedProject) {
       loadedBranchesProjectKeyRef.current = null;
@@ -533,8 +513,8 @@ export function NewTaskDraftScreen(props: {
       return;
     }
     loadedBranchesProjectKeyRef.current = projectKey;
-    flow.loadBranches();
-  }, [flow.loadBranches, selectedProject]);
+    loadBranches();
+  }, [loadBranches, selectedProject]);
 
   useEffect(() => {
     const shareId = props.incomingShareId;
@@ -594,6 +574,7 @@ export function NewTaskDraftScreen(props: {
     let didConsumeShare = false;
     let needsDraftRestore = false;
     activeShareImportTokenRef.current = importToken;
+    // oxlint-disable-next-line react/set-state-in-effect -- Publishes the share import started by this effect before its async work runs.
     setImportingShareKey(importKey);
     void (async () => {
       await reserveShare(shareId, {
@@ -746,6 +727,7 @@ export function NewTaskDraftScreen(props: {
     consumeShare,
     cancelledIncomingShareId,
     flow.draftKey,
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- hasImportedIncomingShare reflects the draft store; a change re-checks whether the share still needs importing.
     hasImportedIncomingShare,
     incomingShare,
     isIncomingShareInboxLoading,
@@ -826,15 +808,7 @@ export function NewTaskDraftScreen(props: {
         draft.modelSelection ?? null,
         selectedProject.id,
       ) ?? flow.selectedModel;
-    const workspaceSelection = resolveNewTaskWorkspaceSelection({
-      selection: draft.workspaceSelection,
-      fallback: {
-        mode: flow.workspaceMode,
-        branch: flow.selectedBranchName,
-        worktreePath: flow.selectedWorktreePath,
-      },
-      isGitRepo: flow.isGitRepo,
-    });
+    const workspaceSelection = flow.resolveWorkspaceSelection(draft.workspaceSelection);
     const workspaceMode = workspaceSelection.mode;
     const selectedBranchName = workspaceSelection.branch;
     const initialMessageText = draft.text.trim();
@@ -895,17 +869,7 @@ export function NewTaskDraftScreen(props: {
       return null;
     }
 
-    const editingPendingTask = flow.editingPendingTask;
-
-    const metadata = editingPendingTask
-      ? {
-          threadId: editingPendingTask.threadId,
-          commandId: editingPendingTask.commandId,
-          messageId: editingPendingTask.messageId,
-          createdAt: editingPendingTask.createdAt,
-        }
-      : creationMetadata;
-    const message = flow.buildPendingTaskMessage(metadata, {
+    const message = flow.buildPendingTaskMessage(creationMetadata, {
       currentCheckoutBranch: queuesInsteadOfStarting ? null : flow.currentCheckoutBranchName,
     });
     if (!message) {
@@ -929,18 +893,17 @@ export function NewTaskDraftScreen(props: {
         submittedThreadParams(String(message.environmentId), String(message.threadId)),
       ),
     );
+    // The composer has moved to the submitted thread; a pick still converting
+    // would otherwise resurrect this draft.
+    abortComposerDraftOperations(draftKey);
     const draftSnapshot = getComposerDraftSnapshot(draftKey);
-    if (editingPendingTask) {
-      flow.finishEditingPendingTask();
-    } else {
-      // The queued message owns the attachments now, so the sweep is deferred
-      // until the write confirms it.
-      clearComposerDraftContent(draftKey, {
-        clearModelSelection: true,
-        clearWorkspaceSelection: true,
-        deferAttachmentCleanup: true,
-      });
-    }
+    // The queued message owns the attachments now, so the sweep is deferred
+    // until the write confirms it.
+    clearComposerDraftContent(draftKey, {
+      clearModelSelection: true,
+      clearWorkspaceSelection: true,
+      deferAttachmentCleanup: true,
+    });
     scheduleUnusedComposerAttachmentCleanup(draftSnapshot.attachments);
     return message.messageId;
   }
@@ -1105,18 +1068,21 @@ export function NewTaskDraftScreen(props: {
 
   if (!flow.selectedModel) {
     return (
-      <ThreadScreenFallback>
-        <AppBar
-          title="New thread"
-          sidebar={false}
-          onBack={goBack}
-          options={{
-            ...threadHeaderAppearance(NATIVE_LIQUID_GLASS_SUPPORTED),
-            unstable_headerSubtitle: undefined,
-            unstable_headerRightItems: () => [],
-            unstable_headerToolbarItems: () => [],
-          }}
-        />
+      <ThreadScreenFallback
+        header={
+          <AppBar
+            title="New thread"
+            sidebar={false}
+            onBack={goBack}
+            options={{
+              ...threadHeaderAppearance(NATIVE_LIQUID_GLASS_SUPPORTED),
+              unstable_headerSubtitle: undefined,
+              unstable_headerRightItems: () => [],
+              unstable_headerToolbarItems: () => [],
+            }}
+          />
+        }
+      >
         <View className="flex-1 justify-end gap-3 p-4">
           {environmentControl}
           <Text className="text-foreground-muted">
@@ -1137,7 +1103,7 @@ export function NewTaskDraftScreen(props: {
   const thread = draftThreadShell({
     environmentId: selectedProject.environmentId,
     projectId: selectedProject.id,
-    threadId: ThreadId.make(flow.editingPendingTask?.threadId ?? creationMetadata.threadId),
+    threadId: ThreadId.make(creationMetadata.threadId),
     modelSelection: flow.selectedModel,
     runtimeMode: flow.runtimeMode,
     interactionMode: flow.interactionMode,
@@ -1243,10 +1209,6 @@ export function NewTaskDraftScreen(props: {
         onSendMessage={handleStart}
         onReconnectEnvironment={() => onReconnectEnvironment(selectedProject.environmentId)}
         canSwitchThreadProvider
-        onUpdateThreadModelSelection={(selection) =>
-          flow.setSelectedModelKey(`${selection.instanceId}:${selection.model}`, selection.options)
-        }
-        onUpdateThreadRuntimeMode={flow.setRuntimeMode}
         onUpdateThreadInteractionMode={flow.planModeEnabled ? flow.setInteractionMode : undefined}
         onRespondToApproval={async () => {}}
         onSelectUserInputOption={() => {}}

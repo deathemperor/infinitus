@@ -7,6 +7,7 @@ import * as Cause from "effect/Cause";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useCallback } from "react";
 
+import { hasCloudPublicConfig } from "../features/cloud/publicConfig";
 import { useConnectionController } from "../features/connection/useConnectionController";
 import { environmentPresentations } from "./presentation";
 import { useWorkspaceConnectionState, useWorkspaceEnvironments } from "./workspace";
@@ -183,10 +184,22 @@ export function useRemoteConnections() {
           `Forget ${environment.environmentLabel} and its cached threads on this device.\n\nIt stays on your ${CONNECT_NAME} account and keeps its host space. Deregister it under ${PRODUCT_NAME} Account → ${CONNECT_NAME} to free it.`,
           [
             { text: "Cancel", style: "cancel" },
+<<<<<<< HEAD
             {
               text: `Open ${PRODUCT_NAME} Account`,
               onPress: () => navigation.navigate("SettingsAuth"),
             },
+=======
+            // SettingsAuth renders nothing in builds without cloud config.
+            ...(hasCloudPublicConfig()
+              ? [
+                  {
+                    text: "Open T3 Account",
+                    onPress: () => navigation.navigate("SettingsAuth"),
+                  },
+                ]
+              : []),
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
             remove,
           ],
         );

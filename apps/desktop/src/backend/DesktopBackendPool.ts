@@ -133,7 +133,11 @@ export const layer = Layer.effect(
         });
         yield* electronDialog.showErrorBox(
           "WSL backend couldn't start",
+<<<<<<< HEAD
           `${reason}\n\nFalling back to the Windows backend so ${PRODUCT_NAME} can open. Re-enable the WSL backend from Settings > Connections once the WSL distro is fixed.`,
+=======
+          `${reason}\n\nFalling back to the Windows backend so T3 Code can open. Re-enable the WSL backend from Settings > Sharing & access once the WSL distro is fixed.`,
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
         );
         // Clear wslOnly too so enabling WSL cannot restore a failed mode.
         // Keep the in-memory fallback if persistence fails.
@@ -292,13 +296,14 @@ export const layer = Layer.effect(
     });
 
     return DesktopBackendPool.of({
-      get: (id) =>
-        SynchronizedRef.get(instancesRef).pipe(
+      get: Effect.fn("DesktopBackendPool.get")(function (id) {
+        return SynchronizedRef.get(instancesRef).pipe(
           Effect.map((instances) => {
             const entry = instances.get(id);
             return entry?._tag === "Active" ? Option.some(entry.instance) : Option.none();
           }),
-        ),
+        );
+      }),
       list: SynchronizedRef.get(instancesRef).pipe(
         Effect.map((instances) =>
           Array.from(instances.values()).flatMap((entry) =>
@@ -327,11 +332,17 @@ export const layerTest = (
       );
       const primary = instances[0]!;
       return DesktopBackendPool.of({
-        get: (id) => Effect.succeed(Option.fromNullishOr(byId.get(id))),
+        get: Effect.fn("DesktopBackendPool.get")(function (id) {
+          return Effect.succeed(Option.fromNullishOr(byId.get(id)));
+        }),
         list: Effect.succeed(Array.from(byId.values())),
         primary: Effect.succeed(primary),
-        register: () => Effect.die("DesktopBackendPool.layerTest does not support register"),
-        unregister: () => Effect.die("DesktopBackendPool.layerTest does not support unregister"),
+        register: Effect.fn("DesktopBackendPool.register")(function () {
+          return Effect.die("DesktopBackendPool.layerTest does not support register");
+        }),
+        unregister: Effect.fn("DesktopBackendPool.unregister")(function () {
+          return Effect.die("DesktopBackendPool.layerTest does not support unregister");
+        }),
       });
     }),
   );

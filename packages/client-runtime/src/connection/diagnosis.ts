@@ -138,7 +138,11 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
 }
 
 function steps(host: string, located: Located, failure: ConnectionAttemptError | null): string[] {
+<<<<<<< HEAD
   const checkHost = `On ${host}, check Settings > Connections or run \`infinitus connect status\`.`;
+=======
+  const checkHost = `On ${host}, check Settings > Sharing & access or run \`t3 connect status\`.`;
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
   switch (located.cause) {
     case "offline":
       return [`Connect this device to the internet. ${PRODUCT_NAME} reconnects on its own.`];
@@ -148,8 +152,13 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
       return [`Turn on automatic date and time on this device and on ${host}, then retry.`];
     case "not_linked":
       return [
+<<<<<<< HEAD
         `Check that this device is signed in to the same ${CONNECT_NAME} account as the host.`,
         `On ${host}, open Settings > Connections and turn ${CONNECT_NAME} on.`,
+=======
+        "Check that this device is signed in to the same T3 Connect account as the host.",
+        `On ${host}, open Settings > Sharing & access and turn T3 Connect on.`,
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
       ];
     case "tunnel_pending":
       return [`Wait a minute. ${PRODUCT_NAME} retries on its own.`, checkHost];
@@ -159,7 +168,11 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
         "If it keeps failing, copy the diagnostics and report it.",
       ];
     case "tunnel_not_enabled":
+<<<<<<< HEAD
       return [`On ${host}, open Settings > Connections and turn ${CONNECT_NAME} on.`];
+=======
+      return [`On ${host}, open Settings > Sharing & access and turn T3 Connect on.`];
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
     case "released":
     case "tunnel_down":
       return [

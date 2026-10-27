@@ -1,16 +1,14 @@
-import { AuthPreviewOperateScope } from "@infinitus/contracts";
 import { scopedThreadKey } from "@infinitus/client-runtime/environment";
 import { Outlet, createFileRoute, redirect, useMatches } from "@tanstack/react-router";
-import { useAtomValue } from "@effect/atom-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { ThreadRouteView } from "../components/ThreadRouteView";
 import { isAppModalPage } from "../components/sidebar/mainAppLocation";
 import { SidebarInset } from "../components/ui/sidebar";
 import { resolveThreadRouteTarget, type ThreadRouteTarget } from "../threadRoutes";
 import { retainThreadFindForRoute } from "../components/chat/threadFindStore";
 import { ThreadLinkPrompt } from "../components/promptLinks/ThreadLinkPrompt";
+<<<<<<< HEAD
 import { useClientSettings, useLegacySidebarEnabled } from "../hooks/useSettings";
 import { openCommandPalette } from "../commandPaletteBus";
 import { useProjects } from "../state/entities";
@@ -199,6 +197,10 @@ function ChatRouteGlobalShortcuts() {
   return null;
 }
 
+=======
+import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
+
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
 function threadRouteTargetKey(target: ThreadRouteTarget | null) {
   if (!target) return null;
   return target.kind === "server" ? scopedThreadKey(target.threadRef) : target.draftId;
@@ -219,7 +221,6 @@ function ChatRouteLayout() {
   const shownTarget = modalOpen ? backgroundTarget : threadTarget;
   return (
     <>
-      {modalOpen ? null : <ChatRouteGlobalShortcuts />}
       {shownTarget?.kind === "server" && !modalOpen ? (
         <ThreadLinkPrompt threadRef={shownTarget.threadRef} />
       ) : null}

@@ -1,4 +1,5 @@
 import * as Dialog from "./ui/Dialog";
+<<<<<<< HEAD
 import { useNavigation } from "@react-navigation/native";
 import {
   useCallback,
@@ -11,6 +12,9 @@ import {
   useMemo,
 } from "react";
 import { Keyboard, Platform } from "react-native";
+=======
+import { useContext, useEffect, useEffectEvent, useState } from "react";
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
 
 import { loadLocalAttachmentPreview } from "../lib/localAttachmentPreview";
 import { reusablePreviewUrl } from "../features/infinitus/previewUrlReuse.logic";
@@ -19,7 +23,8 @@ import {
   nativeViewerErrorMessage,
   shareLocalAttachment,
 } from "../lib/attachmentDownload";
-import { useRefreshAssetUrl } from "../state/assets";
+import { usePreviewPresentation } from "../lib/previewPresentation";
+import { refreshAssetUrl } from "../state/assets";
 import { filePreviewGallery, filePreviewKey, filePreviewName } from "../lib/filePreviewGallery";
 import { FilePreviewGallery } from "./FilePreviewGallery";
 import { FilePreview } from "./FilePreview";
@@ -35,6 +40,7 @@ export type {
   ResolvedFilePreviewSource,
 } from "./FilePreviewModal.types";
 
+<<<<<<< HEAD
 function PreviewItemResolver(props: {
   readonly source: FilePreviewItem;
   /** Fork: whether an attachment may open on the URL its thumbnail is showing. */
@@ -121,6 +127,49 @@ function PreviewItemResolver(props: {
     if (uri !== null) onResolved({ ...source, name: filePreviewName(source), uri }, reusedUrl);
   }, [uri, source, reusedUrl]);
   return null;
+=======
+class PreviewResolutionError extends Error {
+  constructor(
+    override readonly cause: unknown,
+    readonly fallbackMessage: string,
+  ) {
+    super(fallbackMessage, { cause });
+  }
+}
+
+interface ResolvedPreviewItem {
+  readonly source: ResolvedFilePreviewSource;
+  readonly dispose?: () => void;
+}
+
+async function resolvePreviewItem(
+  item: FilePreviewItem,
+  signal: AbortSignal,
+): Promise<ResolvedPreviewItem | null> {
+  const name = filePreviewName(item);
+  if ("attachment" in item) {
+    const file = await loadLocalAttachmentPreview(item.attachment, signal).catch(
+      (error: unknown) => {
+        throw new PreviewResolutionError(error, "Attach the file again and retry.");
+      },
+    );
+    return file && { source: { ...item, name, uri: file.uri }, dispose: file.dispose };
+  }
+  if (!("environmentId" in item)) return { source: { ...item, name } };
+  // Refresh expired URLs before handing them to Quick Look or ACTION_VIEW, which retain them.
+  const url = await refreshAssetUrl(item.environmentId, item.resource, signal)
+    .then((value) => {
+      if (!value) throw new Error("Reconnect to this environment and try again.");
+      return value;
+    })
+    .catch((error: unknown) => {
+      throw new PreviewResolutionError(
+        error,
+        "Reconnect to this environment and try again. The file may have been moved or deleted.",
+      );
+    });
+  return { source: { ...item, name, uri: url + (item.srcFragment ?? "") } };
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
 }
 
 function ResolvedFilePreview(props: {
@@ -130,6 +179,7 @@ function ResolvedFilePreview(props: {
 }) {
   // Freeze the group at opening; streaming messages and URL refreshes must not reopen the viewer.
   const [items] = useState(() => filePreviewGallery(props.source, []));
+<<<<<<< HEAD
   const [resolved, setResolved] = useState<Record<string, ResolvedFilePreviewSource>>({});
   const selectedKey = filePreviewKey(props.source);
   // Fork: the tapped item may open on its thumbnail's URL (`previewUrlReuse.logic.ts`). A reused
@@ -161,13 +211,62 @@ function ResolvedFilePreview(props: {
         return value ? [value] : [];
       }),
     [items, resolved],
+=======
+  const selectedKey = filePreviewKey(props.source);
+  const [gallery, setGallery] = useState<readonly ResolvedFilePreviewSource[] | null>(() =>
+    items.every((item) => "uri" in item)
+      ? items.map((item) => ({ ...item, name: filePreviewName(item) }))
+      : null,
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
   );
-  const ready = selected && gallery.length === items.length;
+  const onResolutionError = useEffectEvent((error: PreviewResolutionError) => {
+    if (props.onOpenError) props.onOpenError(error.cause);
+    else Dialog.alert("Could not open preview", error.fallbackMessage);
+    props.onRequestClose();
+  });
+  // Resolves once per presentation and holds local file leases until it closes.
+  useEffect(() => {
+    if (items.every((item) => "uri" in item)) return;
+    const controller = new AbortController();
+    // The first failure closes the preview at once and cancels the rest of the gallery.
+    const fail = (error: unknown) => {
+      if (controller.signal.aborted) return;
+      controller.abort();
+      onResolutionError(
+        error instanceof PreviewResolutionError
+          ? error
+          : new PreviewResolutionError(error, "Try again."),
+      );
+    };
+    const resolving = Promise.allSettled(
+      items.map((item) =>
+        resolvePreviewItem(item, controller.signal).catch((error: unknown) => {
+          fail(error);
+          throw error;
+        }),
+      ),
+    );
+    void resolving.then((settled) => {
+      if (controller.signal.aborted) return;
+      const sources = settled.flatMap((item) =>
+        item.status === "fulfilled" && item.value ? [item.value.source] : [],
+      );
+      if (sources.length === items.length) setGallery(sources);
+    });
+    return () => {
+      controller.abort();
+      void resolving.then((settled) => {
+        for (const item of settled) if (item.status === "fulfilled") item.value?.dispose?.();
+      });
+    };
+  }, [items]);
+  const selected = gallery?.[items.findIndex((item) => filePreviewKey(item) === selectedKey)];
+  if (!gallery || !selected) return null;
   const onOpenError = (error: unknown) => {
     if (props.onOpenError) return props.onOpenError(error);
     Dialog.alert("Could not open preview", nativeViewerErrorMessage(error), [
       { text: "Cancel", style: "cancel" },
-      ...(selected?.kind === "document"
+      ...(selected.kind === "document"
         ? [
             {
               text: "Save or share",
@@ -190,6 +289,7 @@ function ResolvedFilePreview(props: {
     ]);
   };
   return (
+<<<<<<< HEAD
     <>
       {items.map((item) => {
         const key = filePreviewKey(item);
@@ -217,6 +317,13 @@ function ResolvedFilePreview(props: {
         />
       ) : null}
     </>
+=======
+    <FilePreview
+      source={{ ...selected, gallery }}
+      onRequestClose={props.onRequestClose}
+      onOpenError={onOpenError}
+    />
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
   );
 }
 
@@ -227,41 +334,13 @@ export function FilePreviewModal(props: {
   readonly onOpenError?: (error: unknown) => void;
 }) {
   const group = useContext(FilePreviewGallery);
-  const source = useMemo(
-    () =>
-      props.source === null
-        ? null
-        : {
-            ...props.source,
-            gallery: filePreviewGallery(props.source, group),
-          },
-    [props.source, group],
-  );
-  const navigation = useNavigation();
-  const subscribeToFocus = useCallback(
-    (listener: () => void) => {
-      const offFocus = navigation.addListener("focus", listener);
-      const offBlur = navigation.addListener("blur", listener);
-      return () => {
-        offFocus();
-        offBlur();
-      };
-    },
-    [navigation],
-  );
-  // The legacy envelope's focus context may describe a different route than this v5 card.
-  const isFocused = useSyncExternalStore(
-    subscribeToFocus,
-    navigation.isFocused,
-    navigation.isFocused,
-  );
-  const hasSource = props.source !== null;
-  const onRequestClose = useEffectEvent(props.onRequestClose);
-  useEffect(() => {
-    if (!isFocused && hasSource) onRequestClose();
-  }, [isFocused, hasSource]);
+  const source =
+    props.source === null
+      ? null
+      : { ...props.source, gallery: filePreviewGallery(props.source, group) };
+  usePreviewPresentation(source && filePreviewKey(source), props.onRequestClose);
 
-  if (!source || !isFocused) return null;
+  if (!source) return null;
   return (
     <ResolvedFilePreview
       key={filePreviewKey(source)}

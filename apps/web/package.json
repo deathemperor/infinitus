@@ -1,6 +1,6 @@
 {
   "name": "@infinitus/web",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -33,6 +33,7 @@
     "@infinitus/provider-acp-registry": "workspace:*",
     "@infinitus/provider-core": "workspace:*",
     "@infinitus/provider-cursor": "workspace:*",
+    "@infinitus/provider-fx": "workspace:*",
     "@infinitus/provider-grok": "workspace:*",
     "@infinitus/provider-muse": "workspace:*",
     "@infinitus/provider-opencode": "workspace:*",

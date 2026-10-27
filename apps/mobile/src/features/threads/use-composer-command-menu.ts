@@ -12,17 +12,14 @@ import { matchComposerThreadItems } from "@infinitus/client-runtime/composerThre
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/models";
 
 const EMPTY_THREAD_SHELLS: ReadonlyArray<EnvironmentThreadShell> = [];
-import {
-  COMPOSER_CONTEXT_MAX_RECORDS,
-  PROVIDER_WORKSPACE_SNAPSHOT_TTL_MS,
-} from "@infinitus/contracts";
+import { COMPOSER_CONTEXT_MAX_RECORDS } from "@infinitus/contracts";
 import { formatComposerContextReference } from "@infinitus/shared/composerContextReferences";
 import { pullRequestComposerContext, threadComposerContext } from "../../lib/composerContext";
 import { uuidv4 } from "../../lib/uuid";
 import {
   getComposerDraftSnapshot,
-  readComposerDraftSelection,
   setComposerDraftContext,
+  useComposerDraftSelection,
 } from "../../state/use-composer-drafts";
 import { USAGE_LIMITS_COMMAND } from "@infinitus/shared/usageLimits";
 import {
@@ -37,20 +34,20 @@ import {
   scoreQueryMatch,
 } from "@infinitus/shared/searchRanking";
 import {
+  createProviderWorkspaceSnapshotRefreshAtomFamily,
   dedupeProviderSkillsByName,
   getProviderSkillsForSlashMenu,
   getProviderSlashCommandsForSlashMenu,
   isProviderSkillUserInvocable,
-  hasCompleteProviderWorkspaceSnapshot,
-  hasCurrentProviderWorkspaceSnapshot,
   resolveProviderSkillsForCwd,
   resolveProviderSlashCommandsForCwd,
 } from "@infinitus/client-runtime/providerSkills";
-import { useEffect, useRef, useState } from "react";
+import { useAtomRefresh } from "@effect/atom-react";
+import { Atom } from "effect/reactivity";
+import { useEffect, useState } from "react";
 
 import type { ComposerEditorSelection } from "../../components/ComposerEditor";
 import { serverEnvironment } from "../../state/server";
-import { useAtomCommand } from "../../state/use-atom-command";
 import {
   useComposerPathSearch,
   useComposerPullRequestSearch,
@@ -60,13 +57,45 @@ import type { ComposerCommandItem } from "./ComposerCommandPopover";
 import { matchesSlashSkillQuery } from "./composerSlashSkillSearch";
 import { promptSnippetCommandItems } from "./promptSnippetItems";
 
+<<<<<<< HEAD
 const WORKSPACE_SNAPSHOT_RETRY_COOLDOWN_MS = 10_000;
 const NO_PROMPT_SNIPPETS: readonly PromptSnippet[] = [];
 // A cwd that never scans, such as a deleted worktree, would otherwise retry forever.
 const WORKSPACE_SNAPSHOT_MAX_ATTEMPTS = 3;
+=======
+const providerWorkspaceSnapshotRefresh = createProviderWorkspaceSnapshotRefreshAtomFamily({
+  providers: serverEnvironment.providersValueAtom,
+  refreshProviders: serverEnvironment.refreshProviders,
+});
+
+const idleWorkspaceSnapshotRefreshAtom: Atom.Atom<unknown> = Atom.make<void>(undefined).pipe(
+  Atom.withLabel("mobile:provider-workspace-snapshot-refresh:idle"),
+);
+>>>>>>> upstream-sync-0b02b21e5-upstream-renamed
 
 function composerSelectionAtEnd(draftMessage: string): ComposerEditorSelection {
   return { start: draftMessage.length, end: draftMessage.length };
+}
+
+/**
+ * A caret placed by an insertion (chips, pasted context) wins while the draft
+ * still has the text it was placed in. Otherwise the composer's own caret is
+ * clamped to the draft, and a caret from another owner starts at the end.
+ */
+export function resolveComposerMenuSelection(input: {
+  readonly draftMessage: string;
+  readonly ownerKey: string | null;
+  readonly inserted: ComposerEditorSelection | null;
+  readonly local: {
+    readonly ownerKey: string | null;
+    readonly start: number;
+    readonly end: number;
+  };
+}): ComposerEditorSelection {
+  if (input.inserted) return input.inserted;
+  if (input.local.ownerKey !== input.ownerKey) return composerSelectionAtEnd(input.draftMessage);
+  const length = input.draftMessage.length;
+  return { start: Math.min(input.local.start, length), end: Math.min(input.local.end, length) };
 }
 
 export function buildComposerSlashCommandItems(input: {
@@ -219,141 +248,47 @@ export function useComposerCommandMenu({
   readonly onUpdateInteractionMode?: (mode: ProviderInteractionMode) => void;
   readonly onUsageLimits?: () => void;
 }) {
-  const [selection, setSelection] = useState(() => composerSelectionAtEnd(draftMessage));
+  const [localSelection, setLocalSelection] = useState(() => ({
+    ownerKey,
+    ...composerSelectionAtEnd(draftMessage),
+  }));
   // Thread mentions rank by recency as of when the composer mounted.
   const [now] = useState(() => Date.now());
-  const previousOwnerKeyRef = useRef(ownerKey);
-  const onSelectionChange = (nextSelection: ComposerEditorSelection) => {
-    setSelection(nextSelection);
-  };
-  useEffect(() => {
-    const inserted = ownerKey ? readComposerDraftSelection(ownerKey, draftMessage) : null;
-    if (inserted) {
-      setSelection((current) =>
-        current.start === inserted.start && current.end === inserted.end ? current : inserted,
-      );
-      return;
-    }
-    const end = draftMessage.length;
-    setSelection((current) => {
-      const start = Math.min(current.start, end);
-      const selectionEnd = Math.min(current.end, end);
-      if (start === current.start && selectionEnd === current.end) {
-        return current;
-      }
-      return { start, end: selectionEnd };
-    });
-  }, [draftMessage, ownerKey]);
-  useEffect(() => {
-    if (previousOwnerKeyRef.current === ownerKey) return;
-    previousOwnerKeyRef.current = ownerKey;
-    setSelection(composerSelectionAtEnd(draftMessage));
-  }, [draftMessage, ownerKey]);
+  const insertedSelection = useComposerDraftSelection(ownerKey, draftMessage);
+  const selection = resolveComposerMenuSelection({
+    draftMessage,
+    ownerKey,
+    inserted: insertedSelection,
+    local: localSelection,
+  });
+  const setSelection = (next: ComposerEditorSelection) =>
+    setLocalSelection({ ownerKey, start: next.start, end: next.end });
 
   const skills = selectedProviderStatus
     ? resolveProviderSkillsForCwd(selectedProviderStatus, projectCwd)
     : [];
-  const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
-    reportFailure: false,
-  });
   const selectedProviderInstanceId = selectedProviderStatus?.instanceId;
-  const hasWorkspaceSnapshot = hasCompleteProviderWorkspaceSnapshot(
-    selectedProviderStatus,
-    projectCwd,
-  );
-  // Record client request time to enforce TTL even when the client clock runs ahead of the server.
-  const workspaceRefreshKeyRef = useRef<{ key: string; requestedAt: number } | null>(null);
-  const failedRefreshesRef = useRef<{ key: string; count: number } | null>(null);
-  const [workspaceRefreshRetry, setWorkspaceRefreshRetry] = useState<{
-    key: string;
-    notBefore: number;
-  } | null>(null);
-  const workspaceRefreshScopeKey =
+  const refreshWorkspaceSnapshot = useAtomRefresh(
     environmentId && projectCwd && selectedProviderInstanceId
-      ? `${environmentId}:${selectedProviderInstanceId}:${projectCwd}`
-      : null;
-  const workspaceSlashCommandsPending =
-    selectedProviderStatus?.workspaceSnapshots?.some(
-      (snapshot) => snapshot.cwd === projectCwd && snapshot.slashCommandsPending === true,
-    ) ?? false;
+      ? providerWorkspaceSnapshotRefresh({
+          environmentId,
+          instanceId: selectedProviderInstanceId,
+          cwd: projectCwd,
+        })
+      : idleWorkspaceSnapshotRefreshAtom,
+  );
+  // Every draft change rechecks a stale snapshot, including drafts written by
+  // another surface (a prompt link) that never move the editor selection.
   useEffect(() => {
-    if (
-      !workspaceSlashCommandsPending ||
-      !workspaceRefreshRetry ||
-      workspaceRefreshRetry.key !== workspaceRefreshScopeKey
-    )
-      return;
-    const timeout = setTimeout(
-      () => {
-        setWorkspaceRefreshRetry((current) => (current === workspaceRefreshRetry ? null : current));
-      },
-      Math.max(0, workspaceRefreshRetry.notBefore - Date.now()),
-    );
-    return () => clearTimeout(timeout);
-  }, [workspaceRefreshRetry, workspaceRefreshScopeKey, workspaceSlashCommandsPending]);
-  const hadWorkspaceSnapshotRef = useRef(false);
-  useEffect(() => {
-    if (hadWorkspaceSnapshotRef.current && !hasWorkspaceSnapshot) {
-      workspaceRefreshKeyRef.current = null;
-      setWorkspaceRefreshRetry(null);
-    }
-    hadWorkspaceSnapshotRef.current = hasWorkspaceSnapshot;
-  }, [hasWorkspaceSnapshot]);
-  useEffect(() => {
-    if (!environmentId || !projectCwd || !selectedProviderInstanceId) return;
-    const key = `${environmentId}:${selectedProviderInstanceId}:${projectCwd}`;
-    const now = Date.now();
-    const lastRequest = workspaceRefreshKeyRef.current;
-    if (
-      lastRequest?.key === key &&
-      now - lastRequest.requestedAt < PROVIDER_WORKSPACE_SNAPSHOT_TTL_MS
-    )
-      return;
-    if (hasCurrentProviderWorkspaceSnapshot(selectedProviderStatus, projectCwd, now)) {
-      setWorkspaceRefreshRetry(null);
-      return;
-    }
-    const retry = workspaceRefreshRetry;
-    if (retry?.key === key && now < retry.notBefore) return;
-    const request = { key, requestedAt: now };
-    workspaceRefreshKeyRef.current = request;
-    const retryLater = () => {
-      if (workspaceRefreshKeyRef.current !== request) return;
-      const failed = failedRefreshesRef.current;
-      const count = failed?.key === key ? failed.count + 1 : 1;
-      failedRefreshesRef.current = { key, count };
-      // Keeping the request marker lets the TTL hold off the next scan.
-      if (count >= WORKSPACE_SNAPSHOT_MAX_ATTEMPTS) return;
-      workspaceRefreshKeyRef.current = null;
-      setWorkspaceRefreshRetry({
-        key,
-        notBefore: Date.now() + WORKSPACE_SNAPSHOT_RETRY_COOLDOWN_MS,
-      });
-    };
-    void refreshProviders({
-      environmentId,
-      input: { instanceId: selectedProviderInstanceId, cwd: projectCwd },
-    }).then((result) => {
-      const refreshed =
-        result._tag === "Success" &&
-        hasCompleteProviderWorkspaceSnapshot(
-          result.value.providers.find(
-            (provider) => provider.instanceId === selectedProviderInstanceId,
-          ),
-          projectCwd,
-        );
-      if (!refreshed) retryLater();
-      else failedRefreshesRef.current = null;
-    }, retryLater);
+    refreshWorkspaceSnapshot();
   }, [
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Draft changes are the recheck signal.
     draftMessage,
-    environmentId,
-    projectCwd,
-    refreshProviders,
-    selectedProviderInstanceId,
-    selectedProviderStatus,
-    workspaceRefreshRetry,
+    refreshWorkspaceSnapshot,
   ]);
+  const onSelectionChange = (nextSelection: ComposerEditorSelection) => {
+    setSelection(nextSelection);
+  };
 
   const trigger = (() => {
     if (!enabled || selection.start !== selection.end) {
