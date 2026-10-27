@@ -807,8 +807,8 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
   return {
     ...DeviceService.of({
       testHost,
-      updateTool: (tool) =>
-        lifecycleLock.withPermit(
+      updateTool: Effect.fn("DeviceService.updateTool")(function (tool) {
+        return lifecycleLock.withPermit(
           Effect.gen(function* () {
             if (!installTool)
               return yield* new DeviceOperationError({
@@ -819,15 +819,17 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
             yield* installTool(tool);
             return yield* inspect;
           }),
-        ),
+        );
+      }),
       retryHost,
       inspect,
-      easAccount: () =>
-        Effect.fail(
+      easAccount: Effect.fn("DeviceService.easAccount")(function () {
+        return Effect.fail(
           new DeviceEasAccountError({
             reason: "EAS accounts are unavailable in this device service.",
           }),
-        ),
+        );
+      }),
       agentCli: Effect.fail(
         new DeviceHostUnavailableError({
           hostId: LOCAL_DEVICE_HOST_ID,

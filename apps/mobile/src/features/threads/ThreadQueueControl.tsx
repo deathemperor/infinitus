@@ -1,5 +1,9 @@
 import { type StaticScreenProps, useNavigation } from "@react-navigation/native";
 import { useAtomValue } from "@effect/atom-react";
+import {
+  makeQueuedRunsAtom,
+  queuedRunEditBlockedReason,
+} from "@infinitus/client-runtime/queued-run-edit";
 import type { ChatAttachment, EnvironmentId, RunId, ThreadId } from "@infinitus/contracts";
 import { Atom } from "effect/reactivity";
 import { Image } from "expo-image";
@@ -48,6 +52,12 @@ const EMPTY_QUEUED_COUNT_ATOM = Atom.make(0).pipe(
 type QueueTarget = { readonly environmentId: EnvironmentId; readonly threadId: ThreadId };
 type QueueAction = "steer" | "edit" | "up" | "down" | "remove";
 type QueueRowLayout = { readonly id: RunId; readonly y?: number; readonly height?: number };
+type QueueDrag = {
+  readonly runId: RunId;
+  readonly order: string;
+  beforeRunId: RunId | null | undefined;
+  readonly rows: ReadonlyArray<QueueRowLayout>;
+};
 
 export function useThreadQueueWorkflow(target: QueueTarget) {
   return useAtomValue(environmentThreadDetails.queueWorkflowAtom(target));
@@ -68,6 +78,10 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
   const workflow = useThreadQueueWorkflow(target);
   const threadKey = scopedThreadKey(target.environmentId, target.threadId);
   const editing = useQueuedRunEdit(threadKey);
+  const pendingRequests = useAtomValue(environmentThreadDetails.pendingRequestsAtom(target));
+  const editBlockedReason = queuedRunEditBlockedReason({
+    openQuestionCount: pendingRequests?.userInputs.length ?? 0,
+  });
   const reorder = useAtomCommand(threadEnvironment.reorderQueuedRun, "reorder queued message");
   const promote = useAtomCommand(threadEnvironment.promoteQueuedRun, "promote queued message");
   const cancel = useAtomCommand(threadEnvironment.cancelQueuedRun, "remove queued message");
@@ -75,29 +89,18 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
   const [resuming, setResuming] = useState(false);
   const [busyRunId, setBusyRunId] = useState<RunId | null>(null);
   const busyRef = useRef(false);
-  const [draggedRunId, setDraggedRunId] = useState<RunId | null>(null);
-  const [previewBeforeRunId, setPreviewBeforeRunId] = useState<RunId | null | undefined>();
-  const [dragRows, setDragRows] = useState<ReadonlyArray<QueueRowLayout> | null>(null);
+  const [dragState, setDragState] = useState<QueueDrag | null>(null);
   const rowLayouts = useRef(new Map<RunId, { y: number; height: number }>());
-  const drag = useRef<{
-    runId: RunId;
-    order: string;
-    beforeRunId: RunId | null | undefined;
-    rows: ReadonlyArray<QueueRowLayout>;
-  } | null>(null);
+  const drag = useRef<QueueDrag | null>(null);
   const [translation] = useState(() => new Animated.Value(0));
   const queuedRuns = workflow?.queuedRuns ?? [];
   const order = queuedRuns.map(({ run }) => run.id).join(",");
-
-  useEffect(() => {
-    if (drag.current && drag.current.order !== order) {
-      drag.current = null;
-      setDraggedRunId(null);
-      setPreviewBeforeRunId(undefined);
-      setDragRows(null);
-      translation.setValue(0);
-    }
-  }, [order, translation]);
+  // A queue that changed under the drag (delivery, another client) ends it:
+  // the gesture handlers ignore it from then on and its preview disappears.
+  const visibleDrag = dragState?.order === order ? dragState : null;
+  const draggedRunId = visibleDrag?.runId ?? null;
+  const previewBeforeRunId = visibleDrag?.beforeRunId;
+  const dragRows = visibleDrag?.rows ?? null;
 
   const hadQueuedRuns = useRef(queuedRuns.length > 0);
   useEffect(() => {
@@ -131,15 +134,27 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
       return;
     }
     if (action === "edit") {
+      if (editBlockedReason !== null) return;
       const entry = queuedRuns[index]!;
       void Haptics.selectionAsync();
-      beginQueuedRunEdit(threadKey, {
-        runId,
-        messageId: entry.messageId,
-        originalText: entry.text,
-        existingAttachments: entry.attachments,
-        ...(entry.context ? { context: entry.context } : {}),
-      });
+      beginQueuedRunEdit(
+        threadKey,
+        {
+          runId,
+          messageId: entry.messageId,
+          originalText: entry.text,
+          existingAttachments: entry.attachments,
+          ...(entry.context ? { context: entry.context } : {}),
+        },
+        makeQueuedRunsAtom({
+          threadId: target.threadId,
+          snapshot: threadEnvironment.snapshotAtom(target.environmentId),
+          detailStatus: environmentThreadDetails.statusAtom(target),
+          runs: Atom.make(
+            (get) => get(environmentThreadDetails.quietThreadAtom(target))?.projection.runs ?? null,
+          ),
+        }),
+      );
       navigation.goBack();
       return;
     }
@@ -205,6 +220,9 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
           />
         </View>
       ) : null}
+      {editBlockedReason !== null && queuedRuns.length > 0 ? (
+        <Text className="py-3 text-sm text-foreground-muted">{editBlockedReason}</Text>
+      ) : null}
       {queuedRuns.length === 0 ? (
         <Text className="pt-6 text-center text-sm text-foreground-muted">
           No messages waiting in this queue.
@@ -224,6 +242,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
           canPromoteToSteer: workflow?.canPromoteToSteer ?? false,
           canSendNow: workflow?.canSendNow ?? false,
           canReorder: workflow?.canReorder ?? false,
+          editBlocked: editBlockedReason !== null,
           index,
           isEditing: editing?.runId === run.id,
           isGuestMessage: context?.guest !== undefined,
@@ -261,9 +280,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                     const beforeRunId = resolveQueueDragBeforeRunId(rows, run.id, 0);
                     drag.current = { runId: run.id, order, beforeRunId, rows };
                     translation.setValue(0);
-                    setDragRows(rows);
-                    setPreviewBeforeRunId(beforeRunId);
-                    setDraggedRunId(run.id);
+                    setDragState({ ...drag.current });
                     void Haptics.selectionAsync();
                   }}
                   onMove={(y) => {
@@ -273,7 +290,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                     const before = resolveQueueDragBeforeRunId(current.rows, run.id, y);
                     if (current.beforeRunId !== before) {
                       current.beforeRunId = before;
-                      setPreviewBeforeRunId(before);
+                      setDragState({ ...current });
                     }
                   }}
                   onEnd={(y, success) => {
@@ -281,9 +298,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                     const stop = () => {
                       if (drag.current !== started) return;
                       drag.current = null;
-                      setDraggedRunId(null);
-                      setPreviewBeforeRunId(undefined);
-                      setDragRows(null);
+                      setDragState(null);
                       translation.setValue(0);
                     };
                     if (!success || started?.order !== order || started.runId !== run.id) {
@@ -314,7 +329,8 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                         useNativeDriver: true,
                       }).start();
                     }
-                    setPreviewBeforeRunId(before);
+                    started.beforeRunId = before;
+                    setDragState({ ...started });
                     void move(run.id, before).finally(stop);
                   }}
                 />
@@ -368,7 +384,7 @@ export function ThreadQueueSheet({ route }: StaticScreenProps<QueueTarget>) {
                       accessibilityHint={
                         controls.canEdit
                           ? "Opens this message in the composer for editing"
-                          : undefined
+                          : (editBlockedReason ?? undefined)
                       }
                       disabled={!controls.canEdit}
                       onPress={() => void act(run.id, "edit")}

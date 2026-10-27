@@ -197,6 +197,7 @@ export function makeAcpReplayRuntime(input: {
   readonly fileSystem: FileSystem.FileSystem;
   readonly customModels?: AcpSessionRuntime.AcpSessionRuntimeOptions["customModels"];
   readonly cancelMeta?: AcpSessionRuntime.AcpSessionRuntimeOptions["cancelMeta"];
+  readonly cancelBehavior?: AcpSessionRuntime.AcpSessionRuntimeOptions["cancelBehavior"];
   readonly initializeMeta?: AcpSessionRuntime.AcpSessionRuntimeOptions["initializeMeta"];
   readonly replayGate?: ProviderReplayGate;
 }): (
@@ -238,6 +239,7 @@ export function makeAcpReplayRuntime(input: {
           authMethodId: "replay",
           ...(input.customModels === undefined ? {} : { customModels: input.customModels }),
           ...(input.cancelMeta === undefined ? {} : { cancelMeta: input.cancelMeta }),
+          ...(input.cancelBehavior === undefined ? {} : { cancelBehavior: input.cancelBehavior }),
           ...(input.initializeMeta === undefined ? {} : { initializeMeta: input.initializeMeta }),
           ...(input.replayGate === undefined
             ? {}
