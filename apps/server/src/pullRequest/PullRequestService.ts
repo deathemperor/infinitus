@@ -2954,8 +2954,9 @@ export const make = Effect.gen(function* () {
     ]);
     // A replacement reader can join a lookup still finishing its previous reader's cancellation.
     return Cache.get(listCache, key).pipe(
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause) ? Cache.get(listCache, key) : Effect.failCause(cause),
+      Effect.catchCauseIf(
+        (cause) => Cause.hasInterruptsOnly(cause),
+        (_cause) => Cache.get(listCache, key),
       ),
     );
   };
@@ -3385,8 +3386,9 @@ export const make = Effect.gen(function* () {
     if (missing.size === 0) return { stats: held };
     const key = statsBatchKey(missing.values());
     const { result, at } = yield* Cache.get(listStatsCache, key).pipe(
-      Effect.catchCause((cause) =>
-        Cause.hasInterruptsOnly(cause) ? Cache.get(listStatsCache, key) : Effect.failCause(cause),
+      Effect.catchCauseIf(
+        (cause) => Cause.hasInterruptsOnly(cause),
+        (_cause) => Cache.get(listStatsCache, key),
       ),
     );
     for (const [key, ref] of missing) {
@@ -3621,10 +3623,13 @@ export const make = Effect.gen(function* () {
     withRoutingCredential,
     list,
     filterOptions,
-    listStats: (input) =>
-      Effect.forEach(input.refs, (ref) => canonicalRef(ref).pipe(Effect.option)).pipe(
-        Effect.flatMap((refs) => listStats({ ...input, refs: refs.flatMap(Option.toArray) })),
-      ),
+    // The local operation owns the span; this wrapper only canonicalizes refs.
+    listStats: Effect.fnUntraced(function* (input) {
+      const refs = yield* Effect.forEach(input.refs, (ref) =>
+        canonicalRef(ref).pipe(Effect.option),
+      );
+      return yield* listStats({ ...input, refs: refs.flatMap(Option.toArray) });
+    }),
     summary: credentialCached(summary),
     stack: credentialCached(stack),
     subscribeMerges: PubSub.subscribe(mergedPullRequests).pipe(

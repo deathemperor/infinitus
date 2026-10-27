@@ -6,6 +6,7 @@ import type {
 } from "@infinitus/contracts";
 import { formatModelSlugName, resolveSelectableModel } from "@infinitus/shared/model";
 import { fileBasename } from "@infinitus/shared/path";
+import { resolveModelShortName } from "../providerClients.ts";
 import { isTerminalSubagentStatus } from "./subagentRuntime.ts";
 
 export function subagentGroupSummary(
@@ -70,7 +71,7 @@ export function resolveSubagentMetadata(input: {
     : model;
   const catalogModel = input.provider?.models.find((candidate) => candidate.slug === slug);
   const reportedLabel = catalogModel
-    ? catalogModel.shortName || catalogModel.name
+    ? (resolveModelShortName(catalogModel, input.provider?.driver) ?? catalogModel.name)
     : model
       ? formatModelSlugName(model)
       : "Not reported";

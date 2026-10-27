@@ -1,0 +1,25 @@
+{
+  "name": "@infinitus/evals",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mcp-tool-use": "node --env-file-if-exists=../.env mcp-tool-use/run.ts",
+    "mcp-tool-use:trim-capture": "node mcp-tool-use/trim-capture.ts",
+    "thread-titles": "node --env-file-if-exists=../.env thread-titles/run.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run --config ../vite.config.ts --dir ."
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@infinitus/contracts": "workspace:*",
+    "@infinitus/provider-core": "workspace:*",
+    "@infinitus/shared": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

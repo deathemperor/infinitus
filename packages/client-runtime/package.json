@@ -478,6 +478,10 @@
     "./model-traits": {
       "types": "./src/modelTraits.ts",
       "default": "./src/modelTraits.ts"
+    },
+    "./provider-clients": {
+      "types": "./src/providerClients.ts",
+      "default": "./src/providerClients.ts"
     }
   },
   "scripts": {
@@ -486,6 +490,14 @@
   },
   "dependencies": {
     "@infinitus/contracts": "workspace:*",
+    "@infinitus/provider-acp-registry": "workspace:*",
+    "@infinitus/provider-core": "workspace:*",
+    "@infinitus/provider-cursor": "workspace:*",
+    "@infinitus/provider-fx": "workspace:*",
+    "@infinitus/provider-grok": "workspace:*",
+    "@infinitus/provider-muse": "workspace:*",
+    "@infinitus/provider-opencode": "workspace:*",
+    "@infinitus/provider-pi": "workspace:*",
     "@infinitus/shared": "workspace:*",
     "@infinitus/source-control-core": "workspace:*",
     "@infinitus/source-control-definitions": "workspace:*",
