@@ -293,37 +293,33 @@ export const make = Effect.gen(function* () {
       .pipe(Effect.map(Base64Url.encode), Effect.orDie);
 
   const requireTeam = (teamId: string) =>
-    store
-      .getTeam(teamId)
-      .pipe(
-        Effect.flatMap((team) =>
-          team ? Effect.succeed(team) : Effect.fail(refuse("This team does not exist.")),
-        ),
-      );
+    store.getTeam(teamId).pipe(
+      Effect.filterOrFail(
+        (team) => team !== null,
+        () => refuse("This team does not exist."),
+      ),
+    );
   const requireMember = (teamId: string, userId: string) =>
-    store
-      .getMember(teamId, userId)
-      .pipe(
-        Effect.flatMap((member) =>
-          member ? Effect.succeed(member) : Effect.fail(refuse("You are not in this team.")),
-        ),
-      );
+    store.getMember(teamId, userId).pipe(
+      Effect.filterOrFail(
+        (member) => member !== null,
+        () => refuse("You are not in this team."),
+      ),
+    );
   const requireLeader = (teamId: string, userId: string) =>
     requireMember(teamId, userId).pipe(
-      Effect.flatMap((member) =>
-        member.role === "leader"
-          ? Effect.succeed(member)
-          : Effect.fail(refuse("Only a leader can do that.")),
+      Effect.filterOrFail(
+        (member) => member.role === "leader",
+        () => refuse("Only a leader can do that."),
       ),
     );
   const requireTarget = (teamId: string, targetUserId: string) =>
-    store
-      .getMember(teamId, targetUserId)
-      .pipe(
-        Effect.flatMap((member) =>
-          member ? Effect.succeed(member) : Effect.fail(refuse("That person is not in this team.")),
-        ),
-      );
+    store.getMember(teamId, targetUserId).pipe(
+      Effect.filterOrFail(
+        (member) => member !== null,
+        () => refuse("That person is not in this team."),
+      ),
+    );
   const leaderCount = (members: ReadonlyArray<MemberRecord>) =>
     members.filter((m) => m.role === "leader").length;
 
@@ -447,14 +443,15 @@ export const make = Effect.gen(function* () {
     });
 
   return InfinitusTeamService.of({
-    listTeams: (userId) =>
-      store
+    listTeams: Effect.fn("relay.infinitus_team.list_teams")(function (userId) {
+      return store
         .listTeamsForUser(userId)
         .pipe(
           Effect.map((rows) =>
             rows.map((r) => ({ teamId: r.teamId as TeamId, name: r.name, role: r.role })),
           ),
-        ),
+        );
+    }),
 
     createTeam: Effect.fn("relay.infinitus_team.create")(function* (input) {
       const now = yield* nowIso;
@@ -508,7 +505,9 @@ export const make = Effect.gen(function* () {
       return { teamId: team.teamId as TeamId, status: "pending" as const };
     }),
 
-    getTeam: (input) => snapshot(input.teamId, input.userId),
+    getTeam: Effect.fn("relay.infinitus_team.get")(function (input) {
+      return snapshot(input.teamId, input.userId);
+    }),
 
     updateMe: Effect.fn("relay.infinitus_team.update_me")(function* (input) {
       yield* requireMember(input.teamId, input.userId);

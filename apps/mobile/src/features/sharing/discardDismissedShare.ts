@@ -3,7 +3,7 @@ import type { IncomingSharePresentationTransition } from "./incoming-share-prese
 /**
  * Fork: the new-task sheet closing over an unimported share declines it. Any navigation
  * away counts, a notification tap included: keeping it would replay the sheet on the next
- * cold launch. Called from `Stack.tsx`'s share effect with `discardShare`.
+ * cold launch. Called from `IncomingShareProvider.tsx`'s `presentPendingIncomingShare`.
  */
 export function discardDismissedShare(
   transition: IncomingSharePresentationTransition,

@@ -49,7 +49,7 @@ import { PierreEntryIcon } from "../chat/PierreEntryIcon";
 import { GuestMessageName, guestBubbleClassName } from "../chat/guestMessageStyle";
 import { MessagesTimeline } from "../chat/MessagesTimeline";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { getTriggerDisplayModelName } from "../chat/providerIconUtils";
+import { getDisplayModelName, getTriggerDisplayModelName } from "../chat/providerIconUtils";
 import { ScrollToEndButton } from "../chat/TimelineOverlays";
 import type { TimelineRow } from "../chat/timelineRowContext";
 import { useTimelineFollow } from "../chat/useTimelineFollow";
@@ -392,11 +392,9 @@ function GuestThread({
   const follow = useTimelineFollow({
     legendListRef: listRef,
     composerRef: NO_COMPOSER,
-    composerOverlayElement: null,
     composerTimelineInset: 0,
     routeThreadKey: threadKey,
     activeThreadKey: threadKey,
-    activeThreadId: undefined,
     // Not a server thread: new turns follow the end instead of anchoring near the top.
     isServerThread: false,
     serverProjection: null,
@@ -476,8 +474,7 @@ function GuestThread({
           emptyPlaceholderInset={0}
           liveFollowEnabled={follow.timelineLiveFollowEnabled}
           onIsAtEndChange={follow.onIsAtEndChangeStable}
-          onManualNavigation={follow.cancelTimelineLiveFollowForUserNavigationStable}
-          cancelPositionRestoreRef={follow.cancelPositionRestoreRef}
+          onViewportAttach={follow.attachTimelineViewport}
           footer={
             unplaced.length === 0 ? null : (
               <ol ref={footerRef} className="chat-content-lane flex flex-col gap-4 pb-4">
@@ -491,7 +488,11 @@ function GuestThread({
           }
         />
         {follow.showScrollToBottom ? (
-          <ScrollToEndButton bottom={4} onScrollToEnd={() => follow.scrollToEnd(true)} />
+          <ScrollToEndButton
+            summary={null}
+            bottom={4}
+            onScrollToEnd={() => follow.scrollToEnd(true)}
+          />
         ) : null}
       </div>
       <div className={cn(LANE, "shrink-0 pb-4")}>
@@ -556,11 +557,12 @@ function UnplacedGuestMessage({
 
 /** The thread's model, labeled as the owner's composer labels it, with no way to change it. */
 function GuestModelLabel({ model }: { readonly model: GuestThreadModel }) {
-  const label = getTriggerDisplayModelName({ slug: model.name, ...model });
+  const label = getTriggerDisplayModelName({ slug: model.name, ...model }, model.driver);
+  const fullLabel = getDisplayModelName({ slug: model.name, ...model });
   return (
     <ComposerControl
       render={<span />}
-      aria-label={`Model: ${label}`}
+      aria-label={`Model: ${fullLabel}`}
       className="pointer-events-none min-w-0 shrink"
     >
       {model.driver === null ? null : (

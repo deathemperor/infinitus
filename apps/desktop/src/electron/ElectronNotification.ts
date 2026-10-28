@@ -14,10 +14,11 @@ export class ElectronNotification extends Context.Service<
 
 /** @public */
 export const make = ElectronNotification.of({
-  setBadgeCount: (count) =>
-    Effect.sync(() => {
+  setBadgeCount: Effect.fn("ElectronNotification.setBadgeCount")(function (count) {
+    return Effect.sync(() => {
       Electron.app.setBadgeCount(count);
-    }),
+    });
+  }),
 });
 
 export const layer = Layer.succeed(ElectronNotification, make);

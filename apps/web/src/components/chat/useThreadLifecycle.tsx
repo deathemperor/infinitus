@@ -12,6 +12,7 @@ import {
   makeThreadErrorSetter,
 } from "../ChatView.logic";
 import { useStableCallback } from "../../hooks/useStableCallback";
+import { useNowAfter } from "../../hooks/useDeadline";
 import type { usePendingThreadRequests } from "./usePendingThreadRequests";
 import {
   AuthOrchestrationOperateScope,
@@ -22,13 +23,17 @@ import {
   ProviderInteractionMode,
   RuntimeMode,
 } from "@infinitus/contracts";
-import { effectiveSnoozed, threadWokeAt } from "@infinitus/client-runtime/state/thread-settled";
+import {
+  effectiveSnoozed,
+  snoozeWakeLabel,
+  threadWokeAt,
+} from "@infinitus/client-runtime/state/thread-settled";
 import { useAcknowledgeThreadWoke, useThreadActions } from "../../hooks/useThreadActions";
 import { settleAndAdvance } from "../../settleAndAdvance";
 import type { ChatShortcutCommands } from "./useChatShortcuts";
 import { resolveThreadLastVisitedAt } from "../Sidebar.logic";
 import { scopedThreadKey, scopeThreadRef } from "@infinitus/client-runtime/environment";
-import { type SetStateAction, useEffect, useRef, useState } from "react";
+import { type SetStateAction, useRef, useState } from "react";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
   isAtomCommandInterrupted,
@@ -48,16 +53,12 @@ import { vcsEnvironment } from "../../state/vcs";
 import { useChildThreadInputs, readThreadShell, waitForThreadShell } from "../../state/entities";
 import { environmentShell } from "../../state/shell";
 import { ThreadStatusLine } from "./ThreadStatusLine";
-import { formatRelativeTimeLabel, formatRelativeTimeUntilLabel } from "../../timestampFormat";
+import { formatRelativeTimeLabel } from "../../timestampFormat";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { readEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
-import {
-  backgroundWorkBannerItem,
-  childInputBannerItem,
-  goalBannerItem,
-} from "./ThreadActivityBanners";
+import { backgroundWorkNowItem, childInputNowItem, goalNowItem } from "./ThreadActivityBanners";
 import type { useLocalDispatchState } from "./useLocalDispatchState";
 const RELATED_THREAD_SHELL_WAIT_MS = 1_000;
 
@@ -80,7 +81,7 @@ interface ThreadLifecycleInput {
   readonly serverConfig: EnvironmentServerConfig | null;
   readonly runtimeMode: RuntimeMode;
   readonly isWorking: boolean;
-  readonly pendingBackgroundTasks: Parameters<typeof backgroundWorkBannerItem>[0]["tasks"];
+  readonly pendingBackgroundTasks: Parameters<typeof backgroundWorkNowItem>[0]["tasks"];
   readonly activePendingApproval: PendingThreadRequests["activePendingApproval"];
   readonly activePendingUserInput: PendingThreadRequests["activePendingUserInput"];
   readonly localCheckoutBranchMismatch: {
@@ -167,32 +168,15 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   const supportsSnooze = serverConfig?.environment.capabilities.threadSnooze === true;
   const supportsPinning = serverConfig?.environment.capabilities.threadPinning === true;
   const activeThreadPinned = supportsPinning && activeThreadShell?.pinnedAt != null;
-  // The compiler caches render results on their inputs, so a clock read in render
-  // stays frozen until the shell changes. The clock is state: reset with the shell,
-  // and moved by the wake timer.
-  const [snoozeClockState, setSnoozeClockState] = useState(() => ({
-    shell: activeThreadShell,
-    now: new Date().toISOString(),
-  }));
-  if (snoozeClockState.shell !== activeThreadShell) {
-    setSnoozeClockState({ shell: activeThreadShell, now: new Date().toISOString() });
-  }
-  const snoozeClock = snoozeClockState.now;
+  // A clock read in render would stay frozen in the compiler's cache, so the
+  // snooze checks read a snapshot that moves when the wake time changes or passes.
+  const snoozeClock = new Date(
+    useNowAfter(Date.parse(activeThreadShell?.snoozedUntil ?? "") || null),
+  ).toISOString();
   const activeThreadSnoozed =
     activeThreadShell !== null &&
     supportsSnooze &&
     effectiveSnoozed(activeThreadShell, { now: snoozeClock });
-  useEffect(() => {
-    if (!activeThreadSnoozed) return;
-    const wakeAtMs = Date.parse(activeThreadShell?.snoozedUntil ?? "");
-    if (!Number.isFinite(wakeAtMs)) return;
-    const id = window.setTimeout(
-      () => setSnoozeClockState((clock) => ({ ...clock, now: new Date().toISOString() })),
-      Math.min(Math.max(0, wakeAtMs - Date.now()) + 50, 2_147_483_647),
-    );
-    return () => window.clearTimeout(id);
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- A clock that lands before the wake time (timer clamping, clock skew) re-arms the timer.
-  }, [activeThreadShell?.snoozedUntil, activeThreadSnoozed, snoozeClock]);
   const activeThreadWokeAt =
     activeThreadShell !== null && supportsSnooze
       ? threadWokeAt(activeThreadShell, { now: snoozeClock })
@@ -445,7 +429,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   };
   const onOpenRelatedThreadStable = useStableCallback(onOpenRelatedThread);
   const childThreadInputs = useChildThreadInputs(activeThreadRef);
-  const childInputBanner = childInputBannerItem({
+  const childInputNow = childInputNowItem({
     childThreadInputs,
     parentAwaitingUser: Boolean(
       activePendingApproval || activePendingUserInput || activeThreadShell?.hasPendingUserInput,
@@ -515,9 +499,9 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   };
   const sendStandaloneCommandStable = useStableCallback(sendStandaloneCommand);
   const activeGoal = activeThreadShell?.goal ?? null;
-  const goalBanner =
+  const goalNow =
     activeThread && activeGoal !== null
-      ? goalBannerItem({
+      ? goalNowItem({
           threadId: activeThread.id,
           goal: activeGoal,
           isWorking,
@@ -525,8 +509,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         })
       : null;
 
-  const backgroundWorkBanner = activeThread
-    ? backgroundWorkBannerItem({
+  const backgroundWorkNow = activeThread
+    ? backgroundWorkNowItem({
         threadId: activeThread.id,
         tasks: activeBackgroundTasks,
         stopDisabled: !canOperateThread || isStoppingBackgroundWork,
@@ -538,10 +522,14 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   // The relative times read the clock; nowMinute re-renders them on the minute.
   const snoozedUntil = activeThreadShell?.snoozedUntil ?? null;
   const settledAt = activeThreadShell?.settledAt ?? null;
+  // Same rounding as the sidebar's snoozed shelf, so both read the same hour.
+  const snoozeWake = snoozedUntil
+    ? snoozeWakeLabel(snoozedUntil, { now: `${nowMinute}:00.000Z` })
+    : null;
   const threadStatusLine = activeThreadSnoozed ? (
     <ThreadStatusLine
       icon={<AlarmClockIcon />}
-      label={snoozedUntil ? `Snoozed, ${formatRelativeTimeUntilLabel(snoozedUntil)}` : "Snoozed"}
+      label={snoozeWake && snoozeWake !== "now" ? `Snoozed, ${snoozeWake} left` : "Snoozed"}
       clockMinute={nowMinute}
       actionLabel={isUnsnoozing ? "Waking..." : "Wake now"}
       actionDisabled={!canOperateThread || isUnsnoozing}
@@ -603,9 +591,9 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     shortcuts,
     acknowledgeActiveThreadWoke,
     activeBranchMismatchKey,
-    backgroundWorkBanner,
-    childInputBanner,
-    goalBanner,
+    backgroundWorkNow,
+    childInputNow,
+    goalNow,
     handleSwitchCheckoutToThread,
     handleSwitchCheckoutToThreadStable,
     isRestoringThreadBranch,

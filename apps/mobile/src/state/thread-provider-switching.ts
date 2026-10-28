@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import { threadSupportsProviderHandoff } from "@infinitus/client-runtime/state/thread-workflows";
-import type { OrchestrationV2ThreadProjection } from "@infinitus/contracts";
+import type { ThreadStructure } from "@infinitus/client-runtime/state/models";
 
 type ThreadStartMarkers = Pick<
   EnvironmentThreadShell,
@@ -16,7 +16,7 @@ function threadShellHasStarted(thread: ThreadStartMarkers | null | undefined): b
 
 export function threadAllowsProviderSwitch(input: {
   readonly thread: ThreadStartMarkers | null | undefined;
-  readonly projection: OrchestrationV2ThreadProjection | null | undefined;
+  readonly projection: ThreadStructure | null | undefined;
 }): boolean {
   return input.projection != null
     ? threadSupportsProviderHandoff(input.projection)

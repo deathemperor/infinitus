@@ -24,10 +24,11 @@ these bullets.
   `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so
   a proxied instance's advisor model (#1232) never fires. The add-instance
   wizard collects no environment for Claude, so only the card draws it.
-- `apps/web/src/components/settings/infinitus/settingsSearchItems.ts` — the seven Infinitus `SettingsPath`s (Menu bar, Animations since #747 step 1, Priority (#616, back on v2 per #1627, its `infinitus-sessions` search item), Team, Notifications, Devices, Engines; the Themes page of #747 step 1 folded into the Menu bar page) with their labels and scopes, and the fork's searchable settings in result order: the General rows it adds (resume on limit #648, send mode, worktree limit, keep awake #1075) and one item per Infinitus page. Spread into upstream's `settingsSearch.ts`.
-- `apps/web/src/components/settings/infinitus/InfinitusResumeOnLimitSetting.tsx` — the swap-based resume switch (#648), a scoped server setting mounted by Settings › General after upstream's reset-time auto-resume row.
+- `apps/web/src/components/settings/infinitus/settingsSearchItems.ts` — the six Infinitus `SettingsPath`s (Menu bar, Animations since #747 step 1, Priority (#616, back on v2 per #1627, its `infinitus-sessions` search item), Team, Notifications, Engines; the Themes page of #747 step 1 folded into the Menu bar page; Devices is upstream's path since its #25651) with their labels, scopes and nav group (`INFINITUS_NAV_PATHS`), and the fork's searchable settings in result order: the rows it adds to upstream's pages (resume on limit #648 on Threads, send mode on Chat, worktree limit on Worktrees, keep awake #1075 on Maintenance) and one item per Infinitus page. Spread into upstream's `settingsSearch.ts`.
+- `apps/web/src/components/settings/infinitus/InfinitusResumeOnLimitSetting.tsx` — the swap-based resume switch (#648), a scoped server setting mounted by Settings › Threads after upstream's reset-time auto-resume row.
+- `apps/web/src/components/settings/infinitus/WorktreeLimitSetting.tsx` — the worktree limit row (#269 H), mounted by Settings › Worktrees after upstream's start-from-remote row.
 - `apps/web/src/components/sidebar/InfinitusLimitStop.tsx` — the sidebar row's limit stop (#648): `useThreadLimitStop` off `infinitusLimitStopsAtom`, `limitStopTooltip` (`limitStopLine` in the client's timestamp format, only while the row's status is `limited`) and the `InfinitusLimitStopPill` the row renders in place of its plain status span.
-- `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
+- `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and `useInfinitusNavGroups`, which drops them (and their emptied group) from the nav groups where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
 - `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx`,
   `sidebarNeedsAttention.logic.ts` (+ test), `useNextAttentionKey.ts` and
   `nextAttentionBus.ts` — the "Needs attention" section above the sidebar
@@ -324,13 +325,13 @@ these bullets.
   a banner; Cancel aborts the wait. `ConnectionsNewRouteScreen.tsx` only mounts
   it and maps the credential to the existing connect path.
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
-  `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
+  `pinAtCreation.logic.ts`, `pinThread.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
   only for a project whose server pins threads, backed by the
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
-  it as each creation is delivered and pins through `usePinThread`, silently
-  on failure.
-- `apps/mobile/src/features/infinitus/appLinking.ts`, `InfinitusAppMounts.tsx`, `stackScreens.ts`, `threadLimitStop.ts`, `useProjectFileRead.ts`, and `apps/mobile/src/features/sharing/discardDismissedShare.ts` — the phone's fork features behind one registration each in upstream's `App.tsx`, `Stack.tsx`, `thread-list-v2-items.tsx` and `new-task-flow-provider.tsx` (#1565): the universal-link rewrite and prefix, the two headless bridges, the Accounts / Team / share-to-thread routes, the row's limit stop (#648), the two-name project file read (#823), and the dismissed-share discard.
+  it as each creation is delivered and pins (`pinCreatedThread` in
+  `threadOutboxDelivery.ts`), silently on failure.
+- `apps/mobile/src/features/infinitus/appLinking.ts`, `InfinitusAppMounts.tsx`, `stackScreens.ts`, `threadLimitStop.ts`, `useProjectFileRead.ts`, and `apps/mobile/src/features/sharing/discardDismissedShare.ts` — the phone's fork features behind one registration each in upstream's `App.tsx`, `Stack.tsx`, `IncomingShareProvider.tsx`, `thread-list-v2-items.tsx` and `use-new-task-project-defaults.ts` (#1565): the universal-link rewrite and prefix, the two headless bridges, the Accounts / Team / share-to-thread routes, the row's limit stop (#648), the two-name project file read (#823), and the dismissed-share discard.
 - `apps/mobile/src/features/sharing/ShareToThreadRouteScreen.tsx` (+
   `share-to-thread.ts`, `.test.ts`) — "Add to an existing thread" on the
   share sheet's project picker: the thread list (unarchived, newest first,

@@ -36,6 +36,7 @@ import {
   THREAD_LIST_V2_SETTLED_PAGE_COUNT,
   threadListInboxReturns,
 } from "./threadListV2";
+import { useThreadListNow } from "./use-thread-list-now";
 import { useThreadListV2ShelfPreferences } from "./use-thread-list-v2-shelf-preferences";
 
 const ROW_HEIGHT = 56;
@@ -102,6 +103,7 @@ function DragHandle(props: {
   canMoveDown: boolean;
 }) {
   const latest = useRef(props);
+  /* oxlint-disable react/refs -- The pan gesture captures its callbacks once per `disabled` change; they read the latest handlers when native gesture events fire. */
   latest.current = props;
   const gesture = useMemo(
     () =>
@@ -115,8 +117,9 @@ function DragHandle(props: {
         .onUpdate((event) => latest.current.onMove(event.translationY))
         .onEnd((event) => latest.current.onMove(event.translationY))
         .onFinalize((_, success) => latest.current.onEnd(!success)),
-    [props.disabled],
+    [props.disabled, latest],
   );
+  /* oxlint-enable react/refs */
   return (
     <GestureDetector gesture={gesture}>
       <View
@@ -166,7 +169,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
   const dropBusy = useAtomValue(threadDropBusyAtom);
   const { moveThread } = useThreadListActions();
   const { workingShelfEnabled } = useThreadListV2ShelfPreferences();
-  const [now, setNow] = useState(() => new Date().toISOString());
+  const now = useThreadListNow(threads);
   const [expanded, setExpanded] = useState({ snoozed: false, settled: false });
   const [settledVisibleCount, setSettledVisibleCount] = useState(
     THREAD_LIST_V2_SETTLED_INITIAL_COUNT,
@@ -177,20 +180,6 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
     expanded: expanded.settled,
     visibleCount: settledVisibleCount,
   });
-  useEffect(() => {
-    const wakeAt = Math.min(
-      ...threads.flatMap((thread) => {
-        const at = Date.parse(thread.snoozedUntil ?? "");
-        return at > Date.parse(now) ? [at] : [];
-      }),
-    );
-    if (!Number.isFinite(wakeAt)) return;
-    const timer = setTimeout(
-      () => setNow(new Date().toISOString()),
-      Math.min(Math.max(0, wakeAt - Date.now()) + 1, 2_147_483_647),
-    );
-    return () => clearTimeout(timer);
-  }, [threads, now]);
   const sections = useMemo(() => {
     const shared = {
       threads,
@@ -271,8 +260,9 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
   const drag = useRef<Drag | null>(null);
   const frame = useRef<number | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
-  const translateY = useRef(new Animated.Value(0)).current;
+  const [translateY] = useState(() => new Animated.Value(0));
   const latest = useRef({ rows, planners, moveThread });
+  // oxlint-disable-next-line react/refs -- The autoscroll rAF loop started at drag start reads the current rows and planners on every frame.
   latest.current = { rows, planners, moveThread };
 
   function stop() {
@@ -285,6 +275,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
     .map((row) => `${row.key}:${row.thread?.pinOrderKey}:${row.thread?.activeOrderKey}`)
     .join("|");
   useEffect(() => {
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies, react/set-state-in-effect -- A changed thread order cancels the in-progress drag and clears its preview; stop only touches refs and state setters.
     stop();
   }, [orderVersion]);
   useEffect(
@@ -348,6 +339,7 @@ export function ThreadArrangementSheet(props: { onClose: () => void }) {
     };
     setPreview({ ...drag.current });
     update(0);
+    // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
     let last = performance.now();
     const tick = () => {
       const current = drag.current;

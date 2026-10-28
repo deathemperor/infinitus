@@ -38,8 +38,12 @@ export const InfinitusLimitStopsLive = Layer.effect(
     const refusals = yield* PubSub.unbounded<ClaudeUsageLimitRefusal>();
     return InfinitusLimitStops.of({
       stopped: SubscriptionRef.changes(stopped),
-      setStopped: (threads) => SubscriptionRef.set(stopped, threads),
-      reportRefusal: (refusal) => PubSub.publish(refusals, refusal).pipe(Effect.asVoid),
+      setStopped: Effect.fn("InfinitusLimitStops.setStopped")(function (threads) {
+        return SubscriptionRef.set(stopped, threads);
+      }),
+      reportRefusal: Effect.fn("InfinitusLimitStops.reportRefusal")(function (refusal) {
+        return PubSub.publish(refusals, refusal).pipe(Effect.asVoid);
+      }),
       refusals: Stream.fromPubSub(refusals),
     });
   }),

@@ -28,6 +28,10 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
     "T3",
   ],
   [
+    "apps/server/src/orchestration-v2/testkit/fixtures/tool_call_read_only_on_request/fx_output.ts",
+    "T3",
+  ],
+  [
     "apps/server/src/textGeneration/OpenCode2TextGeneration.fixture.ts",
     "T3 Code generateThreadTitle",
   ],
