@@ -47,10 +47,11 @@ import VirtualTablePreview from "./VirtualTablePreview";
 import { OfficeFilePreview } from "./OfficeFilePreview";
 import { MermaidFilePreview } from "./MermaidFilePreview";
 import JSZip from "jszip";
-import { boundedZip } from "./boundedZip";
+import { boundedZip } from "@infinitus/client-runtime/zip/bounded-zip";
 import BinaryViewer from "./BinaryViewer";
 import { decodeImagePreview } from "./decodeImagePreview";
 import type { BinaryWorkerResult } from "./binaryPreviewProtocol";
+import type { TextPreviewResult } from "./largeTextProtocol";
 
 // Real worker imports and WASM initialization can exceed waitFor's default second
 // when the full browser project runs concurrently on CI.
@@ -462,12 +463,20 @@ describe("large text preview recovery", () => {
     const original = URL.createObjectURL(new Blob(["original\n".repeat(1000)]));
     const changed = URL.createObjectURL(new Blob(["changed\n".repeat(1000)]));
     const workers: Worker[] = [];
+    const indexed: Promise<void>[] = [];
     using _worker = stubGlobal(
       "Worker",
       class extends Worker {
         constructor(...args: ConstructorParameters<typeof Worker>) {
           super(...args);
           workers.push(this);
+          indexed.push(
+            new Promise((resolve) =>
+              this.addEventListener("message", (event: MessageEvent<TextPreviewResult>) => {
+                if (event.data.type === "meta" && event.data.complete) resolve();
+              }),
+            ),
+          );
         }
       },
     );
@@ -499,6 +508,8 @@ describe("large text preview recovery", () => {
       await using screen = await render(preview("first"));
       await vi.waitFor(() => expect(workers).toHaveLength(1));
       await vi.waitFor(() => expect(screen.container.textContent).toContain("original"));
+      // A cold worker can take longer than waitFor allows to load and index on CI.
+      await indexed[0];
       await vi.waitFor(() => expect(screen.container.textContent).toContain("1,000 lines"));
       const viewport = screen.container.querySelector<HTMLElement>('[tabindex="0"]')!;
       await act(() =>
@@ -2143,8 +2154,10 @@ it("refreshes authorization and retries a failed streamed attachment", async () 
         asset={{ environmentId: EnvironmentId.make("test"), attachmentId: "retry" }}
       />,
     );
-    await vi.waitFor(() =>
-      expect(screen.container.textContent).toContain("This file contains binary data."),
+    // A cold large-text worker can take longer than waitFor's default to boot on CI.
+    await vi.waitFor(
+      () => expect(screen.container.textContent).toContain("This file contains binary data."),
+      { timeout: 10_000 },
     );
     await act(() =>
       screen.container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click(),
@@ -2206,7 +2219,10 @@ it("copies every indexed line rather than the mounted preview rows", async () =>
     <LargeTextViewer name="whole.txt" text={text} delimiter={null} copyContents={copyContents} />,
   );
   await vi.waitFor(() => expect(screen.container.textContent).toContain("line-0"));
-  await vi.waitFor(async () => expect(await copyContents.current!()).toBe(text));
+  // Copy rejects until the worker finishes indexing, which a cold worker can delay past waitFor's default on CI.
+  await vi.waitFor(async () => expect(await copyContents.current!()).toBe(text), {
+    timeout: 10_000,
+  });
   const first = copyContents.current!();
   await expect(copyContents.current!()).rejects.toThrow("Another copy is in progress.");
   expect(await first).toBe(text);
@@ -2281,12 +2297,16 @@ it("loads a font attachment through the lazy preview", async () => {
       file={file}
     />,
   );
-  await vi.waitFor(() => {
-    const frame = screen.container.querySelector("iframe");
-    expect(frame?.title).toBe("Carlito.ttf");
-    expect(frame?.srcdoc).toContain("@font-face");
-    expect(frame?.srcdoc).toContain("The quick brown fox");
-  });
+  // Two cold lazy chunks plus decoding a 600 KB font can take longer than waitFor's default on CI.
+  await vi.waitFor(
+    () => {
+      const frame = screen.container.querySelector("iframe");
+      expect(frame?.title).toBe("Carlito.ttf");
+      expect(frame?.srcdoc).toContain("@font-face");
+      expect(frame?.srcdoc).toContain("The quick brown fox");
+    },
+    { timeout: 10_000 },
+  );
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 });
 

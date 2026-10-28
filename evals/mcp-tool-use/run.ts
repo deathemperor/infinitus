@@ -11,7 +11,11 @@ import * as NodeVM from "node:vm";
 import * as NodeZlib from "node:zlib";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { OrchestratorMcpTaskRole, ProviderInstanceId } from "@infinitus/contracts";
+import {
+  ComposerContextRecord,
+  OrchestratorMcpTaskRole,
+  ProviderInstanceId,
+} from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -26,10 +30,11 @@ import { Tool } from "effect/ai";
 import * as McpSchema from "effect/ai/McpSchema";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
-import { taskPrompt } from "../../apps/server/src/mcp/OrchestratorMcpService.ts";
+import { taskPrompt } from "../../apps/server/src/mcp/delegatedTaskModes.ts";
 import * as McpInvocationContext from "../../apps/server/src/mcp/McpInvocationContext.ts";
 import { advertisedJsonSchema } from "../../apps/server/src/mcp/advertisedJsonSchema.ts";
-import { ORCHESTRATOR_MCP_RUNNING_TASK_NEXT } from "@infinitus/contracts";
+import { EnvironmentId, ORCHESTRATOR_MCP_RUNNING_TASK_NEXT, ThreadId } from "@infinitus/contracts";
+import { projectComposerContextForProvider } from "@infinitus/shared/composerContextReferences";
 import { formatThreadLink } from "@infinitus/shared/threadLinks";
 import { buildCodexAdditionalContext } from "../../apps/server/src/provider/CodexDeveloperInstructions.ts";
 import { AttachmentToolkit } from "../../apps/server/src/mcp/toolkits/attachment/tools.ts";
@@ -50,6 +55,7 @@ import {
   CLAUDE_PROVIDER,
   makeClaudeQueryOptions,
 } from "../../apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts";
+import { proxyConfig } from "../shared/proxy.ts";
 import { changeRequestsCreatedBy } from "../../apps/server/src/orchestration-v2/PullRequestSyncReactor.ts";
 /** Agent models by id, with the display name a harness gives them. */
 const MODELS = {
@@ -169,6 +175,8 @@ export const McpToolUseCase = Schema.Struct({
     role: Schema.Literals(["top", "delegated-child", "native-subagent"]),
     /** Runs only on this harness, for cases whose right answer depends on it. */
     harness: Schema.optional(Schema.Literals(["claude", "codex"])),
+    /** The Linked environments beta is on, so T3 lists its link tools. */
+    linkedEnvironments: Schema.optional(Schema.Boolean),
     /** delegate_task `role` for a delegated child. T3 builds the child's first message from it. */
     delegateRole: Schema.optional(OrchestratorMcpTaskRole),
     context: Schema.optional(Schema.String),
@@ -190,6 +198,8 @@ export const McpToolUseCase = Schema.Struct({
     ),
   }),
   prompt: Schema.String,
+  /** Records for the context chips `prompt` links, projected as T3 sends them. */
+  promptContext: Schema.optional(Schema.Struct({ records: Schema.Array(ComposerContextRecord) })),
   expect: McpToolUseExpect,
   /** Model calls this case may need. Overrides `--max-steps`. */
   maxSteps: Schema.optional(Schema.Number),
@@ -307,18 +317,24 @@ const t3Tools: ReadonlyArray<ApiTool> = t3SourceTools.map((tool) => ({
   description: Tool.getDescription(tool) ?? "",
   input_schema: advertisedJsonSchema(tool),
 }));
+const enabledWhen = (predicate: () => boolean) =>
+  new Set(
+    t3SourceTools
+      .filter(
+        (tool) => Context.getOrUndefined(tool.annotations, McpSchema.EnabledWhen) === predicate,
+      )
+      .map((tool) => `${T3_PREFIX}${tool.name}`),
+  );
 // T3 does not offer these to a delegated child, so its harness never lists them.
-const hiddenFromSubagents = new Set(
-  t3SourceTools
-    .filter(
-      (tool) =>
-        Context.getOrUndefined(tool.annotations, McpSchema.EnabledWhen) ===
-        McpInvocationContext.hiddenFromSubagents,
-    )
-    .map((tool) => `${T3_PREFIX}${tool.name}`),
-);
-const visibleT3Tools = (subagent: boolean) =>
-  subagent ? t3Tools.filter((tool) => !hiddenFromSubagents.has(tool.name)) : t3Tools;
+const hiddenFromSubagents = enabledWhen(McpInvocationContext.hiddenFromSubagents);
+// The Linked environments beta starts off, and T3 lists its tools only while it is on.
+const hiddenWhileLinksOff = enabledWhen(McpInvocationContext.hiddenWhileLinksOff);
+const visibleT3Tools = (options: { readonly subagent?: boolean; readonly links?: boolean }) =>
+  t3Tools.filter(
+    (tool) =>
+      (options.links === true || !hiddenWhileLinksOff.has(tool.name)) &&
+      !(options.subagent === true && hiddenFromSubagents.has(tool.name)),
+  );
 
 /** Text T3 appends to Claude Code's system prompt. Delegated children get the same text. */
 export const t3SystemAppend = (model: Model) => {
@@ -381,9 +397,10 @@ export const buildBase = (
     readonly model: Model;
     readonly keepUserInstructions: boolean;
     readonly subagent?: boolean;
+    readonly links?: boolean;
   },
 ) => {
-  const t3 = visibleT3Tools(options.subagent === true);
+  const t3 = visibleT3Tools(options);
   const firstAssistant = template.messages.findIndex((message) => message.role === "assistant");
   const head = template.messages.slice(0, firstAssistant === -1 ? undefined : firstAssistant);
   const systemTexts = [
@@ -456,9 +473,10 @@ const buildCodexBase = (
     readonly keepUserInstructions: boolean;
     readonly effort?: string | undefined;
     readonly subagent?: boolean;
+    readonly links?: boolean;
   },
 ): Base => {
-  const t3 = visibleT3Tools(options.subagent === true);
+  const t3 = visibleT3Tools(options);
   const contentText = (item: Block) =>
     Array.isArray(item.content)
       ? item.content.map((block: Block) => valueText(block.text)).join("\n")
@@ -719,7 +737,10 @@ export const buildMessages = (sample: Sample) => {
     }
     if (turn.text) push(turn.role, text(turn.text));
   }
-  const { prompt } = testCase;
+  const prompt =
+    testCase.promptContext === undefined
+      ? testCase.prompt
+      : projectComposerContextForProvider({ text: testCase.prompt, ...testCase.promptContext });
   const childPrompt = () => taskPrompt({ task: prompt, role: delegateRole });
   push("user", text(role === "delegated-child" ? childPrompt() : prompt));
   return messages;
@@ -872,14 +893,24 @@ const t3Default = (sample: Sample, name: string, input: Readonly<Record<string, 
   }
 };
 
+/** The machine the fake threads live on. */
+const EVAL_ENVIRONMENT_ID = EnvironmentId.make("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee");
+
 /** Fields T3 adds to real thread and task results, applied to mocks and defaults alike. */
 const withProductFields = (name: string, value: unknown, child: boolean): unknown => {
   if (!isRecord(value)) return value;
   const linked = (thread: unknown, idKey = "threadId") => {
     if (!isRecord(thread) || thread.link !== undefined) return thread;
     const id = thread[idKey] ?? thread.id;
-    const title = valueText(thread.title) || "Thread";
-    return typeof id === "string" ? { ...thread, link: formatThreadLink(id, title) } : thread;
+    return typeof id === "string"
+      ? {
+          ...thread,
+          link: formatThreadLink({
+            environmentId: EVAL_ENVIRONMENT_ID,
+            threadId: ThreadId.make(id),
+          }),
+        }
+      : thread;
   };
   const listed = (key: string) =>
     Array.isArray(value[key]) ? { ...value, [key]: value[key].map((item) => linked(item)) } : value;
@@ -894,6 +925,7 @@ const withProductFields = (name: string, value: unknown, child: boolean): unknow
       return { ...value, thread: linked(value.thread) };
     case "t3_thread_launch":
     case "t3_thread_send":
+    case "run_scheduled_task_now":
       return linked(value);
     case "t3_thread_list":
     case "create_threads":
@@ -1337,34 +1369,6 @@ const callCodex = Effect.fn("evaluateMcpToolUse.callCodex")(function* (
   };
 });
 
-// Read credentials into memory only. Python's TOML parser avoids another runner dependency.
-const decodeProxyConfig = Schema.decodeUnknownSync(
-  Schema.Struct({ url: Schema.String, headers: Schema.Record(Schema.String, Schema.String) }),
-);
-const proxyConfig = () =>
-  decodeProxyConfig(
-    JSON.parse(
-      NodeChildProcess.execFileSync(
-        "python3",
-        [
-          "-c",
-          `
-import json, os, pathlib, tomllib
-home = pathlib.Path.home() / '.codex'
-p = tomllib.loads((home / 'config.toml').read_text())['model_providers']['vibeproxy']
-h = p.get('http_headers', {}).copy()
-h.update({k: os.environ[v] for k,v in p.get('env_http_headers', {}).items()})
-key = os.environ[p['env_key']] if p.get('env_key') else p.get('experimental_bearer_token')
-if not key and p.get('requires_openai_auth'): key = json.loads((home / 'auth.json').read_text()).get('OPENAI_API_KEY')
-if key: h['Authorization'] = 'Bearer ' + key
-print(json.dumps({'url': p['base_url'].rstrip('/'), 'headers': h}))
-`,
-        ],
-        { encoding: "utf8" },
-      ),
-    ),
-  );
-
 const postModel = Effect.fn("evaluateMcpToolUse.postModel")(function* (
   apiKey: string,
   body: unknown,
@@ -1710,7 +1714,7 @@ const main = Effect.gen(function* () {
     templatePath.endsWith(".gz") ? NodeZlib.gunzipSync(templateBytes) : templateBytes,
   );
   const keepUserInstructions = flags["user-instructions"] === "keep";
-  const buildFor = (subagent: boolean): Effect.Effect<Base, Schema.SchemaError> =>
+  const buildFor = (subagent: boolean, links = false): Effect.Effect<Base, Schema.SchemaError> =>
     codex
       ? decodeCodexCapture(template).pipe(
           Effect.map((capture) =>
@@ -1719,6 +1723,7 @@ const main = Effect.gen(function* () {
               keepUserInstructions,
               effort: flags.effort,
               subagent,
+              links,
             }),
           ),
         )
@@ -1728,13 +1733,19 @@ const main = Effect.gen(function* () {
               model: flags.model,
               keepUserInstructions,
               subagent,
+              links,
             }),
           ),
         );
   const base = yield* buildFor(false);
   const childBase = yield* buildFor(true);
+  const linkedBase = yield* buildFor(false, true);
   const baseFor = (testCase: McpToolUseCase) =>
-    testCase.setup.role === "delegated-child" ? childBase : base;
+    testCase.setup.role === "delegated-child"
+      ? childBase
+      : testCase.setup.linkedEnvironments === true
+        ? linkedBase
+        : base;
   const effort = flags.effort ?? base.codex?.reasoning.effort ?? "high";
   if (flags["dry-run"]) {
     // One JSON line per case. Without --case this also checks that every case builds.

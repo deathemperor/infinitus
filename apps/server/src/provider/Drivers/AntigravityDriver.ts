@@ -1,4 +1,3 @@
-import { withAgentDeviceEnvironment } from "@infinitus/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@infinitus/provider-core/server/McpProviderSessions";
 import { AntigravitySettings, ProviderDriverKind, ProviderSetupError } from "@infinitus/contracts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
@@ -247,7 +246,7 @@ export const AntigravityDriver: ProviderDriver<
           installation: executable,
           profile,
           cwd: input.cwd,
-          baseEnv: withAgentDeviceEnvironment(processEnvironment, input),
+          baseEnv: processEnvironment,
           auth,
           runtimeTempDirectory,
         }),

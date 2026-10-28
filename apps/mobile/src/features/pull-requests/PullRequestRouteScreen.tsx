@@ -82,6 +82,7 @@ import { pullRequestLabelColor } from "./pullRequestList";
 import { PullRequestReactions } from "./PullRequestReactions";
 import { composerPullRequests } from "../../state/pull-requests";
 import { useEnvironmentQuery } from "../../state/query";
+import { SourceControlAppAccessNotice } from "./SourceControlAppAccessNotice";
 import { usePullToRefresh } from "../../state/use-pull-to-refresh";
 import {
   resolveNativeReviewDiffView,
@@ -341,6 +342,8 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [toolbarHeight, setToolbarHeight] = usePullRequestToolbarHeight(insets.bottom);
+  // Only iOS lists run under the bars; Android lists start below the header.
+  const barInsets = Platform.OS === "ios" ? insets : { top: 0, bottom: 0 };
   const params = route.params;
   usePullRequestEnvironmentFallback(params);
   const connected = usePullRequestConnected(params.environmentId);
@@ -362,7 +365,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
   // has its own offset, which only its next scroll would record here.
   const currentScrollOffset = useRef<{ tab: typeof section; offset: number }>({
     tab: "overview",
-    offset: -insets.top,
+    offset: -barInsets.top,
   });
   const bodyY = useRef(0);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -386,14 +389,15 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
     const current =
       currentScrollOffset.current.tab === from
         ? currentScrollOffset.current.offset
-        : (scrollOffsets.current[from] ?? -insets.top);
+        : (scrollOffsets.current[from] ?? -barInsets.top);
     scrollOffsets.current[section] = current;
-    const headerEnd = Math.max(-insets.top, bodyY.current - insets.top);
+    const headerEnd = Math.max(-barInsets.top, bodyY.current - barInsets.top);
     const offset = pullRequestTabOffset(current, scrollOffsets.current[next], headerEnd);
     requestedSection.current = next;
     scrollOffsets.current[next] = offset;
     currentScrollOffset.current = { tab: next, offset };
-    scrollViews.current[next]?.scrollToOffset({ offset, animated: false });
+    // LegendList clamps to its measured rows, which leave out the short-tab minHeight below.
+    scrollViews.current[next]?.getNativeScrollRef().scrollTo({ y: offset, animated: false });
     setSection(next);
   };
   const tabContent = activityContent;
@@ -441,7 +445,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
     });
   const jumpToFiles = () => {
     scrollViews.current.overview?.scrollToOffset({
-      offset: bodyY.current + filesY.current - insets.top,
+      offset: bodyY.current + filesY.current - barInsets.top,
       animated: true,
     });
     pendingFilesJump.current = false;
@@ -675,7 +679,9 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                   // UIKit owns the bar's inset, so a minimizing bar and a resized column
                   // move the list in the same frame as the bar.
                   contentInsetAdjustmentBehavior="automatic"
-                  contentInsetStartAdjustment={Platform.OS === "ios" ? insets.top : 0}
+                  contentInsetStartAdjustment={barInsets.top}
+                  // RN scrollTo clamps against raw insets and ignores the automatic bar inset.
+                  scrollToOverflowEnabled
                   refreshControl={
                     <RefreshControl
                       refreshing={section === tab && pullRefresh.refreshing}
@@ -694,7 +700,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                     pendingDescriptionJump.current = false;
                     // Collapse changes the scroll range; restore the heading after that layout commits.
                     scrollViews.current.overview?.scrollToOffset({
-                      offset: bodyY.current + descriptionY.current - insets.top,
+                      offset: bodyY.current + descriptionY.current - barInsets.top,
                       animated: false,
                     });
                   }}
@@ -705,7 +711,7 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                     // Short tabs must still be tall enough to preserve the collapsed header.
                     minHeight: Math.max(
                       0,
-                      viewportHeight + headerHeight - insets.top - insets.bottom,
+                      viewportHeight + headerHeight - barInsets.top - barInsets.bottom,
                     ),
                   }}
                   data={[
@@ -715,6 +721,12 @@ export function PullRequestRouteScreen({ route }: StaticScreenProps<PullRequestP
                         <View>
                           {tab === "overview" && identity ? (
                             <View>
+                              <SourceControlAppAccessNotice
+                                environmentId={params.environmentId}
+                                provider={identity.provider}
+                                host={params.host}
+                                repository={params.repository}
+                              />
                               {pr ? (
                                 <PullRequestOverview
                                   pr={pr}
@@ -1015,6 +1027,7 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
   });
   // Subscribed for the whole screen, so a pick made while the diff is still loading is kept for
   // the first draw.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to pull request file jump requests for the screen's lifetime
   useEffect(() => subscribePullRequestFileJump(jumpScope, (path) => jumpToFile(path)), [jumpScope]);
   const { nativeReviewDiffStyle } = useAppearanceCodeSurface();
   const { themeAppearance, appearance, setCodeWordBreak } = useAppearancePreferences();
@@ -1029,6 +1042,7 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
     canHighlight: true,
   });
   const [NativeDiffView] = useState(() => resolveNativeReviewDiffView());
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- requests the next page of the paged diff query until the jump target file has loaded
   useEffect(() => {
     if (!targetFile) loadMore();
   }, [targetFile, loadMore]);
