@@ -817,6 +817,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   section the build lacks renders "no … settings yet") and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
+- `apps/server/src/provider/agentContextBudget.json` — the fork's measured
+  agent context (product names, fork MCP tools and instructions); re-measure
+  with `AgentContextBudget.test.ts` on every sync.
 - `apps/web/src/routes/_chat.settings.devices.tsx` — upstream's Devices page
   (#25651) owns `/settings/devices`, so the fork's Devices pane (pairing
   requests, the catalog's `devices` prefs, crash reports) renders under it

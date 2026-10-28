@@ -138,6 +138,7 @@ function TeamPane(props: { readonly code: string }) {
   );
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- Reads the relay's team list once per client; its state lands after the request.
     void loadTeams();
   }, [loadTeams]);
 
