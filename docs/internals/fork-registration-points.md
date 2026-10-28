@@ -135,7 +135,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   sections, fed the group's checkouts (`promptSnippetTargets`, the
   representative first) and the panel's `reportFailure` (#270 G).
 - `apps/web/src/components/CommandPalette.tsx` — the `accounts.open`
-  listener and palette entry; an "Open captures" entry while a thread has
+  command (registered through upstream's `registerCommands`) and palette entry; an "Open captures" entry while a thread has
   a project (#433).
 - Next attention (#269 D, #270 C; re-ported onto orchestrator v2 under
   #1627): `packages/contracts/src/keybindings.ts` carries
@@ -407,7 +407,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   2026-09-16 — identifiers follow in #1368's later slices). Comments stay. A
   name in a parameter default goes through a module constant: a template
   literal there bails the React Compiler (`SavedEnvironmentRows.tsx`). Re-applied to upstream's new strings on every sync; this
-  one's: `cloud/useCloudLinkController.ts`, `components/NightlyMobileBeta.tsx`,
+  one's: `shortcuts/chatRouteCommands.ts`, `settings/MultipleAccountsNote.tsx`,
+  `settings/LabsSettingsPanel.tsx`, `sidebar/updateEverythingRun.tsx`, `cloud/useCloudLinkController.ts`, `components/NightlyMobileBeta.tsx`,
   `chat/McpAppFrame.tsx`, `chat/MessagesTimeline.tsx` + `.logic.ts`,
   `onboarding/WelcomeWizard.tsx`, `preview/PreviewView.tsx`,
   `settings/AcpSessionManagementSection.tsx`, `settings/CliCommandSettingsRow.tsx`,
@@ -600,10 +601,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `resolveDesktopUpdateTrackRow`: a fork build's select offers Release
   (`infinitus`) and Nightly (`infinitus-nightly`, #1042) instead of upstream's
   Stable / Nightly, which would hand it the real T3 Code with no way back;
-  the row's `options` drive the select. The General panel also mounts
-  `DesktopKeepAwakeSettings` after the background-activity row (#1075),
-  `InfinitusResumeOnLimitSetting` after the auto-resume row (#648), and
-  the restore / dirty-label lists carry `desktopKeepAwake`.
+  the row's `options` drive the select. The Maintenance panel also mounts
+  `DesktopKeepAwakeSettings` after the background-activity row (#1075), the
+  Threads panel `InfinitusResumeOnLimitSetting` after the auto-resume row
+  (#648), and the restore / dirty-label lists carry `desktopKeepAwake`.
 - Worktree limit (#269 H, re-ported onto orchestrator v2 under #1627):
   `packages/contracts/src/settings.ts` carries `worktreeMaxCount` (default
   25, 0 lifts it) on `ServerSettings` and its patch;
@@ -616,10 +617,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `mcp/toolkits/project/handlers.ts` surface the refusal through
   `worktreeCapRefusalMessage` where every other launch failure stays
   generic; `ThreadLaunchService.test.ts`'s harness provides the gate;
-  `apps/web/src/components/settings/SettingsPanels.tsx` mounts the
-  "Worktree limit" row after "Start from origin" and its restore / dirty
-  lists carry the key (`settingsSearch.ts` kept its `worktree-limit` entry
-  through the merge).
+  `apps/web/src/components/settings/WorktreesSettings.tsx` mounts
+  `infinitus/WorktreeLimitSetting.tsx` after "Start from remote" and
+  `SettingsPanels.tsx`'s restore / dirty lists carry the key.
 - `apps/server/src/binCli.ts` — the CLI's root command is `infinitus`, not
   `t3` (the archive's binary, `docs/user/install.md`); `cli/pair.test.ts` and
   `cli/app.test.ts` assert that command path.
@@ -715,7 +715,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   configured screen (`useInfinitusFleetRows()` row data, and
   `InfinitusAlarmsRow` in the Connections section's `footer` slot, the one
   edit to upstream's section shape: a switch is not row data). The Account
-  and About rows say the product name; `SettingsAboutRouteScreen.tsx` and
+  row says the product name (About is upstream's bare "About"); `SettingsAboutRouteScreen.tsx` and
   `SettingsNotificationsRouteScreen.tsx` (upstream's split of this screen)
   carry the product-name strings and the product version.
 - `apps/mobile/src/features/settings/lib/legal-document-url.ts` and its
@@ -770,8 +770,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/timestampFormat.ts` — `timestampLocale` exported, so the Accounts page's quota timeline (`QuotaTimeline.tsx`) writes its day labels in the same locale as every other timestamp.
 - `apps/mobile/src/features/threads/ThreadFeed.tsx` — `MessageAttachmentImage`: a haptic on press, and the thumbnail's URL handed to the preview as `cachedUrl` (`previewUrlReuse.logic.ts`). The trash beside a queued reply's pencil (`confirmDeletePendingMessage.ts`, #1501); both hide on `sendingMessageId`, the prop that replaced `dispatchingMessageId` here and in `ThreadDetailScreen.tsx` / `ThreadRouteScreen.tsx`, fed by `use-thread-composer-state.ts`'s `sendingQueuedMessageId`.
 - `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` root route at `new/share/thread`, from `infinitusNewTaskScreens` in `features/infinitus/stackScreens.ts`), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`. The row is in the project picker, which a share reaches from its draft's project chip; choosing a thread drops the draft and the pickers above it (`isShareFlowRoute`).
-- `apps/mobile/src/Stack.tsx` (`RootStackLayout`'s share effect calls `features/sharing/discardDismissedShare.ts`; its `isShareSheetPresented: isShareFlowRoute(…)`, since the draft's pickers are root routes now and reading only a top draft would discard the share as soon as the project picker opened), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`discardShare`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
-- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/features/threads/ThreadComposer.tsx` (the `/` menu's project snippets, `useProjectPromptSnippets`, #270 G, which the draft renders through `ThreadScreenBinding`), `apps/mobile/src/state/use-thread-outbox-drain.ts` — `usePinAtCreation` after a delivered creation. `use-thread-outbox-drain.permissions.test.ts` and `composer-attachment-uploads.test.ts` mock that hook: its module reaches `expo`, which wants React Native's `__DEV__`. The drain's dispatch bookkeeping moved to the fork's `queued-message-dispatch.ts` (#1501): `beginDispatchingQueuedMessage` hands back the abort signal that rides through `prepareQueuedMessageAttachments` into `prepareTurnAttachments`, and `markDispatchingQueuedMessageSending` right before each `startTurn` publishes the `sending` phase (or abandons an aborted attempt). `use-thread-outbox.ts` lost `dispatchingQueuedMessageIdAtom` to that module; `edit-pending-thread-message.ts` (+ test) guards with `reclaimQueuedMessageFromDispatch`; `thread-task-permissions.test.ts` and both drain tests follow the atom.
+- `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`presentPendingIncomingShare` calls `features/sharing/discardDismissedShare.ts`; its `isShareSheetPresented: isShareFlowRoute(…)`, since the draft's pickers are root routes now and reading only a top draft would discard the share as soon as the project picker opened), and its module-level `discardShare`, `useIncomingShare()` still exposing `consumeShare` for `ShareToThreadRouteScreen`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
+- `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/features/threads/ThreadComposer.tsx` (the `/` menu's project snippets, `useProjectPromptSnippets`, #270 G, which the draft renders through `ThreadScreenBinding`), `apps/mobile/src/state/threadOutboxDelivery.ts` — `pinCreatedThread` after a delivered creation (`pinAtCreation.logic` + `pinThread.logic`, through the service's `runDeliveryCommand`); `threadOutboxDelivery*.test.ts` and `composer-attachment-uploads.test.ts` mock `./preferences`. The delivery's dispatch bookkeeping moved to the fork's `queued-message-dispatch.ts` (#1501): `beginDispatchingQueuedMessage` hands back the abort signal that rides through `prepareQueuedMessageAttachments` into `prepareTurnAttachments`, and `markDispatchingQueuedMessageSending` right before each `startTurn` publishes the `sending` phase (or abandons an aborted attempt). `use-thread-outbox.ts` lost `dispatchingQueuedMessageIdAtom` to that module; `edit-pending-thread-message.ts` (+ test) guards with `reclaimQueuedMessageFromDispatch`; `thread-task-permissions.test.ts` and both delivery tests follow the atom.
 - `apps/mobile/src/lib/composerImages.ts` (+ test) — `pickComposerMedia` and `pasteComposerClipboard` decide pass-through with the fork's `lib/image-passthrough.ts` (#1500, #1502): a still over 2 MB takes upstream's bounded-JPEG path (`renderPhotoAsJpeg`, exported for the share sheet) instead of passing through up to the 10 MB provider cap; a pasted PNG is staged to a cache file first since the clipboard hands over bytes, not a file. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
 - `apps/mobile/src/features/sharing/incoming-share-model.ts` (+ test), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`renderImageAsJpeg` in the file reader) — a shared image takes the same gate (#1502): the reader's optional `renderImageAsJpeg` renders a large still to a bounded JPEG; without it the model keeps upstream's pass-through up to the provider cap, which is what its upstream tests exercise.
 - `apps/mobile/src/lib/attachmentUpload.ts` (+ test) — `uploadFileBytes` aborts and fails a transfer after `ATTACHMENT_UPLOAD_TIMEOUT_MS`: the relay cut a 7.7 MB image at two minutes, iOS's background session kept replaying it, and the one-at-a-time outbox held every queued reply behind it (2026-09-19). The session stays `background` on purpose, so an upload survives a locked phone. Offered upstream as well; drop this bullet once their copy carries it.
@@ -791,7 +791,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `infinitus/settingsSearchItems.ts` (`InfinitusSettingsPath` in the
   `SettingsPath` union, `INFINITUS_SECTION_LABELS`, `INFINITUS_CATEGORY_SCOPES`
   and `INFINITUS_SETTINGS_SEARCH_ITEMS`, the last at the Infinitus pages'
-  place in result order), the `infinitusOnly` search flag with the
+  place in result order), `INFINITUS_NAV_PATHS` as one heading-less group in
+  `SETTINGS_NAV_GROUPS` before Maintenance, the `infinitusOnly` search flag with the
   `hasInfinitusEnvironment` availability it reads, `isSettingsSectionActive`
   so a nested page's nav item is the only one lit, `CONNECT_NAME` as the
   Connect section's title, and search terms naming `infinitus.json` and the
@@ -799,8 +800,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/src/lib/infinitusNotifications.logic.ts`, `apps/web/src/components/desktop/DesktopBadgeCoordinator.tsx`, `apps/web/src/components/desktop/NotificationModeMigration.tsx`, `apps/web/src/components/settings/DesktopBadgeSettings.tsx`, `apps/desktop/src/electron/ElectronNotification.ts`, `apps/desktop/src/ipc/methods/notifications.ts` — what the fork layers on upstream's thread notifications (#11481, ruling #1032): held / limited banners, `quietForViewer`, the queue rule, the Dock badge, the one-time mode migration. Rules and traps: `docs/internals/notifications.md`.
 - `apps/web/src/components/settings/SettingsSidebarNav.tsx` — one import from
   `infinitus/settingsNav.ts`, `...INFINITUS_SECTION_ICONS` spread into the icon
-  map, `useInfinitusSectionFilter()` chained as a second `.filter` on the nav
-  items, and the `isSettingsSectionActive` call (#1565).
+  map, `useInfinitusNavGroups(SETTINGS_NAV_GROUPS)` feeding the groups loop,
+  and the `isSettingsSectionActive(activePath, to)` call (#1565).
 - `apps/web/src/components/settings/useAvailableSettingsSearchItems.ts` —
   fills `hasInfinitusEnvironment` from the environments' capabilities.
 - `apps/web/src/components/settings/settingsSearch.test.ts` — the availability
@@ -816,6 +817,18 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   section the build lacks renders "no … settings yet") and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
+- `apps/web/src/components/files/AttachmentFilePreview.browser.test.tsx` — the
+  `#1711` quarantines for hosted runners, and the Office-metadata test's fetch
+  stub answers each call with its own `Response` (a shared one is locked by
+  whichever other caller reads it first).
+- `apps/server/src/provider/agentContextBudget.json` — the fork's measured
+  agent context (product names, fork MCP tools and instructions); re-measure
+  with `AgentContextBudget.test.ts` on every sync.
+- `apps/web/src/routes/_chat.settings.devices.tsx` — upstream's Devices page
+  (#25651) owns `/settings/devices`, so the fork's Devices pane (pairing
+  requests, the catalog's `devices` prefs, crash reports) renders under it
+  when the environment has the `infinitus` capability; the fork's own
+  `routes/settings.devices.tsx` left with that sync.
 - `apps/web/src/routeTree.gen.ts` — regenerated (with the installed
   `@tanstack/router-generator`, never hand-edited) whenever a fork route is
   added; the upstream sync re-generates it.
@@ -835,7 +848,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/contracts/src/keybindings.ts` — `accounts.open` in
   `STATIC_KEYBINDING_COMMANDS`.
 - `apps/web/src/components/CommandPalette.tsx` — the "Open accounts" action and
-  the `keydown` listener that turns `accounts.open` into a navigation, both
+  the `registerCommands` entry that turns `accounts.open` into a navigation, both
   behind the `infinitus` capability; "Open activity" and "Open utilization"
   (#747) behind the same gate, "Open stats" (#659) ungated.
 - `scripts/build-cli-archive.ts`, `scripts/smoke-cli-archive.ts`, `scripts/build-desktop-artifact.ts`, `packages/shared/src/cliRelease.ts`, `apps/server/src/cloud/pinnedRuntime.ts`, `packages/ssh/src/tunnel.ts`, `apps/desktop/src/wsl/DesktopWslEnvironment.ts`, `apps/server/src/cli/*.ts`, `apps/server/src/cloud/{bootService,selfUpdate}.ts`, `infinitus-release.yml`'s `publish` job — the server binary and its archive are named `infinitus` (#1368 D); re-applied on every sync with their fixtures (`apps/server/src/cloud/selfUpdate.test.ts` among them: the archive and binary names). Rules and traps: `docs/internals/infinitus-rename.md`.
@@ -855,7 +868,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   alerts ride Infinitus Connect's Device Notifications and open Settings ›
   Accounts; the Devices page names the Mac and pairs a phone. Upstream's
   text above it says Infinitus Connect (#1368) and is otherwise untouched.
-- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `new-task-flow-provider.tsx` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
+- **The project file is `infinitus.json`** (#823 layer 1): `packages/contracts/src/t3ProjectFile.ts` (`T3_PROJECT_FILE_NAME`, `LEGACY_T3_PROJECT_FILE_NAME`, `T3_PROJECT_FILE_NAMES`, `T3_PROJECT_FILE_SCHEMA_URL`), the read sites (`T3ProjectFileLoader.ts`, `GitVcsDriverCore.ts`'s submodule read, `useT3ProjectFileScripts.ts`, `SettingsScopeContext.tsx`, `t3ProjectFileDefaults.ts`, `use-new-task-project-defaults.ts` through the fork's `features/infinitus/useProjectFileRead.ts`), the copy, `scripts/build-project-file-schema.ts` → `apps/mac/site/public/schema/infinitus.json`, the repository's own `infinitus.json`. Rules and traps: `docs/internals/project-file.md`.
 - `.github/workflows/ci.yml` — `runs-on` swapped from Blacksmith runners to
   GitHub-hosted ones, timeouts widened, `workflow_dispatch:` added so the
   upstream-sync workflow can start CI on its branch, and the Lint job
@@ -883,7 +896,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `lastResultTotals` on the live query context and, in `finalizeActiveTurn`, `claudeTurnUsageDelta` spreading `turnCostUsd` / `turnModels` onto the provider turn (#834); its case stays in `ClaudeAdapterV2.test.ts`, whose wake harness is too large to copy into a sibling.
 - `apps/server/src/provider/ClaudeTurnTokenUsage.ts` — `claudeCacheTtlSeconds` and the `cacheTtlSeconds` it adds to the normalized usage (#1557).
 - `apps/web/src/components/ChatView.tsx` — `threadUsage`, folded from `serverProjection` with `threadUsageFromProjection`, handed to `ChatComposer` (#834); `packages/shared/src/threadUsage.ts`'s `threadUsageFromProjection` takes only `thread.id`/`usageBaseline` so the quiet `ThreadStructure` fits.
-- `apps/mobile/src/features/threads/ThreadSettingsSheet.tsx` — the optional `threadId` on the settings session, and `<InfinitusThreadUsageRows>` under the options card when it is set (#834); `ThreadComposer.tsx` sets it from the selected thread.
+- `apps/mobile/src/features/threads/ThreadSettingsSheet.tsx` — the optional `threadId` on the settings session, and `<InfinitusThreadUsageRows>` under the options card when it is set (#834); `ExistingThreadSettingsRouteScreen` in the same file sets it from the selected thread.
 - Turn-start gate and steer at the tool boundary (#1627, the queue lane; rules:
   `docs/internals/turn-start-gate.md`):
   `apps/server/src/orchestration-v2/ProviderTurnStartService.ts` requires

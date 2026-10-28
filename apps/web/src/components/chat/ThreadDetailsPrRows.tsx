@@ -6,7 +6,7 @@ import {
   threadPullRequestKeyOf,
   visibleThreadPullRequests,
 } from "@infinitus/client-runtime/thread-pull-requests";
-import { Minus, Plus } from "lucide";
+import { ChevronDown, ChevronUp } from "lucide";
 import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
 
 import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
@@ -124,7 +124,12 @@ export function ThreadDetailsPrRows({
         tone="muted"
         className="w-full active:scale-100"
       >
-        <MorphIcon aria-hidden className="size-4 shrink-0" icon={expanded ? Minus : Plus} />
+        <MorphIcon
+          aria-hidden
+          className="size-4 shrink-0"
+          // Chevrons, not plus and minus: the plus already means "add" in this card.
+          icon={expanded ? ChevronUp : ChevronDown}
+        />
         {expanded ? "Show less" : `Show ${rest.length} more`}
       </ThreadDetailsControl>
     </>

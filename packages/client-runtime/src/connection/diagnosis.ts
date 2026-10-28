@@ -138,7 +138,7 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
 }
 
 function steps(host: string, located: Located, failure: ConnectionAttemptError | null): string[] {
-  const checkHost = `On ${host}, check Settings > Connections or run \`infinitus connect status\`.`;
+  const checkHost = `On ${host}, check Settings > Sharing & access or run \`infinitus connect status\`.`;
   switch (located.cause) {
     case "offline":
       return [`Connect this device to the internet. ${PRODUCT_NAME} reconnects on its own.`];
@@ -149,7 +149,7 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
     case "not_linked":
       return [
         `Check that this device is signed in to the same ${CONNECT_NAME} account as the host.`,
-        `On ${host}, open Settings > Connections and turn ${CONNECT_NAME} on.`,
+        `On ${host}, open Settings > Sharing & access and turn ${CONNECT_NAME} on.`,
       ];
     case "tunnel_pending":
       return [`Wait a minute. ${PRODUCT_NAME} retries on its own.`, checkHost];
@@ -159,7 +159,7 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
         "If it keeps failing, copy the diagnostics and report it.",
       ];
     case "tunnel_not_enabled":
-      return [`On ${host}, open Settings > Connections and turn ${CONNECT_NAME} on.`];
+      return [`On ${host}, open Settings > Sharing & access and turn ${CONNECT_NAME} on.`];
     case "released":
     case "tunnel_down":
       return [

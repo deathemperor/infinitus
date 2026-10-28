@@ -4,7 +4,7 @@ import { searchableSetting } from "../settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "../useScopedSettings";
 
 /**
- * Fork (#648): the swap-based resume, rendered by Settings › General beside
+ * Fork (#648): the swap-based resume, rendered by Settings › Threads beside
  * upstream's reset-time one. A server setting, so the row is scoped like its
  * neighbours.
  */

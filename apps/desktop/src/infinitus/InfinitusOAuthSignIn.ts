@@ -69,6 +69,7 @@ const { logInfo, logWarning } = makeComponentLogger("infinitus-oauth-sign-in");
 const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const signInWindow = yield* InfinitusSignInService;
+  const runFork = Effect.runForkWith(yield* Effect.context<never>());
   const socketPath = resolveInfinitusControlSocketPath({
     platform: environment.platform,
     env: process.env,
@@ -121,7 +122,7 @@ const make = Effect.gen(function* () {
     // and the poll below ends with it.
     flows.set(input.flowId, () => {
       flows.delete(input.flowId);
-      Effect.runFork(
+      runFork(
         request({ command: "signin-cancel", args: [macFlowId] }, STATUS_TIMEOUT_MS).pipe(
           Effect.catch(() => Effect.void),
         ),

@@ -122,9 +122,14 @@ export const withUpdateIdleGate = (input: {
   });
 
   return ServerSelfUpdate.of({
-    update: (request, reportProgress = () => Effect.void, onHandoffAccepted) => {
+    // The wrapped service and awaitIdle own the spans.
+    update: Effect.fnUntraced(function* (
+      request,
+      reportProgress = () => Effect.void,
+      onHandoffAccepted,
+    ) {
       const policy = request.runningTurns ?? "refuse";
-      return (policy === "refuse" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
+      return yield* (policy === "refuse" ? awaitIdle(policy, reportProgress) : Effect.void).pipe(
         Effect.andThen(
           input.selfUpdate.update(
             request,
@@ -144,13 +149,14 @@ export const withUpdateIdleGate = (input: {
           }),
         ),
       );
-    },
+    }),
     // The gate again: this is the quit.
-    commitDesktopUpdate: (requestId, onHandoffAccepted) =>
-      awaitIdle(desktopPolicies.get(requestId) ?? "refuse", () => Effect.void).pipe(
+    commitDesktopUpdate: Effect.fnUntraced(function* (requestId, onHandoffAccepted) {
+      return yield* awaitIdle(desktopPolicies.get(requestId) ?? "refuse", () => Effect.void).pipe(
         Effect.andThen(Effect.sync(() => desktopPolicies.delete(requestId))),
         Effect.andThen(input.selfUpdate.commitDesktopUpdate(requestId, onHandoffAccepted)),
-      ),
+      );
+    }),
   });
 };
 
@@ -454,8 +460,11 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
 
   return ServerSelfUpdate.of({
     update,
-    commitDesktopUpdate: (requestId, onHandoffAccepted) =>
-      desktopAppUpdate.commit(requestId, onHandoffAccepted),
+    commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
+      function (requestId, onHandoffAccepted) {
+        return desktopAppUpdate.commit(requestId, onHandoffAccepted);
+      },
+    ),
   });
 });
 

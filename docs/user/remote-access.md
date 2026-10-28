@@ -20,7 +20,7 @@ Follow the sign-in instructions. Setup offers a
 [background service](./background-service.md); if you decline it, start the
 server with `./infinitus serve`. Saving your sign-in alone does not make the machine
 reachable. Every `infinitus` command on this page is that executable; a Mac host runs
-the desktop app instead and does all of this from **Settings → Connections**.
+the desktop app instead and does all of this from **Settings → Sharing & access**.
 
 On your other device, sign in to the same Infinitus Connect account and choose the
 environment. On the app.t3.codes home page with no computer added yet, signing
@@ -38,7 +38,7 @@ disconnect an otherwise healthy conversation.
 
 Use direct pairing when the other device can reach the host's network address.
 
-On a desktop host, open **Settings → Connections**, enable **Network access**,
+On a desktop host, open **Settings → Sharing & access**, enable **Network access**,
 then create a pairing link using an address the other device can reach. Changing
 network access restarts the desktop app. You can turn it off in the same place.
 
@@ -56,14 +56,14 @@ If a server is already running, generate a fresh link without restarting it:
 ```
 
 Scan the QR code on your phone or paste the pairing URL into **Add environment**
-in the receiving app. Connection settings are under **Settings → Connections**
+in the receiving app. Connection settings are under **Settings → Environments**
 on web and desktop and **Settings → Environments** on mobile. A loopback address
 such as `127.0.0.1` reaches only the device opening the link.
 
 Pairing authorizes that device for future connections. Use a fresh one-time link
 for each new device; you do not need the original token to reconnect. Links
 created in Settings can only be copied from the client that created them while
-its Connections page stays open. If you leave or reload that page, create
+its Sharing & access page stays open. If you leave or reload that page, create
 another link to share.
 
 ### Reach one machine several ways
@@ -94,7 +94,7 @@ later route, Infinitus checks the earlier ones when your network changes, when y
 return to the app, and every minute, and moves back as soon as one works.
 
 On web and desktop, select the route count under the machine's name in
-**Settings → Connections** to see its routes. Drag a route to change the order,
+**Settings → Environments** to see its routes. Drag a route to change the order,
 or remove it. On mobile, open the machine under **Settings → Environments** and
 choose **Edit**. Signing out of Infinitus Connect removes only that route; a machine
 you can still reach another way stays saved.
@@ -109,7 +109,7 @@ different permissions.
 ### Balance new threads across machines
 
 Auto balance is off by default. On web and desktop, enable it in
-**Settings → Connections → Load balancing** to automatically choose a machine for
+**Settings → Environments → Load balancing** to automatically choose a machine for
 new threads in projects grouped across connected environments. The section
 appears once two or more machines are switched on.
 Each machine starts at **Normal**. Choose **Prefer** to favor it when it has CPU and
@@ -127,7 +127,7 @@ Mobile keeps its manual environment selection.
 ### Tailscale HTTPS
 
 Join both devices to the same tailnet. In the desktop app, enable **Tailscale
-HTTPS** in **Settings → Connections**. Turn it off there to remove that route.
+HTTPS** in **Settings → Sharing & access**. Turn it off there to remove that route.
 
 To start a command-line server with Tailscale HTTPS:
 
@@ -161,7 +161,7 @@ uses HTTP, so include `https://` when your server uses HTTPS.
 
 ## Desktop-managed SSH
 
-In the desktop app, open **Settings → Connections → Add environment**, choose
+In the desktop app, open **Settings → Environments → Add environment**, choose
 **SSH**, and enter a host or SSH alias such as `user@example.com`. Infinitus
 downloads the server of its own version onto the host (it needs `curl` or
 `wget` and `tar` there, and a way to reach the releases), starts or reuses it,
@@ -179,7 +179,7 @@ running is left alone.
 
 Each desktop app keeps one session on the host for its SSH connection and reuses
 it when it reconnects. Revoke sessions you no longer use in **Settings →
-Connections** on the host, or on a headless host with `infinitus auth session list` and
+Sharing & access** on the host, or on a headless host with `infinitus auth session list` and
 `infinitus auth session revoke <id>`. A desktop that can still sign in over SSH pairs
 again on its next connect.
 
@@ -244,7 +244,7 @@ threads on an environment through its MCP server. See
 
 ## Manage or revoke access
 
-On the host, **Settings → Connections** lets authorized administrators create
+On the host, **Settings → Sharing & access** lets authorized administrators create
 pairing links and revoke client sessions. Revoking an unused link prevents new
 pairings; revoke a device's session to remove its existing access. Command-line
 management is available through `./infinitus auth --help`.
@@ -300,7 +300,7 @@ page, or **Settings → Infinitus Connect** on mobile, and choose **Deregister**
 revokes its cloud access and frees its host space even when the environment is
 offline or has been wiped. When Infinitus Connect rejects a host's link, the host
 shows that it was removed from Infinitus Connect. To link it again, turn on
-**Infinitus Connect** in **Settings → Connections** on a desktop host, or run
+**Infinitus Connect** in **Settings → Sharing & access** on a desktop host, or run
 `infinitus connect link` on a command-line host and then restart Infinitus there. A
 command-line host that released its tunnel when it last stopped may link itself
 again on its next start; run `infinitus connect unlink` on that host to keep it off.
@@ -334,7 +334,7 @@ error, where the problem is, and how to fix it.
 ## Using the Desktop App as a Remote Only
 
 If a computer should only drive work running elsewhere, turn off its local environment. In the
-desktop app, open **Settings → Connections** and switch off **Local
+desktop app, open **Settings → Environments** and switch off **Local
 environment**. Infinitus restarts without a local server: no local agents or terminals run, WSL
 backends stay off, and other devices can no longer connect to this computer. Your projects,
 history, and saved connections are kept, and you keep working through pairing, Infinitus Connect, or SSH.

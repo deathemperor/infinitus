@@ -9,11 +9,12 @@ import {
   type OrchestrationV2Run,
   type OrchestrationV2RunAttempt,
   type OrchestrationV2TurnItem,
+  isCompactionCommandMessage,
+  parseGoalCommand,
   RunId,
   ThreadId,
 } from "@infinitus/contracts";
 import * as Context from "effect/Context";
-import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -67,16 +68,40 @@ export class ProviderTurnStartError extends Schema.TaggedError<ProviderTurnStart
   },
 ) {}
 
+class WorktreeRecreateError extends Schema.TaggedError<WorktreeRecreateError>()(
+  "WorktreeRecreateError",
+  {
+    worktreePath: Schema.String,
+    branch: Schema.String,
+    cause: Schema.Defect(),
+  },
+) {
+  override get message(): string {
+    return `Could not recreate the worktree for branch '${this.branch}' at ${this.worktreePath}.`;
+  }
+}
+
+class WorktreeRecreateNoBaseError extends Schema.TaggedError<WorktreeRecreateNoBaseError>()(
+  "WorktreeRecreateNoBaseError",
+  { worktreePath: Schema.String, branch: Schema.String },
+) {
+  override get message(): string {
+    return `Could not recreate branch '${this.branch}' at ${this.worktreePath}: the project workspace has no current branch to start it from (detached HEAD?).`;
+  }
+}
+
 const isProviderTurnStartError = Schema.is(ProviderTurnStartError);
 
 /**
  * Claude refuses these before it reads the prompt: replacing a process running background work,
- * or launch arguments whose appended system prompt cannot be read.
+ * launch arguments whose appended system prompt cannot be read, or MCP registration that never
+ * answers while the query opens.
  */
 const PROMPT_REFUSAL_TAGS = [
   "ClaudeBackgroundWorkBlocksQueryReplacementError",
   "ClaudeAppendSystemPromptFileError",
   "ClaudeAppendSystemPromptMissingValueError",
+  "ClaudeMcpRegistrationTimeoutError",
 ] as const;
 
 const refusedBeforePrompt = (error: unknown): boolean =>
@@ -132,6 +157,35 @@ export const layer: Layer.Layer<
     const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
     const runtimePolicy = yield* RuntimePolicy.RuntimePolicyV2;
     const isManagedWorktreePath = yield* makeIsManagedWorktreePath;
+
+    const recreateMissingWorktree = Effect.fn("ProviderTurnStartService.recreateMissingWorktree")(
+      function* (input: {
+        readonly cwd: string;
+        readonly worktreePath: string;
+        readonly branch: string;
+      }) {
+        const { cwd, worktreePath, branch } = input;
+        yield* gitWorkflow.pruneWorktrees({ cwd });
+        const localBranchNames = yield* gitWorkflow.listLocalBranchNames(cwd);
+        if (localBranchNames.includes(branch)) {
+          yield* gitWorkflow.createWorktree({ cwd, refName: branch, path: worktreePath });
+          return;
+        }
+        // Recovery can follow an external checkout, before the status cache expires.
+        yield* gitWorkflow.invalidateLocalStatus(cwd);
+        const { refName: baseRef } = yield* gitWorkflow.localStatus({ cwd });
+        if (baseRef === null) {
+          return yield* new WorktreeRecreateNoBaseError({ worktreePath, branch });
+        }
+        yield* gitWorkflow.createWorktree({
+          cwd,
+          refName: `refs/heads/${baseRef}`,
+          newRefName: branch,
+          baseRefName: `refs/heads/${baseRef}`,
+          path: worktreePath,
+        });
+      },
+    );
 
     // Build draining callbacks outside startup scope so they cannot retain full thread history.
     const makeRunControls = (input: {
@@ -286,11 +340,12 @@ export const layer: Layer.Layer<
                     source.status === "interrupted" ||
                     (source.status === "completed" &&
                       handoff.delivery === undefined &&
+                      // Compaction and /goal turns defer history to the next turn.
                       projection.messages.some(
                         (message) =>
                           message.id === source.userMessageId &&
-                          message.attachments.length === 0 &&
-                          message.text.trim().toLowerCase() === "/compact",
+                          (isCompactionCommandMessage(message) ||
+                            parseGoalCommand(message) !== null),
                       ))),
               ))),
       );
@@ -400,6 +455,39 @@ export const layer: Layer.Layer<
           });
         },
       );
+      const settleStartFailure = Effect.fn("ProviderTurnStartService.settleStartFailure")(
+        function* (failed: {
+          readonly signal: string;
+          readonly title: string;
+          readonly error: Error;
+          readonly message?: string;
+        }) {
+          const nestedCause = "cause" in failed.error ? failed.error.cause : undefined;
+          yield* settleRunBeforeStart({
+            signal: failed.signal,
+            status: "failed",
+            now: yield* DateTime.now,
+            providerInstanceId: run.providerInstanceId,
+            itemProviderThreadId: providerThread.id,
+            item: {
+              type: "error",
+              title: failed.title,
+              failure: makeProviderFailure({
+                cause: failed.error,
+                message:
+                  failed.message ??
+                  knownProviderFailureMessage(failed.error) ??
+                  (nestedCause instanceof Error
+                    ? nestedCause.message
+                    : typeof nestedCause === "string"
+                      ? nestedCause
+                      : failed.error.message),
+                class: "provider_error",
+              }),
+            },
+          });
+        },
+      );
       if (message.attachments.length === 0 && message.text.trimStart().startsWith("/")) {
         const isEmptyCompaction =
           message.text.trim().toLowerCase() === "/compact" && !projection.hasConversation;
@@ -501,24 +589,29 @@ export const layer: Layer.Layer<
               worktreePath,
               branch,
             });
-            yield* gitWorkflow.pruneWorktrees({ cwd: project.workspaceRoot }).pipe(
-              Effect.andThen(
-                gitWorkflow.createWorktree({
-                  cwd: project.workspaceRoot,
-                  refName: branch,
-                  path: worktreePath,
-                }),
-              ),
-              Effect.catchCause((cause) =>
-                Cause.hasInterruptsOnly(cause)
-                  ? Effect.failCause(cause)
-                  : Effect.logWarning("provider turn start failed to recreate worktree", {
-                      threadId: projection.thread.id,
-                      worktreePath,
-                      cause: Cause.pretty(cause),
-                    }),
+            const recreateResult = yield* Effect.result(
+              recreateMissingWorktree({
+                cwd: project.workspaceRoot,
+                worktreePath,
+                branch,
+              }).pipe(
+                Effect.mapError((cause) =>
+                  cause._tag === "WorktreeRecreateNoBaseError"
+                    ? cause
+                    : new WorktreeRecreateError({ worktreePath, branch, cause }),
+                ),
               ),
             );
+            if (recreateResult._tag === "Failure") {
+              if (input.willRetry === true) return yield* recreateResult.failure;
+              yield* settleStartFailure({
+                signal: "worktree-recreate-failure",
+                title: "Couldn't recreate thread workspace",
+                error: recreateResult.failure,
+                message: recreateResult.failure.message,
+              });
+              return;
+            }
           }
         }
       }
@@ -553,37 +646,6 @@ export const layer: Layer.Layer<
       if (!(yield* isCurrentAttemptInStatus("starting"))) return;
       const existingSessionProjection = projection.providerSessions.find(
         (candidate) => candidate.id === providerSessionId,
-      );
-      const settleStartFailure = Effect.fn("ProviderTurnStartService.settleStartFailure")(
-        function* (failed: {
-          readonly signal: string;
-          readonly title: string;
-          readonly error: Error;
-        }) {
-          const nestedCause = "cause" in failed.error ? failed.error.cause : undefined;
-          yield* settleRunBeforeStart({
-            signal: failed.signal,
-            status: "failed",
-            now: yield* DateTime.now,
-            providerInstanceId: run.providerInstanceId,
-            itemProviderThreadId: providerThread.id,
-            item: {
-              type: "error",
-              title: failed.title,
-              failure: makeProviderFailure({
-                cause: failed.error,
-                message:
-                  knownProviderFailureMessage(failed.error) ??
-                  (nestedCause instanceof Error
-                    ? nestedCause.message
-                    : typeof nestedCause === "string"
-                      ? nestedCause
-                      : failed.error.message),
-                class: "provider_error",
-              }),
-            },
-          });
-        },
       );
       const failedRuns = new Map(
         projection.runs
@@ -1040,6 +1102,9 @@ export const layer: Layer.Layer<
         text: message.text,
         records: message.context?.records ?? [],
       });
+      // Codex and Claude parse /goal from the prompt, so it goes verbatim and history waits a turn.
+      const goalDriver = session.driver === "codex" || session.driver === "claudeAgent";
+      const goalCommand = goalDriver && parseGoalCommand(message) !== null;
       // The provider turn marks cancellation work delivered; restart continuations use their own text or resume natively.
       const noteContinuation = isRestartNoteContinuation(
         run,
@@ -1054,8 +1119,8 @@ export const layer: Layer.Layer<
           projection.messages
             .filter(
               (candidate) =>
-                candidate.attachments.length === 0 &&
-                candidate.text.trim().toLowerCase() === "/compact",
+                isCompactionCommandMessage(candidate) ||
+                (goalDriver && parseGoalCommand(candidate) !== null),
             )
             .map((candidate) => candidate.id),
         ),
@@ -1203,7 +1268,7 @@ export const layer: Layer.Layer<
                 ];
           const delivery = yield* deliverContextHandoffs({
             handoffs: [...effectiveHandoffs, ...retryHandoff],
-            deferInline: compact,
+            deferInline: compact || goalCommand,
             providerThread: runningProviderThread,
             budget: Effect.gen(function* () {
               return handoffBudget({
@@ -1257,7 +1322,10 @@ export const layer: Layer.Layer<
             ...(noteContinuation ? promptedInput : turnInput),
             message: {
               ...turnInput.message,
-              text: context === "" ? userText : `${context}\n\nUser message:\n${userText}`,
+              text:
+                context === "" || goalCommand
+                  ? userText
+                  : `${context}\n\nUser message:\n${userText}`,
             },
           }).pipe(
             // Clear pending handoff markers for refused prompts so the next turn retains the native session.
@@ -1375,10 +1443,14 @@ export const layer: Layer.Layer<
     );
 
     return ProviderTurnStartServiceV2.of({
-      start: (input) =>
-        turnStartGate
-          .start({ threadId: input.threadId, runId: input.runId, start: startUnderLease(input) })
-          .pipe(Effect.asVoid),
+      // startUnderLease owns the ProviderTurnStartService.start span.
+      start: Effect.fnUntraced(function* (input) {
+        yield* turnStartGate.start({
+          threadId: input.threadId,
+          runId: input.runId,
+          start: startUnderLease(input),
+        });
+      }),
     });
   }),
 );
