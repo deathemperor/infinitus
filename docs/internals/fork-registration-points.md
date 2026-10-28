@@ -817,6 +817,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   section the build lacks renders "no … settings yet") and
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
+- `apps/web/src/components/files/AttachmentFilePreview.browser.test.tsx` — the
+  `#1711` quarantines for hosted runners, and the Office-metadata test's fetch
+  stub answers each call with its own `Response` (a shared one is locked by
+  whichever other caller reads it first).
 - `apps/server/src/provider/agentContextBudget.json` — the fork's measured
   agent context (product names, fork MCP tools and instructions); re-measure
   with `AgentContextBudget.test.ts` on every sync.
