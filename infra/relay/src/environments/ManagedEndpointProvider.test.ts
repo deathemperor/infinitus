@@ -2,7 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 
 import { describe, expect, it } from "@effect/vitest";
 import * as Alchemy from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
+import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -53,7 +53,6 @@ interface AllocationCall {
     | "markReady"
     | "claimRelease"
     | "claimDeprovision"
-    | "remove"
     | "removeClaimed";
   readonly input: unknown;
 }
@@ -318,11 +317,6 @@ function makeAllocations(calls: AllocationCall[] = []) {
         mutate(allocationKey(input), (current) => current);
         return allocations.get(allocationKey(input))?.generation ?? null;
       }),
-    remove: (input) =>
-      Effect.sync(() => {
-        calls.push({ operation: "remove", input });
-        allocations.delete(allocationKey(input));
-      }),
     removeClaimed: (input) =>
       Effect.sync(() => {
         calls.push({ operation: "removeClaimed", input });
@@ -341,10 +335,13 @@ function makeTunnelLimits(
   result: ManagedTunnelLimits.ManagedTunnelLimitExceeded | null = null,
 ) {
   return ManagedTunnelLimits.ManagedTunnelLimits.of({
-    ensureCapacity: (input) =>
-      Effect.suspend(() => {
+    withCapacity: (input, reserve) =>
+      Effect.gen(function* () {
         calls.push(input);
-        return result === null ? Effect.void : Effect.fail(result);
+        if (result !== null) {
+          return yield* result;
+        }
+        return yield* reserve;
       }),
   });
 }
@@ -956,7 +953,6 @@ describe("ManagedEndpointProvider", () => {
         "createRecord",
         "updateRecord",
       ]);
-      expect(allocationCalls.map((call) => call.operation)).not.toContain("remove");
       const claims = allocationCalls.filter((call) => call.operation === "claimRelease");
       expect(claims.map((call) => (call.input as { markReleased?: boolean }).markReleased)).toEqual(
         [undefined, undefined],

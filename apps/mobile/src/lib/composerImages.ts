@@ -220,7 +220,7 @@ export async function removePersistedComposerAttachmentFile(uri: string): Promis
   }
 }
 
-async function createComposerFileAttachment(input: {
+export async function createComposerFileAttachment(input: {
   readonly uri: string;
   readonly name: string;
   readonly mimeType: string;
@@ -365,14 +365,6 @@ async function loadImagePicker() {
     return await import("expo-image-picker");
   } catch (error) {
     throw new Error("The photo library is unavailable right now.", { cause: error });
-  }
-}
-
-async function loadClipboard() {
-  try {
-    return await import("expo-clipboard");
-  } catch (error) {
-    throw new Error("Clipboard paste is unavailable right now.", { cause: error });
   }
 }
 
@@ -542,6 +534,7 @@ export async function pickComposerMedia(input: {
   };
 }
 
+<<<<<<< HEAD
 /**
  * The clipboard hands over a full-resolution PNG, so a pasted screenshot is as large as a picked
  * one. The same gate as the picker's applies: a small still keeps its bytes (scaled down only when
@@ -669,6 +662,8 @@ export async function pasteComposerClipboard(input: { readonly existingCount: nu
   };
 }
 
+=======
+>>>>>>> upstream-sync-a9418a120-upstream-renamed
 function mimeTypeFromUri(uri: string): string {
   const ext = uri.split(".").pop()?.toLowerCase();
   switch (ext) {
@@ -688,7 +683,7 @@ function mimeTypeFromUri(uri: string): string {
   }
 }
 
-export function isOwnedPastedImageUri(uri: string): boolean {
+function isOwnedPastedImageUri(uri: string): boolean {
   try {
     const url = new URL(uri);
     if (url.protocol !== "file:") {

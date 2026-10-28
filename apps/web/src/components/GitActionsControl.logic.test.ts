@@ -1,10 +1,10 @@
 import { SourceControlProviderKind, type VcsStatusResult } from "@infinitus/contracts";
 import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
+import { resolveAutoFeatureBranchName } from "@infinitus/shared/git";
 import { assert, describe, it } from "vite-plus/test";
 import {
   buildMenuItems,
   requiresDefaultBranchConfirmation,
-  resolveAutoFeatureBranchName,
   resolveDefaultBranchActionDialogCopy,
   resolveLiveThreadBranchUpdate,
   resolveQuickAction,

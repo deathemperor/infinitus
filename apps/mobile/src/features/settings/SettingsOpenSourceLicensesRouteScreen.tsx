@@ -11,6 +11,7 @@ import {
   thirdPartyLicenseEntryKey,
   type ThirdPartyLicenseEntry,
 } from "@infinitus/shared/thirdPartyLicenses";
+<<<<<<< HEAD
 import {
   PRODUCT_NAME,
   UPSTREAM_PRODUCT_NAME,
@@ -18,6 +19,9 @@ import {
   UPSTREAM_REPOSITORY_URL,
 } from "@infinitus/shared/productName";
 import { useCallback, useMemo, useRef, useState } from "react";
+=======
+import { useMemo, useRef, useState } from "react";
+>>>>>>> upstream-sync-a9418a120-upstream-renamed
 import { Linking, Platform, Pressable, type TextInputInstance, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -105,22 +109,16 @@ export function SettingsOpenSourceLicensesRouteScreen() {
   const usesNativeMailSearchToolbar = useNativeMailSearchToolbar();
   const manifest = useMobileThirdPartyLicenses();
   const entries = manifest?.entries ?? [];
-  const filteredEntries = useMemo(
-    () => filterThirdPartyLicenseEntries(entries, query),
-    [entries, query],
-  );
-  const renderItem = useCallback(
-    ({ item }: { readonly item: ThirdPartyLicenseEntry }) => (
-      <LicenseRow
-        entry={item}
-        onPress={() =>
-          navigation.navigate("SettingsOpenSourceLicense", {
-            entryKey: thirdPartyLicenseEntryKey(item),
-          })
-        }
-      />
-    ),
-    [navigation],
+  const filteredEntries = filterThirdPartyLicenseEntries(entries, query);
+  const renderItem = ({ item }: { readonly item: ThirdPartyLicenseEntry }) => (
+    <LicenseRow
+      entry={item}
+      onPress={() =>
+        navigation.navigate("SettingsOpenSourceLicense", {
+          entryKey: thirdPartyLicenseEntryKey(item),
+        })
+      }
+    />
   );
 
   if (!manifest) {

@@ -39,9 +39,15 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
+<<<<<<< HEAD
   // Through the hook, not the resolver: the scene comes from the active theme.
   const backdropVariant = useSidebarStageBackdropVariant(
     environmentIdentificationMode === "artwork",
+=======
+  const backdropVariant = resolveSidebarStageBackdropVariant(
+    stageLabel,
+    environmentIdentificationMode,
+>>>>>>> upstream-sync-a9418a120-upstream-renamed
   );
   const pillLabel =
     environmentIdentificationMode === "pill"

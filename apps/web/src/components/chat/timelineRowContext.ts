@@ -1,4 +1,8 @@
-import type { WorktreeSetupSnapshot } from "@infinitus/contracts";
+import type {
+  ProviderApprovalDecision,
+  RuntimeRequestId,
+  WorktreeSetupSnapshot,
+} from "@infinitus/contracts";
 import {
   type EnvironmentId,
   type MessageId,
@@ -16,6 +20,7 @@ import type { WorkflowOpening } from "@infinitus/client-runtime/state/subagentRu
 import { createContext, type MouseEvent, type ReactNode } from "react";
 import { type LegendListRef } from "@legendapp/list/react";
 import type { CodexArtifactTemplate } from "@infinitus/shared/codexArtifactTemplates";
+import type { PendingApproval } from "../../session-logic";
 import { type ChatFileAttachment } from "../../types";
 import { ExpandedImagePreview } from "./ExpandedImagePreview";
 import { type AssistantCitationTarget } from "./AssistantCitationSource";
@@ -37,6 +42,12 @@ export interface TurnItemSource {
 }
 
 export interface TimelineRowSharedState {
+  pendingApprovals: ReadonlyMap<RuntimeRequestId, PendingApproval>;
+  respondingRequestIds: ReadonlyArray<RuntimeRequestId>;
+  canOperateThread: boolean;
+  onRespondToApproval:
+    | ((requestId: RuntimeRequestId, decision: ProviderApprovalDecision) => Promise<unknown>)
+    | undefined;
   citationRequest: AssistantCitationTarget | null;
   listRef: React.RefObject<LegendListRef | null>;
   timestampFormat: TimestampFormat;
@@ -71,10 +82,6 @@ export interface TimelineRowSharedState {
   onForkFromRun:
     | ((input: { readonly sourceThreadId: ThreadId; readonly runId: RunId }) => Promise<void>)
     | undefined;
-  onRollbackCheckpoint: (input: {
-    readonly checkpointId: string;
-    readonly scopeId: string;
-  }) => void;
   onToggleTurnFold: (runId: RunId) => void;
   onToggleAttemptFold: (attemptId: RunAttemptId) => void;
   onFileOpen: (attachment: ChatFileAttachment) => void;
@@ -94,7 +101,6 @@ export interface TimelineRowActivityState {
   isWorking: boolean;
   isCompacting: boolean;
   isRevertingCheckpoint: boolean;
-  activeTurnInProgress: boolean;
   awaitingUser: boolean;
   isPreparingWorktree: boolean;
   latestRunId: RunId | null;

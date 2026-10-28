@@ -1,6 +1,6 @@
 import * as CloudflareRetry from "@distilled.cloud/cloudflare/Retry";
 import * as Alchemy from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
+import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Arr from "effect/Array";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -377,7 +377,7 @@ function isLoopbackOrigin(origin: RelayManagedEndpointOrigin): boolean {
   );
 }
 
-export function isManagedEndpointNotFound(cause: unknown): boolean {
+function isManagedEndpointNotFound(cause: unknown): boolean {
   if (typeof cause !== "object" || cause === null) {
     return false;
   }
@@ -521,7 +521,7 @@ const makeCloudflareApiGate = (alchemyRuntimeContext: Alchemy.BaseRuntimeContext
  * either one that has not finished draining or another runtime still serving
  * the tunnel.
  */
-export function isManagedEndpointTunnelInUse(cause: unknown): boolean {
+function isManagedEndpointTunnelInUse(cause: unknown): boolean {
   if (typeof cause !== "object" || cause === null) {
     return false;
   }
@@ -550,7 +550,7 @@ const ignoreNotFound = <A>(
     }),
   );
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* RelayConfiguration.RelayConfiguration;
   const crypto = yield* Crypto.Crypto;
   const tunnels = yield* ManagedEndpointTunnelClient;
@@ -1169,27 +1169,7 @@ export const make = Effect.gen(function* () {
         environmentHash,
       );
       const requestedTunnelName = managedEndpointTunnelName(cf.namespace, environmentHash);
-      yield* tunnelLimits
-        .ensureCapacity({
-          userId: input.userId,
-          environmentId: input.environmentId,
-        })
-        .pipe(
-          Effect.catchTags({
-            ManagedTunnelLimitPersistenceError: (cause) =>
-              Effect.fail(
-                new ManagedEndpointProvisioningFailed({
-                  userId: input.userId,
-                  environmentId: input.environmentId,
-                  stage: "check-tunnel-limit",
-                  hostname: requestedHostname,
-                  tunnelName: requestedTunnelName,
-                  cause,
-                }),
-              ),
-          }),
-        );
-      const allocation = yield* allocations
+      const reserveAllocation = allocations
         .reserve({
           userId: input.userId,
           environmentId: input.environmentId,
@@ -1208,6 +1188,26 @@ export const make = Effect.gen(function* () {
                 cause,
               }),
           ),
+        );
+      const allocation = yield* tunnelLimits
+        .withCapacity(
+          { userId: input.userId, environmentId: input.environmentId },
+          reserveAllocation,
+        )
+        .pipe(
+          Effect.catchTags({
+            ManagedTunnelLimitPersistenceError: (cause) =>
+              Effect.fail(
+                new ManagedEndpointProvisioningFailed({
+                  userId: input.userId,
+                  environmentId: input.environmentId,
+                  stage: "check-tunnel-limit",
+                  hostname: requestedHostname,
+                  tunnelName: requestedTunnelName,
+                  cause,
+                }),
+              ),
+          }),
         );
       const { hostname, tunnelName } = allocation;
 
