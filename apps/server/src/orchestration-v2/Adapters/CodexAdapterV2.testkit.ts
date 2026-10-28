@@ -1,15 +1,10 @@
-import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
-import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { type ProviderReplayTranscript } from "@infinitus/contracts";
+import { CodexSettings, type ProviderReplayTranscript } from "@infinitus/contracts";
 import * as CodexClient from "effect-codex-app-server/client";
 import type * as CodexError from "effect-codex-app-server/errors";
 import * as CodexReplay from "effect-codex-app-server/replay";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as Path from "effect/Path";
-import * as PlatformError from "effect/PlatformError";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
@@ -18,9 +13,14 @@ import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 import { ProviderAdapterDriverCreateError } from "@infinitus/provider-core/server/adapterDriver";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
-import type { OrchestratorV2ProviderReplayHarness } from "../testkit/ProviderReplayHarness.ts";
+import {
+  makeReplayServerConfig,
+  type OrchestratorV2ProviderReplayHarness,
+} from "../testkit/ProviderReplayHarness.ts";
 import type { ProviderReplayGate } from "@infinitus/provider-testing/replayGate";
 import * as CodexAdapterV2 from "./CodexAdapterV2.ts";
+
+const DEFAULT_CODEX_SETTINGS = Schema.decodeSync(CodexSettings)({});
 
 export class CodexReplayTranscriptDecodeError extends Schema.TaggedError<CodexReplayTranscriptDecodeError>()(
   "CodexReplayTranscriptDecodeError",
@@ -94,6 +94,7 @@ function metadataFromTranscript(transcript: ProviderReplayTranscript): {
   };
 }
 
+<<<<<<< HEAD
 export function makeReplayServerConfig(
   scenario: string,
 ): Effect.Effect<
@@ -182,6 +183,8 @@ export function makeReplayServerConfig(
   });
 }
 
+=======
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
 export function layer(input: {
   readonly transcript: CodexReplay.CodexAppServerReplayTranscript;
   readonly driver?: CodexReplay.CodexAppServerReplayDriver;
@@ -213,14 +216,15 @@ export function layer(input: {
     ServerConfig.ServerConfig,
     makeReplayServerConfig(input.transcript.scenario).pipe(Effect.orDie),
   ).pipe(Layer.provide(NodeServices.layer));
-  const layerRegistry = ProviderAdapterRegistry.layerFromDrivers({
-    drivers: [CodexAdapterV2.CodexAdapterV2Driver],
-    configMap: {
-      [CodexAdapterV2.CODEX_DEFAULT_INSTANCE_ID]: {
-        driver: CodexAdapterV2.CODEX_DRIVER_KIND,
-      },
-    },
-  }).pipe(
+  const layerRegistry = ProviderAdapterRegistry.layerFromAdaptersEffect(
+    CodexAdapterV2.createCodexAdapterV2({
+      instanceId: CodexAdapterV2.CODEX_DEFAULT_INSTANCE_ID,
+      displayName: undefined,
+      environment: [],
+      enabled: true,
+      config: DEFAULT_CODEX_SETTINGS,
+    }).pipe(Effect.map((adapter) => [adapter])),
+  ).pipe(
     Layer.provide(
       Layer.mergeAll(
         layerReplayClientFactory,

@@ -7,7 +7,6 @@ import {
 } from "@infinitus/contracts";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import { useAtomValue } from "@effect/atom-react";
-import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { createContext, type ReactNode, useContext } from "react";
 
@@ -37,6 +36,7 @@ const memberProjectFilesAtom = Atom.family((membersKey: string) => {
       const result = get(getProjectFileQueryAtom(environmentId, workspaceRoot, fileName));
       if (result.waiting) return "waiting";
       const data =
+<<<<<<< HEAD
         get(optimisticFileAtom(environmentId, workspaceRoot, fileName))?.data ??
         Option.getOrNull(AsyncResult.value(result));
       return data === null || data.exists === false ? null : data;
@@ -48,6 +48,10 @@ const memberProjectFilesAtom = Atom.family((membersKey: string) => {
       if (preferred === "waiting") continue;
       const data = preferred ?? read(environmentId, workspaceRoot, LEGACY_T3_PROJECT_FILE_NAME);
       if (data === "waiting") continue;
+=======
+        get(optimisticFileAtom(environmentId, workspaceRoot, T3_PROJECT_FILE_NAME))?.data ??
+        AsyncResult.getOrElse(result, () => null);
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
       files.set(
         physicalProjectKey,
         data === null || data.truncated ? null : parseT3ProjectFile(data.contents),

@@ -1,11 +1,14 @@
 import { AudioPreview } from "../files/AudioPreview";
 import { onTestFinished } from "vite-plus/test";
+import { page } from "vite-plus/test/browser";
 import { stubGlobal } from "../../../test/render";
 import {
   EnvironmentId,
   MessageId,
   RunAttemptId,
   RunId,
+  RuntimeRequestId,
+  TurnItemId,
   ScheduledTaskId,
   ThreadId,
 } from "@infinitus/contracts";
@@ -18,7 +21,10 @@ import "~/index.css";
 import { act, fakeTimers, render } from "../../../test/render";
 import { MessagesTimeline } from "./MessagesTimeline";
 import { makeStreamingTimelineFixture } from "../../test-fixtures";
-import { deriveTimelineEntriesFromVisibleTurnItems } from "../../session-logic";
+import {
+  type PendingApproval,
+  deriveTimelineEntriesFromVisibleTurnItems,
+} from "../../session-logic";
 import { remarkThoughtPreview } from "./TimelineWorkEntryRow.logic";
 import { parseMarkdownWithMath } from "@infinitus/shared/markdownMath";
 import { collectThreadFindRanges } from "./threadFindHighlights";
@@ -67,7 +73,6 @@ type Entry = TimelineProps["timelineEntries"][number];
 function baseProps(): Omit<TimelineProps, "timelineEntries"> {
   return {
     isWorking: false,
-    activeTurnInProgress: false,
     listRef: createRef<LegendListRef | null>(),
     latestRun: null,
     turnDiffSummaries: [],
@@ -76,7 +81,6 @@ function baseProps(): Omit<TimelineProps, "timelineEntries"> {
     onOpenTurnDiff: () => {},
     onOpenThread: () => {},
     onForkFromRun: async () => {},
-    onRollbackCheckpoint: () => {},
     supportsConversationRollback: false,
     onRevertToTurnCount: () => {},
     isRevertingCheckpoint: false,
@@ -199,6 +203,29 @@ describe("MessagesTimeline messages", () => {
       expect(props.listRef.current!.getState().sizeAtIndex(0)).toBeGreaterThan(0);
     });
     expect(maxNestedCommits).toBeLessThan(20);
+  });
+
+  it("keeps reporting overflow while the composer inset changes", async () => {
+    setup();
+    const props = baseProps();
+    const overflowReports: boolean[] = [];
+    const replies = Array.from({ length: 40 }, (_, index) =>
+      message(`Reply ${index}\n\n${"line\n\n".repeat(8)}`, { role: "assistant" }, `r-${index}`),
+    );
+    const timeline = (inset: number) => (
+      <MessagesTimeline
+        {...props}
+        timelineEntries={replies}
+        contentInsetEndAdjustment={inset}
+        onContentOverflowChange={(overflows) => overflowReports.push(overflows)}
+      />
+    );
+    await using screen = await renderElement(timeline(110));
+    await vi.waitFor(() => expect(overflowReports.at(-1)).toBe(true));
+    overflowReports.length = 0;
+    // The resting composer resizes with overflow; a false report here flips it back.
+    await screen.rerender(timeline(148));
+    expect(overflowReports).not.toContain(false);
   });
 
   it("keeps the first and last message headings reachable from either end", async () => {
@@ -962,7 +989,6 @@ it("renders automatic compaction as one live divider that finishes with its reas
       timelineEntries={entries(completed)}
       isWorking={!completed}
       isCompacting={!completed}
-      activeTurnInProgress={!completed}
       activeTurnStartedAt={fixture.time(5)}
       latestRun={{
         runId: fixture.runId,
@@ -992,4 +1018,173 @@ it("renders automatic compaction as one live divider that finishes with its reas
     .toBeVisible();
   expect(container.querySelectorAll('[role="separator"]')).toHaveLength(1);
   expect(container.textContent).not.toContain("Compacting before");
+});
+
+it("keeps concurrent approvals actionable outside collapsed work and restores settled rows", async () => {
+  setup();
+  const fixture = makeStreamingTimelineFixture();
+  const source = fixture.visibleTurnItems[4]!;
+  if (source.item.type !== "dynamic_tool") throw new Error("Expected fixture tool");
+  const sourceItem = source.item;
+  const commandRequest = RuntimeRequestId.make("command-approval");
+  const appRequest = RuntimeRequestId.make("app-approval");
+  const approvals: PendingApproval[] = [
+    {
+      requestId: commandRequest,
+      requestKind: "command",
+      createdAt: fixture.time(6),
+      detail: "printf '" + "long-command ".repeat(80) + "'",
+      reason: "Needs permission to run the command",
+      fullAccessOverride: "ask_rule",
+      responseCapability: "live",
+    },
+    {
+      requestId: appRequest,
+      requestKind: "permission",
+      createdAt: fixture.time(6),
+      detail: "Open the current tab",
+      appName: "Safari",
+      options: [
+        { decision: "decline", label: "Deny" },
+        { decision: "accept", label: "Allow once" },
+        {
+          decision: "acceptAlways",
+          label: "Always allow Safari",
+          warning: "Applies to future requests",
+        },
+      ],
+      responseCapability: "live",
+    },
+  ];
+  const entries = (completed = false) =>
+    deriveTimelineEntriesFromVisibleTurnItems({
+      visibleTurnItems: [
+        { ...source, item: { ...sourceItem, status: completed ? "completed" : sourceItem.status } },
+        ...approvals.map((approval, index) => ({
+          ...source,
+          position: source.position + index + 1,
+          sourceItemId: TurnItemId.make(`approval-${index}`),
+          item: {
+            ...sourceItem,
+            id: TurnItemId.make(`approval-${index}`),
+            type: "approval_request" as const,
+            status: completed ? ("completed" as const) : ("waiting" as const),
+            requestId: approval.requestId,
+            requestKind: approval.requestKind,
+            prompt: approval.detail,
+          },
+        })),
+      ],
+      optimisticMessages: [],
+    });
+  const props = baseProps();
+  const onRespondToApproval = vi.fn(async () => {});
+  const ui = (overrides: Partial<TimelineProps> = {}) => (
+    <MessagesTimeline
+      {...props}
+      timelineEntries={entries()}
+      pendingApprovals={approvals}
+      canOperateThread
+      onRespondToApproval={onRespondToApproval}
+      isWorking
+      runningRunId={fixture.runId}
+      {...overrides}
+    />
+  );
+  await using screen = await renderElement(ui());
+  await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
+  await expect
+    .element(screen.getByRole("group", { name: "App permission approval" }))
+    .toBeVisible();
+  await expect.element(screen.getByText(approvals[0]!.detail!, { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("Needs permission to run the command")).toBeVisible();
+  await vi.waitFor(() => {
+    expect(
+      getComputedStyle(screen.getByLabelText("Command", { exact: true }).element()).userSelect,
+    ).toBe("text");
+    expect(
+      getComputedStyle(screen.getByText("Needs permission to run the command").element())
+        .userSelect,
+    ).toBe("text");
+  });
+  await expect.element(screen.getByText("Safari", { exact: true })).toBeVisible();
+  await click(screen.button("Why am I being asked this?"));
+  await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
+  await click(screen.button("Why am I being asked this?"));
+  await click(screen.buttons("More approval options")[1]!);
+  await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
+  expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "acceptAlways");
+  await click(screen.buttons("More approval options")[0]!);
+  await expect.element(page.getByRole("menuitem", { name: "Cancel", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Always allow this session" }).click();
+  expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "acceptForSession");
+  await click(screen.button("Decline"));
+  expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "decline");
+  await click(screen.button("Allow once"));
+  expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "accept");
+  for (const timelineEntries of [entries(), []]) {
+    await screen.rerender(
+      ui({ timelineEntries, heldApprovalRequestIds: new Set([commandRequest]) }),
+    );
+    await expect
+      .element(screen.getByRole("group", { name: "Command approval" }))
+      .not.toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
+    await expect
+      .element(screen.getByRole("button", { name: "Allow once", exact: true }))
+      .toBeVisible();
+    await screen.rerender(ui({ timelineEntries }));
+    await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
+    await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(1));
+  }
+  await screen.rerender(ui({ timelineEntries: [], isWorking: false }));
+  await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
+  await click(screen.button("Approve"));
+  expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "accept");
+  await click(screen.button("Deny"));
+  expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "decline");
+  await screen.rerender(
+    ui({
+      timelineEntries: [],
+      isWorking: false,
+      pendingApprovals: [{ ...approvals[0]!, detail: "" }],
+    }),
+  );
+  await expect
+    .element(screen.getByLabelText("Command", { exact: true }))
+    .toHaveTextContent("Command approval");
+  await screen.rerender(ui({ canOperateThread: false }));
+  await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
+  await vi.waitFor(() =>
+    expect(
+      screen.buttons("More approval options").every((button) => button.hasAttribute("disabled")),
+    ).toBe(true),
+  );
+  await screen.rerender(ui({ respondingRequestIds: [commandRequest] }));
+  await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
+  await expect
+    .element(screen.getByRole("button", { name: "Allow once", exact: true }))
+    .toBeEnabled();
+  await screen.rerender(
+    ui({ pendingApprovals: [{ ...approvals[0]!, responseCapability: "not_resumable" }] }),
+  );
+  await expect
+    .element(screen.getByText("Provider process is gone. Interrupt or restart the run to respond."))
+    .toBeVisible();
+  await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
+  await screen.rerender(
+    ui({ pendingApprovals: [], timelineEntries: entries(true), isWorking: false }),
+  );
+  await expect
+    .element(screen.getByRole("group", { name: "Command approval" }))
+    .not.toBeInTheDocument();
+  await vi.waitFor(() => expect(screen.text()).not.toContain("Waiting for approval"));
+  await screen.getByRole("button", { expanded: false }).click();
+  await expect
+    .element(screen.getByRole("button", { name: approvals[0]!.detail!, exact: true }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Open the current tab", exact: true }))
+    .toBeVisible();
 });

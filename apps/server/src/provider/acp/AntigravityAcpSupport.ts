@@ -36,9 +36,12 @@ export interface AntigravityAcpRuntimeInput extends Omit<
   | "transformSessionUpdate"
   | "transformStdout"
 > {
+<<<<<<< HEAD
   readonly threadId?: string;
   readonly environmentId?: string;
   readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
+=======
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
   readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
   readonly onAuthorizationUrl?: (url: string) => Effect.Effect<void, EffectAcpErrors.AcpError>;
   readonly clientFileSystem?: boolean;

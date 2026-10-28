@@ -6,17 +6,18 @@ import {
   type ServerSelfUpdateProgressStage,
   type ServerRunningTurn,
   type ServerSelfUpdateResult,
+<<<<<<< HEAD
   type ServerUpdateRunningTurnsPolicy,
   type ThreadId,
+=======
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
 } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import * as Cause from "effect/Cause";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as FileSystem from "effect/FileSystem";
@@ -73,6 +74,7 @@ export class ServerSelfUpdate extends Context.Service<
   }
 >()("t3/cloud/selfUpdate/ServerSelfUpdate") {}
 
+<<<<<<< HEAD
 /** How often a `wait` update re-reads the running turns (#829). */
 export const RUNNING_TURNS_POLL = Duration.seconds(5);
 
@@ -266,6 +268,8 @@ export const withRunningThreadContinuation = Effect.fn(
   });
 });
 
+=======
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
 /**
  * A server starting from the runtime its launcher settled on means runtimes left by earlier
  * updates can go. The boot service says so through its IPC context. The SSH launcher and the

@@ -1,8 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
+<<<<<<< HEAD
 import { RunId, ServerSelfUpdateError, ThreadId } from "@infinitus/contracts";
+=======
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -132,6 +134,7 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
 });
 
 it.layer(NodeServices.layer)("server self update", (it) => {
+<<<<<<< HEAD
   it.effect("refuses an update while a turn runs, naming the turns (#829)", () =>
     Effect.gen(function* () {
       const running = [{ threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") }];
@@ -416,6 +419,8 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     }),
   );
 
+=======
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
   // regression: #5181 make remote updates rollback-safe
   it.effect("rejects invalid versions and desktop-managed servers before staging", () =>
     Effect.gen(function* () {

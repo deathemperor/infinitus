@@ -8,12 +8,12 @@ import * as Redacted from "effect/Redacted";
 import * as SourceControlHost from "@infinitus/source-control-core/server/SourceControlHost";
 import * as TestSourceControlHost from "@infinitus/source-control-testing/TestSourceControlHost";
 
-import * as GitHubRest from "./GitHubRest.ts";
+import * as GitHubAppAccess from "./GitHubAppAccess.ts";
 import { cascadeRebaseStack } from "./githubStackRebase.ts";
 
 const layer = Layer.mergeAll(
-  Layer.mock(GitHubRest.GitHubRest)({
-    credential: () => Effect.succeed({ token: Redacted.make("token"), fingerprint: "fp" }),
+  Layer.mock(GitHubAppAccess.GitHubAppAccess)({
+    credentialFor: () => Effect.succeed({ token: Redacted.make("token"), fingerprint: "fp" }),
   }),
   TestSourceControlHost.layerWithRealGit(),
 ).pipe(Layer.provideMerge(NodeServices.layer));

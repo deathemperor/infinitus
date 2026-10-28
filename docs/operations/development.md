@@ -73,6 +73,7 @@ Read ports from the `[dev-runner]` output. Worktrees derive stable preferences f
 but occupied ports can shift them. `T3CODE_PORT_OFFSET` or `T3CODE_DEV_INSTANCE` can select a
 different preference when needed.
 
+<<<<<<< HEAD
 #### Publishing to the Mac app
 
 Only the installed desktop's bundled server publishes its port and the `infinitusctl`
@@ -86,6 +87,20 @@ To drive one dev server from `infinitusctl` instead, start it with
 slot from it even while it runs. Hand the slot back by quitting that server, or with
 `infinitusctl desktop release`; the installed desktop's heartbeat re-takes it within a minute,
 without a restart. `infinitusctl desktop status` names the environment holding the slot.
+=======
+### Replay provider
+
+`vp run dev` registers `Replay (dev)`, a local ACP agent at
+[dev-replay-agent.ts](../../apps/server/scripts/dev-replay-agent.ts). It plays recorded
+ACP transcripts with simulated streaming, so the real adapter, orchestration, and UI run
+without a paid model. Each scenario is a model, and each prompt plays the next recorded turn.
+Bundled servers, including desktop dev, skip it because they have no agent script.
+Dev servers add it back on start, so turn it off in Settings instead of removing it.
+To add a scenario, point a `SCENARIOS` entry at a generic ACP replay fixture
+(`registry_transcript.ndjson`) or a file in [dev-replay](../../apps/server/scripts/dev-replay).
+The agent replays session updates, permission requests, and questions. It drops session setup
+and vendor frames, so Grok and fx recordings lose their vendor-only behavior.
+>>>>>>> upstream-sync-2a738273e-upstream-renamed
 
 ### Sharing and remote debugging
 
