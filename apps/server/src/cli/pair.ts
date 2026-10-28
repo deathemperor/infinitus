@@ -8,6 +8,7 @@ import {
 import { resolveWorktreeT3Home } from "@infinitus/shared/devHome";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { DEFAULT_SIGNAL_EXPORT } from "@infinitus/shared/observability";
+import { buildPairingAppLink } from "@infinitus/shared/remote";
 import * as OtelEnvironment from "@infinitus/shared/otelEnvironment";
 import {
   buildTailscaleHttpsBaseUrl,
@@ -193,6 +194,7 @@ const formatPairOutput = (input: {
     renderTerminalQrCode(input.pairingUrl),
     "",
     `Pairing URL: ${input.pairingUrl}`,
+    `App link: ${buildPairingAppLink(input.pairingUrl)}`,
     `Token: ${input.token}`,
     `Expires: ${DateTime.formatIso(input.expiresAt)}`,
     ...input.notes.flatMap((note) => ["", `Note: ${note}`]),

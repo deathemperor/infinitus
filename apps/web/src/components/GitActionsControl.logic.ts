@@ -425,5 +425,3 @@ export function resolveLiveThreadBranchUpdate(input: {
     branch: input.gitStatus.refName,
   };
 }
-
-export { resolveAutoFeatureBranchName } from "@infinitus/shared/git";
