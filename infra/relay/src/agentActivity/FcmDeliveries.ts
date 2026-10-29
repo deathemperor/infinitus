@@ -148,7 +148,7 @@ export class FcmDeliveries extends Context.Service<
   }
 >()("infinitus-relay/agentActivity/FcmDeliveries") {}
 
-export const make = Effect.gen(function* () {
+const make = Effect.gen(function* () {
   const config = yield* RelayConfiguration.RelayConfiguration;
   const crypto = yield* Crypto.Crypto;
   const sender = yield* FcmDeliveryQueueSender.FcmDeliveryQueueSender;

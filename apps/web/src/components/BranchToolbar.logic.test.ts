@@ -1,7 +1,7 @@
 import { type VcsRef } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
+import { dedupeRemoteBranchesWithLocalMatches } from "@infinitus/shared/git";
 import {
-  dedupeRemoteBranchesWithLocalMatches,
   deriveLocalBranchNameFromRemoteRef,
   resolveBranchSelectionTarget,
   resolveDraftEnvModeAfterBranchChange,

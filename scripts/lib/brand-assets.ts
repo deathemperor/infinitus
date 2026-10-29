@@ -51,6 +51,7 @@ export function resolveWebAssetBrandForChannel(channel: WebAssetChannel): WebAss
   return channel === "nightly" ? "nightly" : "production";
 }
 
+<<<<<<< HEAD
 /** Every build of this repo wears the Infinitus brand, its own nightly (#1042)
     included; only an upstream nightly or preview (first prerelease id `nightly` /
     `preview`, #823) keeps its own. The fork cuts no previews; that arm is kept so
@@ -59,6 +60,8 @@ export function resolveWebAssetBrandForPackageVersion(version: string): WebAsset
   return /^[^-+]+-(?:nightly|preview)\./.test(version) ? "nightly" : "infinitus";
 }
 
+=======
+>>>>>>> upstream-sync-dac8b11dd-upstream-renamed
 export interface IconOverride {
   readonly sourceRelativePath: string;
   readonly targetRelativePath: string;

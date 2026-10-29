@@ -73,7 +73,7 @@ import {
 import { useBrowserDefaults } from "~/browser/browserDefaults";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
-import { faviconUrlForOrigin } from "~/lib/favicon";
+import { faviconUrlForOrigin } from "@infinitus/shared/favicon";
 import { useTheme } from "~/hooks/useTheme";
 import { useDeviceState } from "~/state/device";
 import type { PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
@@ -390,6 +390,7 @@ function RightPanelEmptyState(props: {
     event.stopPropagation();
     action.onClick();
   });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a capture-phase window keydown listener for surface shortcuts while the menu is mounted
   useEffect(() => {
     const handler = (event: KeyboardEvent) => handleShortcut(event);
     window.addEventListener("keydown", handler, true);
@@ -436,7 +437,7 @@ function RightPanelEmptyState(props: {
 
   return (
     <div
-      ref={focusOnMount}
+      data-workspace-focus-default
       tabIndex={0}
       onKeyDown={handleKeyDown}
       aria-label="Open a surface"
@@ -712,17 +713,17 @@ function PullRequestSurfaceIcon({
       ? undefined
       : configs.get(resolvedEnvironmentId)?.environment.capabilities;
   const linkedSnapshot =
-    capabilities?.threadPullRequests === true
+    capabilities !== undefined
       ? (resolvePullRequestTabLink(threads, resolvedEnvironmentId, host, surface)?.snapshot ?? null)
       : null;
   const detail = useEnvironmentQuery(
-    resolvedEnvironmentId === null || capabilities?.pullRequests !== true || linkedSnapshot !== null
+    resolvedEnvironmentId === null || capabilities === undefined || linkedSnapshot !== null
       ? null
       : pullRequestEnvironment.detail({
           environmentId: resolvedEnvironmentId,
           input: {
             projectId: surface.projectId as ProjectId,
-            ...(capabilities?.threadPullRequests === true && surface.host !== undefined
+            ...(capabilities !== undefined && surface.host !== undefined
               ? { host: surface.host }
               : {}),
             repository: surface.repository,
@@ -746,10 +747,6 @@ function PullRequestSurfaceIcon({
     isDraft: status.isDraft ?? detail?.isDraft ?? seed?.isDraft ?? false,
   });
   return <presentation.Icon className={cn("size-3 shrink-0", presentation.toneClassName)} />;
-}
-
-function focusOnMount(node: HTMLDivElement | null) {
-  node?.focus();
 }
 
 function SortableTabList(props: {
@@ -945,6 +942,7 @@ function RightPanelTab(
 }
 
 export function RightPanelTabs(props: RightPanelTabsProps) {
+  const focusedSurface = props.surfaces.find((surface) => surface.id === props.activeSurfaceId);
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
   const browserProfiles = useBrowserDefaults().profiles;
   const { resolvedTheme } = useTheme();
@@ -976,6 +974,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       setAddSurfaceMenuOpen(true);
     }
   });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a document keydown listener for the new surface shortcut while the panel is open
   useEffect(() => {
     if (props.open === false) return;
     document.addEventListener("keydown", onNewSurfaceKeyDown, true);
@@ -1182,6 +1181,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   });
 
   // A newly active tab, or tabs that start overflowing, can sit outside the scrolled strip.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scrolls the active tab DOM node into view after it changes or the tab strip starts overflowing
   useEffect(() => {
     if (!props.activeSurfaceId || !tabScrollState.hasOverflow) return;
     const activeTab = tabListRef.current?.querySelector<HTMLElement>("[data-active-tab='true']");
@@ -1224,6 +1224,13 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
   return (
     <PreviewPanelShell
+      workspaceArea
+      workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
+      workspaceLabel={
+        focusedSurface
+          ? `Workspace panel: ${surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById)}`
+          : "Workspace panel"
+      }
       mode={props.mode}
       {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
       {...(props.open !== undefined ? { open: props.open } : {})}

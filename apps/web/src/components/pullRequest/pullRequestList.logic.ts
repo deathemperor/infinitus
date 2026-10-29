@@ -19,7 +19,7 @@ import type {
   PullRequestState,
 } from "@infinitus/contracts";
 
-import { toSortableTimestamp } from "../../lib/threadSort";
+import { toSortableTimestamp } from "@infinitus/client-runtime/state/thread-sort";
 import type { PullRequestListSort } from "./pullRequestListPreferences";
 
 export interface EnvironmentPullRequestEntry extends PullRequestListEntry {

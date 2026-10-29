@@ -188,6 +188,11 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
       ) ?? null)
     : null;
   const { connectedEnvironments } = useRemoteConnectionStatus();
+  const connectedEnvironmentIds = new Set(
+    connectedEnvironments
+      .filter((environment) => environment.connectionState === "connected")
+      .map((environment) => environment.environmentId),
+  );
   const openScratch = useAtomCommand(projectEnvironment.openScratch, {
     reportFailure: false,
   });
@@ -288,6 +293,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     scratchStartInFlightRef.current = false;
   }
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- navigates to the incoming share's reserved destination draft once its project loads and the screen is focused
   useEffect(() => {
     const destination = incomingShare?.destination;
     if (!destination) {
@@ -536,6 +542,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                 const selectionTarget = getProjectScopeSelectionTarget(
                   scope,
                   selectedEnvironmentId,
+                  connectedEnvironmentIds,
                 );
                 if (Platform.OS === "android") {
                   return (
