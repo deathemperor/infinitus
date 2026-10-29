@@ -362,7 +362,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 =======
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     # Shards take 2-5 minutes. When the shared task cache throttles reads, each
     # failed fetch stalls vp for 15-90s, which pushed shards past 10 minutes.
     timeout-minutes: 20
