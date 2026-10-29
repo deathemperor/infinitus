@@ -1,8 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
+<<<<<<< HEAD
 import { RunId, ServerSelfUpdateError, ThreadId } from "@infinitus/contracts";
+=======
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -132,6 +134,7 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
 });
 
 it.layer(NodeServices.layer)("server self update", (it) => {
+<<<<<<< HEAD
   it.effect("refuses an update while a turn runs, naming the turns (#829)", () =>
     Effect.gen(function* () {
       const running = [{ threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") }];
@@ -416,6 +419,8 @@ it.layer(NodeServices.layer)("server self update", (it) => {
     }),
   );
 
+=======
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
   // regression: #5181 make remote updates rollback-safe
   it.effect("rejects invalid versions and desktop-managed servers before staging", () =>
     Effect.gen(function* () {
@@ -600,4 +605,37 @@ it.layer(NodeServices.layer)("pruning runtimes on start", (it) => {
       expect(remaining).toEqual([staleVersion, packageJson.version].toSorted());
     }),
   );
+});
+
+it("a host crosses tracks only to a release that knows its whole database", () => {
+  const cross = (
+    serverVersion: string,
+    targetVersion: string,
+    targetDatabaseMigration: number | undefined,
+    databaseMigration = 72,
+  ) =>
+    ServerSelfUpdate.trackSwitchBlockReason({
+      serverVersion,
+      targetVersion,
+      targetDatabaseMigration,
+      databaseMigration: () => databaseMigration,
+    });
+  const nightly = "0.1.4-nightly.20261027.3796";
+
+  expect(cross(nightly, "0.1.4", 72)).toBeNull();
+  // Another client moved this host to a newer Nightly after the switch was planned.
+  expect(cross(nightly, "0.1.4", 72, 73)).toContain("does not support yet");
+  expect(cross(nightly, "0.1.4", undefined)).toContain("Cannot confirm");
+  // A Stable tag can carry a migration the latest Nightly lacks.
+  expect(cross("0.1.4", nightly, 72, 73)).toContain("does not support yet");
+  expect(cross("0.1.3", "0.1.4", undefined)).toBeNull();
+  // A database that exists but cannot be read proves nothing.
+  expect(
+    ServerSelfUpdate.trackSwitchBlockReason({
+      serverVersion: nightly,
+      targetVersion: "0.1.4",
+      targetDatabaseMigration: 72,
+      databaseMigration: () => undefined,
+    }),
+  ).toContain("Cannot confirm");
 });

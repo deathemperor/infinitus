@@ -24,6 +24,7 @@ import { readAgentActivityPublishingActive } from "../cloud/config.ts";
 import { resolveServerSelfUpdateCapability } from "../cloud/selfUpdate.ts";
 import { resolveServiceLauncherMode } from "../cloud/serviceLauncherClient.ts";
 import * as ServerConfig from "../config.ts";
+import { databaseMigrationHead } from "../persistence/databaseMigrationHead.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { resolveServerEnvironmentLabel } from "./ServerEnvironmentLabel.ts";
 import { detectServerEnvironmentMachineKind } from "./ServerEnvironmentMachine.ts";
@@ -208,6 +209,7 @@ export const make = Effect.gen(function* () {
   const desktopAppUpdate =
     serverSelfUpdate === "desktop-managed" && serverConfig.desktopTelemetryControlFd !== undefined;
 
+<<<<<<< HEAD
   // Computed from the same pure resolver the client layer uses rather than by
   // pulling `InfinitusControlClient` in: the descriptor is built where no
   // Infinitus service is reachable, and the references it needs are here.
@@ -220,6 +222,9 @@ export const make = Effect.gen(function* () {
   // Fork (#651): where a phone on the Mac's own network can dial this server.
   const lanBaseUrls = lanHttpBaseUrls({ host: serverConfig.host, port: serverConfig.port });
 
+=======
+  const databaseMigration = databaseMigrationHead(serverConfig.dbPath);
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
   const descriptor: ExecutionEnvironmentDescriptor = {
     environmentId,
     label,
@@ -230,6 +235,7 @@ export const make = Effect.gen(function* () {
     },
     serverVersion: packageJson.version,
     orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
+    ...(databaseMigration === undefined ? {} : { databaseMigration }),
     capabilities: {
       repositoryIdentity: true,
       connectionProbe: true,
@@ -263,6 +269,7 @@ export const make = Effect.gen(function* () {
       threadPinReorder: true,
       threadActiveReorder: true,
       threadAutoSettleOptOut: true,
+      threadProjectFromScratch: true,
       threadTitleRegeneration: true,
       commandOutputStreaming: true,
       threadVisitedTracking: true,
@@ -272,18 +279,27 @@ export const make = Effect.gen(function* () {
       threadPullRequestLinking: true,
       serverResolvedCommandContext: true,
       threadStop: true,
+      ...(hostPlatform === "win32" ? {} : { localServerStop: true }),
       environmentIcon: true,
       projectCloneTracking: true,
       ignoredFileListing: true,
+      triage: true,
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),
       ...(serverInstallation === null ? {} : { serverInstallation }),
       ...(serverSelfUpdate === "boot-service" || desktopAppUpdate
         ? { serverSelfUpdateProgress: true }
         : {}),
+<<<<<<< HEAD
       ...(desktopAppUpdate ? { desktopAppUpdate: true } : {}),
       stats: true,
       infinitus: infinitusSocketPath !== null,
+=======
+      ...(desktopAppUpdate ? { desktopAppUpdate: true, desktopAppChannelSwitch: true } : {}),
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
       serverBrowser: true,
+      peerLinks: true,
+      mcpModeLimitHeader: true,
+      linkFence: true,
     },
     ...(lanBaseUrls.length === 0 ? {} : { lanHttpBaseUrls: lanBaseUrls }),
   };

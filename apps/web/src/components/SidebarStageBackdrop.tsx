@@ -1,5 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
+<<<<<<< HEAD
 import type { ReactElement } from "react";
+=======
+import type { EnvironmentIdentificationMode } from "@infinitus/contracts";
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
 import { useId } from "react";
 
 import { APP_STAGE_LABEL } from "../branding";
@@ -20,10 +24,16 @@ const STAGE_BACKDROP_VIEW_BOX = "0 0 8192 96";
  */
 export function resolveSidebarStageBackdropVariant(
   stageLabel: string,
+<<<<<<< HEAD
   enabled = true,
   themeScene: StageArtScene | null = null,
+=======
+  mode: EnvironmentIdentificationMode = "artwork",
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
 ): SidebarStageBackdropVariant | null {
-  if (!enabled) return null;
+  if (mode === "nightly-artwork") return "nightly";
+  if (mode === "dev-artwork") return "dev";
+  if (mode !== "artwork") return null;
   const normalized = stageLabel.trim().toLowerCase();
   // Fork: the release track draws artwork too. Upstream leaves its stable
   // channel bare because the art is how it marks a prerelease; here every build
@@ -56,6 +66,7 @@ export function useEnvironmentStageLabel(): string {
   });
 }
 
+<<<<<<< HEAD
 /** The scene the active theme asks for, or null when it leaves the choice open. */
 function useThemeStageArtScene(): StageArtScene | null {
   const { resolvedTheme, theme, themeHalves } = useTheme();
@@ -66,6 +77,12 @@ export function useSidebarStageBackdropVariant(enabled = true): SidebarStageBack
   const stageLabel = useEnvironmentStageLabel();
   const themeScene = useThemeStageArtScene();
   return resolveSidebarStageBackdropVariant(stageLabel, enabled, themeScene);
+=======
+export function useSidebarStageBackdropVariant(
+  mode: EnvironmentIdentificationMode,
+): SidebarStageBackdropVariant | null {
+  return resolveSidebarStageBackdropVariant(useEnvironmentStageLabel(), mode);
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
 }
 
 export function SidebarStageBackdrop({ variant }: { variant: SidebarStageBackdropVariant }) {
@@ -79,6 +96,7 @@ export function SidebarStageBackdrop({ variant }: { variant: SidebarStageBackdro
   );
 }
 
+<<<<<<< HEAD
 type StageSceneArt = (props: { compact?: boolean }) => ReactElement;
 
 const STAGE_SCENE_ART: Readonly<Record<SidebarStageBackdropVariant, StageSceneArt>> = {
@@ -92,6 +110,10 @@ const STAGE_SCENE_ART: Readonly<Record<SidebarStageBackdropVariant, StageSceneAr
 export function StageBackdropArt({ variant }: { variant: SidebarStageBackdropVariant }) {
   const Art = STAGE_SCENE_ART[variant];
   return <Art />;
+=======
+function StageBackdropArt({ variant }: { variant: SidebarStageBackdropVariant }) {
+  return variant === "nightly" ? <NightlySkyArt /> : <DevBlueprintArt />;
+>>>>>>> upstream-sync-c1876b57c-upstream-renamed
 }
 
 export function StageBackdropButtonArt({ variant }: { variant: SidebarStageBackdropVariant }) {

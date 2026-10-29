@@ -2,7 +2,8 @@ import { EnvironmentId, ThreadId } from "@infinitus/contracts";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
 import { describe, expect, it } from "vite-plus/test";
 import { formatInlineContextReference } from "../../lib/composerContextReferences";
-import { threadContextRecord, threadContextReference } from "../../lib/composerContextRecords";
+import { threadContextReference } from "../../lib/composerContextRecords";
+import { threadContextRecord } from "@infinitus/shared/composerContextReferences";
 import {
   approvalRedirectNotice,
   loadBalancingSendWarning,
