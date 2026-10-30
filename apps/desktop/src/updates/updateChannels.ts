@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { DesktopUpdateChannel } from "@infinitus/contracts";
 
 /** The version's first prerelease id (`alpha` for `0.5.0-alpha.1`), or
@@ -5,6 +6,10 @@ import type { DesktopUpdateChannel } from "@infinitus/contracts";
     the GitHub feed on it (#924), so every rule here reads it and never a
     substring: `0.5.0-alpha.6-infinitus-nightly.20260913.42` is an `alpha`. */
 const PRERELEASE_ID_PATTERN = /^\d+\.\d+\.\d+-([0-9A-Za-z-]+)/;
+=======
+// Preview builds share nightly branding but ship without an update feed.
+const PRERELEASE_VERSION_PATTERN = /^[^-+]+-(?:nightly|preview)\.\d{8}\.\d+$/;
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
 
 function resolvePrereleaseId(version: string): string | undefined {
   return PRERELEASE_ID_PATTERN.exec(version)?.[1];
@@ -36,6 +41,7 @@ export function isInfinitusNightlyDesktopVersion(version: string): boolean {
 export function isInfinitusDesktopVersion(version: string): boolean {
   return !isNightlyDesktopVersion(version);
 }
+<<<<<<< HEAD
 
 export function resolveDefaultDesktopUpdateChannel(appVersion: string): DesktopUpdateChannel {
   // The nightly TRACK, not the nightly brand: an upstream preview brands as
@@ -90,3 +96,5 @@ export function resolveElectronUpdaterFeed(
     ? { channel: "latest", allowPrerelease: false, allowDowngrade: nightlyBuild }
     : { channel: prereleaseId, allowPrerelease: true, allowDowngrade: nightlyBuild };
 }
+=======
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed

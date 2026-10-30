@@ -29,7 +29,8 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
       appearance={{
         elements: {
           avatarBox: "size-7",
-          userButtonTrigger: "rounded-lg p-1 hover:bg-sidebar-row-hover",
+          // Clerk's unlayered trigger reset (padding, radius, background) beats layered utilities.
+          userButtonTrigger: "mb-1! rounded-lg! p-1! hover:bg-sidebar-row-hover!",
         },
       }}
     >
@@ -49,11 +50,12 @@ function ConfiguredInfinitusConnectSidebarAvatar() {
 
 function ConfiguredInfinitusConnectSidebarSignIn() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { authPrompt, openAuthPrompt } = useInfinitusConnectAuthPrompt();
+  const { openAuthPrompt } = useInfinitusConnectAuthPrompt();
 
   if (!isLoaded || isSignedIn) return null;
 
   return (
+<<<<<<< HEAD
     <>
       <SidebarMenu>
         <SidebarMenuItem>
@@ -65,5 +67,15 @@ function ConfiguredInfinitusConnectSidebarSignIn() {
       </SidebarMenu>
       {authPrompt}
     </>
+=======
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton onClick={openAuthPrompt}>
+          <LogInIcon />
+          <span>Sign in to T3 Connect</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
   );
 }

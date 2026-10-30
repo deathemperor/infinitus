@@ -18,7 +18,9 @@ vi.mock(import("~/assets/assetUrls"), async (original) => ({
 // The real source view highlights through a worker pool; the text it receives is what matters here.
 // Never load the original: its highlighter graph can outlast waitFor on a cold CI browser.
 vi.mock(import("./ReadOnlySourcePreview"), () => ({
-  default: ({ text }: { text: string }) => <pre>{text}</pre>,
+  default: ({ text, wordWrap }: { text: string; wordWrap?: boolean }) => (
+    <pre data-word-wrap={String(wordWrap)}>{text}</pre>
+  ),
 }));
 
 // The Word engine compiles about 30 MB of WebAssembly in a fresh worker per document, which took
@@ -41,16 +43,18 @@ vi.mock(import("./office/WordDocument"), async () => {
   };
 });
 
+import { getClientSettings } from "~/hooks/useSettings";
 import { AttachmentFilePreview } from "./AttachmentFilePreview";
 import LargeTextViewer from "./LargeTextViewer";
 import VirtualTablePreview from "./VirtualTablePreview";
 import { OfficeFilePreview } from "./OfficeFilePreview";
 import { MermaidFilePreview } from "./MermaidFilePreview";
 import JSZip from "jszip";
-import { boundedZip } from "./boundedZip";
+import { boundedZip } from "@infinitus/client-runtime/zip/bounded-zip";
 import BinaryViewer from "./BinaryViewer";
 import { decodeImagePreview } from "./decodeImagePreview";
 import type { BinaryWorkerResult } from "./binaryPreviewProtocol";
+import type { TextPreviewResult } from "./largeTextProtocol";
 
 // Real worker imports and WASM initialization can exceed waitFor's default second
 // when the full browser project runs concurrently on CI.
@@ -462,12 +466,20 @@ describe("large text preview recovery", () => {
     const original = URL.createObjectURL(new Blob(["original\n".repeat(1000)]));
     const changed = URL.createObjectURL(new Blob(["changed\n".repeat(1000)]));
     const workers: Worker[] = [];
+    const indexed: Promise<void>[] = [];
     using _worker = stubGlobal(
       "Worker",
       class extends Worker {
         constructor(...args: ConstructorParameters<typeof Worker>) {
           super(...args);
           workers.push(this);
+          indexed.push(
+            new Promise((resolve) =>
+              this.addEventListener("message", (event: MessageEvent<TextPreviewResult>) => {
+                if (event.data.type === "meta" && event.data.complete) resolve();
+              }),
+            ),
+          );
         }
       },
     );
@@ -483,6 +495,7 @@ describe("large text preview recovery", () => {
           workspaceMutationId={mutation}
           revealLine={null}
           revealRequestId={0}
+          wordWrap
         />
       </div>
     );
@@ -499,6 +512,8 @@ describe("large text preview recovery", () => {
       await using screen = await render(preview("first"));
       await vi.waitFor(() => expect(workers).toHaveLength(1));
       await vi.waitFor(() => expect(screen.container.textContent).toContain("original"));
+      // A cold worker can take longer than waitFor allows to load and index on CI.
+      await indexed[0];
       await vi.waitFor(() => expect(screen.container.textContent).toContain("1,000 lines"));
       const viewport = screen.container.querySelector<HTMLElement>('[tabindex="0"]')!;
       await act(() =>
@@ -2149,8 +2164,10 @@ it("refreshes authorization and retries a failed streamed attachment", async () 
         asset={{ environmentId: EnvironmentId.make("test"), attachmentId: "retry" }}
       />,
     );
-    await vi.waitFor(() =>
-      expect(screen.container.textContent).toContain("This file contains binary data."),
+    // A cold large-text worker can take longer than waitFor's default to boot on CI.
+    await vi.waitFor(
+      () => expect(screen.container.textContent).toContain("This file contains binary data."),
+      { timeout: 10_000 },
     );
     await act(() =>
       screen.container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click(),
@@ -2212,7 +2229,10 @@ it("copies every indexed line rather than the mounted preview rows", async () =>
     <LargeTextViewer name="whole.txt" text={text} delimiter={null} copyContents={copyContents} />,
   );
   await vi.waitFor(() => expect(screen.container.textContent).toContain("line-0"));
-  await vi.waitFor(async () => expect(await copyContents.current!()).toBe(text));
+  // Copy rejects until the worker finishes indexing, which a cold worker can delay past waitFor's default on CI.
+  await vi.waitFor(async () => expect(await copyContents.current!()).toBe(text), {
+    timeout: 10_000,
+  });
   const first = copyContents.current!();
   await expect(copyContents.current!()).rejects.toThrow("Another copy is in progress.");
   expect(await first).toBe(text);
@@ -2287,12 +2307,16 @@ it("loads a font attachment through the lazy preview", async () => {
       file={file}
     />,
   );
-  await vi.waitFor(() => {
-    const frame = screen.container.querySelector("iframe");
-    expect(frame?.title).toBe("Carlito.ttf");
-    expect(frame?.srcdoc).toContain("@font-face");
-    expect(frame?.srcdoc).toContain("The quick brown fox");
-  });
+  // Two cold lazy chunks plus decoding a 600 KB font can take longer than waitFor's default on CI.
+  await vi.waitFor(
+    () => {
+      const frame = screen.container.querySelector("iframe");
+      expect(frame?.title).toBe("Carlito.ttf");
+      expect(frame?.srcdoc).toContain("@font-face");
+      expect(frame?.srcdoc).toContain("The quick brown fox");
+    },
+    { timeout: 10_000 },
+  );
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 });
 
@@ -2327,8 +2351,28 @@ it("toggles a Mermaid attachment between diagram and source through the lazy pre
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 });
 
+<<<<<<< HEAD
 // quarantine: #1711 no iframe within vi.waitFor on GitHub-hosted runners
 it.skip("mounts a bounded set of saved notebook outputs as the reader scrolls", async () => {
+=======
+it("unwraps one text attachment without turning off the word wrap setting", async () => {
+  const file = new Blob(["a long line"], { type: "text/plain" });
+  await using screen = await render(
+    <AttachmentFilePreview
+      name="notes.txt"
+      mimeType={file.type}
+      sizeBytes={file.size}
+      file={file}
+    />,
+  );
+  await screen.getByRole("button", { name: "Disable word wrap" }).click();
+  await expect.element(screen.getByRole("button", { name: "Enable word wrap" })).toBeVisible();
+  expect(getClientSettings().wordWrap).toBe(true);
+  expect(screen.container.querySelector("pre")?.dataset.wordWrap).toBe("false");
+});
+
+it("mounts a bounded set of saved notebook outputs as the reader scrolls", async () => {
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
   const notebook = {
     nbformat: 4,
     metadata: {},

@@ -401,7 +401,10 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
                   }),
                 )
               : spawner,
+<<<<<<< HEAD
           clientInfo: { name: "infinitus", version: "0.0.0" },
+=======
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
         });
         const initialized = yield* runtime.initialize();
         if (

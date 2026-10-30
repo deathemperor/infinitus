@@ -6,15 +6,6 @@ import {
 
 const files = new Map<string, { base64: string; deleted: boolean; text?: string }>();
 
-const clipboard = vi.hoisted(() => ({
-  hasImageAsync: vi.fn(),
-  getImageAsync: vi.fn(),
-  hasStringAsync: vi.fn(),
-  getStringAsync: vi.fn(),
-}));
-
-vi.mock("expo-clipboard", () => clipboard);
-
 const manipulator = vi.hoisted(() => {
   const state = { sourceSize: { width: 0, height: 0 } };
   const manipulate = vi.fn((source: string | { width: number; height: number }) => {
@@ -111,6 +102,7 @@ vi.mock("./uuid", () => ({
   uuidv4: () => "attachment-id",
 }));
 
+<<<<<<< HEAD
 import { convertPastedImagesToAttachments, pasteComposerClipboard } from "./composerImages";
 import { ORIGINAL_STILL_IMAGE_MAX_BYTES } from "./image-passthrough";
 
@@ -272,6 +264,9 @@ describe("oversized pasted images", () => {
     ]);
   });
 });
+=======
+import { convertPastedImagesToAttachments } from "./composerImages";
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
 
 describe("native pasted image cleanup", () => {
   beforeEach(() => {

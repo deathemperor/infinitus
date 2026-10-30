@@ -34,7 +34,6 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
@@ -51,8 +50,12 @@ export interface AuthorizedRemoteEnvironment {
   readonly httpBaseUrl: string;
   readonly socketUrl: string;
   readonly httpAuthorization: PreparedHttpAuthorization;
+<<<<<<< HEAD
   /** Fork (#663): the server's other base URLs, when it names any. */
   readonly alternateHttpBaseUrls?: ReadonlyArray<string>;
+=======
+  readonly descriptor?: ExecutionEnvironmentDescriptor;
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
 }
 
 export interface AuthorizedRemoteHttpEnvironment {
@@ -90,7 +93,6 @@ export class RemoteEnvironmentAuthorization extends Context.Service<
 >()("@infinitus/client-runtime/authorization/service/RemoteEnvironmentAuthorization") {}
 
 const CACHED_ENDPOINT_SOCKET_TIMEOUT_MS = 3_000;
-const BEARER_DESCRIPTOR_CACHE_TTL_MS = 10_000;
 const DPOP_AUTHORIZATION_TIMEOUT_MS = 30_000;
 
 function mapDpopSocketError(error: RemoteEnvironmentAuthError | ConnectionAttemptError) {
@@ -133,16 +135,6 @@ export const make = Effect.gen(function* () {
       readonly token: Effect.Effect<TokenStore.RemoteDpopAccessToken, ConnectionAttemptError>;
     }
   >();
-  const bearerDescriptors = yield* Ref.make<
-    ReadonlyMap<
-      EnvironmentId,
-      {
-        readonly httpBaseUrl: string;
-        readonly descriptor: ExecutionEnvironmentDescriptor;
-        readonly validatedAtEpochMs: number;
-      }
-    >
-  >(new Map());
 
   /**
    * A saved LAN address can belong to another machine on a different network.
@@ -156,6 +148,7 @@ export const make = Effect.gen(function* () {
           others behind it in the roaming walk. */
       readonly descriptorTimeoutMs?: number;
     }) {
+<<<<<<< HEAD
       const now = yield* Clock.currentTimeMillis;
       const cachedDescriptor = (yield* Ref.get(bearerDescriptors)).get(input.expectedEnvironmentId);
       const canReuseDescriptor =
@@ -168,21 +161,15 @@ export const make = Effect.gen(function* () {
             input.connectionMethod,
             input.descriptorTimeoutMs,
           ).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+=======
+      const descriptor = yield* fetchDescriptor(input.httpBaseUrl, input.connectionMethod).pipe(
+        Effect.provideService(HttpClient.HttpClient, httpClient),
+      );
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
       if (descriptor.environmentId !== input.expectedEnvironmentId) {
         return yield* environmentMismatchError({
           expected: input.expectedEnvironmentId,
           actual: descriptor.environmentId,
-        });
-      }
-      if (!canReuseDescriptor) {
-        yield* Ref.update(bearerDescriptors, (current) => {
-          const next = new Map(current);
-          next.set(input.expectedEnvironmentId, {
-            httpBaseUrl: input.httpBaseUrl,
-            descriptor,
-            validatedAtEpochMs: now,
-          });
-          return next;
         });
       }
       return descriptor;
@@ -215,6 +202,7 @@ export const make = Effect.gen(function* () {
         label: descriptor.label,
         httpBaseUrl: input.httpBaseUrl,
         socketUrl,
+        descriptor,
         httpAuthorization: {
           _tag: "Bearer" as const,
           token: input.bearerToken,
@@ -507,16 +495,18 @@ export const make = Effect.gen(function* () {
     input: Parameters<RemoteEnvironmentAuthorization["Service"]["authorizeDpop"]>[0],
   ) {
     const endpoint = input.directEndpoint;
-    if (endpoint !== undefined) {
-      yield* verifyDirectEndpoint({
-        expectedEnvironmentId: input.expectedEnvironmentId,
-        httpBaseUrl: endpoint.httpBaseUrl,
-        connectionMethod: "direct",
-      });
-    }
+    const descriptor =
+      endpoint === undefined
+        ? undefined
+        : yield* verifyDirectEndpoint({
+            expectedEnvironmentId: input.expectedEnvironmentId,
+            httpBaseUrl: endpoint.httpBaseUrl,
+            connectionMethod: "direct",
+          });
     const authorized = (token: TokenStore.RemoteDpopAccessToken, socketUrl: string) => ({
       ...httpAuthorization(token, endpoint?.httpBaseUrl),
       socketUrl,
+      ...(descriptor === undefined ? {} : { descriptor }),
     });
     let selected = yield* getDpopToken(input);
     if (selected.fromCache) {

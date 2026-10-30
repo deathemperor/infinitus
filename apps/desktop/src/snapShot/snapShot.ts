@@ -24,7 +24,6 @@ interface AccessibilityTreeNode {
 }
 
 const MAX_ACCESSIBILITY_TREE_NODES = 10_000;
-const WINDOW_BLUR_TIMEOUT_MS = 1_000;
 
 export const WINDOWS_MODIFIER_PAIR_VIRTUAL_KEYS: Record<
   SnapShotModifier,
@@ -439,6 +438,7 @@ export async function accessibleWindowElementTree(
   return { root: compacted.root, truncated: completedTruncated };
 }
 
+<<<<<<< HEAD
 export function hideAndWaitForBlur(window: {
   readonly hide: () => void;
   readonly once: (event: "blur", listener: () => void) => unknown;
@@ -458,6 +458,8 @@ export function hideAndWaitForBlur(window: {
   });
 }
 
+=======
+>>>>>>> upstream-sync-97e35bcf2-upstream-renamed
 type WindowBounds = {
   readonly x: number;
   readonly y: number;
@@ -590,30 +592,6 @@ export function toElectronAccelerator(shortcut: SnapShotKeyChord): string {
   if (shortcut.shiftKey) parts.push("Shift");
   parts.push(ELECTRON_KEY_NAMES[shortcut.key] ?? shortcut.key.toUpperCase());
   return parts.join("+");
-}
-
-interface CaptureSourceLike {
-  readonly id: string;
-  readonly name: string;
-}
-
-interface ActiveWindowLike {
-  readonly id: number;
-  readonly title: string;
-}
-
-export function findCaptureSource<T extends CaptureSourceLike>(
-  sources: readonly T[],
-  activeWindow: ActiveWindowLike,
-): T | undefined {
-  const idPrefix = `window:${activeWindow.id}:`;
-  const idMatch = sources.find((source) => source.id.startsWith(idPrefix));
-  if (idMatch) return idMatch;
-
-  const title = activeWindow.title.trim();
-  if (!title) return undefined;
-  const titleMatches = sources.filter((source) => source.name.trim() === title);
-  return titleMatches.length === 1 ? titleMatches[0] : undefined;
 }
 
 export function isWaylandSession(
