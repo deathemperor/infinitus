@@ -1,7 +1,9 @@
 import type { Root, RootContent } from "mdast";
-import { resolveWorkEntryToolPresentation } from "@infinitus/client-runtime/work-log/presentation";
+import {
+  resolveWorkEntryToolPresentation,
+  toolGroupAction,
+} from "@infinitus/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@infinitus/shared/toolActivity";
-import { toolGroupAction } from "./MessagesTimeline.logic";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { type TimelineWorkEntry, type TimelineRow } from "./timelineRowContext";
 import { type WorkEntryIconName } from "./TimelineToolActivityIcon";

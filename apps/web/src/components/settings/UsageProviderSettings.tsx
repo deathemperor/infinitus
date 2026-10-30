@@ -120,6 +120,7 @@ export function UsageProviderSettings({
           onOpenChange={setAdding}
           environmentId={environmentId}
           environmentLabel={environmentLabel}
+          sources={sources}
         />
       ) : null}
     </>

@@ -13,6 +13,7 @@ import {
   RelayConnectionTarget,
   type SupervisorConnectionState,
 } from "./model.ts";
+<<<<<<< HEAD
 import {
   connectionCatalogAlternateHosts,
   connectionCatalogDisplayUrl,
@@ -21,6 +22,9 @@ import {
   presentEnvironmentConnection,
   presentConnectionState,
 } from "./presentation.ts";
+=======
+import { environmentMcpUrl, presentConnectionState } from "./presentation.ts";
+>>>>>>> upstream-sync-32ecd7172-upstream-renamed
 
 const TARGET = new BearerConnectionTarget({
   environmentId: EnvironmentId.make("environment-1"),
@@ -197,7 +201,7 @@ describe("connection presentation", () => {
 
   it("preserves an explicitly available environment while offline", () => {
     expect(
-      presentEnvironmentConnection(
+      presentConnectionState(
         supervisorState({
           desired: false,
           network: "offline",
