@@ -216,25 +216,31 @@ describe("DesktopRemoteUpdates", () => {
   });
 
   it.effect("drops a retained download below the switch's checked release", () => {
-    const harness = makeHarness({ beforeSetUpdateChannel: Effect.void });
+    // A plain version is an infinitus build here, so the host is an upstream nightly.
+    const harness = makeHarness({
+      appVersion: "1.2.3-nightly.20261001.1",
+      savedChannel: "nightly",
+      beforeSetUpdateChannel: Effect.void,
+    });
 
     return runRemoteUpdatesTest(harness, ({ reports, requests }) =>
       Effect.gen(function* () {
         const updates = yield* DesktopUpdates.DesktopUpdates;
-        // Downloaded earlier on this Stable host, before the switch checked 1.2.5.
-        harness.emit("update-downloaded", { version: "1.2.4" });
+        yield* updates.configure;
+        // Downloaded earlier on this host, before the switch checked 1.2.5.
+        harness.emit("update-downloaded", { version: "1.2.4-nightly.20261010.1" });
         yield* settle;
-        assert.equal((yield* updates.getState).downloadedVersion, "1.2.4");
+        assert.equal((yield* updates.getState).downloadedVersion, "1.2.4-nightly.20261010.1");
 
         yield* Queue.offer(requests, {
           ...request("req-floor"),
-          channel: "latest",
-          targetVersion: "1.2.5",
+          channel: "nightly",
+          targetVersion: "1.2.5-nightly.20261020.1",
         });
         yield* settle;
-        harness.emit("update-available", { version: "1.2.5" });
+        harness.emit("update-available", { version: "1.2.5-nightly.20261020.1" });
         yield* settle;
-        harness.emit("update-downloaded", { version: "1.2.5" });
+        harness.emit("update-downloaded", { version: "1.2.5-nightly.20261020.1" });
         yield* settle;
 
         assert.deepEqual(
@@ -242,7 +248,7 @@ describe("DesktopRemoteUpdates", () => {
             report.outcome,
             report.state.downloadedVersion,
           ]),
-          [["ready-to-install", "1.2.5"]],
+          [["ready-to-install", "1.2.5-nightly.20261020.1"]],
         );
       }),
     );
@@ -266,7 +272,7 @@ describe("DesktopRemoteUpdates", () => {
           ["failed"],
         );
         assert.include(terminalReports(reports)[0]?.reason ?? "", "Switch it on that machine");
-        assert.equal((yield* updates.getState).channel, "latest");
+        assert.equal((yield* updates.getState).channel, "infinitus");
       }),
     );
   });
