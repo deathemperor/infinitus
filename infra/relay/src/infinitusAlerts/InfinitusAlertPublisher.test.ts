@@ -162,8 +162,6 @@ function harness(input?: {
           listTargets: ({ userId }) => Effect.succeed(targets[userId] ?? []),
           listIdleArmedTargets: () => Effect.succeed([]),
           markDelivery: () => Effect.void,
-          markStartQueued: () => Effect.void,
-          clearStartQueued: () => Effect.void,
           invalidateDeliveryToken: () => Effect.void,
         }),
         Layer.succeed(ApnsDeliveryQueue.ApnsDeliveryQueue, {

@@ -1,6 +1,9 @@
 import type { PromptSnippet } from "@infinitus/contracts";
 import { useClientSettings, useEnvironmentSettings } from "../../hooks/useSettings";
-import { derivePhysicalProjectKey, selectProjectGroupingSettings } from "../../logicalProject";
+import {
+  derivePhysicalProjectKey,
+  selectProjectGroupingSettings,
+} from "@infinitus/client-runtime/state/project-grouping";
 import { buildPhysicalToLogicalProjectKeyMap } from "../../sidebarProjectGrouping";
 import { useProjects } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";

@@ -91,6 +91,7 @@ export function InfinitusEnginePolicy({
     await read(fleet);
   };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads each fleet's switching policy from the engine over the socket once the fleets are known
   useEffect(() => {
     if (fleetList === "" || environmentId === null) return;
     // The engine is read over the socket once the fleets are known; every set

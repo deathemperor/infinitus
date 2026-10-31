@@ -25,7 +25,11 @@ Yes.
 
 ## How much does Infinitus cost?
 
-Nothing. There's no way to pay us to use Infinitus. You bring your own sub. It is free and open source (MIT). You still pay your provider like you already do. Infinitus Connect is free too, for now. Every account can connect up to 3 machines running Infinitus. Phones and browsers that connect to them do not count. We don't want to charge for this, but if the bill gets unacceptable we may have to change course. If you hit limits or have issues, you can always fork it, self host, or use Tailscale. [Install](./install.md)
+Nothing. There's no way to pay us to use Infinitus. You bring your own sub. It is free and open source (MIT). You still pay your provider like you already do. Infinitus Connect is free too, for now. Every account can connect up to 3 machines running Infinitus. Phones and browsers that connect to them do not count. Need more? Link a paid Infinitus Chat account. [More machines](#can-i-connect-more-than-3-machines-with-t3-connect) We don't want to charge for this, but if the bill gets unacceptable we may have to change course. If you hit limits or have issues, you can always fork it, self host, or use Tailscale. [Install](./install.md)
+
+## Can I connect more than 3 machines with Infinitus Connect?
+
+Yes. Link your Infinitus Chat account and Infinitus Connect raises your limit: up to 10 machines with Infinitus Chat Pro, or 100 with Premier. Open your account menu in Infinitus, go to **Infinitus Chat**, and select **Link Infinitus Chat**. Sign in to Infinitus Chat and approve. The free Infinitus Chat plan keeps the normal limit of 3. [More machines with Infinitus Chat](./remote-access.md#more-machines-with-t3-chat)
 
 ## Why is my Claude 5-hour limit draining so fast?
 
@@ -41,7 +45,7 @@ Get the [iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819
 
 ## Why does Infinitus Connect keep disconnecting?
 
-Infinitus Connect is our built-in alternative to Tailscale for remote connections. If it keeps dropping, open **Settings > Connections**, find the machine, and select **Details**. The first part marked as failed is the cause. I will not be disappointed if you set up Tailscale as a fallback (I do this personally). [Infinitus Connect troubleshooting](./t3-connect-troubleshooting.md)
+Infinitus Connect is our built-in alternative to Tailscale for remote connections. If it keeps dropping, open **Settings > Environments**, find the machine, and select **Details**. The first part marked as failed is the cause. I will not be disappointed if you set up Tailscale as a fallback (I do this personally). [Infinitus Connect troubleshooting](./t3-connect-troubleshooting.md)
 
 ## Will I get banned for using my subscription?
 

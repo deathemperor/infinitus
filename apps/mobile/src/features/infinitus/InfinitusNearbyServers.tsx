@@ -47,6 +47,7 @@ export function InfinitusNearbyServers(props: { readonly onPick: (host: string) 
   const [report, setReport] = useState<SweepReport | null>(null);
   const scan = useRef<AbortController | null>(null);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- aborts an in-flight LAN scan on unmount
   useEffect(() => () => scan.current?.abort(), []);
 
   const start = useCallback(async () => {

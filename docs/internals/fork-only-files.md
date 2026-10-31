@@ -200,7 +200,7 @@ these bullets.
   (`cloud/bootService.ts`) and the desktop's main process drains the child's
   pipes into `server-child.log` — which the packaged desktop stopped
   receiving, while `server.trace.ndjson` holds spans only (a log becomes a
-  span event only inside a sampled span). So `ServerLoggerLive` also writes
+  span event only inside a sampled span). So `serverLogger.ts`'s `layer` also writes
   `<logsDir>/server.log.ndjson`, whoever spawned the process: one
   `Logger.formatJson` record per line, batched (1 s, flushed when the layer's
   scope closes) into the shared `RotatingFileSink` (10 MiB × 10, the trace
@@ -281,7 +281,7 @@ these bullets.
   desktop's.
 - `packages/client-runtime/src/connection/roaming.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on one host, connect on another (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect; public hosts are dialed before private ones (the LAN address). No server fills the list since the Cloudflare tunnels retired (`InfinitusDescriptor.ts` went with them). Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/state/queued-message-dispatch.ts` (+ test), `apps/mobile/src/state/delete-pending-thread-message.ts`, `apps/mobile/src/features/threads/confirmDeletePendingMessage.ts` — the outbox drain's dispatch state as `{ messageId, phase: "uploading" | "sending" }` with the upload's abort handle, and the delete under a queued reply's bubble that aborts an upload in flight and refuses only during the send RPC (#1501). Edit takes the same gate.
-- `apps/mobile/src/lib/image-passthrough.ts` (+ test) — the one decision for every way a picture enters the phone's composer (picker, clipboard, share sheet; #1500, #1502): which originals pass through byte for byte and which are rendered to a bounded JPEG, plus the rendered attachment's name. Pure, so the share model's tests can import it without Expo.
+- `apps/mobile/src/lib/image-passthrough.ts` (+ test) — the one decision for every way a picture enters the phone's composer through the picker or the share sheet (#1500, #1502): which originals pass through byte for byte and which are rendered to a bounded JPEG, plus the rendered attachment's name. Pure, so the share model's tests can import it without Expo.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
   snippets (#270 G): `useProjectPromptSnippets(environmentId, projectId)`
@@ -344,7 +344,6 @@ these bullets.
   `docs/internals/<feature>.md` page and one ledger line here.
 - `scripts/phone.sh` (+ `.agents/skills/drive-phone/SKILL.md`) — drives the developer's paired physical iPhone from a session with the server's pinned `agent-device` (launch, deep links, screenshots, console; snapshots and taps once the Mac's `DevToolsSecurity` is on). The CLI installs under the worktree's `.t3/tools`, never on the Mac. Usage and traps: the skill.
 - `.github/workflows/upstream-sync.yml` — the daily upstream merge as a PR (INFINITUS.md); once `scripts/infinitus-rename.ts --check` passes on `main` it renames upstream's tip on its own branch before merging (#1368 C). A conflicted `pnpm-lock.yaml` is regenerated from upstream's side rather than left to hand-merge, and each new sync closes older still-untouched sync PRs, since its merge contains theirs.
-- `scripts/effect-budget.infinitus.json` — React effect budgets for the fork's files (and upstream files whose effect count the fork raised), merged over upstream's `scripts/effect-budget.json` by `react-effect-budget`.
 - `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components, and the product name in `docs/user` prose) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`, `fork-visual-fixture.guard.test.ts`) — the canned Infinitus control socket the pass runs against in CI, kept honest against `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift` (#1091, #1139). Rules and traps: `docs/internals/fork-visual-pass.md`.

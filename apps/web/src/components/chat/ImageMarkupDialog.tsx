@@ -51,6 +51,7 @@ export function ImageMarkupDialog(props: ImageMarkupDialogProps) {
 
   // The composer mounts this dialog per image and only while it is open, so
   // every state above starts fresh; the effect only loads the pixels.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- loads the preview into an Image element while open and drops it on close
   useEffect(() => {
     if (!props.open) return;
     const image = new Image();
@@ -74,6 +75,7 @@ export function ImageMarkupDialog(props: ImageMarkupDialogProps) {
     };
   }, [props.open, props.previewUrl]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- paints the loaded image and markup shapes onto the canvas DOM node
   useEffect(() => {
     if (!ready) return;
     const canvas = canvasRef.current;

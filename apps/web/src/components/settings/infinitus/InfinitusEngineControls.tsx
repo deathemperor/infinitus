@@ -59,6 +59,7 @@ export function useInfinitusEngineProcesses() {
     });
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the engine commands over desktop IPC once the bridge exists; a late reply is ignored after unmount
   useEffect(() => {
     if (bridge === null) return;
     let cancelled = false;

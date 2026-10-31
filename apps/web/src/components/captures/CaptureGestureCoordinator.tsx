@@ -43,6 +43,7 @@ export function CaptureGestureCoordinator() {
     }
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- delivers a desktop capture gesture that arrived before any project was open, once one is
   useEffect(() => {
     if (project !== null) lastProjectRef.current = project;
     const pending = pendingRef.current;
@@ -51,6 +52,7 @@ export function CaptureGestureCoordinator() {
     void deliver(pending);
   }, [deliver, project]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the desktop bridge's capture gestures and drains the ones queued before mount
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
     if (

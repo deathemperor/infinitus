@@ -65,6 +65,7 @@ describe("collectNeedsAttention (#269 D)", () => {
       ],
       new Map([[`${env}:parked`, stop]]),
       describeStop,
+      new Set(),
     );
     expect(entries.map((entry) => [entry.thread.id, entry.status, entry.summary])).toEqual([
       ["approval", "approval", null],
@@ -88,6 +89,7 @@ describe("collectNeedsAttention (#269 D)", () => {
       ],
       new Map(),
       describeStop,
+      new Set(),
     );
     expect(entries.map((entry) => entry.thread.id)).toEqual(["earlier", "later"]);
   });

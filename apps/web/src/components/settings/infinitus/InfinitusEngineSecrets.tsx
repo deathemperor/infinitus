@@ -115,6 +115,7 @@ export function InfinitusEngineSecrets({
 
   // The engines' settings are not part of the snapshot: read once the app
   // answers, and again after a save's relaunch brings it back.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads each proxy engine's settings over the socket once the app answers, and again after a relaunch
   useEffect(() => {
     if (!supported || environmentId === null) return;
     for (const engine of PROXY_ENGINES) void read(engine);

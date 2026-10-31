@@ -3,7 +3,9 @@ import type { ProviderInstanceConfig } from "@infinitus/contracts";
 /** Whether the instance routes Claude through a proxy, which the advisor tool does not cross (#1232). */
 function hasAnthropicBaseUrl(instance: ProviderInstanceConfig): boolean {
   return (instance.environment ?? []).some(
-    (variable) => variable.name === "ANTHROPIC_BASE_URL" && variable.value.trim().length > 0,
+    (variable) =>
+      variable.name === "ANTHROPIC_BASE_URL" &&
+      (typeof variable.value !== "string" || variable.value.trim().length > 0),
   );
 }
 

@@ -163,6 +163,7 @@ export function EnvironmentAccounts({
       the port until stopped, and an address it caught after the page is gone
       has nobody to send it. Leaving frees the port. */
   const redirectFlowIdRef = useRef<string | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- on unmount, stops the OAuth redirect listener and cancels the shell sign-in flow through the desktop bridges
   useEffect(
     () => () => {
       addRunRef.current += 1;
@@ -198,6 +199,7 @@ export function EnvironmentAccounts({
 
   const signInInFlight =
     pendingSignIn !== null && pendingSignIn.snapshot === snapshot ? pendingSignIn.key : null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- timer that drops a pending sign-in marker after the settle timeout
   useEffect(() => {
     if (pendingSignIn === null) return;
     const timer = setTimeout(() => setPendingSignIn(null), COMMAND_SETTLE_TIMEOUT_MS);

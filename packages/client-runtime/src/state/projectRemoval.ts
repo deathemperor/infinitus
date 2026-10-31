@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { EnvironmentProject, EnvironmentThreadShell } from "./models.ts";
 
 export function planProjectRemoval<
@@ -38,8 +39,10 @@ export function planProjectRemoval<
         ]
       : [`This removes ${members.length} grouped project entries.`]),
     ...(threadCount > 0
-      ? ["This permanently clears conversation history for those threads and any archived threads."]
-      : ["This permanently clears any archived conversation history."]),
+      ? [
+          `Those threads and any archived threads are deleted from ${PRODUCT_NAME}. Provider sessions are kept.`,
+        ]
+      : [`Any archived threads are deleted from ${PRODUCT_NAME}. Provider sessions are kept.`]),
     isWholeGroup && !hasOtherMembers
       ? "This removes only the project entries, not the files on disk."
       : "Other entries in this grouped project are unaffected.",

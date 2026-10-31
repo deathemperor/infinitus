@@ -16,8 +16,9 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
 ];
 
 /** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.
-    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match. */
-const BARE_T3 = /\bT3\b(?![_A-Za-z0-9])/;
+    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match, nor does
+    T3 Chat, upstream's separate product whose plan the relay can link. */
+const BARE_T3 = /\bT3\b(?![_A-Za-z0-9]| Chat\b)/;
 
 const SRC = NodeURL.fileURLToPath(new URL(".", import.meta.url));
 

@@ -137,6 +137,7 @@ function TeamPane(props: { readonly code: string }) {
     [client, fail, loadTeam],
   );
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the relay's team list once per client; its state lands after the request
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Reads the relay's team list once per client; its state lands after the request.
     void loadTeams();

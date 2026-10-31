@@ -17,7 +17,9 @@ const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   ["infra/relay/src/persistence/schema.ts", '.default("T3 Environment")'],
   // Byte-identical to upstream's `.github/triage/PLAYBOOK.md` (its test), which
   // upstream's own triage workflow reads; it names upstream's issue tracker.
-  ["apps/server/src/cli/triagePrompt.ts", "T3 Code"],
+  ["apps/server/src/triage/triagePrompt.ts", "T3 Code"],
+  // An HTTP header name agents send, not prose.
+  ["apps/server/src/mcp/McpHttpServer.ts", "T3-Mode-Limit"],
   // Recorded provider fixtures and replay assertions: upstream's transcripts, never shown.
   // The restart note is replayed verbatim against one of them, so it keeps upstream's words.
   ["apps/server/src/orchestration-v2/RestartBackgroundNote.ts", "T3"],
@@ -67,8 +69,9 @@ const ROOTS = [
 ];
 
 /** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.
-    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match. */
-const BARE_T3 = /\bT3\b(?![_A-Za-z0-9])/;
+    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match, nor does
+    T3 Chat, upstream's separate product whose plan the relay can link. */
+const BARE_T3 = /\bT3\b(?![_A-Za-z0-9]| Chat\b)/;
 
 const REPO = NodeURL.fileURLToPath(new URL("..", import.meta.url));
 

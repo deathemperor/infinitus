@@ -72,6 +72,7 @@ export function AccountRow(props: {
   const [flip, setFlip] = useState<RowFlip | null>(null);
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const row = withFlip(props.row, flip);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the pending flip-settle timer on unmount
   useEffect(
     () => () => {
       if (settle.current !== null) clearTimeout(settle.current);

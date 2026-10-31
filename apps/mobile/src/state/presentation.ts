@@ -1,17 +1,31 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentPresentation } from "@infinitus/client-runtime/connection";
-import { createEnvironmentPresentationAtoms } from "@infinitus/client-runtime/state/presentation";
+import {
+  createEnvironmentPresentationAtoms,
+  createEnvironmentSummaryAtoms,
+} from "@infinitus/client-runtime/state/presentation";
 import type { EnvironmentId } from "@infinitus/contracts";
 import { Atom } from "effect/reactivity";
 
 import { environmentCatalog } from "../connection/catalog";
-import { serverEnvironment } from "./server";
+import { environmentServerConfigsAtom, serverEnvironment } from "./server";
+import { createThreadListEnvironmentsAtom } from "./thread-list-environments";
 
 export const environmentPresentations = createEnvironmentPresentationAtoms({
   catalogValueAtom: environmentCatalog.catalogValueAtom,
   stateAtom: environmentCatalog.stateAtom,
   serverConfigValueAtom: serverEnvironment.configValueAtom,
 });
+
+export const { connectedEnvironmentIdsAtom } = createEnvironmentSummaryAtoms({
+  catalogValueAtom: environmentCatalog.catalogValueAtom,
+  presentationAtom: environmentPresentations.presentationAtom,
+});
+
+export const threadListEnvironmentsAtom = createThreadListEnvironmentsAtom(
+  environmentServerConfigsAtom,
+  connectedEnvironmentIdsAtom,
+);
 
 const EMPTY_ENVIRONMENT_PRESENTATION_ATOM = Atom.make<EnvironmentPresentation | null>(null).pipe(
   Atom.withLabel("mobile-environment-presentation:empty"),
