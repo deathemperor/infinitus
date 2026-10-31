@@ -226,7 +226,6 @@ describe("DesktopRemoteUpdates", () => {
     return runRemoteUpdatesTest(harness, ({ reports, requests }) =>
       Effect.gen(function* () {
         const updates = yield* DesktopUpdates.DesktopUpdates;
-        yield* updates.configure;
         // Downloaded earlier on this host, before the switch checked 1.2.5.
         harness.emit("update-downloaded", { version: "1.2.4-nightly.20261010.1" });
         yield* settle;

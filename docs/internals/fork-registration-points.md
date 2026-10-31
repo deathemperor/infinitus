@@ -271,6 +271,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `triagePrompt.ts` — the path in the triage context so `t3 triage` names it;
   the test `ServerConfig` from `makeReplayServerConfig` in
   `orchestration-v2/testkit/ProviderReplayHarness.ts` carries the field.
+- `apps/server/src/storageCleanup.ts` — a broken `.git` file that newer Git reports as
+  "does not point to a valid repository" reads as not a repository, like "not a git
+  repository"; upstream's own test failed on the hosted runners' Git otherwise.
 - `apps/server/src/persistence/Migrations.ts` (+ `initializeV2Database.test.ts`,
   whose V1 ledger ends at 64) — the fork's own `051`–`064` stay in the ledger
   (queued turns, babysit, side questions, groups, session status reason, turn
@@ -280,7 +283,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (OrchestrationV2 onward) are renumbered `065`–`085` on every sync
   (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
-  legacy/V2 boundary ids are the fork's. Upstream's `reconcileV2PreviewMigration` is not carried: no
+  legacy/V2 boundary ids are the fork's, as are the `toMigrationInclusive` ids in
+  `Migrations/079_ThreadMessageSearch.test.ts`. Upstream's `reconcileV2PreviewMigration` is not carried: no
   fork database recorded its preview numbers, and 53 and 54 are taken here.
 - `apps/server/src/usage/UsageService.ts` — `readStats` (#659, the Stats
   page's fold over the transcript and repository scanners in
