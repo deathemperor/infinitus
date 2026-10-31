@@ -319,6 +319,7 @@ function SidebarUpdateControl() {
     setInstallWhenIdle(false);
     if (install) installNow();
   });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- fires the armed desktop-bridge update install once the server's running turns reach zero, or drops the wait when nothing is left to install
   useEffect(() => {
     if (!installWhenIdle) return;
     const step = resolveInstallWhenIdleStep(state, action, runningLocalTurns);

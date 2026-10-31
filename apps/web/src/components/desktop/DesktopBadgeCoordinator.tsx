@@ -17,6 +17,7 @@ export function DesktopBadgeCoordinator() {
   const enabled = useClientSettings((settings) => settings.desktopBadgeAttention);
   const badge = useRef<number | null>(null);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes the attention count to the dock badge over desktop IPC when it changes
   useEffect(() => {
     if (setBadgeCount === undefined) return;
     const count = enabled

@@ -85,6 +85,7 @@ export function useInfinitusSettingsSync(): {
 
   // A machine that left the list starts over when it returns; one that
   // arrived or reconnected is aligned on the next pass.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- forgets machines that left and runs an alignment pass of engine commands over the socket when the machine list changes
   useEffect(() => {
     const present = new Set(machines.map((machine) => machine.environmentId));
     for (const environmentId of state.current.observed.keys()) {

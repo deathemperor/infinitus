@@ -161,6 +161,7 @@ export function ShareToThreadRouteScreen({
     [insets.bottom, usesNativeMailSearchToolbar],
   );
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- tracks mount so an async share import finishing after unmount skips its state updates
   useEffect(() => {
     mountedRef.current = true;
     return () => {

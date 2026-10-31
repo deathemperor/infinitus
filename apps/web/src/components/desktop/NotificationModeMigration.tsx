@@ -32,6 +32,7 @@ function readLegacySoundEnabled(): boolean {
  * only while the mode still reads `off`; the old sound key is removed.
  */
 export function NotificationModeMigration() {
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- one-time migration of the legacy localStorage sound key into persisted client settings on mount
   useEffect(() => {
     let cancelled = false;
     void (async () => {

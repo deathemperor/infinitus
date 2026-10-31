@@ -87,30 +87,26 @@ function threadWithRun(
 }
 
 const layer = InfinitusRunningTurnsLive.pipe(
-  Layer.provideMerge(
-    ProjectionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory)),
-  ),
+  Layer.provideMerge(ProjectionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))),
 );
 
-it.effect(
-  "lists the threads whose run is live, a waiting one included (#829)",
-  () =>
-    Effect.gen(function* () {
-      const store = yield* ProjectionStore.ProjectionStoreV2;
-      const now = yield* DateTime.now;
-      const events = [
-        ...threadWithRun("running", "running", now),
-        ...threadWithRun("waiting", "waiting", now),
-        ...threadWithRun("completed", "completed", now),
-      ];
-      yield* Effect.forEach(events, (event) => store.apply(event), { discard: true });
-      const turns = yield* (yield* InfinitusRunningTurns).list;
-      assert.deepEqual(
-        turns.toSorted((left, right) => left.threadId.localeCompare(right.threadId)),
-        [
-          { threadId: "thread:running", turnId: "run:running" },
-          { threadId: "thread:waiting", turnId: "run:waiting" },
-        ],
-      );
-    }).pipe(Effect.provide(layer)),
+it.effect("lists the threads whose run is live, a waiting one included (#829)", () =>
+  Effect.gen(function* () {
+    const store = yield* ProjectionStore.ProjectionStoreV2;
+    const now = yield* DateTime.now;
+    const events = [
+      ...threadWithRun("running", "running", now),
+      ...threadWithRun("waiting", "waiting", now),
+      ...threadWithRun("completed", "completed", now),
+    ];
+    yield* Effect.forEach(events, (event) => store.apply(event), { discard: true });
+    const turns = yield* (yield* InfinitusRunningTurns).list;
+    assert.deepEqual(
+      turns.toSorted((left, right) => left.threadId.localeCompare(right.threadId)),
+      [
+        { threadId: "thread:running", turnId: "run:running" },
+        { threadId: "thread:waiting", turnId: "run:waiting" },
+      ],
+    );
+  }).pipe(Effect.provide(layer)),
 );

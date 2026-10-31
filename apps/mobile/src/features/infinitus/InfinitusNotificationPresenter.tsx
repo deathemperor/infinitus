@@ -21,6 +21,7 @@ const HIDE: Notifications.NotificationBehavior = {
     alarm shows as a banner without sound; everything else gets the all-false behaviour
     iOS applies with no handler, so T3's notifications are unchanged. */
 export function InfinitusNotificationPresenter() {
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- installs the expo-notifications foreground handler while mounted
   useEffect(() => {
     if (Platform.OS === "web") return;
     Notifications.setNotificationHandler({

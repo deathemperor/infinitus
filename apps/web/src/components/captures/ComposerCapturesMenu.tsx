@@ -95,10 +95,12 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
     }
   };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- focuses the input DOM node each time the captures shortcut asks for it
   useEffect(() => {
     if (focusInputKey > 0) inputRef.current?.focus();
   }, [focusInputKey]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- document pointerdown listener that closes the drawer on an outside press
   useEffect(() => {
     if (typeof document === "undefined") return;
     const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -115,6 +117,7 @@ export const ComposerCapturesMenu = memo(function ComposerCapturesMenu(props: {
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
   }, [onClose]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window capture-phase Escape listener that closes the drawer
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handler = (event: KeyboardEvent) => {

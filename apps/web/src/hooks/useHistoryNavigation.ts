@@ -16,6 +16,7 @@ import {
 export function useHistoryNavigation(pathname: string): void {
   const navigate = useNavigate();
   const canGoBack = useCanGoBack();
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window mouseup listener and desktop-bridge swipe gesture subscription for back and forward
   useEffect(() => {
     const applyHistoryIntent = (intent: MouseHistoryIntent) => {
       if (intent === "forward") {
