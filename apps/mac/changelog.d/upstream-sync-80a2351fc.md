@@ -1,3 +1,0 @@
-Desktop: From upstream — link other machines so agents work there (Labs), review local commits in the Diff pane, back/forward buttons with trackpad swipes, a simpler composer with a rich-text/Markdown switch, and a resizable file explorer.
-Desktop: From upstream — provider environment variables can come from a secret provider, snooze options are yours to choose, the sidebar filters by several projects, and a thread falls back to another provider when the default is out of usage.
-Phone: From upstream — message media and file cards match the desktop, ZIP attachments open in the archive reader, and Usage fills the width on iPad.
