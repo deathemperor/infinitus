@@ -1,6 +1,6 @@
 #!/bin/sh
 # Drives a paired physical iPhone from a session with the `agent-device` CLI
-# the server already pins (apps/server/src/device/DeviceToolchain.ts), so a
+# the server already pins (apps/server/src/device/deviceToolVersions.json), so a
 # session can launch the app, open a deep link, screenshot the screen and read
 # the app's console on the developer's own phone. Nothing is installed on the
 # Mac: the CLI lives under this worktree's gitignored `.t3/tools`, its daemon
@@ -19,9 +19,9 @@
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-version=$(sed -n 's/^export const AGENT_DEVICE_VERSION = "\([^"]*\)";$/\1/p' \
-  "$root/apps/server/src/device/DeviceToolchain.ts")
-[ -n "$version" ] || { echo "phone.sh: AGENT_DEVICE_VERSION not found in DeviceToolchain.ts" >&2; exit 1; }
+version=$(sed -n 's/^ *"agent-device": "\([^"]*\)",\{0,1\}$/\1/p' \
+  "$root/apps/server/src/device/deviceToolVersions.json")
+[ -n "$version" ] || { echo "phone.sh: agent-device not found in deviceToolVersions.json" >&2; exit 1; }
 
 prefix="$root/.t3/tools/agent-device/$version"
 cli="$prefix/node_modules/agent-device/bin/agent-device.mjs"
