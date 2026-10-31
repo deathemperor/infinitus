@@ -70,13 +70,23 @@ export const runDefaultServerCommand = Effect.fn("server.runDefaultServerCommand
 });
 
 export const startCommand = Command.make("start", { ...sharedServerCommandFlags }).pipe(
+<<<<<<< HEAD
   Command.withDescription(`Run the ${PRODUCT_NAME} server.`),
+=======
+  Command.withDescription("Same as `t3`."),
+  Command.unlisted,
+>>>>>>> upstream-sync-2359643cff-upstream-renamed
   Command.withHandler((flags) => runServerCommand(flags, { rejectRunningServer: true })),
 );
 
 export const serveCommand = Command.make("serve", { ...sharedServerCommandFlags }).pipe(
+  Command.withShortDescription("Run T3 Code in this terminal, with no browser."),
   Command.withDescription(
+<<<<<<< HEAD
     `Run the ${PRODUCT_NAME} server without opening a browser and print headless pairing details.`,
+=======
+    "Run T3 Code in this terminal without opening a browser, and print pairing details. The background service runs this. To set up access from your other devices, run `t3 up`.",
+>>>>>>> upstream-sync-2359643cff-upstream-renamed
   ),
   Command.withHandler((flags) =>
     runServerCommand(flags, {

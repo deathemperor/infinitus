@@ -32,6 +32,7 @@ desktop puts the matching server on it by itself.
 
 Run these on the machine that will host the server:
 
+<<<<<<< HEAD
 | Task                            | Command                       |
 | ------------------------------- | ----------------------------- |
 | Install and start               | `infinitus service install`   |
@@ -39,6 +40,17 @@ Run these on the machine that will host the server:
 | Update or repair                | `infinitus service update`    |
 | Restart                         | `infinitus service restart`   |
 | Stop and remove from startup    | `infinitus service uninstall` |
+=======
+| Task                                  | Command                |
+| ------------------------------------- | ---------------------- |
+| Set up access from your other devices | `t3 up`                |
+| See how your other devices reach it   | `t3 status`            |
+| Install and start                     | `t3 service install`   |
+| Inspect status and log location       | `t3 service status`    |
+| Move to a newer release               | `t3 update`            |
+| Restart                               | `t3 service restart`   |
+| Stop and remove from startup          | `t3 service uninstall` |
+>>>>>>> upstream-sync-2359643cff-upstream-renamed
 
 The service reuses the copy the install script put under
 `~/.infinitus/runtime`; a hand-unpacked `./infinitus` downloads that version's
@@ -62,13 +74,18 @@ update already in progress.
 
 ## Local network access
 
-The service listens on your local network and Tailscale addresses, so the
-desktop and mobile apps on the same network connect directly instead of through
-Infinitus Connect. The hosted web app at app.t3.codes stays on Infinitus Connect, because
-browsers block plain HTTP from an HTTPS page. The service does not answer on
-public addresses, and every device still needs to pair or sign in. To keep the service reachable from this machine only, set
-`T3CODE_HOST=127.0.0.1` in `service.env` (below). Any `T3CODE_HOST` value
-replaces this default.
+A new service answers only on this machine. Other devices reach it through
+Infinitus Connect, or directly once you choose the local network in `t3 up` (or run
+`t3 up --lan`, which sets `T3CODE_LAN=true` in `service.env`). It then listens on
+your local network and Tailscale addresses, so the desktop and mobile apps on
+the same network connect directly instead of through Infinitus Connect. It still does
+not answer on public addresses. Anyone on the same network can reach the port,
+so a pairing code is all that keeps them out. The hosted web app at app.t3.codes
+stays on Infinitus Connect, because browsers block plain HTTP from an HTTPS page.
+
+A service installed before `T3CODE_LAN` existed keeps listening on the local
+network. `t3 status` says so, and `t3 up --no-lan` turns it off. Any
+`T3CODE_HOST` value replaces this setting.
 
 ## Configure the service environment
 
@@ -111,7 +128,7 @@ enabled, or keep `t3 serve` running in a terminal. Minimize the desktop app rath
 than closing its last window, which stops its local server. Linking Infinitus Connect
 does not configure automatic startup at Windows sign-in.
 
-Infinitus Connect can offer service installation during setup, but the two are managed
+`t3 up` installs the service when you set up Infinitus Connect, but the two are managed
 separately. Signing out of Infinitus Connect does not stop or uninstall the service.
 
 ## Keep the server responsive when agents use all memory
