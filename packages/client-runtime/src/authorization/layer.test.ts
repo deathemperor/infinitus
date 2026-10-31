@@ -266,7 +266,8 @@ const prepareDirectBearer = Effect.fn("TestRemoteAuthorization.prepareDirectBear
         harness.layer,
         Layer.succeed(ConnectionProfileStore.ConnectionProfileStore, {
           get: unused,
-          put: unused,
+          // Fork (#663): a prepare records the host that answered for the roaming walk.
+          put: () => Effect.void,
           remove: unused,
         }),
         Layer.succeed(ConnectionCredentialStore.ConnectionCredentialStore, {
