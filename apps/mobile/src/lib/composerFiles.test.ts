@@ -224,12 +224,13 @@ describe("composer file attachments", () => {
       header.writeUInt32BE(1668, 16);
       header.writeUInt32BE(2388, 20);
       native.size = { width: 1668, height: 2388 };
-      // Native PNG encoding of the 2000px resample is larger than the 7 MB original.
+      // Native PNG encoding of the 2000px resample is larger than the original. The fork renders
+      // stills over 2 MB to JPEG (#1502), so the original here is one that passes through.
       native.encode = (size, format) => ({
         uri: `file:///cache/fitted-${size.width}x${size.height}.${format}`,
         base64: Buffer.alloc(size.width * size.height * 4).toString("base64"),
       });
-      mocks.size.mockReturnValue(7 * 1024 * 1024);
+      mocks.size.mockReturnValue(2 * 1024 * 1024);
       mocks.readBase64.mockResolvedValue(header.toString("base64"));
       mocks.pickMedia.mockResolvedValue({
         canceled: false,
