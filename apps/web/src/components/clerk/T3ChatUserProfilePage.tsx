@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { T3CHAT_PLAN_TUNNEL_LIMITS, type RelayT3ChatLink } from "@infinitus/contracts/relay";
 import { MessageSquareIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -45,7 +46,7 @@ export function T3ChatUserProfilePage() {
   return (
     <ClerkUserProfilePage
       title="T3 Chat"
-      description={`Link a paid T3 Chat account for more T3 Connect tunnels: up to ${T3CHAT_PLAN_TUNNEL_LIMITS.pro} with Pro, ${T3CHAT_PLAN_TUNNEL_LIMITS.premier} with Premier.`}
+      description={`Link a paid T3 Chat account for more ${CONNECT_NAME} tunnels: up to ${T3CHAT_PLAN_TUNNEL_LIMITS.pro} with Pro, ${T3CHAT_PLAN_TUNNEL_LIMITS.premier} with Premier.`}
       action={
         <ClerkUserProfileRefreshButton
           disabled={pending !== null}
@@ -61,7 +62,7 @@ export function T3ChatUserProfilePage() {
         </div>
       ) : data === null ? null : !data.available ? (
         <p className="border-t py-4 text-xs text-muted-foreground">
-          This T3 Connect server does not support T3 Chat linking.
+          This {CONNECT_NAME} server does not support T3 Chat linking.
         </p>
       ) : (
         <ul className="border-t">

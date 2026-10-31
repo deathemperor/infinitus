@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { T3CHAT_PLAN_TUNNEL_LIMITS } from "@infinitus/contracts/relay";
 import { TriangleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -48,7 +49,7 @@ export function TunnelUsageMeter({
       </div>
       <div
         role="meter"
-        aria-label="T3 Connect tunnels in use"
+        aria-label={`${CONNECT_NAME} tunnels in use`}
         aria-valuemin={0}
         aria-valuemax={limit}
         aria-valuenow={used}

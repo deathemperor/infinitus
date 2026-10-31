@@ -1,3 +1,4 @@
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import { AuthMcpClientAccess, EnvironmentId, type PeerLinkSummary } from "@infinitus/contracts";
 import * as Console from "effect/Console";
 import * as DateTime from "effect/DateTime";
@@ -79,7 +80,7 @@ const environmentLinkCommand = Command.make("link", {
   ...authLocationFlags,
   url: Argument.String("url").pipe(
     Argument.withDescription(
-      "Where the other environment answers: its T3 Connect, Tailscale, LAN or loopback address.",
+      `Where the other environment answers: its ${CONNECT_NAME}, Tailscale, LAN or loopback address.`,
     ),
   ),
   alternateUrl: Flag.String("url").pipe(
@@ -97,7 +98,7 @@ const environmentLinkCommand = Command.make("link", {
   ),
 }).pipe(
   Command.withDescription(
-    "Link another T3 Code environment, so agents here can work there. It shows up there under Settings → Connections, where it can be revoked.",
+    `Link another ${PRODUCT_NAME} environment, so agents here can work there. It shows up there under Settings → Connections, where it can be revoked.`,
   ),
   Command.withHandler((flags) =>
     runWithPeerLinks(flags, (links) =>
@@ -155,7 +156,9 @@ const environmentUnlinkCommand = Command.make("unlink", {
 );
 
 export const environmentCommand = Command.make("environment").pipe(
-  Command.withDescription("Link other T3 Code environments, so agents here can work there."),
+  Command.withDescription(
+    `Link other ${PRODUCT_NAME} environments, so agents here can work there.`,
+  ),
   Command.withSubcommands([
     environmentLinkCommand,
     environmentListCommand,

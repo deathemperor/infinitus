@@ -7,6 +7,7 @@ import {
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
 import { resolveUserMessagePresentation } from "@infinitus/client-runtime/user-message";
 import type { ChatAttachment, EnvironmentId, RunId, ThreadId } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { Atom } from "effect/reactivity";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -95,7 +96,7 @@ function QueuedRunSender(props: {
             label: senderShell?.title.trim() || "Agent",
           }
         : attribution === "t3code"
-          ? { icon: null, label: "Sent by T3 Code" }
+          ? { icon: null, label: `Sent by ${PRODUCT_NAME}` }
           : null;
   if (sender === null) return null;
   return (

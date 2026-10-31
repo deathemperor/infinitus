@@ -1,5 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off - exercises concurrent real CLI subprocesses.
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { describe, expect, it } from "@effect/vitest";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeNet from "node:net";
@@ -240,7 +241,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
       ]) {
         yield* Effect.promise(() =>
           expect(launch(managed)).rejects.toThrow(
-            `T3 Code manages this command's connection to the device, so \`${managed.find((arg) => ["connect", "disconnect", "auth", "daemon"].includes(arg))}\` is not available through it.`,
+            `${PRODUCT_NAME} manages this command's connection to the device, so \`${managed.find((arg) => ["connect", "disconnect", "auth", "daemon"].includes(arg))}\` is not available through it.`,
           ),
         );
       }
@@ -310,7 +311,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
         expect(launch(["screenshot", "/tmp/shot.png"])).rejects.toMatchObject({
           code: 1,
           stdout: "",
-          stderr: `T3 Code's device connection at 127.0.0.1:${port} is not reachable from this shell (connect ECONNREFUSED). Call device_open again to reconnect; if that succeeds and this repeats, this shell runs in a network sandbox, so run the command with network access, outside the sandbox.\n`,
+          stderr: `${PRODUCT_NAME}'s device connection at 127.0.0.1:${port} is not reachable from this shell (connect ECONNREFUSED). Call device_open again to reconnect; if that succeeds and this repeats, this shell runs in a network sandbox, so run the command with network access, outside the sandbox.\n`,
         }),
       );
       // An explicit --daemon-base-url wins over the config, as it does in agent-device.

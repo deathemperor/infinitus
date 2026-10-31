@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAtomValue } from "@effect/atom-react";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type { DesktopUpdateChannel } from "@infinitus/contracts";
@@ -165,7 +166,7 @@ function SwitchPlan({
           ? ["This app's updates are off here, so reinstall it yourself to switch."]
           : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["If T3 Code does not reopen after it restarts, open it again."]
+          ? [`If ${PRODUCT_NAME} does not reopen after it restarts, open it again.`]
           : []),
       ]}
       restarts={everything.restarts}

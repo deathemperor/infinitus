@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
 import { deriveThreadQueueWorkflowState } from "@infinitus/client-runtime/state/thread-workflows";
 import { assistantCitationsToPlainText } from "@infinitus/shared/assistantCitations";
@@ -439,7 +440,7 @@ function QueuedMessage(props: {
   return (
     <>
       {attribution === "t3code" ? (
-        <p className="me-1 text-2xs text-muted-foreground/70">Sent by T3 Code</p>
+        <p className="me-1 text-2xs text-muted-foreground/70">Sent by {PRODUCT_NAME}</p>
       ) : null}
       {presentation?.guestName === undefined ? null : (
         <GuestMessageName name={presentation.guestName} />

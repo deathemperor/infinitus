@@ -1,5 +1,6 @@
 import { EnvironmentId, MessageId, ThreadId } from "@infinitus/contracts";
 import { serializeAssistantCitation } from "@infinitus/shared/assistantCitations";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DateTime from "effect/DateTime";
 import type { ComponentProps } from "react";
 import { expect, it, vi } from "vite-plus/test";
@@ -170,7 +171,7 @@ it("shows who sent a queued message and folds automation and agent prompts", asy
   await page.getByRole("button", { name: "Open thread" }).click({ force: true });
   expect(onOpenThread).toHaveBeenCalledExactlyOnceWith("thread:lead");
 
-  await expect.element(page.getByText("Sent by T3 Code")).toBeVisible();
+  await expect.element(page.getByText(`Sent by ${PRODUCT_NAME}`)).toBeVisible();
   await expect.element(page.getByText("Continue where you left off.")).toBeVisible();
 });
 

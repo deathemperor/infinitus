@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { type EnvironmentId, SourceControlProviderKind } from "@infinitus/contracts";
 import { runAtomCommand } from "@infinitus/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";
@@ -27,7 +28,7 @@ function dismiss() {
 function showStarPrompt() {
   const close = () => toastManager.close(id);
   const id = toastManager.add({
-    title: "Enjoying T3 Code?",
+    title: `Enjoying ${PRODUCT_NAME}?`,
     description: "Give us a star on GitHub to let us know!",
     timeout: 0,
     onClose: dismiss,

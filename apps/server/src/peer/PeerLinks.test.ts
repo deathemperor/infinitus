@@ -1,5 +1,6 @@
 import { NodeHttpServer } from "@effect/platform-node";
 import { type ExecutionEnvironmentDescriptor, OrchestratorMcpFailure } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
@@ -138,7 +139,7 @@ it.effect("links with a pairing code, and the peer holds its agents to the limit
       });
       // B lists the link under A's name, where it can be revoked.
       expect((yield* linkedSessions(b)).map((session) => session.client.label)).toEqual([
-        "T3 Code · Laptop",
+        `${PRODUCT_NAME} · Laptop`,
       ]);
       expect(
         (yield* a.links.list).map(({ environmentId, status }) => [environmentId, status]),
@@ -147,8 +148,11 @@ it.effect("links with a pairing code, and the peer holds its agents to the limit
       // The caller's limits narrow the link's access; they never widen it.
       expect(
         yield* probe(a, { runtimeMode: "approval-required", interactionMode: "plan" }),
-      ).toEqual({ caller: "T3 Code · Laptop", modes: "approval-required/plan" });
-      expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+      ).toEqual({ caller: `${PRODUCT_NAME} · Laptop`, modes: "approval-required/plan" });
+      expect(yield* probe(a)).toEqual({
+        caller: `${PRODUCT_NAME} · Laptop`,
+        modes: "auto/default",
+      });
 
       // A refusal keeps the peer's reason.
       const notFound = yield* probe(a, undefined, "refuse").pipe(Effect.flip);
@@ -189,7 +193,10 @@ it.effect(
         expect(waiting.code).toBe("orchestration_error");
         expect(waiting.message).toContain("has Linked environments turned off");
         yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: true });
-        expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+        expect(yield* probe(a)).toEqual({
+          caller: `${PRODUCT_NAME} · Laptop`,
+          modes: "auto/default",
+        });
       }),
     ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

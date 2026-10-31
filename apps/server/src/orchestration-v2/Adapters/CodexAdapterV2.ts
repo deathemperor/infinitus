@@ -50,6 +50,7 @@ import {
 import { getModelSelectionStringOptionValue, modelSelectionsEqual } from "@infinitus/shared/model";
 import { appendGeneratedImageEmbeds } from "@infinitus/shared/generatedImageMarkdown";
 import { resolveSpawnCommand } from "@infinitus/shared/shell";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type {
   ChatAttachment,
   OrchestrationV2AppThread,
@@ -1736,7 +1737,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return yield* new ProviderSetupError({
                 instanceId: adapterOptions.instanceId,
                 operation: "runtime",
-                detail: `Codex ${version} does not work with this T3 Code release. Update Codex to ${target}, then retry.`,
+                detail: `Codex ${version} does not work with this ${PRODUCT_NAME} release. Update Codex to ${target}, then retry.`,
               });
             }
             yield* client.notify("initialized", undefined);

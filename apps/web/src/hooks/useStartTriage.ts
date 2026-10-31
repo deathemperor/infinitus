@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { scopeProjectRef } from "@infinitus/client-runtime/environment";
 import {
   type AtomCommandResult,
@@ -77,7 +78,7 @@ export function useStartTriage() {
     // A null result means the user went elsewhere; only a throw is a failure.
     await handleNewThread(scopeProjectRef(project.value.environmentId, project.value.id), {
       prompt: prepared.value.prompt,
-    }).catch(() => fail("T3 Code could not open a new thread."));
+    }).catch(() => fail(`${PRODUCT_NAME} could not open a new thread.`));
   };
 
   return async (environmentId: EnvironmentId) => {

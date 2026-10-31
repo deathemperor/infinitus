@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import type { LinkableMachine } from "@infinitus/client-runtime/link-request";
 import { useId } from "react";
 
@@ -20,7 +21,7 @@ export function LinkMachineBadge({ machine }: { readonly machine: LinkableMachin
   if (machine.connected) return null;
   return (
     <Badge variant="outline" size="sm">
-      {machine.connectOnly ? "T3 Connect" : "Not connected"}
+      {machine.connectOnly ? CONNECT_NAME : "Not connected"}
     </Badge>
   );
 }

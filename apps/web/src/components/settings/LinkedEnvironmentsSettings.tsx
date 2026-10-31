@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAtomValue } from "@effect/atom-react";
 import { linkRequestFailureMessage } from "@infinitus/client-runtime/link-request";
 import {
@@ -74,7 +75,7 @@ export function LinkedEnvironmentsSettings({
       ) : links.data.links.length === 0 ? (
         <SettingsRow
           title="No linked environments"
-          description="Link another machine running T3 Code, such as a VPS, so agents here can launch and drive threads there."
+          description={`Link another machine running ${PRODUCT_NAME}, such as a VPS, so agents here can launch and drive threads there.`}
         />
       ) : (
         links.data.links.map((link) => (
@@ -103,7 +104,7 @@ function LinkedEnvironmentRow({
   const [busy, setBusy] = useState(false);
   const forget = async () => {
     const confirmed = await (requestConfirmDialog(
-      `Forget ${link.label}? Agents here stop working there. Revoke "T3 Code · …" in ${link.label}'s Connections to end the session there too.`,
+      `Forget ${link.label}? Agents here stop working there. Revoke "${PRODUCT_NAME} · …" in ${link.label}'s Connections to end the session there too.`,
       { variant: "destructive" },
     ) ?? Promise.resolve(false));
     if (!confirmed) return;

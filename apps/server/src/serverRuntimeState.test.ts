@@ -5,6 +5,7 @@ import * as NodeSqlite from "node:sqlite";
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -259,7 +260,7 @@ describe("server ownership", () => {
             ? []
             : [
                 [
-                  `Server ownership lock at ${lockPath} was deleted or replaced. Another server may now share this T3 home. Stop any other server using this home, then restart this server. Do not delete server-owner.sqlite while a server is running.`,
+                  `Server ownership lock at ${lockPath} was deleted or replaced. Another server may now share this ${PRODUCT_NAME} home. Stop any other server using this home, then restart this server. Do not delete server-owner.sqlite while a server is running.`,
                 ],
               ];
         assert.deepEqual(messages, expected);

@@ -4,6 +4,7 @@
  * It carries exactly what an agent sign-in with the chosen access needs.
  */
 import { type AuthMcpClientAccess, mcpClientScopes } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import type * as HttpClient from "effect/http/HttpClient";
@@ -20,7 +21,7 @@ import { executeAuthenticatedEnvironmentHttpRequest } from "./environmentHttpAut
 import { createEnvironmentCommand } from "./runtime.ts";
 
 const MINT_TIMEOUT_MS = 8_000;
-const PEER_PAIRING_CODE_LABEL = "T3 Code link";
+const PEER_PAIRING_CODE_LABEL = `${PRODUCT_NAME} link`;
 
 /** Minting failed; the user can still paste a code from the other environment. */
 export class PeerPairingCodeError extends Data.TaggedError("PeerPairingCodeError")<{

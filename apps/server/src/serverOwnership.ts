@@ -274,7 +274,7 @@ export const acquireServerOwnership = Effect.fn("acquireServerOwnership")(functi
         current.ino !== lock.identity.ino;
     }
     yield* Effect.logError(
-      `Server ownership lock at ${lockPath} was deleted or replaced. Another server may now share this T3 home. Stop any other server using this home, then restart this server. Do not delete server-owner.sqlite while a server is running.`,
+      `Server ownership lock at ${lockPath} was deleted or replaced. Another server may now share this ${PRODUCT_NAME} home. Stop any other server using this home, then restart this server. Do not delete server-owner.sqlite while a server is running.`,
     );
   }).pipe(Effect.forkScoped);
 

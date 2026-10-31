@@ -28,6 +28,7 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import { isLocalLoopbackHost, isTailnetHost } from "@infinitus/shared/hostClassification";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -392,7 +393,7 @@ const make = Effect.gen(function* () {
     if (Option.isNone(descriptor)) {
       return yield* new PeerLinkError({
         reason: "not_a_t3_environment",
-        message: `Nothing at ${primary} answered as a T3 Code environment.`,
+        message: `Nothing at ${primary} answered as a ${PRODUCT_NAME} environment.`,
       });
     }
     return { primary, peer: descriptor.value, origins };
@@ -423,10 +424,10 @@ const make = Effect.gen(function* () {
     if (!linkLimitsHold(peer)) {
       return yield* new PeerLinkError({
         reason: "incompatible",
-        message: `${peer.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
+        message: `${peer.label} runs a ${PRODUCT_NAME} version that cannot keep a linked agent's limits. Update it, then link again.`,
       });
     }
-    const issued = yield* signIn(primary, input, `T3 Code · ${self.label}`);
+    const issued = yield* signIn(primary, input, `${PRODUCT_NAME} · ${self.label}`);
     const now = yield* DateTime.now;
     const linked: PeerLink = {
       environmentId: peer.environmentId,
@@ -579,7 +580,7 @@ const make = Effect.gen(function* () {
       if (!fenced) {
         return yield* new PeerLinkError({
           reason: "incompatible",
-          message: `${link.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
+          message: `${link.label} runs a ${PRODUCT_NAME} version that cannot keep a linked agent's limits. Update it, then link again.`,
         });
       }
       return { link, url: url.value, token: new TextDecoder().decode(stored.value) };

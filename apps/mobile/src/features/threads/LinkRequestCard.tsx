@@ -1,3 +1,4 @@
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 import { pipe } from "effect/Function";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -475,7 +476,7 @@ function MachineRow(props: {
     : machine.connected
       ? null
       : machine.connectOnly
-        ? "T3 Connect"
+        ? CONNECT_NAME
         : "Not connected";
   return (
     <Pressable

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { type EnvironmentContextRecord, resolveEnvironmentMachineKind } from "@infinitus/contracts";
 
 import { useEnvironment } from "~/state/environments";
@@ -33,7 +34,7 @@ export function EnvironmentContextChip(props: {
         }
       />
       <TooltipPopup side="top">
-        {environment ? "T3 Code environment" : "Machine not in this app"}
+        {environment ? `${PRODUCT_NAME} environment` : "Machine not in this app"}
       </TooltipPopup>
     </Tooltip>
   );
