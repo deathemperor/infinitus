@@ -1,6 +1,9 @@
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { Discovery } from "@infinitus/client-runtime/relay";
+import type { EnvironmentId } from "@infinitus/contracts";
 import { useState } from "react";
 
+import { useRelayEnvironmentDiscovery } from "../../state/environments";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -15,17 +18,40 @@ import { useInfinitusConnectAccountPage } from "./InfinitusConnectAccountPages";
 
 export function RemoveInfinitusConnectEnvironmentDialog({
   environmentLabel,
+  environmentId,
   onCancel,
   onConfirm,
 }: {
   readonly environmentLabel: string | null;
+  readonly environmentId: EnvironmentId | null;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }) {
   const accountPage = useInfinitusConnectAccountPage();
-  const [shownLabel, setShownLabel] = useState(environmentLabel);
-  if (environmentLabel !== null && environmentLabel !== shownLabel) setShownLabel(environmentLabel);
+  const discovery = useRelayEnvironmentDiscovery();
+  const registration = environmentId
+    ? Discovery.relayEnvironmentRegistration(discovery, environmentId)
+    : "unknown";
+  const [shown, setShown] = useState({ label: environmentLabel, registration });
+  if (
+    environmentLabel !== null &&
+    (environmentLabel !== shown.label || registration !== shown.registration)
+  ) {
+    setShown({ label: environmentLabel, registration });
+  }
   const openAccountPage = accountPage.open;
+  const accountPageLink = openAccountPage ? (
+    <InlineButton
+      onClick={() => {
+        onCancel();
+        openAccountPage();
+      }}
+    >
+      {CONNECT_NAME} settings
+    </InlineButton>
+  ) : (
+    `${CONNECT_NAME} settings`
+  );
 
   return (
     <>
@@ -37,25 +63,24 @@ export function RemoveInfinitusConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {shownLabel} from this device?</AlertDialogTitle>
+            <AlertDialogTitle>Remove {shown.label} from this device?</AlertDialogTitle>
             <AlertDialogDescription>
               This forgets its pairing, credentials, and cached threads here.
             </AlertDialogDescription>
             <AlertDialogDescription>
-              It stays on your {CONNECT_NAME} account and keeps its host space. Deregister it in{" "}
-              {openAccountPage ? (
-                <InlineButton
-                  onClick={() => {
-                    onCancel();
-                    openAccountPage();
-                  }}
-                >
-                  {CONNECT_NAME} settings
-                </InlineButton>
+              {shown.registration === "registered" ? (
+                <>
+                  It stays on your {CONNECT_NAME} account and keeps its host space. Deregister it in{" "}
+                  {accountPageLink} to free it.
+                </>
+              ) : shown.registration === "unregistered" ? (
+                `It's no longer on your ${CONNECT_NAME} account.`
               ) : (
-                `${CONNECT_NAME} settings`
-              )}{" "}
-              to free it.
+                <>
+                  This doesn't change your {CONNECT_NAME} account. To deregister it there, use{" "}
+                  {accountPageLink}.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

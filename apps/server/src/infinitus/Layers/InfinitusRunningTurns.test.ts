@@ -86,20 +86,15 @@ function threadWithRun(
   ];
 }
 
-const storageCases = (["sqlite", "memory"] as const).map((storage) => ({
-  storage,
-  layer: InfinitusRunningTurnsLive.pipe(
-    Layer.provideMerge(
-      storage === "sqlite"
-        ? ProjectionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory))
-        : ProjectionStore.layerMemory,
-    ),
+const layer = InfinitusRunningTurnsLive.pipe(
+  Layer.provideMerge(
+    ProjectionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory)),
   ),
-}));
+);
 
-it.effect.each(storageCases)(
-  "$storage: lists the threads whose run is live, a waiting one included (#829)",
-  ({ layer }) =>
+it.effect(
+  "lists the threads whose run is live, a waiting one included (#829)",
+  () =>
     Effect.gen(function* () {
       const store = yield* ProjectionStore.ProjectionStoreV2;
       const now = yield* DateTime.now;

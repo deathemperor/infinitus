@@ -17,7 +17,7 @@ import * as Layer from "effect/Layer";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import type { McpInvocationScope } from "./McpInvocationContext.ts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
-import { threadNotFound } from "./OrchestratorMcpService.ts";
+import { threadNotFound } from "./threadAccess.ts";
 
 export class ThreadMetadataMcpService extends Context.Service<
   ThreadMetadataMcpService,

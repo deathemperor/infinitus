@@ -12,20 +12,20 @@ describe("SidebarStageBackdrop", () => {
   it("resolves stage artwork only when enabled", () => {
     expect(resolveSidebarStageBackdropVariant("Dev")).toBe("dev");
     expect(resolveSidebarStageBackdropVariant("Nightly")).toBe("nightly");
-    expect(resolveSidebarStageBackdropVariant("Dev", false)).toBeNull();
+    expect(resolveSidebarStageBackdropVariant("Dev", "none")).toBeNull();
     // Fork: the release track draws the night sky; only an unknown stage is bare.
     expect(resolveSidebarStageBackdropVariant("Alpha")).toBe("nightly");
     expect(resolveSidebarStageBackdropVariant("Latest")).toBeNull();
   });
 
   it("lets a theme's scene replace the stage default", () => {
-    expect(resolveSidebarStageBackdropVariant("Alpha", true, "nebula")).toBe("nebula");
-    expect(resolveSidebarStageBackdropVariant("Nightly", true, "tide")).toBe("tide");
+    expect(resolveSidebarStageBackdropVariant("Alpha", "artwork", "nebula")).toBe("nebula");
+    expect(resolveSidebarStageBackdropVariant("Nightly", "artwork", "tide")).toBe("tide");
     // A theme's scene overrides the blueprint too, so dev builds are themed.
-    expect(resolveSidebarStageBackdropVariant("Dev", true, "dawn")).toBe("dawn");
+    expect(resolveSidebarStageBackdropVariant("Dev", "artwork", "dawn")).toBe("dawn");
     // The stage still decides whether any artwork draws.
-    expect(resolveSidebarStageBackdropVariant("Latest", true, "nebula")).toBeNull();
-    expect(resolveSidebarStageBackdropVariant("Alpha", false, "nebula")).toBeNull();
+    expect(resolveSidebarStageBackdropVariant("Latest", "artwork", "nebula")).toBeNull();
+    expect(resolveSidebarStageBackdropVariant("Alpha", "pill", "nebula")).toBeNull();
   });
 
   it("resolves supported environment pill labels", () => {

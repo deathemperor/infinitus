@@ -81,6 +81,12 @@ import Migration0076 from "./Migrations/076_RepairClientSettlementTimestamps.ts"
 import Migration0077 from "./Migrations/077_WebhookDedupe.ts";
 import Migration0078 from "./Migrations/078_ShellStopRequestIndex.ts";
 import Migration0079 from "./Migrations/079_ThreadMessageSearch.ts";
+import Migration0080 from "./Migrations/080_PeerLinks.ts";
+import Migration0081 from "./Migrations/081_PeerLinkFence.ts";
+import Migration0082 from "./Migrations/082_WaitingLinkRequestIndex.ts";
+import Migration0083 from "./Migrations/083_ActiveTurnItemIndexes.ts";
+import Migration0084 from "./Migrations/084_ExcludeAttachmentPlaceholdersFromSearch.ts";
+import Migration0085 from "./Migrations/085_SubagentDeliveryState.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -167,6 +173,13 @@ const migrationEntries = [
   [77, "WebhookDedupe", Migration0077],
   [78, "ShellStopRequestIndex", Migration0078],
   [79, "ThreadMessageSearch", Migration0079],
+  // Upstream's 70-75, renumbered after the fork's 79.
+  [80, "PeerLinks", Migration0080],
+  [81, "PeerLinkFence", Migration0081],
+  [82, "WaitingLinkRequestIndex", Migration0082],
+  [83, "ActiveTurnItemIndexes", Migration0083],
+  [84, "ExcludeAttachmentPlaceholdersFromSearch", Migration0084],
+  [85, "SubagentDeliveryState", Migration0085],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

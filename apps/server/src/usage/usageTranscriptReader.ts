@@ -3,6 +3,7 @@
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as NodeStringDecoder from "node:string_decoder";
+import * as NodeZlib from "node:zlib";
 
 import type {
   SelectedFields,
@@ -85,7 +86,11 @@ export async function listTranscriptFiles(
     for (const entry of entries) {
       const child = NodePath.join(dir, entry.name);
       if (entry.isDirectory()) await walk(child);
-      else if (fileName !== undefined ? entry.name === fileName : entry.name.endsWith(".jsonl")) {
+      else if (
+        fileName !== undefined
+          ? entry.name === fileName
+          : entry.name.endsWith(".jsonl") || entry.name.endsWith(".jsonl.zst")
+      ) {
         candidates.push(child);
       }
     }
@@ -176,6 +181,7 @@ export async function readTranscriptRecords<State>(
 ): Promise<TranscriptParseResult | null> {
   const streamingThresholdBytes = options?.streamingThresholdBytes ?? STREAMING_THRESHOLD_BYTES;
   const observer = options?.observer;
+  const compressed = filePath.endsWith(".jsonl.zst");
   let handle: NodeFSP.FileHandle;
   try {
     handle = await NodeFSP.open(filePath, "r");
@@ -195,6 +201,7 @@ export async function readTranscriptRecords<State>(
         ? Option.none()
         : decodeState(resumeFrom.state);
     if (
+      !compressed &&
       resumeFrom !== undefined &&
       resumeFrom.resumeOffset > 0 &&
       (codec === undefined || Option.isSome(savedState)) &&
@@ -273,11 +280,14 @@ export async function readTranscriptRecords<State>(
       streaming = undefined;
       decoder = undefined;
     };
-    const stream = handle.createReadStream({
+    const input = handle.createReadStream({
       start,
-      autoClose: false,
+      autoClose: compressed,
       highWaterMark: 256 * 1024,
-    }) as AsyncIterable<Buffer>;
+    });
+    // Compressed snapshots cache a full parse; decoded byte offsets cannot
+    // resume the compressed input.
+    const stream = compressed ? input.compose(NodeZlib.createZstdDecompress()) : input;
     for await (const chunk of stream) {
       let lineStart = 0;
       while (lineStart < chunk.length) {
@@ -305,7 +315,7 @@ export async function readTranscriptRecords<State>(
       decodeState === undefined ? state : Option.getOrThrow(decodeState(encodedState));
     finish(tailState, tailRecords);
 
-    const guardLength = Math.min(GUARD_LENGTH, resumeOffset);
+    const guardLength = compressed ? 0 : Math.min(GUARD_LENGTH, resumeOffset);
     let guardHash = 0;
     if (guardLength > 0) {
       const window = Buffer.alloc(guardLength);
@@ -318,7 +328,7 @@ export async function readTranscriptRecords<State>(
       tailRecords,
       malformedRecords: format.readMalformedRecords?.(tailState) ?? 0,
       position: {
-        resumeOffset,
+        resumeOffset: compressed ? 0 : resumeOffset,
         guardLength,
         guardHash,
         state: encodedState,

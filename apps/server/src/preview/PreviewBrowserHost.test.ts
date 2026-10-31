@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Effect from "effect/Effect";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
@@ -72,6 +73,38 @@ const diagnose = (input: {
 };
 
 describe("diagnoseLaunchFailure", () => {
+  it.effect("explains how to restart a root server without Chrome's sandbox", () =>
+    Effect.gen(function* () {
+      const { error, commands } = yield* diagnose({
+        platform: "linux",
+        uid: 0,
+        output: PreviewBrowserHost.NO_SANDBOX_SIGNATURE,
+        ldd: "",
+      });
+      expect(error).toBeInstanceOf(PreviewBrowserHost.PreviewBrowserRootError);
+      expect(error?.message).toContain(`${PRODUCT_NAME} server is running as root`);
+      expect(error?.message).toContain(
+        `${PRODUCT_NAME} server's environment and restart the server`,
+      );
+      expect(error?.message).toContain("T3CODE_SERVER_BROWSER_SANDBOX=0 t3 serve");
+      expect(error?.message).toContain("Environment=T3CODE_SERVER_BROWSER_SANDBOX=0");
+      expect(error?.message).toContain("this disables Chrome's sandbox");
+      expect(commands).toEqual([]);
+    }),
+  );
+
+  it.effect("keeps host setup guidance for a nonroot sandbox failure", () =>
+    Effect.gen(function* () {
+      const { error } = yield* diagnose({
+        platform: "linux",
+        output: PreviewBrowserHost.NO_SANDBOX_SIGNATURE,
+        ldd: "",
+      });
+      expect(error).toBeInstanceOf(PreviewBrowserHost.PreviewBrowserSandboxError);
+      expect(error?.message).toContain("Run `sudo t3 browser setup` on the host");
+    }),
+  );
+
   it.effect("names every library the loader cannot find", () =>
     Effect.gen(function* () {
       const { error } = yield* diagnose({

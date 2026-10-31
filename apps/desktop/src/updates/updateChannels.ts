@@ -79,8 +79,7 @@ export function resolveElectronUpdaterFeed(
     return { channel, allowPrerelease: true, allowDowngrade: true };
   }
   if (channel !== "infinitus") {
-    const prerelease = channel === "nightly";
-    return { channel, allowPrerelease: prerelease, allowDowngrade: prerelease };
+    return { channel, allowPrerelease: channel === "nightly", allowDowngrade: false };
   }
   const nightlyBuild = isInfinitusNightlyDesktopVersion(appVersion);
   const prereleaseId = resolvePrereleaseId(
