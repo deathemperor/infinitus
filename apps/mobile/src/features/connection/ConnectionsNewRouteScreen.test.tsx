@@ -38,6 +38,11 @@ vi.mock("expo-camera", () => ({
   CameraView: () => null,
   useCameraPermissions: () => [null, vi.fn()],
 }));
+// Fork (#724): the screen reads the app variant for the scanned-QR prefill, and draws the
+// nearby-servers and ask-to-approve rows, which reach native modules.
+vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock("../infinitus/InfinitusAskToApprove", () => ({ InfinitusAskToApprove: () => null }));
+vi.mock("../infinitus/InfinitusNearbyServers", () => ({ InfinitusNearbyServers: () => null }));
 vi.mock("expo-haptics", () => ({
   notificationAsync: vi.fn(async () => {}),
   NotificationFeedbackType: { Success: "success", Error: "error" },

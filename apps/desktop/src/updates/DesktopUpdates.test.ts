@@ -24,8 +24,10 @@ import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
 
 // Every build of this repo defaults to the infinitus channel (#823), where an
 // available update downloads itself; these tests exercise upstream's
-// click-to-download channels, so they start on one.
+// click-to-download channels, so they start on one, as an upstream nightly build: an update
+// is offered only on the running build's own track.
 const UPSTREAM_CHANNEL = {
+  appVersion: "1.2.3-nightly.20260801.1",
   settings: { updateChannel: "nightly", updateChannelConfiguredByUser: true },
 } as const;
 
@@ -216,7 +218,12 @@ describe("DesktopUpdates", () => {
         assert.equal(unchangedState.status, "downloaded");
         assert.equal(unchangedState.downloadedVersion, "1.2.4-nightly.20260901.1");
         assert.deepEqual(unchangedState.releaseNotes, [
-          { version: "1.2.4-nightly.20260901.1", items: ["fix: queued update"], totalItems: 1 },
+          {
+            version: "1.2.4-nightly.20260901.1",
+            items: ["fix: queued update"],
+            totalItems: 1,
+            releasedAt: "2026-09-01",
+          },
         ]);
         assert.equal(unchangedState.omittedReleaseCount, 0);
 
@@ -992,10 +999,10 @@ describe("DesktopUpdates", () => {
         yield* updates.configure;
         const before = harness.checkAllowedDowngrade.length;
         yield* updates.setChannel("nightly");
-        yield* updates.setChannel("latest");
+        yield* updates.setChannel("infinitus");
         yield* updates.check("remote-update", { allowDowngrade: true });
 
-        // Back on its own Stable track the build never needs an older release.
+        // Back on its own track the build never needs an older release.
         assert.deepEqual(harness.checkAllowedDowngrade.slice(before), [true, false, true]);
         assert.isFalse(harness.allowDowngrade());
       }),
@@ -1051,7 +1058,7 @@ describe("DesktopUpdates", () => {
       Effect.gen(function* () {
         const updates = yield* DesktopUpdates.DesktopUpdates;
         yield* updates.configure;
-        yield* updates.setChannel("latest", { minimumVersion: "1.2.3" });
+        yield* updates.setChannel("infinitus", { minimumVersion: "1.2.3" });
 
         harness.emit("update-available", { version: "1.2.2" });
         yield* flushCallbacks;

@@ -783,14 +783,8 @@ const make = Effect.gen(function* () {
       adopted === undefined && (await desktopRenders(snapshot))
         ? await connectDesktop(snapshot)
         : null;
-    // Otherwise a desktop that attaches late shows its own page, and the agent drives another.
-    if (!desktop && desktopChannel.available) {
-      await runPromise(
-        manager
-          .markHeadless({ threadId: ThreadId.make(snapshot.threadId), tabId: snapshot.tabId })
-          .pipe(Effect.ignore),
-      );
-    }
+    // Fork (#1688): a headless tab is not marked headless (upstream #22877), so a desktop that
+    // mounts late draws its own page and the `attached` handler moves the agent onto it.
     const isolatedContext =
       adopted === undefined &&
       desktop === null &&

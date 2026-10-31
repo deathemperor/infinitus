@@ -12,6 +12,7 @@ import {
   RunId,
   ThreadId,
 } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -719,8 +720,8 @@ describe("CursorAdapterV2", () => {
         );
         const sent = sentMessages.at(-1)!;
         return {
-          orchestration: sent.includes("## T3 Code orchestration"),
-          devices: sent.includes("## T3 Code devices"),
+          orchestration: sent.includes(`## ${PRODUCT_NAME} orchestration`),
+          devices: sent.includes(`## ${PRODUCT_NAME} devices`),
         };
       });
       const told = (orchestration: boolean, devices: boolean) => ({ orchestration, devices });

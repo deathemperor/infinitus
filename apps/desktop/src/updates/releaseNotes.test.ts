@@ -76,7 +76,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
         "</details>",
       ].join("\n"),
       "1.2.4",
-      "latest",
+      "infinitus",
       "2026-10-29T10:00:00.000Z",
     );
 
@@ -116,7 +116,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     const result = normalizeDesktopUpdateReleaseNotes(
       "- Older fix\n- Newer fix\n<details><summary>Logs</summary>\n- hidden\n</details>",
       "1.2.3",
-      "latest",
+      "infinitus",
     );
 
     expect(result.releaseNotes).toEqual([
