@@ -68,6 +68,19 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/desktop/src/updates/updatesTestHarness.ts` — the `resourcesPath`
   option (#1042); under upstream's no-op file system, reads below it go to
   the real disk so the feed-swap test's own `app-update.yml` is found.
+- `apps/desktop/src/updates/updateChannels.ts`, `DesktopUpdates.ts`,
+  `releaseNotes.ts` and `apps/desktop/src/settings/DesktopAppSettings.ts` —
+  the fork's tracks (#924, #1042): `updateChannels.ts` adds
+  `resolveDefaultDesktopUpdateChannel` (a version's track; `latest` is never a
+  default), `resolveEffectiveDesktopUpdateChannel` and
+  `resolveElectronUpdaterFeed`; the default settings and the release-notes
+  filter call the first where upstream calls `desktopUpdateChannelOf`.
+  `DesktopUpdates.ts` takes the feed from them (`applyFeedProvider`,
+  `autoDownloadOnForkChannel`, a missing channel file read as a release still
+  building); upstream's `offerable` uses the fork's resolver, and with no
+  floor set the fork's two tracks skip the running-build-track rule, since
+  Settings switches them both ways with no database check. Rules and traps:
+  `docs/internals/release-and-updates.md`.
 - `packages/contracts/src/rpc.ts` — `...INFINITUS_WS_METHODS` in `WS_METHODS`
   from `infinitusRpc.ts` (`fork-only-files.md`); upstream's group is declared
   as `UpstreamWsRpcGroup`, and `WsRpcGroup` is its merge with
@@ -181,15 +194,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   one call before the command, intersected with upstream's `input.filePaths`
   and passed in upstream's `:(top,literal)<path>` form; `removeWorktree` answers `VcsRemoveWorktreeResult` (#270 A);
   the checkpoint author and committer names are `PRODUCT_NAME`.
-- `packages/contracts/src/providerRuntime.ts` — fork-owned optional
-  fields: `TaskStartedPayload.prompt` (#1573) and `isBackgrounded` (#974;
-  the one on `TaskUpdatedPayload` is upstream's), which no orchestration-v2
-  adapter writes yet and no client reads (kept for their #1627 ports), and
+- `packages/contracts/src/providerRuntime.ts` — the optional
   `TurnTokenUsage.cacheTtlSeconds` (#1557), which `ClaudeTurnTokenUsage.ts`
-  fills from the result's `usage.cache_creation`. `TurnCompletedPayload`'s
-  `turnCostUsd` / `turnModels` (#834) moved onto
-  `OrchestrationV2ProviderTurn` with the v2 port; `usageLimited` (#648)
-  left with it: the failure's `class: "usage_limit"` carries it.
+  fills from the result's `usage.cache_creation`.
 - `packages/contracts/src/settings.ts` — the `PromptSnippet` schema with its
   caps and `projectPromptSnippets`
   (`Record(ProjectId, NullOr(Array(PromptSnippet)))`, default `{}`) on
@@ -255,22 +262,22 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (`apps/web/src/components/InfinitusRootMounts.tsx`, which lists the fork's
   headless coordinators), beside `DesktopAppActivationCoordinator`, with the
   authenticated flag.
-- `apps/server/src/serverLogger.ts` — `ServerLoggerLive` adds the fork's file
-  logger (`infinitus/serverLogFile.ts`, in `fork-only-files.md`) beside `consolePretty` and
+- `apps/server/src/serverLogger.ts` — `layer` adds the fork's file
+  logger (`infinitus/serverLogFile.ts`, in `fork-only-files.md`), wrapped in
+  upstream's `redactingCredentials` like the others, beside `consolePretty` and
   `tracerLogger` (#1182); `apps/server/src/config.ts` — `serverLogNdjsonPath`
   (`<logsDir>/server.log.ndjson`) on `ServerDerivedPaths` beside upstream's
-  `serverLogPath`; `apps/server/src/cli/triage.ts` and `triagePrompt.ts` —
-  the path in the triage context so `t3 triage` names it; the test
-  `ServerConfig`s in `apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.testkit.ts`
-  and `orchestration-v2/testkit/ProviderReplayHarness.ts` carry the field.
+  `serverLogPath`; `apps/server/src/triage/triageSession.ts` and
+  `triagePrompt.ts` — the path in the triage context so `t3 triage` names it;
+  the test `ServerConfig` from `makeReplayServerConfig` in
+  `orchestration-v2/testkit/ProviderReplayHarness.ts` carries the field.
 - `apps/server/src/persistence/Migrations.ts` (+ `initializeV2Database.test.ts`,
   whose V1 ledger ends at 64) — the fork's own `051`–`064` stay in the ledger
   (queued turns, babysit, side questions, groups, session status reason, turn
   usage, message context, title state, PR files viewed, auto-settle; their
   features left with #1627, but existing fork databases recorded them, so
-  they are schema history, not live code) and upstream's `055`–`061`
-  (OrchestrationV2 onward) are renumbered `065`–`071`, its `062`–`067`
-  (ThreadFailureLookupIndex to WebhookDedupe) `072`–`077`, on every sync
+  they are schema history, not live code) and upstream's `055`–`075`
+  (OrchestrationV2 onward) are renumbered `065`–`085` on every sync
   (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
   legacy/V2 boundary ids are the fork's. Upstream's `reconcileV2PreviewMigration` is not carried: no
@@ -288,17 +295,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `packages/provider-core/src/server/mcpSession.ts` —
   `withProviderSessionEnvironment`: the device-environment wrapper plus
   `T3_THREAD_ID` / `T3_ENVIRONMENT_ID`, which `infinitusctl` reads inside a
-  thread's terminal (#822). `apps/server/src/terminal/Manager.ts` (the
-  terminal spawn env; the environment id from `ServerEnvironment` when it is
-  provided) and `apps/server/src/provider/Drivers/AntigravityDriver.ts` call
-  it where upstream calls `withAgentDeviceEnvironment`.
+  thread's terminal (#822). `apps/server/src/terminal/Manager.ts` wraps the
+  terminal spawn env in it (the environment id from `ServerEnvironment` when
+  it is provided).
 - `apps/server/src/**` — the same `PRODUCT_NAME` / `CONNECT_NAME` rule for
   the strings a user or an agent reads: `vcs/GitVcsDriver.ts` (the
   checkpoint author), `provider/ClaudeProvider.ts`, `cli/triage.ts` +
-  `triagePrompt.ts`, `server.ts` and `relay/AgentAwarenessRelay.ts` (the
+  `triage/triagePrompt.ts`, `server.ts` and `relay/AgentAwarenessRelay.ts` (the
   tunnel log lines), `orchestration-v2/PullRequestWatchReactor.ts` (the
-  agent-facing notices), `provider/Drivers/AntigravityDriver.ts` (the
-  `clientInfo` names). Re-applied to upstream's new strings on every sync,
+  agent-facing notices). Re-applied to upstream's new strings on every sync,
   with the tests that assert them (`provider/ProviderRegistry.test.ts`,
   `provider/CodexDeveloperInstructions.test.ts`). The one exception is
   `orchestration-v2/RestartBackgroundNote.ts`: a Claude replay fixture
@@ -386,13 +391,15 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   keeps its spinner instead of reading "Reconnecting to X" beside a
   wifi-slash; the full-screen notice drops `bolt.horizontal.circle` and
   shows wifi-slash for every non-retrying phase.
-- `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — mounts
-  `InfinitusNearbyServers` above the Host field (#651) and
+- `apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx` — upstream's
+  `PairingForm` mounts `InfinitusNearbyServers` above the Host field (#651) and
   `InfinitusAskToApprove` under the code field (#710), whose approved
-  credential goes through the screen's own `connectAndClose`.; and its
-  deep-link prefill goes through `pairPrefill.logic.ts` (#724): host and code
-  fill in for the Infinitus variant outside `__DEV__` too, auto-connect stays
-  development-only.
+  credential goes through the form's own `connectAndClose`; the prefill URL
+  comes from `pairPrefill.logic.ts`'s `routePairingPrefill` (#724): host and
+  code fill in for the Infinitus variant outside `__DEV__` too, while
+  auto-connect stays upstream's development-only `devAutoConnect.ts`. Its
+  upstream test `ConnectionsNewRouteScreen.test.tsx` mocks `expo-constants`,
+  `InfinitusAskToApprove` and `InfinitusNearbyServers`.
 - `apps/server/src/environment/ServerEnvironment.ts` — fills the `infinitus`
   capability from `resolveInfinitusControlSocketPath`, and `lanHttpBaseUrls`
   from `infinitus/Layers/LanBaseUrls.ts` (#651: the routable IPv4 addresses
@@ -440,15 +447,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   match is by name and `Latest` (hosted web) stays bare, pinned by
   `SidebarStageBackdrop.test.tsx`. No new art and no CSS: `--stage-night-*`
   is already defined for `:root` and every `sidebarArtwork` theme. The pill
-  label is widened with it because `SettingsPanels.tsx`'s
-  `showEnvironmentIdentification` row is derived from that function — without
-  it the artwork would have no off switch — so that row's `settingsSearch.ts` terms follow (`alpha artwork
-  background`). Riding along, all
+  label is widened with it so `SidebarChrome.tsx`'s `pill` mode has a label on
+  this track; `AppearanceSettingsPanel.tsx`'s identification row reads the
+  resolver, so an `Alpha` build offers "Nightly artwork", and that row's
+  `settingsSearch.ts` terms carry `alpha artwork background`. Riding along, all
   upstream code the fork does not touch: `AppSidebarLayout.tsx`'s floating
-  sidebar trigger turns white, `ComposerPrimaryActions.tsx` draws the send
-  button on the art, and `AuthSurfaceShell.tsx` (no mode gate — the auth
-  surface has no settings) gives the CLI-connect pages the sky in place of
-  its hardcoded blue gradient. `apps/server/src/cloud/cliAuthHtml.ts`'s
+  sidebar trigger turns white and `ComposerPrimaryActions.tsx` draws the send
+  button on the art. `apps/server/src/cloud/cliAuthHtml.ts`'s
   `.stage-*` CSS is a separate mechanism off `__T3CODE_BUILD_CHANNEL__` and
   is unaffected.
   A theme then picks WHICH scene: `StageArtScene`
@@ -464,12 +469,12 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   default the label would pick, the blueprint included, so a dev build is
   themed like any other — which is why
   `resolveSidebarStageBackdropVariant` takes the scene as an optional third
-  argument and `AuthSurfaceShell.tsx`'s two-argument call keeps working
-  untouched. `StageBackdropArt` dispatches through a
+  argument after upstream's `mode: EnvironmentIdentificationMode`, which
+  `useSidebarStageBackdropVariant` fills from the theme, and
+  `AppearanceSettingsPanel.tsx`'s one-argument call stays untouched.
+  `StageBackdropArt` dispatches through a
   `Record<StageArtScene, …>`, so a new scene is one map entry and one
-  component; `resolveSidebarStageFocusRingOffsetClass` tests for `dev`
-  rather than `nightly` because every other scene reads the night palette.
-  Still no CSS and no new art files: each scene is inline SVG over the
+  component. Still no CSS and no new art files: each scene is inline SVG over the
   `--stage-night-*` vars that already resolve for every theme, tiled in a
   `<pattern>` on the 8192-wide canvas, `useId`-prefixed def ids (the test
   renders each scene twice and asserts globally unique ids) and no
@@ -497,7 +502,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   constant. `apps/server/src/orchestration-v2/ThreadLaunchService.test.ts`
   expects `infinitus/<hash>` where upstream's fixtures say `t3/<hash>`.
   Upstream's own `t3code/…` fixtures in tests stay as legacy data.
-- `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); re-flipped after every sync with its fixtures, `packages/shared/src/cliRelease.test.ts`, `packages/ssh/src/tunnel.test.ts` and `apps/mobile/src/features/settings/environment-maintenance.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
+- `packages/shared/src/cliRelease.ts` — `CLI_RELEASE_REPOSITORY` is `deathemperor/infinitus` and `cliReleaseChannelOf` reads the fork's nightly suffix (#1042, #1192); `acceptsTrackSwitchRelease` takes a `DesktopUpdateChannel` and reads `infinitus-nightly` as the nightly train; re-flipped after every sync with its fixtures, `packages/shared/src/cliRelease.test.ts`, `packages/ssh/src/tunnel.test.ts` and `apps/mobile/src/features/settings/environment-maintenance.test.ts`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/shared/package.json` — the `./productName`, `./homeDir`,
   `./desktopIdentity`, `./infinitusControl`, `./infinitusControlSocket`,
   `./orderKeys`, `./stats` (#659) and `./infinitusTeamRedaction` (#1592)
@@ -526,7 +531,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the artifact's package `description` say `DESKTOP_PRODUCT_NAME`, and
   `stageDesktopDmgBackground` rasterizes a per-channel SVG, so the `infinitus`
   channel has artwork of its own (#601, #732; the file is in `fork-only-files.md`).
-- `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`, `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon project in place of upstream's PlanetScale database (#1322, #1366). Rules and traps: `docs/internals/release-and-updates.md`.
+- `infra/relay/src/db.ts`, `infra/relay/alchemy.run.ts`, `.github/workflows/deploy-relay.yml` — the relay's Postgres is a Neon project in place of upstream's PlanetScale database (#1322, #1366); `infra/relay/package.json` and `pnpm-workspace.yaml` carry `@alchemy.run/neon` in place of `@alchemy.run/planetscale`. Rules and traps: `docs/internals/release-and-updates.md`.
 - `docs/operations/connect-setup.md` — the "Sign in with Apple (phone)" section: the Apple Services ID, key and Clerk connection App Review's guideline 4.8 requires next to Google (#10, 2026-09-22).
 - `infra/relay/package.json`, `infra/relay/README.md`, `infra/relay/.env.example`, the root `.env.example`, every `infra/relay/src` service tag, `infra/relay/src/http/Api.ts` (`expectedClerkAudiences`), `docs/operations/connect-setup.md` — the relay's fork-owned names are `infinitus-relay` (#1368 B, #1322); the Alchemy stack and the Axiom names stay. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `packages/contracts/src/relay.ts`, `infra/relay/src/worker.ts` — the
@@ -601,7 +606,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `resolveDesktopUpdateTrackRow`: a fork build's select offers Release
   (`infinitus`) and Nightly (`infinitus-nightly`, #1042) instead of upstream's
   Stable / Nightly, which would hand it the real T3 Code with no way back;
-  the row's `options` drive the select. The Maintenance panel also mounts
+  the row's `options` drive the select. Upstream's fleet track switch (npm's
+  Stable / Nightly, every connected machine) runs only when the desktop
+  reports `latest` or `nightly` (`onUpstreamTrack`); on the fork's tracks
+  `handleUpdateChannelChange` switches this app alone. The Maintenance panel also mounts
   `DesktopKeepAwakeSettings` after the background-activity row (#1075), the
   Threads panel `InfinitusResumeOnLimitSetting` after the auto-resume row
   (#648), and the restore / dirty-label lists carry `desktopKeepAwake`.
@@ -609,7 +617,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `packages/contracts/src/settings.ts` carries `worktreeMaxCount` (default
   25, 0 lifts it) on `ServerSettings` and its patch;
   `apps/server/src/orchestration-v2/ProjectionStore.ts` answers
-  `getWorktreeHolders` in both the SQL and the memory store;
+  `getWorktreeHolders` in the SQL store;
   `ThreadLaunchService.ts` takes the fork's `WorktreeCapGate`, reserves a
   slot before `thread.create` for a `worktree` strategy and hands the
   release to the preparation (`PreparationInput.releaseWorktreeSlot`);
@@ -772,7 +780,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/mobile/src/features/threads/NewTaskRouteScreen.tsx` (`selectExistingThread` and its row above the project list, shown only for a pending share), `apps/mobile/src/Stack.tsx` (the `NewTaskShareThread` root route at `new/share/thread`, from `infinitusNewTaskScreens` in `features/infinitus/stackScreens.ts`), `docs/user/composer.md` (the share-sheet sentence) — a native share lands in an existing thread through the fork's `features/sharing/ShareToThreadRouteScreen.tsx`. The row is in the project picker, which a share reaches from its draft's project chip; choosing a thread drops the draft and the pickers above it (`isShareFlowRoute`).
 - `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`presentPendingIncomingShare` calls `features/sharing/discardDismissedShare.ts`; its `isShareSheetPresented: isShareFlowRoute(…)`, since the draft's pickers are root routes now and reading only a top draft would discard the share as soon as the project picker opened), and its module-level `discardShare`, `useIncomingShare()` still exposing `consumeShare` for `ShareToThreadRouteScreen`), `apps/mobile/src/features/sharing/incoming-share-presentation.ts` (`shareIdToDiscard`), `docs/user/composer.md` (the closing-the-sheet sentence) — closing the new-task sheet over an unimported share discards it, files included. Upstream keeps the item durable and only remembers the dismissal in memory, so a declined share reopened the sheet on every cold launch.
 - `apps/mobile/src/features/threads/NewTaskDraftScreen.tsx` (`InfinitusPinAtCreationControl`, #742), `apps/mobile/src/features/threads/ThreadComposer.tsx` (the `/` menu's project snippets, `useProjectPromptSnippets`, #270 G, which the draft renders through `ThreadScreenBinding`), `apps/mobile/src/state/threadOutboxDelivery.ts` — `pinCreatedThread` after a delivered creation (`pinAtCreation.logic` + `pinThread.logic`, through the service's `runDeliveryCommand`); `threadOutboxDelivery*.test.ts` and `composer-attachment-uploads.test.ts` mock `./preferences`. The delivery's dispatch bookkeeping moved to the fork's `queued-message-dispatch.ts` (#1501): `beginDispatchingQueuedMessage` hands back the abort signal that rides through `prepareQueuedMessageAttachments` into `prepareTurnAttachments`, and `markDispatchingQueuedMessageSending` right before each `startTurn` publishes the `sending` phase (or abandons an aborted attempt). `use-thread-outbox.ts` lost `dispatchingQueuedMessageIdAtom` to that module; `edit-pending-thread-message.ts` (+ test) guards with `reclaimQueuedMessageFromDispatch`; `thread-task-permissions.test.ts` and both delivery tests follow the atom.
-- `apps/mobile/src/lib/composerImages.ts` (+ test) — `pickComposerMedia` and `pasteComposerClipboard` decide pass-through with the fork's `lib/image-passthrough.ts` (#1500, #1502): a still over 2 MB takes upstream's bounded-JPEG path (`renderPhotoAsJpeg`, exported for the share sheet) instead of passing through up to the 10 MB provider cap; a pasted PNG is staged to a cache file first since the clipboard hands over bytes, not a file. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
+- `apps/mobile/src/lib/composerImages.ts` — `pickComposerMedia` decides pass-through with the fork's `lib/image-passthrough.ts` (#1500, #1502): a still over 2 MB takes upstream's bounded-JPEG path (`renderPhotoAsJpeg`, exported for the share sheet) instead of passing through up to the 10 MB provider cap. A 7.7 MB screenshot could not finish uploading over the relay before it cut the request (2026-09-19).
 - `apps/mobile/src/features/sharing/incoming-share-model.ts` (+ test), `apps/mobile/src/features/sharing/IncomingShareProvider.tsx` (`renderImageAsJpeg` in the file reader) — a shared image takes the same gate (#1502): the reader's optional `renderImageAsJpeg` renders a large still to a bounded JPEG; without it the model keeps upstream's pass-through up to the provider cap, which is what its upstream tests exercise.
 - `apps/mobile/src/lib/attachmentUpload.ts` (+ test) — `uploadFileBytes` aborts and fails a transfer after `ATTACHMENT_UPLOAD_TIMEOUT_MS`: the relay cut a 7.7 MB image at two minutes, iOS's background session kept replaying it, and the one-at-a-time outbox held every queued reply behind it (2026-09-19). The session stays `background` on purpose, so an upload survives a locked phone. Offered upstream as well; drop this bullet once their copy carries it.
 - `apps/mobile/src/features/home/HomeScreen.tsx` — the thread list's header:
@@ -783,7 +791,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   / `paused` statuses (#741, #743): the resolver takes the holds stream's
   kind for the thread (from `sidebar/useInfinitusHeldSummary.ts`), above
   working and below approval and input; the row's pill reads "Held" /
-  "Paused". The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
+  "Paused" with no icon (`TopStatusIcon` takes `null`), and
+  `resolveSidebarFolderDot` calls the resolver through a lambda so `map`'s
+  index never reaches its options parameter. The phone's twin: `apps/mobile/src/features/threads/threadListV2.ts`,
   `thread-list-v2-items.tsx` and `thread-row-emphasis.ts`, through
   `features/infinitus/useThreadHeldEntry.ts`. `makeInfinitusServerLayers`
   (`InfinitusServerLayers.ts`) provides `InfinitusSessionHoldsIdle` until the policies land.
@@ -818,9 +828,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `apps/web/src/routeTree.gen.ts` — regenerated with
   `@tanstack/router-generator`, never edited by hand.
 - `apps/web/src/components/files/AttachmentFilePreview.browser.test.tsx` — the
-  `#1711` quarantines for hosted runners, and the Office-metadata test's fetch
-  stub answers each call with its own `Response` (a shared one is locked by
-  whichever other caller reads it first).
+  `#1711` quarantines for hosted runners.
 - `apps/server/src/provider/agentContextBudget.json` — the fork's measured
   agent context (product names, fork MCP tools and instructions); re-measure
   with `AgentContextBudget.test.ts` on every sync.
@@ -897,6 +905,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/server/src/provider/ClaudeTurnTokenUsage.ts` — `claudeCacheTtlSeconds` and the `cacheTtlSeconds` it adds to the normalized usage (#1557).
 - `apps/web/src/components/ChatView.tsx` — `threadUsage`, folded from `serverProjection` with `threadUsageFromProjection`, handed to `ChatComposer` (#834); `packages/shared/src/threadUsage.ts`'s `threadUsageFromProjection` takes only `thread.id`/`usageBaseline` so the quiet `ThreadStructure` fits.
 - `apps/mobile/src/features/threads/ThreadSettingsSheet.tsx` — the optional `threadId` on the settings session, and `<InfinitusThreadUsageRows>` under the options card when it is set (#834); `ExistingThreadSettingsRouteScreen` in the same file sets it from the selected thread.
+- `apps/mobile/src/state/use-thread-detail.ts` — `useThreadProjection` is exported for `InfinitusThreadUsageRows` (#834).
 - Turn-start gate and steer at the tool boundary (#1627, the queue lane; rules:
   `docs/internals/turn-start-gate.md`):
   `apps/server/src/orchestration-v2/ProviderTurnStartService.ts` requires
@@ -924,4 +933,3 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - `apps/web/package.json` — `react-test-renderer` and `@types/react-test-renderer` as devDependencies: upstream moved every React test into a real browser and dropped them (#20944), while the fork's component tests (`AccountsPage`, `StatsPage`, `ComposerCapturesMenu`, `InfinitusEventToasts`, `settings/infinitus/*`) still render with them.
 - `packages/source-control-forgejo/src/server/ForgejoSourceControlProvider.test.ts` — "reads Forgejo jobs that did not run as finished checks" (#16668) mocks `branches/main` as `{}`: upstream wrote it before its checks read began fetching the base branch's protection, so on upstream's own `main` the mock answers that read with `[]` and the test fails. Take upstream's version once it fixes the test.
 - `oxlint-plugin-t3code/rules/no-low-value-comments.ts` — `CHECK_BARE_ISSUE_REFS = false`: upstream's rule (#21514) rejects a bare `#123` in a comment as history git already keeps, but the fork's comments cite this repository's issues as the design record (INFINITUS.md), so that one check is off and the rule's others stand.
-- `oxlint-plugin-t3code/rules/react-effect-budget.ts` — merges `scripts/effect-budget.infinitus.json` over upstream's `scripts/effect-budget.json`: fork files and upstream files the fork adds effects to budget there, so upstream's list merges without conflicts. A new fork effect still needs its reason or a budget bump in the fork's file.
