@@ -236,5 +236,9 @@ if ($interactive) { [Console]::Error.Write("`r$esc[2K") }
 if (($env:PATH -split ";") -notcontains $binDir) {
   Write-Host "  Add $binDir to your PATH, then run ${bold}infinitus$reset.`n"
 } else {
+<<<<<<< HEAD
   Write-Host "  Run ${bold}infinitus$reset to get started.`n"
+=======
+  Write-Host "  Run ${bold}t3$reset to use T3 Code here, or ${bold}t3 up$reset to use it from your other devices.`n"
+>>>>>>> upstream-sync-2359643cff-upstream-renamed
 }

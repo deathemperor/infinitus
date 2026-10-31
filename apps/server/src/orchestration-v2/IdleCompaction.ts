@@ -1,4 +1,4 @@
-import type { OrchestrationV2ThreadProjection } from "@infinitus/contracts";
+import { isListedThreadLineage, type OrchestrationV2ThreadProjection } from "@infinitus/contracts";
 import { COMPACTION_SUGGESTION_MIN_TOKENS } from "@infinitus/shared/claudeCompaction";
 import { derivePendingBackgroundWork } from "@infinitus/shared/orchestrationV2PendingBackgroundWork";
 import * as DateTime from "effect/DateTime";
@@ -50,7 +50,7 @@ export function idleCompactionWindow(
   if (thread.settledAt !== null || thread.settledOverride === "settled") return null;
   if (thread.snoozedUntil != null && DateTime.toEpochMillis(thread.snoozedUntil) > nowMs)
     return null;
-  if (thread.lineage.relationshipToParent === "subagent") return null;
+  if (!isListedThreadLineage(thread.lineage)) return null;
   const latestRun = runs.reduce<(typeof runs)[number] | null>(
     (latest, run) => (latest === null || run.ordinal > latest.ordinal ? run : latest),
     null,

@@ -160,8 +160,10 @@ function resolveAppVariant(value: string | undefined): AppVariant {
     case "production":
     case "infinitus":
       return value;
-    default:
+    case undefined:
       return "production";
+    default:
+      throw new Error("APP_VARIANT must be development, preview, or production.");
   }
 }
 
