@@ -50,6 +50,7 @@ import { niriSocketPath } from "./NiriSnapShot.ts";
 import { CaptureShortcutConfig, niriCaptureConfigPath } from "./CaptureShortcutConfig.ts";
 import type { PortalCaptureShortcut } from "./PortalCaptureShortcut.ts";
 import {
+  CaptureSetupRequiredError,
   isGnomeCaptureSession,
   niriCaptureBinding,
   portalShortcutTrigger,
@@ -126,6 +127,7 @@ const DesktopSnapShotOperation = Schema.Literals([
   "disabled",
   "no-window-selected",
   "window-unavailable",
+  "setup-required",
   "capture",
 ]);
 
@@ -153,6 +155,8 @@ export class DesktopSnapShotError extends Schema.TaggedError<DesktopSnapShotErro
         return "No window was selected.";
       case "window-unavailable":
         return "The active window is not available for capture.";
+      case "setup-required":
+        return "Finish SnapShot setup in Settings → SnapShots.";
       case "capture":
         return "Could not capture the active window.";
     }
@@ -162,9 +166,9 @@ export class DesktopSnapShotError extends Schema.TaggedError<DesktopSnapShotErro
 const isDesktopSnapShotError = Schema.is(DesktopSnapShotError);
 
 function captureFailure(cause: unknown, captureId?: string): DesktopSnapShotError {
-  return isDesktopSnapShotError(cause)
-    ? cause
-    : new DesktopSnapShotError({ operation: "capture", captureId, cause });
+  if (isDesktopSnapShotError(cause)) return cause;
+  const operation = cause instanceof CaptureSetupRequiredError ? "setup-required" : "capture";
+  return new DesktopSnapShotError({ operation, captureId, cause });
 }
 
 export class DesktopSnapShot extends Context.Service<

@@ -41,6 +41,7 @@ import * as Semaphore from "effect/Semaphore";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import { writeFileStringAtomically } from "@infinitus/shared/atomicWrite";
+import { formatMalformedUsageWarning } from "@infinitus/shared/usageFormat";
 import * as ServerConfig from "../config.ts";
 import { UsageAttribution } from "../infinitus/Services/UsageAttribution.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -1004,10 +1005,7 @@ export const make = Effect.gen(function* () {
         distinctSessions: sessionIds.size,
         message:
           malformedRecords > 0
-            ? [
-                sourceMessage,
-                `${malformedRecords} malformed or inconsistent usage record(s) were skipped; usage may be incomplete.`,
-              ]
+            ? [sourceMessage, formatMalformedUsageWarning(malformedRecords)]
                 .filter(Boolean)
                 .join(" ")
             : sourceMessage,

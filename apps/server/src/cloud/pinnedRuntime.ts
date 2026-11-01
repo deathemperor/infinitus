@@ -377,6 +377,13 @@ const PINNED_RUNTIME_PRUNE_GRACE = Duration.hours(1);
  */
 const PINNED_RUNTIME_LAUNCHERS_FILE = "launchers";
 
+/**
+ * Starts on a fresh line whatever the file ends with when the append lands: another process's
+ * append may have been cut short since this one read the file. Readers skip the blank lines.
+ */
+const launcherRecords = (launchers: ReadonlyArray<string>) =>
+  `\n${launchers.map((launcher) => `${launcher}\n`).join("")}`;
+
 export function launcherOwnsVersionsDir(
   path: Path.Path,
   versionsDir: string,
@@ -386,7 +393,32 @@ export function launcherOwnsVersionsDir(
   return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
+<<<<<<< HEAD
 /** The executable an `infinitus.cmd` shim written by the install script or `infinitus update` runs. */
+=======
+/**
+ * `t3 update` repoints the launcher it was started through, which may be on neither PATH nor the
+ * default bin dir. Unrecorded, the next prune would remove the runtime it now points at.
+ */
+export const recordPinnedRuntimeLauncher = Effect.fn("cloud.pinned_runtime.record_launcher")(
+  function* (input: { readonly baseDir: string; readonly launcher: string }) {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const launchersFile = path.join(
+      input.baseDir,
+      PINNED_RUNTIME_DIR,
+      PINNED_RUNTIME_LAUNCHERS_FILE,
+    );
+    // Prune may run in another process, such as the service, whose working directory differs.
+    const launcher = path.resolve(input.launcher);
+    const recorded = yield* fs.readFileString(launchersFile).pipe(Effect.orElseSucceed(() => ""));
+    if (recorded.split(/\r?\n/).includes(launcher)) return;
+    yield* fs.writeFileString(launchersFile, launcherRecords([launcher]), { flag: "a" });
+  },
+);
+
+/** The executable a `t3.cmd` shim written by the install script or `t3 update` runs. */
+>>>>>>> upstream-sync-ce9e016406-upstream-renamed
 export const windowsShimTarget = (contents: string) => /^"([^"]+)"/m.exec(contents)?.[1];
 
 /** Where the `infinitus` launchers written by the install scripts and `infinitus update` point. */
@@ -437,9 +469,7 @@ const shellLauncherTargets = Effect.fn("cloud.pinned_runtime.shell_launcher_targ
   }
   if (unrecorded.length > 0) {
     yield* fs
-      .writeFileString(launchersFile, unrecorded.map((launcher) => `${launcher}\n`).join(""), {
-        flag: "a",
-      })
+      .writeFileString(launchersFile, launcherRecords(unrecorded), { flag: "a" })
       .pipe(Effect.ignore);
   }
   return targets;

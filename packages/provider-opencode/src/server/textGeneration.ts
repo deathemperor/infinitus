@@ -190,8 +190,17 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
           try: (signal) =>
             client.session.create(
               {
+<<<<<<< HEAD
                 title: `${PRODUCT_NAME} ${input.operation}`,
                 permission: [{ permission: "*", pattern: "*", action: "deny" }],
+=======
+                title: `T3 Code ${input.operation}`,
+                // OpenCode Zen refuses free-model requests that carry no tools, so keep read.
+                permission: [
+                  { permission: "*", pattern: "*", action: "deny" },
+                  { permission: "read", pattern: "*", action: "allow" },
+                ],
+>>>>>>> upstream-sync-ce9e016406-upstream-renamed
               },
               { signal },
             ),

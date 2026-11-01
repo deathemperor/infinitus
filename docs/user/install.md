@@ -24,9 +24,49 @@ One command installs the server as a self-contained executable — no Node.js:
 curl -fsSL https://infinitus.run/install.sh | sh
 ```
 
+<<<<<<< HEAD
 It takes the newest release's `infinitus-<version>-linux-<arch>.tar.gz` (releases cut
 after 0.5.0-alpha.11 attach them, with `SHA256SUMS`), verifies it, unpacks it
 under `~/.infinitus/runtime` and links `infinitus` into `~/.local/bin`. Then run:
+=======
+On Windows, in PowerShell:
+
+```powershell
+irm https://t3.codes/install.ps1 | iex
+```
+
+This installs the `t3` binary to `~/.local/bin`. If your shell reports `command not found`
+afterwards, that directory is not on your `PATH` yet; the installer prints the
+line to add. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
+`T3CODE_VERSION` to pin an exact version.
+
+| Task                                             | Command                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| Start the server and open the web app            | `t3`                                                                    |
+| Start the server without a browser               | `t3 serve`                                                              |
+| Use it from your other devices                   | `t3 up` ([details](./remote-access.md))                                 |
+| Keep it running in the background (macOS, Linux) | `t3 service install` ([details](./background-service.md))               |
+| Move to the newest release                       | `t3 update`                                                             |
+| Reclaim database space                           | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
+| Remove it again                                  | `t3 uninstall`                                                          |
+
+Run `t3 help` or `t3 --help` for the full reference. To start in a new working
+directory, use an explicit path such as `t3 ./my-project`. A bare directory name
+is accepted only if it already exists.
+
+If `t3` or `t3 start` reports an already running server, connect to that server
+instead. Stop it before starting a replacement, or use a different `--base-dir`
+for an independent server.
+
+To try Infinitus once without installing it, run `npx t3@latest` instead (needs
+Node.js for `npx`).
+
+### Intel Macs
+
+There is no `t3` executable for Intel Macs (the desktop app is available). To
+run a server there, build it from source with `vp`, which provides the Node version it needs
+([Install vp](https://github.com/pingdotgg/t3code#install-vp)):
+>>>>>>> upstream-sync-ce9e016406-upstream-renamed
 
 ```bash
 infinitus
@@ -153,9 +193,10 @@ When a provider CLI is behind its latest release, its provider card shows the
 available version. **Update now** runs the installer that owns the CLI
 (Homebrew, or a global npm, pnpm, Yarn, Bun, Volta, or Vite+ install), or the
 CLI's own update command when Infinitus cannot tell. Update a CLI installed with
-mise through mise. Cursor and Antigravity update with Infinitus. Homebrew installs
-compare against the version Homebrew offers, which can trail the npm release by
-a few hours.
+mise through mise. Cursor and Antigravity update with Infinitus. Homebrew and
+Chocolatey installs compare against the version their package manager offers,
+which can trail the npm release; update Claude installed with Chocolatey
+through Chocolatey.
 
 Add another provider instance for a separate account or configuration. Each
 instance can have its own environment variables, such as API keys or a custom

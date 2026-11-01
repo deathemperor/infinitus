@@ -95,7 +95,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
     </Tooltip>
   ) : null;
 
-  // The chip opens the same Permissions toggle used in the effort menu.
+  // The chip opens the same Permissions toggle used in the model picker and the overflow menu.
   const permissionsTooltip = `Permissions: ${runtimeModeOption.label}. ${runtimeModeOption.description}`;
   const permissionsChip = (
     <Menu
@@ -114,7 +114,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
                   ref={permissionsChipRef}
                   data-composer-shortcut="composer.mode"
                   size={size}
-                  // Mirrors the effort chip's trailing pe-1 so both gaps around the bars match.
+                  // Mirrors the model trigger's trailing pe-1 so the gaps on both sides of the chip match.
                   className="ps-1.5"
                   aria-label={`Permissions: ${runtimeModeOption.label}`}
                 />
@@ -158,7 +158,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
 /**
  * Permission modes as one horizontal toggle, with the shown mode named below.
  * Each segment is a real menu radio item, so arrow keys reach it from the rest of the menu
- * and a pick closes the menu. Lives inside a Menu: the permissions chip, the effort menu,
+ * and a pick closes the menu. Lives inside a Menu: the permissions chip, the model picker,
  * or the overflow menu.
  */
 export function ComposerPermissionsSection(props: {
