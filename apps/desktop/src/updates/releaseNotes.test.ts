@@ -99,7 +99,7 @@ describe("normalizeDesktopUpdateReleaseNotes", () => {
     const { releaseNotes } = normalizeDesktopUpdateReleaseNotes(
       summary + "\n<details><summary>Full changelog</summary>raw list</details>",
       "1.2.4",
-      "latest",
+      "infinitus",
     );
     expect(releaseNotes).toEqual([
       {
