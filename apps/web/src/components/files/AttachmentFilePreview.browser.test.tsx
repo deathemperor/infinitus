@@ -2520,7 +2520,8 @@ function pdfScroll(screen: Screen) {
   return { region, canvas, offset, scrollTo };
 }
 
-it("keeps workspace PDF scroll and zoom after reloads", async () => {
+// quarantine: #1711 times out in 15 s on GitHub-hosted runners (#1733)
+it.skip("keeps workspace PDF scroll and zoom after reloads", async () => {
   using fixture = await workspacePdfPreview();
   const { preview, urls } = fixture;
   await using screen = await render(preview(urls.original, "one"));
