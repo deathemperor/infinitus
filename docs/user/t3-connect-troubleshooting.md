@@ -129,6 +129,7 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 
 ## Infinitus Connect returned an error
 
+<<<<<<< HEAD
 | Error                                                     | Fix                                                                                                                                                              |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                                                 |
@@ -136,6 +137,15 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 | Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                                               |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                                                    |
 | HTTP 408, 429, or 5xx                                     | Wait a few minutes. Infinitus retries temporary failures on its own.                                                                                             |
+=======
+| Error                                                     | Fix                                                                                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                            |
+| `auth_invalid` or `invalid_bearer`                        | Run `t3 connect login`. If credentials were revoked, run `t3 connect logout`, then `t3 connect` again. Restart the server after signing in. |
+| Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                          |
+| HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                               |
+| HTTP 408, 429, or 5xx                                     | Wait a few minutes. Infinitus retries temporary failures on its own.                                                                        |
+>>>>>>> upstream-sync-47f2c8d29e-upstream-renamed
 
 After you fix a permanent rejection, restart the host's server with
 `infinitus service restart`. For a foreground server, stop it and run `infinitus serve` again.
