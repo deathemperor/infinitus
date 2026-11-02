@@ -113,7 +113,7 @@ Infinitus Connect does not have an active link between your account and the host
   device.** Sign out of Infinitus Connect and sign in again.
 - **Your account reached its tunnel limit.** Remove an environment you do not
   use from your Infinitus account's Infinitus Connect page, or
-  [link a paid Infinitus Chat account](./remote-access.md#more-machines-with-t3-chat)
+  [link a paid T3 Chat account](./remote-access.md#more-machines-with-t3-chat)
   for a higher limit. Then restart Infinitus on the host.
 
 ## The clock is off
@@ -131,7 +131,7 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 
 | Error                                                     | Fix                                                                                                                                                              |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid Infinitus Chat account, then restart Infinitus on the host.                                                          |
+| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                                                 |
 | `auth_invalid` or `invalid_bearer`                        | Run `infinitus connect login`. If credentials were revoked, run `infinitus connect logout`, then `infinitus connect` again. Restart the server after signing in. |
 | Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                                               |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                                                    |
@@ -151,3 +151,7 @@ If none of this helps, open an issue on
 - The text from **Copy diagnostics** in the environment's **Details**.
 - The output of `infinitus connect status` on the host.
 - The trace ID, if one is shown.
+- If the tunnel dropped earlier, the host's tunnel log, `relay-client.ndjson`
+  in the logs folder (`~/.t3/userdata/logs` by default). It records when the
+  tunnel connected, warned, exited, and restarted, with the tunnel token
+  removed.

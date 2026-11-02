@@ -87,7 +87,17 @@ function tool(
   return { displayName, labels, icon, summaryAction };
 }
 
-const T3_MCP_SERVER_ALIASES = new Set(["infinitus", "t3-code", "t3_code", "t3code"]);
+// Codex registers "infinitus-direct" (upstream's "t3-code-direct") for tools kept out of Code Mode.
+const T3_MCP_SERVER_ALIASES = new Set([
+  "infinitus",
+  "infinitus-direct",
+  "infinitus_direct",
+  "t3-code",
+  "t3_code",
+  "t3code",
+  "t3-code-direct",
+  "t3_code_direct",
+]);
 
 const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   link_pull_request: tool(
@@ -95,8 +105,18 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     "link-pr",
     "pull-request",
   ),
+  link_pull_requests: tool(
+    ["Link", "Linking", "Linked", "pull requests"],
+    "link-pr",
+    "pull-request",
+  ),
   unlink_pull_request: tool(
     ["Unlink", "Unlinking", "Unlinked", "a pull request"],
+    "unlink-pr",
+    "pull-request",
+  ),
+  unlink_pull_requests: tool(
+    ["Unlink", "Unlinking", "Unlinked", "pull requests by state"],
     "unlink-pr",
     "pull-request",
   ),
@@ -135,10 +155,7 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     ["Cancel", "Canceling", "Requested cancellation of", "a delegated task"],
     "task-cancel",
   ),
-  schedule_task: tool(
-    ["Schedule", "Scheduling", "Scheduled", "a recurring task"],
-    "schedule-create",
-  ),
+  schedule_task: tool(["Schedule", "Scheduling", "Scheduled", "a task"], "schedule-create"),
   list_scheduled_tasks: tool(["List", "Listing", "Listed", "scheduled tasks"], "schedule-list"),
   update_scheduled_task: tool(
     ["Update", "Updating", "Updated", "a scheduled task"],
@@ -393,7 +410,9 @@ function resolveT3McpToolName(value: string): string | null {
   }
 
   const namespaceMatch =
-    /^(?<server>infinitus|t3-code|t3_code|t3code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(label);
+    /^(?<server>infinitus(?:[-_]direct)?|t3[-_]code[-_]direct|t3-code|t3_code|t3code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
+      label,
+    );
   if (namespaceMatch?.groups) {
     return namespaceMatch.groups.tool ?? null;
   }

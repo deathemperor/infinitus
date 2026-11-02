@@ -39,6 +39,7 @@ import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import * as McpProviderSessions from "@infinitus/provider-core/server/McpProviderSessions";
 import * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 import * as RuntimePolicy from "../RuntimePolicy.ts";
+import * as ServerSettings from "../../serverSettings.ts";
 import { acpPermissionDisposition } from "@infinitus/provider-acp/server/clientPolicy";
 import { acpCompletedTurnShouldTerminalizeTool } from "@infinitus/provider-acp/server/adapter";
 import {
@@ -336,6 +337,7 @@ describe("Grok launch permission mode", () => {
       }).pipe(
         Effect.provide(
           RuntimePolicy.layerFromProjectStore.pipe(
+            Layer.provide(ServerSettings.layerTest()),
             Layer.provide(
               Layer.mock(ProjectStore.ProjectStoreV2)({
                 get: () => Effect.die("the thread has a worktree"),

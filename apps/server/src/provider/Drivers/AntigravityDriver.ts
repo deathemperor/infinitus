@@ -46,8 +46,8 @@ import {
 import type * as AcpSessionRuntime from "@infinitus/provider-acp/server/AcpSessionRuntime";
 import type { ServerProviderDraft } from "@infinitus/provider-core/server/snapshotProbe";
 import {
-  removeAntigravityRuntimeTempDirs,
   removeAntigravitySessionFiles,
+  retireAntigravityRuntimeTempDirs,
 } from "../acp/AntigravitySessionFiles.ts";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import * as ProviderContinuationRequests from "@infinitus/provider-core/server/ProviderContinuationRequests";
@@ -150,9 +150,11 @@ export const AntigravityDriver: ProviderDriver<
       directories.runtimeTemp,
       path.join(profileDirectory, "antigravity-acp", "tmp"),
     ]) {
-      yield* removeAntigravityRuntimeTempDirs(directory).pipe(
+      const removeRetired = yield* retireAntigravityRuntimeTempDirs(directory).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem),
+        Effect.provideService(Path.Path, path),
       );
+      yield* Effect.forkScoped(removeRetired);
     }
     const continuationIdentity = defaultProviderContinuationIdentity({
       driverKind: DRIVER,

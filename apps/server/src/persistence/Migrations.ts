@@ -87,6 +87,8 @@ import Migration0082 from "./Migrations/082_WaitingLinkRequestIndex.ts";
 import Migration0083 from "./Migrations/083_ActiveTurnItemIndexes.ts";
 import Migration0084 from "./Migrations/084_ExcludeAttachmentPlaceholdersFromSearch.ts";
 import Migration0085 from "./Migrations/085_SubagentDeliveryState.ts";
+import Migration0086 from "./Migrations/086_ProjectionProjectsPinArchive.ts";
+import Migration0087 from "./Migrations/087_RepairBooleanSettledOverride.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -173,13 +175,15 @@ const migrationEntries = [
   [77, "WebhookDedupe", Migration0077],
   [78, "ShellStopRequestIndex", Migration0078],
   [79, "ThreadMessageSearch", Migration0079],
-  // Upstream's 70-75, renumbered after the fork's 79.
+  // Upstream's 70-77, renumbered after the fork's 79.
   [80, "PeerLinks", Migration0080],
   [81, "PeerLinkFence", Migration0081],
   [82, "WaitingLinkRequestIndex", Migration0082],
   [83, "ActiveTurnItemIndexes", Migration0083],
   [84, "ExcludeAttachmentPlaceholdersFromSearch", Migration0084],
   [85, "SubagentDeliveryState", Migration0085],
+  [86, "ProjectionProjectsPinArchive", Migration0086],
+  [87, "RepairBooleanSettledOverride", Migration0087],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

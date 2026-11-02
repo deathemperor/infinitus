@@ -15,10 +15,15 @@ import { projectEnvironment } from "../../state/projects";
 import { useEnvironmentShellHasSnapshot } from "../../state/shell";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+import { useOrchestrationCommand } from "../../state/use-orchestration-command";
+import { reportProjectFailure } from "../../hooks/useProjectGroupUpdate";
 
 export function DesktopAppActivationCoordinator() {
   const primaryEnvironment = usePrimaryEnvironment();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
+  const updateProject = useOrchestrationCommand(projectEnvironment.update, {
+    label: "project unarchive",
+  });
   const openThread = useNewThreadHandler();
   const queueRef = useRef(Promise.resolve());
   const activation = window.desktopBridge?.appActivation;
@@ -73,7 +78,21 @@ export function DesktopAppActivationCoordinator() {
       waitForProject: async (projectRef) => {
         await waitForProject(projectRef);
       },
-      openThread: (projectRef) => openThread(projectRef),
+      openThread: (projectRef) => {
+        const project = readProjects().find(
+          (candidate) =>
+            candidate.environmentId === projectRef.environmentId &&
+            candidate.id === projectRef.projectId,
+        );
+        // Opening an archived project's folder again brings the project back.
+        if (project?.archivedAt != null) {
+          void updateProject({
+            environmentId: projectRef.environmentId,
+            input: { projectId: projectRef.projectId, archived: false },
+          }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+        }
+        return openThread(projectRef);
+      },
     }),
   );
 
