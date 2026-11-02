@@ -131,7 +131,7 @@ describe("AcpMcpOverAcpBridge", () => {
           return Promise.resolve(reply(request.id, { tools: [] }));
         },
       });
-      const { connectionId } = yield* bridge.connect({ serverId: "t3-code" });
+      const { connectionId } = yield* bridge.connect({ serverId: "infinitus" });
       yield* bridge.message({ connectionId, method: "initialize" });
 
       const wait = yield* bridge

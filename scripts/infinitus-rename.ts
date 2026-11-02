@@ -95,7 +95,7 @@ export const RENAMES: ReadonlyArray<Rename> = [
   },
   {
     what: "a bare T3's article in the user guides (a T3 theme → an Infinitus theme)",
-    pattern: /\b([Aa])(\s+)T3(?! Tools\b)(?![_A-Za-z0-9])/g,
+    pattern: /\b([Aa])(\s+)T3(?! Tools\b| Chat\b)(?![_A-Za-z0-9])/g,
     replacement: "$1n$2Infinitus",
     within: "docs/user/",
     prose: true,
@@ -105,7 +105,7 @@ export const RENAMES: ReadonlyArray<Rename> = [
     // Only the user guides: in docs/internals a bare T3 is as often
     // upstream's (its glyph, mark, Clerk instance) as the product, and the
     // publisher, T3 Tools, Inc., stays everywhere.
-    pattern: /\bT3(?! Tools\b)(?![_A-Za-z0-9])/g,
+    pattern: /\bT3(?! Tools\b| Chat\b)(?![_A-Za-z0-9])/g,
     replacement: "Infinitus",
     within: "docs/user/",
     prose: true,
