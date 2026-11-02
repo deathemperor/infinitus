@@ -296,7 +296,7 @@ it.effect("unlinks on startup and refuses to link when the policy turns Connect 
 
       const applyError = yield* link.applyRelayConfig({} as never).pipe(Effect.flip);
       const mintError = yield* link.mintCredential({} as never).pipe(Effect.flip);
-      assert.equal(applyError.message, "Example Corp's policy does not allow T3 Connect.");
+      assert.equal(applyError.message, "Example Corp's policy does not allow Infinitus Connect.");
       assert.equal(mintError._tag, "ManagedPolicyRefusedError");
     }).pipe(Effect.provide(CloudLink.layer.pipe(Layer.provide(layerDependencies))));
   }),

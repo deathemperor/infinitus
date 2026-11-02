@@ -10,6 +10,7 @@ import {
   type ManagedPolicyDocument,
   type ManagedUpdatesMode,
 } from "@infinitus/contracts";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -76,7 +77,7 @@ const make = Effect.gen(function* () {
             mode: "off",
             feedUrl: undefined,
             allowNightly: false,
-            message: `Updates are off because T3 Code cannot use the managed policy at ${error.path}. Contact your administrator.`,
+            message: `Updates are off because ${PRODUCT_NAME} cannot use the managed policy at ${error.path}. Contact your administrator.`,
           }),
         ),
     }),

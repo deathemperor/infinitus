@@ -519,9 +519,9 @@ export const make = Effect.gen(function* () {
   // Without nightly, an install on that channel stays put until its user picks stable: moving it
   // silently would be a downgrade nobody asked for, and checking nightly would break the policy.
   const channelBlockedReason = (channel: DesktopUpdateChannel): Option.Option<string> =>
-    channel === "nightly" && !policy.allowNightly
+    (channel === "nightly" || channel === "infinitus-nightly") && !policy.allowNightly
       ? Option.some(
-          `${policy.message ?? "Nightly updates are turned off on this machine."} Switch to the stable channel to keep getting updates.`,
+          `${policy.message ?? "Nightly updates are turned off on this machine."} Switch to the ${channel === "nightly" ? "stable" : "release"} channel to keep getting updates.`,
         )
       : Option.none();
 
@@ -558,11 +558,7 @@ export const make = Effect.gen(function* () {
     channel: DesktopUpdateChannel,
   ) {
     const wanted = channel === "infinitus-nightly" ? "nightly" : "app-update.yml";
-    if (
-      mockUpdates ||
-      policy.feedUrl !== undefined ||
-      (yield* Ref.get(feedProviderRef)) === wanted
-    )
+    if (mockUpdates || policy.feedUrl !== undefined || (yield* Ref.get(feedProviderRef)) === wanted)
       return;
     const appUpdateYmlConfig = yield* Ref.get(appUpdateYmlConfigRef);
     if (Option.isNone(appUpdateYmlConfig)) return;

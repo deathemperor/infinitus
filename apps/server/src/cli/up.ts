@@ -1,4 +1,5 @@
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
@@ -119,7 +120,7 @@ const needsRestart = (before: Routes, after: Routes) =>
   after.lan !== before.lan || (after.connect && !before.connect);
 
 const CHOICES = {
-  connect: { title: "T3 Connect", description: "Creates a tunnel to control your PC." },
+  connect: { title: CONNECT_NAME, description: "Creates a tunnel to control your PC." },
   lan: { title: "Local network", description: "LAN and tailnet. Pairing code required." },
 } satisfies Record<Route, { readonly title: string; readonly description: string }>;
 
@@ -138,11 +139,11 @@ const formatSetup = (setup: Setup) => {
       ? []
       : [
           [
-            "T3 Connect",
+            CONNECT_NAME,
             setup.connect
-              ? "on · your T3 account"
+              ? `on · your ${CONNECT_NAME} account`
               : setup.connectRevoked
-                ? "off · link revoked. Run `t3 connect`."
+                ? "off · link revoked. Run `infinitus connect`."
                 : "off",
           ] as const,
         ]),
@@ -162,7 +163,7 @@ const formatSetup = (setup: Setup) => {
       ? ["Anyone on your LAN or tailnet can reach the port. A pairing code is the only lock."]
       : []),
     ...(setup.lanFromOldDefault
-      ? ["Older installs keep LAN access on. Turn it off: `t3 up --no-lan`."]
+      ? ["Older installs keep LAN access on. Turn it off: `infinitus up --no-lan`."]
       : []),
   ];
   return [
@@ -174,15 +175,15 @@ const formatSetup = (setup: Setup) => {
 const formatNextSteps = (routes: Routes, serviceInstalled: boolean) =>
   [
     ...(routes.connect
-      ? ["On your other device, sign in to T3 Connect with the same account."]
+      ? [`On your other device, sign in to ${CONNECT_NAME} with the same account.`]
       : []),
-    ...(routes.lan ? ["Run `t3 pair`. Use the code on your other device."] : []),
+    ...(routes.lan ? ["Run `infinitus pair`. Use the code on your other device."] : []),
     ...(routes.connect || routes.lan
       ? []
       : [
           serviceInstalled
-            ? "Remote access is off. T3 Code still runs here in the background."
-            : "Remote access is off. Run `t3` to use T3 Code here.",
+            ? `Remote access is off. ${PRODUCT_NAME} still runs here in the background.`
+            : `Remote access is off. Run \`infinitus\` to use ${PRODUCT_NAME} here.`,
         ]),
   ].join("\n");
 
@@ -201,7 +202,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
   if (before.connect === null && Option.getOrElse(flags.connect, () => false)) {
     return yield* new CliError.UserError({
       cause: "connect",
-      userMessage: "T3 Connect is unavailable in this build.",
+      userMessage: `${CONNECT_NAME} is unavailable in this build.`,
     });
   }
 
@@ -236,7 +237,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
       cause: "routes",
       userMessage: `No terminal. Choose access with ${
         before.connect === null ? "--lan" : "--connect or --lan"
-      }, or use --yes for the default. See \`t3 up --help\`.`,
+      }, or use --yes for the default. See \`infinitus up --help\`.`,
     });
   }
   if (routes.connect && !current.connect) yield* requireConnectAllowed;
@@ -273,7 +274,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
     const confirmed = yield* Prompt.run(
       Prompt.Confirm({
         message: update
-          ? "Update and restart T3 Code? Running agent turns will stop."
+          ? `Update and restart ${PRODUCT_NAME}? Running agent turns will stop.`
           : "Apply changes and restart? Running agent turns will stop.",
         initial: true,
       }),
@@ -288,7 +289,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
     });
     if (linked === null) return;
     yield* Console.log(
-      `✓ Signed in to T3 Connect${linked.identity ? ` as ${linked.identity}` : ""}`,
+      `✓ Signed in to ${CONNECT_NAME}${linked.identity ? ` as ${linked.identity}` : ""}`,
     );
   }
   // A running server unlinks live; when that fails, only a restart stops its tunnel.
@@ -348,7 +349,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
       yield* Console.log(`Keeping installed service version t3@${installedVersion}.`);
     }
     if (update && !interactive) {
-      yield* Console.log("Updating T3 Code. Running agent turns will stop.");
+      yield* Console.log(`Updating ${PRODUCT_NAME}. Running agent turns will stop.`);
     }
     const result = newer
       ? ({ changed: false } as const)
@@ -363,7 +364,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
       // The old service still runs, so a foreground server would clash with it.
       yield* restoreServiceEnv;
       yield* Console.log(
-        `Service setup failed: ${result.failed} Fix that, then run \`t3 up\` again.`,
+        `Service setup failed: ${result.failed} Fix that, then run \`infinitus up\` again.`,
       );
     } else if ("failed" in result) {
       yield* printServeCommand(`Service setup failed: ${result.failed}`);
@@ -376,16 +377,15 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
         !interactive ||
         (yield* Prompt.run(
           Prompt.Confirm({
-            message:
-              "The running service still has T3 Connect on. Restart it? Running agent turns will stop.",
+            message: `The running service still has ${CONNECT_NAME} on. Restart it? Running agent turns will stop.`,
             initial: true,
           }),
         ).pipe(Effect.catchTags({ QuitError: () => Effect.succeed(false) })));
       if (!confirmed) {
-        yield* Console.log("Run `t3 service restart` to turn T3 Connect off.");
+        yield* Console.log(`Run \`infinitus service restart\` to turn ${CONNECT_NAME} off.`);
       } else {
         if (!interactive && !stopped) {
-          yield* Console.log("Restarting T3 Code. Running agent turns will stop.");
+          yield* Console.log(`Restarting ${PRODUCT_NAME}. Running agent turns will stop.`);
         }
         const outcome = yield* service.restart.pipe(Effect.tapError(() => rollBack));
         if (outcome === "queued") {
@@ -393,7 +393,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
         }
         if (outcome === "skipped") {
           yield* Console.log(
-            "The installed service runs another T3 home, so it was not restarted. Pass its --base-dir.",
+            `The installed service runs another ${PRODUCT_NAME} home, so it was not restarted. Pass its --base-dir.`,
           );
         }
         started = outcome === "restarted";
@@ -416,7 +416,7 @@ export const upCommand = Command.make("up", {
   ...projectLocationFlags,
   connect: Flag.Boolean("connect").pipe(
     Flag.withDescription(
-      "Allow access through T3 Connect with your T3 account. Turn off with --no-connect.",
+      `Allow access through ${CONNECT_NAME} with your account. Turn off with --no-connect.`,
     ),
     Flag.optional,
   ),
@@ -428,23 +428,26 @@ export const upCommand = Command.make("up", {
   ),
   yes: Flag.Boolean("yes").pipe(
     Flag.withDescription(
-      "Ask nothing. Keep the access settings; a new machine gets T3 Connect. A restart stops running agent turns.",
+      `Ask nothing. Keep the access settings; a new machine gets ${CONNECT_NAME}. A restart stops running agent turns.`,
     ),
     Flag.withDefault(false),
   ),
   headless: headlessFlag,
 }).pipe(
-  Command.withShortDescription("Set up remote access and the T3 Code background service."),
+  Command.withShortDescription(`Set up remote access and the ${PRODUCT_NAME} background service.`),
   Command.withDescription(
-    "Set up remote access and the T3 Code background service. Access flags skip the question, and routes not named keep their settings. Without a terminal, a needed restart runs without asking and stops running agent turns.",
+    `Set up remote access and the ${PRODUCT_NAME} background service. Access flags skip the question, and routes not named keep their settings. Without a terminal, a needed restart runs without asking and stops running agent turns.`,
   ),
   Command.withExamples([
-    { command: "t3 up", description: "Choose remote access." },
-    { command: "t3 up --connect", description: "Turn on T3 Connect. Keep other settings." },
-    { command: "t3 up --lan", description: "Allow LAN access with pairing codes." },
-    { command: "t3 up --no-lan", description: "Stop LAN access." },
-    { command: "t3 up --yes", description: "Take the defaults with no questions." },
-    { command: "t3 status --json", description: "Read the settings from a script." },
+    { command: "infinitus up", description: "Choose remote access." },
+    {
+      command: "infinitus up --connect",
+      description: `Turn on ${CONNECT_NAME}. Keep other settings.`,
+    },
+    { command: "infinitus up --lan", description: "Allow LAN access with pairing codes." },
+    { command: "infinitus up --no-lan", description: "Stop LAN access." },
+    { command: "infinitus up --yes", description: "Take the defaults with no questions." },
+    { command: "infinitus status --json", description: "Read the settings from a script." },
   ]),
   Command.withHandler((flags) => runCloudCommand(flags, setUp(flags), { quietLogs: true })),
 );
@@ -453,7 +456,9 @@ export const connectCommand = Command.make("connect", {
   ...projectLocationFlags,
   headless: headlessFlag,
 }).pipe(
-  Command.withDescription("Set up T3 Connect for this machine. Same as `t3 up --connect`."),
+  Command.withDescription(
+    `Set up ${CONNECT_NAME} for this machine. Same as \`infinitus up --connect\`.`,
+  ),
   Command.withHandler((flags) =>
     runCloudCommand(
       flags,
@@ -494,8 +499,8 @@ export const statusCommand = Command.make("status", {
 }).pipe(
   Command.withDescription("Show service setup and remote access settings."),
   Command.withExamples([
-    { command: "t3 status", description: "Show the settings." },
-    { command: "t3 status --json", description: "Print them for scripts and agents." },
+    { command: "infinitus status", description: "Show the settings." },
+    { command: "infinitus status --json", description: "Print them for scripts and agents." },
   ]),
   Command.withHandler(
     Effect.fn("cli.status")(function* (flags) {
@@ -513,7 +518,7 @@ export const statusCommand = Command.make("status", {
       yield* Console.log(
         flags.json
           ? setupJson(setup)
-          : `This machine\n${formatSetup(setup)}\n\nChange access: \`t3 up\`.`,
+          : `This machine\n${formatSetup(setup)}\n\nChange access: \`infinitus up\`.`,
       );
     }),
   ),

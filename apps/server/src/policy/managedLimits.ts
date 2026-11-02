@@ -23,6 +23,7 @@ import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 
 import * as NetService from "@infinitus/shared/Net";
+import { CONNECT_NAME } from "@infinitus/shared/productName";
 
 import { loopbackBindAddress } from "../auth/utils.ts";
 
@@ -83,7 +84,7 @@ const refuse = (policy: PolicyDocument, action: string, detail?: string) =>
     ...(detail === undefined ? {} : { detail }),
   });
 
-export const refuseConnect = (policy: PolicyDocument) => refuse(policy, "T3 Connect");
+export const refuseConnect = (policy: PolicyDocument) => refuse(policy, CONNECT_NAME);
 
 // Node throws ENOTDIR, outside the spawner's error mapping, when PATH ends in a file.
 const isMissingCli = (cause: unknown) =>

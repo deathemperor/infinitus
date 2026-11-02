@@ -26,6 +26,7 @@ import {
   type AtomCommandResult,
 } from "@infinitus/client-runtime/state/runtime";
 import { resolvePastedPath } from "@infinitus/shared/path";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import {
   DEFAULT_WEBHOOK_PROMPT,
   emptyWebhookFilterDraft,
@@ -752,7 +753,7 @@ function TaskForm({
     if (draft.schedule.mode === "once" && !offersOnce) {
       Dialog.alert(
         "Once is not available here",
-        "This environment runs an older T3 Code. Update it to schedule a one-time task, or pick another schedule.",
+        `This environment runs an older ${PRODUCT_NAME}. Update it to schedule a one-time task, or pick another schedule.`,
       );
       return;
     }

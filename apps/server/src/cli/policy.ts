@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 import * as References from "effect/References";
 import { Argument, Command, GlobalFlag } from "effect/cli";
 import * as CliError from "effect/cli/CliError";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
@@ -43,7 +44,7 @@ export const describeRunningServer = Effect.fn("cli.policy.describeRunningServer
 ) {
   const state = yield* readPersistedServerRuntimeState(statePath);
   if (Option.isNone(state) || !isProcessAlive(state.value.pid)) {
-    return "No T3 Code server is running from this T3 home. The installed policy applies when one starts.";
+    return `No ${PRODUCT_NAME} server is running from this ${PRODUCT_NAME} home. The installed policy applies when one starts.`;
   }
   const { pid, startedAt, managedPolicy: loaded } = state.value;
   const server = `The running server (pid ${pid}, started ${startedAt})`;
@@ -59,7 +60,7 @@ export const describeRunningServer = Effect.fn("cli.policy.describeRunningServer
     loaded === null
       ? "no policy"
       : `${loaded.organization}'s policy from ${loaded.source} (fingerprint ${loaded.fingerprint})`;
-  return `${server} loaded ${what}. Restart T3 Code to apply the installed policy.`;
+  return `${server} loaded ${what}. Restart ${PRODUCT_NAME} to apply the installed policy.`;
 });
 
 const showCommand = Command.make("show", projectLocationFlags).pipe(

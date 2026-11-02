@@ -1298,7 +1298,21 @@ describe("DesktopUpdates under a managed policy", () => {
         yield* updates.configure;
         const error = yield* updates.setChannel("nightly").pipe(Effect.flip);
         assert.equal(error._tag, "DesktopUpdateChannelManagedError");
-        assert.equal((yield* updates.getState).channel, "latest");
+        assert.equal((yield* updates.getState).channel, "infinitus");
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("refuses the infinitus-nightly track without nightly", () => {
+    const harness = makeHarness({ policy: managed({ allowNightly: false }) });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+        const error = yield* updates.setChannel("infinitus-nightly").pipe(Effect.flip);
+        assert.equal(error._tag, "DesktopUpdateChannelManagedError");
+        assert.equal((yield* updates.getState).channel, "infinitus");
       }),
     ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });

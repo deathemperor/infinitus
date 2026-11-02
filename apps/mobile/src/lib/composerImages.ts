@@ -6,6 +6,7 @@ import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+  isProviderSendTurnSupportedImageMimeType,
   type EnvironmentId,
   type PastedTextAttachmentSource,
   type UploadChatImageAttachment,

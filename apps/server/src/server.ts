@@ -513,6 +513,8 @@ const layerAuth = EnvironmentAuth.layer.pipe(
   Layer.provideMerge(layerPersistence),
   Layer.provide(layerServerEnvironment),
   Layer.provide(ServerSecretStore.layer),
+  // Fork: `makeInfinitusServerLayers` builds on this layer, outside upstream's policy provision.
+  Layer.provide(ManagedPolicy.layer),
 );
 
 // Fork: below layerAuth because the port publish mints infinitusctl's session

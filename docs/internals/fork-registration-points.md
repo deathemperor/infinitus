@@ -79,8 +79,10 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `autoDownloadOnForkChannel`, a missing channel file read as a release still
   building); upstream's `offerable` uses the fork's resolver, and with no
   floor set the fork's two tracks skip the running-build-track rule, since
-  Settings switches them both ways with no database check. Rules and traps:
-  `docs/internals/release-and-updates.md`.
+  Settings switches them both ways with no database check. Under a managed
+  policy the feed swap stands down for the administrator's mirror
+  (`policy.feedUrl`), and the no-nightly block covers `infinitus-nightly` too.
+  Rules and traps: `docs/internals/release-and-updates.md`.
 - `packages/contracts/src/rpc.ts` — `...INFINITUS_WS_METHODS` in `WS_METHODS`
   from `infinitusRpc.ts` (`fork-only-files.md`); upstream's group is declared
   as `UpstreamWsRpcGroup`, and `WsRpcGroup` is its merge with
@@ -279,8 +281,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (queued turns, babysit, side questions, groups, session status reason, turn
   usage, message context, title state, PR files viewed, auto-settle; their
   features left with #1627, but existing fork databases recorded them, so
-  they are schema history, not live code) and upstream's `055`–`075`
-  (OrchestrationV2 onward) are renumbered `065`–`085` on every sync
+  they are schema history, not live code) and upstream's `055`–`077`
+  (OrchestrationV2 onward) are renumbered `065`–`087` on every sync
   (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
   legacy/V2 boundary ids are the fork's, as are the `toMigrationInclusive` ids in
@@ -307,7 +309,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   checkpoint author), `provider/ClaudeProvider.ts`, `cli/triage.ts` +
   `triage/triagePrompt.ts`, `server.ts` and `relay/AgentAwarenessRelay.ts` (the
   tunnel log lines), `orchestration-v2/PullRequestWatchReactor.ts` (the
-  agent-facing notices). Re-applied to upstream's new strings on every sync,
+  agent-facing notices), `cli/up.ts`, `cli/policy.ts`, `cloud/CloudLink.ts`
+  and `policy/managedLimits.ts` (with `packages/contracts/src/managedPolicy.ts`
+  and `packages/shared/src/managedPolicyFile.ts`). Re-applied to upstream's new strings on every sync,
   with the tests that assert them (`provider/ProviderRegistry.test.ts`,
   `provider/CodexDeveloperInstructions.test.ts`). The one exception is
   `orchestration-v2/RestartBackgroundNote.ts`: a Claude replay fixture
@@ -350,7 +354,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
 - The MCP server the agents see is named `infinitus` (#1368 E): the
   registration sites are `orchestration-v2/Adapters/ClaudeAdapterV2.ts`
   (the `mcpServers` key, `CLAUDE_T3_MCP_TOOL_WILDCARD` and the read-only
-  `mcp__infinitus__*` list), `CodexAdapterV2.ts` (the `-c` override key),
+  `mcp__infinitus__*` list), `CodexAdapterV2.ts` (the `-c` override keys, `infinitus` and the
+  direct-only `infinitus-direct`, which `t3McpToolPresentation.ts` reads too),
   `packages/provider-acp/src/server/adapter.ts` (the session's `mcpServers`
   name/serverId and the `clientInfo` name) + `mcpOverAcpBridge.ts` (the
   serverId it answers), `packages/provider-cursor/src/server/adapter.ts`,
@@ -424,7 +429,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `onboarding/WelcomeWizard.tsx`, `preview/PreviewView.tsx`,
   `settings/AcpSessionManagementSection.tsx`, `settings/CliCommandSettingsRow.tsx`,
   `settings/ConnectionsSettings.tsx`, `settings/SettingsPanels.tsx`,
-  `settings/StorageSettings.tsx`, `ServerUpdateAction.tsx`, `ChatView.tsx`,
+  `settings/StorageSettings.tsx`, `settings/ScheduledTasksSettings.tsx`, `ServerUpdateAction.tsx`, `ChatView.tsx`,
   `RightPanelTabs.tsx`, and the tests `desktopUpdate.logic.test.ts`,
   `settings/settingsSearch.test.ts`, `chat/MessagesTimeline.logic.test.ts`,
   `chat/MessagesTimeline.test.tsx` and `cloud/CloudEnvironmentConnectList.test.tsx`
@@ -613,7 +618,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   the row's `options` drive the select. Upstream's fleet track switch (npm's
   Stable / Nightly, every connected machine) runs only when the desktop
   reports `latest` or `nightly` (`onUpstreamTrack`); on the fork's tracks
-  `handleUpdateChannelChange` switches this app alone. The Maintenance panel also mounts
+  `handleUpdateChannelChange` switches this app alone. A managed policy
+  without nightly disables both nightly tracks (`isNightlyTrack`). The Maintenance panel also mounts
   `DesktopKeepAwakeSettings` after the background-activity row (#1075), the
   Threads panel `InfinitusResumeOnLimitSetting` after the auto-resume row
   (#648), and the restore / dirty-label lists carry `desktopKeepAwake`.
@@ -661,11 +667,6 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   The `threadUsage` prop (#834) rides `ChatComposerProps` down to
   `ComposerFooterPrimaryActions`, which mounts `<ComposerThreadUsage>`
   before the context meter.
-- `scripts/build-desktop-artifact.test.ts` — the cross-architecture Windows
-  probe test asserts on the probe's executable, not on `ELECTRON_RUN_AS_NODE`
-  in any spawned env: the bundle self-check inherits the host's env, and a
-  runner hosted by the desktop app (an agent inside Infinitus) carries that
-  variable, so the upstream assertion failed there.
 - `apps/server/src/usage/UsageService.test.ts` — the fixture home is the
   temp directory's real path: the service canonicalises transcript roots,
   and macOS keeps its temp directory behind a symlink (`/var` → `/private/var`),
