@@ -1,5 +1,13 @@
+<<<<<<< HEAD
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { DesktopBridge, DesktopUpdateState } from "@infinitus/contracts";
+=======
+import {
+  type DesktopBridge,
+  type DesktopUpdateState,
+  managedUpdatesDenial,
+} from "@infinitus/contracts";
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 import { TriangleAlertIcon } from "lucide-react";
 import { type ComponentProps, useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -10,9 +18,14 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { cn } from "../../lib/utils";
 import { ensureLocalApi } from "../../localApi";
+<<<<<<< HEAD
 import { desktopInstallWhenIdleAtom, useDesktopUpdateState } from "../../state/desktopUpdate";
 import { useAllEnvironmentShellsBootstrapped, useThreadShells } from "../../state/entities";
 import { useEnvironments } from "../../state/environments";
+=======
+import { useDesktopUpdateState } from "../../state/desktopUpdate";
+import { usePrimaryManagedPolicy } from "../../state/managedPolicy";
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   canCheckForUpdate,
@@ -204,6 +217,7 @@ export function SidebarUpdatePill() {
 
 function SidebarUpdateControl() {
   const state = useDesktopUpdateState();
+<<<<<<< HEAD
   const installWhenIdle = useAtomValue(desktopInstallWhenIdleAtom);
   const setInstallWhenIdle = useAtomSet(desktopInstallWhenIdleAtom);
   const shells = useThreadShells();
@@ -220,6 +234,10 @@ function SidebarUpdateControl() {
         return target._tag === "PrimaryConnectionTarget" || isDesktopLocalConnectionTarget(target);
       })
     : null;
+=======
+  // The desktop updates this machine, whose policy the primary environment reports.
+  const updatesDenial = managedUpdatesDenial(usePrimaryManagedPolicy());
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
   const [isActionPending, setIsActionPending] = useState(false);
   const [runningTurnsDialog, setRunningTurnsDialog] =
     useState<DesktopUpdateRunningTurnsDialogRequest | null>(null);
@@ -269,7 +287,7 @@ function SidebarUpdateControl() {
     showCheckIcon,
   });
   const idleTooltip =
-    !showUpdateDetails && !showCheckIcon ? getDesktopUpdateIdleTooltip(state) : null;
+    !showUpdateDetails && !showCheckIcon ? getDesktopUpdateIdleTooltip(state, updatesDenial) : null;
   const tooltip = runsEverything
     ? everything.summary
     : showUpdateDetails
@@ -397,7 +415,9 @@ function SidebarUpdateControl() {
             type: "error",
             title: "Could not check for updates",
             description:
-              result.state.message ?? "Automatic updates are not available in this build.",
+              updatesDenial ??
+              result.state.message ??
+              "Automatic updates are not available in this build.",
           }),
         );
       })
@@ -483,7 +503,7 @@ function SidebarUpdateControl() {
           ? { status: "downloading", percent: state.downloadPercent }
           : { status: "waiting" };
     return (
-      <SidebarMenuItem className="ml-auto flex min-w-0 flex-1">
+      <SidebarMenuItem className="ml-auto flex flex-1">
         <SidebarUpdateCapsule
           run={run}
           local={local}

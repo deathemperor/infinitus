@@ -130,6 +130,19 @@ Only one server can use an Infinitus home directory at a time. If startup report
 another server owns it, stop that server before retrying, or use a separate home
 directory and pair with the running server.
 
+### macOS app does not reopen after an Alpha update
+
+Updating an older **Infinitus (Alpha)** installation can replace it with
+**Infinitus (Beta)** without reopening the app. Open **Infinitus (Beta)** from
+Applications, or run:
+
+```sh
+open "/Applications/T3 Code (Beta).app"
+```
+
+If an old Dock shortcut no longer opens the app, remove it and add the Beta app
+from Applications again.
+
 ## If the desktop app does not start
 
 If the desktop app's server keeps failing at startup, Infinitus shows a "T3 Code

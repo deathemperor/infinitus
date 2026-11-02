@@ -151,6 +151,7 @@ export function canCheckForUpdate(state: DesktopUpdateState | null): boolean {
   );
 }
 
+<<<<<<< HEAD
 // #829: installing the desktop update quits the app, and with it every local
 // backend's running turns. The count below is read from the same thread
 // shells the sidebar shows — never from process heuristics.
@@ -240,17 +241,23 @@ export function resolveInstallWhenIdleStep(
   return action === "install" && runningLocalTurns === 0 ? "install" : "wait";
 }
 
+=======
+/** `managedDenial` is this machine's policy refusing updates (`managedUpdatesDenial`); it wins. */
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 export function getDesktopUpdateDisabledReason(
   state: Pick<DesktopUpdateState, "enabled" | "status" | "message"> | null,
+  managedDenial?: string,
 ): string | null {
+  if (managedDenial !== undefined) return managedDenial;
   if (!state || (state.enabled && state.status !== "disabled")) return null;
   return state.message?.trim() || "Automatic updates are not available in this build.";
 }
 
 export function getDesktopUpdateIdleTooltip(
   state: Pick<DesktopUpdateState, "enabled" | "status" | "message"> | null,
+  managedDenial?: string,
 ) {
-  const disabledReason = getDesktopUpdateDisabledReason(state);
+  const disabledReason = getDesktopUpdateDisabledReason(state, managedDenial);
   return disabledReason
     ? { title: "Updates unavailable", detail: disabledReason }
     : { title: "Check for updates", detail: null };

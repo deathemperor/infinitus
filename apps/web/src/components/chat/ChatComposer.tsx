@@ -1,6 +1,7 @@
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
+import { BackgroundThreadContext } from "./backgroundThread";
 import {
   resolveCompatibleRuntimeMode,
   runtimeModeConfig,
@@ -38,6 +39,8 @@ import type {
 import {
   EnvironmentRequestInvalidError,
   AuthOrchestrationOperateScope,
+  clampManagedRuntimeMode,
+  managedRuntimeModeDenial,
   ProviderDriverKind,
   ProviderInstanceId,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
@@ -53,6 +56,7 @@ import { createModelSelection, normalizeModelSlug } from "@infinitus/shared/mode
 import { USAGE_LIMITS_COMMAND } from "@infinitus/shared/usageLimits";
 import {
   memo,
+  use,
   useEffect,
   useEffectEvent,
   useId,
@@ -91,6 +95,7 @@ import { serializeComposerImages } from "./composerImagePersistence";
 import {
   isInsideCollapsedComposerControls,
   isInsideRestingComposerControlScope,
+  markOpenToEffort,
   markOpenToPermissions,
 } from "./composerEventScope";
 import {
@@ -235,30 +240,27 @@ import { observeResize } from "~/lib/observeResize";
 
 const isEnvironmentRequestInvalidError = Schema.is(EnvironmentRequestInvalidError);
 import { toastManager } from "../ui/toast";
-import { PlayIcon } from "lucide-react";
+import { BuildingIcon, PlayIcon } from "lucide-react";
+import { Button } from "../ui/button";
+import { useManagedPolicy } from "../../state/managedPolicy";
 import { proposedPlanTitle } from "@infinitus/shared/proposedPlanText";
 import { hasProviderSetup } from "./ProviderStatusBanner";
 import { type AppModelOption, getAppModelOptionsForInstance } from "../../modelSelection";
 import type { UnifiedSettings } from "@infinitus/contracts/settings";
-import {
-  isVideoAttachment,
-  type ChatMessage,
-  type SessionPhase,
-  type Thread,
-  type ThreadShell,
-} from "../../types";
+import { isVideoAttachment, type SessionPhase, type Thread, type ThreadShell } from "../../types";
 import { type ComposerPromptHistoryPosition } from "./composerPromptHistory";
 import type { PendingUserInputDraftAnswer } from "@infinitus/client-runtime/state/pending-user-input";
 import type {
   LatestProposedPlanState,
   PendingApproval,
   PendingUserInput,
+  TimelineEntry,
 } from "../../session-logic";
 import {
   resolveComposerDispatchMode,
   type ComposerDispatchMode,
 } from "@infinitus/client-runtime/state/composer-dispatch";
-import type { ContextWindowSnapshot } from "../../lib/contextWindow";
+import { deriveLatestContextWindowSnapshot } from "../../lib/contextWindow";
 import {
   resolveProviderSkillsForCwd,
   resolveProviderSlashCommandsForCwd,
@@ -267,7 +269,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useSoftwareKeyboardOpen } from "../../hooks/useSoftwareKeyboardOpen";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { usePanelAnimationSettings } from "../../panelAnimations";
-import { readEnvironmentScope } from "../../state/session";
+import { readEnvironmentScope, readPreparedConnection } from "../../state/session";
 import type { ReviewCommentContext } from "../../reviewCommentContext";
 import { useComposerRestingTransition } from "./useComposerRestingTransition";
 import { ComposerCommandMenuLayer } from "./ComposerCommandMenuLayer";
@@ -372,7 +374,7 @@ export interface ChatComposerProps {
   activeThreadId: ThreadId | null;
   activeThread: Thread | undefined;
   activeThreadShell: ThreadShell | null;
-  promptHistoryMessages: ReadonlyArray<ChatMessage>;
+  promptHistoryEntries: ReadonlyArray<TimelineEntry>;
   forceExpandedOnMobile: boolean;
   projectSelectionRequired: boolean;
 
@@ -389,6 +391,8 @@ export interface ChatComposerProps {
   keepFullHistory: boolean;
   onToggleKeepFullHistory: () => void;
   onUsageLimitsCommand?: (() => void) | undefined;
+  sideChatAvailable?: boolean;
+  sideChatDisabledReason?: string | null;
   environmentUnavailable: {
     readonly label: string;
     readonly connection: EnvironmentConnectionPresentation;
@@ -432,9 +436,15 @@ export interface ChatComposerProps {
   reportedModelSelection?: ModelSelection | null;
   activeProjectId: ProjectId | null;
 
+<<<<<<< HEAD
   activeContextWindow: ContextWindowSnapshot | null;
   /** Fork (#834): the thread's usage rollup, folded from its projection. */
   threadUsage?: ThreadUsageRollup | undefined;
+=======
+  contextWindowEntries: Parameters<typeof deriveLatestContextWindowSnapshot>[0];
+  contextWindowLiveUsage: Parameters<typeof deriveLatestContextWindowSnapshot>[1];
+  contextWindowProviderThread: Parameters<typeof deriveLatestContextWindowSnapshot>[2];
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
   compactThreadUnavailable: boolean;
   compactDisabled: boolean;
   compactDisabledReason: string | null;
@@ -525,7 +535,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onMultipleModelSelectionsChange: setMultipleModelSelections,
     activeThreadId,
     activeThread,
-    promptHistoryMessages,
+    promptHistoryEntries,
     forceExpandedOnMobile,
     projectSelectionRequired,
     phase,
@@ -558,8 +568,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     activeThreadModelSelection,
     reportedModelSelection,
     activeProjectId,
+<<<<<<< HEAD
     activeContextWindow,
     threadUsage,
+=======
+    contextWindowEntries,
+    contextWindowLiveUsage,
+    contextWindowProviderThread,
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
     compactThreadUnavailable,
     compactDisabled,
     compactDisabledReason,
@@ -604,6 +620,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     editingQueuedAttachments,
     onRemoveEditingQueuedAttachment,
   } = props;
+  const activeContextWindow = deriveLatestContextWindowSnapshot(
+    contextWindowEntries,
+    contextWindowLiveUsage,
+    contextWindowProviderThread,
+  );
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
   const {
@@ -916,9 +937,20 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       runtimeMode,
       selectedProviderEntry?.snapshot.supportedRuntimeModes,
     );
-  const compatibleRuntimeModeOptions = runtimeModeOptions.filter((option) =>
-    compatibleRuntimeModes.includes(option.mode),
-  );
+  // Modes above an administrator's ceiling stay listed, disabled with the reason.
+  const managedPolicy = useManagedPolicy(environmentId);
+  const compatibleRuntimeModeOptions = runtimeModeOptions
+    .filter((option) => compatibleRuntimeModes.includes(option.mode))
+    .map((option) => {
+      const disabledReason = managedRuntimeModeDenial(managedPolicy, option.mode);
+      return disabledReason === undefined ? option : { ...option, disabledReason };
+    });
+  // A thread or draft already above the ceiling would be refused; offer the broadest mode left.
+  const runtimeModeCeilingDenial = managedRuntimeModeDenial(managedPolicy, compatibleRuntimeMode);
+  const runtimeModeCeilingFallback =
+    runtimeModeCeilingDenial === undefined
+      ? undefined
+      : clampManagedRuntimeMode(managedPolicy, compatibleRuntimeMode, compatibleRuntimeModes);
 
   const providerSendBlockReason = getAntigravitySendBlockReason(
     selectedProviderEntry?.snapshot,
@@ -930,6 +962,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (activePendingProgress
       ? attachmentBlockReason
       : (attachmentBlockReason ??
+        runtimeModeCeilingDenial ??
         (multipleModelSelections === null ? providerSendBlockReason : null)));
   const isSendDisabled = sendDisabledReason !== null;
   const selectedProviderStatus = selectedProviderEntry?.snapshot ?? null;
@@ -940,11 +973,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const selectedProviderSlashCommands = selectedProviderStatus
     ? resolveProviderSlashCommandsForCwd(selectedProviderStatus, gitCwd)
     : NO_PROVIDER_SLASH_COMMANDS;
-  const refreshWorkspaceSnapshotOnTyping = useProviderWorkspaceSnapshotRefresh({
-    environmentId,
-    gitCwd,
-    instanceId: selectedProviderEntry?.instanceId,
-  });
+  const { refresh: refreshWorkspaceSnapshotOnTyping, scanning: workspaceSkillsScanning } =
+    useProviderWorkspaceSnapshotRefresh({
+      environmentId,
+      gitCwd,
+      instanceId: selectedProviderEntry?.instanceId,
+    });
 
   const selectedPromptEffort = composerProviderState.promptEffort;
   const selectedModelOptionsForDispatch = composerProviderState.modelOptionsForDispatch;
@@ -1056,14 +1090,19 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     isRevertingCheckpointRef.current = isRevertingCheckpoint;
   });
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown, blur and the desktop paste-as-text event to arm plain-text paste
+  const backgroundThread = use(BackgroundThreadContext);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to keydown, window blur and the desktop paste-as-text event to arm plain-text paste
   useEffect(() => {
+    // A background composer listens on its own form, so it never hears the main composer's keys.
+    const target: EventTarget | null = backgroundThread ? composerFormRef.current : window;
+    if (target === null) return;
     const armPasteAsTextShortcut = () => {
       // Electron's menu action can precede paste; browsers deliver keydown first.
       pasteAsTextShortcutUntilRef.current = Date.now() + 1_000;
     };
-    const onKeyDown = (event: KeyboardEvent) => {
+    const onKeyDown = (event: Event) => {
       if (
+        event instanceof KeyboardEvent &&
         event.target instanceof Node &&
         composerFormRef.current?.contains(event.target) &&
         isPasteAsTextShortcut(event, isMacPlatform(navigator.platform))
@@ -1081,22 +1120,24 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         activeElement.closest(
           'input, textarea, select, button, a[href], summary, [contenteditable="true"], [contenteditable="plaintext-only"], [role="textbox"], [role="button"], [role="menuitem"], [role="option"]',
         ) !== null;
+      // A background composer takes no paste-to-focus, so it arms only for its own focus.
       if (
         (activeElement instanceof Node && composerFormRef.current?.contains(activeElement)) ||
-        !blocksPasteToFocus
+        (!blocksPasteToFocus && !backgroundThread)
       ) {
         armPasteAsTextShortcut();
       }
     };
-    window.addEventListener(DESKTOP_PASTE_AS_TEXT_EVENT, onDesktopPasteAsText);
-    window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("blur", onBlur);
+    target.addEventListener(DESKTOP_PASTE_AS_TEXT_EVENT, onDesktopPasteAsText);
+    target.addEventListener("keydown", onKeyDown, true);
+    // An arm lasts a second, so a background composer can skip the window blur reset.
+    if (!backgroundThread) window.addEventListener("blur", onBlur);
     return () => {
-      window.removeEventListener(DESKTOP_PASTE_AS_TEXT_EVENT, onDesktopPasteAsText);
-      window.removeEventListener("keydown", onKeyDown, true);
+      target.removeEventListener(DESKTOP_PASTE_AS_TEXT_EVENT, onDesktopPasteAsText);
+      target.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("blur", onBlur);
     };
-  }, []);
+  }, [backgroundThread]);
 
   const composerSendState = deriveComposerSendState({
     prompt,
@@ -1136,11 +1177,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     pullRequestRepository,
     threadPullRequests,
     planModeUiEnabled,
+    sideChatAvailable: props.sideChatAvailable === true,
+    sideChatDisabledReason: props.sideChatDisabledReason ?? null,
     compactSlashCommandAvailable,
     selectedProvider,
     selectedProviderSkills,
     selectedProviderSlashCommands,
     showSkillsInSlashMenu: settings.showSkillsInSlashMenu,
+    workspaceSkillsScanning,
     questionAttachmentTarget,
   });
   const composerMenuItems =
@@ -1868,6 +1912,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         }
         return;
       }
+      if (item.command === "side" || item.command === "btw") {
+        if (props.sideChatDisabledReason) return;
+        const applied = applyPromptReplacement(
+          trigger.rangeStart,
+          trigger.rangeEnd,
+          `/${item.command} `,
+          { expectedText: snapshot.value.slice(trigger.rangeStart, trigger.rangeEnd) },
+        );
+        if (applied) setComposerHighlightedItemId(null);
+        return;
+      }
       if (!planModeUiEnabled) return;
       void handleInteractionModeChange(item.command === "plan" ? "plan" : "default");
       const applied = applyPromptReplacement(trigger.rangeStart, trigger.rangeEnd, "", {
@@ -2194,7 +2249,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       planModeUiEnabled,
       isLiteralPendingAnswer,
       pendingUserInputs,
-      promptHistoryMessages,
+      promptHistoryEntries,
       promptHistoryPositionRef,
       composerDraftTarget,
       promptRef,
@@ -2349,12 +2404,37 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   // An open question owns the space above the composer. Only a machine problem,
   // which is why an answer could not go through, stays beside it.
+  const bannerItems: readonly ComposerBannerStackItem[] =
+    runtimeModeCeilingDenial === undefined || activePendingProgress
+      ? props.bannerItems
+      : [
+          ...props.bannerItems,
+          {
+            id: "managed-runtime-mode",
+            variant: "warning",
+            icon: <BuildingIcon />,
+            title: runtimeModeCeilingDenial,
+            ...(runtimeModeCeilingFallback === undefined
+              ? {}
+              : {
+                  actions: (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => handleRuntimeModeChange(runtimeModeCeilingFallback)}
+                    >
+                      Switch to {runtimeModeConfig[runtimeModeCeilingFallback].label}
+                    </Button>
+                  ),
+                }),
+          },
+        ];
   const shelfItems = hasBlockingComposerTopDrawer
-    ? props.bannerItems.filter(
+    ? bannerItems.filter(
         (item) =>
           item.group === "environment" && (item.variant === "error" || item.variant === "warning"),
       )
-    : props.bannerItems;
+    : bannerItems;
 
   const insertComposerText = (
     text: string,
@@ -2477,11 +2557,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       localEnvironmentDisabled: isLocalEnvironmentDisabled(),
       environmentId,
       primaryEnvironmentId,
+      connection: readPreparedConnection(environmentId),
+      isDesktopRenderer: window.desktopBridge !== undefined,
     });
     if (target === "remote") {
       toastManager.add({
         type: "error",
-        title: "Folders can only be referenced in the local desktop environment",
+        title: "Folders can only be referenced on a server running on this computer",
       });
       return;
     }
@@ -2837,15 +2919,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           direction,
         });
         if (!change) return;
-        if (change.modelOptions) {
-          useComposerDraftStore
-            .getState()
-            .setProviderModelOptions(composerDraftTarget, selectedProvider, change.modelOptions, {
-              instanceId: selectedInstanceId,
-              model: selectedModel,
-              persistSticky: true,
-            });
-        }
+        useComposerDraftStore
+          .getState()
+          .setProviderModelOptions(composerDraftTarget, selectedProvider, change.modelOptions, {
+            instanceId: selectedInstanceId,
+            model: selectedModel,
+            persistSticky: true,
+          });
         if (change.prompt !== promptRef.current) {
           applyPromptReplacementStable(0, promptRef.current.length, change.prompt, {
             expandedCursorAfterReplace: change.cursor,
@@ -2877,6 +2957,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (!trigger) return;
         trigger.focus({ preventScroll: true });
         if (command === "composer.mode") markOpenToPermissions(trigger);
+        if (command === "composer.effort") markOpenToEffort(trigger);
         trigger.click();
       },
       compactContext: compactThreadContextStable,
@@ -3308,7 +3389,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   ? isComposerMenuLoading
                     ? composerTriggerKind === "pull-request"
                       ? "Finding pull request..."
-                      : "Searching workspace files..."
+                      : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
+                        ? "Searching workspace skills..."
+                        : "Searching workspace files..."
                     : composerMenuEmptyState
                   : ""}
               </div>

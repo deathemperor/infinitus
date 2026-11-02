@@ -8,6 +8,7 @@ import type { ThreadCheckpointSummary } from "@infinitus/client-runtime/state/th
 import { resolvePendingHandoff } from "@infinitus/client-runtime/handoff";
 import {
   deriveProviderSubagentStatus,
+  deriveResumableRunId,
   deriveRunlessWorkStartedAt,
   deriveThreadActivityRun,
   deriveThreadRuntime,
@@ -367,6 +368,9 @@ export function useThreadComposerState() {
   // A stop or a restart holds the queue, completion wakes included, until it
   // is resumed; the queue sheet lists only the user's own messages.
   const queueHeld = queueWorkflow?.isHeld === true;
+  const resumableRunId = selectedThreadProjection
+    ? deriveResumableRunId(selectedThreadProjection.projection, selectedThreadRuntime)
+    : null;
 
   const runlessWorkStartedAt = selectedThreadProjection
     ? deriveRunlessWorkStartedAt(selectedThreadProjection.projection)
@@ -755,6 +759,7 @@ export function useThreadComposerState() {
     followUpBehavior,
     canSteerActiveTurn,
     queueHeld,
+    resumableRunId,
     queuedRunEdit,
     isSavingQueuedEdit,
     cancelQueuedRunEdit,

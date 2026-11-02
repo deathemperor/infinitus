@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import * as HostProcess from "@infinitus/shared/HostProcess";
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 import * as NodeSqliteClient from "@infinitus/shared/nodeSqliteClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -221,13 +225,23 @@ const make = Effect.gen(function* () {
     function* (databasePath: string) {
       const legacy = legacyPath(databasePath);
       if (!(yield* fs.exists(legacy))) return;
-      // Older servers may use this file; hold its lock and delete the database before WAL to preserve commits on failure.
-      yield* Effect.gen(function* () {
-        yield* lockExclusively(legacy);
-        for (const suffix of ["", "-wal", "-shm"]) {
-          yield* fs.remove(legacy + suffix, { force: true });
-        }
-      }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: legacy })));
+      // Delete the database before WAL to preserve commits if unlink fails.
+      const removeFiles = Effect.forEach(
+        ["", "-wal", "-shm"],
+        (suffix) => fs.remove(legacy + suffix, { force: true }),
+        { discard: true },
+      );
+      const connection = NodeSqliteClient.layer({ filename: legacy });
+      if ((yield* HostProcess.Platform) === "win32") {
+        // Windows blocks unlink while any SQLite handle is open, including our own.
+        yield* lockExclusively(legacy).pipe(Effect.provide(connection));
+        yield* removeFiles;
+      } else {
+        yield* lockExclusively(legacy).pipe(
+          Effect.andThen(removeFiles),
+          Effect.provide(connection),
+        );
+      }
     },
     (effect, databasePath) =>
       effect.pipe(

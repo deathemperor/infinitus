@@ -22,7 +22,11 @@ For contributors: this tree builds on [T3 Code](https://github.com/pingdotgg/t3c
 
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
 
+<<<<<<< HEAD
 Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Oh My Pi, Google Antigravity, and Pi. If they're set up on your computer, T3 Code can control them.
+=======
+Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Google Antigravity, and fx. If they're set up on your computer, T3 Code can control them.
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 
 ## "Wait, what are you selling me?"
 
@@ -35,7 +39,11 @@ We wanted something performant, remote-ready, and truly open. If we ever go the 
 Every Infinitus build comes from one [GitHub release](https://github.com/deathemperor/infinitus/releases) of this repository. There is no npm package, Homebrew cask, winget or AUR package for the desktop app; `npx t3` installs upstream's T3 Code, not Infinitus.
 
 > [!WARNING]
+<<<<<<< HEAD
 > Infinitus drives Codex, Claude, Cursor, Grok Build, OpenCode, Oh My Pi, Antigravity and Pi. Install and sign in to at least one before starting a thread:
+=======
+> T3 Code currently supports Codex, Claude, Cursor, Grok Build, OpenCode, Antigravity, and fx. Install and authenticate at least one provider before use:
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 >
 > - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
 > - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
@@ -44,7 +52,11 @@ Every Infinitus build comes from one [GitHub release](https://github.com/deathem
 > - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
 > - Oh My Pi: install [Oh My Pi](https://github.com/oh-my-pi/oh-my-pi) and run `omp` once to sign in
 > - Antigravity: enable it in Settings, then use **Install Antigravity** and **Sign in with Google**. No CLI is required.
+<<<<<<< HEAD
 > - Pi: install [Pi](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) and run `pi` once to sign in to a model provider
+=======
+> - fx: install [fx](https://fx.sh) and run `fx login` on the machine running the T3 Code server ([setup guide](./docs/user/providers-fx.md))
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
 
 ### Desktop app (macOS, Apple Silicon)
 

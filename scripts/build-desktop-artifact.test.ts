@@ -1347,11 +1347,20 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           appVersion: WINDOWS_PAYLOAD_FIXTURE_VERSION,
         });
 
+<<<<<<< HEAD
         // The probe runs the packaged executable; the bundle self-check inherits
         // the host's env, so an Electron-hosted runner would leak
         // ELECTRON_RUN_AS_NODE into it.
         const probeExecutable = path.join(fixture.packagedAppDir, fixture.appExecutableName);
         assert.isFalse(commands.some((command) => command.command === probeExecutable));
+=======
+        assert.isFalse(
+          commands.some(
+            (command) =>
+              command.command === NodePath.join(fixture.packagedAppDir, fixture.appExecutableName),
+          ),
+        );
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
         assert.isTrue(
           commands.some(
             (command) =>

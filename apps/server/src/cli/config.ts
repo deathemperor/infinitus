@@ -86,6 +86,12 @@ const tailscaleServePortFlag = Flag.Int("tailscale-serve-port").pipe(
   Flag.withDescription("HTTPS port for Tailscale Serve when --tailscale-serve is enabled."),
   Flag.optional,
 );
+const lanFlag = Flag.Boolean("lan").pipe(
+  Flag.withDescription(
+    "Accept connections from your local network and tailnet, not only this machine (equivalent to T3CODE_LAN).",
+  ),
+  Flag.optional,
+);
 
 export const traceFileConfig = Config.String("T3CODE_TRACE_FILE").pipe(
   Config.option,
@@ -166,6 +172,7 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
+  lan: Config.Boolean("T3CODE_LAN").pipe(Config.option, Config.map(Option.getOrUndefined)),
 });
 
 const DevAuthTokenConfig = Config.Redacted("T3CODE_DEV_AUTH_TOKEN").pipe(
@@ -201,6 +208,7 @@ export interface CliServerFlags {
   readonly logWebSocketEvents: Option.Option<boolean>;
   readonly tailscaleServeEnabled: Option.Option<boolean>;
   readonly tailscaleServePort: Option.Option<number>;
+  readonly lan: Option.Option<boolean>;
 }
 
 export interface CliAuthLocationFlags {
@@ -235,6 +243,7 @@ export const sharedServerCommandFlags = {
   logWebSocketEvents: logWebSocketEventsFlag,
   tailscaleServeEnabled: tailscaleServeFlag,
   tailscaleServePort: tailscaleServePortFlag,
+  lan: lanFlag,
 } as const;
 
 const resolveOptionPrecedence = <Value>(
@@ -278,6 +287,7 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     logWebSocketEvents: flags.logWebSocketEvents ?? Option.none(),
     tailscaleServeEnabled: flags.tailscaleServeEnabled ?? Option.none(),
     tailscaleServePort: flags.tailscaleServePort ?? Option.none(),
+    lan: flags.lan ?? Option.none(),
   } satisfies CliServerFlags;
   const bootstrapFd = Option.getOrUndefined(normalizedFlags.bootstrapFd) ?? env.bootstrapFd;
   const bootstrapEnvelope =
@@ -411,16 +421,19 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     Option.fromUndefinedOr(env.host),
     Option.fromUndefinedOr(bootstrap?.host),
   );
-  // A background service exists to be reached from other devices, so it
-  // listens on private networks unless `service.env` sets `T3CODE_HOST`.
-  // Clients then learn its LAN address and prefer it over T3 Connect.
+  // Private networks only, so clients learn a LAN address and prefer it over
+  // T3 Connect. `t3 service install` writes T3CODE_LAN=false for a new
+  // service; one installed before T3CODE_LAN existed keeps listening.
+  const lan = resolveOptionPrecedence(normalizedFlags.lan, Option.fromUndefinedOr(env.lan));
   const privateNetworkOnly =
     Option.isNone(explicitHost) &&
     mode === "web" &&
-    (yield* resolveServiceLauncherMode().pipe(
-      Effect.map((launcher) => launcher.managed),
-      Effect.orElseSucceed(() => false),
-    ));
+    (Option.isSome(lan)
+      ? lan.value
+      : yield* resolveServiceLauncherMode().pipe(
+          Effect.map((launcher) => launcher.managed),
+          Effect.orElseSucceed(() => false),
+        ));
   const host = Option.getOrElse(explicitHost, () =>
     privateNetworkOnly ? "0.0.0.0" : mode === "desktop" ? "127.0.0.1" : undefined,
   );
@@ -531,6 +544,7 @@ export const resolveCliAuthConfig = (
       logWebSocketEvents: Option.none(),
       tailscaleServeEnabled: Option.none(),
       tailscaleServePort: Option.none(),
+      lan: Option.none(),
     },
     cliLogLevel,
   );

@@ -8,9 +8,11 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import * as DesktopManagedPolicy from "../app/DesktopManagedPolicy.ts";
 import * as DesktopBackendConfiguration from "./DesktopBackendConfiguration.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
@@ -22,6 +24,8 @@ import * as DesktopWslServerTree from "../wsl/DesktopWslServerTree.ts";
 const layerShellEnvironment = (prepared = true) =>
   Layer.succeed(DesktopShellEnvironment.DesktopShellEnvironment, {
     installIntoProcess: Effect.succeed(prepared),
+    awaitDiscovery: Effect.succeed(prepared),
+    updates: Stream.empty,
   });
 
 const layerBackendConfiguration = (prepared = true) =>
@@ -237,11 +241,15 @@ describe("DesktopBackendConfiguration", () => {
         assert.equal(first.cwd, environment.backendCwd);
         assert.equal(first.captureOutput, true);
         assert.equal(first.env.ELECTRON_RUN_AS_NODE, "1");
+<<<<<<< HEAD
         // The packaged macOS app names its bundle for the nested helper (#777).
         assert.equal(
           first.env.INFINITUS_DESKTOP_BUNDLE,
           environment.path.resolve(environment.resourcesPath, "..", ".."),
         );
+=======
+        assert.equal(first.env.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING, "1");
+>>>>>>> upstream-sync-d01b92c061-upstream-renamed
         assert.isUndefined(first.env.T3CODE_PORT);
         assert.isUndefined(first.env.T3CODE_MODE);
         assert.isUndefined(first.env.T3CODE_DESKTOP_LAN_HOST);
@@ -974,6 +982,7 @@ describe("DesktopBackendConfiguration", () => {
         Layer.provideMerge(DesktopAppSettings.layerTest()),
         Layer.provideMerge(DesktopWslServerTree.layerTest()),
         Layer.provideMerge(DesktopWslEnvironment.layer),
+        Layer.provideMerge(DesktopManagedPolicy.layerTest()),
         Layer.provideMerge(
           Layer.succeed(
             ChildProcessSpawner.ChildProcessSpawner,
