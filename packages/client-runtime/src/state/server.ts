@@ -1118,6 +1118,13 @@ export function createServerEnvironmentAtoms<R, E>(
       ]);
     }).pipe(Atom.withLabel(`environment-data:server:usage-scan-settings:${environmentId}`)),
   );
+  // Settings snapshots rebuild the filter object; only a changed filter should touch the Usage tab.
+  const usageModelFilterAtom = Atom.family((environmentId: EnvironmentId) =>
+    Atom.make((get) => get(settingsValueAtom(environmentId))?.usageModelFilter).pipe(
+      Atom.withEquality((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+      Atom.withLabel(`environment-data:server:usage-model-filter:${environmentId}`),
+    ),
+  );
   const providersValueAtom = Atom.family((environmentId: EnvironmentId) =>
     Atom.make((get) => get(configValueAtom(environmentId))?.providers ?? null).pipe(
       Atom.withLabel(`environment-data:server:providers:${environmentId}`),
@@ -1200,6 +1207,7 @@ export function createServerEnvironmentAtoms<R, E>(
     }),
     updateStateAtom,
     settingsValueAtom,
+    usageModelFilterAtom,
     providersValueAtom,
     providerAuthState: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:provider:auth-state",
@@ -1256,7 +1264,7 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.providerInstallStart,
       concurrency: {
         mode: "singleFlight",
-        key: ({ environmentId }) => environmentId,
+        key: ({ environmentId, input }) => JSON.stringify([environmentId, input]),
       },
     }),
     cancelProviderInstall: createEnvironmentRpcCommand(runtime, {

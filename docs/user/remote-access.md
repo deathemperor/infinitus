@@ -13,14 +13,16 @@ For a Linux host without the desktop app, run the unpacked server archive's
 `infinitus` (see [Install](./install.md#headless-server-linux)):
 
 ```bash
-./infinitus connect
+./infinitus up
 ```
 
-Follow the sign-in instructions. On Linux and macOS, setup offers a
-[background service](./background-service.md); if you decline it, start the
-server with `./infinitus serve`. Saving your sign-in alone does not start a server or
-make the machine reachable. Every `infinitus` command on this page is that executable;
-a Mac host runs the desktop app instead and does all of this from **Settings → Sharing & access**.
+It asks how your other devices reach the machine: Infinitus Connect, the local network,
+or both. Choose Infinitus Connect and follow the sign-in instructions. On Linux and
+macOS, it then runs Infinitus as a [background service](./background-service.md).
+`./infinitus connect` is the same as `./infinitus up --connect`. Run `./infinitus up`
+again to change your choice, and `./infinitus status` to see it. Every `infinitus` command
+on this page is that executable; a Mac host runs the desktop app instead and does all
+of this from **Settings → Sharing & access**.
 
 On your other device, sign in to the same Infinitus Connect account and choose the
 environment. On the app.t3.codes home page with no computer added yet, signing
@@ -34,16 +36,29 @@ connection. Pull request diffs and provider settings keep working after the
 previous credential expires. A failed renewal affects that request; it does not
 disconnect an otherwise healthy conversation.
 
-### More machines with Infinitus Chat
+### Scripts and agents
+
+`./infinitus up` asks nothing when you name a choice: `--connect`, `--lan`, or their
+`--no-` forms. Choices you do not name keep their settings, and `--yes` takes
+the defaults. Without a terminal:
+
+- Infinitus Connect sign-in prints a URL and a code. Approve it on any device.
+- A needed restart runs without asking, and stops running agent turns.
+- With nothing set up and no choice named, `./infinitus up` stops and names the flags.
+
+`./infinitus status --json` prints the settings. `./infinitus up --help` lists every flag with
+examples.
+
+### More machines with T3 Chat
 
 Each Infinitus Connect account can link up to 3 machines. Phones and browsers do not
-count. A paid Infinitus Chat plan raises the limit to 10 machines with Pro, or 100 with
+count. A paid T3 Chat plan raises the limit to 10 machines with Pro, or 100 with
 Premier.
 
-To link Infinitus Chat, open your account menu on the web or desktop app, go to
-**Infinitus Chat**, and select **Link Infinitus Chat**. Sign in to Infinitus Chat in the window that
+To link T3 Chat, open your account menu on the web or desktop app, go to
+**T3 Chat**, and select **Link T3 Chat**. Sign in to T3 Chat in the window that
 opens and approve. The new limit applies the next time you add a machine. If you
-cancel or downgrade Infinitus Chat, machines you already linked stay linked, but you
+cancel or downgrade T3 Chat, machines you already linked stay linked, but you
 cannot add more until you are under the limit again.
 
 ## Pair over a LAN or private network
@@ -54,12 +69,15 @@ On a desktop host, open **Settings → Sharing & access**, enable **Network acce
 then create a pairing link using an address the other device can reach. Changing
 network access restarts the desktop app. You can turn it off in the same place.
 
-For a command-line host, replace `<private-ip>` with the host's LAN or tailnet
-address:
+For a command-line host, choose the local network in `./infinitus up`, or run:
 
 ```bash
-./infinitus serve --host <private-ip>
+./infinitus up --lan
 ```
+
+For a server in a terminal, run `./infinitus serve --lan`. Either way, Infinitus then
+accepts connections from your local network and tailnet, so a pairing code is
+all that keeps other devices on them out.
 
 If a server is already running, generate a fresh link without restarting it:
 
@@ -103,8 +121,9 @@ machine's current LAN and Tailscale addresses and adds them as routes, so
 pairing once through Infinitus Connect is enough to use the LAN at home. When the
 machine's LAN address changes, for example after it joins another Wi-Fi network,
 the learned route follows it. The machine must allow network access for its LAN
-address to be learned. The [background service](./background-service.md#local-network-access)
-allows it on private networks by default. You can reorder a learned route, but not remove it; it
+address to be learned: **Network access** in the desktop app, or the
+[local network](./background-service.md#local-network-access) choice in `./infinitus up`.
+You can reorder a learned route, but not remove it; it
 goes away with the route it was learned through, or when the machine stops
 reporting that address.
 
@@ -167,7 +186,7 @@ The mapping created by `pair --tailscale` persists across restarts. Remove its
 default-port mapping with:
 
 ```bash
-tailscale serve --https=443 off
+tailscale serve --https=443 --set-path=/ off
 ```
 
 If that port is already in use, choose another with
@@ -233,6 +252,19 @@ tab closes. Audio does not play on your device.
 On a phone, tap the floating preview's corner dot to show its controls, then
 **Pop into separate window** to keep watching in picture-in-picture over other
 apps.
+
+### Local servers
+
+The browser lists ports held by processes your terminals and agents started.
+Infinitus reads which process holds each port and never connects to it, so a
+listed port opens as `http://localhost:<port>` and might not be a web page. For
+an HTTPS server or a specific path, set the **Preview URL** on the project
+script that starts it; Infinitus checks that address and opens it as written.
+
+To stop listing ports, set `T3CODE_PORT_DISCOVERY=0` in the environment that
+starts the Infinitus server, such as
+[`service.env`](./background-service.md#configure-the-service-environment) for
+the background service, and restart it. Script preview URLs still appear.
 
 ### Browser host setup
 
