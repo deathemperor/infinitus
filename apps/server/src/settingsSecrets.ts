@@ -12,6 +12,7 @@ import {
 import { acpRegistryClient } from "@infinitus/provider-acp-registry/client";
 import { cursorClient } from "@infinitus/provider-cursor/client";
 import { grokClient } from "@infinitus/provider-grok/client";
+import { kiroClient } from "@infinitus/provider-kiro/client";
 import { museClient } from "@infinitus/provider-muse/client";
 import { openCodeClient } from "@infinitus/provider-opencode/client";
 import { piClient } from "@infinitus/provider-pi/client";
@@ -28,7 +29,15 @@ const providerSecretFields = new Map([
   ["codex", secretSettingsFields(CodexSettings)],
   ["claudeAgent", secretSettingsFields(ClaudeSettings)],
   ["antigravity", secretSettingsFields(AntigravitySettings)],
-  ...[cursorClient, grokClient, museClient, openCodeClient, piClient, acpRegistryClient].map(
+  ...[
+    cursorClient,
+    grokClient,
+    kiroClient,
+    museClient,
+    openCodeClient,
+    piClient,
+    acpRegistryClient,
+  ].map(
     (definition) =>
       [definition.driverKind, secretSettingsFields(definition.settingsSchema)] as const,
   ),

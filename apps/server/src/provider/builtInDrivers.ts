@@ -15,6 +15,7 @@ import type {
   AnyProviderDriver,
   ProviderUsageReaderEnv,
 } from "@infinitus/provider-core/server/driver";
+import { KiroDriver, type KiroDriverEnv } from "@infinitus/provider-kiro/server";
 
 export type BuiltInDriversEnv =
   | AcpRegistryDriverEnv
@@ -24,6 +25,7 @@ export type BuiltInDriversEnv =
   | CursorDriverEnv
   | FxDriverEnv
   | GrokDriverEnv
+  | KiroDriverEnv
   | OpenCodeDriverEnv
   | PiDriverEnv
   | MuseDriverEnv;
@@ -36,6 +38,7 @@ export const BUILT_IN_DRIVERS: ReadonlyArray<AnyProviderDriver<BuiltInDriversEnv
   FxDriver,
   OpenCodeDriver,
   AntigravityDriver,
+  KiroDriver,
   PiDriver,
   MuseDriver,
   AcpRegistryDriver,
