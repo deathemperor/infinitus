@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
 import * as Crypto from "effect/Crypto";
+=======
+import * as SecureRandom from "effect/crypto/SecureRandom";
+>>>>>>> upstream-sync-cefb544af3-upstream-renamed
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as FileSystem from "effect/FileSystem";
@@ -226,8 +230,8 @@ const upsertAnonymousId = Effect.gen(function* () {
     return existing.value;
   }
 
-  const anonymousId = yield* Crypto.Crypto.pipe(
-    Effect.flatMap((crypto) => crypto.randomUUIDv4()),
+  const anonymousId = yield* SecureRandom.SecureRandom.pipe(
+    Effect.flatMap((crypto) => crypto.uuidV4()),
     Effect.mapError(
       (cause) =>
         new TelemetryAnonymousIdGenerationError({
