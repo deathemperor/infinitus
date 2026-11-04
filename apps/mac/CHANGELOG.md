@@ -10,6 +10,20 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.43
+
+### Desktop
+- Side chats open beside the main thread.
+- Projects can be pinned and archived.
+- One control picks the model and its effort.
+- A context meter shows how close a thread is to its limit.
+- Threads show where the model or effort changed.
+- Usage can be filtered by provider and model.
+- Scheduled tasks can run once at a set date and time.
+- Approvals from child threads show in the parent thread.
+- Administrators can manage settings and updates with a managed policy.
+- `infinitus up` asks how your other devices reach this machine and sets up the background service.
+
 ## 0.5.0-alpha.42
 
 ### Desktop
