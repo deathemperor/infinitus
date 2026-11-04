@@ -7,7 +7,7 @@ import {
   resolveNodeExecutable,
   nodeRuntimeUnavailableMessage,
 } from "@infinitus/shared/nodeRuntime";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
 import * as Hex from "effect/encoding/Hex";
 import * as FileSystem from "effect/FileSystem";
@@ -181,9 +181,9 @@ export interface AntigravityInstanceDirectories {
 export const resolveAntigravityInstanceDirectories = Effect.fn(
   "resolveAntigravityInstanceDirectories",
 )(function* (stateDir: string, instanceId: ProviderInstanceId) {
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
   const path = yield* Path.Path;
-  const key = Hex.encode(yield* crypto.digest("SHA-256", new TextEncoder().encode(instanceId)));
+  const key = Hex.encode(yield* digest.digest(Digest.sha256, new TextEncoder().encode(instanceId)));
   return {
     profile: path.join(stateDir, "providers", "antigravity", key),
     runtimeTemp: path.join(stateDir, "antigravity-tmp", key.slice(0, 12)),
