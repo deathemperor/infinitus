@@ -13,8 +13,15 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## 0.5.0-alpha.43
 
 ### Desktop
-- From upstream (T3 Code 0.1.6) — side chats beside the main thread, pinned and archived projects, one control for the model and its effort, a context meter against the limit, threads that show model and effort switches, and Usage filtered by provider and model.
-- From upstream — scheduled tasks can run once at a set date and time, child approvals show in the parent thread, and administrators can manage settings and updates with a managed policy.
+- Side chats open beside the main thread.
+- Projects can be pinned and archived.
+- One control picks the model and its effort.
+- A context meter shows how close a thread is to its limit.
+- Threads show where the model or effort changed.
+- Usage can be filtered by provider and model.
+- Scheduled tasks can run once at a set date and time.
+- Approvals from child threads show in the parent thread.
+- Administrators can manage settings and updates with a managed policy.
 - `infinitus up` asks how your other devices reach this machine and sets up the background service.
 
 ## 0.5.0-alpha.42
