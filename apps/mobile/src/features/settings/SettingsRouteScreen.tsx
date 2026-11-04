@@ -18,7 +18,6 @@ import { useAuth, useUser } from "@clerk/expo";
 import { useNavigation, useNavigationState } from "@react-navigation/native";
 import { use, type ComponentProps, type ReactNode } from "react";
 import { Platform, View } from "react-native";
-import { useWorkspaceSurface } from "../workspace/useWorkspaceSurface";
 import { useNativeColumnLayoutMetrics } from "../../native/native-layout-metrics";
 import { deriveProjectGroupLabel } from "@infinitus/client-runtime/state/project-grouping";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,7 +31,7 @@ import { InfinitusAlarmsRow, useInfinitusFleetRows } from "./SettingsInfinitusRo
 import { SettingsScreen } from "./components/SettingsScreen";
 import type { SettingsPageTarget } from "./components/settings-page-targets";
 import {
-  AndroidSettingsEnvironmentFilter,
+  useSettingsEnvironmentMenu,
   SettingsEnvironmentFilterHeader,
 } from "./components/SettingsEnvironmentFilterHeader";
 import { useSettingsEnvironmentFilter } from "./settings-environment-filter";
@@ -59,8 +58,8 @@ export function SettingsListScreen(props: {
   readonly sidebar: boolean;
   readonly selected: string | null;
 }) {
-  const surface = useWorkspaceSurface();
   const workspace = useWorkspaceTabs();
+  const environmentMenu = useSettingsEnvironmentMenu();
   const inSidebar = props.sidebar;
   const selected = props.selected;
   const sidebar = inSidebar ? { selected } : null;
@@ -72,13 +71,13 @@ export function SettingsListScreen(props: {
 
   return (
     <SettingsSidebarContext value={sidebar}>
-      <View className={`flex-1 ${inSidebar ? surface.className : "bg-screen"}`}>
+      <View className="flex-1 bg-screen">
         <SettingsEnvironmentFilterHeader />
         {Platform.OS === "android" ? (
           <SettingsScreen
             title="Settings"
             workspaceRoot={inSidebar}
-            trailing={<AndroidSettingsEnvironmentFilter />}
+            menus={[environmentMenu]}
             search={
               workspace
                 ? {
@@ -264,12 +263,8 @@ function useSettingsIndexSections(): SettingsListSection[] {
         ...(navigationCustomizationAvailable()
           ? [page("SettingsNavigation", "line.3.horizontal", "Navigation tabs")]
           : []),
-        ...(Platform.OS === "ios"
-          ? [
-              page("SettingsKeyboard", "keyboard", "Keyboard"),
-              page("SettingsMicrophone", "mic", "Microphone"),
-            ]
-          : []),
+        ...(Platform.OS === "ios" ? [page("SettingsKeyboard", "keyboard", "Keyboard")] : []),
+        page("SettingsMicrophone", "mic", "Microphone"),
       ],
     },
     {

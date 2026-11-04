@@ -18,6 +18,7 @@ import {
   type NavigationState,
 } from "@react-navigation/native";
 import { pipe } from "effect/Function";
+import { DEFAULT_HOSTED_APP_URL } from "@infinitus/shared/connectAuth";
 
 import { RegistryContext } from "@effect/atom-react";
 import { ProjectChipIconRasterizer } from "./native/ProjectChipIconImages";
@@ -132,9 +133,14 @@ const appLinking = {
     "t3code://",
     "t3code-dev://",
     "t3code-preview://",
+<<<<<<< HEAD
     ...INFINITUS_LINK_PREFIXES,
   ],
   ...infinitusLinkingListeners,
+=======
+    DEFAULT_HOSTED_APP_URL,
+  ],
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
   config: { initialRouteName: "Home" },
   filter: (url: string) => shouldHandleAppLink(url, hasCloudPublicConfig()),
   getInitialURL: async () => (await Linking.getInitialURL()) ?? (await launchWorkspaceURL()),

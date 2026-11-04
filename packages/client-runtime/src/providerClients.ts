@@ -11,6 +11,7 @@ import { modelShortName } from "@infinitus/provider-core/modelShortName";
 import { cursorClient } from "@infinitus/provider-cursor/client";
 import { fxClient } from "@infinitus/provider-fx/client";
 import { grokClient } from "@infinitus/provider-grok/client";
+import { kiroClient } from "@infinitus/provider-kiro/client";
 import { museClient } from "@infinitus/provider-muse/client";
 import { openCodeClient } from "@infinitus/provider-opencode/client";
 import { piClient } from "@infinitus/provider-pi/client";
@@ -41,6 +42,7 @@ export const providerClients = makeProviderClientRegistry([
     acpRegistryAgentIds: ["antigravity-acp"],
     settingsSchema: AntigravitySettings,
   },
+  kiroClient,
   museClient,
   piClient,
   acpRegistryClient,

@@ -1,8 +1,13 @@
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+import { isListedThreadLineage } from "@infinitus/contracts";
+
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 import type { EnvironmentProject, EnvironmentThreadShell } from "./models.ts";
 
 export function planProjectRemoval<
-  Thread extends Pick<EnvironmentThreadShell, "environmentId" | "projectId">,
+  Thread extends Pick<EnvironmentThreadShell, "environmentId" | "projectId" | "lineage">,
 >(options: {
   readonly members: ReadonlyArray<
     Pick<EnvironmentProject, "id" | "environmentId" | "title" | "workspaceRoot"> & {
@@ -21,7 +26,10 @@ export function planProjectRemoval<
   const projectThreads = threads.filter((thread) =>
     memberKeys.has(`${thread.environmentId}:${thread.projectId}`),
   );
-  const threadCount = projectThreads.length + (options.unloadedThreadCount ?? 0);
+  // Side chats and subagents go with their parent but never show in thread lists.
+  const threadCount =
+    projectThreads.filter((thread) => isListedThreadLineage(thread.lineage)).length +
+    (options.unloadedThreadCount ?? 0);
   const isWholeGroup = members.length === groupMemberCount;
   const targetKind = hasOtherMembers || !isWholeGroup ? "checkout" : "project";
   const singleMember = members.length === 1 ? members[0]! : null;

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useNavigation, useNavigationState } from "@react-navigation/native";
 import { useWorkspaceTabs } from "../workspace/WorkspaceTabsContext";
@@ -119,4 +120,11 @@ export function ThreadListToolbar(props: {
       />
     </View>
   );
+=======
+import type { ThreadListToolbarProps } from "./ThreadListToolbar.types";
+
+/** iOS lists use native header items; only Android draws this toolbar. */
+export function ThreadListToolbar(_props: ThreadListToolbarProps) {
+  return null;
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 }

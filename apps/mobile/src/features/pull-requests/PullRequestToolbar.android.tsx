@@ -1,18 +1,16 @@
 import { useNavigation } from "@react-navigation/native";
-import { useEffect, useRef } from "react";
-import { BackHandler, Keyboard, View, type TextInputInstance } from "react-native";
-import { AndroidHeaderIconButton } from "../../components/ui/AndroidScreenHeader";
-import { AndroidAnchoredMenu } from "../../components/ui/AndroidAnchoredMenu";
-import { SearchField } from "../../components/ui/SearchField";
-import { useToolbarLayout } from "../../components/ui/useToolbarLayout";
+import { useEffect } from "react";
+import { BackHandler, Keyboard } from "react-native";
+import { AppBar } from "../../components/ui/AppBar";
+import { appBarMenuItemsFromActions } from "../../components/ui/menuActionItems";
 import { useHardwareKeyboardCommand } from "../keyboard/hardwareKeyboardCommands";
-import { WorkspaceListToolbarRow } from "../workspace/WorkspaceListToolbarRow";
+import { WorkspaceBrandTitle } from "../workspace/WorkspaceBrandTitle";
 import { useWorkspaceTabs } from "../workspace/WorkspaceTabsContext";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import type { PullRequestFilterMenu } from "./PullRequestListFilters";
 import { openSettings } from "../settings/settings-navigation";
 
-/** PR search shares the thread list's Android header row. */
+/** PR search shares the thread list's Android header. */
 export function PullRequestToolbar(props: {
   readonly filters: PullRequestFilterMenu | null;
   readonly onRequestVisibility?: () => void;
@@ -23,7 +21,6 @@ export function PullRequestToolbar(props: {
   const { dispatch, getScrollOffset, recordScrollOffset, isTabActive } = workspace;
   const { onRequestVisibility } = props;
   const tab = workspace.state.tabs.pullRequests;
-  const input = useRef<TextInputInstance>(null);
   const searching = tab.searchMode !== "resting";
   const openSearch = () => {
     onRequestVisibility?.();
@@ -33,7 +30,6 @@ export function PullRequestToolbar(props: {
       offset: getScrollOffset("pullRequests"),
     });
     dispatch({ type: "search", tab: "pullRequests" });
-    input.current?.focus();
     return true;
   };
   useHardwareKeyboardCommand("focusSearch", openSearch);
@@ -57,8 +53,8 @@ export function PullRequestToolbar(props: {
     });
     return () => subscription.remove();
   }, [searching, closeSearch, navigation, isTabActive]);
-  const { paddingTop, paddingBottom } = useToolbarLayout();
   return (
+<<<<<<< HEAD
     <View className="bg-header px-2" style={{ paddingTop, paddingBottom }}>
       <WorkspaceListToolbarRow
         searching={searching}
@@ -99,5 +95,37 @@ export function PullRequestToolbar(props: {
         }
       />
     </View>
+=======
+    <AppBar
+      title="T3 Code"
+      titleContent={
+        <WorkspaceBrandTitle
+          accessibilityLabel="T3 Code, Pull requests"
+          onOpenEnvironments={() => openSettings(navigation, "SettingsEnvironments")}
+        />
+      }
+      search={{
+        value: tab.query,
+        onChangeText: (query) => dispatch({ type: "query", tab: "pullRequests", query }),
+        placeholder: "Search pull requests",
+        active: searching,
+        onOpen: openSearch,
+        onClose: closeSearch,
+      }}
+      menus={
+        filters
+          ? [
+              {
+                title: "Filter pull requests",
+                icon: filters.customized
+                  ? "line.3.horizontal.decrease.circle.fill"
+                  : "line.3.horizontal.decrease.circle",
+                items: appBarMenuItemsFromActions(filters.actions, filters.onSelect),
+              },
+            ]
+          : undefined
+      }
+    />
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
   );
 }

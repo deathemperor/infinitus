@@ -583,6 +583,7 @@
     "@infinitus/provider-cursor": "workspace:*",
     "@infinitus/provider-fx": "workspace:*",
     "@infinitus/provider-grok": "workspace:*",
+    "@infinitus/provider-kiro": "workspace:*",
     "@infinitus/provider-muse": "workspace:*",
     "@infinitus/provider-opencode": "workspace:*",
     "@infinitus/provider-pi": "workspace:*",

@@ -571,6 +571,7 @@ export function useThreadActions() {
       deletedThreadId: threadRef.threadId,
       deletedThreadIds,
       sortOrder: sidebarThreadSortOrder,
+      now: new Date().toISOString(),
     });
     const deleteResult = await deleteThreadMutation({
       environmentId: threadRef.environmentId,

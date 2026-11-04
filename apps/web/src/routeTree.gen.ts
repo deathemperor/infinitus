@@ -30,8 +30,12 @@ import { Route as ChatUsageRouteImport } from './routes/_chat.usage'
 import { Route as ChatSettingsRouteImport } from './routes/_chat.settings'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as ChatNewRouteImport } from './routes/_chat.new'
+<<<<<<< HEAD
 import { Route as SettingsInfinitusSplatRouteImport } from './routes/settings.infinitus.$'
 import { Route as SettingsEnginesActivityRouteImport } from './routes/settings.engines_.activity'
+=======
+import { Route as ThreadsEnvironmentIdThreadIdRouteImport } from './routes/threads.$environmentId.$threadId'
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 import { Route as ChatSettingsWorktreesRouteImport } from './routes/_chat.settings.worktrees'
 import { Route as ChatSettingsThreadsRouteImport } from './routes/_chat.settings.threads'
 import { Route as ChatSettingsStorageRouteImport } from './routes/_chat.settings.storage'
@@ -165,6 +169,7 @@ const ChatNewRoute = ChatNewRouteImport.update({
   path: '/new',
   getParentRoute: () => ChatRoute,
 } as any)
+<<<<<<< HEAD
 const SettingsInfinitusSplatRoute = SettingsInfinitusSplatRouteImport.update({
   id: '/settings/infinitus/$',
   path: '/settings/infinitus/$',
@@ -175,6 +180,14 @@ const SettingsEnginesActivityRoute = SettingsEnginesActivityRouteImport.update({
   path: '/settings/engines/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+=======
+const ThreadsEnvironmentIdThreadIdRoute =
+  ThreadsEnvironmentIdThreadIdRouteImport.update({
+    id: '/threads/$environmentId/$threadId',
+    path: '/threads/$environmentId/$threadId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 const ChatSettingsWorktreesRoute = ChatSettingsWorktreesRouteImport.update({
   id: '/worktrees',
   path: '/worktrees',
@@ -370,8 +383,12 @@ export interface FileRoutesByFullPath {
   '/settings/storage': typeof ChatSettingsStorageRoute
   '/settings/threads': typeof ChatSettingsThreadsRoute
   '/settings/worktrees': typeof ChatSettingsWorktreesRoute
+<<<<<<< HEAD
   '/settings/engines/activity': typeof SettingsEnginesActivityRoute
   '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
+=======
+  '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 }
 export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
@@ -422,8 +439,12 @@ export interface FileRoutesByTo {
   '/settings/storage': typeof ChatSettingsStorageRoute
   '/settings/threads': typeof ChatSettingsThreadsRoute
   '/settings/worktrees': typeof ChatSettingsWorktreesRoute
+<<<<<<< HEAD
   '/settings/engines/activity': typeof SettingsEnginesActivityRoute
   '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
+=======
+  '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -476,8 +497,12 @@ export interface FileRoutesById {
   '/_chat/settings/storage': typeof ChatSettingsStorageRoute
   '/_chat/settings/threads': typeof ChatSettingsThreadsRoute
   '/_chat/settings/worktrees': typeof ChatSettingsWorktreesRoute
+<<<<<<< HEAD
   '/settings/engines_/activity': typeof SettingsEnginesActivityRoute
   '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
+=======
+  '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -530,8 +555,12 @@ export interface FileRouteTypes {
     | '/settings/storage'
     | '/settings/threads'
     | '/settings/worktrees'
+<<<<<<< HEAD
     | '/settings/engines/activity'
     | '/settings/infinitus/$'
+=======
+    | '/threads/$environmentId/$threadId'
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/accounts'
@@ -582,8 +611,12 @@ export interface FileRouteTypes {
     | '/settings/storage'
     | '/settings/threads'
     | '/settings/worktrees'
+<<<<<<< HEAD
     | '/settings/engines/activity'
     | '/settings/infinitus/$'
+=======
+    | '/threads/$environmentId/$threadId'
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
   id:
     | '__root__'
     | '/_chat'
@@ -635,8 +668,12 @@ export interface FileRouteTypes {
     | '/_chat/settings/storage'
     | '/_chat/settings/threads'
     | '/_chat/settings/worktrees'
+<<<<<<< HEAD
     | '/settings/engines_/activity'
     | '/settings/infinitus/$'
+=======
+    | '/threads/$environmentId/$threadId'
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -650,6 +687,7 @@ export interface RootRouteChildren {
   UtilizationRoute: typeof UtilizationRoute
   WelcomeRoute: typeof WelcomeRoute
   ProjectsProjectKeyRoute: typeof ProjectsProjectKeyRoute
+<<<<<<< HEAD
   SettingsAnimationsRoute: typeof SettingsAnimationsRoute
   SettingsEnginesRoute: typeof SettingsEnginesRoute
   SettingsMenuBarRoute: typeof SettingsMenuBarRoute
@@ -658,6 +696,9 @@ export interface RootRouteChildren {
   SettingsTeamRoute: typeof SettingsTeamRoute
   SettingsEnginesActivityRoute: typeof SettingsEnginesActivityRoute
   SettingsInfinitusSplatRoute: typeof SettingsInfinitusSplatRoute
+=======
+  ThreadsEnvironmentIdThreadIdRoute: typeof ThreadsEnvironmentIdThreadIdRoute
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 }
 
 declare module '@tanstack/react-router' {
@@ -809,6 +850,7 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatNewRouteImport
       parentRoute: typeof ChatRoute
     }
+<<<<<<< HEAD
     '/settings/infinitus/$': {
       id: '/settings/infinitus/$'
       path: '/settings/infinitus/$'
@@ -821,6 +863,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/engines/activity'
       fullPath: '/settings/engines/activity'
       preLoaderRoute: typeof SettingsEnginesActivityRouteImport
+=======
+    '/threads/$environmentId/$threadId': {
+      id: '/threads/$environmentId/$threadId'
+      path: '/threads/$environmentId/$threadId'
+      fullPath: '/threads/$environmentId/$threadId'
+      preLoaderRoute: typeof ThreadsEnvironmentIdThreadIdRouteImport
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
       parentRoute: typeof rootRouteImport
     }
     '/_chat/settings/worktrees': {
@@ -1117,6 +1166,7 @@ const rootRouteChildren: RootRouteChildren = {
   UtilizationRoute: UtilizationRoute,
   WelcomeRoute: WelcomeRoute,
   ProjectsProjectKeyRoute: ProjectsProjectKeyRoute,
+<<<<<<< HEAD
   SettingsAnimationsRoute: SettingsAnimationsRoute,
   SettingsEnginesRoute: SettingsEnginesRoute,
   SettingsMenuBarRoute: SettingsMenuBarRoute,
@@ -1125,6 +1175,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsTeamRoute: SettingsTeamRoute,
   SettingsEnginesActivityRoute: SettingsEnginesActivityRoute,
   SettingsInfinitusSplatRoute: SettingsInfinitusSplatRoute,
+=======
+  ThreadsEnvironmentIdThreadIdRoute: ThreadsEnvironmentIdThreadIdRoute,
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -69,10 +69,16 @@ export function classifyReachability(
   const restart = `Restart ${PRODUCT_NAME}. If it stays, run \`infinitus connect\` again.`;
 
   if (!facts.managedTunnelConfigured) {
+    // A running server reads the link `t3 connect` stores only at startup.
     return fail(
       "not_linked",
+<<<<<<< HEAD
       `The server has not set up a ${CONNECT_NAME} tunnel.`,
       "Run `infinitus connect`, then restart the server (`infinitus service restart`) so it applies the link.",
+=======
+      "The server has not set up a T3 Connect tunnel.",
+      "Run `t3 connect`, then restart T3 Code so it applies the link.",
+>>>>>>> upstream-sync-8b44f42b14-upstream-renamed
     );
   }
   if (connector === null) {
