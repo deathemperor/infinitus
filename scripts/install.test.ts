@@ -67,6 +67,56 @@ const runInstaller = async (channel: string, version: string) => {
   }
 };
 
+describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer home", () => {
+  it("installs a relative home from a directory ending in a newline", async () => {
+    const temporaryRoot = await NodeFSP.realpath(
+      await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "infinitus-install-home-")),
+    );
+    const root = NodePath.join(temporaryRoot, "cwd\n");
+    const homeName = "-custom home\\home\n";
+    const home = NodePath.join(root, homeName);
+    const version = "1.2.3";
+    const target = NodePath.join(home, "runtime/versions", version);
+    const launcher = NodePath.join(root, "bin/infinitus");
+    try {
+      await NodeFSP.mkdir(target, { recursive: true });
+      await NodeFSP.writeFile(NodePath.join(target, ".install-complete"), `${version}\n`);
+      await NodeFSP.writeFile(
+        NodePath.join(target, "infinitus"),
+        "#!/bin/sh\necho 'infinitus v1.2.3'\n",
+        { mode: 0o755 },
+      );
+      const { status, stdout, stderr } = NodeChildProcess.spawnSync(
+        "sh",
+        [NodePath.resolve(import.meta.dirname, "install.sh")],
+        {
+          cwd: root,
+          env: {
+            ...process.env,
+            HOME: root,
+            T3CODE_HOME: homeName,
+            T3CODE_VERSION: version,
+            T3CODE_INSTALL_BIN_DIR: NodePath.dirname(launcher),
+            T3CODE_RELEASE_BASE_URL: "http://127.0.0.1:1",
+          },
+          encoding: "utf8",
+        },
+      );
+      expect(status, stdout + stderr).toBe(0);
+      expect(stderr).toContain(`Installed Infinitus ${version}`);
+      expect(await NodeFSP.readlink(launcher)).toBe(NodePath.join(target, "infinitus"));
+      expect(
+        NodeChildProcess.execFileSync(launcher, ["--version"], {
+          cwd: NodeOS.tmpdir(),
+          encoding: "utf8",
+        }).trim(),
+      ).toBe("infinitus v1.2.3");
+    } finally {
+      await NodeFSP.rm(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer channel lookup", () => {
   it("finds the newest release-train tag behind nightly and preview builds", async () => {
     const { code, output } = await runInstaller("stable", "0.5.0-alpha.39");

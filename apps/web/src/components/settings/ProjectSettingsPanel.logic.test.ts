@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { EnvironmentId, ProjectId } from "@infinitus/contracts";
+import { EnvironmentId, ProjectId, ThreadId } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { planProjectRemoval } from "@infinitus/client-runtime/state/projects";
 
@@ -17,18 +17,32 @@ describe("project removal confirmation", () => {
     environmentLabel: "Remote",
   };
 
-  it("limits a checkout's thread count to its environment and project", () => {
+  const parentId = ThreadId.make("parent");
+  const listed = { rootThreadId: parentId, parentThreadId: null, relationshipToParent: null };
+  const child = { rootThreadId: parentId, parentThreadId: parentId };
+
+  it("limits a checkout's thread count to its listed threads in that environment and project", () => {
     const plan = planProjectRemoval({
       members: [local],
       groupMemberCount: 2,
       hasOtherMembers: false,
       displayName: "Repo",
       threads: [
-        { environmentId: local.environmentId, projectId: local.id },
-        { environmentId: remote.environmentId, projectId: remote.id },
+        { environmentId: local.environmentId, projectId: local.id, lineage: listed },
+        {
+          environmentId: local.environmentId,
+          projectId: local.id,
+          lineage: { ...child, relationshipToParent: "subagent" },
+        },
+        {
+          environmentId: local.environmentId,
+          projectId: local.id,
+          lineage: { ...child, relationshipToParent: "fork", sideChat: true },
+        },
+        { environmentId: remote.environmentId, projectId: remote.id, lineage: listed },
       ],
     });
-    expect(plan.projectThreads).toHaveLength(1);
+    expect(plan.projectThreads).toHaveLength(3);
     expect(plan.confirmationMessage).toBe(
       `Remove checkout "Repo" and delete its 1 thread?\nPath: /work/repo\nEnvironment: Local\nThose threads and any archived threads are deleted from ${PRODUCT_NAME}. Provider sessions are kept.\nOther entries in this grouped project are unaffected.\nThis action cannot be undone.`,
     );

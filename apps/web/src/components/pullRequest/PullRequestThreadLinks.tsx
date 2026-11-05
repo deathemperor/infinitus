@@ -1,5 +1,7 @@
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
+import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@infinitus/client-runtime/environment";
+import { visibleLinkedThreads } from "@infinitus/client-runtime/state/threads";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import type {
   EnvironmentId,
@@ -14,8 +16,16 @@ import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
 
 import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
 import { normalizeThreadPullRequestKey } from "@infinitus/client-runtime/thread-pull-requests";
-import { useProjects, useServerConfigs, useThreadShell, useThreadShells } from "~/state/entities";
+import {
+  useAnyEnvironmentHiding,
+  useEnvironmentThreadRefs,
+  useProjects,
+  useServerConfigs,
+  useThreadShell,
+  useVisibleThreadShells,
+} from "~/state/entities";
 import { pullRequestEnvironment } from "~/state/pullRequests";
+import { environmentThreadShells } from "~/state/threads";
 import { useEnvironmentQuery } from "~/state/query";
 import { useThreadSearch } from "~/state/queries";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
@@ -63,6 +73,9 @@ function EnabledPullRequestThreadLinks({
   const currentThreadRef = thread === null ? null : threadRef;
   const linking = usePullRequestLinking(environmentId);
   const linkedHere = linking.isLinked(thread, url);
+  const hiddenKeys = useAtomValue(environmentThreadShells.hiddenThreadKeysAtom);
+  const hidingAnywhere = useAnyEnvironmentHiding();
+  const loadedThreadRefs = useEnvironmentThreadRefs(environmentId);
   const relations = useEnvironmentQuery(
     linking.mode === "multiple" && display !== "menu-item"
       ? pullRequestEnvironment.linkedThreads({
@@ -109,8 +122,13 @@ function EnabledPullRequestThreadLinks({
   };
 
   if (parsed === null || (!linkedHere && !linking.canLink(url))) return null;
-  const linkedThreads =
-    linking.mode === "multiple" ? ((relations.data ?? lastRelations)?.threads ?? []) : [];
+  const linkedThreads = visibleLinkedThreads(
+    linking.mode === "multiple" ? ((relations.data ?? lastRelations)?.threads ?? []) : [],
+    environmentId,
+    loadedThreadRefs,
+    hiddenKeys,
+    hidingAnywhere,
+  );
   const linkedThreadsLabel =
     linkedThreads.length > 0
       ? `Linked from ${linkedThreads.length} ${linkedThreads.length === 1 ? "thread" : "threads"}`
@@ -193,7 +211,7 @@ function ThreadPicker({
   pending: boolean;
   onSelect: (threadId: ThreadId) => void;
 }) {
-  const threads = useThreadShells();
+  const threads = useVisibleThreadShells();
   const linking = usePullRequestLinking(environmentId);
   const projects = useProjects();
   const [query, setQuery] = useState("");

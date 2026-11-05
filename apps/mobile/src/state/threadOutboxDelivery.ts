@@ -16,10 +16,10 @@ import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
+  MessageId,
   managedRuntimeModeDenial,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   type EnvironmentId,
-  type MessageId,
   type ThreadId,
 } from "@infinitus/contracts";
 import { buildTemporaryWorktreeBranchName } from "@infinitus/shared/git";
@@ -895,10 +895,41 @@ export function createThreadOutboxDelivery(): {
       settings,
       currentConfig.providers,
     );
-    if (!hasAccess()) return true;
     // Infinitus (fork, #1501): a delete or edit that aborted the upload
     // phase wins here; from this line on the send is off limits to both.
     if (!markDispatchingQueuedMessageSending(queuedMessage.messageId)) return true;
+    if (queuedMessage.compactBeforeSend === true) {
+      if (!hasAccess()) return true;
+      // Queued, since steering a running turn with a compaction is rejected.
+      const compactionResult = await runDeliveryCommand(threadEnvironment.startTurn, {
+        environmentId: queuedMessage.environmentId,
+        input: {
+          commandId: settingsCommandId(queuedMessage, "compact"),
+          creationSource: "mobile",
+          threadId: queuedMessage.threadId,
+          message: {
+            messageId: MessageId.make(`${queuedMessage.messageId}:compact`),
+            role: "user",
+            text: "/compact",
+            attachments: [],
+            idleCompaction: "onReturn",
+          },
+          modelSelection: sendSettings.modelSelection,
+          runtimeMode: sendSettings.runtimeMode,
+          interactionMode: sendSettings.interactionMode,
+          createdAt: queuedMessage.createdAt,
+          dispatchMode: "queue",
+        },
+      });
+      if (AsyncResult.isFailure(compactionResult) && !hasAccess()) return true;
+      const compactionFailure = reportCommandFailure(queuedMessage, compactionResult, "start-turn");
+      if (compactionFailure?.action === "retry") return false;
+      if (compactionFailure?.action === "restore") {
+        return restoreQueuedMessage(persistedMessage, compactionFailure.message);
+      }
+      if (!isQueuedMessagePayloadCurrent(persistedMessage, deliveryRevision)) return true;
+    }
+    if (!hasAccess()) return true;
     const deliveryResult = await runDeliveryCommand(threadEnvironment.startTurn, {
       environmentId: queuedMessage.environmentId,
       input: {

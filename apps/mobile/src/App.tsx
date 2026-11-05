@@ -18,6 +18,7 @@ import {
   type NavigationState,
 } from "@react-navigation/native";
 import { pipe } from "effect/Function";
+import { DEFAULT_HOSTED_APP_URL } from "@infinitus/shared/connectAuth";
 
 import { RegistryContext } from "@effect/atom-react";
 import { ProjectChipIconRasterizer } from "./native/ProjectChipIconImages";
@@ -132,6 +133,7 @@ const appLinking = {
     "t3code://",
     "t3code-dev://",
     "t3code-preview://",
+    DEFAULT_HOSTED_APP_URL,
     ...INFINITUS_LINK_PREFIXES,
   ],
   ...infinitusLinkingListeners,
