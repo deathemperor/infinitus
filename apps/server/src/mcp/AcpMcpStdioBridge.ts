@@ -4,8 +4,9 @@ import * as NodeReadline from "node:readline";
 
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import * as Result from "effect/Result";
+import * as Option from "effect/Option";
 import * as Fiber from "effect/Fiber";
+import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { discardResponseBody, responsePayloads } from "@infinitus/shared/mcpResponsePayloads";
@@ -13,14 +14,22 @@ import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /** ACP mandates stdio MCP support; HTTP/SSE support varies. */
 
-export class AcpMcpBridgeError extends Error {
-  readonly _tag = "AcpMcpBridgeError";
-}
+export class AcpMcpBridgeError extends Schema.TaggedError<AcpMcpBridgeError>()(
+  "AcpMcpBridgeError",
+  { message: Schema.String, cause: Schema.optional(Schema.Defect()) },
+) {}
+
+const isAcpMcpBridgeError = Schema.is(AcpMcpBridgeError);
 
 const bridgeError = (cause: unknown): AcpMcpBridgeError =>
-  cause instanceof AcpMcpBridgeError
+  isAcpMcpBridgeError(cause)
     ? cause
-    : new AcpMcpBridgeError(cause instanceof Error ? cause.message : String(cause), { cause });
+    : new AcpMcpBridgeError({
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      });
+
+const decodeJsonLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 
 interface JsonRpcEnvelope {
   readonly id?: unknown;
@@ -102,11 +111,17 @@ export const mcpToolSession = (
     sessionId = response.headers.get("mcp-session-id") ?? sessionId;
     if (!response.ok) {
       yield* discardResponseBody(response);
+<<<<<<< HEAD
       return yield* Effect.fail(
         new AcpMcpBridgeError(
           `${PRODUCT_NAME} MCP endpoint responded with HTTP ${response.status}.`,
         ),
       );
+=======
+      return yield* new AcpMcpBridgeError({
+        message: `T3 Code MCP endpoint responded with HTTP ${response.status}.`,
+      });
+>>>>>>> upstream-sync-67eebaca23-upstream-renamed
     }
     const payloads = yield* Stream.runCollect(responsePayloads(response, bridgeError));
     for (const payload of payloads) {
@@ -123,11 +138,17 @@ export const mcpToolSession = (
     const responses = yield* send({ jsonrpc: "2.0", id, method, params });
     const envelope = asEnvelope(responses.find((entry) => asEnvelope(entry)?.id === id));
     if (envelope === null || envelope.error !== undefined) {
+<<<<<<< HEAD
       return yield* Effect.fail(
         new AcpMcpBridgeError(
           `${PRODUCT_NAME} MCP ${method} failed${envelope?.error === undefined ? "." : `: ${JSON.stringify(envelope.error)}`}`,
         ),
       );
+=======
+      return yield* new AcpMcpBridgeError({
+        message: `T3 Code MCP ${method} failed${envelope?.error === undefined ? "." : `: ${JSON.stringify(envelope.error)}`}`,
+      });
+>>>>>>> upstream-sync-67eebaca23-upstream-renamed
     }
     return envelope;
   });
@@ -135,9 +156,11 @@ export const mcpToolSession = (
   const terminate = Effect.suspend(() =>
     sessionId === null
       ? Effect.void
-      : Effect.tryPromise(() =>
-          fetchImplementation(options.endpoint, { method: "DELETE", headers: headers() }),
-        ).pipe(Effect.flatMap(discardResponseBody), Effect.ignore),
+      : Effect.tryPromise({
+          try: () =>
+            fetchImplementation(options.endpoint, { method: "DELETE", headers: headers() }),
+          catch: bridgeError,
+        }).pipe(Effect.flatMap(discardResponseBody), Effect.ignore),
   );
 
   // Registered before the handshake so a session the server opened is ended
@@ -277,11 +300,11 @@ export function runAcpMcpStdioBridge(options: AcpMcpStdioBridgeOptions): Effect.
       line: string,
     ): Effect.fn.Return<void> {
       if (line.trim().length === 0) return;
-      const parsed = yield* Effect.try((): unknown => JSON.parse(line)).pipe(Effect.result);
-      if (Result.isFailure(parsed)) {
+      const parsed = decodeJsonLine(line);
+      if (Option.isNone(parsed)) {
         return yield* respondWithError(null, "Parse error", -32700);
       }
-      const envelope = asEnvelope(parsed.success);
+      const envelope = asEnvelope(parsed.value);
       if (envelope === null) return;
       const isResponse = envelope.id !== undefined && ("result" in envelope || "error" in envelope);
       const isSessionHandshake =
