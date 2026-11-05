@@ -10,6 +10,19 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.44
+
+### Desktop
+- Kiro is available as an early-access provider.
+- Copy thread copies a link that opens the thread.
+- Administrators can set the managed policy from a Windows Group Policy template.
+- Repositories can be cloned into host/owner/repo folders.
+- The model picker lists the Claude models Claude Code reports.
+
+### Phone
+- Android has on-device dictation.
+- On wider screens the sidebar floats over the page and the inspector opens as a sheet.
+
 ## 0.5.0-alpha.43
 
 ### Desktop
