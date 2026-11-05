@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { signInDismissSupported } from "@infinitus/client-runtime/state/infinitusAccounts";
+import type { EnvironmentId } from "@infinitus/contracts";
 import * as Redacted from "effect/Redacted";
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
@@ -41,10 +42,21 @@ import {
 /** Every paired Mac's lapsed AWS / gcloud sign-ins as cards (#572 task 7):
     on Home above the thread list, and in Settings › Accounts. Renders
     nothing when no Mac reports one. */
-export function InfinitusSignIns(props: { readonly className?: string }) {
+export function InfinitusSignIns(props: {
+  readonly className?: string;
+  /** The Usage screen's environment filter; null shows every Mac. */
+  readonly environmentIds?: ReadonlySet<EnvironmentId> | null;
+}) {
   const configs = useAtomValue(environmentServerConfigsAtom);
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
-  const macs = useMemo(() => infinitusMacs(configs, presentations), [configs, presentations]);
+  const { environmentIds = null } = props;
+  const macs = useMemo(
+    () =>
+      infinitusMacs(configs, presentations).filter(
+        (mac) => environmentIds === null || environmentIds.has(mac.environmentId),
+      ),
+    [configs, presentations, environmentIds],
+  );
   if (macs.length === 0) return null;
   return (
     <View className={cn("gap-3", props.className)}>

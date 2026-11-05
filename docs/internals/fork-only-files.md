@@ -269,7 +269,8 @@ these bullets.
   derived from them with ImageMagick. Regenerate by hand when the mark changes.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
-  `@infinitus/client-runtime/state/infinitusAccounts`).
+  `@infinitus/client-runtime/state/infinitusAccounts`); `InfinitusAccounts.tsx`
+  is its body, also the Usage screen's Accounts view.
 - `apps/mobile/src/features/team/` — Settings › Team on Infinitus Connect
   (#1592): the phone reads and changes the team on the relay as the signed-in
   user through the same client the web pane uses

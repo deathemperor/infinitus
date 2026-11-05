@@ -7,7 +7,7 @@ import {
   USAGE_CONTRACT_VERSION,
   type UsageProviderKind,
 } from "@infinitus/contracts";
-import { type RouteProp, useIsFocused, useRoute } from "@react-navigation/native";
+import { type RouteProp, useRoute } from "@react-navigation/native";
 import { cursorKeychainAccessEnvironments } from "@infinitus/client-runtime/state/usage";
 import {
   updatingProvidersLabel,
@@ -42,7 +42,6 @@ import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { useReduceMotionEnabled } from "../../lib/appState";
 import { AppText as Text } from "../../components/ui/AppText";
 import { useWorkspaceSettledContentWidth } from "../layout/workspace-content-width";
-import { ProviderIcon } from "../../components/ProviderIcon";
 import { cn } from "../../lib/cn";
 import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { useUsage, type EnvironmentUsageStatus } from "../../state/usage";
@@ -51,8 +50,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { UsageDailyChart } from "./UsageDailyChart";
 import { toggleUsageEnvironment } from "./usageEnvironmentSelection";
-import { useRefreshLimits } from "./UsageLimitsSection";
-import { UsageLimitsSection } from "./UsageLimitsPooled";
+import { InfinitusAccounts } from "../accounts/InfinitusAccounts";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { withNativeGlassHeaderItem } from "../layout/native-glass-header-items";
 import type { UsageChartMetric } from "./usageChartData";
@@ -62,7 +60,7 @@ type UsageView = UsageChartMetric | "limits";
 const VIEW_OPTIONS = [
   { value: "cost", label: "Cost" },
   { value: "tokens", label: "Tokens" },
-  { value: "limits", label: "Limits" },
+  { value: "limits", label: "Accounts" },
 ] as const satisfies readonly { value: UsageView; label: string }[];
 
 const WINDOW_OPTIONS = [
@@ -118,13 +116,8 @@ function UsageScreen(props: {
     window,
     selectedEnvironmentIds,
   );
-  const isFocused = useIsFocused();
-  const limits = useRefreshLimits(selectedEnvironmentIds, isFocused && view === "limits");
   const cursorAccessEnvironments = cursorKeychainAccessEnvironments(selectedEnvironments);
-  const refreshAfterCursorEnable = () => {
-    void refresh();
-    void limits.refreshAfterEnable();
-  };
+  const refreshAfterCursorEnable = () => void refresh();
   const sourceMessages = usageSourceMessages(
     selectedEnvironments.flatMap((environment) => environment.summary?.sources ?? []),
   );
@@ -288,11 +281,8 @@ function UsageScreen(props: {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         refreshControl={
-          showingLimits || canReadDiagnostics ? (
-            <RefreshControl
-              refreshing={showingLimits ? limits.refreshing : refreshingUsage}
-              onRefresh={showingLimits ? () => void limits.refresh() : refreshWindow}
-            />
+          !showingLimits && canReadDiagnostics ? (
+            <RefreshControl refreshing={refreshingUsage} onRefresh={refreshWindow} />
           ) : undefined
         }
       >
@@ -333,20 +323,7 @@ function UsageScreen(props: {
             className="gap-6"
           >
             {showingLimits ? (
-              <UsageLimitsSection
-                now={limits.now}
-                failedLabels={limits.failedLabels}
-                selectedEnvironmentIds={selectedEnvironmentIds}
-                wide={wide}
-                cursorPrompt={
-                  cursorAccessEnvironments.length > 0 ? (
-                    <CursorEnableLimits
-                      environments={cursorAccessEnvironments}
-                      onEnabled={refreshAfterCursorEnable}
-                    />
-                  ) : null
-                }
-              />
+              <InfinitusAccounts environmentIds={selectedEnvironmentIds} />
             ) : (
               <>
                 {wide ? null : (
@@ -540,37 +517,6 @@ function CursorEnableRow({
         </Text>
       </View>
       <CursorEnableAction environmentId={environmentId} label={label} onEnabled={onEnabled} />
-    </View>
-  );
-}
-
-function CursorEnableLimits({
-  environments,
-  onEnabled,
-}: {
-  readonly environments: readonly EnvironmentUsageStatus[];
-  readonly onEnabled: () => void;
-}) {
-  return (
-    <View className="gap-3">
-      <View className="flex-row items-center gap-2 px-1">
-        <ProviderIcon provider="cursor" size={18} />
-        <Text className="text-base font-infinitus-medium text-foreground">Cursor</Text>
-      </View>
-      <View className="items-start gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
-        <Text className="text-xs text-foreground-muted">{CURSOR_KEYCHAIN_COPY}</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {environments.map((environment) => (
-            <CursorEnableAction
-              key={environment.environmentId}
-              environmentId={environment.environmentId}
-              label={environment.label}
-              buttonText={environments.length > 1 ? `Enable on ${environment.label}` : "Enable"}
-              onEnabled={onEnabled}
-            />
-          ))}
-        </View>
-      </View>
     </View>
   );
 }
