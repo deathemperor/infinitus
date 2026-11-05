@@ -3,6 +3,7 @@ import {
   AuthStandardClientScopes,
   AuthOrchestrationReadScope,
 } from "@infinitus/contracts";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
@@ -63,7 +64,7 @@ const withPairing = <A, E>(
       Effect.provide(
         InfinitusPairingLive.pipe(
           Layer.provide(authLayer(issued, revoked)),
-          Layer.provide(NodeServices.layer),
+          Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
         ),
       ),
     );

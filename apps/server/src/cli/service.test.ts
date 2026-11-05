@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import * as HostProcess from "@infinitus/shared/HostProcess";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NetService from "@infinitus/shared/Net";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
@@ -239,7 +240,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("service commands
         ),
       );
       expect(uninstalls).toEqual(input.removed);
-      expect(output).toContain(input.otherHome ? "another T3 home" : "Removed");
+      expect(output).toContain(input.otherHome ? `another ${PRODUCT_NAME} home` : "Removed");
     }),
   );
 });

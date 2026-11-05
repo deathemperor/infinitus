@@ -44,7 +44,7 @@ function showStarPrompt(environmentId: EnvironmentId) {
       toastManager.update(id, {
         type: "success",
         title: "Thanks for the star!",
-        description: "It really helps T3 Code grow.",
+        description: `It really helps ${PRODUCT_NAME} grow.`,
         timeout: 5_000,
         actionProps: undefined,
         data: {},

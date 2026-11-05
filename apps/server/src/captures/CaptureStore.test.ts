@@ -1,5 +1,6 @@
 import { ProjectId } from "@infinitus/contracts";
 import { MAX_CAPTURES_PER_PROJECT, type CaptureId } from "@infinitus/contracts/captures";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
@@ -23,7 +24,7 @@ const storeLayer = () =>
     Layer.provideMerge(
       Layer.fresh(ServerConfig.layerTest(process.cwd(), { prefix: "t3code-captures-test-" })),
     ),
-    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   );
 
 const current = (store: CaptureStore["Service"], projectId: ProjectId) =>
@@ -134,7 +135,7 @@ describe("CaptureStore", () => {
         Effect.provide(
           CaptureStoreLayer.pipe(
             Layer.provide(ServerConfig.layer(config)),
-            Layer.provide(NodeServices.layer),
+            Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
           ),
         ),
       );

@@ -35,7 +35,7 @@ export const LEGACY_SCAN_CACHE_FILE_NAMES = [
 const SPEEDS: readonly UsageSpeed[] = ["standard", "fast", "ultrafast"];
 
 export interface CachedFile {
-  readonly activity?: typeof TranscriptActivity.Type;
+  readonly activity?: TranscriptActivity;
   readonly size: number;
   readonly mtimeMs: number;
   readonly provider: UsageProviderKind;
@@ -66,7 +66,7 @@ type SerializedRecord = readonly [
 ];
 
 interface SerializedFile {
-  readonly a?: typeof TranscriptActivity.Type;
+  readonly a?: TranscriptActivity;
   readonly s: number;
   readonly m: number;
   readonly p: UsageProviderKind;

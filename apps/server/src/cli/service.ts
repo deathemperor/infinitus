@@ -291,7 +291,7 @@ const serviceUninstallCommand = Command.make("uninstall", projectLocationFlags).
           path.resolve(installedBaseDir) !== path.resolve(baseDir)
         ) {
           yield* Console.log(
-            "The installed service runs another T3 home, so it was not removed. Pass its --base-dir.",
+            `The installed service runs another ${PRODUCT_NAME} home, so it was not removed. Pass its --base-dir.`,
           );
           return;
         }

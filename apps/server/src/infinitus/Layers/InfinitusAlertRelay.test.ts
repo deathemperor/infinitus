@@ -1,3 +1,4 @@
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { EnvironmentId } from "@infinitus/contracts";
 import {
@@ -6,7 +7,6 @@ import {
 } from "@infinitus/contracts/relayInfinitusAlert";
 import { verifyRelayJwt } from "@infinitus/shared/relayJwt";
 import { describe, expect, it } from "@effect/vitest";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -25,7 +25,6 @@ import { InfinitusAlertRelay } from "../Services/InfinitusAlertRelay.ts";
 import { INFINITUS_ALERT_DEEP_LINK, InfinitusAlertRelayLive } from "./InfinitusAlertRelay.ts";
 
 const environmentId = EnvironmentId.make("env-1");
-const decodeProof = Schema.decodeUnknownEffect(RelayInfinitusAlertProofPayload);
 const decodeBody = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 function memorySecretStore(seed: Record<string, string>) {
@@ -120,7 +119,7 @@ function harness(input: { readonly linked: boolean; readonly status?: number }) 
         Layer.succeed(HttpClient.HttpClient, http),
       ),
     ),
-    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   );
   return { requests, secrets, layer };
 }
@@ -147,15 +146,13 @@ describe("InfinitusAlertRelayLive (#1375)", () => {
       });
       // The proof verifies with the key the store now holds and binds the alert.
       const keyPair = yield* getOrCreateEnvironmentKeyPairFromSecretStore(h.secrets);
-      const now = yield* DateTime.now;
-      const proof = yield* verifyRelayJwt({
+      const proof = yield* verifyRelayJwt(RelayInfinitusAlertProofPayload, {
         publicKey: keyPair.publicKey,
         token: body.proof,
         typ: RELAY_INFINITUS_ALERT_TYP,
         issuer: "t3-env:env-1",
         audience: "https://relay.example.test",
-        nowEpochSeconds: Math.floor(now.epochMilliseconds / 1_000),
-      }).pipe(Effect.flatMap(decodeProof));
+      });
       expect(proof.environmentId).toBe("env-1");
       expect(proof.sub).toBe("env-1");
       expect(proof.alert).toEqual(body.alert);

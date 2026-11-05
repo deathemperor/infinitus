@@ -1,3 +1,4 @@
+import * as NodeCryptoLayer from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import { EnvironmentId } from "@infinitus/contracts";
@@ -84,7 +85,7 @@ function harness() {
         Layer.mergeAll(infinitusTeamApi, infinitusTeamEnvironmentApi).pipe(Layer.provide(service)),
       ),
       Layer.provide([clientAuth, envAuth]),
-      Layer.provide([HttpServer.layerServices, NodeServices.layer]),
+      Layer.provide([HttpServer.layerServices, NodeServices.layer, NodeCryptoLayer.layer]),
     ),
     { disableLogger: true },
   );

@@ -15,7 +15,7 @@ import {
 } from "@infinitus/contracts/captures";
 import { fromJsonStringPretty } from "@infinitus/shared/schemaJson";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -87,7 +87,7 @@ const make = Effect.gen(function* () {
   const { stateDir } = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
   const lock = yield* Semaphore.make(1);
   const lists = new Map<ProjectId, SubscriptionRef.SubscriptionRef<CaptureList>>();
 
@@ -135,7 +135,7 @@ const make = Effect.gen(function* () {
           if (command.type === "add" && list.length >= MAX_CAPTURES_PER_PROJECT) {
             return yield* new CaptureListFull({ projectId, limit: MAX_CAPTURES_PER_PROJECT });
           }
-          const id = (yield* crypto.randomUUIDv4().pipe(Effect.orDie)) as CaptureId;
+          const id = (yield* random.uuidV4()) as CaptureId;
           const next = applyCaptureCommand(list, command, { id, now: yield* DateTime.now });
           if (next === list) return;
           const contents = yield* encodeCaptureList(next).pipe(

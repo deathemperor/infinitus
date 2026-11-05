@@ -14,6 +14,7 @@ import {
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NetService from "@infinitus/shared/Net";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { SshCommandError } from "@infinitus/ssh/errors";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -370,15 +371,13 @@ describe("device setup consent", () => {
       name: "a Windows host",
       exitCode: 1,
       stderr: "private diagnostics",
-      expected:
-        "Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run T3 Code on it and connect to that environment.",
+      expected: `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
     },
     {
       name: "a Windows host returning 9009",
       exitCode: 9009,
       stderr: "private diagnostics",
-      expected:
-        "Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run T3 Code on it and connect to that environment.",
+      expected: `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
     },
     {
       name: "missing Node on a Windows host with a POSIX shell",
@@ -650,13 +649,12 @@ it.effect.each([1, 9009])(
         _tag: "DeviceHostUnavailableError",
         hostId: "windows",
         hostLabel: "Windows test",
-        reason:
-          "Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run T3 Code on it and connect to that environment.",
+        reason: `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
       });
       const codec = Schema.fromJsonString(DeviceError);
       const decoded = yield* Schema.decodeEffect(codec)(yield* Schema.encodeEffect(codec)(error));
       expect(decoded.message).toBe(
-        "Windows test is unavailable: Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run T3 Code on it and connect to that environment.",
+        `Windows test is unavailable: Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`,
       );
       expect(decoded.message).not.toContain("private SSH diagnostics");
     }).pipe(

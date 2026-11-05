@@ -1,4 +1,5 @@
 import * as NetService from "@infinitus/shared/Net";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -62,8 +63,7 @@ export const make = Effect.gen(function* () {
       if (!windows.has(port)) return port;
     }
     return yield* new CliError.UserError({
-      cause:
-        "Windows is already using every port T3 Code tried. Pass --port or set T3CODE_PORT to a port Windows is not using.",
+      cause: `Windows is already using every port ${PRODUCT_NAME} tried. Pass --port or set T3CODE_PORT to a port Windows is not using.`,
     });
   });
 });

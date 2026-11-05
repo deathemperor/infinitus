@@ -8,6 +8,7 @@ import {
 import { runSshCommand, baseSshArgs, resolveSshCommand } from "@infinitus/ssh/command";
 import { SshCommandError } from "@infinitus/ssh/errors";
 import * as NetService from "@infinitus/shared/Net";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { waitForHttpReady } from "@infinitus/shared/httpReadiness";
 import * as Digest from "effect/crypto/Digest";
 import * as Exit from "effect/Exit";
@@ -36,7 +37,7 @@ export class SshWindowsHostError extends Schema.TaggedError<SshWindowsHostError>
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run T3 Code on it and connect to that environment.";
+    return `Connected over SSH, but this host runs Windows, and SSH device hosts currently need macOS or Linux. To use this machine's devices, run ${PRODUCT_NAME} on it and connect to that environment.`;
   }
 }
 export const isSshWindowsHostError = Schema.is(SshWindowsHostError);

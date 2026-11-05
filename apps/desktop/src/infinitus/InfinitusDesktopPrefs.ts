@@ -19,7 +19,7 @@ import * as SynchronizedRef from "effect/SynchronizedRef";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 
-export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefsSchema.Type;
+export type InfinitusDesktopPrefs = InfinitusDesktopPrefsSchema;
 
 export const DEFAULT_INFINITUS_DESKTOP_PREFS: InfinitusDesktopPrefs = {
   quitInfinitusWithApp: false,

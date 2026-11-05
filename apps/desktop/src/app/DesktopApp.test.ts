@@ -68,6 +68,15 @@ import * as ElectronTheme from "../electron/ElectronTheme.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as MacPermissions from "../permissions/MacPermissions.ts";
 import * as PreviewManager from "../preview/Manager.ts";
+import * as InfinitusCaptureGesture from "../captures/InfinitusCaptureGesture.ts";
+import * as ElectronNotification from "../electron/ElectronNotification.ts";
+import * as InfinitusDeepLinks from "../infinitus/InfinitusDeepLinks.ts";
+import * as InfinitusDesktopPrefs from "../infinitus/InfinitusDesktopPrefs.ts";
+import * as InfinitusEngineSupervisor from "../infinitus/InfinitusEngineSupervisor.ts";
+import * as InfinitusKeepAwake from "../infinitus/InfinitusKeepAwake.ts";
+import * as InfinitusOAuthSignIn from "../infinitus/InfinitusOAuthSignIn.ts";
+import * as InfinitusSignIn from "../infinitus/InfinitusSignIn.ts";
+import * as InfinitusSignInRedirect from "../infinitus/InfinitusSignInRedirect.ts";
 
 it.effect(
   "starts the backend and window while Linux registration is stalled and cancels it on shutdown",
@@ -206,6 +215,15 @@ it.effect(
             Layer.mock(ElectronTheme.ElectronTheme, {}),
             Layer.mock(ElectronWindow.ElectronWindow, {}),
             Layer.mock(MacPermissions.MacPermissions, {}),
+            Layer.mock(ElectronNotification.ElectronNotification, {}),
+            Layer.mock(InfinitusCaptureGesture.InfinitusCaptureGestureService, {}),
+            Layer.mock(InfinitusDeepLinks.InfinitusDeepLinksService, {}),
+            Layer.mock(InfinitusDesktopPrefs.InfinitusDesktopPrefsService, {}),
+            Layer.mock(InfinitusEngineSupervisor.InfinitusEngineSupervisorService, {}),
+            Layer.mock(InfinitusKeepAwake.InfinitusKeepAwakeService, {}),
+            Layer.mock(InfinitusOAuthSignIn.InfinitusOAuthSignInService, {}),
+            Layer.mock(InfinitusSignIn.InfinitusSignInService, {}),
+            Layer.mock(InfinitusSignInRedirect.InfinitusSignInRedirectService, {}),
             Layer.mock(PreviewManager.PreviewManager, {
               isBrowserPartition: () => {
                 throw new Error("unexpected browser partition lookup");

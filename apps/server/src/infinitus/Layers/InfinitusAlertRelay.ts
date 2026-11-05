@@ -4,7 +4,8 @@ import {
   type RelayInfinitusAlertProofPayload,
 } from "@infinitus/contracts/relayInfinitusAlert";
 import { normalizeRelayIssuer, signRelayJwt } from "@infinitus/shared/relayJwt";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
+import * as Signature from "effect/crypto/Signature";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -44,7 +45,8 @@ export const InfinitusAlertRelayLive = Layer.effect(
   Effect.gen(function* () {
     const secrets = yield* ServerSecretStore.ServerSecretStore;
     const serverEnvironment = yield* ServerEnvironment;
-    const crypto = yield* Crypto.Crypto;
+    const random = yield* SecureRandom.SecureRandom;
+    const signature = yield* Signature.Signature;
     const httpClient = yield* HttpClient.HttpClient;
 
     const readSecretString = (name: string) =>
@@ -65,55 +67,56 @@ export const InfinitusAlertRelayLive = Layer.effect(
     });
 
     return InfinitusAlertRelay.of({
-      publish: Effect.fn("InfinitusAlertRelay.publish")(function* (input) {
-        const link = yield* readRelayLink;
-        if (link === null) return yield* new InfinitusAlertRelayUnlinked();
-        const keyPair = yield* getOrCreateEnvironmentKeyPairFromSecretStore(secrets).pipe(
-          Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "key_pair", cause })),
-        );
-        const environmentId = yield* serverEnvironment.getEnvironmentId;
-        const deepLink = input.deepLink ?? INFINITUS_ALERT_DEEP_LINK;
-        const alert = { title: input.title, body: input.body, deepLink };
-        const now = yield* DateTime.now;
-        const jti = yield* crypto
-          .randomUUIDv4()
-          .pipe(
+      publish: Effect.fn("InfinitusAlertRelay.publish")(
+        function* (input) {
+          const link = yield* readRelayLink;
+          if (link === null) return yield* new InfinitusAlertRelayUnlinked();
+          const keyPair = yield* getOrCreateEnvironmentKeyPairFromSecretStore(secrets).pipe(
+            Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "key_pair", cause })),
+          );
+          const environmentId = yield* serverEnvironment.getEnvironmentId;
+          const deepLink = input.deepLink ?? INFINITUS_ALERT_DEEP_LINK;
+          const alert = { title: input.title, body: input.body, deepLink };
+          const now = yield* DateTime.now;
+          const jti = yield* random.uuidV4();
+          const payload = {
+            iss: `t3-env:${environmentId}`,
+            aud: normalizeRelayIssuer(link.issuer),
+            sub: environmentId,
+            jti,
+            iat: Math.floor(now.epochMilliseconds / 1_000),
+            exp: Math.floor(DateTime.add(now, { minutes: 5 }).epochMilliseconds / 1_000),
+            environmentId,
+            alert,
+          } satisfies RelayInfinitusAlertProofPayload;
+          const proof = yield* signRelayJwt({
+            privateKey: keyPair.privateKey,
+            typ: RELAY_INFINITUS_ALERT_TYP,
+            payload,
+          }).pipe(
             Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "sign", cause })),
           );
-        const payload = {
-          iss: `t3-env:${environmentId}`,
-          aud: normalizeRelayIssuer(link.issuer),
-          sub: environmentId,
-          jti,
-          iat: Math.floor(now.epochMilliseconds / 1_000),
-          exp: Math.floor(DateTime.add(now, { minutes: 5 }).epochMilliseconds / 1_000),
-          environmentId,
-          alert,
-        } satisfies RelayInfinitusAlertProofPayload;
-        const proof = yield* signRelayJwt({
-          privateKey: keyPair.privateKey,
-          typ: RELAY_INFINITUS_ALERT_TYP,
-          payload,
-        }).pipe(
-          Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "sign", cause })),
-        );
-        const client = yield* HttpApiClient.make(RelayApi, {
-          baseUrl: link.url,
-          transformClient: HttpClient.mapRequest(
-            HttpClientRequest.setHeader("authorization", `Bearer ${link.credential}`),
-          ),
-        }).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
-        const response = yield* client.infinitusAlert
-          .publishInfinitusAlert({ params: { environmentId }, payload: { alert, proof } })
-          .pipe(
-            Effect.mapError((cause) => new InfinitusAlertRelayFailed({ stage: "publish", cause })),
-          );
-        yield* Effect.logInfo("infinitus.alert.published", {
-          deliveries: response.deliveries.length,
-          ok: response.ok,
-        });
-        return { deliveries: response.deliveries.length };
-      }),
+          const client = yield* HttpApiClient.make(RelayApi, {
+            baseUrl: link.url,
+            transformClient: HttpClient.mapRequest(
+              HttpClientRequest.setHeader("authorization", `Bearer ${link.credential}`),
+            ),
+          }).pipe(Effect.provideService(HttpClient.HttpClient, httpClient));
+          const response = yield* client.infinitusAlert
+            .publishInfinitusAlert({ params: { environmentId }, payload: { alert, proof } })
+            .pipe(
+              Effect.mapError(
+                (cause) => new InfinitusAlertRelayFailed({ stage: "publish", cause }),
+              ),
+            );
+          yield* Effect.logInfo("infinitus.alert.published", {
+            deliveries: response.deliveries.length,
+            ok: response.ok,
+          });
+          return { deliveries: response.deliveries.length };
+        },
+        Effect.provideService(Signature.Signature, signature),
+      ),
     });
   }),
 );
