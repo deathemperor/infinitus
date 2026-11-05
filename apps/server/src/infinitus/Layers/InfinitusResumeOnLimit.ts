@@ -399,6 +399,15 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
             runId: stop.runId,
           });
         }
+        // A notification leaves a snooze standing, and a thread snoozed until the reset is back to work.
+        if (shell.snoozedUntil != null) {
+          yield* orchestrator.dispatch({
+            type: "thread.unsnooze",
+            commandId: CommandId.make(`limit-resume-unsnooze:${stop.runId}:${resumedAt}`),
+            threadId: stop.threadId,
+            reason: "user",
+          });
+        }
         yield* orchestrator.dispatch({
           type: "message.dispatch",
           commandId: CommandId.make(`limit-resume:${stop.runId}:${resumedAt}`),
@@ -407,9 +416,15 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           // The orchestrator only continues the latest executed run; a wake over it is not one.
           ...(shell.latestRunId === stop.runId ? { manualContinuationOfRunId: stop.runId } : {}),
           text: CONTINUATION_PROMPT,
+          notification: {
+            source: { kind: "system" },
+            outcome: "updated",
+            summary: `Resumed on ${target.account} after a usage limit`,
+            detail: CONTINUATION_PROMPT,
+          },
           attachments: [],
           dispatchMode: { type: "start_immediately" },
-          createdBy: "user",
+          createdBy: "agent",
           creationSource: "server",
         });
         yield* Effect.logInfo("infinitus.resume-on-limit.resumed", {
