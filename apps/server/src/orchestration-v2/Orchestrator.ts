@@ -5795,7 +5795,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         (command.creationSource !== "server" && command.creationSource !== "provider") ||
         (dispatchMode.type !== "queue_after_active" &&
           !(
-            command.restartContinuationOfRunId !== undefined &&
+            (command.restartContinuationOfRunId !== undefined ||
+              (command.creationSource === "server" &&
+                command.notification.source.kind === "system")) &&
             dispatchMode.type === "start_immediately"
           )))
     ) {

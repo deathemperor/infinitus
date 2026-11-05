@@ -16,6 +16,7 @@ import type {
 import { it as effectIt } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
@@ -213,6 +214,8 @@ const makeHarness = (input: {
                   threadId: command.threadId,
                   source: command.manualContinuationOfRunId,
                   text: command.text,
+                  createdBy: command.createdBy,
+                  summary: command.notification?.summary,
                 }
               : command.type === "run.interrupt"
                 ? { type: command.type, threadId: command.threadId, runId: command.runId }
@@ -258,6 +261,8 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
             threadId: one,
             source: runOne,
             text: "Continue where you left off.",
+            createdBy: "agent",
+            summary: "Resumed on loctruongh after a usage limit",
           },
         ]);
         // The continuation's own run moves the thread on without a second stop.
@@ -293,6 +298,36 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
         ),
       );
       expect(yield* h.commands).toEqual([{ type: "run.interrupt", threadId: one, runId: runOne }]);
+    }),
+  );
+
+  effectIt.effect("a thread snoozed until the limit resets wakes when it resumes", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({
+        shells: [shell(one)],
+        snapshot: fleet(
+          account("hiep1", {
+            active: true,
+            usage: { sevenDay: { pct: 100, resetsAt: HIEP1_WEEKLY } },
+          }),
+        ),
+      });
+      yield* h.refuse(refusal(one, runOne));
+      yield* h.setShell(
+        shell(one, {
+          status: "failed",
+          activeRunId: null,
+          lastErrorClass: "usage_limit",
+          usageLimitResetAt: HIEP1_WEEKLY,
+          snoozedUntil: DateTime.makeUnsafe(HIEP1_WEEKLY),
+        }),
+      );
+      yield* h.emit(runUpdated(one, runOne, "failed"));
+      yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
+      expect((yield* h.commands).map((command) => command.type)).toEqual([
+        "thread.unsnooze",
+        "message.dispatch",
+      ]);
     }),
   );
 
@@ -335,6 +370,8 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           threadId: one,
           source: runOne,
           text: "Continue where you left off.",
+          createdBy: "agent",
+          summary: "Resumed on hiep2 after a usage limit",
         },
       ]);
       expect(yield* h.stopped).toEqual([]);
@@ -385,6 +422,8 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
             threadId: one,
             source: undefined,
             text: "Continue where you left off.",
+            createdBy: "agent",
+            summary: "Resumed on hiep2 after a usage limit",
           },
         ]);
       }),
@@ -426,6 +465,8 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           threadId: one,
           source: runTwo,
           text: "Continue where you left off.",
+          createdBy: "agent",
+          summary: "Resumed on hiep2 after a usage limit",
         },
       ]);
     }),
@@ -588,6 +629,8 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           threadId: one,
           source: runOne,
           text: "Continue where you left off.",
+          createdBy: "agent",
+          summary: "Resumed on hiep2 after a usage limit",
         },
       ]);
     }),

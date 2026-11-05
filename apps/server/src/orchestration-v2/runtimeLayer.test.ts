@@ -7834,6 +7834,89 @@ it.layer(layerSharedApplicationDataPlaneTest)("shared application data plane", (
 });
 
 it.layer(layerTest)("usage-limit recovery", (it) => {
+  it.effect("a server's system notification starts at once as a notification row", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const events = yield* EventSink.EventSinkV2;
+      const threadId = ThreadId.make("limit-resume-row");
+      const projectId = ProjectId.make("limit-resume-row:project");
+      const now = yield* DateTime.now;
+      yield* seedProject({
+        projectId,
+        title: "Resume project",
+        workspaceRoot: process.cwd(),
+        defaultModelSelection: modelSelection,
+        createdAt: DateTime.formatIso(now),
+      });
+      yield* orchestrator.dispatch({
+        type: "thread.create",
+        commandId: CommandId.make("limit-resume-row:create"),
+        threadId,
+        projectId,
+        title: "Limited thread",
+        modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdBy: "user",
+        creationSource: "web",
+      });
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        commandId: CommandId.make("limit-resume-row:start"),
+        threadId,
+        messageId: MessageId.make("limit-resume-row:start"),
+        text: "Start work.",
+        attachments: [],
+        dispatchMode: { type: "defer_start" },
+        createdBy: "user",
+        creationSource: "web",
+      });
+      const [source] = (yield* orchestrator.getThreadProjection(threadId)).runs as [
+        OrchestrationV2Run,
+      ];
+      yield* events.write({
+        events: [
+          {
+            id: EventId.make("limit-resume-row:stop"),
+            type: "run.updated",
+            threadId,
+            occurredAt: now,
+            payload: { ...source, status: "interrupted", completedAt: now },
+          },
+        ],
+      });
+      const resume = (suffix: string, kind: "system" | "monitor") => ({
+        type: "message.dispatch" as const,
+        commandId: CommandId.make(`limit-resume-row:${suffix}`),
+        threadId,
+        messageId: MessageId.make(`limit-resume-row:${suffix}`),
+        text: "Continue where you left off.",
+        notification: {
+          source: { kind },
+          outcome: "updated" as const,
+          summary: "Resumed on hiep2 after a usage limit",
+        },
+        attachments: [],
+        dispatchMode: { type: "start_immediately" as const },
+        createdBy: "agent" as const,
+        creationSource: "server" as const,
+      });
+      assert.equal(
+        (yield* orchestrator.dispatch(resume("monitor", "monitor")).pipe(Effect.exit))._tag,
+        "Failure",
+      );
+      yield* orchestrator.dispatch(resume("system", "system"));
+      const after = yield* orchestrator.getThreadProjection(threadId);
+      assert.equal(after.runs[1]?.status, "starting");
+      assert.deepEqual(
+        after.turnItems.filter((item) => item.runId === after.runs[1]?.id).map((item) => item.type),
+        ["notification"],
+      );
+    }),
+  );
+
   it.effect.each(["interrupted", "usage_limit"] as const)(
     "manually resumes an %s run ahead of its queued message only once",
     (reason) =>

@@ -328,6 +328,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `packages/client-runtime/src/relay/errorPresentation.ts` (+
   `connection/errors.test.ts`) follow the same rule.
 - Resume-on-limit (#648, #1486, #1107, #1627; `docs/internals/resume-on-limit.md`):
+  `orchestration-v2/Orchestrator.ts` — `message.dispatch` lets a server-created
+  `system` notification start immediately, not only a restart continuation;
   `orchestration-v2/Adapters/ClaudeAdapterV2.ts` — `ClaudeUsageLimitRefusal`
   and the `onUsageLimitRefusal` option (called on a rejected
   `rate_limit_event` with an active turn, through `createClaudeAdapterV2`'s
