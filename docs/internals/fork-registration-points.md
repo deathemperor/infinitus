@@ -281,8 +281,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (queued turns, babysit, side questions, groups, session status reason, turn
   usage, message context, title state, PR files viewed, auto-settle; their
   features left with #1627, but existing fork databases recorded them, so
-  they are schema history, not live code) and upstream's `055`–`077`
-  (OrchestrationV2 onward) are renumbered `065`–`087` on every sync
+  they are schema history, not live code) and upstream's `055`–`079`
+  (OrchestrationV2 onward) are renumbered `065`–`089` on every sync
   (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
   legacy/V2 boundary ids are the fork's, as are the `toMigrationInclusive` ids in
@@ -687,7 +687,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `appleTeamId` per variant), selected with `APP_VARIANT=infinitus`; its
   `universalLinkHost` (`infinitus.run`, #724) adds `applinks:infinitus.run`
   to the iOS associated domains and an `autoVerify` intent filter for
-  `https://infinitus.run/join` (#1313) on Android (the site serves the AASA
+  `https://infinitus.run/join` (#1313) on Android, appended to upstream's own
+  `android.intentFilters` array (a second `intentFilters` key would silently
+  replace upstream's) (the site serves the AASA
   `applinks` for `Q783W6B4FA.run.infinitus.mobile` and `assetlinks.json`);
   `extra.productVersion` is the root `VERSION` (#823 layer 3), which
   `SettingsAboutRouteScreen` shows in place of the store version.
@@ -897,7 +899,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   branch that touches `.github/workflows` (#658); without it such a sync
   is done by hand.
 - Upstream's deploy and publish workflows — disabled in the repository's Actions settings, never deleted; `deploy-relay.yml` is the one enabled (#1322). Rules and traps: `docs/internals/release-and-updates.md`.
-- `infra/relay/migrations/postgres/<newest upstream migration>/snapshot.json` — rewritten after each sync that brings a relay migration so the snapshot chain has one head that includes the fork's Team tables (today `20261005232034_managed_endpoint_tunnel_released_at`). Procedure: `docs/internals/release-and-updates.md`.
+- `infra/relay/migrations/postgres/20261005232034_managed_endpoint_tunnel_released_at/snapshot.json` — its `prevIds` also names the fork's Team snapshot, so the chain has one head that includes the Team tables. Procedure: `docs/internals/release-and-updates.md`.
 - `apps/server/src/vcs/GitVcsDriverCore.test.ts` — the "keeps complete stats for files beyond the combined patch limit" fixture rewrites `a-large.txt` to a different byte length (#1517): upstream's same-size rewrite in the same second as its commit intermittently read as unchanged through the index stat cache and dropped the file from the working-tree stats on CI.
 - `apps/server/src/project/AgentSessionScanner.ts` — the base and worktrees dirs are also compared by their realpath (#1661): the candidate was realpath'd but the roots were not, so a T3 home behind a symlink (macOS temp dirs, a linked home) let its own sandboxes into the import list.
 - `apps/server/src/cli/invocation.test.ts` — the "manual server installation ownership" prefix fixtures realpath their temp root (#1661): the resolver reports the realpath'd prefix, which on macOS is `/private/var/…`, not `/var/…`.
