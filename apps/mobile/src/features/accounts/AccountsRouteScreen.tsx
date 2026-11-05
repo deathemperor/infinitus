@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Linking, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/ui/AndroidScreenHeader";
+import { AppBar } from "../../components/ui/AppBar";
 import { AppText as Text } from "../../components/ui/AppText";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ErrorBanner } from "../../components/ui/ErrorBanner";
@@ -44,7 +44,7 @@ export function AccountsRouteScreen() {
       {Platform.OS === "android" ? (
         <>
           <NativeStackScreenOptions options={{ headerShown: false }} />
-          <AndroidScreenHeader title="Accounts" onBack={() => navigation.goBack()} />
+          <AppBar embedded title="Accounts" onBack={() => navigation.goBack()} />
         </>
       ) : null}
       <ScrollView

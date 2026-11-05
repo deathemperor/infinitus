@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/ui/AndroidScreenHeader";
+import { AppBar } from "../../components/ui/AppBar";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/ui/AppText";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ErrorBanner } from "../../components/ui/ErrorBanner";
@@ -48,7 +48,7 @@ export function TeamRouteScreen({ route }: StaticScreenProps<TeamRouteParams | u
       {Platform.OS === "android" ? (
         <>
           <NativeStackScreenOptions options={{ headerShown: false }} />
-          <AndroidScreenHeader title="Team" onBack={() => navigation.goBack()} />
+          <AppBar embedded title="Team" onBack={() => navigation.goBack()} />
         </>
       ) : null}
       <ScrollView
