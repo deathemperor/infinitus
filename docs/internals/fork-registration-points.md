@@ -377,6 +377,13 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   symbols only the fork's surfaces use (`alarm`, `checkmark.shield`,
   `pencil.tip`, `person.3`, `push_pin`); upstream's
   `AppSymbolName` admits no symbol without one.
+- `apps/mobile/src/features/usage/UsageRouteScreen.tsx` — the second tab is
+  labelled Accounts and renders `features/accounts/InfinitusAccounts.tsx`
+  (filtered by the screen's environment picker) instead of upstream's pooled
+  limits, which show one account per provider. The tab value stays `limits`
+  (the widget's deep link); upstream's limits refresh, pull-to-refresh and
+  `CursorEnableLimits` are gone, so a sync keeps ours on those hunks. The
+  Usage tab keeps its own Cursor enable row.
 - `apps/mobile/src/features/connection/ConnectionEnvironmentRow.tsx` — the
   `roamingHostsLine` under a saved environment's host (#663).
 - `apps/mobile/src/features/connection/EnvironmentConnectionNotice.tsx` and

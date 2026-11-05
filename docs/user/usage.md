@@ -88,6 +88,8 @@ or Claude accounts across your enabled environments and hubs you read one number
 list. Each window card shows how much of the pool is left and a bar with one segment per account,
 kept in the same column across windows. Accounts are ordered by their next 5-hour refill, soonest
 first. For an account with no weekly quota left, this is when its session becomes usable again.
+On the phone, the second tab is **Usage → Accounts** instead: every account on each Infinitus Mac,
+as on the [Accounts](accounts.md) page.
 The first available window is used when no account reports a 5-hour limit. A gap means the
 account does not report that window. When the provider reports reset times, the card also says
 when the next reset lands and how much it hands back. The hatched
@@ -144,7 +146,7 @@ windows, banked resets and actions. There is no separate hub list under Settings
 ## Subscription usage widget
 
 Add **Subscription usage** from your iOS or Android widget gallery to see remaining Codex and
-Claude quotas. Tap it to open **Usage → Limits**; on Android this works while Infinitus is running in
+Claude quotas. Tap it to open **Usage → Accounts**; on Android this works while Infinitus is running in
 the background, otherwise open the app from the launcher. On iOS, use **Edit Widget** to choose
 Session, Weekly, or both for each provider. Reopen Infinitus to refresh expired readings.
 
