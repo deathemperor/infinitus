@@ -30,6 +30,7 @@ import { Route as ChatUsageRouteImport } from './routes/_chat.usage'
 import { Route as ChatSettingsRouteImport } from './routes/_chat.settings'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as ChatNewRouteImport } from './routes/_chat.new'
+import { Route as ThreadsEnvironmentIdThreadIdRouteImport } from './routes/threads.$environmentId.$threadId'
 import { Route as SettingsInfinitusSplatRouteImport } from './routes/settings.infinitus.$'
 import { Route as SettingsEnginesActivityRouteImport } from './routes/settings.engines_.activity'
 import { Route as ChatSettingsWorktreesRouteImport } from './routes/_chat.settings.worktrees'
@@ -165,6 +166,12 @@ const ChatNewRoute = ChatNewRouteImport.update({
   path: '/new',
   getParentRoute: () => ChatRoute,
 } as any)
+const ThreadsEnvironmentIdThreadIdRoute =
+  ThreadsEnvironmentIdThreadIdRouteImport.update({
+    id: '/threads/$environmentId/$threadId',
+    path: '/threads/$environmentId/$threadId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SettingsInfinitusSplatRoute = SettingsInfinitusSplatRouteImport.update({
   id: '/settings/infinitus/$',
   path: '/settings/infinitus/$',
@@ -372,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/settings/worktrees': typeof ChatSettingsWorktreesRoute
   '/settings/engines/activity': typeof SettingsEnginesActivityRoute
   '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
+  '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
 }
 export interface FileRoutesByTo {
   '/accounts': typeof AccountsRoute
@@ -424,6 +432,7 @@ export interface FileRoutesByTo {
   '/settings/worktrees': typeof ChatSettingsWorktreesRoute
   '/settings/engines/activity': typeof SettingsEnginesActivityRoute
   '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
+  '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -478,6 +487,7 @@ export interface FileRoutesById {
   '/_chat/settings/worktrees': typeof ChatSettingsWorktreesRoute
   '/settings/engines_/activity': typeof SettingsEnginesActivityRoute
   '/settings/infinitus/$': typeof SettingsInfinitusSplatRoute
+  '/threads/$environmentId/$threadId': typeof ThreadsEnvironmentIdThreadIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -532,6 +542,7 @@ export interface FileRouteTypes {
     | '/settings/worktrees'
     | '/settings/engines/activity'
     | '/settings/infinitus/$'
+    | '/threads/$environmentId/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/accounts'
@@ -584,6 +595,7 @@ export interface FileRouteTypes {
     | '/settings/worktrees'
     | '/settings/engines/activity'
     | '/settings/infinitus/$'
+    | '/threads/$environmentId/$threadId'
   id:
     | '__root__'
     | '/_chat'
@@ -637,6 +649,7 @@ export interface FileRouteTypes {
     | '/_chat/settings/worktrees'
     | '/settings/engines_/activity'
     | '/settings/infinitus/$'
+    | '/threads/$environmentId/$threadId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -658,6 +671,7 @@ export interface RootRouteChildren {
   SettingsTeamRoute: typeof SettingsTeamRoute
   SettingsEnginesActivityRoute: typeof SettingsEnginesActivityRoute
   SettingsInfinitusSplatRoute: typeof SettingsInfinitusSplatRoute
+  ThreadsEnvironmentIdThreadIdRoute: typeof ThreadsEnvironmentIdThreadIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -808,6 +822,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/new'
       preLoaderRoute: typeof ChatNewRouteImport
       parentRoute: typeof ChatRoute
+    }
+    '/threads/$environmentId/$threadId': {
+      id: '/threads/$environmentId/$threadId'
+      path: '/threads/$environmentId/$threadId'
+      fullPath: '/threads/$environmentId/$threadId'
+      preLoaderRoute: typeof ThreadsEnvironmentIdThreadIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/settings/infinitus/$': {
       id: '/settings/infinitus/$'
@@ -1125,6 +1146,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsTeamRoute: SettingsTeamRoute,
   SettingsEnginesActivityRoute: SettingsEnginesActivityRoute,
   SettingsInfinitusSplatRoute: SettingsInfinitusSplatRoute,
+  ThreadsEnvironmentIdThreadIdRoute: ThreadsEnvironmentIdThreadIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

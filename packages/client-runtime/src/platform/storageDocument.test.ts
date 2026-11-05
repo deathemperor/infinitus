@@ -216,8 +216,9 @@ describe("ConnectionCatalogDocument", () => {
       profiles: [BEARER_PROFILE],
     };
     const restored = Schema.decodeSync(schema)(Schema.encodeSync(schema)(before));
-    expect(restored.profiles[0]).toEqual(BEARER_PROFILE);
-    expect("alternateHttpBaseUrls" in (restored.profiles[0] ?? {})).toBe(false);
+    const [profile] = restored.profiles;
+    expect(profile).toEqual(BEARER_PROFILE);
+    expect(profile !== undefined && "alternateHttpBaseUrls" in profile).toBe(false);
   });
 
   it("replaces obsolete connection metadata without discarding a reusable DPoP token", () => {

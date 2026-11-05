@@ -61,7 +61,7 @@ export const publishOptedIn = (value: string | undefined): boolean =>
 export const HELD_REPLY_PREFIX = "held by environment ";
 
 const decodeManifest = Schema.decodeUnknownEffect(InfinitusManifest);
-type Manifest = typeof InfinitusManifest.Type;
+type Manifest = InfinitusManifest;
 
 const decodePrefs = Schema.decodeUnknownEffect(InfinitusPrefs);
 
@@ -76,7 +76,7 @@ const HEARTBEAT_INTERVAL = Duration.seconds(60);
  * port (#1137). A missing pref or a non-port value answers undefined: a false positive would
  * republish every minute, and each publish rotates the `infinitusctl` credential.
  */
-export const publishedPort = (prefs: typeof InfinitusPrefs.Type): number | undefined => {
+export const publishedPort = (prefs: InfinitusPrefs): number | undefined => {
   const pref = prefs.prefs.find((entry) => entry.key === PORT_PREF);
   if (pref === undefined) return undefined;
   if (typeof pref.value === "number") return pref.value;

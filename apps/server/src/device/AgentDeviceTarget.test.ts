@@ -5,7 +5,9 @@ import { describe, expect, it } from "@effect/vitest";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeNet from "node:net";
 import * as NodeUtil from "node:util";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Layer from "effect/Layer";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -83,7 +85,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
             }),
           ).rejects.toMatchObject({ code: 23, stdout: `${JSON.stringify(args)}\n`, stderr: "" }),
         );
-      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+      }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
   it.effect("binds one device's flags into its launcher and leaves help alone", () =>
@@ -174,7 +176,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
       Effect.scoped,
       Effect.provideService(HostProcess.IsExecutable, false),
       Effect.provideService(HostProcess.ExecutablePath, process.execPath),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),
   );
 
@@ -249,7 +251,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
       Effect.scoped,
       Effect.provideService(HostProcess.IsExecutable, false),
       Effect.provideService(HostProcess.ExecutablePath, process.execPath),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),
   );
 
@@ -339,7 +341,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
       Effect.scoped,
       Effect.provideService(HostProcess.IsExecutable, false),
       Effect.provideService(HostProcess.ExecutablePath, process.execPath),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),
   );
 
@@ -364,7 +366,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
       Effect.scoped,
       Effect.provideService(HostProcess.IsExecutable, false),
       Effect.provideService(HostProcess.ExecutablePath, process.execPath),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),
   );
 
@@ -394,7 +396,7 @@ exec '${process.execPath.replaceAll("'", "'\"'\"'")}' "$@"
       }).pipe(
         Effect.scoped,
         Effect.provideService(HostProcess.IsExecutable, false),
-        Effect.provide(NodeServices.layer),
+        Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
       ),
   );
 
@@ -475,7 +477,7 @@ if (process.env.AGENT_DEVICE_DAEMON_BASE_URL) process.exit(2);`,
       Effect.scoped,
       Effect.provideService(HostProcess.IsExecutable, true),
       Effect.provideService(HostProcess.ExecutablePath, "/packaged/t3"),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),
   );
 });

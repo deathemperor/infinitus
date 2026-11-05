@@ -10,14 +10,14 @@ import {
   type PairingApprovalPollResult,
   type PairingApprovalRequest,
 } from "@infinitus/contracts/infinitusPairing";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
-// @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no constant-time compare or sha256 digest.
+// @effect-diagnostics-next-line nodeBuiltinImport:off -- the secret hash is synchronous; Effect's Digest is a service.
 import * as NodeCrypto from "node:crypto";
 
 import * as EnvironmentAuth from "../../auth/EnvironmentAuth.ts";
@@ -59,7 +59,7 @@ const isPending = (entry: Entry, now: DateTime.Utc) =>
   entry.decision.state === "pending" && isLive(entry, now);
 
 const makeInfinitusPairing = Effect.gen(function* () {
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
   const auth = yield* EnvironmentAuth.EnvironmentAuth;
   // Expiry timers outlive the request that armed them, so they run in the
   // layer's scope.
@@ -69,7 +69,7 @@ const makeInfinitusPairing = Effect.gen(function* () {
   const matchCode = Effect.gen(function* () {
     let code = "";
     while (code.length < MATCH_CODE_LENGTH) {
-      const bytes = yield* crypto.randomBytes(MATCH_CODE_LENGTH * 2).pipe(Effect.orDie);
+      const bytes = yield* random.randomBytes(MATCH_CODE_LENGTH * 2);
       for (const byte of bytes) {
         if (byte >= MATCH_CODE_REJECTION_LIMIT || code.length === MATCH_CODE_LENGTH) continue;
         code += MATCH_CODE_ALPHABET[byte % MATCH_CODE_ALPHABET.length];
@@ -113,7 +113,7 @@ const makeInfinitusPairing = Effect.gen(function* () {
       ) {
         return yield* new PairingApprovalRefused({ reason: "too_many_from_address" });
       }
-      const id = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+      const id = yield* random.uuidV4();
       const entry: Entry = {
         id,
         deviceName: input.deviceName,

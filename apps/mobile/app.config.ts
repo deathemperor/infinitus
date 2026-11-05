@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Expo evaluates this config in plain Node; it reads the root VERSION file.
 import type { ExpoConfig } from "expo/config";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
@@ -12,6 +13,8 @@ type AppVariant = "development" | "preview" | "production" | "infinitus";
 
 const repoEnv = loadRepoEnv();
 Object.assign(process.env, repoEnv);
+// Expo's TypeScript setup otherwise installs `typescript` on every start; we typecheck with tsrs.
+process.env.EXPO_NO_TYPESCRIPT_SETUP = "1";
 
 const APP_VARIANT = resolveAppVariant(repoEnv.APP_VARIANT);
 const isIosPersonalTeamBuild = repoEnv.T3CODE_IOS_PERSONAL_TEAM === "1";
@@ -168,6 +171,8 @@ function resolveAppVariant(value: string | undefined): AppVariant {
 }
 
 const variant = VARIANT_CONFIG[APP_VARIANT];
+// Copied thread links open the app. app.t3.codes/.well-known lists every variant's identifiers.
+const HOSTED_APP_HOST = "app.t3.codes";
 const iosBundleIdentifier = isIosPersonalTeamBuild
   ? personalTeamBundleIdentifier!
   : variant.iosBundleIdentifier;
@@ -309,6 +314,7 @@ const config: ExpoConfig = {
     associatedDomains: [
       `applinks:${variant.relyingParty}`,
       `webcredentials:${variant.relyingParty}`,
+      `applinks:${HOSTED_APP_HOST}`,
       ...("universalLinkHost" in variant ? [`applinks:${variant.universalLinkHost}`] : []),
     ],
     entitlements: {
@@ -357,22 +363,28 @@ const config: ExpoConfig = {
     },
     // JS back dispatch needs RN's Android 16 shim and withAndroidPredictiveBackCompat on Android 13-15.
     predictiveBackGestureEnabled: true,
-    ...("universalLinkHost" in variant
-      ? {
-          // Fork (#1313): a team invite, infinitus.run/join#<code>, opens the
-          // app; verified against `/.well-known/assetlinks.json` on that host.
-          intentFilters: [
+    // expo-sensors declares this for its pedometer, which the app does not use.
+    blockedPermissions: ["android.permission.ACTIVITY_RECOGNITION"],
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [{ scheme: "https", host: HOSTED_APP_HOST, pathPrefix: "/threads/" }],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+      ...("universalLinkHost" in variant
+        ? [
+            // Fork (#1313): a team invite, infinitus.run/join#<code>, opens the
+            // app; verified against `/.well-known/assetlinks.json` on that host.
             {
               action: "VIEW",
               autoVerify: true,
               data: [{ scheme: "https", host: variant.universalLinkHost, pathPrefix: "/join" }],
               category: ["BROWSABLE", "DEFAULT"],
             },
-          ],
-        }
-      : {}),
-    // expo-sensors declares this for its pedometer, which the app does not use.
-    blockedPermissions: ["android.permission.ACTIVITY_RECOGNITION"],
+          ]
+        : []),
+    ],
   },
   web: {
     favicon: variant.assets.appIcon,
@@ -438,7 +450,7 @@ const config: ExpoConfig = {
       "expo-audio",
       {
         microphonePermission: `Allow ${variant.appName} to use your microphone for voice input.`,
-        recordAudioAndroid: false,
+        recordAudioAndroid: true,
         enableBackgroundPlayback: false,
         enableBackgroundRecording: false,
       },
@@ -452,7 +464,14 @@ const config: ExpoConfig = {
         recordAudioAndroid: false,
       },
     ],
-    ["expo-image-picker", { photosPermission: false, microphonePermission: false }],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: false,
+        // `false` makes this plugin add RECORD_AUDIO to blockedPermissions, breaking Android dictation.
+        microphonePermission: `Allow ${variant.appName} to use your microphone for voice input.`,
+      },
+    ],
     [
       "expo-splash-screen",
       {

@@ -1,3 +1,4 @@
+import * as NodeCryptoLayer from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -61,7 +62,7 @@ function harness() {
     Layer.provide(
       Layer.mergeAll(InMemory.layer(state), TranscriptStore.inMemoryLayer(objects), links),
     ),
-    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCryptoLayer.layer)),
   );
   return { state, objects, layer };
 }

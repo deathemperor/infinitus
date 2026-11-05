@@ -89,6 +89,8 @@ import Migration0084 from "./Migrations/084_ExcludeAttachmentPlaceholdersFromSea
 import Migration0085 from "./Migrations/085_SubagentDeliveryState.ts";
 import Migration0086 from "./Migrations/086_ProjectionProjectsPinArchive.ts";
 import Migration0087 from "./Migrations/087_RepairBooleanSettledOverride.ts";
+import Migration0088 from "./Migrations/088_DropOrchestrationEventCorrelationIndex.ts";
+import Migration0089 from "./Migrations/089_DelegatedRecoveryIndexes.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -184,6 +186,9 @@ const migrationEntries = [
   [85, "SubagentDeliveryState", Migration0085],
   [86, "ProjectionProjectsPinArchive", Migration0086],
   [87, "RepairBooleanSettledOverride", Migration0087],
+  // Upstream's 78-79, renumbered after the fork's 87.
+  [88, "DropOrchestrationEventCorrelationIndex", Migration0088],
+  [89, "DelegatedRecoveryIndexes", Migration0089],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

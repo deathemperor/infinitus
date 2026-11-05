@@ -1,4 +1,5 @@
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   AuthStandardClientScopes,
@@ -38,7 +39,7 @@ const authLayer = Layer.mock(EnvironmentAuth.EnvironmentAuth)({
 
 const pairingLayer = InfinitusPairingLive.pipe(
   Layer.provide(authLayer),
-  Layer.provide(NodeServices.layer),
+  Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
 );
 
 /** The api's other groups carry this middleware; the two pairing routes do

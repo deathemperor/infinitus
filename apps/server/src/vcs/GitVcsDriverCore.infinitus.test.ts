@@ -1,6 +1,7 @@
 // The fork's worktree cleanup and seeding cases (#270 A), beside upstream's
 // `GitVcsDriverCore.test.ts`; the fixtures are copies of that file's. Rules
 // and traps: `docs/internals/worktree-cleanup.md`.
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -19,7 +20,7 @@ const layerServerConfig = ServerConfig.layerTest(process.cwd(), {
 });
 const layerTest = GitVcsDriver.layer.pipe(
   Layer.provide(layerServerConfig),
-  Layer.provideMerge(NodeServices.layer),
+  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
 );
 
 const makeTmpDir = (

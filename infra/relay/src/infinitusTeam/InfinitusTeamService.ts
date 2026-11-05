@@ -26,7 +26,8 @@ import {
 } from "@infinitus/contracts/relayInfinitusTeam";
 import type { EnvironmentId } from "@infinitus/contracts";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
@@ -277,7 +278,8 @@ export const make = Effect.gen(function* () {
   const store = yield* InfinitusTeamStore;
   const transcripts = yield* InfinitusTeamTranscriptStore;
   const links = yield* EnvironmentLinks.EnvironmentLinks;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
+  const digest = yield* Digest.Digest;
 
   const nowIso = DateTime.now.pipe(Effect.map(DateTime.formatIso));
   const plusSeconds = (iso: string, seconds: number) =>
@@ -286,11 +288,11 @@ export const make = Effect.gen(function* () {
         ? DateTime.subtract(DateTime.makeUnsafe(iso), { seconds: -seconds })
         : DateTime.add(DateTime.makeUnsafe(iso), { seconds }),
     );
-  const uuid = crypto.randomUUIDv4().pipe(Effect.orDie);
+  const uuid = random.uuidV4();
   const hashToken = (token: string) =>
-    crypto
-      .digest("SHA-256", new TextEncoder().encode(token))
-      .pipe(Effect.map(Base64Url.encode), Effect.orDie);
+    digest
+      .digest(Digest.sha256, new TextEncoder().encode(token))
+      .pipe(Effect.map(Base64Url.encode));
 
   const requireTeam = (teamId: string) =>
     store.getTeam(teamId).pipe(
@@ -539,7 +541,7 @@ export const make = Effect.gen(function* () {
       const team = yield* requireTeam(input.teamId);
       if (team.policyRequests === "off") return yield* refuse("This team is not taking requests.");
       const now = yield* nowIso;
-      const token = Base64Url.encode(yield* crypto.randomBytes(32).pipe(Effect.orDie));
+      const token = Base64Url.encode(yield* random.randomBytes(32));
       const inviteId = yield* uuid;
       const expiresAt = plusSeconds(now, input.days * 86_400);
       yield* store.createInvite({

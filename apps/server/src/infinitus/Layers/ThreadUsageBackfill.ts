@@ -1,7 +1,7 @@
 import { CommandId, ThreadId, ThreadUsageRollup } from "@infinitus/contracts";
 import { makeDrainableWorker } from "@infinitus/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -126,7 +126,7 @@ export const ThreadUsageBackfillLive = Layer.effectDiscard(
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const usageService = yield* UsageService;
     const sql = yield* SqlClient.SqlClient;
-    const crypto = yield* Crypto.Crypto;
+    const random = yield* SecureRandom.SecureRandom;
     const bootAt = DateTime.formatIso(yield* DateTime.now);
     const attempted = new Set<ThreadId>();
 
@@ -151,7 +151,7 @@ export const ThreadUsageBackfillLive = Layer.effectDiscard(
       for (const candidate of fresh) {
         const usageBaseline = baselineForCandidate(candidate, sessions, bootAt);
         if (usageBaseline === undefined) continue;
-        const uuid = yield* crypto.randomUUIDv4();
+        const uuid = yield* random.uuidV4();
         yield* orchestrator
           .dispatch({
             type: "thread.metadata.update",

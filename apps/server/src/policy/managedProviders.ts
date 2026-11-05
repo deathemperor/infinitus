@@ -19,6 +19,7 @@ import { acpRegistryClient } from "@infinitus/provider-acp-registry/client";
 import { cursorClient } from "@infinitus/provider-cursor/client";
 import { fxClient } from "@infinitus/provider-fx/client";
 import { grokClient } from "@infinitus/provider-grok/client";
+import { kiroClient } from "@infinitus/provider-kiro/client";
 import { museClient } from "@infinitus/provider-muse/client";
 import { openCodeClient } from "@infinitus/provider-opencode/client";
 import { piClient } from "@infinitus/provider-pi/client";
@@ -45,6 +46,7 @@ const PACKAGED_CLIENTS: ReadonlyArray<ProviderClientDefinition> = [
   cursorClient,
   grokClient,
   fxClient,
+  kiroClient,
   museClient,
   openCodeClient,
   piClient,
@@ -74,6 +76,10 @@ const KNOWN_DRIVERS: ReadonlyMap<ProviderDriverKind, KnownDriver> = new Map([
     known(client.driverKind, client.label, client.settingsSchema, client.hasDefaultInstance),
   ),
 ]);
+
+/** Each driver a policy may name, with the label users see. */
+export const knownDriverLabels = () =>
+  Array.from(KNOWN_DRIVERS, ([driver, { label }]) => ({ driver, label }));
 
 const PINNED_CONFIG_FIELDS = ["binaryPath", "launchArgs"] as const;
 type PinnedConfigField = (typeof PINNED_CONFIG_FIELDS)[number];

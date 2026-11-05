@@ -12,6 +12,7 @@ import {
   DeviceOperationError,
   type DevicePlatform,
   type EasDeviceHostConfig,
+  type SettingsSecretValue,
 } from "@infinitus/contracts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -33,6 +34,8 @@ import { writeFileStringAtomically } from "@infinitus/shared/atomicWrite";
 import * as HostProcess from "@infinitus/shared/HostProcess";
 
 import * as ServerConfig from "../config.ts";
+import * as SecretResolver from "@infinitus/secret-provider-core/server/SecretResolver";
+import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
 import { releaseAgentDeviceSession } from "./AgentDeviceTarget.ts";
 import * as DeviceHost from "./DeviceHost.ts";
 import { findEasProjectId } from "./easProjectId.ts";
@@ -141,11 +144,21 @@ const decodePathSegment = (segment: string): string | null => {
   }
 };
 
+/**
+ * The Expo credential a host's setting holds or names. Every session bills the account behind
+ * it, so a named secret that cannot be read fails rather than falling back to another login.
+ */
+export const resolveSavedExpoCredential = (
+  secrets: SecretResolver.SecretResolver["Service"],
+  saved: SettingsSecretValue,
+) => requireSettingsSecret(secrets, saved).pipe(Effect.flatMap(resolveExpoCredential));
+
 export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDeviceHostConfig) {
   const http = yield* HttpClient.HttpClient;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const server = yield* ServerConfig.ServerConfig;
+  const secrets = yield* SecretResolver.SecretResolver;
   const services = yield* Effect.context<
     FileSystem.FileSystem | Path.Path | Effect.Services<ReturnType<typeof findEasProjectId>>
   >();
@@ -199,12 +212,23 @@ export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDevice
       ...(cause === undefined ? {} : { cause }),
     });
 
-  const api: Effect.Effect<ExpoApi, DeviceHostUnavailableError> = resolveExpoCredential(
+  let lastApi: ExpoApi | undefined;
+  const api: Effect.Effect<ExpoApi, DeviceHostUnavailableError> = resolveSavedExpoCredential(
+    secrets,
     config.accessToken,
   ).pipe(
     Effect.map((credential) => makeExpoApi(http, credential)),
+    Effect.tap((expo) =>
+      Effect.sync(() => {
+        lastApi = expo;
+      }),
+    ),
     Effect.provide(services),
     Effect.mapError((error) => unavailable(error.message, error)),
+  );
+  /** Stopping a billed session must not depend on the secret still being readable; starting one must. */
+  const apiForStop = api.pipe(
+    Effect.catch((error) => (lastApi === undefined ? Effect.fail(error) : Effect.succeed(lastApi))),
   );
 
   /** A missing ledger is empty; an unreadable one is an error, never an empty list. */
@@ -627,7 +651,7 @@ export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDevice
     if (stale.length === 0 && unresolved.size === 0 && uncertain.size === 0 && !reapDue) return;
     const reap = reapDue || uncertain.size > 0;
     if (reap) reapedAt = now;
-    const expo = yield* api.pipe(
+    const expo = yield* apiForStop.pipe(
       // Without a credential no sweep can look; a record Expo would have
       // listed by now still stops counting, so the limit is not held forever.
       Effect.tapError(() =>
@@ -724,7 +748,7 @@ export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDevice
       Option.match(sessionFor(device.id), {
         onNone: () => Effect.void,
         onSome: (session) =>
-          api.pipe(
+          apiForStop.pipe(
             Effect.flatMap((expo) => stopTracked(expo, session)),
             Effect.asVoid,
             Effect.mapError(
@@ -854,7 +878,7 @@ export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDevice
     // Interrupted starts stop the sessions they created before this returns.
     yield* FiberSet.clear(starts);
     yield* FiberSet.clear(background);
-    const expo = yield* api;
+    const expo = yield* apiForStop;
     yield* Effect.forEach(
       [...sessions.values()],
       (session) => stopTracked(expo, session).pipe(Effect.ignore),
@@ -885,7 +909,7 @@ export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDevice
   // Each server signs in on its own, so one with no Expo credential answers for itself. Reading
   // the credential is local; whether Expo accepts it is only known once a session starts.
   const platformAvailability = (platform: DevicePlatform) =>
-    resolveExpoCredential(config.accessToken).pipe(
+    resolveSavedExpoCredential(secrets, config.accessToken).pipe(
       Effect.provide(services),
       Effect.as({ platform, available: true }),
       Effect.catch((error) =>
