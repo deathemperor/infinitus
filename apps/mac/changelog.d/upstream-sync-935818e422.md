@@ -1,6 +1,5 @@
 Desktop: Kiro is available as an early-access provider.
 Desktop: Copy thread copies a link that opens the thread.
-Desktop: Agents ask for secrets through a secure prompt instead of in chat.
 Desktop: Administrators can set the managed policy from a Windows Group Policy template.
 Desktop: Repositories can be cloned into host/owner/repo folders.
 Desktop: The model picker lists the Claude models Claude Code reports.
