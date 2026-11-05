@@ -8,7 +8,8 @@ import type { RelayDeliveryResult, RelayPublishResponse } from "@infinitus/contr
 import { decodeRelayJwt, normalizeRelayIssuer, verifyRelayJwt } from "@infinitus/shared/relayJwt";
 import { stableStringify } from "@infinitus/shared/relaySigning";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as Digest from "effect/crypto/Digest";
+import * as Signature from "effect/crypto/Signature";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
@@ -92,8 +93,6 @@ export class InfinitusAlertPublisher extends Context.Service<
   }
 >()("infinitus-relay/infinitusAlerts/InfinitusAlertPublisher") {}
 
-const decodeProof = Schema.decodeUnknownEffect(RelayInfinitusAlertProofPayload);
-
 const alertDeliveryResult = (input: {
   readonly deviceId: string;
   readonly ok: boolean;
@@ -111,7 +110,8 @@ const alertDeliveryResult = (input: {
 export const make = Effect.gen(function* () {
   const proofReplay = yield* DpopProofs.DpopProofReplay;
   const config = yield* RelayConfiguration.RelayConfiguration;
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
+  const signature = yield* Signature.Signature;
   const links = yield* EnvironmentLinks.EnvironmentLinks;
   const liveActivities = yield* LiveActivities.LiveActivities;
   const apnsQueue = yield* ApnsDeliveryQueue.ApnsDeliveryQueue;
@@ -134,22 +134,20 @@ export const make = Effect.gen(function* () {
       });
     const now = yield* DateTime.now;
     const nowEpochSeconds = Math.floor(now.epochMilliseconds / 1_000);
-    const decoded = yield* Effect.try({
-      try: () => decodeRelayJwt(input.request.proof),
-      catch: (cause) => invalid("decode_token", cause),
-    });
+    const decoded = yield* decodeRelayJwt(input.request.proof).pipe(
+      Effect.mapError((cause) => invalid("decode_token", cause)),
+    );
     if (typeof decoded.exp === "number" && decoded.exp <= nowEpochSeconds) {
       return yield* new InfinitusAlertProofExpired({ environmentId: input.environmentId });
     }
-    const proof = yield* verifyRelayJwt({
+    const proof = yield* verifyRelayJwt(RelayInfinitusAlertProofPayload, {
       publicKey: input.environmentPublicKey,
       token: input.request.proof,
       typ: RELAY_INFINITUS_ALERT_TYP,
       issuer: `t3-env:${input.environmentId}`,
       audience: normalizeRelayIssuer(config.relayIssuer),
-      nowEpochSeconds,
     }).pipe(
-      Effect.flatMap(decodeProof),
+      Effect.provideService(Signature.Signature, signature),
       Effect.mapError((cause) => invalid("verify_proof", cause)),
     );
     if (
@@ -163,9 +161,9 @@ export const make = Effect.gen(function* () {
     if (expiresAt._tag === "None") {
       return yield* invalid("validate_expiration");
     }
-    const thumbprint = yield* crypto
+    const thumbprint = yield* digest
       .digest(
-        "SHA-256",
+        Digest.sha256,
         new TextEncoder().encode(
           stableStringify({
             environmentId: input.environmentId,

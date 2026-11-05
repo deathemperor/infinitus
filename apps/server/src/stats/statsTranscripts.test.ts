@@ -53,7 +53,7 @@ describe("Stats transcript activity", () => {
     const records = lines.flatMap((line) => {
       const r = parseCodexLine(line, state);
       observer.line(line, "codex", state);
-      return r ? [r] : [];
+      return r;
     });
     const result = summarizeStatsSession({
       id: "codex:s1",

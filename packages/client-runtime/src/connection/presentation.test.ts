@@ -18,7 +18,6 @@ import {
   connectionCatalogDisplayUrl,
   environmentMcpUrl,
   connectionCatalogRoamedHost,
-  presentEnvironmentConnection,
   presentConnectionState,
 } from "./presentation.ts";
 
@@ -197,7 +196,7 @@ describe("connection presentation", () => {
 
   it("preserves an explicitly available environment while offline", () => {
     expect(
-      presentEnvironmentConnection(
+      presentConnectionState(
         supervisorState({
           desired: false,
           network: "offline",

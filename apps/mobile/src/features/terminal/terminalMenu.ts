@@ -4,11 +4,7 @@ import { nextTerminalId, resolveTerminalSessionLabel } from "@infinitus/shared/t
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
 
-export {
-  getTerminalLabel,
-  nextTerminalId,
-  resolveTerminalSessionLabel,
-} from "@infinitus/shared/terminalLabels";
+export { resolveTerminalSessionLabel } from "@infinitus/shared/terminalLabels";
 
 export interface TerminalMenuSession {
   readonly terminalId: string;

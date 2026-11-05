@@ -1,6 +1,7 @@
 // The fork's ProviderEventIngestor cases (#834, #927: the tool-call count on the
 // terminal provider turn), beside upstream's `ProviderEventIngestor.test.ts` so that
 // file stays theirs. The fixture helpers are copies of that file's.
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import {
@@ -24,6 +25,7 @@ import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
 import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
+import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
@@ -39,7 +41,7 @@ const layerTestEventSink = EventSink.layer.pipe(
 
 const layerGit = GitVcsDriver.layer.pipe(
   Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "ingestor-infinitus-git-" })),
-  Layer.provideMerge(NodeServices.layer),
+  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
 );
 
 const layerTest = Layer.mergeAll(
@@ -55,6 +57,9 @@ const layerTest = Layer.mergeAll(
         IdAllocator.layer,
         ThreadCommandExecutor.layer,
         layerGit,
+        Layer.mock(ProviderInstanceRegistry.ProviderInstanceRegistry)({
+          getInstance: () => Effect.undefined,
+        }),
       ),
     ),
   ),

@@ -168,6 +168,7 @@ function TeamPane({ client }: { readonly client: InfinitusTeamClient }) {
     }
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the relay's team list once per mount; its state lands after the request
   useEffect(() => {
     void loadTeams();
   }, [loadTeams]);
@@ -1058,6 +1059,7 @@ function JoinSection({
   // on mount when the link opened this page, by subscription when it arrived
   // with the page open. The user still presses Join.
   const [token, setToken] = useState(() => usePendingTeamJoinStore.getState().take() ?? "");
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the pending team-join store so a join link that arrives with the page open fills the token
   useEffect(
     () =>
       usePendingTeamJoinStore.subscribe((state) => {
@@ -1244,6 +1246,7 @@ function PrivateProjectsSection() {
     setProjects(parsed);
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the private-project list from the engine over the socket once it answers
   useEffect(() => {
     if (supported && environmentId !== null) void read();
   }, [environmentId, read, supported]);

@@ -34,7 +34,10 @@ export class TurnStartGate extends Context.Service<TurnStartGate, TurnStartGateS
 
 /** The gate that holds nothing: every start runs at once. */
 export const TurnStartGatePassthrough = Layer.succeed(TurnStartGate)({
-  start: ({ start }) => start.pipe(Effect.as("started" as const)),
+  // The start it runs owns the span.
+  start: Effect.fnUntraced(function* ({ start }) {
+    return yield* start.pipe(Effect.as("started" as const));
+  }),
 });
 
 /**

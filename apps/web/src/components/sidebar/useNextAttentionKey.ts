@@ -66,6 +66,7 @@ export function useNextAttentionKey(input: {
     return true;
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window keydown listener for the next-attention-thread shortcut
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || isCommandPaletteOpen() || isModelPickerOpen()) {
@@ -90,6 +91,7 @@ export function useNextAttentionKey(input: {
     return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, [jumpToNextAttentionThread, keybindings, routeTerminalOpen]);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to next-attention requests from outside the sidebar while mounted
   useEffect(
     () => onNextAttentionThreadRequest(jumpToNextAttentionThread),
     [jumpToNextAttentionThread],

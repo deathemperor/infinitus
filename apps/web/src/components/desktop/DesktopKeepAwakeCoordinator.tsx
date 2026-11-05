@@ -19,6 +19,7 @@ export function DesktopKeepAwakeCoordinator() {
   const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
   const wanted = keepAwakeWanted({ enabled, primaryEnvironmentId, shells });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the desktop keep-awake power lock over IPC while wanted and releases it on cleanup
   useEffect(() => {
     if (setKeepAwake === undefined) return;
     void setKeepAwake(wanted);

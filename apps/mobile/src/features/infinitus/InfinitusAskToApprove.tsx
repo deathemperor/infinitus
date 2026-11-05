@@ -31,6 +31,7 @@ export function InfinitusAskToApprove(props: {
   const [notice, setNotice] = useState<{ host: string; message: string } | null>(null);
   const wait = useRef<AbortController | null>(null);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- aborts an in-flight approval request to the Mac on unmount
   useEffect(() => () => wait.current?.abort(), []);
 
   const ask = useCallback(async () => {

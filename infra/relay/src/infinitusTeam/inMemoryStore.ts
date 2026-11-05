@@ -58,9 +58,11 @@ const transcriptKey = (t: {
 
 export const make = (state: InMemoryTeamState = emptyState()) =>
   InfinitusTeamStore.of({
-    getTeam: (teamId) => Effect.sync(() => state.teams.get(teamId) ?? null),
-    createTeam: (input) =>
-      Effect.sync(() => {
+    getTeam: Effect.fn("InfinitusTeamStore.getTeam")(function (teamId) {
+      return Effect.sync(() => state.teams.get(teamId) ?? null);
+    }),
+    createTeam: Effect.fn("InfinitusTeamStore.createTeam")(function (input) {
+      return Effect.sync(() => {
         state.teams.set(input.teamId, {
           teamId: input.teamId,
           name: input.name,
@@ -68,32 +70,38 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
           policyRequests: "code",
           createdAt: input.now,
         });
-      }),
-    updateTeamPolicy: (teamId, requests) =>
-      Effect.sync(() => {
+      });
+    }),
+    updateTeamPolicy: Effect.fn("InfinitusTeamStore.updateTeamPolicy")(function (teamId, requests) {
+      return Effect.sync(() => {
         const team = state.teams.get(teamId);
         if (team) state.teams.set(teamId, { ...team, policyRequests: requests });
-      }),
-    listTeamsForUser: (userId) =>
-      Effect.sync(() =>
+      });
+    }),
+    listTeamsForUser: Effect.fn("InfinitusTeamStore.listTeamsForUser")(function (userId) {
+      return Effect.sync(() =>
         [...state.members.values()]
           .filter((m) => m.userId === userId)
           .flatMap((m) => {
             const team = state.teams.get(m.teamId);
             return team ? [{ teamId: team.teamId, name: team.name, role: m.role }] : [];
           }),
-      ),
-    listMembers: (teamId) =>
-      Effect.sync(() => [...state.members.values()].filter((m) => m.teamId === teamId)),
-    getMember: (teamId, userId) =>
-      Effect.sync(() => state.members.get(memberKey(teamId, userId)) ?? null),
-    upsertMember: (input) =>
-      Effect.sync(() => {
+      );
+    }),
+    listMembers: Effect.fn("InfinitusTeamStore.listMembers")(function (teamId) {
+      return Effect.sync(() => [...state.members.values()].filter((m) => m.teamId === teamId));
+    }),
+    getMember: Effect.fn("InfinitusTeamStore.getMember")(function (teamId, userId) {
+      return Effect.sync(() => state.members.get(memberKey(teamId, userId)) ?? null);
+    }),
+    upsertMember: Effect.fn("InfinitusTeamStore.upsertMember")(function (input) {
+      return Effect.sync(() => {
         const { now: _now, ...record } = input;
         state.members.set(memberKey(input.teamId, input.userId), record);
-      }),
-    updateMember: (teamId, userId, patch) =>
-      Effect.sync(() => {
+      });
+    }),
+    updateMember: Effect.fn("InfinitusTeamStore.updateMember")(function (teamId, userId, patch) {
+      return Effect.sync(() => {
         const key = memberKey(teamId, userId);
         const member = state.members.get(key);
         if (!member) return;
@@ -103,9 +111,10 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
           ...(patch.shares === undefined ? {} : { shares: patch.shares }),
           ...(patch.role === undefined ? {} : { role: patch.role }),
         });
-      }),
-    deleteMember: (teamId, userId) =>
-      Effect.sync(() => {
+      });
+    }),
+    deleteMember: Effect.fn("InfinitusTeamStore.deleteMember")(function (teamId, userId) {
+      return Effect.sync(() => {
         const transcripts = [...state.transcripts.values()].filter(
           (t) => t.teamId === teamId && t.userId === userId,
         );
@@ -121,49 +130,61 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
         state.requests.delete(memberKey(teamId, userId));
         state.members.delete(memberKey(teamId, userId));
         return transcripts;
-      }),
-    createInvite: (input) =>
-      Effect.sync(() => {
+      });
+    }),
+    createInvite: Effect.fn("InfinitusTeamStore.createInvite")(function (input) {
+      return Effect.sync(() => {
         state.invites.set(input.inviteId, { ...input, usedByUserId: null, revokedAt: null });
-      }),
-    getInviteByHash: (tokenHash) =>
-      Effect.sync(() => [...state.invites.values()].find((i) => i.tokenHash === tokenHash) ?? null),
-    markInviteUsed: (inviteId, userId) =>
-      Effect.sync(() => {
+      });
+    }),
+    getInviteByHash: Effect.fn("InfinitusTeamStore.getInviteByHash")(function (tokenHash) {
+      return Effect.sync(
+        () => [...state.invites.values()].find((i) => i.tokenHash === tokenHash) ?? null,
+      );
+    }),
+    markInviteUsed: Effect.fn("InfinitusTeamStore.markInviteUsed")(function (inviteId, userId) {
+      return Effect.sync(() => {
         const invite = state.invites.get(inviteId);
         if (invite) state.invites.set(inviteId, { ...invite, usedByUserId: userId });
-      }),
-    revokeInvite: (teamId, inviteId, now) =>
-      Effect.sync(() => {
+      });
+    }),
+    revokeInvite: Effect.fn("InfinitusTeamStore.revokeInvite")(function (teamId, inviteId, now) {
+      return Effect.sync(() => {
         const invite = state.invites.get(inviteId);
         if (!invite || invite.teamId !== teamId) return false;
         state.invites.set(inviteId, { ...invite, revokedAt: now });
         return true;
-      }),
-    listInvites: (teamId) =>
-      Effect.sync(() =>
+      });
+    }),
+    listInvites: Effect.fn("InfinitusTeamStore.listInvites")(function (teamId) {
+      return Effect.sync(() =>
         [...state.invites.values()]
           .filter((i) => i.teamId === teamId)
           .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
-      ),
-    upsertRequest: (input) =>
-      Effect.sync(() => {
+      );
+    }),
+    upsertRequest: Effect.fn("InfinitusTeamStore.upsertRequest")(function (input) {
+      return Effect.sync(() => {
         state.requests.set(memberKey(input.teamId, input.userId), input);
-      }),
-    getRequest: (teamId, userId) =>
-      Effect.sync(() => state.requests.get(memberKey(teamId, userId)) ?? null),
-    listRequests: (teamId) =>
-      Effect.sync(() =>
+      });
+    }),
+    getRequest: Effect.fn("InfinitusTeamStore.getRequest")(function (teamId, userId) {
+      return Effect.sync(() => state.requests.get(memberKey(teamId, userId)) ?? null);
+    }),
+    listRequests: Effect.fn("InfinitusTeamStore.listRequests")(function (teamId) {
+      return Effect.sync(() =>
         [...state.requests.values()]
           .filter((r) => r.teamId === teamId)
           .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
-      ),
-    deleteRequest: (teamId, userId) =>
-      Effect.sync(() => {
+      );
+    }),
+    deleteRequest: Effect.fn("InfinitusTeamStore.deleteRequest")(function (teamId, userId) {
+      return Effect.sync(() => {
         state.requests.delete(memberKey(teamId, userId));
-      }),
-    upsertDocuments: (input) =>
-      Effect.sync(() => {
+      });
+    }),
+    upsertDocuments: Effect.fn("InfinitusTeamStore.upsertDocuments")(function (input) {
+      return Effect.sync(() => {
         for (const document of input.documents) {
           const record: DocumentRecord = {
             teamId: input.teamId,
@@ -176,9 +197,10 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
           };
           state.documents.set(documentKey(record), record);
         }
-      }),
-    listDocuments: (input) =>
-      Effect.sync(() =>
+      });
+    }),
+    listDocuments: Effect.fn("InfinitusTeamStore.listDocuments")(function (input) {
+      return Effect.sync(() =>
         [...state.documents.values()].filter(
           (d) =>
             d.teamId === input.teamId &&
@@ -186,13 +208,15 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
             (input.environmentId === undefined || d.environmentId === input.environmentId) &&
             (input.kind === undefined || d.kind === input.kind),
         ),
-      ),
-    insertTranscriptChunk: (input) =>
-      Effect.sync(() => {
+      );
+    }),
+    insertTranscriptChunk: Effect.fn("InfinitusTeamStore.insertTranscriptChunk")(function (input) {
+      return Effect.sync(() => {
         state.transcripts.set(transcriptKey(input), input);
-      }),
-    listTranscriptChunks: (input) =>
-      Effect.sync(() =>
+      });
+    }),
+    listTranscriptChunks: Effect.fn("InfinitusTeamStore.listTranscriptChunks")(function (input) {
+      return Effect.sync(() =>
         [...state.transcripts.values()]
           .filter(
             (t) =>
@@ -202,70 +226,97 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
               t.threadId === input.threadId,
           )
           .sort((a, b) => a.seq - b.seq),
-      ),
-    listTranscriptsForMember: (teamId, userId) =>
-      Effect.sync(() =>
-        [...state.transcripts.values()]
-          .filter((t) => t.teamId === teamId && t.userId === userId)
-          .sort((a, b) =>
-            a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.seq - b.seq,
-          ),
-      ),
-    listTranscriptsOlderThan: (createdBefore) =>
-      Effect.sync(() => [...state.transcripts.values()].filter((t) => t.createdAt < createdBefore)),
-    listTranscriptBytesByMember: () =>
-      Effect.sync(() => {
-        const totals = new Map<string, { teamId: string; userId: string; bytes: number }>();
-        for (const t of state.transcripts.values()) {
-          const key = memberKey(t.teamId, t.userId);
-          const total = totals.get(key) ?? { teamId: t.teamId, userId: t.userId, bytes: 0 };
-          totals.set(key, { ...total, bytes: total.bytes + t.bytes });
-        }
-        return [...totals.values()];
-      }),
-    deleteTranscriptChunks: (keys) =>
-      Effect.sync(() => {
+      );
+    }),
+    listTranscriptsForMember: Effect.fn("InfinitusTeamStore.listTranscriptsForMember")(
+      function (teamId, userId) {
+        return Effect.sync(() =>
+          [...state.transcripts.values()]
+            .filter((t) => t.teamId === teamId && t.userId === userId)
+            .sort((a, b) =>
+              a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.seq - b.seq,
+            ),
+        );
+      },
+    ),
+    listTranscriptsOlderThan: Effect.fn("InfinitusTeamStore.listTranscriptsOlderThan")(
+      function (createdBefore) {
+        return Effect.sync(() =>
+          [...state.transcripts.values()].filter((t) => t.createdAt < createdBefore),
+        );
+      },
+    ),
+    listTranscriptBytesByMember: Effect.fn("InfinitusTeamStore.listTranscriptBytesByMember")(
+      function () {
+        return Effect.sync(() => {
+          const totals = new Map<string, { teamId: string; userId: string; bytes: number }>();
+          for (const t of state.transcripts.values()) {
+            const key = memberKey(t.teamId, t.userId);
+            const total = totals.get(key) ?? { teamId: t.teamId, userId: t.userId, bytes: 0 };
+            totals.set(key, { ...total, bytes: total.bytes + t.bytes });
+          }
+          return [...totals.values()];
+        });
+      },
+    ),
+    deleteTranscriptChunks: Effect.fn("InfinitusTeamStore.deleteTranscriptChunks")(function (keys) {
+      return Effect.sync(() => {
         for (const key of keys) state.transcripts.delete(transcriptKey(key));
-      }),
-    createGrant: (input) =>
-      Effect.sync(() => {
+      });
+    }),
+    createGrant: Effect.fn("InfinitusTeamStore.createGrant")(function (input) {
+      return Effect.sync(() => {
         state.grants.set(input.grantId, input);
-      }),
-    getGrant: (grantId) => Effect.sync(() => state.grants.get(grantId) ?? null),
-    listGrantsForTeam: (teamId) =>
-      Effect.sync(() => [...state.grants.values()].filter((g) => g.teamId === teamId)),
-    deleteGrant: (teamId, grantId, userId) =>
-      Effect.sync(() => {
+      });
+    }),
+    getGrant: Effect.fn("InfinitusTeamStore.getGrant")(function (grantId) {
+      return Effect.sync(() => state.grants.get(grantId) ?? null);
+    }),
+    listGrantsForTeam: Effect.fn("InfinitusTeamStore.listGrantsForTeam")(function (teamId) {
+      return Effect.sync(() => [...state.grants.values()].filter((g) => g.teamId === teamId));
+    }),
+    deleteGrant: Effect.fn("InfinitusTeamStore.deleteGrant")(function (teamId, grantId, userId) {
+      return Effect.sync(() => {
         const grant = state.grants.get(grantId);
         if (!grant || grant.teamId !== teamId || grant.userId !== userId) return false;
         state.grants.delete(grantId);
         return true;
-      }),
-    createCommand: (input) =>
-      Effect.sync(() => {
+      });
+    }),
+    createCommand: Effect.fn("InfinitusTeamStore.createCommand")(function (input) {
+      return Effect.sync(() => {
         state.commands.set(input.commandId, input);
-      }),
-    getCommand: (commandId) => Effect.sync(() => state.commands.get(commandId) ?? null),
-    takeQueuedForEnvironment: (environmentId, now) =>
-      Effect.sync(() => {
-        const taken: Array<CommandRecord> = [];
-        for (const [key, c] of state.commands) {
-          if (c.environmentId === environmentId && c.status === "queued" && c.expiresAt > now) {
-            const running = { ...c, status: "running" as const };
-            state.commands.set(key, running);
-            taken.push(running);
+      });
+    }),
+    getCommand: Effect.fn("InfinitusTeamStore.getCommand")(function (commandId) {
+      return Effect.sync(() => state.commands.get(commandId) ?? null);
+    }),
+    takeQueuedForEnvironment: Effect.fn("InfinitusTeamStore.takeQueuedForEnvironment")(
+      function (environmentId, now) {
+        return Effect.sync(() => {
+          const taken: Array<CommandRecord> = [];
+          for (const [key, c] of state.commands) {
+            if (c.environmentId === environmentId && c.status === "queued" && c.expiresAt > now) {
+              const running = { ...c, status: "running" as const };
+              state.commands.set(key, running);
+              taken.push(running);
+            }
           }
-        }
-        return taken;
-      }),
-    listPendingForUser: (teamId, toUserId) =>
-      Effect.sync(() =>
-        [...state.commands.values()]
-          .filter((c) => c.teamId === teamId && c.toUserId === toUserId && c.status === "pending")
-          .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
-      ),
-    updateCommand: (commandId, patch) =>
-      Effect.sync(() => {
+          return taken;
+        });
+      },
+    ),
+    listPendingForUser: Effect.fn("InfinitusTeamStore.listPendingForUser")(
+      function (teamId, toUserId) {
+        return Effect.sync(() =>
+          [...state.commands.values()]
+            .filter((c) => c.teamId === teamId && c.toUserId === toUserId && c.status === "pending")
+            .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)),
+        );
+      },
+    ),
+    updateCommand: Effect.fn("InfinitusTeamStore.updateCommand")(function (commandId, patch) {
+      return Effect.sync(() => {
         const command = state.commands.get(commandId);
         if (!command) return;
         state.commands.set(commandId, {
@@ -275,9 +326,10 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
           ...(patch.expiresAt === undefined ? {} : { expiresAt: patch.expiresAt }),
           ...(patch.answeredAt === undefined ? {} : { answeredAt: patch.answeredAt }),
         });
-      }),
-    expireCommands: (now) =>
-      Effect.sync(() => {
+      });
+    }),
+    expireCommands: Effect.fn("InfinitusTeamStore.expireCommands")(function (now) {
+      return Effect.sync(() => {
         for (const [key, c] of state.commands) {
           if (
             (c.status === "queued" || c.status === "pending" || c.status === "running") &&
@@ -286,7 +338,8 @@ export const make = (state: InMemoryTeamState = emptyState()) =>
             state.commands.set(key, { ...c, status: "expired", answeredAt: now });
           }
         }
-      }),
+      });
+    }),
   });
 
 export const layer = (state: InMemoryTeamState = emptyState()) =>

@@ -9,6 +9,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useClientSettings } from "../../hooks/useSettings";
+import { useDelegatedUnderParent } from "../../state/entities";
 import { infinitusLimitStopsAtom } from "../../state/infinitus";
 import { formatElapsedDurationLabel, formatShortTimestamp } from "../../timestampFormat";
 import type { SidebarThreadSummary } from "../../types";
@@ -49,8 +50,12 @@ export function SidebarNeedsAttention(props: {
   const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
   const nowMinute = useNowMinute();
   const nowMs = Date.parse(nowMinute);
-  const entries = collectNeedsAttention(props.threads, limitStops, (stop) =>
-    limitStopLine(stop, (iso) => formatShortTimestamp(iso, timestampFormat), nowMs),
+  const delegatedUnderParent = useDelegatedUnderParent();
+  const entries = collectNeedsAttention(
+    props.threads,
+    limitStops,
+    (stop) => limitStopLine(stop, (iso) => formatShortTimestamp(iso, timestampFormat), nowMs),
+    delegatedUnderParent,
   );
   if (entries.length === 0) return null;
   const showEnvironment = props.environmentLabelById.size > 1;

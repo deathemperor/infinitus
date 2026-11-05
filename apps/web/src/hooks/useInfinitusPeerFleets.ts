@@ -151,17 +151,20 @@ export function useInfinitusPeerFleets(): {
   // row-visible field.
   const pushKey =
     machines.length === 0 ? null : `${primaryId ?? ""}|${machinesKey}|${fleetsVersion}`;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes the peer fleets to the Mac over the socket when the machine set or a fleet changes
   useEffect(() => {
     if (pushKey === null) return;
     void sync();
   }, [pushKey, sync]);
 
   // The app says a peer row is waiting: push now rather than on the clock.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes to the Mac over the socket as soon as it reports peer commands waiting
   useEffect(() => {
     if (pendingCommands > 0) void sync();
   }, [pendingCommands, sync]);
 
   // The heartbeat keeps a quiet fleet alive on the Mac.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- heartbeat interval that keeps quiet peer fleets alive on the Mac
   useEffect(() => {
     if (machines.length === 0) return;
     const timer = setInterval(() => void sync(), PEER_SYNC_HEARTBEAT_MS);

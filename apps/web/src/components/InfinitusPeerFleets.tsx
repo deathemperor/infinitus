@@ -21,6 +21,7 @@ export function PeerSnapshotFeeder({
     connected ? infinitusEnvironment.snapshot({ environmentId, input: {} }) : null,
   );
   const snapshot = query.data;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports this machine's snapshot to the peer-fleet pusher whenever its subscription delivers one
   useEffect(() => {
     report(environmentId, snapshot);
   }, [environmentId, report, snapshot]);

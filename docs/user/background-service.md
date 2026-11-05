@@ -32,13 +32,15 @@ desktop puts the matching server on it by itself.
 
 Run these on the machine that will host the server:
 
-| Task                            | Command                       |
-| ------------------------------- | ----------------------------- |
-| Install and start               | `infinitus service install`   |
-| Inspect status and log location | `infinitus service status`    |
-| Update or repair                | `infinitus service update`    |
-| Restart                         | `infinitus service restart`   |
-| Stop and remove from startup    | `infinitus service uninstall` |
+| Task                                  | Command                       |
+| ------------------------------------- | ----------------------------- |
+| Set up access from your other devices | `infinitus up`                |
+| See how your other devices reach it   | `infinitus status`            |
+| Install and start                     | `infinitus service install`   |
+| Inspect status and log location       | `infinitus service status`    |
+| Update or repair                      | `infinitus service update`    |
+| Restart                               | `infinitus service restart`   |
+| Stop and remove from startup          | `infinitus service uninstall` |
 
 The service reuses the copy the install script put under
 `~/.infinitus/runtime`; a hand-unpacked `./infinitus` downloads that version's
@@ -62,13 +64,18 @@ update already in progress.
 
 ## Local network access
 
-The service listens on your local network and Tailscale addresses, so the
-desktop and mobile apps on the same network connect directly instead of through
-Infinitus Connect. The hosted web app at app.t3.codes stays on Infinitus Connect, because
-browsers block plain HTTP from an HTTPS page. The service does not answer on
-public addresses, and every device still needs to pair or sign in. To keep the service reachable from this machine only, set
-`T3CODE_HOST=127.0.0.1` in `service.env` (below). Any `T3CODE_HOST` value
-replaces this default.
+A new service answers only on this machine. Other devices reach it through
+Infinitus Connect, or directly once you choose the local network in `infinitus up` (or run
+`infinitus up --lan`, which sets `T3CODE_LAN=true` in `service.env`). It then listens on
+your local network and Tailscale addresses, so the desktop and mobile apps on
+the same network connect directly instead of through Infinitus Connect. It still does
+not answer on public addresses. Anyone on the same network can reach the port,
+so a pairing code is all that keeps them out. The hosted web app at app.t3.codes
+stays on Infinitus Connect, because browsers block plain HTTP from an HTTPS page.
+
+A service installed before `T3CODE_LAN` existed keeps listening on the local
+network. `infinitus status` says so, and `infinitus up --no-lan` turns it off. Any
+`T3CODE_HOST` value replaces this setting.
 
 ## Configure the service environment
 
@@ -105,10 +112,32 @@ yet (the install script says so and stops), so there is nothing to install
 them from. Keep the desktop app running on
 the Mac instead; it hosts remote clients the same way.
 
-Windows background services are not supported.
+Windows background services are not supported. To keep a Windows host available
+through Infinitus Connect, leave the desktop app running with its local environment
+enabled, or keep `t3 serve` running in a terminal. Minimize the desktop app rather
+than closing its last window, which stops its local server. Linking Infinitus Connect
+does not configure automatic startup at Windows sign-in.
 
-Infinitus Connect can offer service installation during setup, but the two are managed
+`infinitus up` installs the service when you set up Infinitus Connect, but the two are managed
 separately. Signing out of Infinitus Connect does not stop or uninstall the service.
+
+## Keep the server responsive when agents use all memory
+
+On Linux, agents already run with lower priority than the server. When they
+fill the machine's memory, though, the kernel may still slow down or stop the
+server, because only an administrator can reserve memory for it. Run, as your
+normal user:
+
+```sh
+t3 service protect
+```
+
+It shows the system settings it will change, asks before applying them, and
+then asks for your sudo password. If the machine runs Tailscale or SSH, it
+also offers to protect them, so you can still reach the machine. Memory
+protection takes effect at once. The server's protection from the kernel's
+out-of-memory killer takes effect after `t3 service restart`. `t3 service status` reports whether
+the protection is in place, and `t3 service protect --undo` removes it.
 
 ## Troubleshooting
 
@@ -146,10 +175,10 @@ For failures after signing in to Infinitus Connect, see
 
 ## Reclaim database space
 
-Infinitus removes superseded internal history on its own while it runs; your
-conversations are kept. Databases created before this shrank automatically
+Infinitus removes internal history older than a day on its own while it runs;
+your conversations are kept. Databases created before this shrank automatically
 still hold the freed space on disk until a one-time offline repair returns it
-and turns on automatic shrinking. Settings > Storage (web and desktop) or
+and turns on automatic shrinking. Settings > Maintenance (web and desktop) or
 Settings > Maintenance (mobile) suggests the repair when at least 1 GiB can be
 reclaimed.
 

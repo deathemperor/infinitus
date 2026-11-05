@@ -206,7 +206,9 @@ export function proxyInstanceLabel(
   const instance = instances[selection.instanceId];
   if (instance === undefined) return null;
   const proxied = (instance.environment ?? []).some(
-    (variable) => variable.name === PROXY_BASE_URL_VARIABLE && variable.value.trim() !== "",
+    (variable) =>
+      variable.name === PROXY_BASE_URL_VARIABLE &&
+      (typeof variable.value !== "string" || variable.value.trim() !== ""),
   );
   return proxied ? (instance.displayName ?? selection.instanceId) : null;
 }

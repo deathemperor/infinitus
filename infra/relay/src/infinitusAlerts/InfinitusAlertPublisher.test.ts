@@ -1,5 +1,6 @@
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Effect's Crypto has no generateKeyPairSync.
 import * as NodeCrypto from "node:crypto";
+import * as NodeCryptoLayer from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { RelayDeliveryResult } from "@infinitus/contracts/relay";
 import {
@@ -162,8 +163,6 @@ function harness(input?: {
           listTargets: ({ userId }) => Effect.succeed(targets[userId] ?? []),
           listIdleArmedTargets: () => Effect.succeed([]),
           markDelivery: () => Effect.void,
-          markStartQueued: () => Effect.void,
-          clearStartQueued: () => Effect.void,
           invalidateDeliveryToken: () => Effect.void,
         }),
         Layer.succeed(ApnsDeliveryQueue.ApnsDeliveryQueue, {
@@ -190,7 +189,7 @@ function harness(input?: {
         }),
       ),
     ),
-    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCryptoLayer.layer)),
   );
   return { apns, fcm, consumed, layer };
 }

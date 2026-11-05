@@ -11,14 +11,14 @@ import { describe, expect, it } from "vite-plus/test";
  */
 const LITERAL_ALLOWED: ReadonlyArray<readonly [file: string, text: string]> = [
   // Copied standalone into a bare temp root by bundledDev.test, so it cannot
-  // import the constant; vite.config's productNamePlugin rewrites it at build.
-  ["lib/bootError.ts", "T3 Code failed to start."],
-  ["lib/bootError.ts", "T3 Code could not load."],
+  // import the constant; vite.config's productNamePlugin rewrites every one at build.
+  ["lib/bootError.ts", "T3 Code"],
 ];
 
 /** A bare "T3" used as the product noun ("T3 Account", "Open T3"), #1368.
-    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match. */
-const BARE_T3 = /\bT3\b(?![_A-Za-z0-9])/;
+    Identifiers (`T3CODE_HOME`, `T3_THREAD_ID`, `t3code`) never match, nor does
+    T3 Chat, upstream's separate product whose plan the relay can link. */
+const BARE_T3 = /\bT3\b(?![_A-Za-z0-9]| Chat\b)/;
 
 const SRC = NodeURL.fileURLToPath(new URL(".", import.meta.url));
 

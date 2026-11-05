@@ -81,6 +81,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     const lastResumeAt = new Map<ThreadId, number>();
     /** The parked runs a resume has interrupted and waits on. */
     const interrupted = new Map<RunId, Deferred.Deferred<void>>();
+    /** The provider wake run over a stop, per thread: a background-task
+        delivery the CLI starts after the limit, not the user moving on. */
+    const wakes = new Map<ThreadId, { readonly runId: RunId; readonly ended: boolean }>();
     const watch = yield* FiberHandle.make();
     const resumes = yield* FiberMap.make<ThreadId>();
 
@@ -140,6 +143,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
     );
 
     const forget = Effect.fn("InfinitusResumeOnLimit.forget")(function* (threadId: ThreadId) {
+      wakes.delete(threadId);
       if (!stops.delete(threadId)) return;
       yield* publish;
       // A proxy's stop (#1088) waits for nothing here: it keeps no poll alive.
@@ -228,6 +232,16 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       );
     });
 
+    /** Whether the run is a provider continuation (`ProviderContinuationService`'s
+        wake); an unreadable message counts as the user's. */
+    const isProviderWake = (threadId: ThreadId, runId: RunId) =>
+      projections.getRunMessage(threadId, runId).pipe(
+        Effect.map(
+          (message) => message?.createdBy === "agent" && message.creationSource === "provider",
+        ),
+        Effect.orElseSucceed(() => false),
+      );
+
     // Runs for every run update on the live tail; avoid a per-event span.
     const onEvent = Effect.fnUntraced(function* (event: OrchestrationV2DomainEvent) {
       const threadId = event.threadId;
@@ -263,9 +277,14 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               if (known !== undefined) yield* forget(threadId);
               return;
             }
-            if (known !== undefined && known.runId === run.id) {
-              // A parked turn ending the way the CLI ends it: one stop, the
-              // window kept, nothing reported twice.
+            if (
+              known !== undefined &&
+              (known.runId === run.id || wakes.get(threadId)?.runId === run.id)
+            ) {
+              // A parked turn ending the way the CLI ends it, or a wake failing on
+              // the limit again: one stop, the window kept, nothing reported twice.
+              // A failed wake becomes the stop's run, the one the orchestrator continues.
+              wakes.delete(threadId);
               return yield* record({ ...known, ...failed, kind: "failed" }, { report: false });
             }
             const proxy = yield* proxyFor(shell);
@@ -294,9 +313,25 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           }
           if (known === undefined) return;
           if (known.runId !== run.id) {
+            if (run.status === "queued") return;
+            // The CLI delivering background work the limit also stopped: it
+            // runs on the spent login and ends at once, masking the stop.
+            if (
+              wakes.get(threadId)?.runId === run.id ||
+              (yield* isProviderWake(threadId, run.id))
+            ) {
+              wakes.set(threadId, {
+                runId: run.id,
+                ended:
+                  run.status === "completed" ||
+                  run.status === "interrupted" ||
+                  run.status === "cancelled",
+              });
+              return;
+            }
             // Another run on the thread: the user sent again, or the
             // continuation went. The stop is no longer ours.
-            if (run.status !== "queued") yield* forget(threadId);
+            yield* forget(threadId);
             return;
           }
           // The stop's own run ended some other way: a parked turn that
@@ -320,13 +355,17 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         itself. Each command re-reads the thread first, so a settle, an
         archive or the user's own send since the stop stands (#1522). */
     const resume = Effect.fn("InfinitusResumeOnLimit.resume")(
-      function* (stop: LimitStop, target: ResumeTarget) {
+      function* (stop: LimitStop, target: ResumeTarget, wake: RunId | undefined) {
         const resumedAt = yield* nowMillis;
-        const stillOurs = (shell: OrchestrationV2ThreadShell | null, parkedRunActive: boolean) =>
+        const stillOurs = (
+          shell: OrchestrationV2ThreadShell | null,
+          parkedRunActive: boolean,
+        ): shell is OrchestrationV2ThreadShell =>
           shell !== null &&
           shell.archivedAt === null &&
           shell.settledOverride !== "settled" &&
-          shell.latestRunId === stop.runId &&
+          (shell.latestRunId === stop.runId ||
+            (wake !== undefined && shell.latestRunId === wake)) &&
           (parkedRunActive ? shell.activeRunId === stop.runId : shell.activeRunId === null);
         if (stop.kind === "parked") {
           if (!stillOurs(yield* shellOf(stop.threadId), true)) {
@@ -353,7 +392,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
               Effect.ensuring(Effect.sync(() => interrupted.delete(stop.runId))),
             );
         }
-        if (!stillOurs(yield* shellOf(stop.threadId), false)) {
+        const shell = yield* shellOf(stop.threadId);
+        if (!stillOurs(shell, false)) {
           return yield* Effect.logInfo("infinitus.resume-on-limit.overtaken", {
             threadId: stop.threadId,
             runId: stop.runId,
@@ -364,7 +404,8 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
           commandId: CommandId.make(`limit-resume:${stop.runId}:${resumedAt}`),
           messageId: MessageId.make(`limit-resume:${stop.runId}:${resumedAt}`),
           threadId: stop.threadId,
-          manualContinuationOfRunId: stop.runId,
+          // The orchestrator only continues the latest executed run; a wake over it is not one.
+          ...(shell.latestRunId === stop.runId ? { manualContinuationOfRunId: stop.runId } : {}),
           text: CONTINUATION_PROMPT,
           attachments: [],
           dispatchMode: { type: "start_immediately" },
@@ -400,6 +441,9 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
       for (const stop of stops.values()) {
         const target = resumeTarget(stop, accounts, now);
         if (target === null) continue;
+        // A running wake would read as the thread moving on; the next probe retries.
+        const wake = wakes.get(stop.threadId);
+        if (wake !== undefined && !wake.ended) continue;
         const last = lastResumeAt.get(stop.threadId);
         if (last !== undefined && now - last < RESUME_COOLDOWN_MS) continue;
         if (!(yield* enabled)) continue;
@@ -412,7 +456,7 @@ export const InfinitusResumeOnLimitLive = Layer.effectDiscard(
         resumed.add(stop.runId);
         lastResumeAt.set(stop.threadId, now);
         yield* forget(stop.threadId);
-        yield* FiberMap.run(resumes, stop.threadId)(resume(stop, target));
+        yield* FiberMap.run(resumes, stop.threadId)(resume(stop, target, wake?.runId));
       }
     });
 

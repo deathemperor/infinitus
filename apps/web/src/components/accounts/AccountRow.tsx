@@ -215,6 +215,7 @@ export function AccountRow({
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = pendingAction !== null;
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- focuses the rename input DOM node when renaming starts
   useEffect(() => {
     if (renaming) inputRef.current?.focus();
   }, [renaming]);

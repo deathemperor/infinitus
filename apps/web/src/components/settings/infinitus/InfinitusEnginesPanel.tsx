@@ -128,6 +128,7 @@ function InfinitusEngineUpdateRow({
     setUpdatable(parsed.updatable);
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- asks the engine over the socket for the newest swapd release once the row mounts
   useEffect(() => {
     // GitHub is asked once the row mounts; every set lands after the reply.
     if (environmentId !== null) void check();

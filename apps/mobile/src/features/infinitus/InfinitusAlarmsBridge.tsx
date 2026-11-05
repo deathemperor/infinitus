@@ -32,6 +32,7 @@ export function InfinitusAlarmsBridge() {
   const enabled =
     AsyncResult.isSuccess(preferences) && preferences.value.infinitusAlarmsEnabled === true;
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- expo-notifications response listener that opens the app's alarm deep link
   useEffect(() => {
     if (Platform.OS === "web") return;
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -41,6 +42,7 @@ export function InfinitusAlarmsBridge() {
     return () => subscription.remove();
   }, []);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- cancels the scheduled native alarm notifications when alarms are turned off
   useEffect(() => {
     if (enabled) return;
     void cancelInfinitusAlarms();
@@ -67,6 +69,7 @@ function MacAlarms(props: { readonly mac: InfinitusMac }) {
       switch back on, which asks for the permission, schedules afresh. */
   const scheduledPlan = useRef<string | null>(null);
   const snapshot = view.data;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- hands each new alarm plan to the native notification scheduler
   useEffect(() => {
     if (snapshot === null) return;
     const alarms = planAlarms(snapshot, previous.current, Date.now());

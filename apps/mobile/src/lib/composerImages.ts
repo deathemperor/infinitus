@@ -6,6 +6,7 @@ import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+  isProviderSendTurnSupportedImageMimeType,
   type EnvironmentId,
   type PastedTextAttachmentSource,
   type UploadChatImageAttachment,
@@ -127,10 +128,8 @@ export async function persistComposerAttachmentFile(
   const { Directory, File, FileMode, Paths } = await import("expo-file-system");
   const directory = new Directory(Paths.document, COMPOSER_ATTACHMENT_DIRECTORY);
   directory.create({ idempotent: true, intermediates: true });
-  const safeName =
-    Array.from(name, (character) =>
-      character === "/" || character === "\\" || character.charCodeAt(0) < 32 ? "-" : character,
-    ).join("") || "file";
+  // Android's java.net.URI rejects characters expo-file-system leaves unencoded, such as `[` and `]`.
+  const safeName = name.replace(/[^\w. -]/g, "-") || "file";
   const destination = new File(directory, `${uuidv4()}-${safeName}`);
   const source = new File(uri);
   const sourceSize = source.size;
@@ -220,7 +219,7 @@ export async function removePersistedComposerAttachmentFile(uri: string): Promis
   }
 }
 
-async function createComposerFileAttachment(input: {
+export async function createComposerFileAttachment(input: {
   readonly uri: string;
   readonly name: string;
   readonly mimeType: string;
@@ -365,14 +364,6 @@ async function loadImagePicker() {
     return await import("expo-image-picker");
   } catch (error) {
     throw new Error("The photo library is unavailable right now.", { cause: error });
-  }
-}
-
-async function loadClipboard() {
-  try {
-    return await import("expo-clipboard");
-  } catch (error) {
-    throw new Error("Clipboard paste is unavailable right now.", { cause: error });
   }
 }
 
@@ -542,133 +533,6 @@ export async function pickComposerMedia(input: {
   };
 }
 
-/**
- * The clipboard hands over a full-resolution PNG, so a pasted screenshot is as large as a picked
- * one. The same gate as the picker's applies: a small still keeps its bytes (scaled down only when
- * its dimensions are oversized), a large one is staged to a cache file and rendered to a bounded
- * JPEG, and the staging files are removed.
- */
-async function boundPastedImage(
-  base64: string,
-  dataUri: string,
-): Promise<{ base64: string; mimeType: string }> {
-  const sourceBytes = estimateBase64ByteSize(base64);
-  if (originalImagePassthroughMimeType({ mimeType: "image/png", sourceBytes }) !== null) {
-    const fitted = await fitComposerImage({ uri: dataUri, mimeType: "image/png", base64 });
-    return { base64: fitted?.base64 ?? base64, mimeType: "image/png" };
-  }
-  const { File, Paths } = await import("expo-file-system");
-  const staged = new File(Paths.cache, `t3-paste-${uuidv4()}.png`);
-  let renderedUri: string | null = null;
-  try {
-    staged.create();
-    await staged.write(base64, { encoding: "base64" });
-    const rendered = await renderPhoto(staged.uri);
-    renderedUri = rendered.uri;
-    return { base64: rendered.base64, mimeType: "image/jpeg" };
-  } finally {
-    for (const uri of [staged.uri, renderedUri]) {
-      if (uri === null) continue;
-      try {
-        const file = new File(uri);
-        if (file.exists) file.delete();
-      } catch {
-        // A leftover in the cache directory is the OS's to reclaim.
-      }
-    }
-  }
-}
-
-export async function pasteComposerClipboard(input: { readonly existingCount: number }): Promise<
-  | {
-      readonly images: ReadonlyArray<DraftComposerImageAttachment>;
-      readonly text: null;
-      readonly error: string | null;
-    }
-  | {
-      readonly images: readonly [];
-      readonly text: string;
-      readonly error: null;
-    }
-> {
-  let clipboard: Awaited<ReturnType<typeof loadClipboard>>;
-  try {
-    clipboard = await loadClipboard();
-  } catch (error) {
-    return {
-      images: [],
-      text: null,
-      error: error instanceof Error ? error.message : "Clipboard paste is unavailable right now.",
-    };
-  }
-
-  const remainingSlots = PROVIDER_SEND_TURN_MAX_ATTACHMENTS - input.existingCount;
-
-  if (await clipboard.hasImageAsync()) {
-    if (remainingSlots <= 0) {
-      return {
-        images: [],
-        text: null,
-        error: `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} images per message.`,
-      };
-    }
-    const image = await clipboard.getImageAsync({ format: "png" });
-    if (!image) {
-      return {
-        images: [],
-        text: null,
-        error: "Clipboard image is unavailable.",
-      };
-    }
-
-    let pasted: { base64: string; mimeType: string };
-    try {
-      pasted = await boundPastedImage(image.data.split(",")[1] ?? "", image.data);
-    } catch {
-      return { images: [], text: null, error: "Clipboard image could not be read." };
-    }
-    const sizeBytes = estimateBase64ByteSize(pasted.base64);
-    if (sizeBytes <= 0 || sizeBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
-      return {
-        images: [],
-        text: null,
-        error: "Clipboard image exceeds the 10 MB attachment limit.",
-      };
-    }
-
-    const dataUrl = `data:${pasted.mimeType};base64,${pasted.base64}`;
-    return {
-      images: [
-        {
-          id: uuidv4(),
-          type: "image",
-          name: pasted.mimeType === "image/jpeg" ? "pasted-image.jpg" : "pasted-image.png",
-          mimeType: pasted.mimeType,
-          sizeBytes,
-          dataUrl,
-          previewUri: dataUrl,
-        },
-      ],
-      text: null,
-      error: null,
-    };
-  }
-
-  if (await clipboard.hasStringAsync()) {
-    const text = await clipboard.getStringAsync();
-    return {
-      images: [],
-      ...(text.length > 0 ? { text, error: null } : { text: null, error: "Clipboard is empty." }),
-    };
-  }
-
-  return {
-    images: [],
-    text: null,
-    error: "Clipboard does not contain pasteable text or image content.",
-  };
-}
-
 function mimeTypeFromUri(uri: string): string {
   const ext = uri.split(".").pop()?.toLowerCase();
   switch (ext) {
@@ -688,7 +552,7 @@ function mimeTypeFromUri(uri: string): string {
   }
 }
 
-export function isOwnedPastedImageUri(uri: string): boolean {
+function isOwnedPastedImageUri(uri: string): boolean {
   try {
     const url = new URL(uri);
     if (url.protocol !== "file:") {
@@ -712,15 +576,25 @@ export async function convertPastedImagesToAttachments(input: {
   const results: DraftComposerImageAttachment[] = [];
 
   for (const [index, uri] of input.uris.entries()) {
-    const ownedTemporaryFile = isOwnedPastedImageUri(uri);
+    const temporaryUris = isOwnedPastedImageUri(uri) ? [uri] : [];
     try {
       if (index >= Math.max(0, remainingSlots)) {
         continue;
       }
       const file = new File(uri);
-      const mimeType = mimeTypeFromUri(uri);
-      const pastedBase64 = await file.base64();
-      const fitted = await fitComposerImage({ uri, mimeType, base64: pastedBase64 });
+      const reportedMimeType = file.type;
+      const sourceMimeType = reportedMimeType?.startsWith("image/")
+        ? reportedMimeType
+        : mimeTypeFromUri(uri);
+      const mimeType = isProviderSendTurnSupportedImageMimeType(sourceMimeType)
+        ? sourceMimeType
+        : "image/jpeg";
+      const rendered = mimeType === sourceMimeType ? null : await renderPhoto(uri);
+      if (rendered !== null) {
+        temporaryUris.push(rendered.uri);
+      }
+      const pastedBase64 = rendered?.base64 ?? (await file.base64());
+      const fitted = rendered ?? (await fitComposerImage({ uri, mimeType, base64: pastedBase64 }));
       const base64 = fitted?.base64 ?? pastedBase64;
       const sizeBytes = estimateBase64ByteSize(base64);
       if (sizeBytes <= 0 || sizeBytes > PROVIDER_SEND_TURN_MAX_IMAGE_BYTES) {
@@ -733,19 +607,19 @@ export async function convertPastedImagesToAttachments(input: {
         mimeType,
         sizeBytes,
         dataUrl: `data:${mimeType};base64,${base64}`,
-        previewUri: ownedTemporaryFile ? `data:${mimeType};base64,${base64}` : (fitted?.uri ?? uri),
+        previewUri: `data:${mimeType};base64,${base64}`,
       });
     } catch (error) {
       console.warn("Failed to read pasted image", uri, error);
     } finally {
-      if (ownedTemporaryFile) {
+      for (const temporaryUri of temporaryUris) {
         try {
-          const file = new File(uri);
+          const file = new File(temporaryUri);
           if (file.exists) {
             file.delete();
           }
         } catch (error) {
-          console.warn("Failed to remove temporary pasted image", uri, error);
+          console.warn("Failed to remove temporary pasted image", temporaryUri, error);
         }
       }
     }

@@ -20,6 +20,7 @@ import {
 import { randomUuidV4 } from "@infinitus/provider-core/server/randomUuid";
 import * as SourceControlHost from "@infinitus/source-control-core/server/SourceControlHost";
 import * as SourceControlProvider from "@infinitus/source-control-core/server/SourceControlProvider";
+import { isSshRemoteUrl } from "@infinitus/shared/sourceControl";
 import { parsePullRequestUrl } from "../shared/definition.ts";
 
 import * as GitCafeApi from "./GitCafeApi.ts";
@@ -165,7 +166,7 @@ const cloneUrls = (target: Target) => ({
 });
 
 const isSshRemote = (remoteUrl: string | undefined) =>
-  remoteUrl !== undefined && (/^ssh:\/\//iu.test(remoteUrl) || /^[^/:]+@[^/:]+:/u.test(remoteUrl));
+  remoteUrl !== undefined && isSshRemoteUrl(remoteUrl);
 
 export const make = Effect.gen(function* () {
   const api = yield* GitCafeApi.GitCafeApi;
@@ -492,8 +493,10 @@ export const make = Effect.gen(function* () {
             yield* git.execute({
               operation: "GitCafeSourceControlProvider.checkoutChangeRequest",
               cwd: input.cwd,
+              // The upstream is recorded next, through the host's serialized config write.
               args: [
                 "checkout",
+                "--no-track",
                 "-B",
                 localBranch,
                 `refs/remotes/${remoteName}/${pull.headRefName}`,

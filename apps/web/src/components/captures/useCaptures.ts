@@ -87,6 +87,7 @@ export function useCapturesShortcuts(input: {
   const { keybindings, terminalOpen, modelPickerOpen, project } = input;
   const addCapture = useAddCapture();
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window keydown listener for the captures toggle and add shortcuts
   useEffect(() => {
     const handler = (event: globalThis.KeyboardEvent) => {
       const command = resolveShortcutCommand(event, keybindings, {

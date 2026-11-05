@@ -44,6 +44,7 @@ export function InfinitusDesktopCard() {
   const [prefs, setPrefs] = useState<InfinitusDesktopPrefs | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reads the desktop prefs over desktop IPC once the bridge exists; a late reply is ignored after unmount
   useEffect(() => {
     if (bridge === null) return;
     let cancelled = false;

@@ -79,7 +79,7 @@ export function createDesktopUpdateStateAtom(getBridge: () => DesktopUpdateBridg
   );
 }
 
-const desktopUpdateStateAtom = createDesktopUpdateStateAtom(getDesktopUpdateBridge);
+export const desktopUpdateStateAtom = createDesktopUpdateStateAtom(getDesktopUpdateBridge);
 
 /** #829: the update button was told to install once every running turn on
     a local backend has finished. Cleared by the button itself when the

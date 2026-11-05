@@ -31,6 +31,7 @@ export function useInfinitusPairingToasts(): void {
   const navigate = useNavigate();
   const watched = useRef<Watched | null>(null);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- shows imperative toasts for pairing requests not yet seen
   useEffect(() => {
     if (environmentId === null || access.kind === "loading" || access.kind === "forbidden") return;
     if (watched.current === null || watched.current.environmentId !== environmentId) {

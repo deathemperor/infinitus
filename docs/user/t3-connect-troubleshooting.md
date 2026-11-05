@@ -7,12 +7,12 @@ An Infinitus Connect connection goes through four parts, in this order:
 3. **The host's tunnel** (cloudflared on the host) carries the request to the host.
 4. **Infinitus on the host** answers.
 
-When a connection fails, open **Settings > Connections**, find the environment,
+When a connection fails, open **Settings > Environments**, find the environment,
 and select **Details**. The first part marked as failed is the cause. Find its
 section below.
 
 To see the host's side, run `infinitus connect status` on the host, or open
-**Settings > Connections** on the host. Both check the host's Infinitus Connect
+**Settings > Sharing & access** on the host. Both check the host's Infinitus Connect
 address from the host, and say why it fails. `infinitus connect` runs the same check
 when it finishes setup. This check cannot test another device's network. For a
 problem on one device, use **Details** on that device.
@@ -99,20 +99,27 @@ Fix:
 
 ## Sign-in, account, or link problems
 
-Infinitus Connect does not have an active link between your account and the host.
+This device's Infinitus Connect sign-in is not ready yet, or Infinitus Connect does not have
+an active link between your account and the host.
 
 - **The host is linked to a different account.** Sign in to the same Infinitus Connect
   account on this device and on the host. On the host, run `infinitus connect logout`,
   then `infinitus connect`.
 - **Infinitus Connect is off on the host, or the host only publishes agent activity.**
-  On the host, open **Settings > Connections** and turn **Infinitus Connect** on, or
+  On the host, open **Settings > Sharing & access** and turn **Infinitus Connect** on, or
   run `infinitus connect`.
-- **The host was linked, but the server did not apply the link yet.** Run
-  `infinitus service restart` on the host, or restart `infinitus serve`.
+- **The host was linked, but the server did not apply the link yet.** Restart
+  the server on the host: quit and reopen the Infinitus desktop app, run
+  `infinitus service restart`, or stop `infinitus serve` and run it again.
 - **This device's sign-in expired, or the host no longer accepts this
   device.** Sign out of Infinitus Connect and sign in again.
+- **This device is still loading its Infinitus Connect sign-in.** Wait a moment;
+  Infinitus retries on its own. If it keeps waiting, reload or restart Infinitus on
+  this device.
 - **Your account reached its tunnel limit.** Remove an environment you do not
-  use from your Infinitus account's Infinitus Connect page, then restart Infinitus on the host.
+  use from your Infinitus account's Infinitus Connect page, or
+  [link a paid T3 Chat account](./remote-access.md#more-machines-with-t3-chat)
+  for a higher limit. Then restart Infinitus on the host.
 
 ## The clock is off
 
@@ -129,7 +136,7 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 
 | Error                                                     | Fix                                                                                                                                                              |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment, then restart Infinitus on the host.                                                                                                |
+| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                                                 |
 | `auth_invalid` or `invalid_bearer`                        | Run `infinitus connect login`. If credentials were revoked, run `infinitus connect logout`, then `infinitus connect` again. Restart the server after signing in. |
 | Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                                               |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                                                    |
@@ -149,3 +156,7 @@ If none of this helps, open an issue on
 - The text from **Copy diagnostics** in the environment's **Details**.
 - The output of `infinitus connect status` on the host.
 - The trace ID, if one is shown.
+- If the tunnel dropped earlier, the host's tunnel log, `relay-client.ndjson`
+  in the logs folder (`~/.t3/userdata/logs` by default). It records when the
+  tunnel connected, warned, exited, and restarted, with the tunnel token
+  removed.

@@ -33,6 +33,8 @@ export const InfinitusSessionHoldsIdle = Layer.succeed(
   InfinitusSessionHolds,
   InfinitusSessionHolds.of({
     held: Stream.make([]),
-    release: () => Effect.succeed({ released: false, reason: "nothing is held or paused" }),
+    release: Effect.fn("InfinitusSessionHolds.release")(function () {
+      return Effect.succeed({ released: false, reason: "nothing is held or paused" });
+    }),
   }),
 );

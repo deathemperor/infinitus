@@ -45,11 +45,11 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "effect-tsgo tsrs --noEmit",
     "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
-    "@cursor/sdk": "1.0.35",
+    "@cursor/sdk": "1.2.0",
     "@infinitus/contracts": "workspace:*",
     "@infinitus/provider-core": "workspace:*",
     "@infinitus/shared": "workspace:*",

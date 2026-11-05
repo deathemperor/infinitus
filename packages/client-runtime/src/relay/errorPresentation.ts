@@ -1,7 +1,8 @@
 import type { DpopFailureReason } from "@infinitus/contracts";
-import type {
-  RelayEnvironmentStatusResponse,
-  RelayProtectedError,
+import {
+  T3CHAT_PLAN_TUNNEL_LIMITS,
+  type RelayEnvironmentStatusResponse,
+  type RelayProtectedError,
 } from "@infinitus/contracts/relay";
 import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 
@@ -51,7 +52,7 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
         return `The environment's ${CONNECT_NAME} tunnel is still being set up.`;
       }
       if (error.reason === "endpoint_provider_not_managed") {
-        return `This environment is linked only to publish agent activity, so it cannot accept connections. On that computer, open Settings > Connections and turn ${CONNECT_NAME} on.`;
+        return `This environment is linked only to publish agent activity, so it cannot accept connections. On that computer, open Settings > Sharing & access and turn ${CONNECT_NAME} on.`;
       }
       return error.reason
         ? `Relay rejected the environment connection request (${error.reason}).`
@@ -67,7 +68,9 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
         error.provisioningStage ? ` Failed stage: ${error.provisioningStage}.` : ""
       }`;
     case "RelayEnvironmentLinkLimitExceededError":
-      return `Relay refused the link: this account already has its maximum of ${error.maxTunnels} managed tunnels. Unlink an environment to free one up.`;
+      return error.maxTunnels < T3CHAT_PLAN_TUNNEL_LIMITS.premier
+        ? `Relay refused the link: this account already has its maximum of ${error.maxTunnels} managed tunnels. Unlink an environment, or link a paid T3 Chat account in your ${CONNECT_NAME} account settings on web or desktop. Pro raises the default limit to ${T3CHAT_PLAN_TUNNEL_LIMITS.pro} and Premier to ${T3CHAT_PLAN_TUNNEL_LIMITS.premier}.`
+        : `Relay refused the link: this account already has its maximum of ${error.maxTunnels} managed tunnels. Unlink an environment to free one up.`;
     case "RelayAgentActivityPublishProofExpiredError":
       return "Relay rejected an expired agent activity publish proof.";
     case "RelayAgentActivityPublishProofInvalidError":

@@ -2,7 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/ui/AndroidScreenHeader";
+import { AppBar } from "../../components/ui/AppBar";
 import { NativeStackScreenOptions } from "../../native/StackHeader";
 import { InfinitusAccounts } from "./InfinitusAccounts";
 
@@ -16,7 +16,7 @@ export function AccountsRouteScreen() {
       {Platform.OS === "android" ? (
         <>
           <NativeStackScreenOptions options={{ headerShown: false }} />
-          <AndroidScreenHeader title="Accounts" onBack={() => navigation.goBack()} />
+          <AppBar embedded title="Accounts" onBack={() => navigation.goBack()} />
         </>
       ) : null}
       <ScrollView

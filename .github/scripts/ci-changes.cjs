@@ -14,7 +14,7 @@ const INERT = [
 
 // Shared test setup and vendored mobile dependencies affect every package.
 const RUNS_EVERYTHING = [
-  /^packages\/shared\/src\/(HostProcess|testing\/longTempDir)\.ts$/,
+  /^packages\/shared\/src\/(HostProcess|testing\/(longTempDir|providerEnv))\.ts$/,
   /^apps\/mobile\/deps\//,
 ];
 
@@ -27,11 +27,15 @@ const EXTRA_OWNERS = [
   [/^native\/browser-secret\//, ["@infinitus/desktop"]],
   [/^native\/kde-snap-shot\//, ["@infinitus/desktop"]],
   [/^native\/libghostty-vt\//, ["@infinitus/web"]],
+  // apps/server/src/cloud/ConnectReachability.test.ts checks the guide's headings.
+  [/^docs\/user\/t3-connect-troubleshooting\.md$/, ["t3"]],
 ];
 const RUST = /^native\/(resource-monitor|kde-snap-shot|hyprland-snap-shot)\//;
 
 // These tests read other packages without declaring dependencies.
 const TEST_ONLY_DEPS = {
+  // Evals import the server's source to test its real model-facing text.
+  "@infinitus/evals": ["t3"],
   "@infinitus/provider-pi": ["@infinitus/client-runtime"],
   "@infinitus/scripts": [
     "@infinitus/desktop",
@@ -90,11 +94,11 @@ function readWorkspace() {
 
 // [] means inert; null means unknown and requires every job.
 function ownersOf(file, packages) {
-  if (INERT.some((pattern) => pattern.test(file))) return [];
+  const extra = EXTRA_OWNERS.flatMap(([pattern, names]) => (pattern.test(file) ? names : []));
+  if (INERT.some((pattern) => pattern.test(file))) return extra;
   // A manifest can change dependencies or versions other packages read.
   if (path.posix.basename(file) === "package.json") return null;
   if (RUNS_EVERYTHING.some((pattern) => pattern.test(file))) return null;
-  const extra = EXTRA_OWNERS.flatMap(([pattern, names]) => (pattern.test(file) ? names : []));
   // scripts/build-desktop-artifact.test.ts reads the crates' sources.
   if (RUST.test(file)) return ["@infinitus/scripts", ...extra];
 

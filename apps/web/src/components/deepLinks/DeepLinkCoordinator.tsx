@@ -69,6 +69,7 @@ export function DeepLinkCoordinator() {
     }
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the desktop bridge's pending deep links and drains the ones queued before mount
   useEffect(() => {
     const bridge = typeof window === "undefined" ? undefined : window.desktopBridge;
     if (

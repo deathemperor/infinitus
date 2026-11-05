@@ -3,7 +3,10 @@ import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
 import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
-import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
+import {
+  useAppearancePreferences,
+  useAndroidFloatingTabs,
+} from "../settings/appearance/AppearancePreferencesProvider";
 import type { EnvironmentThreadShell } from "@infinitus/client-runtime/state/shell";
 import { settlePromise, squashAtomCommandFailure } from "@infinitus/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
@@ -18,7 +21,6 @@ import {
   type MessageId,
   type ModelSelection,
   type ProviderInteractionMode,
-  type RuntimeMode,
   type ServerConfig as T3ServerConfig,
   type UsageLimitsReport,
 } from "@infinitus/contracts";
@@ -30,8 +32,8 @@ import {
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import { StackActions, useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Keyboard, Platform, View, type ViewStyle } from "react-native";
+import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
+import { I18nManager, Keyboard, Platform, View, type ViewStyle } from "react-native";
 import { composerImageGallery } from "../../lib/composerImageGallery";
 import { filePreviewGallery } from "../../lib/filePreviewGallery";
 import { FilePreviewModal, type FilePreviewSource } from "../../components/FilePreviewModal";
@@ -46,6 +48,7 @@ import Animated, {
   type LayoutAnimationFunction,
   ReduceMotion,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -63,7 +66,9 @@ import {
 } from "../../state/use-composer-drafts";
 import { appAtomRegistry } from "../../state/atom-registry";
 import type { ComposerDocumentAttachment } from "../../lib/composerContext";
-import { useProject, useThreadShells } from "../../state/entities";
+import { useProject, useVisibleThreadShells } from "../../state/entities";
+import { useMentionableEnvironments } from "../../state/environments";
+import { useLinkedEnvironments } from "../../state/peerLinks";
 import { scopeProjectRef } from "@infinitus/client-runtime/environment";
 
 import { AppText as Text } from "../../components/ui/AppText";
@@ -82,15 +87,10 @@ import {
   composerStripAttachments,
   type DraftComposerFileAttachment,
 } from "../../lib/composerImages";
-import {
-  buildModelOptions,
-  groupByProvider,
-  isModelSelectionUnavailable,
-} from "../../lib/modelOptions";
+import { buildModelOptions, isModelSelectionUnavailable } from "../../lib/modelOptions";
 import { useScaledTextRole, type ScaledTextRole } from "../settings/appearance/useScaledTextRole";
 import type { RemoteClientConnectionState } from "../../lib/connection";
 import { MOBILE_TYPOGRAPHY } from "../../lib/typography";
-import { resolveProviderOptionDescriptors } from "../../lib/providerOptions";
 import { Menu } from "../../components/ui/Menu";
 import type { ActiveTurnComposerAction } from "@infinitus/client-runtime/state/composer-dispatch";
 import type { FollowUpBehavior } from "../../lib/followUpBehavior";
@@ -98,14 +98,18 @@ import {
   resolveComposerSendPresentation,
   type ComposerSendPresentation,
 } from "./composerSendPresentation";
+import { compactEditorInsets } from "./compactEditorInsets";
 import { ComposerCommandPopover } from "./ComposerCommandPopover";
 import { ComposerPopoverAnchor } from "./ComposerPopoverAnchor";
 import { ComposerQueuedEditAttachments } from "./ComposerQueuedEdit";
 import { useComposerCommandMenu } from "./use-composer-command-menu";
 import { useProjectPromptSnippets } from "./usePromptSnippets";
+import type { ComposerEnvironmentCandidate } from "@infinitus/client-runtime/composerThreadItems";
+import { offersLinkedEnvironments } from "@infinitus/client-runtime/link-request";
 import {
   ComposerDictationCancelAction,
   ComposerDictationDraftContent,
+  ComposerDictationError,
   ComposerDictationPrimaryAction,
   ComposerDictationStartAction,
   ComposerDictationStatus,
@@ -114,14 +118,7 @@ import {
 import { useVoiceInputController } from "../voice-input/useVoiceInputController";
 import { useMarkUpDraftImage } from "../infinitus/useMarkUpDraftImage";
 import { resolveVoiceComposerPresentation } from "../voice-input/voiceInputPresentation";
-import {
-  rememberModelOptions,
-  withRememberedModelOptions,
-} from "../../state/use-model-option-memory";
-import {
-  type ExistingThreadSettingsRouteSession,
-  useExistingThreadSettingsRoutePresentation,
-} from "./ThreadSettingsSheet";
+import type { ExistingThreadSettingsRouteParams } from "./ThreadSettingsSheet";
 import {
   useThreadSettingsSheetPresentation,
   type NavigationWithFinishTransitioning,
@@ -129,6 +126,7 @@ import {
 
 export const COMPOSER_COLLAPSED_CHROME = 60;
 
+const NO_MACHINES: ReadonlyArray<ComposerEnvironmentCandidate> = [];
 const COLLAPSED_EDITOR_DEFAULT_INSET = 6;
 // iOS puts line-height slack above glyphs. DM Sans's lowercase midline is
 // descender (0.31em) + half x-height (0.504em) above the line bottom.
@@ -143,7 +141,7 @@ function collapsedEditorInset(text: ScaledTextRole): number {
   return Math.max(0, Math.round(COLLAPSED_EDITOR_DEFAULT_INSET - shift));
 }
 
-export function useCompactComposerEditor(text: ScaledTextRole, value: string) {
+function useCompactComposerEditor(text: ScaledTextRole, value: string) {
   const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
   const [compactWidth, setCompactWidth] = useState(0);
   const contentHeight = contentSize.height;
@@ -164,48 +162,25 @@ export function useCompactComposerEditor(text: ScaledTextRole, value: string) {
     (contentHeight > text.lineHeight * 1.5 ||
       (compactWidth > 0 && contentSize.width > compactWidth));
   const compactRowHeight = Math.max(44, minimum);
-  const animatedHeight = useSharedValue(height);
-  const surfaceHeight = useSharedValue(compactRowHeight);
-  const targetSurfaceHeight = isExpanded ? height + 52 : compactRowHeight;
-  const expansion = useSharedValue(0);
-  useLayoutEffect(() => {
-    const config = { duration: 180, reduceMotion: ReduceMotion.System };
-    if (Platform.OS === "android") {
-      animatedHeight.set(height);
-      surfaceHeight.set(targetSurfaceHeight);
-      expansion.set(Number(isExpanded));
-      return;
-    }
-    // Resolve wrapping at the destination width before animating vertically.
-    // Intermediate widths otherwise produce taller measurements mid-transition.
-    let nextFrame: number | undefined;
-    const frame = requestAnimationFrame(() => {
-      nextFrame = requestAnimationFrame(() => {
-        animatedHeight.set(withTiming(height, config));
-        surfaceHeight.set(withTiming(targetSurfaceHeight, config));
-        expansion.set(withTiming(Number(isExpanded), config));
-      });
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      if (nextFrame !== undefined) cancelAnimationFrame(nextFrame);
-    };
-  }, [animatedHeight, expansion, height, isExpanded, surfaceHeight, targetSurfaceHeight]);
-  const containerStyle = useAnimatedStyle(() => ({
-    height: surfaceHeight.value,
-  }));
+  const isRTL = I18nManager.isRTL;
   const editorStyle = useAnimatedStyle(() => ({
     position: "absolute",
     overflow: "hidden",
-    height: animatedHeight.value,
-    left: isExpanded ? 14 : editorX.value + 4,
-    right: isExpanded ? 14 : rowWidth.value - editorX.value - editorWidth.value + 4,
-    bottom:
-      (compactRowHeight - minimum) / 2 + expansion.value * (52 - (compactRowHeight - minimum) / 2),
+    height,
+    ...(isExpanded
+      ? { left: 14, right: 14 }
+      : compactEditorInsets({
+          slotX: editorX.value,
+          slotWidth: editorWidth.value,
+          rowWidth: rowWidth.value,
+          isRTL,
+        })),
+    // The full-width editor must move above the controls in the same frame it widens.
+    bottom: isExpanded ? 52 : (compactRowHeight - minimum) / 2,
   }));
   return {
     isExpanded,
-    containerStyle,
+    containerStyle: { height: isExpanded ? height + 52 : compactRowHeight },
     editorStyle,
     onRowLayout: (event: { nativeEvent: { layout: { width: number } } }) => {
       rowWidth.set(event.nativeEvent.layout.width);
@@ -240,7 +215,6 @@ export interface ThreadComposerProps {
   readonly bottomInset?: number;
   readonly connectionState: RemoteClientConnectionState;
   readonly environmentLabel: string | null;
-  readonly threadSyncPhase?: "loading" | "syncing" | null;
   readonly selectedThread: EnvironmentThreadShell;
   readonly reportedModelSelection?: ModelSelection | null;
   readonly hasCompactableConversation: boolean;
@@ -278,15 +252,13 @@ export interface ThreadComposerProps {
   ) => Promise<MessageId | null>;
   readonly onShowUsageLimits: (report: UsageLimitsReport | null) => void;
   readonly canSwitchProvider: boolean;
-  readonly onUpdateModelSelection: (modelSelection: ModelSelection) => void;
-  readonly onUpdateRuntimeMode: (runtimeMode: RuntimeMode) => void;
   readonly onUpdateInteractionMode?: (interactionMode: ProviderInteractionMode) => void;
   readonly onHeightChange?: (height: number) => void;
   readonly onEditorFocusChange?: (focused: boolean) => void;
 }
 
 // Android KeyboardStickyView tracks the IME; concurrent timed layout morphs cause jitter.
-export const COMPOSER_TRANSITION_DURATION_MS = 220;
+const COMPOSER_TRANSITION_DURATION_MS = 220;
 // Side panes animate dock width; nested horizontal transitions would make the surface trail the toolbar.
 const composerHeightTransition: LayoutAnimationFunction = (values) => {
   "worklet";
@@ -309,8 +281,7 @@ const composerHeightTransition: LayoutAnimationFunction = (values) => {
     },
   };
 };
-export const COMPOSER_LAYOUT_TRANSITION =
-  Platform.OS === "android" ? undefined : composerHeightTransition;
+const COMPOSER_LAYOUT_TRANSITION = Platform.OS === "android" ? undefined : composerHeightTransition;
 // Share of the one-row composer the draft keeps; a long model name truncates first.
 const INLINE_EDITOR_MIN_WIDTH = "40%";
 const INLINE_EDITOR_HEIGHT = 36;
@@ -377,7 +348,7 @@ function SendActionButton(props: {
   );
 }
 
-export function ComposerSurface(props: {
+function ComposerSurface(props: {
   readonly children: ReactNode;
   readonly style: ViewStyle;
   readonly animateLayout?: boolean;
@@ -385,18 +356,15 @@ export function ComposerSurface(props: {
   const colors = useUniwindTheme();
   const targetBorderRadius =
     typeof props.style.borderRadius === "number" ? props.style.borderRadius : 0;
-  const animatedBorderRadius = useSharedValue(targetBorderRadius);
   const shouldAnimate = props.animateLayout !== false && Platform.OS !== "android";
-  useLayoutEffect(() => {
-    animatedBorderRadius.set(
-      shouldAnimate
-        ? withTiming(targetBorderRadius, {
-            duration: COMPOSER_TRANSITION_DURATION_MS,
-            reduceMotion: ReduceMotion.System,
-          })
-        : targetBorderRadius,
-    );
-  }, [animatedBorderRadius, shouldAnimate, targetBorderRadius]);
+  const animatedBorderRadius = useDerivedValue(() =>
+    shouldAnimate
+      ? withTiming(targetBorderRadius, {
+          duration: COMPOSER_TRANSITION_DURATION_MS,
+          reduceMotion: ReduceMotion.System,
+        })
+      : targetBorderRadius,
+  );
   const borderCurve = props.style.borderCurve;
   const animatedShapeStyle = useAnimatedStyle(() => ({
     borderRadius: animatedBorderRadius.value,
@@ -457,12 +425,25 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
   const pendingPastedTextAttachmentCountRef = useRef(0);
   const pendingNativeImagePasteCountRef = useRef(0);
   const [pendingPastedTextAttachmentCount, setPendingPastedTextAttachmentCount] = useState(0);
+  const settingsRoutePresentedRef = useRef(false);
   const settingsSheetPresentation = useThreadSettingsSheetPresentation({
     editorRef: inputRef,
-    isEditorFocused: isFocused,
+    onPresent: () => {
+      if (settingsRoutePresentedRef.current) return;
+      settingsRoutePresentedRef.current = true;
+      // The draft composer edits the new-task flow, which owns its own settings route.
+      navigation.dispatch(
+        props.isDraft
+          ? StackActions.push("NewTaskThreadSettings")
+          : StackActions.push("ThreadSettingsSheet", {
+              environmentId: props.environmentId,
+              threadId: props.selectedThread.id,
+              draftKey: composerDraftKey,
+            } satisfies ExistingThreadSettingsRouteParams),
+      );
+    },
   });
-  const settingsRoutePresentation = useExistingThreadSettingsRoutePresentation();
-  const settingsRoutePresentedRef = useRef(false);
+  const disposeSettingsSheetPresentation = useEffectEvent(settingsSheetPresentation.dispose);
   const wasExpandedBeforePreviewRef = useRef(false);
   const inFlightThreadIdsRef = useRef(new Set<string>());
 
@@ -508,7 +489,6 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
   });
   const sendLabel = sendPresentation.label;
   const currentModelSelection = props.selectedThread.modelSelection;
-  const currentRuntimeMode = props.selectedThread.runtimeMode;
   const modelUnavailable =
     props.connectionState === "connected" &&
     isModelSelectionUnavailable(
@@ -563,16 +543,19 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     props.environmentId,
     props.selectedThread.projectId,
   );
+  const mentionableEnvironments = useMentionableEnvironments();
   const composerMenu = useComposerCommandMenu({
     draftMessage: draftMessage,
     ownerKey: composerDraftKey,
     environmentId: props.environmentId,
-    threadShells: useThreadShells(),
+    threadShells: useVisibleThreadShells(),
+    environments: offersLinkedEnvironments(props.serverConfig)
+      ? mentionableEnvironments
+      : NO_MACHINES,
+    linkedEnvironments: useLinkedEnvironments(props.environmentId),
     currentThreadId: props.selectedThread.id,
     projectCwd: props.projectCwd,
-    pullRequestProjectId: props.serverConfig?.environment.capabilities.pullRequests
-      ? (project?.id ?? null)
-      : null,
+    pullRequestProjectId: props.serverConfig ? (project?.id ?? null) : null,
     pullRequestRepository: project?.repositoryIdentity?.displayName ?? null,
     threadPullRequests: props.selectedThread.pullRequests,
     selectedProviderStatus,
@@ -603,10 +586,13 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     voiceInput.state,
     voiceInput.elapsedSeconds,
   );
-  const isVoiceInputPresented = voicePresentation.statusLabel !== null;
+  const isVoiceInputPresented = voicePresentation.statusKind === "active";
   const isExpanded = isFocused || settingsSheetPresentation.keepsComposerExpanded;
-  const { setComposerEditing } = useAdaptiveWorkspaceLayout();
-  const hasSidebarTabBar = useSidebarWorkspaceTabs() === "picker";
+  const { layout, setComposerEditing } = useAdaptiveWorkspaceLayout();
+  const floatingSidebarComposer = useAndroidFloatingTabs() && layout.usesSplitView;
+  const usesLargeControls =
+    useSidebarWorkspaceTabs() === "picker" || (Platform.OS === "ios" && Platform.isPad);
+  const surfacePaddingVertical = usesLargeControls ? 9 : floatingSidebarComposer ? 6 : 2;
   const [compactRowWidth, setCompactRowWidth] = useState(0);
   const compactAttachmentLimit = compactRowWidth >= 500 ? 3 : 1;
   const compactEditor = useCompactComposerEditor(bodyText, draftMessage);
@@ -636,7 +622,11 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     sendBlockedReason === null &&
     !modelUnavailable;
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- clears the workspace layout's composer-editing flag when the composer unmounts
   useEffect(() => () => setComposerEditing(false), [setComposerEditing]);
+  // A pending sheet presentation or focus restore has no composer left to act on.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- disposes the pending settings sheet presentation and focus restore on unmount
+  useEffect(() => () => disposeSettingsSheetPresentation(), []);
 
   const onMarkUpDraftImage = useMarkUpDraftImage(props.environmentId, props.selectedThread.id);
   const onPressPreview = (source: FilePreviewSource) => {
@@ -670,12 +660,14 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
   const onEditorFocusChange = props.onEditorFocusChange;
   const handleFocus = () => {
     setIsFocused(true);
+    settingsSheetPresentation.onEditorFocusChange(true);
     onEditorFocusChange?.(true);
     setComposerEditing(true);
   };
 
   const handleBlur = () => {
     setIsFocused(false);
+    settingsSheetPresentation.onEditorFocusChange(false);
     onEditorFocusChange?.(false);
     setComposerEditing(false);
   };
@@ -731,65 +723,15 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     lockedProviderInstanceId,
     props.selectedThread.projectId,
   );
-  const threadProviderGroups = groupByProvider(modelOptions);
   const currentModelOption =
     modelOptions.find(
       (option) =>
         option.selection.instanceId === currentModelSelection.instanceId &&
         option.selection.model === currentModelSelection.model,
     ) ?? null;
-  const providerOptionDescriptors = resolveProviderOptionDescriptors({
-    capabilities: currentModelOption?.capabilities,
-    selections: currentModelSelection.options,
-  });
-  const settingsOwnerId = composerOwnerKey;
-  const settingsRouteSession = {
-    ownerId: settingsOwnerId,
-    environmentId: props.environmentId,
-    projectId: props.selectedThread.projectId,
-    // Fork (#834): the thread's usage rows in the settings sheet; a draft has none yet.
-    ...(props.isDraft ? {} : { threadId: props.selectedThread.id }),
-    providerInstanceId: currentModelSelection.instanceId,
-    ...(lockedProviderInstanceId ? { lockedProviderInstanceId } : {}),
-    providerGroups: threadProviderGroups,
-    selectedModel: currentModelSelection,
-    prompt: draftMessage,
-    onPromptChange: (text) => setComposerDraftText(composerDraftKey, text),
-    reportedModelSelection: props.reportedModelSelection,
-    onSelectModel: (option) =>
-      props.onUpdateModelSelection(withRememberedModelOptions(option.selection)),
-    restoreSelection: withRememberedModelOptions,
-    optionDescriptors: providerOptionDescriptors,
-    onUpdateOptionSelections: (options) => {
-      rememberModelOptions(
-        currentModelSelection.instanceId,
-        currentModelSelection.model,
-        options ?? [],
-      );
-      props.onUpdateModelSelection({ ...currentModelSelection, options });
-    },
-    runtimeMode: currentRuntimeMode,
-    onUpdateRuntimeMode: props.onUpdateRuntimeMode,
-  } satisfies ExistingThreadSettingsRouteSession;
   const openSettings = () => {
-    settingsRoutePresentation.present(settingsRouteSession);
     settingsSheetPresentation.open();
   };
-
-  useEffect(() => {
-    if (settingsSheetPresentation.isActive) {
-      settingsRoutePresentation.present(settingsRouteSession);
-    }
-  }, [settingsRoutePresentation.present, settingsRouteSession, settingsSheetPresentation.isActive]);
-
-  useEffect(() => {
-    if (!settingsSheetPresentation.isVisible || settingsRoutePresentedRef.current) {
-      return;
-    }
-
-    settingsRoutePresentedRef.current = true;
-    navigation.dispatch(StackActions.push("ThreadSettingsSheet"));
-  }, [navigation, settingsSheetPresentation.isVisible]);
 
   useFocusEffect(() => {
     if (!settingsRoutePresentedRef.current) {
@@ -798,9 +740,9 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
 
     settingsRoutePresentedRef.current = false;
     settingsSheetPresentation.onDismissed();
-    settingsRoutePresentation.clear(settingsOwnerId);
   });
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the native stack's finishTransitioning event to restore the keyboard after a sheet dismisses
   useEffect(
     () =>
       // The native-stack patch exposes UIKit dismissal completion; restore the keyboard then.
@@ -861,7 +803,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
   const modelControl = (
     <View className="min-w-0 shrink">
       <ComposerModelControl
-        size={hasSidebarTabBar ? "large" : "regular"}
+        size={usesLargeControls ? "large" : "regular"}
         modelOption={currentModelOption}
         selection={currentModelSelection}
         provider={selectedProviderStatus?.driver}
@@ -945,12 +887,16 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         <ComposerSurface
           animateLayout={false}
           style={{
-            borderRadius: hasSidebarTabBar ? 31 : 27,
+            borderRadius: usesLargeControls ? 31 : 27,
             borderCurve: "circular",
             overflow: "hidden",
-            paddingVertical: hasSidebarTabBar ? 9 : 2,
+            paddingVertical: surfacePaddingVertical,
           }}
         >
+          <ComposerDictationError
+            error={voiceInput.state.phase === "error" ? voiceInput.state.error : null}
+            onDismiss={voiceInput.cancel}
+          />
           {isExpanded ? editingAttachments : null}
           <View
             onLayout={(event) => {
@@ -964,11 +910,9 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
               hidden={showsCompactDictation}
             >
               <ComposerAttachmentButton
-                size={hasSidebarTabBar ? "large" : "regular"}
+                size={usesLargeControls ? "large" : "regular"}
                 disabled={isSubmissionLocked}
-                supportsFiles={Boolean(
-                  props.serverConfig?.environment.capabilities.fileAttachments,
-                )}
+                supportsFiles={props.serverConfig !== null}
                 onPickMedia={props.onPickDraftMedia}
                 onPickFiles={props.onPickDraftFiles}
               />
@@ -986,6 +930,143 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   compactEditor.isExpanded ? { flex: 0, width: 0 } : undefined,
                 ]}
               ></Animated.View>
+              {/* TalkBack orders siblings by position; outside this row the editor reads after Send. */}
+              <Animated.View
+                style={[
+                  compactEditor.editorStyle,
+                  showsCompactDictation ? { display: "none" } : undefined,
+                ]}
+              >
+                <ComposerEditor
+                  hidden={props.hidden}
+                  draftKey={composerDraftKey}
+                  environmentId={props.environmentId}
+                  onOpenMention={(path) => {
+                    Keyboard.dismiss();
+                    if (props.isDraft) {
+                      navigation.navigate("NewTaskFile", {
+                        environmentId: String(props.environmentId),
+                        cwd: props.projectCwd ?? undefined,
+                        path: fileRoutePathSegments(path),
+                      });
+                    } else {
+                      navigation.navigate("ThreadFile", {
+                        environmentId: String(props.environmentId),
+                        threadId: String(props.selectedThread.id),
+                        path: fileRoutePathSegments(path),
+                      });
+                    }
+                  }}
+                  onOpenAttachment={openDraftDocument}
+                  chipsInert={!isExpanded}
+                  onInertChipPress={() => inputRef.current?.focus()}
+                  ref={inputRef}
+                  multiline
+                  value={draftMessage}
+                  // The save uses a draft snapshot; further typing would be discarded on success.
+                  readOnly={isSubmissionLocked}
+                  skills={composerMenu.skills}
+                  selection={composerMenu.selection}
+                  onChangeText={(text) => {
+                    if (!isSubmissionLocked) props.onChangeDraftMessage(text);
+                  }}
+                  onSelectionChange={composerMenu.onSelectionChange}
+                  onPasteImages={(uris) => {
+                    if (isSubmissionLocked) return;
+                    pendingNativeImagePasteCountRef.current += 1;
+                    void props.onNativePasteImages(uris).finally(() => {
+                      pendingNativeImagePasteCountRef.current -= 1;
+                    });
+                  }}
+                  onPasteText={(paste) => {
+                    if (isSubmissionLocked) return;
+                    const insertPaste = () => {
+                      const insertion = replaceTextSelection({
+                        value: paste.value,
+                        selection: paste.selection,
+                        text: paste.text,
+                      });
+                      const selection = { start: insertion.cursor, end: insertion.cursor };
+                      props.onChangeDraftMessage(insertion.value);
+                      composerMenu.onSelectionChange(selection);
+                    };
+                    const capabilities = props.serverConfig?.environment.capabilities;
+                    const advertisedMax = capabilities?.fileAttachments?.maxUploadBytes;
+                    const maxBytes =
+                      advertisedMax === undefined
+                        ? null
+                        : clampFileAttachmentUploadBytes(advertisedMax);
+                    const wouldExceedInputLimit =
+                      paste.value.length -
+                        Math.max(0, paste.selection.end - paste.selection.start) +
+                        paste.text.length >
+                      PROVIDER_SEND_TURN_MAX_INPUT_CHARS;
+                    const canAttach =
+                      maxBytes !== null &&
+                      countComposerDraftAttachmentsAfterSelection(composerDraftKey, {
+                        text: paste.value,
+                        ...paste.selection,
+                      }) < PROVIDER_SEND_TURN_MAX_ATTACHMENTS &&
+                      new TextEncoder().encode(paste.text).byteLength <= maxBytes;
+                    if (
+                      pastedTextDisposition({
+                        text: paste.text,
+                        wouldExceedInputLimit,
+                        canAttach: true,
+                      }) === "attachment"
+                    ) {
+                      if (canAttach) {
+                        pendingPastedTextAttachmentCountRef.current += 1;
+                        setPendingPastedTextAttachmentCount(
+                          pendingPastedTextAttachmentCountRef.current,
+                        );
+                        const finishAttachment = () => {
+                          pendingPastedTextAttachmentCountRef.current = Math.max(
+                            0,
+                            pendingPastedTextAttachmentCountRef.current - 1,
+                          );
+                          setPendingPastedTextAttachmentCount(
+                            pendingPastedTextAttachmentCountRef.current,
+                          );
+                        };
+                        void props
+                          .onNativePasteText(paste)
+                          .then(finishAttachment, finishAttachment);
+                      } else if (!wouldExceedInputLimit) {
+                        insertPaste();
+                      } else {
+                        Dialog.alert(
+                          "Pasted text is too large for this message",
+                          "Remove some text or an attachment, then paste again.",
+                        );
+                      }
+                      return;
+                    }
+                    insertPaste();
+                  }}
+                  placeholder={props.placeholder}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                  onSubmit={(alternate) =>
+                    void handleSend(
+                      alternate && sendPresentation.alternate !== null
+                        ? sendPresentation.alternate
+                        : undefined,
+                    )
+                  }
+                  submitTitle={sendPresentation.label}
+                  alternateSubmitTitle={
+                    sendPresentation.alternate === null
+                      ? sendPresentation.label
+                      : FOLLOW_UP_ACTION_LABEL[sendPresentation.alternate]
+                  }
+                  {...compactEditor.editorProps}
+                  textStyle={{
+                    ...bodyText,
+                    color: foregroundColor,
+                  }}
+                />
+              </Animated.View>
               {!isExpanded && stripAttachments.length > 0 ? (
                 <View className="h-[44px] shrink-0 flex-row items-center gap-1 pl-1">
                   {stripAttachments.slice(0, compactAttachmentLimit).map((attachment) => (
@@ -1017,7 +1098,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
               >
                 {modelControl}
                 <ComposerDictationStartAction
-                  size={hasSidebarTabBar ? "large" : "regular"}
+                  size={usesLargeControls ? "large" : "regular"}
                   state={voiceInput.state}
                   isAvailable={voiceInput.isAvailable}
                   disabled={isSubmissionLocked}
@@ -1026,7 +1107,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 />
                 {showStopAction ? (
                   <ComposerActionButton
-                    size={hasSidebarTabBar ? "large" : "regular"}
+                    size={usesLargeControls ? "large" : "regular"}
                     accessibilityLabel="Stop agent"
                     icon="stop.fill"
                     variant="danger"
@@ -1035,15 +1116,15 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   />
                 ) : showResumeAction ? (
                   <ComposerActionButton
-                    size={hasSidebarTabBar ? "large" : "regular"}
-                    accessibilityLabel="Resume queue"
+                    size={usesLargeControls ? "large" : "regular"}
+                    accessibilityLabel="Resume thread"
                     icon="play"
                     disabled={!props.canOperateThread || resumingQueue}
                     onPress={() => void handleResumeQueue()}
                   />
                 ) : (
                   <SendActionButton
-                    size={hasSidebarTabBar ? "large" : "regular"}
+                    size={usesLargeControls ? "large" : "regular"}
                     accessibilityLabel={sendBlockedReason ?? sendLabel}
                     presentation={sendPresentation}
                     disabled={!canSend}
@@ -1052,154 +1133,13 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 )}
               </View>
             </ComposerDictationDraftContent>
-            <Animated.View
-              style={[
-                compactEditor.editorStyle,
-                showsCompactDictation ? { display: "none" } : undefined,
-              ]}
-            >
-              <ComposerEditor
-                hidden={props.hidden}
-                draftKey={composerDraftKey}
-                environmentId={props.environmentId}
-                onOpenMention={(path) => {
-                  Keyboard.dismiss();
-                  if (props.isDraft) {
-                    navigation.navigate("NewTaskFile", {
-                      environmentId: String(props.environmentId),
-                      cwd: props.projectCwd ?? undefined,
-                      path: fileRoutePathSegments(path),
-                    });
-                  } else {
-                    navigation.navigate("ThreadFile", {
-                      environmentId: String(props.environmentId),
-                      threadId: String(props.selectedThread.id),
-                      path: fileRoutePathSegments(path),
-                    });
-                  }
-                }}
-                onOpenAttachment={openDraftDocument}
-                chipsInert={!isExpanded}
-                onInertChipPress={() => inputRef.current?.focus()}
-                ref={inputRef}
-                multiline
-                value={draftMessage}
-                // The save uses a draft snapshot; further typing would be discarded on success.
-                readOnly={isSubmissionLocked}
-                skills={composerMenu.skills}
-                selection={composerMenu.selection}
-                onChangeText={(text) => {
-                  if (!isSubmissionLocked) props.onChangeDraftMessage(text);
-                }}
-                onSelectionChange={composerMenu.onSelectionChange}
-                onPasteImages={(uris) => {
-                  if (isSubmissionLocked) return;
-                  pendingNativeImagePasteCountRef.current += 1;
-                  void props.onNativePasteImages(uris).finally(() => {
-                    pendingNativeImagePasteCountRef.current -= 1;
-                  });
-                }}
-                onPasteText={(paste) => {
-                  if (isSubmissionLocked) return;
-                  const insertPaste = () => {
-                    const insertion = replaceTextSelection({
-                      value: paste.value,
-                      selection: paste.selection,
-                      text: paste.text,
-                    });
-                    const selection = { start: insertion.cursor, end: insertion.cursor };
-                    props.onChangeDraftMessage(insertion.value);
-                    composerMenu.onSelectionChange(selection);
-                  };
-                  const capabilities = props.serverConfig?.environment.capabilities;
-                  const advertisedMax =
-                    capabilities?.attachmentUploads === true
-                      ? capabilities.fileAttachments?.maxUploadBytes
-                      : undefined;
-                  const maxBytes =
-                    advertisedMax === undefined
-                      ? null
-                      : clampFileAttachmentUploadBytes(advertisedMax);
-                  const wouldExceedInputLimit =
-                    paste.value.length -
-                      Math.max(0, paste.selection.end - paste.selection.start) +
-                      paste.text.length >
-                    PROVIDER_SEND_TURN_MAX_INPUT_CHARS;
-                  const canAttach =
-                    maxBytes !== null &&
-                    countComposerDraftAttachmentsAfterSelection(composerDraftKey, {
-                      text: paste.value,
-                      ...paste.selection,
-                    }) < PROVIDER_SEND_TURN_MAX_ATTACHMENTS &&
-                    new TextEncoder().encode(paste.text).byteLength <= maxBytes;
-                  if (
-                    pastedTextDisposition({
-                      text: paste.text,
-                      wouldExceedInputLimit,
-                      canAttach: true,
-                    }) === "attachment"
-                  ) {
-                    if (canAttach) {
-                      pendingPastedTextAttachmentCountRef.current += 1;
-                      setPendingPastedTextAttachmentCount(
-                        pendingPastedTextAttachmentCountRef.current,
-                      );
-                      const finishAttachment = () => {
-                        pendingPastedTextAttachmentCountRef.current = Math.max(
-                          0,
-                          pendingPastedTextAttachmentCountRef.current - 1,
-                        );
-                        setPendingPastedTextAttachmentCount(
-                          pendingPastedTextAttachmentCountRef.current,
-                        );
-                      };
-                      void props.onNativePasteText(paste).then(finishAttachment, finishAttachment);
-                    } else if (!wouldExceedInputLimit) {
-                      insertPaste();
-                    } else {
-                      Dialog.alert(
-                        wouldExceedInputLimit
-                          ? "Pasted text is too large for this message"
-                          : "Could not attach pasted text",
-                        wouldExceedInputLimit
-                          ? "Remove some text or an attachment, then paste again."
-                          : "Remove an attachment or use a smaller paste, then try again.",
-                      );
-                    }
-                    return;
-                  }
-                  insertPaste();
-                }}
-                placeholder={props.placeholder}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-                onSubmit={(alternate) =>
-                  void handleSend(
-                    alternate && sendPresentation.alternate !== null
-                      ? sendPresentation.alternate
-                      : undefined,
-                  )
-                }
-                submitTitle={sendPresentation.label}
-                alternateSubmitTitle={
-                  sendPresentation.alternate === null
-                    ? sendPresentation.label
-                    : FOLLOW_UP_ACTION_LABEL[sendPresentation.alternate]
-                }
-                {...compactEditor.editorProps}
-                textStyle={{
-                  ...bodyText,
-                  color: foregroundColor,
-                }}
-              />
-            </Animated.View>
           </View>
           <Animated.View
             accessibilityElementsHidden={!isToolbarVisible}
             collapsable={false}
             importantForAccessibility={isToolbarVisible ? "auto" : "no-hide-descendants"}
             pointerEvents={isToolbarVisible ? "auto" : "none"}
-            style={{ position: "absolute", bottom: hasSidebarTabBar ? 9 : 2, left: 0, right: 0 }}
+            style={{ position: "absolute", bottom: surfacePaddingVertical, left: 0, right: 0 }}
           >
             <ComposerDictationToolbar
               showsDictation={isVoiceInputPresented}
@@ -1212,35 +1152,19 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 style={{ gap: 0 }}
               >
                 <ComposerDictationCancelAction
-                  size={hasSidebarTabBar ? "large" : "regular"}
+                  size={usesLargeControls ? "large" : "regular"}
                   presentation={voicePresentation}
                   onCancel={voiceInput.cancel}
                 />
-                {isVoiceInputPresented ? (
-                  <ComposerDictationStatus
-                    audioLevels={voiceInput.audioLevels}
-                    elapsedSeconds={voiceInput.elapsedSeconds}
-                    phase={voiceInput.state.phase}
-                    presentation={voicePresentation}
-                    onDismissError={voiceInput.cancel}
-                  />
-                ) : (
-                  <View className="min-w-0 flex-1 flex-row items-center justify-between">
-                    <ComposerAttachmentButton
-                      size={hasSidebarTabBar ? "large" : "regular"}
-                      disabled={isSubmissionLocked}
-                      supportsFiles={Boolean(
-                        props.serverConfig?.environment.capabilities.fileAttachments,
-                      )}
-                      onPickMedia={props.onPickDraftMedia}
-                      onPickFiles={props.onPickDraftFiles}
-                    />
-                    {modelControl}
-                  </View>
-                )}
+                <ComposerDictationStatus
+                  audioLevels={voiceInput.audioLevels}
+                  elapsedSeconds={voiceInput.elapsedSeconds}
+                  phase={voiceInput.state.phase}
+                  presentation={voicePresentation}
+                />
                 <View className="shrink-0 flex-row items-center">
                   <ComposerDictationPrimaryAction
-                    size={hasSidebarTabBar ? "large" : "regular"}
+                    size={usesLargeControls ? "large" : "regular"}
                     state={voiceInput.state}
                     presentation={voicePresentation}
                     isAvailable={voiceInput.isAvailable}
@@ -1251,6 +1175,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   />
                   {showStopAction ? (
                     <ComposerActionButton
+                      size={usesLargeControls ? "large" : "regular"}
                       accessibilityLabel="Stop agent"
                       icon="stop.fill"
                       variant="danger"
@@ -1259,13 +1184,15 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                     />
                   ) : showResumeAction && voicePresentation.showsSend ? (
                     <ComposerActionButton
-                      accessibilityLabel="Resume queue"
+                      size={usesLargeControls ? "large" : "regular"}
+                      accessibilityLabel="Resume thread"
                       icon="play"
                       disabled={!props.canOperateThread || resumingQueue}
                       onPress={() => void handleResumeQueue()}
                     />
                   ) : voicePresentation.showsSend ? (
                     <SendActionButton
+                      size={usesLargeControls ? "large" : "regular"}
                       accessibilityLabel={sendBlockedReason ?? sendLabel}
                       presentation={sendPresentation}
                       disabled={!canSend}

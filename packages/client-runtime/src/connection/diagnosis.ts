@@ -27,7 +27,7 @@ export interface ConnectionDiagnosis {
   readonly hops: ReadonlyArray<ConnectionDiagnosisHop>;
   readonly steps: ReadonlyArray<string>;
   readonly facts: ReadonlyArray<readonly [label: string, value: string]>;
-  /** The troubleshooting guide section for this failure. Null for direct routes. */
+  /** The troubleshooting guide section for this failure. Null for direct routes, except a pending T3 Connect sign-in. */
   readonly moreInfoUrl: string | null;
 }
 
@@ -47,7 +47,15 @@ export interface ConnectionDiagnosisInput {
 
 interface Located {
   readonly hop: ConnectionHop;
-  readonly cause: ConnectionFailureCause | "offline" | "outdated" | "released" | null;
+  readonly cause:
+    | ConnectionFailureCause
+    | "offline"
+    | "outdated"
+    | "released"
+    | "session_pending"
+    | null;
+  /** The failure named no hop, so the hops before this one were never probed. */
+  readonly guessed?: true;
 }
 
 const NOT_ANSWERING: ReadonlySet<ConnectionFailureCause> = new Set([
@@ -63,6 +71,9 @@ function locate(input: ConnectionDiagnosisInput): Located | null {
   if (failure?._tag === "ConnectionBlockedError" && failure.serverUpdateRequired) {
     return { hop: "server", cause: "outdated" };
   }
+  if (failure?.reason === "session-pending") {
+    return { hop: "device", cause: "session_pending" };
+  }
   if (failure?.hop !== undefined) {
     return { hop: failure.hop, cause: failure.failureCause ?? null };
   }
@@ -72,7 +83,11 @@ function locate(input: ConnectionDiagnosisInput): Located | null {
       failure.reason === "timeout" ||
       failure.reason === "transport";
     const via = failure.via ?? input.via;
-    return { hop: unreachable && via === "relay" ? "tunnel" : "server", cause: null };
+    return {
+      hop: unreachable && via === "relay" ? "tunnel" : "server",
+      cause: null,
+      guessed: true,
+    };
   }
   const status = input.relayStatus;
   if (status?.status !== "offline") return null;
@@ -85,6 +100,8 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
   switch (located.cause) {
     case "offline":
       return "This device is offline";
+    case "session_pending":
+      return `This device is still loading its ${CONNECT_NAME} sign-in`;
     case "outdated":
       return `${host} runs an older ${PRODUCT_NAME}`;
     case "clock_skew":
@@ -138,10 +155,15 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
 }
 
 function steps(host: string, located: Located, failure: ConnectionAttemptError | null): string[] {
-  const checkHost = `On ${host}, check Settings > Connections or run \`infinitus connect status\`.`;
+  const checkHost = `On ${host}, check Settings > Sharing & access or run \`infinitus connect status\`.`;
   switch (located.cause) {
     case "offline":
       return [`Connect this device to the internet. ${PRODUCT_NAME} reconnects on its own.`];
+    case "session_pending":
+      return [
+        `Wait a moment. ${PRODUCT_NAME} retries on its own.`,
+        `If it keeps waiting, reload or restart ${PRODUCT_NAME} on this device.`,
+      ];
     case "outdated":
       return [`Update ${PRODUCT_NAME} on ${host}.`];
     case "clock_skew":
@@ -149,7 +171,7 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
     case "not_linked":
       return [
         `Check that this device is signed in to the same ${CONNECT_NAME} account as the host.`,
-        `On ${host}, open Settings > Connections and turn ${CONNECT_NAME} on.`,
+        `On ${host}, open Settings > Sharing & access and turn ${CONNECT_NAME} on.`,
       ];
     case "tunnel_pending":
       return [`Wait a minute. ${PRODUCT_NAME} retries on its own.`, checkHost];
@@ -159,7 +181,7 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
         "If it keeps failing, copy the diagnostics and report it.",
       ];
     case "tunnel_not_enabled":
-      return [`On ${host}, open Settings > Connections and turn ${CONNECT_NAME} on.`];
+      return [`On ${host}, open Settings > Sharing & access and turn ${CONNECT_NAME} on.`];
     case "released":
     case "tunnel_down":
       return [
@@ -221,6 +243,7 @@ function helpSection(
       return "the-host-runs-an-older-infinitus";
     case "clock_skew":
       return "the-clock-is-off";
+    case "session_pending":
     case "not_linked":
     case "tunnel_not_enabled":
       return "sign-in-account-or-link-problems";
@@ -303,7 +326,12 @@ export function presentConnectionDiagnosis(
   const hops = order.map((hop, index): ConnectionDiagnosisHop => ({
     hop,
     label: hopLabel(hop, host),
-    result: index < failedIndex ? "ok" : index === failedIndex ? "failed" : "unchecked",
+    result:
+      index === failedIndex
+        ? "failed"
+        : index < failedIndex && located.guessed !== true
+          ? "ok"
+          : "unchecked",
   }));
 
   // The relay health check only explains the state when no attempt has failed yet.
@@ -332,7 +360,10 @@ export function presentConnectionDiagnosis(
     hops,
     steps: steps(host, located, failure),
     facts,
-    moreInfoUrl: relayPath ? t3ConnectTroubleshootingUrl(helpSection(located, failure)) : null,
+    moreInfoUrl:
+      relayPath || located.cause === "session_pending"
+        ? t3ConnectTroubleshootingUrl(helpSection(located, failure))
+        : null,
   };
 }
 

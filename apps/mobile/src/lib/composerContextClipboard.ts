@@ -13,7 +13,10 @@ import {
   decodeComposerContextFragment,
   encodeComposerContextFragment,
 } from "@infinitus/shared/composerContextClipboard";
-import { threadContextsOutsideEnvironment } from "@infinitus/shared/composerContextReferences";
+import {
+  threadContextsOutsideEnvironment,
+  threadLinkContextReferences,
+} from "@infinitus/shared/composerContextReferences";
 import {
   executeAtomQuery,
   squashAtomCommandFailure,
@@ -23,6 +26,8 @@ import * as Option from "effect/Option";
 import { appAtomRegistry } from "../state/atom-registry";
 import { assetEnvironment } from "../state/assets";
 import { environmentSession } from "../state/session";
+import { environmentThreadShells } from "../state/threads";
+import { workspaceConnections } from "../state/workspace";
 import { downloadAttachmentForPreview } from "./attachmentDownload";
 import {
   persistComposerAttachmentFile,
@@ -70,12 +75,41 @@ export async function importComposerContextClipboard(
   signal: AbortSignal,
   existingContextCount = 0,
   destinationEnvironmentId?: EnvironmentId,
+  /** The machines the destination links to, whose threads its agent can read too. */
+  linkedEnvironments: ReadonlyMap<EnvironmentId, string> = new Map(),
 ) {
-  const fragment =
+  const copied =
     decodeComposerContextFragment(input.fragment) ?? decodeComposerContextClipboardHtml(input.html);
-  if (!fragment) return null;
-  const selected = referencedComposerContext(input.text, { version: 1, records: fragment.records });
-  const imported = reidentifyComposerContext(input.text, selected?.records ?? [], uuidv4);
+  // A thread link becomes a chip only where this agent can read its machine; others stay links.
+  const threads = threadLinkContextReferences(
+    input.text,
+    copied?.records ?? [],
+    (ref) => appAtomRegistry.get(environmentThreadShells.threadShellAtom(ref))?.title,
+    (record) =>
+      destinationEnvironmentId === undefined ||
+      record.environmentId === destinationEnvironmentId ||
+      linkedEnvironments.has(record.environmentId)
+        ? record.contextId
+        : undefined,
+  );
+  const source =
+    copied?.source ??
+    (threads.records[0] ? { environmentId: threads.records[0].environmentId } : null);
+  if (!source) return null;
+  const fragment = {
+    source,
+    records: [
+      ...(copied?.records ?? []).filter((record) =>
+        threads.records.every((thread) => thread.contextId !== record.contextId),
+      ),
+      ...threads.records,
+    ],
+  };
+  const selected = referencedComposerContext(threads.text, {
+    version: 1,
+    records: fragment.records,
+  });
+  const imported = reidentifyComposerContext(threads.text, selected?.records ?? [], uuidv4);
   const skippedThreads =
     destinationEnvironmentId === undefined
       ? []
@@ -83,6 +117,7 @@ export async function importComposerContextClipboard(
           text: imported.text,
           records: imported.context.records,
           environmentId: destinationEnvironmentId,
+          linkedEnvironments,
         });
   const skippedIds = new Set(skippedThreads.map((record) => record.contextId));
   const retained = imported.context.records.filter((record) => !skippedIds.has(record.contextId));
@@ -109,6 +144,8 @@ export async function importComposerContextClipboard(
         failures.push(record.name);
       }
     }
+    // The last copy can be cancelled after its own check; a cancelled import must not return files nobody will release.
+    checkAborted(signal);
     return {
       text: imported.text,
       context: { version: 1 as const, records },
@@ -135,7 +172,13 @@ async function importAttachment(
 ): Promise<DraftComposerAttachment> {
   await waitForComposerDraftsLoaded();
   checkAborted(signal);
-  const local = findLocalComposerClipboardAttachment(environmentId, record.attachmentId);
+  const local = findLocalComposerClipboardAttachment(
+    appAtomRegistry
+      .get(workspaceConnections.environmentsAtom)
+      .map((environment) => environment.environmentId),
+    environmentId,
+    record.attachmentId,
+  );
   if (local) {
     if (!local.fileUri && local.type === "image" && local.dataUrl)
       return {

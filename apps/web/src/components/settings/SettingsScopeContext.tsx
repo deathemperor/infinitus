@@ -7,7 +7,6 @@ import {
 } from "@infinitus/contracts";
 import { parseT3ProjectFile } from "@infinitus/shared/t3ProjectFile";
 import { useAtomValue } from "@effect/atom-react";
-import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { createContext, type ReactNode, useContext } from "react";
 
@@ -38,7 +37,7 @@ const memberProjectFilesAtom = Atom.family((membersKey: string) => {
       if (result.waiting) return "waiting";
       const data =
         get(optimisticFileAtom(environmentId, workspaceRoot, fileName))?.data ??
-        Option.getOrNull(AsyncResult.value(result));
+        AsyncResult.getOrElse(result, () => null);
       return data === null || data.exists === false ? null : data;
     };
     for (const [environmentId, workspaceRoot, physicalProjectKey] of members) {

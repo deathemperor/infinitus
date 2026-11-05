@@ -7,6 +7,7 @@ import {
   isSharedAddressSpaceHost,
 } from "@infinitus/shared/hostClassification";
 import { QrCode } from "@infinitus/shared/qrCode";
+import { buildPairingAppLink } from "@infinitus/shared/remote";
 import * as Effect from "effect/Effect";
 import { HttpServer } from "effect/http";
 import * as NetAddress from "effect/net/NetAddress";
@@ -190,6 +191,7 @@ export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): 
     `Connection string: ${accessInfo.connectionString}`,
     `Token: ${accessInfo.token}`,
     `Pairing URL: ${accessInfo.pairingUrl}`,
+    `App link: ${buildPairingAppLink(accessInfo.pairingUrl)}`,
     "",
     renderTerminalQrCode(accessInfo.pairingUrl),
     "",

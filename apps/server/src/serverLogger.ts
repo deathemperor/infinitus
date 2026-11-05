@@ -12,9 +12,15 @@ import * as OtlpLogger from "effect/observability/OtlpLogger";
 import * as ServerConfig from "./config.ts";
 import { makeServerLogFileLogger } from "./infinitus/serverLogFile.ts";
 
+// HTTP errors logged with --log-ws-events carry the request URL and its connection ticket.
+const redactingCredentials = <Output>(logger: Logger.Logger<unknown, Output>) =>
+  Logger.make<unknown, Output>((options) =>
+    logger.log({ ...options, cause: SharedObservability.redactCauseCredentials(options.cause) }),
+  );
+
 // consolePretty collapses Cause fields via util.inspect; render them with Cause.pretty like standalone arguments.
 const consolePretty = (): Logger.Logger<unknown, void> => {
-  const pretty = Logger.consolePretty();
+  const pretty = redactingCredentials(Logger.consolePretty());
   return Logger.make((options) =>
     pretty.log({
       ...options,
@@ -57,11 +63,13 @@ export const layer = Effect.gen(function* () {
           exportInterval: `${logs.exportIntervalMs} millis`,
           headers: logs.headers,
           resource: ServerConfig.otlpResource(config, hostName),
-        });
+        }).pipe(Effect.map(redactingCredentials));
   // Fork (#1182): stdout is only kept by whoever started the server, and a
   // packaged desktop backend has no one keeping it. `Logger.layer` takes
   // the effect and owns its scope, so the batch flushes on shutdown.
-  const fileLogger = makeServerLogFileLogger({ filePath: config.serverLogNdjsonPath });
+  const fileLogger = makeServerLogFileLogger({ filePath: config.serverLogNdjsonPath }).pipe(
+    Effect.map(redactingCredentials),
+  );
 
   // Logger.layer replaces the whole set; name every logger here.
   // OTLP includes traced messages as log records, so also using tracerLogger would duplicate in-span exports.

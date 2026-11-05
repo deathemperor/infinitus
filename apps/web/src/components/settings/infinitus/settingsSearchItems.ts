@@ -7,7 +7,6 @@ export type InfinitusSettingsPath =
   | "/settings/priority"
   | "/settings/team"
   | "/settings/notifications"
-  | "/settings/devices"
   | "/settings/engines";
 
 // The app is Infinitus, so its pages carry no prefix (user 2026-09-11); the
@@ -18,9 +17,13 @@ export const INFINITUS_SECTION_LABELS: Readonly<Record<InfinitusSettingsPath, st
   "/settings/priority": "Priority",
   "/settings/team": "Team",
   "/settings/notifications": "Notifications",
-  "/settings/devices": "Devices",
   "/settings/engines": "Engines",
 };
+
+/** The sidebar's own group for these pages, between Connections and Maintenance. */
+export const INFINITUS_NAV_PATHS = Object.keys(
+  INFINITUS_SECTION_LABELS,
+) as ReadonlyArray<InfinitusSettingsPath>;
 
 // The menu bar app's pages read the primary environment and need no
 // selection scope to render.
@@ -32,39 +35,38 @@ export const INFINITUS_CATEGORY_SCOPES: Readonly<
   "/settings/priority": null,
   "/settings/team": null,
   "/settings/notifications": null,
-  "/settings/devices": null,
   "/settings/engines": null,
 };
 
 /**
  * The fork's searchable settings, spread into upstream's `SETTINGS_SEARCH_ITEMS` in this order: the
- * rows the fork adds to General (resume on limit #648, send mode, worktree limit, keep awake #1075)
- * and the Infinitus pages, each indexed once by its destination with `targetId` the first section
- * it renders.
+ * rows the fork adds to upstream's pages (resume on limit #648, send mode, worktree limit, keep
+ * awake #1075) and the Infinitus pages, each indexed once by its destination with `targetId` the
+ * first section it renders.
  */
 export const INFINITUS_SETTINGS_SEARCH_ITEMS = [
   {
     id: "infinitus-resume-on-limit",
     title: "Resume limited threads on another account",
-    to: "/settings/general",
+    to: "/settings/threads",
     searchTerms: ["usage quota rate limit swap another account resume continue"],
   },
   {
     id: "composer-send-mode",
     title: "Sending while a turn runs",
-    to: "/settings/general",
+    to: "/settings/chat",
     searchTerms: ["queue steer send next step tool running turn enter composer follow-up"],
   },
   {
     id: "worktree-limit",
     title: "Worktree limit",
-    to: "/settings/general",
+    to: "/settings/worktrees",
     searchTerms: ["max worktrees count cap archived threads delete"],
   },
   {
     id: "desktop-keep-awake",
     title: "Keep awake",
-    to: "/settings/general",
+    to: "/settings/maintenance",
     searchTerms: ["sleep power nap idle running turn thread mac caffeinate"],
     desktopOnly: true,
   },

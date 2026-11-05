@@ -24,10 +24,11 @@ these bullets.
   `ANTHROPIC_BASE_URL`: the CLI adds the advisor tool on first-party only, so
   a proxied instance's advisor model (#1232) never fires. The add-instance
   wizard collects no environment for Claude, so only the card draws it.
-- `apps/web/src/components/settings/infinitus/settingsSearchItems.ts` — the seven Infinitus `SettingsPath`s (Menu bar, Animations since #747 step 1, Priority (#616, back on v2 per #1627, its `infinitus-sessions` search item), Team, Notifications, Devices, Engines; the Themes page of #747 step 1 folded into the Menu bar page) with their labels and scopes, and the fork's searchable settings in result order: the General rows it adds (resume on limit #648, send mode, worktree limit, keep awake #1075) and one item per Infinitus page. Spread into upstream's `settingsSearch.ts`.
-- `apps/web/src/components/settings/infinitus/InfinitusResumeOnLimitSetting.tsx` — the swap-based resume switch (#648), a scoped server setting mounted by Settings › General after upstream's reset-time auto-resume row.
+- `apps/web/src/components/settings/infinitus/settingsSearchItems.ts` — the six Infinitus `SettingsPath`s (Menu bar, Animations since #747 step 1, Priority (#616, back on v2 per #1627, its `infinitus-sessions` search item), Team, Notifications, Engines; the Themes page of #747 step 1 folded into the Menu bar page; Devices is upstream's path since its #25651) with their labels, scopes and nav group (`INFINITUS_NAV_PATHS`), and the fork's searchable settings in result order: the rows it adds to upstream's pages (resume on limit #648 on Threads, send mode on Chat, worktree limit on Worktrees, keep awake #1075 on Maintenance) and one item per Infinitus page. Spread into upstream's `settingsSearch.ts`.
+- `apps/web/src/components/settings/infinitus/InfinitusResumeOnLimitSetting.tsx` — the swap-based resume switch (#648), a scoped server setting mounted by Settings › Threads after upstream's reset-time auto-resume row.
+- `apps/web/src/components/settings/infinitus/WorktreeLimitSetting.tsx` — the worktree limit row (#269 H), mounted by Settings › Worktrees after upstream's start-from-remote row.
 - `apps/web/src/components/sidebar/InfinitusLimitStop.tsx` — the sidebar row's limit stop (#648): `useThreadLimitStop` off `infinitusLimitStopsAtom`, `limitStopTooltip` (`limitStopLine` in the client's timestamp format, only while the row's status is `limited`) and the `InfinitusLimitStopPill` the row renders in place of its plain status span.
-- `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and the capability filter that hides them where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
+- `apps/web/src/components/settings/infinitus/settingsNav.ts` — the six Infinitus pages' nav icons and `useInfinitusNavGroups`, which drops them (and their emptied group) from the nav groups where no connected server runs an Infinitus app; `SettingsSidebarNav.tsx` registers both (#1565).
 - `apps/web/src/components/sidebar/SidebarNeedsAttention.tsx`,
   `sidebarNeedsAttention.logic.ts` (+ test), `useNextAttentionKey.ts` and
   `nextAttentionBus.ts` — the "Needs attention" section above the sidebar
@@ -199,7 +200,7 @@ these bullets.
   (`cloud/bootService.ts`) and the desktop's main process drains the child's
   pipes into `server-child.log` — which the packaged desktop stopped
   receiving, while `server.trace.ndjson` holds spans only (a log becomes a
-  span event only inside a sampled span). So `ServerLoggerLive` also writes
+  span event only inside a sampled span). So `serverLogger.ts`'s `layer` also writes
   `<logsDir>/server.log.ndjson`, whoever spawned the process: one
   `Logger.formatJson` record per line, batched (1 s, flushed when the layer's
   scope closes) into the shared `RotatingFileSink` (10 MiB × 10, the trace
@@ -269,7 +270,7 @@ these bullets.
 - `apps/mobile/src/state/infinitus.ts`, `apps/mobile/src/features/accounts/` —
   the Infinitus atoms and the Accounts screen (row model imported from
   `@infinitus/client-runtime/state/infinitusAccounts`); `InfinitusAccounts.tsx`
-  is its body, also the Usage screen's Accounts tab.
+  is its body, also the Usage screen's Accounts view.
 - `apps/mobile/src/features/team/` — Settings › Team on Infinitus Connect
   (#1592): the phone reads and changes the team on the relay as the signed-in
   user through the same client the web pane uses
@@ -281,7 +282,7 @@ these bullets.
   desktop's.
 - `packages/client-runtime/src/connection/roaming.ts`, `apps/mobile/src/features/connection/roamingHosts.ts` — pair on one host, connect on another (#663): the descriptor's `alternateHttpBaseUrls`, re-learned on every connect; public hosts are dialed before private ones (the LAN address). No server fills the list since the Cloudflare tunnels retired (`InfinitusDescriptor.ts` went with them). Rules and traps: `docs/internals/roaming.md`.
 - `apps/mobile/src/state/queued-message-dispatch.ts` (+ test), `apps/mobile/src/state/delete-pending-thread-message.ts`, `apps/mobile/src/features/threads/confirmDeletePendingMessage.ts` — the outbox drain's dispatch state as `{ messageId, phase: "uploading" | "sending" }` with the upload's abort handle, and the delete under a queued reply's bubble that aborts an upload in flight and refuses only during the send RPC (#1501). Edit takes the same gate.
-- `apps/mobile/src/lib/image-passthrough.ts` (+ test) — the one decision for every way a picture enters the phone's composer (picker, clipboard, share sheet; #1500, #1502): which originals pass through byte for byte and which are rendered to a bounded JPEG, plus the rendered attachment's name. Pure, so the share model's tests can import it without Expo.
+- `apps/mobile/src/lib/image-passthrough.ts` (+ test) — the one decision for every way a picture enters the phone's composer through the picker or the share sheet (#1500, #1502): which originals pass through byte for byte and which are rendered to a bounded JPEG, plus the rendered attachment's name. Pure, so the share model's tests can import it without Expo.
 - `apps/mobile/src/features/threads/promptSnippetItems.ts` (+
   `usePromptSnippets.ts`) — the phone's read-only half of per-project prompt
   snippets (#270 G): `useProjectPromptSnippets(environmentId, projectId)`
@@ -325,13 +326,13 @@ these bullets.
   a banner; Cancel aborts the wait. `ConnectionsNewRouteScreen.tsx` only mounts
   it and maps the credential to the existing connect path.
 - `apps/mobile/src/features/infinitus/InfinitusPinAtCreationControl.tsx` (+
-  `pinAtCreation.ts`, `pinAtCreation.logic.ts`) — "Pin on create" for the
+  `pinAtCreation.logic.ts`, `pinThread.logic.ts`) — "Pin on create" for the
   phone (#742, the web's #753): a "Pin" pill in the new-task composer, shown
   only for a project whose server pins threads, backed by the
   `infinitusPinAtCreation` preference (off by default); the outbox drain reads
-  it as each creation is delivered and pins through `usePinThread`, silently
-  on failure.
-- `apps/mobile/src/features/infinitus/appLinking.ts`, `InfinitusAppMounts.tsx`, `stackScreens.ts`, `threadLimitStop.ts`, `useProjectFileRead.ts`, and `apps/mobile/src/features/sharing/discardDismissedShare.ts` — the phone's fork features behind one registration each in upstream's `App.tsx`, `Stack.tsx`, `thread-list-v2-items.tsx` and `new-task-flow-provider.tsx` (#1565): the universal-link rewrite and prefix, the two headless bridges, the Accounts / Team / share-to-thread routes, the row's limit stop (#648), the two-name project file read (#823), and the dismissed-share discard.
+  it as each creation is delivered and pins (`pinCreatedThread` in
+  `threadOutboxDelivery.ts`), silently on failure.
+- `apps/mobile/src/features/infinitus/appLinking.ts`, `InfinitusAppMounts.tsx`, `stackScreens.ts`, `threadLimitStop.ts`, `useProjectFileRead.ts`, and `apps/mobile/src/features/sharing/discardDismissedShare.ts` — the phone's fork features behind one registration each in upstream's `App.tsx`, `Stack.tsx`, `IncomingShareProvider.tsx`, `thread-list-v2-items.tsx` and `use-new-task-project-defaults.ts` (#1565): the universal-link rewrite and prefix, the two headless bridges, the Accounts / Team / share-to-thread routes, the row's limit stop (#648), the two-name project file read (#823), and the dismissed-share discard.
 - `apps/mobile/src/features/sharing/ShareToThreadRouteScreen.tsx` (+
   `share-to-thread.ts`, `.test.ts`) — "Add to an existing thread" on the
   share sheet's project picker: the thread list (unarchived, newest first,
@@ -344,7 +345,6 @@ these bullets.
   `docs/internals/<feature>.md` page and one ledger line here.
 - `scripts/phone.sh` (+ `.agents/skills/drive-phone/SKILL.md`) — drives the developer's paired physical iPhone from a session with the server's pinned `agent-device` (launch, deep links, screenshots, console; snapshots and taps once the Mac's `DevToolsSecurity` is on). The CLI installs under the worktree's `.t3/tools`, never on the Mac. Usage and traps: the skill.
 - `.github/workflows/upstream-sync.yml` — the daily upstream merge as a PR (INFINITUS.md); once `scripts/infinitus-rename.ts --check` passes on `main` it renames upstream's tip on its own branch before merging (#1368 C). A conflicted `pnpm-lock.yaml` is regenerated from upstream's side rather than left to hand-merge, and each new sync closes older still-untouched sync PRs, since its merge contains theirs.
-- `scripts/effect-budget.infinitus.json` — React effect budgets for the fork's files (and upstream files whose effect count the fork raised), merged over upstream's `scripts/effect-budget.json` by `react-effect-budget`.
 - `scripts/infinitus-rename.ts` (+ test) — the identifier codemod (#1368 slice C): the idempotent table of the fork-owned names (the workspace package scope, the service tags, the CSS variables and font utilities, the wordmark and Connect components, and the product name in `docs/user` prose) with `--dry-run` and `--check`; the compat-read identifiers stay out of it. Rules and traps: `docs/internals/infinitus-rename.md`.
 - `scripts/fork-visual-pass.mjs` — the visual pass harness: one headless Chrome over CDP pairs with a running web app and screenshots each route (`shot-<route>.png` + `text-<route>.txt`). Rules and traps: `docs/internals/fork-visual-pass.md`.
 - `scripts/fork-visual-fixture.mjs` (+ `fork-visual-fixture.data.json`, `fork-visual-fixture.guard.test.ts`) — the canned Infinitus control socket the pass runs against in CI, kept honest against `apps/mac/Sources/InfinitusCore/{ControlProtocol,PrefCatalog}.swift` (#1091, #1139). Rules and traps: `docs/internals/fork-visual-pass.md`.

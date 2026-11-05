@@ -48,6 +48,7 @@ export function useInfinitusEventToasts(): void {
   const navigate = useNavigate();
   const watched = useRef<Watched | null>(null);
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- shows imperative toasts for engine events new since the last snapshot
   useEffect(() => {
     if (environmentId === null || !supported || snapshot === null) return;
     if (watched.current === null || watched.current.environmentId !== environmentId) {

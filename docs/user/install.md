@@ -40,6 +40,7 @@ prints the line to add. Set `T3CODE_VERSION` to pin an exact release.
 | ------------------------------------- | ------------------------------------------------------------------------------ |
 | Start the server and open the web app | `infinitus`                                                                    |
 | Start the server without a browser    | `infinitus serve`                                                              |
+| Use it from your other devices        | `infinitus up` ([details](./remote-access.md))                                 |
 | Keep it running in the background     | `infinitus service install` ([details](./background-service.md))               |
 | Move to the newest release            | `infinitus update`                                                             |
 | Reclaim database space                | `infinitus doctor` ([details](./background-service.md#reclaim-database-space)) |
@@ -79,7 +80,7 @@ other Node processes.
 ### The `t3` command
 
 The desktop app includes the `t3` command-line tool. To run it from any
-terminal, open **Settings → General → About** and choose **Install** next to
+terminal, open **Settings → About** and choose **Install** next to
 **t3 command**. On macOS and Linux it adds a `t3` link to a folder on your
 `PATH`; on Windows it adds the app's command folder to your `PATH`. Open a new
 terminal afterwards. **Remove** takes it off again. If you already have `t3`
@@ -87,7 +88,7 @@ from npm, it stays as it is.
 
 ### Windows Subsystem for Linux
 
-Choose a WSL distro in **Settings → Connections** to run agents and projects
+Choose a WSL distro in **Settings → Sharing & access** to run agents and projects
 there. Install Node.js and provider CLIs inside that distro. Infinitus installs its
 matching server runtime there automatically; the first launch after an app
 update can take longer.
@@ -105,7 +106,7 @@ The Infinitus phone app is not on a store: it is installed from a build
 machine. Follow
 [remote access](./remote-access.md) to link it through Infinitus Connect or a pairing URL.
 
-Store links and QR codes are also available in **Settings → General → Mobile app**
+Store links and QR codes are also available in **Settings → About → Mobile app**
 on web and desktop. The store apps work with both stable and Nightly servers. Test builds are optional:
 
 - **iPhone and iPad:** TestFlight is invite-only.
@@ -131,10 +132,12 @@ computer.
 | Claude      | Install [Claude Code](https://claude.com/product/claude-code), then run `claude auth login`.                                                              |
 | Cursor      | Install [Cursor CLI](https://cursor.com/cli), then run `agent login`.                                                                                     |
 | Grok Build  | Install [Grok Build CLI](https://x.ai/cli), then run `grok login`.                                                                                        |
+| Kiro        | Install [Kiro CLI](https://kiro.dev/docs/cli/), then run `kiro-cli login`.                                                                                |
 | OpenCode    | Install [OpenCode](https://opencode.ai), then run `opencode auth login`.                                                                                  |
 | Antigravity | Install and sign in with Google from Infinitus's provider settings.                                                                                       |
 | Pi          | Install [Pi](./providers-pi.md#set-up-pi) with Node.js 22.19 or newer, then run `pi` and `/login`.                                                        |
 | Muse Code   | Install [Muse Code](https://dev.meta.ai/docs/muse-code) on the server, run `muse login`, then enable it in Settings → Providers.                          |
+| fx          | Install [fx](https://fx.sh) with `curl -fsSL https://fx.sh/setup.sh \| bash`, then run `fx login`.                                                        |
 
 Provider CLIs must be on the server's `PATH`. If Infinitus cannot find one, set its
 **Binary path** in provider settings, especially when using a version manager.
@@ -152,9 +155,10 @@ When a provider CLI is behind its latest release, its provider card shows the
 available version. **Update now** runs the installer that owns the CLI
 (Homebrew, or a global npm, pnpm, Yarn, Bun, Volta, or Vite+ install), or the
 CLI's own update command when Infinitus cannot tell. Update a CLI installed with
-mise through mise. Cursor and Antigravity update with Infinitus. Homebrew installs
-compare against the version Homebrew offers, which can trail the npm release by
-a few hours.
+mise through mise. Cursor and Antigravity update with Infinitus. Homebrew and
+Chocolatey installs compare against the version their package manager offers,
+which can trail the npm release; update Claude installed with Chocolatey
+through Chocolatey.
 
 Add another provider instance for a separate account or configuration. Each
 instance can have its own environment variables, such as API keys or a custom
@@ -163,8 +167,8 @@ their original values.
 
 For provider-specific setup and accounts, see [Codex](./providers-codex.md),
 [Claude](./providers-claude.md), [OpenCode](./providers-opencode.md),
-[Antigravity](./providers-antigravity.md), [Pi](./providers-pi.md), and
-[Muse Code](./providers-muse.md).
+[Antigravity](./providers-antigravity.md), [Kiro](./providers-kiro.md),
+[Pi](./providers-pi.md), [Muse Code](./providers-muse.md), and [fx](./providers-fx.md).
 
 ## Next steps
 
@@ -173,3 +177,4 @@ For provider-specific setup and accounts, see [Codex](./providers-codex.md),
 - [Remote access](./remote-access.md): connect from another device.
 - [Running in the background](./background-service.md): keep a Linux or macOS host available.
 - [Updating](./updating.md): update the app and connected servers.
+- [Managed policy](./managed-policy.md): configure Infinitus for everyone on a machine.

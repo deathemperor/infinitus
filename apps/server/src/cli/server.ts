@@ -9,7 +9,8 @@ import * as CliError from "effect/cli/CliError";
 
 import * as ServerConfig from "../config.ts";
 import { awaitLauncherLoss } from "../launcherWatch.ts";
-import { runServer } from "../server.ts";
+import * as ProcessRunner from "../processRunner.ts";
+import * as AutomaticPort from "./automaticPort.ts";
 import { type CliServerFlags, resolveServerConfig, sharedServerCommandFlags } from "./config.ts";
 
 const encodeCommand = Schema.encodeEffect(Schema.fromJsonString(Schema.String));
@@ -29,8 +30,11 @@ const runServerCommand = Effect.fn("server.runServerCommand")(function* (
     readonly rejectRunningServer?: boolean;
   },
 ) {
+  // Before config resolution, which claims a port and creates directories.
+  const { runServer } = yield* Effect.promise(() => import("../server.ts"));
   const logLevel = yield* GlobalFlag.LogLevel;
-  const config = yield* resolveServerConfig(flags, logLevel, options);
+  const selectAutomaticPort = yield* AutomaticPort.make.pipe(Effect.provide(ProcessRunner.layer));
+  const config = yield* resolveServerConfig(flags, logLevel, { ...options, selectAutomaticPort });
   const run = runServer.pipe(Effect.provideService(ServerConfig.ServerConfig, config));
   if (config.mode !== "desktop" || config.desktopBootstrapToken === undefined) return yield* run;
   yield* Effect.sync(() => {
@@ -70,13 +74,15 @@ export const runDefaultServerCommand = Effect.fn("server.runDefaultServerCommand
 });
 
 export const startCommand = Command.make("start", { ...sharedServerCommandFlags }).pipe(
-  Command.withDescription(`Run the ${PRODUCT_NAME} server.`),
+  Command.withDescription("Same as `infinitus`."),
+  Command.unlisted,
   Command.withHandler((flags) => runServerCommand(flags, { rejectRunningServer: true })),
 );
 
 export const serveCommand = Command.make("serve", { ...sharedServerCommandFlags }).pipe(
+  Command.withShortDescription(`Run ${PRODUCT_NAME} in this terminal, with no browser.`),
   Command.withDescription(
-    `Run the ${PRODUCT_NAME} server without opening a browser and print headless pairing details.`,
+    `Run ${PRODUCT_NAME} in this terminal without opening a browser, and print pairing details. The background service runs this. To set up access from your other devices, run \`infinitus up\`.`,
   ),
   Command.withHandler((flags) =>
     runServerCommand(flags, {

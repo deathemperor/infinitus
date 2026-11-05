@@ -10,6 +10,47 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.44
+
+### Desktop
+- Kiro is available as an early-access provider.
+- Copy thread copies a link that opens the thread.
+- Administrators can set the managed policy from a Windows Group Policy template.
+- Repositories can be cloned into host/owner/repo folders.
+- The model picker lists the Claude models Claude Code reports.
+
+### Phone
+- Android has on-device dictation.
+- On wider screens the sidebar floats over the page and the inspector opens as a sheet.
+
+## 0.5.0-alpha.43
+
+### Desktop
+- Side chats open beside the main thread.
+- Projects can be pinned and archived.
+- One control picks the model and its effort.
+- A context meter shows how close a thread is to its limit.
+- Threads show where the model or effort changed.
+- Usage can be filtered by provider and model.
+- Scheduled tasks can run once at a set date and time.
+- Approvals from child threads show in the parent thread.
+- Administrators can manage settings and updates with a managed policy.
+- `infinitus up` asks how your other devices reach this machine and sets up the background service.
+
+## 0.5.0-alpha.42
+
+### Desktop
+- A thread whose background subagents also hit the usage limit now resumes after the account switch; before, their failure reports made it look finished.
+- From upstream — link other machines so agents work there (Labs), review local commits in the Diff pane, back/forward buttons with trackpad swipes, a simpler composer with a rich-text/Markdown switch, and a resizable file explorer.
+- From upstream — provider environment variables can come from a secret provider, snooze options are yours to choose, the sidebar filters by several projects, and a thread falls back to another provider when the default is out of usage.
+- From upstream — the new design is on by default, Settings grouped by concern with General split into focused pages, thread state at the end of the timeline, a recovery screen when the app fails to start, and Vercel fx as a provider.
+- Agents get MCP tool schemas a third smaller, and queued messages get a simpler Send now row.
+- The Devices settings page shows Infinitus's paired devices, pairing requests and crash reports under upstream's device list.
+
+### Phone
+- From upstream — message media and file cards match the desktop, ZIP attachments open in the archive reader, and Usage fills the width on iPad.
+- From upstream — a "Use last project" preference, thread rows that lead with the title, and two-pane Settings on wide Android screens.
+
 ## 0.5.0-alpha.41
 
 ### Desktop

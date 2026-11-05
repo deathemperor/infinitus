@@ -40,6 +40,7 @@ export function InfinitusCrashesCard() {
 
   // The reports are not part of the snapshot, so they are asked for once the
   // app is answering. They only change on a crash, which takes a relaunch.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- asks the engine over the socket for its crash reports once it answers; a late reply is ignored after unmount
   useEffect(() => {
     if (!supported || environmentId === null) return;
     let live = true;
@@ -85,6 +86,7 @@ export function InfinitusCrashesCard() {
     }
   };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- timer that clears the copied confirmation after two seconds
   useEffect(() => {
     if (copied === null) return;
     const timer = setTimeout(() => setCopied(null), 2_000);

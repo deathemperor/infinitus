@@ -1,5 +1,7 @@
 import type { SdkLoginOptions, StoredSdkCredentials } from "@cursor/sdk";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Layer from "effect/Layer";
 import { expect, it } from "@effect/vitest";
 import {
   ProviderInstanceId,
@@ -16,7 +18,9 @@ import * as Stream from "effect/Stream";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 import { makeCursorAuth, type CursorAuthOptions } from "./auth.ts";
-import { InMemoryCredentialStore } from "./sdk.ts";
+import { loadCursorSdk } from "./sdk.ts";
+
+const { InMemoryCredentialStore } = loadCursorSdk();
 
 const instanceId = ProviderInstanceId.make("cursor-personal");
 const owner = "owner-client";
@@ -82,7 +86,7 @@ const phase = (auth: Auth, phase: ProviderAuthState["phase"], session = owner) =
     Effect.map(Option.getOrThrow),
   );
 
-it.layer(NodeServices.layer)("CursorAuth", (it) => {
+it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("CursorAuth", (it) => {
   it.effect("closes SDK sessions and interrupts in-flight credential work before signing out", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness();

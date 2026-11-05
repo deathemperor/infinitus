@@ -352,11 +352,12 @@ const make = Effect.gen(function* () {
         return supervisor.snapshot();
       });
     }),
-    control: (input) =>
-      Effect.sync(() => {
+    control: Effect.fn("InfinitusEngineSupervisorService.control")(function (input) {
+      return Effect.sync(() => {
         supervisor.control(input);
         return supervisor.snapshot();
-      }),
+      });
+    }),
   });
 });
 

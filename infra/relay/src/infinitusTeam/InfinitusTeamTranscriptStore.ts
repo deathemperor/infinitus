@@ -44,15 +44,19 @@ export const objectKey = (input: {
 
 export const inMemoryLayer = (objects: Map<string, string> = new Map()) =>
   Layer.succeed(InfinitusTeamTranscriptStore, {
-    put: (key, lines) =>
-      Effect.sync(() => {
+    put: Effect.fn("InfinitusTeamTranscriptStore.put")(function (key, lines) {
+      return Effect.sync(() => {
         objects.set(key, lines);
-      }),
-    get: (key) => Effect.sync(() => objects.get(key) ?? null),
-    delete: (keys) =>
-      Effect.sync(() => {
+      });
+    }),
+    get: Effect.fn("InfinitusTeamTranscriptStore.get")(function (key) {
+      return Effect.sync(() => objects.get(key) ?? null);
+    }),
+    delete: Effect.fn("InfinitusTeamTranscriptStore.delete")(function (keys) {
+      return Effect.sync(() => {
         for (const key of keys) objects.delete(key);
-      }),
+      });
+    }),
   });
 
 /** The Worker's store: the R2 bucket binding, every call run under the
@@ -77,25 +81,28 @@ export const layerR2 = (
   runtimeContext: Alchemy.BaseRuntimeContext,
 ) =>
   Layer.succeed(InfinitusTeamTranscriptStore, {
-    put: (key, lines) =>
-      bucket.put(key, lines).pipe(
+    put: Effect.fn("InfinitusTeamTranscriptStore.put")(function (key, lines) {
+      return bucket.put(key, lines).pipe(
         Effect.asVoid,
         Effect.mapError((cause) => new InfinitusTeamTranscriptStoreError({ op: "put", cause })),
         Effect.provideService(Alchemy.RuntimeContext, runtimeContext),
-      ),
-    get: (key) =>
-      bucket.get(key).pipe(
+      );
+    }),
+    get: Effect.fn("InfinitusTeamTranscriptStore.get")(function (key) {
+      return bucket.get(key).pipe(
         Effect.flatMap((body) => (body === null ? Effect.succeed(null) : body.text())),
         Effect.mapError((cause) => new InfinitusTeamTranscriptStoreError({ op: "get", cause })),
         Effect.provideService(Alchemy.RuntimeContext, runtimeContext),
-      ),
-    delete: (keys) =>
-      keys.length === 0
+      );
+    }),
+    delete: Effect.fn("InfinitusTeamTranscriptStore.delete")(function (keys) {
+      return keys.length === 0
         ? Effect.void
         : bucket.delete([...keys]).pipe(
             Effect.mapError(
               (cause) => new InfinitusTeamTranscriptStoreError({ op: "delete", cause }),
             ),
             Effect.provideService(Alchemy.RuntimeContext, runtimeContext),
-          ),
+          );
+    }),
   });

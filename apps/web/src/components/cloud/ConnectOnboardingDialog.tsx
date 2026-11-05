@@ -4,6 +4,7 @@ import {
   AuthRelayReadScope,
   AuthRelayWriteScope,
   type AuthSessionState,
+  managedCapabilityDenial,
 } from "@infinitus/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import {
   ConnectOnboardingOptOutSchema,
   EMPTY_CONNECT_ONBOARDING_OPT_OUT_STATE,
 } from "~/cloud/connectOnboarding";
+import { useManagedTunnelUsage } from "~/cloud/managedRelayState";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
@@ -22,8 +24,14 @@ import {
   usePrimaryEnvironment,
   usePrimaryEnvironmentId,
 } from "~/state/environments";
+import { usePrimaryManagedPolicy } from "~/state/managedPolicy";
 import { environmentSession, readEnvironmentScope, useEnvironmentScope } from "~/state/session";
+import {
+  type InfinitusConnectAccountPageUrl,
+  useInfinitusConnectAccountPage,
+} from "../clerk/InfinitusConnectAccountPages";
 import { CloudEnvironmentConnectRows } from "./CloudEnvironmentConnectList";
+import { TunnelLimitAlert } from "./TunnelUsage";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
@@ -63,11 +71,15 @@ function ConfiguredConnectOnboardingDialog() {
   );
   const canReadRelay = useEnvironmentScope(primaryEnvironmentId, AuthRelayReadScope);
   const canWriteRelay = useEnvironmentScope(primaryEnvironmentId, AuthRelayWriteScope);
-  const canManageRelay = canReadRelay && canWriteRelay;
+  // A policy that turns Connect off leaves nothing to publish; reaching other devices still works.
+  const connectAllowed =
+    managedCapabilityDenial(usePrimaryManagedPolicy(), "connect") === undefined;
+  const canManageRelay = canReadRelay && canWriteRelay && connectAllowed;
   const sessionScopesKnown =
     primaryEnvironmentId === null ? environmentsReady : primarySessionState._tag !== "Initial";
 
-  const controller = useCloudLinkController();
+  const controller = useCloudLinkController(primaryEnvironmentId);
+  const accountPage = useInfinitusConnectAccountPage();
   const showPublishStep = canManageRelay && controller.linkState.target !== null;
   const steps: ReadonlyArray<OnboardingStep> = showPublishStep
     ? ["publish", "devices"]
@@ -185,6 +197,15 @@ function ConfiguredConnectOnboardingDialog() {
     setStep("devices");
   };
 
+  const openAccountPage = accountPage.open;
+  // The account page is a Clerk modal, so close this dialog before it opens.
+  const leaveForAccountPage = openAccountPage
+    ? (page: InfinitusConnectAccountPageUrl) => {
+        complete();
+        openAccountPage(page);
+      }
+    : null;
+
   return (
     <Dialog
       open={openForAccount !== null}
@@ -228,6 +249,8 @@ function ConfiguredConnectOnboardingDialog() {
               publishAgentActivity={publishAgentActivity}
               disabled={isApplying || !canManageRelay || linkStateData === null}
               operationError={controller.operationError ?? controller.linkState.error}
+              tunnelLimit={controller.tunnelLimit}
+              onOpenAccountPage={leaveForAccountPage}
               onExposeEnvironmentChange={(enabled) => {
                 if (
                   primaryEnvironmentId !== null &&
@@ -279,6 +302,8 @@ function ConfiguredConnectOnboardingDialog() {
           )}
         </WizardFooter>
       </WizardPopup>
+      {/* Base UI renders Root children while closed, so this keeps the account page mounted. */}
+      {accountPage.portals}
     </Dialog>
   );
 }
@@ -293,6 +318,8 @@ function PublishStep({
   publishAgentActivity,
   disabled,
   operationError,
+  tunnelLimit,
+  onOpenAccountPage,
   onExposeEnvironmentChange,
   onPublishAgentActivityChange,
 }: {
@@ -300,6 +327,8 @@ function PublishStep({
   readonly publishAgentActivity: boolean;
   readonly disabled: boolean;
   readonly operationError: string | null;
+  readonly tunnelLimit: number | null;
+  readonly onOpenAccountPage: ((page: InfinitusConnectAccountPageUrl) => void) | null;
   readonly onExposeEnvironmentChange: (enabled: boolean) => void;
   readonly onPublishAgentActivityChange: (enabled: boolean) => void;
 }) {
@@ -322,7 +351,25 @@ function PublishStep({
         />
       </div>
       {operationError ? <p className="text-xs text-destructive">{operationError}</p> : null}
+      {tunnelLimit !== null ? (
+        <OnboardingTunnelLimitAlert onOpenAccountPage={onOpenAccountPage} />
+      ) : null}
     </div>
+  );
+}
+
+function OnboardingTunnelLimitAlert({
+  onOpenAccountPage,
+}: {
+  readonly onOpenAccountPage: ((page: InfinitusConnectAccountPageUrl) => void) | null;
+}) {
+  const { upgrade } = useManagedTunnelUsage();
+  return (
+    <TunnelLimitAlert
+      upgrade={upgrade}
+      onLinkT3Chat={onOpenAccountPage ? () => onOpenAccountPage("t3-chat") : null}
+      onManageTunnels={onOpenAccountPage ? () => onOpenAccountPage("t3-connect") : null}
+    />
   );
 }
 

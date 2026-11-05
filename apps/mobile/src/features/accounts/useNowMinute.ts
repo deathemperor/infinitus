@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
     limited state: read once on mount, then each minute. */
 export function useNowMinute(): number {
   const [now, setNow] = useState(() => Date.now());
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- interval timer that ticks the clock each minute
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);

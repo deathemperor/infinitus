@@ -38,6 +38,7 @@ const one = ThreadId.make("thread-1");
 const two = ThreadId.make("thread-2");
 const runOne = RunId.make("run-1");
 const runTwo = RunId.make("run-2");
+const runThree = RunId.make("run-3");
 
 /** hiep1's weekly reset, as a refusal carries it (epoch ms) and swapd reads it (ISO). */
 const HIEP1_WEEKLY = "2026-10-15T08:00:00.000Z";
@@ -119,6 +120,8 @@ const makeHarness = (input: {
   readonly snapshot?: InfinitusSnapshot;
   readonly shells?: ReadonlyArray<OrchestrationV2ThreadShell>;
   readonly settings?: Partial<ServerSettings>;
+  /** Runs started by `ProviderContinuationService` (a background-task wake). */
+  readonly wakeRuns?: ReadonlyArray<RunId>;
 }) =>
   Effect.gen(function* () {
     const events = yield* PubSub.unbounded<OrchestrationV2DomainEvent>();
@@ -155,6 +158,12 @@ const makeHarness = (input: {
                       archivedThreads: [],
                     }) as never,
                 ),
+              ),
+            getRunMessage: (_threadId, runId) =>
+              Effect.succeed(
+                input.wakeRuns?.includes(runId)
+                  ? ({ createdBy: "agent", creationSource: "provider" } as never)
+                  : undefined,
               ),
           }),
           Layer.mock(InfinitusService)({
@@ -328,6 +337,112 @@ describe("InfinitusResumeOnLimitLive (#648, #1627)", () => {
           text: "Continue where you left off.",
         },
       ]);
+      expect(yield* h.stopped).toEqual([]);
+    }),
+  );
+
+  effectIt.effect(
+    "a background-task wake after a failed limit run keeps the stop, and the resume continues past it",
+    () =>
+      Effect.gen(function* () {
+        const h = yield* makeHarness({
+          shells: [shell(one)],
+          snapshot: fleet(
+            account("hiep1", {
+              active: true,
+              usage: { sevenDay: { pct: 100, resetsAt: HIEP1_WEEKLY } },
+            }),
+          ),
+          wakeRuns: [runTwo],
+        });
+        yield* h.refuse(refusal(one, runOne));
+        yield* h.setShell(
+          shell(one, {
+            status: "failed",
+            activeRunId: null,
+            lastErrorClass: "usage_limit",
+            usageLimitResetAt: HIEP1_WEEKLY,
+          }),
+        );
+        yield* h.emit(runUpdated(one, runOne, "failed"));
+        // The subagents the limit also stopped report back: the CLI wakes on
+        // the spent login, does nothing and completes, so the shell reads done.
+        yield* h.setShell(
+          shell(one, { status: "completed", latestRunId: runTwo, activeRunId: null }),
+        );
+        yield* h.emit(runUpdated(one, runTwo, "running"));
+        // The swap lands while the wake still runs: the resume waits for it.
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
+        expect(yield* h.commands).toEqual([]);
+        yield* h.emit(runUpdated(one, runTwo, "completed"));
+        expect((yield* h.stopped).map((stop) => [stop.threadId, stop.account])).toEqual([
+          [one, "hiep1"],
+        ]);
+        yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 6 } } })));
+        expect(yield* h.commands).toEqual([
+          {
+            type: "message.dispatch",
+            threadId: one,
+            source: undefined,
+            text: "Continue where you left off.",
+          },
+        ]);
+      }),
+  );
+
+  effectIt.effect("a wake that fails on the limit again is the same stop, reported once", () =>
+    Effect.gen(function* () {
+      const failedOn = (runId: RunId) =>
+        shell(one, {
+          status: "failed",
+          latestRunId: runId,
+          activeRunId: null,
+          lastErrorClass: "usage_limit",
+          usageLimitResetAt: HIEP1_WEEKLY,
+        });
+      const h = yield* makeHarness({
+        shells: [shell(one)],
+        snapshot: fleet(
+          account("hiep1", {
+            active: true,
+            usage: { sevenDay: { pct: 100, resetsAt: HIEP1_WEEKLY } },
+          }),
+        ),
+        wakeRuns: [runTwo],
+      });
+      yield* h.refuse(refusal(one, runOne));
+      yield* h.setShell(failedOn(runOne));
+      yield* h.emit(runUpdated(one, runOne, "failed"));
+      yield* h.emit(runUpdated(one, runTwo, "running"));
+      yield* h.setShell(failedOn(runTwo));
+      yield* h.emit(runUpdated(one, runTwo, "failed"));
+      expect((yield* h.stopped).map((stop) => stop.account)).toEqual(["hiep1"]);
+      expect(yield* h.reports).toHaveLength(1);
+      // The swap resumes it, continuing the wake: the latest executed run.
+      yield* h.probe(fleet(account("hiep2", { active: true, usage: { sevenDay: { pct: 5 } } })));
+      expect(yield* h.commands).toEqual([
+        {
+          type: "message.dispatch",
+          threadId: one,
+          source: runTwo,
+          text: "Continue where you left off.",
+        },
+      ]);
+    }),
+  );
+
+  effectIt.effect("the user's own send after a wake still ends the stop", () =>
+    Effect.gen(function* () {
+      const h = yield* makeHarness({
+        shells: [shell(one)],
+        snapshot: fleet(account("hiep1", { active: true, usage: { sevenDay: { pct: 100 } } })),
+        wakeRuns: [runTwo],
+      });
+      yield* h.refuse(refusal(one, runOne));
+      yield* h.emit(runUpdated(one, runTwo, "running"));
+      yield* h.emit(runUpdated(one, runTwo, "completed"));
+      expect((yield* h.stopped).map((stop) => stop.threadId)).toEqual([one]);
+      yield* h.emit(runUpdated(one, runThree, "running"));
       expect(yield* h.stopped).toEqual([]);
     }),
   );

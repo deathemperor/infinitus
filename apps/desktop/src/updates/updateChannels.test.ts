@@ -141,7 +141,7 @@ describe("resolveElectronUpdaterFeed", () => {
     expect(resolveElectronUpdaterFeed("0.0.40-nightly.20260911.7", "nightly")).toEqual({
       channel: "nightly",
       allowPrerelease: true,
-      allowDowngrade: true,
+      allowDowngrade: false,
     });
     expect(resolveElectronUpdaterFeed("0.0.40", "latest")).toEqual({
       channel: "latest",

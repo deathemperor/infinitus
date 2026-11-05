@@ -27,20 +27,20 @@ export const infinitusTeamEnvironmentApi = HttpApiBuilder.group(
     const service = yield* InfinitusTeamService;
     const principalFor = (environmentId: string) =>
       RelayEnvironmentPrincipal.pipe(
-        Effect.flatMap((principal) =>
-          principal.environmentId === environmentId
-            ? Effect.succeed(principal)
-            : currentTraceId.pipe(
-                Effect.flatMap((traceId) =>
-                  Effect.fail(
-                    new RelayAuthInvalidError({
-                      code: "auth_invalid",
-                      reason: "not_authorized",
-                      traceId,
-                    }),
-                  ),
+        Effect.filterOrElse(
+          (principal) => principal.environmentId === environmentId,
+          () =>
+            currentTraceId.pipe(
+              Effect.flatMap((traceId) =>
+                Effect.fail(
+                  new RelayAuthInvalidError({
+                    code: "auth_invalid",
+                    reason: "not_authorized",
+                    traceId,
+                  }),
                 ),
               ),
+            ),
         ),
       );
     return handlers

@@ -26,9 +26,9 @@ export class MobileSecureStorage extends Context.Service<
     readonly setItem: (key: string, value: string) => Effect.Effect<void, MobileSecureStorageError>;
     readonly removeItem: (key: string) => Effect.Effect<void, MobileSecureStorageError>;
   }
->()("@infinitus/mobile/persistence/MobileSecureStorage") {}
+>()("@infinitus/mobile/persistence/mobile-secure-storage/MobileSecureStorage") {}
 
-export const make = MobileSecureStorage.of({
+const make = MobileSecureStorage.of({
   getItem: Effect.fn("MobileSecureStorage.getItem")((key) =>
     Effect.tryPromise({
       try: () => SecureStore.getItemAsync(key),

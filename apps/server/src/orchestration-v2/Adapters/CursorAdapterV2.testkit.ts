@@ -20,13 +20,12 @@ import * as IdAllocator from "@infinitus/provider-core/server/IdAllocator";
 import { ProviderAdapterDriverCreateError } from "@infinitus/provider-core/server/adapterDriver";
 import * as ProviderAdapterRegistry from "../ProviderAdapterRegistry.ts";
 import type { OrchestratorV2ProviderReplayHarness } from "../testkit/ProviderReplayHarness.ts";
-import { CursorAdapterV2Driver } from "@infinitus/provider-cursor/server";
 import * as CursorAgentSdk from "@infinitus/provider-cursor/server/CursorAgentSdk";
 import {
   CURSOR_DEFAULT_INSTANCE_ID,
-  CURSOR_DRIVER_KIND,
   cursorSdkModelSelection,
   makeCursorAgentOptions,
+  makeCursorAdapterV2,
 } from "@infinitus/provider-cursor/testing";
 import type * as ProviderAdapter from "@infinitus/provider-core/server/ProviderAdapter";
 import type { RuntimePolicyV2Override } from "../RuntimePolicy.ts";
@@ -525,14 +524,15 @@ export function layer(
       return { HOME: home };
     }).pipe(Effect.orDie),
   ).pipe(Layer.provide(NodeServices.layer));
-  return ProviderAdapterRegistry.layerFromDrivers({
-    drivers: [CursorAdapterV2Driver],
-    configMap: {
-      [CURSOR_DEFAULT_INSTANCE_ID]: {
-        driver: CURSOR_DRIVER_KIND,
-      },
-    },
-  }).pipe(
+  return ProviderAdapterRegistry.layerFromAdaptersEffect(
+    Effect.gen(function* () {
+      const adapter = yield* makeCursorAdapterV2({
+        instanceId: CURSOR_DEFAULT_INSTANCE_ID,
+        environment: yield* HostProcess.Environment,
+      });
+      return [adapter];
+    }),
+  ).pipe(
     Layer.provide(
       Layer.mergeAll(
         layerCursorAgentSdkReplay(transcript, options),

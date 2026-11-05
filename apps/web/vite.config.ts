@@ -50,6 +50,7 @@ const configuredDesktopUpdateRepository =
   process.env.T3CODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
   process.env.GITHUB_REPOSITORY?.trim() ||
   "";
+const configuredFeatureSecrets = process.env.T3CODE_FEATURE_SECRETS?.trim() || "";
 const configuredHostedAppUrl = (() => {
   const explicitHostedAppUrl = process.env.VITE_HOSTED_APP_URL?.trim();
   if (explicitHostedAppUrl) {
@@ -236,6 +237,30 @@ function devCompressionPlugin(): Plugin {
   };
 }
 
+// A static import cycle between chunks can run a chunk before the values it imports exist,
+// which blanks the app at boot. Fail the build instead of shipping it.
+function chunkCycleGuardPlugin(): Plugin {
+  return {
+    name: "t3code:chunk-cycle-guard",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      const done = new Set<string>();
+      const visit = (fileName: string, path: string[]) => {
+        if (done.has(fileName)) return;
+        const start = path.indexOf(fileName);
+        if (start !== -1) {
+          this.error(`Chunk import cycle: ${[...path.slice(start), fileName].join(" -> ")}`);
+        }
+        const chunk = bundle[fileName];
+        if (chunk?.type !== "chunk") return;
+        for (const imported of chunk.imports) visit(imported, [...path, fileName]);
+        done.add(fileName);
+      };
+      for (const fileName of Object.keys(bundle)) visit(fileName, []);
+    },
+  };
+}
+
 // Allow Tailnet hosts for sharing; Tailscale-controlled DNS prevents attacker rebinding.
 const configuredAllowedHosts = (process.env.T3CODE_DEV_ALLOWED_HOSTS ?? "")
   .split(",")
@@ -247,9 +272,9 @@ export default defineConfig(() => {
   return {
     run: {
       tasks: {
-        // tsc (tsc-rs) rewrites the tsbuildinfo it reads, which keeps a task out of the cache.
+        // A local tsbuildinfo is leftover build state, not a typecheck input.
         typecheck: {
-          command: "tsc --noEmit",
+          command: "effect-tsgo tsrs --noEmit",
           cache: { input: [{ auto: true }, "!*.tsbuildinfo"] },
         },
       },
@@ -258,6 +283,7 @@ export default defineConfig(() => {
     plugins: [
       productNamePlugin(),
       devCompressionPlugin(),
+      chunkCycleGuardPlugin(),
       builtDev
         ? undefined
         : thirdPartyLicensesPlugin({
@@ -307,6 +333,7 @@ export default defineConfig(() => {
       "import.meta.env.T3CODE_DESKTOP_UPDATE_REPOSITORY": JSON.stringify(
         configuredDesktopUpdateRepository,
       ),
+      "import.meta.env.T3CODE_FEATURE_SECRETS": JSON.stringify(configuredFeatureSecrets),
       "import.meta.env.VITE_RELEASE_CHANNEL": JSON.stringify(configuredReleaseChannel),
       "import.meta.env.APP_VERSION": JSON.stringify(configuredAppVersion),
     },
@@ -375,23 +402,6 @@ export default defineConfig(() => {
             asset.originalFileNames.some((path) => /[/\\]pdfjs-dist[/\\]wasm[/\\]/.test(path))
               ? `assets/pdfjs-${pdfjsPkg.version}/[name][extname]`
               : "assets/[name]-[hash][extname]",
-          codeSplitting: {
-            // Preview imports must not fold shared file icons back into main.
-            groups: [
-              {
-                name: "react",
-                test: /\/node_modules\/(?:react|react-dom|scheduler)\//,
-                includeDependenciesRecursively: false,
-              },
-              {
-                name: "icons",
-                // mediaPreview's shared imports ride along: left in the shared chunk that imports
-                // mediaPreview, they close a cycle and the icon table reads them undefined at boot.
-                test: /\/(?:components\/chat\/PierreEntryIcon\.tsx|pierre-icons\.ts|mediaPreview\.ts|shared\/src\/(?:video|image)\.ts)$/,
-                includeDependenciesRecursively: false,
-              },
-            ],
-          },
         },
       },
     },

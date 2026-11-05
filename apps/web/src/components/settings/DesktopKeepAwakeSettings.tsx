@@ -4,7 +4,7 @@ import { searchableSetting } from "./settingsSearch";
 import { SettingsRow } from "./settingsLayout";
 
 /**
- * Fork (#1075): the keep-awake switch closing Settings › General › Behavior.
+ * Fork (#1075): the keep-awake switch closing Settings › Maintenance › Background activity.
  * Rendered only where the shell can hold a power-save blocker.
  */
 export function DesktopKeepAwakeSettings() {

@@ -19,7 +19,7 @@ import * as SynchronizedRef from "effect/SynchronizedRef";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 
-export type InfinitusDesktopPrefs = typeof InfinitusDesktopPrefsSchema.Type;
+export type InfinitusDesktopPrefs = InfinitusDesktopPrefsSchema;
 
 export const DEFAULT_INFINITUS_DESKTOP_PREFS: InfinitusDesktopPrefs = {
   quitInfinitusWithApp: false,
@@ -139,16 +139,23 @@ const make = Effect.gen(function* () {
 
   return InfinitusDesktopPrefsService.of({
     get: SynchronizedRef.get(ref),
-    setQuitWithApp: (enabled) => setFlag("quitInfinitusWithApp", enabled),
-    setCaptureGestureEnabled: (enabled) => setFlag("captureGestureEnabled", enabled),
-    setEngine: (change) =>
-      SynchronizedRef.updateAndGetEffect(ref, (prefs) => {
+    setQuitWithApp: Effect.fn("InfinitusDesktopPrefsService.setQuitWithApp")(function (enabled) {
+      return setFlag("quitInfinitusWithApp", enabled);
+    }),
+    setCaptureGestureEnabled: Effect.fn("InfinitusDesktopPrefsService.setCaptureGestureEnabled")(
+      function (enabled) {
+        return setFlag("captureGestureEnabled", enabled);
+      },
+    ),
+    setEngine: Effect.fn("InfinitusDesktopPrefsService.setEngine")(function (change) {
+      return SynchronizedRef.updateAndGetEffect(ref, (prefs) => {
         const next: InfinitusDesktopPrefs = {
           ...prefs,
           engines: applyEngineSettings(prefs.engines, change),
         };
         return write(next).pipe(Effect.as(next));
-      }),
+      });
+    }),
   });
 });
 

@@ -236,5 +236,5 @@ if ($interactive) { [Console]::Error.Write("`r$esc[2K") }
 if (($env:PATH -split ";") -notcontains $binDir) {
   Write-Host "  Add $binDir to your PATH, then run ${bold}infinitus$reset.`n"
 } else {
-  Write-Host "  Run ${bold}infinitus$reset to get started.`n"
+  Write-Host "  Run ${bold}infinitus$reset to use Infinitus here, or ${bold}infinitus up$reset to use it from your other devices.`n"
 }

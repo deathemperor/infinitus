@@ -40,9 +40,10 @@ export function collectNeedsAttention(
   threads: ReadonlyArray<SidebarThreadSummary>,
   limitStops: ReadonlyMap<string, InfinitusLimitStop>,
   describeLimitStop: (stop: InfinitusLimitStop) => string,
+  delegatedUnderParent: ReadonlySet<string>,
 ): ReadonlyArray<NeedsAttentionEntry> {
   const entries: NeedsAttentionEntry[] = [];
-  for (const thread of filterSidebarV2VisibleThreads(threads, null)) {
+  for (const thread of filterSidebarV2VisibleThreads(threads, null, delegatedUnderParent)) {
     const stop = limitStops.get(limitStopKey(thread.environmentId, thread.id)) ?? null;
     const status = resolveSidebarThreadStatus(thread, { limitStopped: stop !== null });
     if (status !== "approval" && status !== "input" && status !== "limited") continue;

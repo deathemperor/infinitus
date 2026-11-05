@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import type { EnvironmentIdentificationMode } from "@infinitus/contracts";
 import type { ReactElement } from "react";
 import { useId } from "react";
 
@@ -20,10 +21,12 @@ const STAGE_BACKDROP_VIEW_BOX = "0 0 8192 96";
  */
 export function resolveSidebarStageBackdropVariant(
   stageLabel: string,
-  enabled = true,
+  mode: EnvironmentIdentificationMode = "artwork",
   themeScene: StageArtScene | null = null,
 ): SidebarStageBackdropVariant | null {
-  if (!enabled) return null;
+  if (mode === "nightly-artwork") return "nightly";
+  if (mode === "dev-artwork") return "dev";
+  if (mode !== "artwork") return null;
   const normalized = stageLabel.trim().toLowerCase();
   // Fork: the release track draws artwork too. Upstream leaves its stable
   // channel bare because the art is how it marks a prerelease; here every build
@@ -62,10 +65,12 @@ function useThemeStageArtScene(): StageArtScene | null {
   return themeStageArtScene(resolveThemeHalf(theme, themeHalves, resolvedTheme));
 }
 
-export function useSidebarStageBackdropVariant(enabled = true): SidebarStageBackdropVariant | null {
+export function useSidebarStageBackdropVariant(
+  mode: EnvironmentIdentificationMode,
+): SidebarStageBackdropVariant | null {
   const stageLabel = useEnvironmentStageLabel();
   const themeScene = useThemeStageArtScene();
-  return resolveSidebarStageBackdropVariant(stageLabel, enabled, themeScene);
+  return resolveSidebarStageBackdropVariant(stageLabel, mode, themeScene);
 }
 
 export function SidebarStageBackdrop({ variant }: { variant: SidebarStageBackdropVariant }) {

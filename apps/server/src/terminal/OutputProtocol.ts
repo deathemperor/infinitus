@@ -30,8 +30,7 @@ export function withTerminalOutputWindow(
           if (
             message._tag === "Request" &&
             (message.tag === WS_METHODS.terminalAttach ||
-              message.tag === WS_METHODS.terminalObserve ||
-              message.tag === WS_METHODS.subscribeTerminalEvents)
+              message.tag === WS_METHODS.terminalObserve)
           ) {
             const key = `${clientId}:${message.id}`;
             if (!windows.has(key)) windows.set(key, []);
@@ -55,7 +54,7 @@ export function withTerminalOutputWindow(
         } else if (response._tag === "Chunk") {
           const window = windows.get(`${clientId}:${response.requestId}`);
           if (window) {
-            // @effect-diagnostics-next-line preferSchemaOverJson:off
+            // @effect-diagnostics-next-line globalJsonInEffect:off
             const size = Buffer.byteLength(JSON.stringify(response));
             window.push(size);
             if (!isFull(window)) {

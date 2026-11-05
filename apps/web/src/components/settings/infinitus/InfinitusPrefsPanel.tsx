@@ -233,6 +233,7 @@ export function InfinitusPrefsPanel({
 
   // Every snapshot both confirms the writes it reports and, for a restart-effect
   // write, carries the unavailable→available pair that ends the relaunch.
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- folds each server snapshot into the pending-write reducer so it confirms writes and ends a relaunch
   useEffect(() => {
     if (snapshot === null) return;
     dispatch({ type: "snapshot", prefs: snapshot.prefs, available: snapshot.available });

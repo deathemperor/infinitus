@@ -13,7 +13,7 @@ import { Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AndroidScreenHeader } from "../../components/ui/AndroidScreenHeader";
+import { AppBar } from "../../components/ui/AppBar";
 import * as Dialog from "../../components/ui/Dialog";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { AppText as Text } from "../../components/ui/AppText";
@@ -161,6 +161,7 @@ export function ShareToThreadRouteScreen({
     [insets.bottom, usesNativeMailSearchToolbar],
   );
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- tracks mount so an async share import finishing after unmount skips its state updates
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -315,7 +316,8 @@ export function ShareToThreadRouteScreen({
     return (
       <View className="flex-1 bg-sheet" collapsable={false}>
         <NativeStackScreenOptions options={{ headerShown: false }} />
-        <AndroidScreenHeader
+        <AppBar
+          embedded
           title="Choose thread"
           hideBottomBorder
           onBack={() => navigation.goBack()}
