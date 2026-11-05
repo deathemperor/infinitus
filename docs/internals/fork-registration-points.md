@@ -371,7 +371,9 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   tests assert the new spelling; the Muse and OpenCode replay testkits
   (`MuseAdapterV2.testkit.ts`, `OpenCodeAdapterV2.testkit.ts`) compare the
   recordings' `t3-code` (and upstream's product name) under the fork's
-  spelling, since the transcripts were recorded upstream.
+  spelling, since the transcripts were recorded upstream;
+  `testkit/ReplayRuntimeInstructions.ts` does the same for a recording's
+  own `<runtime_info>` prompt part (kiro_model_switch).
 - `testkit/fixtures/claude_local_bash_task/output.ts` asserts the recorded
   command without its package scope, which the rename script rewrites in
   the assertion but not in the transcript.

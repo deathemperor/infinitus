@@ -1,6 +1,7 @@
 import type { ProviderDriverKind, ProviderReplayTranscript } from "@infinitus/contracts";
 
 import { buildRuntimeInstructions } from "@infinitus/provider-core/server/runtimeInstructions";
+import { PRODUCT_NAME, UPSTREAM_PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export function materializeReplayTranscriptRuntimeInstructions(
   transcript: ProviderReplayTranscript,
@@ -60,7 +61,15 @@ export function materializeReplayTranscriptRuntimeInstructions(
           // instructions for the model each prompt ran on.
           (lastPart.text === instructions || lastPart.text.startsWith("<runtime_info>"))
         ) {
-          return entry;
+          // Recorded upstream, so under its product name.
+          const text = lastPart.text.replaceAll(UPSTREAM_PRODUCT_NAME, PRODUCT_NAME);
+          return {
+            ...entry,
+            frame: {
+              ...frame,
+              params: { ...frame.params, prompt: [...prompt.slice(0, -1), { ...lastPart, text }] },
+            },
+          };
         }
         return {
           ...entry,

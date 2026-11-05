@@ -278,7 +278,7 @@ describe("ConnectionResolver", () => {
 
       expect(prepared.httpBaseUrl).toBe(TUNNEL);
       expect(prepared.socketUrl).toBe(
-        `wss://code.infinitus.run/ws?wsTicket=ticket&orchestrationProtocol=${ORCHESTRATION_PROTOCOL_VERSION}`,
+        `wss://code.infinitus.run/ws?wsTicket=ticket&orchestrationProtocol=${ORCHESTRATION_PROTOCOL_VERSION}&clientCapabilities=settingsSecretReferences`,
       );
       const tried = yield* Ref.get(inputs);
       expect(tried.map((input) => [input.httpBaseUrl, input.descriptorTimeoutMs])).toEqual([
