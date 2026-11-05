@@ -46,7 +46,7 @@ export function InfinitusAccounts(props: {
 
   return (
     <View className="gap-5">
-      {macs.length > 0 ? <InfinitusSignIns /> : null}
+      {macs.length > 0 ? <InfinitusSignIns environmentIds={environmentIds} /> : null}
       {macs.length === 0 ? (
         <EmptyState
           title="No Infinitus Mac"
