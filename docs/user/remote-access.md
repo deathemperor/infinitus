@@ -52,16 +52,16 @@ the defaults. Without a terminal:
 `t3 status --json` prints the settings. `t3 up --help` lists every flag with
 examples.
 
-### More machines with Infinitus Chat
+### More machines with T3 Chat
 
 Each Infinitus Connect account can link up to 3 machines. Phones and browsers do not
-count. A paid Infinitus Chat plan raises the limit to 10 machines with Pro, or 100 with
+count. A paid T3 Chat plan raises the limit to 10 machines with Pro, or 100 with
 Premier.
 
-To link Infinitus Chat, open your account menu on the web or desktop app, go to
-**Infinitus Chat**, and select **Link Infinitus Chat**. Sign in to Infinitus Chat in the window that
+To link T3 Chat, open your account menu on the web or desktop app, go to
+**T3 Chat**, and select **Link T3 Chat**. Sign in to T3 Chat in the window that
 opens and approve. The new limit applies the next time you add a machine. If you
-cancel or downgrade Infinitus Chat, machines you already linked stay linked, but you
+cancel or downgrade T3 Chat, machines you already linked stay linked, but you
 cannot add more until you are under the limit again.
 
 ## Pair over a LAN or private network
@@ -368,6 +368,10 @@ On the host, **Settings → Sharing & access** lets authorized administrators cr
 pairing links and revoke client sessions. Revoking an unused link prevents new
 pairings; revoke a device's session to remove its existing access. Command-line
 management is available through `t3 auth --help`.
+
+When the app connects to more than one environment, choose one at the top of the
+page. A desktop app with **Local environment** off can manage a background
+service on the same machine this way, including its Infinitus Connect link.
 
 A session with an open connection stays listed after its access credential
 expires.

@@ -1,3 +1,4 @@
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -72,7 +73,7 @@ const runtimeDependencies = (
     relayClientLayer,
     secretStoreLayer,
     ServerConfig.layerTest(process.cwd(), { prefix: "t3-managed-endpoint-" }),
-  ).pipe(Layer.provideMerge(NodeServices.layer));
+  ).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
 
 const buildCloudManagedEndpointRuntime = (
   spawner: ReturnType<typeof ChildProcessSpawner.make>,
@@ -412,6 +413,28 @@ describe("CloudManagedEndpointRuntime", () => {
     return { spawner, spawned, killed, exits, started, emit, observe };
   });
 
+  it.effect("restarts only the inspected connector and supervises its replacement", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeTransportSpawner();
+      const runtime = yield* buildCloudManagedEndpointRuntime(fixture.spawner);
+      expect(yield* runtime.restartConnector(800, Effect.succeed(true))).toBe(false);
+      yield* runtime.applyConfig(tunnelConfig);
+      yield* fixture.observe(runtime, 0);
+      expect(yield* runtime.inspectConnector).toMatchObject({ pid: 800 });
+      expect(yield* runtime.restartConnector(799, Effect.succeed(true))).toBe(false);
+      // A newer check saw the tunnel recover while this one waited for the lock.
+      expect(yield* runtime.restartConnector(800, Effect.succeed(false))).toBe(false);
+      expect(fixture.killed).toEqual([]);
+      expect(yield* runtime.restartConnector(800, Effect.succeed(true))).toBe(true);
+      expect(yield* Queue.take(fixture.started)).toBe(0);
+      expect(yield* Queue.take(fixture.started)).toBe(1);
+      yield* fixture.observe(runtime, 1);
+      expect(fixture.killed).toContain(800);
+      expect(yield* runtime.restartConnector(800, Effect.succeed(true))).toBe(false);
+      expect(yield* runtime.inspectConnector).toMatchObject({ pid: 801 });
+    }),
+  );
+
   it.effect("preserves an explicit transport choice despite repeated QUIC stalls", () =>
     Effect.gen(function* () {
       const fixture = yield* makeTransportSpawner({ transport: "quic" });
@@ -433,7 +456,7 @@ describe("CloudManagedEndpointRuntime", () => {
         const context = yield* Layer.build(
           ServerSecretStore.layer.pipe(
             Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-transport-test-" })),
-            Layer.provide(NodeServices.layer),
+            Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
           ),
         );
         const secretStoreLayer = Layer.succeed(
@@ -556,6 +579,39 @@ describe("CloudManagedEndpointRuntime", () => {
     }),
   );
 
+  it.effect("decides a restart only once it holds the reconcile lock", () =>
+    Effect.gen(function* () {
+      const checking = yield* Deferred.make<void>();
+      const releaseCheck = yield* Deferred.make<void>();
+      const fixture = yield* makeTransportSpawner({
+        isRunning: Deferred.succeed(checking, undefined).pipe(
+          Effect.andThen(Deferred.await(releaseCheck)),
+          Effect.as(true),
+        ),
+      });
+      const runtime = yield* buildCloudManagedEndpointRuntime(fixture.spawner);
+      yield* runtime.applyConfig(tunnelConfig);
+      yield* fixture.observe(runtime, 0);
+
+      // Hold reconciliation in a process probe so the restart waits for the lock.
+      const probe = yield* runtime.applyConfig(tunnelConfig).pipe(Effect.forkChild);
+      yield* Deferred.await(checking);
+      let stillDead = true;
+      const restart = yield* runtime
+        .restartConnector(
+          800,
+          Effect.sync(() => stillDead),
+        )
+        .pipe(Effect.forkChild({ startImmediately: true }));
+      stillDead = false;
+      yield* Deferred.succeed(releaseCheck, undefined);
+      yield* Fiber.join(probe);
+
+      expect(yield* Fiber.join(restart)).toBe(false);
+      expect(fixture.killed).toEqual([]);
+    }),
+  );
+
   it.effect("keeps redacted connector logs bounded even when rotation fails", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -644,7 +700,7 @@ describe("CloudManagedEndpointRuntime", () => {
           ),
         ).toBe(true);
       }
-    }).pipe(Effect.provide(NodeServices.layer)),
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
   it.effect("discards a pending fallback when its connector is replaced or removed", () =>

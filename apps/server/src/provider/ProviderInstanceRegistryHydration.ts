@@ -9,7 +9,7 @@ import {
   ServerSettings,
 } from "@infinitus/contracts";
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import type * as Crypto from "effect/Crypto";
+import type * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -43,7 +43,7 @@ type ProviderInstanceRegistryHydrationEnv =
   | Path.Path
   | FileSystem.FileSystem
   // Secret provider reads.
-  | Crypto.Crypto
+  | SecureRandom.SecureRandom
   // The Claude runner counts its CLIs as running agents for port discovery.
   | PortScanner.PortDiscovery;
 

@@ -99,7 +99,8 @@ Fix:
 
 ## Sign-in, account, or link problems
 
-Infinitus Connect does not have an active link between your account and the host.
+This device's Infinitus Connect sign-in is not ready yet, or Infinitus Connect does not have
+an active link between your account and the host.
 
 - **The host is linked to a different account.** Sign in to the same Infinitus Connect
   account on this device and on the host. On the host, run `t3 connect logout`,
@@ -107,13 +108,17 @@ Infinitus Connect does not have an active link between your account and the host
 - **Infinitus Connect is off on the host, or the host only publishes agent activity.**
   On the host, open **Settings > Sharing & access** and turn **Infinitus Connect** on, or
   run `t3 connect`.
-- **The host was linked, but the server did not apply the link yet.** Run
-  `t3 service restart` on the host, or restart `t3 serve`.
+- **The host was linked, but the server did not apply the link yet.** Restart
+  the server on the host: quit and reopen the Infinitus desktop app, run
+  `t3 service restart`, or stop `t3 serve` and run it again.
 - **This device's sign-in expired, or the host no longer accepts this
   device.** Sign out of Infinitus Connect and sign in again.
+- **This device is still loading its Infinitus Connect sign-in.** Wait a moment;
+  Infinitus retries on its own. If it keeps waiting, reload or restart Infinitus on
+  this device.
 - **Your account reached its tunnel limit.** Remove an environment you do not
   use from your Infinitus account's Infinitus Connect page, or
-  [link a paid Infinitus Chat account](./remote-access.md#more-machines-with-t3-chat)
+  [link a paid T3 Chat account](./remote-access.md#more-machines-with-t3-chat)
   for a higher limit. Then restart Infinitus on the host.
 
 ## The clock is off
@@ -131,7 +136,7 @@ This app needs a newer Infinitus on the host. Update Infinitus on the host. See
 
 | Error                                                     | Fix                                                                                                                                         |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid Infinitus Chat account, then restart Infinitus on the host.                                     |
+| `environment_link_limit_exceeded` or managed tunnel limit | Remove an unused environment or link a paid T3 Chat account, then restart Infinitus on the host.                                            |
 | `auth_invalid` or `invalid_bearer`                        | Run `t3 connect login`. If credentials were revoked, run `t3 connect logout`, then `t3 connect` again. Restart the server after signing in. |
 | Expired or invalid link proof                             | Check the host's date and time, update Infinitus, then restart it.                                                                          |
 | HTTP 403 without a recognized error                       | Check relay access, proxies, and firewall rules. Keep any Cloudflare Ray ID for a bug report.                                               |

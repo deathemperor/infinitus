@@ -1,4 +1,4 @@
-// @effect-diagnostics preferSchemaOverJson:off - JSON string literals embed paths safely into generated JavaScript.
+// @effect-diagnostics globalJsonInEffect:off - JSON string literals embed paths safely into generated JavaScript.
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { resolveNodeExecutable } from "@infinitus/shared/nodeRuntime";
 import * as Effect from "effect/Effect";

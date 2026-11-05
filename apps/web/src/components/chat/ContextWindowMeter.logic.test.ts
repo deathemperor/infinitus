@@ -1,9 +1,9 @@
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@infinitus/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import { deriveProviderInstanceEntries } from "../../providerInstances";
+import { hasDismissedResumeCompaction } from "@infinitus/client-runtime/state/context-window";
 import {
   hasAvailableCompactionProvider,
-  hasDismissedResumeCompaction,
   resolveContextWindowModelDisplayName,
   shouldReserveContextWindowMeter,
 } from "./ContextWindowMeter.logic";
