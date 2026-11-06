@@ -36,7 +36,7 @@ import {
 import { AuthOrchestrationOperateScope } from "@infinitus/contracts";
 import { Atom } from "effect/reactivity";
 
-import { environmentThreadDetails, threadEnvironment } from "../state/threads";
+import { environmentThreadDetails, threadEnvironment } from "./threads";
 import {
   buildPendingUserInputAnswers,
   setPendingUserInputCustomAnswer,

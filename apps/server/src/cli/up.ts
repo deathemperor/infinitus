@@ -368,8 +368,13 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
     if ("failed" in result && before.service.installed) {
       // The old service still runs, so a foreground server would clash with it.
       yield* restoreServiceEnv;
+      const { command } = yield* resolveHostCliCommand("up", baseDirArgs);
       yield* Console.log(
+<<<<<<< HEAD
         `Service setup failed: ${result.failed} Fix that, then run \`infinitus up\` again.`,
+=======
+        `Service setup failed: ${result.failed} Fix that, then run \`${command}\` again.`,
+>>>>>>> upstream-sync-6577c6b618-upstream-renamed
       );
     } else if ("failed" in result) {
       yield* printServeCommand(`Service setup failed: ${result.failed}`);
@@ -387,7 +392,12 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
           }),
         ).pipe(Effect.catchTags({ QuitError: () => Effect.succeed(false) })));
       if (!confirmed) {
+<<<<<<< HEAD
         yield* Console.log(`Run \`infinitus service restart\` to turn ${CONNECT_NAME} off.`);
+=======
+        const { command } = yield* resolveHostCliCommand("service restart", baseDirArgs);
+        yield* Console.log(`Run \`${command}\` to turn T3 Connect off.`);
+>>>>>>> upstream-sync-6577c6b618-upstream-renamed
       } else {
         if (!interactive && !stopped) {
           yield* Console.log(`Restarting ${PRODUCT_NAME}. Running agent turns will stop.`);

@@ -2,10 +2,13 @@ import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import { useAuth } from "@clerk/react";
 import { Link } from "@tanstack/react-router";
 import { managedCapabilityDenial } from "@infinitus/contracts";
+import { ToolCallVisibility } from "@infinitus/contracts/settings";
+import * as Schema from "effect/Schema";
 
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useInfinitusConnectAuthPrompt } from "../clerk/useInfinitusConnectAuthPrompt";
 import { Button } from "../ui/button";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
@@ -22,7 +25,12 @@ export function LabsSettingsPanel() {
       <SettingsSection id="beta" title="Beta">
         <BoringSidebarRow />
         <BoringSidebarMultilineRow />
+<<<<<<< HEAD
         {/* Clerk is only mounted when this build has Connect. */}
+=======
+        <ToolCallVisibilityRow />
+        {/* Clerk is only mounted when this build has T3 Connect. */}
+>>>>>>> upstream-sync-6577c6b618-upstream-renamed
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
         <LinkedEnvironmentsRow />
         <SimlockHostsRow />
@@ -73,7 +81,51 @@ function BoringSidebarMultilineRow() {
   );
 }
 
+<<<<<<< HEAD
 /** Signed out of Connect, the row offers to sign in instead of its switch. */
+=======
+const TOOL_CALL_VISIBILITY_LABELS: Record<ToolCallVisibility, string> = {
+  showAll: "Show all",
+  hideSuccessful: "Hide successful",
+  hideAll: "Hide all",
+  zen: "Zen",
+};
+
+const isToolCallVisibility = Schema.is(ToolCallVisibility);
+
+function ToolCallVisibilityRow() {
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("tool-call-visibility")}
+      description="Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show."
+      control={
+        <div className="w-full sm:w-40">
+          <Select
+            value={settings.toolCallVisibility}
+            onValueChange={(value) => {
+              if (isToolCallVisibility(value)) updateSettings({ toolCallVisibility: value });
+            }}
+          >
+            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Tool calls in chat">
+              <SelectValue>{TOOL_CALL_VISIBILITY_LABELS[settings.toolCallVisibility]}</SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              <SelectItem value="showAll">Show all</SelectItem>
+              <SelectItem value="hideSuccessful">Hide successful</SelectItem>
+              <SelectItem value="hideAll">Hide all</SelectItem>
+              <SelectItem value="zen">Zen</SelectItem>
+            </SelectPopup>
+          </Select>
+        </div>
+      }
+    />
+  );
+}
+
+/** Signed out of T3 Connect, the row offers to sign in instead of its switch. */
+>>>>>>> upstream-sync-6577c6b618-upstream-renamed
 function GuestLinksRowWithSignIn() {
   const { isSignedIn } = useAuth();
   const { openAuthPrompt } = useInfinitusConnectAuthPrompt();
@@ -82,7 +134,11 @@ function GuestLinksRowWithSignIn() {
   return (
     <SettingsRow
       {...searchableSetting("guest-links")}
+<<<<<<< HEAD
       description={`Share a thread with a guest who watches it live in their browser and sends messages you approve. Sign in to ${CONNECT_NAME} to use guest links.`}
+=======
+      description="Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to T3 Connect to use guest links."
+>>>>>>> upstream-sync-6577c6b618-upstream-renamed
       control={
         <Button size="sm" variant="outline" onClick={openAuthPrompt}>
           Sign in
@@ -113,12 +169,17 @@ function GuestLinksRow() {
       managed={settings.guestSharingEnabled ? undefined : connectDenial}
       description={
         <>
+<<<<<<< HEAD
           Share a thread with a guest who watches it live in their browser and sends messages you
           approve. Needs {CONNECT_NAME}: sign in and link this machine in{" "}
+=======
+          Share a thread with a guest who watches it live in a browser and sends messages you
+          approve. Needs T3 Connect: sign in and link this machine in{" "}
+>>>>>>> upstream-sync-6577c6b618-upstream-renamed
           <Link to="/settings/access" className="underline underline-offset-2">
             Sharing & access
           </Link>
-          . While it is off, every guest link stops working.
+          . Turning it off stops every guest link.
         </>
       }
       control={
@@ -148,7 +209,7 @@ function LinkedEnvironmentsRow() {
           <Link to="/settings/connections" className="underline underline-offset-2">
             Connections
           </Link>
-          . While it is off, nothing new starts over a link; tasks already running finish.
+          . While off, nothing new starts over a link; running tasks finish.
         </>
       }
       control={
