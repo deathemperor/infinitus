@@ -73,6 +73,7 @@ import { readDeviceDetail, runDeviceAction } from "./DeviceActions.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as SecretResolver from "@infinitus/secret-provider-core/server/SecretResolver";
 import * as SecretResolverLayer from "../secrets/SecretResolver.ts";
+import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
 import * as DeviceHost from "./DeviceHost.ts";
 import * as SshDeviceHost from "./SshDeviceHost.ts";
 import * as EasDeviceHost from "./EasDeviceHost.ts";
@@ -84,11 +85,13 @@ import * as LocalDeviceHost from "./LocalDeviceHost.ts";
 
 export const DEVICE_HUB_ROUTE_PREFIX = "/api/device-hub";
 
+const isSshCommandError = Schema.is(SshCommandError);
+
 const sshProbeFailureMessage = (error: DeviceHost.DeviceHostError): string => {
   const windows = SshDeviceHost.isSshWindowsHostError(error.cause) ? error.cause : null;
   const cause = windows ? windows.cause : error.cause;
   if (
-    !(cause instanceof SshCommandError) ||
+    !isSshCommandError(cause) ||
     cause.exitCode === null ||
     cause.exitCode < 1 ||
     (cause.exitCode > 254 && cause.exitCode !== 9009)
@@ -1595,8 +1598,11 @@ export const make = Effect.gen(function* () {
               (host) => host.id === input.hostId,
             );
       const token = input.agentToken
-        ? { agentToken: input.agentToken, source: "entered" as const }
-        : SimlockDeviceHost.resolveSimlockToken(gatewayUrl, savedHost, environment);
+        ? {
+            agentToken: yield* requireSettingsSecret(secrets, input.agentToken),
+            source: "entered" as const,
+          }
+        : yield* SimlockDeviceHost.resolveSimlockToken(secrets, gatewayUrl, savedHost, environment);
       if (!token)
         return yield* new DeviceSimlockIdentityError({
           reason: savedHost?.agentToken
@@ -1624,6 +1630,8 @@ export const make = Effect.gen(function* () {
     Effect.catchTags({
       ServerSettingsError: () =>
         Effect.fail(new DeviceSimlockIdentityError({ reason: "Could not read the saved token." })),
+      SettingsSecretUnresolvedError: (error) =>
+        Effect.fail(new DeviceSimlockIdentityError({ reason: error.message })),
     }),
     Effect.provide(simlockContext),
   );
