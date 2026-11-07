@@ -4432,7 +4432,10 @@ describe("AcpAdapterV2", () => {
         {
           sessionId: "mock-session-1-fork",
           command: process.execPath,
-          args: ["-e", "process.stdout.write(process.env.T3_ACP_MCP_AUTHORIZATION ?? '')"],
+          args: [
+            "-e",
+            "process.stdout.write(`${process.env.T3CODE_THREAD_ID ?? ''}\n${process.env.T3_ACP_MCP_AUTHORIZATION ?? ''}`)",
+          ],
         },
         { requestId: "test-terminal-create", method: "terminal/create" },
       );
@@ -4450,7 +4453,10 @@ describe("AcpAdapterV2", () => {
         },
         { requestId: "test-terminal-output", method: "terminal/output" },
       );
-      assert.equal(terminalOutput.output, "Bearer target-thread-token");
+      assert.equal(
+        terminalOutput.output,
+        "thread-acp-native-fork-target\nBearer target-thread-token",
+      );
     }).pipe(Effect.provide(layerTest), Effect.scoped),
   );
 
@@ -5081,6 +5087,10 @@ describe("AcpAdapterV2", () => {
       assert.equal(
         runtimeInputs[1]?.processEnvironment?.T3_ACP_MCP_AUTHORIZATION,
         "Bearer rollback-target-token",
+      );
+      assert.equal(
+        runtimeInputs[1]?.processEnvironment?.T3CODE_THREAD_ID,
+        "thread-acp-rollback-session-target",
       );
       const replacementMcpServer = runtimeInputs[1]?.mcpServers[0];
       const replacementMcpEnvironment =

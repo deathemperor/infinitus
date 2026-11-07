@@ -183,9 +183,13 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       {
         scopedLimitNames,
         onUsageLimits: (update) => snapshot.applyUsageLimits(update),
+<<<<<<< HEAD
         ...(Option.isSome(limitStops)
           ? { onUsageLimitRefusal: limitStops.value.reportRefusal }
           : {}),
+=======
+        modelCatalog,
+>>>>>>> upstream-sync-67fdc53823-upstream-renamed
       },
     ).pipe(
       Effect.mapError(
