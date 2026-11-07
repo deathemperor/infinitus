@@ -4,8 +4,12 @@
  * It carries exactly what an agent sign-in with the chosen access needs.
  */
 import { type AuthMcpClientAccess, mcpClientScopes } from "@infinitus/contracts";
+<<<<<<< HEAD
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Data from "effect/Data";
+=======
+import * as Schema from "effect/Schema";
+>>>>>>> upstream-sync-67fdc53823-upstream-renamed
 import * as Effect from "effect/Effect";
 import type * as HttpClient from "effect/http/HttpClient";
 import * as Option from "effect/Option";
@@ -24,10 +28,13 @@ const MINT_TIMEOUT_MS = 8_000;
 const PEER_PAIRING_CODE_LABEL = `${PRODUCT_NAME} link`;
 
 /** Minting failed; the user can still paste a code from the other environment. */
-export class PeerPairingCodeError extends Data.TaggedError("PeerPairingCodeError")<{
-  readonly reason: "not_allowed" | "unavailable";
-  readonly cause: unknown;
-}> {
+export class PeerPairingCodeError extends Schema.TaggedError<PeerPairingCodeError>()(
+  "PeerPairingCodeError",
+  {
+    reason: Schema.Literals(["not_allowed", "unavailable"]),
+    cause: Schema.Defect(),
+  },
+) {
   override get message(): string {
     return this.reason === "not_allowed"
       ? "Your session there cannot create pairing codes. Paste a code from there instead."
