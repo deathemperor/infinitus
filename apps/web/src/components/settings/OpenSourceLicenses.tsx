@@ -1,7 +1,7 @@
 import { ChevronRightIcon, ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
-import * as Data from "effect/Data";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { FetchHttpClient, HttpClient } from "effect/http";
@@ -28,6 +28,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group"
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 
+<<<<<<< HEAD
 /**
  * Credits the upstream project the fork is built on. The formal notice is the
  * "T3 Code" entry in the list below (MIT requires shipping its text), but that
@@ -59,6 +60,12 @@ function UpstreamCreditSection() {
 class LicenseManifestLoadError extends Data.TaggedError("LicenseManifestLoadError")<{
   readonly message: string;
 }> {}
+=======
+class LicenseManifestLoadError extends Schema.TaggedError<LicenseManifestLoadError>()(
+  "LicenseManifestLoadError",
+  { message: Schema.String },
+) {}
+>>>>>>> upstream-sync-257e4073c1-upstream-renamed
 
 // Not keepAlive: a failed load must not stick for the session, so each visit to the page loads
 // the manifest again (a static asset the HTTP cache serves).

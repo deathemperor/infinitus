@@ -26,9 +26,14 @@ import { persistComposerAttachmentFile, renderPhotoAsJpeg } from "../../lib/comp
 import { subscribeAppActive } from "../../lib/appState";
 import { coalescedRun } from "../../lib/coalescedRun";
 import { rootNavigationRef } from "../../lib/rootNavigation";
+<<<<<<< HEAD
 import { selectWorkspaceDetail } from "../workspace/workspace-detail-selection";
 import { isShareFlowRoute } from "./share-to-thread";
 import { discardDismissedShare } from "./discardDismissedShare";
+=======
+import { selectWorkspaceDetail } from "../layout/workspace/workspace-detail-selection";
+import { isDraftThreadRoute } from "../threads/thread-route-state";
+>>>>>>> upstream-sync-257e4073c1-upstream-renamed
 import { makeIncomingShareImports } from "../threads/incomingShareImport";
 import { liveNewTaskFlowKeys } from "../threads/new-task-flow-state";
 import { appAtomRegistry } from "../../state/atom-registry";

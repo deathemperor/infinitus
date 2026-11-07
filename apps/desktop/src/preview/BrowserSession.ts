@@ -55,6 +55,9 @@ const externalProtocolPromptUrl = (rawUrl: string | undefined): string | null =>
   }
 };
 
+// Teams sends Electron User-Agents to an error page before sign-in. Electron allows one listener per session.
+const TEAMS_URL_PATTERNS = ["https://teams.cloud.microsoft/*", "https://teams.microsoft.com/*"];
+
 const MAX_PROMPT_URL_LENGTH = 300;
 
 const truncateForPrompt = (text: string): string =>
@@ -371,11 +374,30 @@ export const make = Effect.gen(function* BrowserSessionMake() {
               ? clipboardReadDecisions.get(permissionOrigin(requestingOrigin) ?? "") === true
               : ALLOWED_PREVIEW_PERMISSIONS.has(permission),
           );
+<<<<<<< HEAD
           // The request stays pending until the callback runs, so it runs on
           // every path, exactly once — a failed chooser cancels the sign-in.
           browserSession.on("select-webauthn-account", (_event, details, callback) => {
             void chooseWebAuthnAccount(details).then(callback, () => callback(null));
           });
+=======
+          browserSession.webRequest.onBeforeSendHeaders(
+            { urls: TEAMS_URL_PATTERNS },
+            ({ requestHeaders }, callback) => {
+              const userAgent = Object.entries(requestHeaders).find(
+                ([name]) => name.toLowerCase() === "user-agent",
+              );
+              if (userAgent === undefined) {
+                callback({});
+                return;
+              }
+              const [name, value] = userAgent;
+              callback({
+                requestHeaders: { ...requestHeaders, [name]: value.replace(/ Electron\/\S+/, "") },
+              });
+            },
+          );
+>>>>>>> upstream-sync-257e4073c1-upstream-renamed
           const next = new Map(sessions);
           next.set(partition, browserSession);
           return [browserSession, next] as const;
