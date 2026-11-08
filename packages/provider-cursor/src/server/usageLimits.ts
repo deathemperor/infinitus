@@ -1,13 +1,14 @@
 import type { ServerProviderUsageWindow } from "@infinitus/contracts";
 import type { CursorSettings } from "../settings.ts";
+<<<<<<< HEAD
 import * as HostProcess from "@infinitus/shared/HostProcess";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
+=======
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
 import { CURSOR_USAGE_WINDOWS } from "@infinitus/shared/usageLimits";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
-import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
@@ -18,10 +19,7 @@ import {
   makeUsageLimits,
 } from "@infinitus/provider-core/server/usageLimits";
 import { DEFAULT_CURSOR_API_ENDPOINT, exchangeCursorApiKey } from "./apiKey.ts";
-import * as CursorKeychain from "./CursorKeychain.ts";
 
-const CursorCredentials = Schema.Struct({ accessToken: Schema.optional(Schema.String) });
-const decodeCredentials = Schema.decodeEffect(Schema.fromJsonString(CursorCredentials));
 const CursorUsageResponse = Schema.Struct({
   billingCycleEnd: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
   planUsage: Schema.optional(
@@ -65,13 +63,9 @@ export function cursorUsageResponseToLimits(
 export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function* (
   settings: Pick<CursorSettings, "apiEndpoint">,
   environment: NodeJS.ProcessEnv = process.env,
-  allowKeychain = false,
 ) {
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
   return yield* Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const platform = yield* HostProcess.Platform;
     const endpoint = (
       settings.apiEndpoint?.trim() ||
       environment.CURSOR_API_ENDPOINT?.trim() ||
@@ -79,8 +73,6 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
     ).replace(/\/$/, "");
     let token = environment.CURSOR_AUTH_TOKEN?.trim();
     const apiKey = environment.CURSOR_API_KEY?.trim();
-    const credentialStore = environment.AGENT_CLI_CREDENTIAL_STORE;
-    // An API key can name a different account from the stored login, so read the key's own.
     if (!token && apiKey) {
       if (endpoint !== DEFAULT_CURSOR_API_ENDPOINT) {
         return makeUnavailableUsageLimits({
@@ -90,6 +82,7 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
         });
       }
       token = yield* exchangeCursorApiKey(apiKey);
+<<<<<<< HEAD
     } else if (!token && credentialStore === "memory") {
       return makeUnavailableUsageLimits({
         checkedAt,
@@ -131,6 +124,8 @@ export const readCursorUsageLimits = Effect.fn("readCursorUsageLimits")(function
         Effect.flatMap(decodeCredentials),
       );
       token = credentials.accessToken?.trim();
+=======
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
     }
     if (!token) return makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" });
     const client = yield* HttpClient.HttpClient;

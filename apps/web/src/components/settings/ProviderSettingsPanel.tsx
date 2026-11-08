@@ -351,12 +351,20 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
       hasServerConfig: environment.serverConfig !== null,
     }),
   )?.environmentId;
+<<<<<<< HEAD
   // A search jump to a setting the selected device cannot show switches to one that can.
+=======
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
   let searchRedirectEnvironmentId: EnvironmentId | undefined;
   {
     if (
       !target.scoped &&
+<<<<<<< HEAD
       searchTargetId === searchableSetting("provider-health-check-interval").id &&
+=======
+      (searchTargetId === searchableSetting("provider-health-check-interval").id ||
+        searchTargetId === searchableSetting("usage-providers").id) &&
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
       !selectedEnvironmentCanRenderSettings &&
       searchableEnvironmentId !== undefined
     ) {
@@ -1084,8 +1092,19 @@ export function EnvironmentProviderSettings({
         </SettingsGroup>
       </SettingsSection>
 
+<<<<<<< HEAD
       {/* Upstream's "Usage providers" hub section is not mounted here: the
           Accounts page reads every hub through the Mac app (#1554). */}
+=======
+      <UsageProviderSettings
+        key={environmentId}
+        environmentId={environmentId}
+        environmentLabel={environmentLabel}
+        sources={settings.usageLimitSources}
+        readOnly={readOnly}
+      />
+
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
       <SettingsSection title="Advanced">
         <SettingsRow
           id={searchableSetting("provider-health-check-interval").id}

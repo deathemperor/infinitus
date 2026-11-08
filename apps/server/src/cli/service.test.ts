@@ -60,13 +60,33 @@ function makeTestService(
 }
 
 it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("service commands", (it) => {
-  it.effect.each(["install", "update"] as const)(
-    "%s refuses a downgrade before changing the service",
-    (command) =>
+  it.effect.each(
+    (["install", "update"] as const).flatMap((command) => [
+      {
+        command,
+        label: "a downgrade",
+        status: newerServiceStatus,
+        error: {
+          _tag: "BootServiceDowngradeRefusedError",
+          installedVersion: "999.0.0",
+          targetVersion: packageJson.version,
+        },
+      },
+      // This home's newer state must not ask for --allow-downgrade first.
+      {
+        command,
+        label: "another home's service",
+        status: { ...newerServiceStatus, otherBaseDir: "/srv/t3" },
+        error: { _tag: "BootServiceOtherBaseDirError", installedBaseDir: "/srv/t3" },
+      },
+    ]),
+  )(
+    "$command refuses $label before changing the service",
+    ({ command, status: serviceStatus, error: expected }) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
-        const { service, installOptions } = makeTestService(newerServiceStatus);
+        const { service, installOptions } = makeTestService(serviceStatus);
         vi.spyOn(BootService, "layer").mockReturnValue(
           Layer.succeed(BootService.BootService, service),
         );
@@ -81,11 +101,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("service commands
           Effect.flip,
         );
 
-        expect(error).toMatchObject({
-          _tag: "BootServiceDowngradeRefusedError",
-          installedVersion: "999.0.0",
-          targetVersion: packageJson.version,
-        });
+        expect(error).toMatchObject(expected);
         expect(installOptions).toEqual([]);
       }),
   );
@@ -240,7 +256,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("service commands
         ),
       );
       expect(uninstalls).toEqual(input.removed);
+<<<<<<< HEAD
       expect(output).toContain(input.otherHome ? `another ${PRODUCT_NAME} home` : "Removed");
+=======
+      expect(output).toContain(input.otherHome ? "--base-dir '/home/me/.t3'" : "Removed");
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
     }),
   );
 });

@@ -51,7 +51,7 @@ import * as RelayTracing from "../cloud/relayTracing.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ExternalLauncher from "../process/externalLauncher.ts";
-import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
+import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import { resolveCliCommand } from "./invocation.ts";
 import * as CliService from "./service.ts";
@@ -301,6 +301,7 @@ const withCloudCliSessionToken = <A, E, R>(
 
 type LiveCloudActionResult =
   | { readonly status: "not-running" }
+  | { readonly status: "server-gone" }
   | { readonly status: "succeeded" }
   | { readonly status: "failed"; readonly cause: Cause.Cause<unknown> };
 
@@ -309,6 +310,10 @@ const runLiveCloudUnlink = Effect.fn("cloud.cli.run_live_unlink")(function* () {
   const runtimeState = yield* readPersistedServerRuntimeState(config.serverRuntimeStatePath);
   if (Option.isNone(runtimeState)) {
     return { status: "not-running" } satisfies LiveCloudActionResult;
+  }
+  // A killed server leaves its record behind, and another process may own its port by now.
+  if (!isProcessAlive(runtimeState.value.pid)) {
+    return { status: "server-gone" } satisfies LiveCloudActionResult;
   }
 
   const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
@@ -460,7 +465,17 @@ const reportCloudDisconnectResults = Effect.fn("cloud.cli.report_disconnect_resu
         `${CONNECT_NAME} is disabled, but the running server could not stop its tunnel.\nRestart that server to stop the connector.`,
       );
     } else {
+<<<<<<< HEAD
       yield* Console.log(`${CONNECT_NAME} is disabled locally.`);
+=======
+      yield* Console.log("T3 Connect is disabled locally.");
+      // A killed server cannot stop the connector it started, and nothing adopts it on restart.
+      if (input.liveResult.status === "server-gone") {
+        yield* Console.warn(
+          "The server that ran T3 Connect is gone, but its cloudflared process may still be running.\nStop that process if it is.",
+        );
+      }
+>>>>>>> upstream-sync-09a54f01bc-upstream-renamed
     }
 
     if (Exit.isFailure(input.relayResult)) {

@@ -31,10 +31,6 @@
       "types": "./src/server/CursorAccountReader.ts",
       "import": "./src/server/CursorAccountReader.ts"
     },
-    "./server/CursorKeychain": {
-      "types": "./src/server/CursorKeychain.ts",
-      "import": "./src/server/CursorKeychain.ts"
-    },
     "./server/CursorUsageAccounts": {
       "types": "./src/server/CursorUsageAccounts.ts",
       "import": "./src/server/CursorUsageAccounts.ts"
@@ -53,7 +49,6 @@
     "@infinitus/contracts": "workspace:*",
     "@infinitus/provider-core": "workspace:*",
     "@infinitus/shared": "workspace:*",
-    "@napi-rs/keyring": "^1.3.0",
     "effect": "catalog:",
     "yaml": "catalog:"
   },
