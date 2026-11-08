@@ -1,12 +1,15 @@
 included:
   - ios/T3Code
   - modules/t3-composer-editor/ios
-  - modules/t3-highlights/ios
   - modules/t3-native-controls/ios
   - modules/t3-terminal/ios
   - modules/t3-review-diff/ios
+<<<<<<< HEAD
   - modules/infinitus-markup/ios
   - modules/infinitus-loopback-catch/ios
+=======
+  - modules/t3-voice-transcription/ios
+>>>>>>> upstream-sync-8e6a732305-upstream-renamed
 
 excluded:
   - ios/Pods

@@ -528,10 +528,16 @@ const config: ExpoConfig = {
   ],
   extra: {
     appVariant: APP_VARIANT,
+<<<<<<< HEAD
     // One product, one version (#823): the root VERSION file, shown in
     // Settings. `version` above stays the store's dotted-integer marketing
     // version (EAS owns the build numbers, `appVersionSource: remote`).
     productVersion: PRODUCT_VERSION,
+=======
+    secretsFeatureEnabled: ["1", "true"].includes(
+      process.env.T3CODE_FEATURE_SECRETS?.trim().toLowerCase() ?? "",
+    ),
+>>>>>>> upstream-sync-8e6a732305-upstream-renamed
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
     // Fork: `sandbox` for a build Xcode signs onto a device (its APNs token
     // is a sandbox one); unset everywhere else, where the variant decides.

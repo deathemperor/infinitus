@@ -1,13 +1,11 @@
-import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
-import { SheetHeader } from "../../components/ui/SheetHeader";
-import { IconButton } from "../../components/ui/IconButton";
+import { AppBar } from "../../components/ui/AppBar";
 import { Button } from "../../components/ui/Button";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 
 import { useAuth } from "@clerk/expo";
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
-import { Platform, RefreshControl, View } from "react-native";
+import { RefreshControl, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { reportAtomCommandResult, settlePromise } from "@infinitus/client-runtime/state/runtime";
@@ -61,30 +59,20 @@ function ConfiguredConnectOnboardingRouteScreen() {
 
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
+<<<<<<< HEAD
       <SheetHeader
         presentation={Platform.OS === "android" ? "inline" : "native"}
         title={`Set up ${CONNECT_NAME}`}
+=======
+      <AppBar
+        title="Set up T3 Connect"
+>>>>>>> upstream-sync-8e6a732305-upstream-renamed
         onClose={handleClose}
-        trailing={
-          Platform.OS === "android" ? (
-            isRefreshing ? (
-              <View
-                className="size-12 items-center justify-center"
-                accessible
-                accessibilityLabel="Refreshing environments"
-                accessibilityState={{ busy: true }}
-              >
-                <AppActivityIndicator />
-              </View>
-            ) : (
-              <IconButton
-                accessibilityLabel="Refresh environments"
-                icon="arrow.clockwise"
-                onPress={handleRefresh}
-              />
-            )
-          ) : undefined
-        }
+        refresh={{
+          accessibilityLabel: "Refresh environments",
+          disabled: isRefreshing,
+          onPress: handleRefresh,
+        }}
       />
       <ScrollView
         nestedScrollEnabled
@@ -98,11 +86,7 @@ function ConfiguredConnectOnboardingRouteScreen() {
           paddingHorizontal: 20,
           paddingTop: 16,
         }}
-        refreshControl={
-          Platform.OS === "ios" ? (
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-          ) : undefined
-        }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
       >
         {isSignedIn ? (
           <CloudEnvironmentRows
