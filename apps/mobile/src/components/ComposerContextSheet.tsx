@@ -13,7 +13,7 @@ import type {
 import { formatAttachmentSize } from "@infinitus/client-runtime/state/attachments";
 import { sourceControlClients } from "@infinitus/client-runtime/source-control-clients";
 import { videoMimeType } from "@infinitus/shared/video";
-import { Platform, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { REVIEW_MONO_FONT_FAMILY } from "../features/review/reviewDiffRendering";
 import { ReviewCommentCard, useReviewCommentColors } from "../features/review/ReviewCommentCard";
@@ -193,7 +193,7 @@ export function ComposerContextSheet(props: {
       <ScrollView
         nestedScrollEnabled
         className="flex-1"
-        contentInsetAdjustmentBehavior={Platform.OS === "ios" ? "automatic" : "never"}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 12,
