@@ -1,14 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useAuth } from "@clerk/react";
 import { findErrorTraceId } from "@infinitus/client-runtime/errors";
-import {
-  AuthRelayReadScope,
-  AuthRelayWriteScope,
-  type EnvironmentCloudLinkStateResult,
-  type EnvironmentId,
-} from "@infinitus/contracts";
+import { AuthRelayReadScope, AuthRelayWriteScope, type EnvironmentId } from "@infinitus/contracts";
 import { ManagedRelay } from "@infinitus/client-runtime/relay";
-import type { RelayManagedEndpointProviderKind } from "@infinitus/contracts/relay";
 import {
   isAtomCommandInterrupted,
   settlePromise,
@@ -18,10 +12,12 @@ import * as Schema from "effect/Schema";
 import { useState } from "react";
 
 import { toastManager } from "../components/ui/toast";
+import { stackedThreadToast } from "../components/ui/toastHelpers";
+import { relayFailureReason } from "./relayFailureReason";
 import { relayEnvironmentDiscovery } from "../state/relay";
 import { readEnvironmentScope } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
-import { CloudEnvironmentLinkError } from "./linkEnvironment";
+import { isCloudEnvironmentLinkError } from "./linkEnvironment";
 import { refreshManagedTunnelUsage } from "./managedRelayState";
 import {
   linkEnvironment as linkEnvironmentAtom,
@@ -30,7 +26,11 @@ import {
 } from "./linkEnvironmentAtoms";
 import { readCachedCloudLinkState, useCloudLinkState } from "./cloudLinkState";
 import { resolveRelayClerkTokenOptions } from "./publicConfig";
+<<<<<<< HEAD
 import { CONNECT_NAME } from "@infinitus/shared/productName";
+=======
+import { isManagedTunnelActive } from "./t3ConnectState";
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
 
 export interface CloudLinkDesiredState {
   readonly managedTunnel: boolean;
@@ -38,24 +38,12 @@ export interface CloudLinkDesiredState {
   readonly holdWebhooksWhileOffline?: boolean;
 }
 
-// Require managed discovery: stale tunnel config after a publish-only switch causes endpoint_provider_not_managed.
-function isManagedTunnelActive(
-  linkState: EnvironmentCloudLinkStateResult,
-  relayProviderKind: RelayManagedEndpointProviderKind | undefined,
-) {
-  const localManagedTunnel = linkState.managedTunnelActive ?? linkState.linked;
-  return (
-    linkState.linkRevoked !== true &&
-    localManagedTunnel &&
-    (relayProviderKind === undefined || relayProviderKind === "cloudflare_tunnel")
-  );
-}
-
 const isManagedRelayRequestFailedError = Schema.is(ManagedRelay.ManagedRelayRequestFailedError);
+const isManagedRelayClientError = Schema.is(ManagedRelay.ManagedRelayClientError);
 
 /** The account's tunnel cap when the relay refused a new tunnel for being at it. */
 function tunnelLimitFromLinkFailure(cause: unknown): number | null {
-  if (!(cause instanceof CloudEnvironmentLinkError)) return null;
+  if (!isCloudEnvironmentLinkError(cause)) return null;
   const relayCause = cause.cause;
   if (!isManagedRelayRequestFailedError(relayCause)) return null;
   return relayCause.relayError?._tag === "RelayEnvironmentLinkLimitExceededError"
@@ -85,12 +73,18 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
   const [operationError, setOperationError] = useState<string | null>(null);
   const [tunnelLimit, setTunnelLimit] = useState<number | null>(null);
 
+<<<<<<< HEAD
   const reportUpdateFailure = (cause: unknown) => {
     const message =
       cause instanceof Error ? cause.message : `Could not update ${CONNECT_NAME} access.`;
+=======
+  const reportUpdateFailure = (cause: unknown, reason?: string) => {
+    const message = cause instanceof Error ? cause.message : "Could not update T3 Connect access.";
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
     const traceId = findErrorTraceId(cause);
     console.error(`[t3-connect] Could not update ${CONNECT_NAME}`, { message, traceId, cause });
     setOperationError(traceId ? `${message} Trace ID: ${traceId}` : message);
+<<<<<<< HEAD
     toastManager.add({
       type: "error",
       title: `Could not update ${CONNECT_NAME}`,
@@ -104,6 +98,25 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
           }
         : undefined,
     });
+=======
+    toastManager.add(
+      stackedThreadToast({
+        type: "error",
+        title: "Could not update T3 Connect",
+        description: reason ?? relayFailureReason(cause) ?? message,
+        ...(traceId
+          ? {
+              actionProps: {
+                children: "Copy trace ID",
+                onClick: () => void navigator.clipboard?.writeText(traceId),
+              },
+              actionVariant: "outline",
+            }
+          : {}),
+        data: { hideCopyButton: true },
+      }),
+    );
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
   };
 
   const linkData = cloudLinkState.data;
@@ -163,9 +176,19 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
       refreshManagedTunnelUsage();
       if (unlinkResult._tag === "Failure") {
         if (!isAtomCommandInterrupted(unlinkResult)) {
-          reportUpdateFailure(squashAtomCommandFailure(unlinkResult));
+          const cause = squashAtomCommandFailure(unlinkResult);
+          // Only the relay delete fails with a relay error, and it runs after the local unlink.
+          const relayKeptLink =
+            isCloudEnvironmentLinkError(cause) && isManagedRelayClientError(cause.cause);
+          reportUpdateFailure(
+            cause,
+            relayKeptLink
+              ? "Disconnected here, but T3 Connect still lists it. Remove it in Account."
+              : undefined,
+          );
         }
         cloudLinkState.refresh();
+        await refreshRelayEnvironments();
         return false;
       }
     } else {

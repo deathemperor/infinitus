@@ -29,6 +29,7 @@ import {
 import {
   sortActiveThreadsByOrderKey,
   resolveSettledThreadTimestamp,
+  resolveThreadActivityTimestamp,
   sortPinnedThreadsByOrderKey,
   sortSettledThreads,
 } from "@infinitus/client-runtime/state/thread-sort";
@@ -189,7 +190,7 @@ export function resolveThreadListV2SnoozeGateExpiryMs(
   >,
   options: { readonly now: string },
 ): number | null {
-  if (thread.hasPendingApprovals || thread.hasPendingUserInput) return null;
+  if (thread.hasPendingApprovals) return null;
   if (thread.pendingSubagentRequest != null) return null;
   if (!hasQueuedTurnStart(thread, options)) return null;
   const messageAtMs = Date.parse(thread.latestUserMessageAt ?? "");
@@ -534,7 +535,7 @@ function resolveThreadListV2ItemTimeLabel(
   const settledTimestamp =
     variant === "slim" && !snoozed ? resolveSettledThreadTimestamp(thread) : null;
   return relativeTime(
-    settledTimestamp ?? thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,
+    settledTimestamp ?? resolveThreadActivityTimestamp(thread) ?? thread.createdAt,
   );
 }
 

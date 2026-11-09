@@ -96,6 +96,11 @@ import { ExpandableText } from "./ExpandableText";
 import { IntervalSecondsField } from "./IntervalSecondsField";
 import { ProviderInstanceCard } from "./ProviderInstanceCard";
 import { useSecretSources } from "./SecretSourceInput";
+<<<<<<< HEAD
+=======
+import { TextGeneratorsSettings } from "./TextGeneratorsSettings";
+import { UsageProviderSettings } from "./UsageProviderSettings";
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
 import { ProviderSetupSection, readAntigravityAuthMethod } from "./ProviderSetupSection";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
 import { CodexSetupSection, CodexManagedRuntimeFields } from "./CodexSetupSection";
@@ -351,12 +356,20 @@ function ProviderSettingsPanelContent(target: ProviderSettingsTarget) {
       hasServerConfig: environment.serverConfig !== null,
     }),
   )?.environmentId;
+<<<<<<< HEAD
   // A search jump to a setting the selected device cannot show switches to one that can.
+=======
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
   let searchRedirectEnvironmentId: EnvironmentId | undefined;
   {
     if (
       !target.scoped &&
+<<<<<<< HEAD
       searchTargetId === searchableSetting("provider-health-check-interval").id &&
+=======
+      (searchTargetId === searchableSetting("provider-health-check-interval").id ||
+        searchTargetId === searchableSetting("usage-providers").id) &&
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
       !selectedEnvironmentCanRenderSettings &&
       searchableEnvironmentId !== undefined
     ) {
@@ -1084,8 +1097,30 @@ export function EnvironmentProviderSettings({
         </SettingsGroup>
       </SettingsSection>
 
+<<<<<<< HEAD
       {/* Upstream's "Usage providers" hub section is not mounted here: the
           Accounts page reads every hub through the Mac app (#1554). */}
+=======
+      <UsageProviderSettings
+        key={environmentId}
+        environmentId={environmentId}
+        environmentLabel={environmentLabel}
+        sources={settings.usageLimitSources}
+        readOnly={readOnly}
+      />
+
+      {/* The server drops text generators under a provider allow-list. */}
+      {managedPolicy?.limits?.providers?.allowedDrivers === undefined ? (
+        <TextGeneratorsSettings
+          key={`text-generators:${environmentId}`}
+          environmentId={environmentId}
+          environmentLabel={environmentLabel}
+          providers={serverProviders}
+          readOnly={readOnly}
+        />
+      ) : null}
+
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
       <SettingsSection title="Advanced">
         <SettingsRow
           id={searchableSetting("provider-health-check-interval").id}

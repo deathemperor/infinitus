@@ -3,7 +3,6 @@ import {
   buildExpiredTerminalContextToastCopy,
   mergeDirectPreviewAnnotation,
   planComposerTurn,
-  restorePlanFollowUpComposer,
   snapshotComposerSend,
   withMessageContext,
   deriveAvailableRevertTurnCounts,
@@ -1077,6 +1076,7 @@ describe("planComposerTurn", () => {
     keepFullHistory: false,
     phase: "ready" as const,
     dispatchMode: "auto" as const,
+    freshContext: false,
   };
 
   it("prepares a worktree from the selected branch on a new thread", () => {
@@ -1127,6 +1127,7 @@ describe("planComposerTurn", () => {
       shouldQueueBehindActiveRun: true,
       baseBranchForWorktree: null,
     });
+<<<<<<< HEAD
     expect(planComposerTurn({ ...running, dispatchMode: "auto" }).shouldQueueBehindActiveRun).toBe(
       false,
     );
@@ -1182,9 +1183,21 @@ describe("restorePlanFollowUpComposer", () => {
       resetCursor: ({ prompt }) => {
         composer.cursor = prompt;
       },
+=======
+    // A fresh session cannot join the running turn, and a stale one is not compacted first.
+    expect(
+      planComposerTurn({
+        ...running,
+        dispatchMode: "steer",
+        freshContext: true,
+        resumeCompactionTokens: 120_000,
+      }),
+    ).toMatchObject({
+      compactBeforeSend: false,
+      turnDispatchMode: "queue",
+      shouldQueueBehindActiveRun: true,
+>>>>>>> upstream-sync-4f0b74e190-upstream-renamed
     });
-
-    expect(composer).toEqual(after);
   });
 });
 
