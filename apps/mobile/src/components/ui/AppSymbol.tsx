@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { Icon } from "@tabler/icons-react-native/types";
 /* Package-root imports eagerly register the entire Tabler icon set in Metro. */
 import IconAdjustmentsHorizontal from "@tabler/icons-react-native/IconAdjustmentsHorizontal";
@@ -71,9 +72,16 @@ import IconFolderPlus from "@tabler/icons-react-native/IconFolderPlus";
 import IconGitPullRequestClosed from "@tabler/icons-react-native/IconGitPullRequestClosed";
 import IconGitPullRequestDraft from "@tabler/icons-react-native/IconGitPullRequestDraft";
 import IconGitCommit from "@tabler/icons-react-native/IconGitCommit";
+=======
+>>>>>>> upstream-sync-c6ca605630-upstream-renamed
 import IconGitBranch from "@tabler/icons-react-native/IconGitBranch";
 import IconGitMerge from "@tabler/icons-react-native/IconGitMerge";
+import IconGitCommit from "@tabler/icons-react-native/IconGitCommit";
+import IconGitPullRequestClosed from "@tabler/icons-react-native/IconGitPullRequestClosed";
+import IconGitPullRequestDraft from "@tabler/icons-react-native/IconGitPullRequestDraft";
+import type { SFSymbol } from "expo-symbols";
 import IconGitPullRequest from "@tabler/icons-react-native/IconGitPullRequest";
+<<<<<<< HEAD
 import IconHammer from "@tabler/icons-react-native/IconHammer";
 import IconHome from "@tabler/icons-react-native/IconHome";
 import IconInfoCircle from "@tabler/icons-react-native/IconInfoCircle";
@@ -138,13 +146,26 @@ import IconWifiOff from "@tabler/icons-react-native/IconWifiOff";
 import IconWorld from "@tabler/icons-react-native/IconWorld";
 import IconX from "@tabler/icons-react-native/IconX";
 import type { AndroidSymbol, SFSymbol, SymbolViewProps } from "expo-symbols";
+=======
+import IconFileDiff from "@tabler/icons-react-native/IconFileDiff";
+import { SymbolView as ExpoSymbolView } from "expo-symbols";
+>>>>>>> upstream-sync-c6ca605630-upstream-renamed
 import { withUniwind } from "uniwind";
+import type { AppSymbolViewProps } from "./AppSymbol.android";
 
-const ANDROID_ICON_BY_SF_SYMBOL = {
-  plusminus: IconPlusMinus,
+export type { SFSymbol } from "expo-symbols";
+export type { AppSymbolName, AppSymbolViewProps } from "./AppSymbol.android";
+
+const CUSTOM_ICONS = {
+  "file.diff": IconFileDiff,
+  "arrow.triangle.pull": IconGitPullRequest,
+  "arrow.triangle.merge": IconGitMerge,
+  "arrow.triangle.branch": IconGitBranch,
+  "arrow.branch": IconGitBranch,
   "git.pull-request.closed": IconGitPullRequestClosed,
   "git.pull-request.draft": IconGitPullRequestDraft,
   "git.commit": IconGitCommit,
+<<<<<<< HEAD
   // Fork: the symbols only the Infinitus surfaces use.
   alarm: IconAlarm,
   "checkmark.shield": IconShieldCheck,
@@ -348,28 +369,27 @@ export type AppSymbolViewProps = Omit<SymbolViewProps, "name"> & { name: AppSymb
 export function isAppSymbolName(name: string): name is Extract<AppSymbolName, string> {
   return Object.prototype.hasOwnProperty.call(ANDROID_ICON_BY_SF_SYMBOL, name);
 }
+=======
+};
+>>>>>>> upstream-sync-c6ca605630-upstream-renamed
 
 function AppSymbolView(props: AppSymbolViewProps) {
-  const materialName = typeof props.name === "string" ? undefined : props.name.android;
-  const sfSymbol = typeof props.name === "string" ? props.name : props.name.ios;
-  const AndroidIcon =
-    (materialName ? ANDROID_ICON_BY_MATERIAL_NAME[materialName] : undefined) ??
-    (sfSymbol ? SF_ICON_LOOKUP[sfSymbol] : undefined);
-
-  if (!AndroidIcon) {
-    return props.fallback ?? null;
+  const name = typeof props.name === "string" ? props.name : props.name.ios;
+  const CustomIcon = CUSTOM_ICONS[name as keyof typeof CUSTOM_ICONS];
+  if (CustomIcon) {
+    return (
+      <CustomIcon
+        accessibilityLabel={props.accessibilityLabel}
+        color={props.tintColor}
+        size={props.size}
+        strokeWidth={2}
+        style={props.style}
+        testID={props.testID}
+      />
+    );
   }
 
-  return (
-    <AndroidIcon
-      accessibilityLabel={props.accessibilityLabel}
-      color={props.tintColor}
-      size={props.size}
-      strokeWidth={2}
-      style={props.style}
-      testID={props.testID}
-    />
-  );
+  return <ExpoSymbolView {...props} name={name as SFSymbol} />;
 }
 
 export const SymbolView = withUniwind(AppSymbolView);

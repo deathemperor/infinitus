@@ -1,5 +1,10 @@
 import type { ChangeRequestTerminology } from "@infinitus/client-runtime/source-control-clients";
-import { EnvironmentId, ProjectId, type PullRequestListEntry } from "@infinitus/contracts";
+import {
+  EnvironmentId,
+  ProjectId,
+  type PullRequestListEntry,
+  type PullRequestSummary,
+} from "@infinitus/contracts";
 import { useAtomRefresh } from "@effect/atom-react";
 import { useLayoutEffect, useMemo, useState } from "react";
 
@@ -18,7 +23,7 @@ export type PullRequestParams = {
   readonly repository: string;
   readonly number: number;
   readonly host?: string;
-  readonly initialSummary?: PullRequestListEntry;
+  readonly initialSummary?: PullRequestListEntry | PullRequestSummary;
 };
 
 export type PullRequestDiffParams = PullRequestParams & { readonly commit?: string };

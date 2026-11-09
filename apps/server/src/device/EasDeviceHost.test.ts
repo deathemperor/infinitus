@@ -232,6 +232,7 @@ const fakeExpo = (
 
 const makeSecretResolver = (values: Record<string, string> = {}) =>
   Layer.succeed(SecretResolver.SecretResolver, {
+    label: (provider) => Effect.succeed(provider),
     read: (references) =>
       Effect.succeed(references.map((reference) => values[reference.reference])),
     invalidate: () => Effect.void,
@@ -365,6 +366,7 @@ describe("EAS Simulator host", () => {
       Effect.provide(
         layerWith(
           Layer.succeed(SecretResolver.SecretResolver, {
+            label: (provider) => Effect.succeed(provider),
             read: (references) =>
               Effect.succeed(references.map(() => (readable.value ? "expo-token" : undefined))),
             invalidate: () => Effect.void,
