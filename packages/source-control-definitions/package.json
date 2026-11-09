@@ -15,6 +15,7 @@
     "@infinitus/source-control-azure-devops": "workspace:*",
     "@infinitus/source-control-bitbucket": "workspace:*",
     "@infinitus/source-control-core": "workspace:*",
+    "@infinitus/source-control-cursor-origin": "workspace:*",
     "@infinitus/source-control-forgejo": "workspace:*",
     "@infinitus/source-control-gitcafe": "workspace:*",
     "@infinitus/source-control-github": "workspace:*",

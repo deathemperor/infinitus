@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { NonNegativeInt, TextGenerationError } from "@infinitus/contracts";
+import { NonNegativeInt, settingsSecretLiteral, TextGenerationError } from "@infinitus/contracts";
 import type { OpenCodeSettings } from "../settings.ts";
 import { getModelSelectionStringOptionValue } from "@infinitus/shared/model";
 
@@ -18,6 +18,7 @@ const OpenCodeTextGenerationOperation = Schema.Literals([
   "generateBranchName",
   "generateThreadTitle",
   "generateReviewGuide",
+  "generateTranscriptionPostProcessing",
 ]);
 
 const openCodeTextGenerationErrorContext = {
@@ -358,8 +359,8 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
               binaryPath: openCodeSettings.binaryPath,
               directory: input.cwd,
               serverUrl: openCodeSettings.serverUrl,
-              ...(openCodeSettings.serverPassword
-                ? { serverPassword: openCodeSettings.serverPassword }
+              ...(settingsSecretLiteral(openCodeSettings.serverPassword)
+                ? { serverPassword: settingsSecretLiteral(openCodeSettings.serverPassword) }
                 : {}),
             })
             .pipe(Effect.flatMap(runAgainstServer), Effect.scoped)

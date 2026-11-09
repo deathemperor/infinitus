@@ -4,8 +4,8 @@ Infinitus shows a setup flow when you open a new installation. Existing
 workspaces skip this flow.
 
 The hosted app at app.t3.codes does not open setup. With no computer connected,
-it asks you to sign in to Infinitus Connect, then to run `npx t3 connect` on your
-computer. From home, it adds compatible computers linked to your account and
+it asks you to sign in to Infinitus Connect, then to install Infinitus and run
+`t3 connect` on your computer. From home, it adds compatible computers linked to your account and
 opens the app.
 
 Close setup while no import is running to go straight to the app. You can connect
