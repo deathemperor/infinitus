@@ -10,6 +10,23 @@ release cut folds the fragments and `## Unreleased` into the new section.
 ## Unreleased
 
 
+## 0.5.0-alpha.45
+
+### Mac
+- Proxy usage prices Claude Fable 5.2.
+
+### Desktop
+- A thread resumed after a usage limit shows a line naming the account, instead of a "Continue where you left off." message from you.
+- Claude Fable 5.2 is available and is the default Fable.
+- First run is a single Welcome page.
+- Fast worktree checkout on macOS is available in Labs.
+- Text generators can use your own model API key for titles and commit messages.
+- Scheduled tasks choose how they use threads.
+
+### Phone
+- A thread resumed after a usage limit shows a line naming the account, instead of a "Continue where you left off." message from you.
+- Usage's Limits tab is now Accounts, listing every account on each Infinitus Mac instead of one per provider.
+
 ## 0.5.0-alpha.44
 
 ### Desktop
