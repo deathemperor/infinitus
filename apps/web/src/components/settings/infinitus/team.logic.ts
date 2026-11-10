@@ -118,10 +118,12 @@ export function teamGrantDraft(input: {
   };
 }
 
+const isTeamError = Schema.is(InfinitusTeamError);
+
 /** What the pane shows for a failed call: the relay's sentence verbatim, a
     trace id on a relay failure, and a plain line for anything else. */
 export function teamErrorMessage(error: unknown): string {
-  if (error instanceof InfinitusTeamError) {
+  if (isTeamError(error)) {
     return error.kind === "failed" && error.traceId !== null
       ? `${error.message} Trace ID: ${error.traceId}`
       : error.message;

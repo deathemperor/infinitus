@@ -1,3 +1,4 @@
+import * as Schema from "effect/Schema";
 /**
  * Worktree limit (#269 H). A launch that would create a worktree is refused once `worktreeMaxCount`
  * worktrees are held by live threads, before the thread is created. Archived threads keep theirs
@@ -50,18 +51,17 @@ export function worktreeCapRefusal(
  * should not see); the transports pull this one's message back out with
  * `worktreeCapRefusalMessage`.
  */
-export class WorktreeCapRefusalError extends Error {
-  readonly _tag = "WorktreeCapRefusalError";
-  constructor(message: string) {
-    super(message);
-    this.name = "WorktreeCapRefusalError";
-  }
-}
+export class WorktreeCapRefusalError extends Schema.TaggedError<WorktreeCapRefusalError>()(
+  "WorktreeCapRefusalError",
+  { message: Schema.String },
+) {}
+
+const isWorktreeCapRefusal = Schema.is(WorktreeCapRefusalError);
 
 /** The refusal text when `error` is a launch failure caused by the cap, else undefined. */
 export function worktreeCapRefusalMessage(error: unknown): string | undefined {
   for (let current: unknown = error, depth = 0; current !== null && depth < 4; depth += 1) {
-    if (current instanceof WorktreeCapRefusalError) return current.message;
+    if (isWorktreeCapRefusal(current)) return current.message;
     if (typeof current !== "object" || !("cause" in current)) return undefined;
     current = current.cause;
   }

@@ -26,7 +26,7 @@ import { persistComposerAttachmentFile, renderPhotoAsJpeg } from "../../lib/comp
 import { subscribeAppActive } from "../../lib/appState";
 import { coalescedRun } from "../../lib/coalescedRun";
 import { rootNavigationRef } from "../../lib/rootNavigation";
-import { selectWorkspaceDetail } from "../workspace/workspace-detail-selection";
+import { selectWorkspaceDetail } from "../layout/workspace/workspace-detail-selection";
 import { isShareFlowRoute } from "./share-to-thread";
 import { discardDismissedShare } from "./discardDismissedShare";
 import { makeIncomingShareImports } from "../threads/incomingShareImport";

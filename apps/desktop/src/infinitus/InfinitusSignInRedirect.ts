@@ -15,11 +15,16 @@ import type {
 import * as Electron from "electron";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as Layer from "effect/Layer";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import { openInPrivateWindow } from "./InfinitusSwapdProcess.ts";
+
+class BrowserOpenError extends Schema.TaggedError<BrowserOpenError>()("BrowserOpenError", {
+  cause: Schema.Defect(),
+}) {}
 
 /** The engine's own path; anything else on the port is not the redirect. */
 const CALLBACK_PATH = "/callback";
@@ -145,7 +150,10 @@ const make = Effect.gen(function* () {
       environment.platform === "darwin" &&
       (yield* Effect.promise(() => openInPrivateWindow(input.url)));
     if (!privateWindow) {
-      yield* Effect.tryPromise(() => Electron.shell.openExternal(input.url)).pipe(
+      yield* Effect.tryPromise({
+        try: () => Electron.shell.openExternal(input.url),
+        catch: (cause) => new BrowserOpenError({ cause }),
+      }).pipe(
         Effect.tapError((error) => logWarning("the browser did not open", { error })),
         Effect.ignore,
       );

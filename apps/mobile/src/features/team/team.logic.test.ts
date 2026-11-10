@@ -29,11 +29,19 @@ describe("the roster name and the error line", () => {
 
   it("shows the relay's sentence, a trace id on a failure, a plain line otherwise", () => {
     expect(
-      teamErrorMessage(new InfinitusTeamError("refused", "The invite has expired.", null)),
+      teamErrorMessage(
+        new InfinitusTeamError({
+          kind: "refused",
+          message: "The invite has expired.",
+          traceId: null,
+        }),
+      ),
     ).toBe("The invite has expired.");
-    expect(teamErrorMessage(new InfinitusTeamError("failed", "The relay failed.", "tr-1"))).toBe(
-      "The relay failed. Trace ID: tr-1",
-    );
+    expect(
+      teamErrorMessage(
+        new InfinitusTeamError({ kind: "failed", message: "The relay failed.", traceId: "tr-1" }),
+      ),
+    ).toBe("The relay failed. Trace ID: tr-1");
     expect(teamErrorMessage(new Error("offline"))).toBe("offline");
     expect(teamErrorMessage("?")).toBe("The request failed.");
   });

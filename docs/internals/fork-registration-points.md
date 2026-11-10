@@ -281,8 +281,8 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   (queued turns, babysit, side questions, groups, session status reason, turn
   usage, message context, title state, PR files viewed, auto-settle; their
   features left with #1627, but existing fork databases recorded them, so
-  they are schema history, not live code) and upstream's `055`–`079`
-  (OrchestrationV2 onward) are renumbered `065`–`089` on every sync
+  they are schema history, not live code) and upstream's `055`–`080`
+  (OrchestrationV2 onward) are renumbered `065`–`090` on every sync
   (INFINITUS.md). Upstream's `assertV2MigrationsCanRun` guard (#15925) is
   carried with `FIRST_V2_MIGRATION_ID = 65`, and `Migrations.test.ts`'s
   legacy/V2 boundary ids are the fork's, as are the `toMigrationInclusive` ids in
@@ -391,7 +391,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   `authorizeBearer` takes `descriptorTimeoutMs` and returns the descriptor's
   alternates (#663); `connection/resolver.test.ts` carries the roaming cases
   (its harness's `profilePuts`).
-- `apps/mobile/src/components/AppSymbol.tsx` — the Android icons for the
+- `apps/mobile/src/components/ui/AppSymbol.android.tsx` — the Android icons for the
   symbols only the fork's surfaces use (`alarm`, `checkmark.shield`,
   `pencil.tip`, `person.3`, `push_pin`); upstream's
   `AppSymbolName` admits no symbol without one.
@@ -437,7 +437,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   one's: `shortcuts/chatRouteCommands.ts`, `settings/MultipleAccountsNote.tsx`,
   `settings/LabsSettingsPanel.tsx`, `sidebar/updateEverythingRun.tsx`, `cloud/useCloudLinkController.ts`, `components/NightlyMobileBeta.tsx`,
   `chat/McpAppFrame.tsx`, `chat/MessagesTimeline.tsx` + `.logic.ts`,
-  `onboarding/WelcomeWizard.tsx`, `preview/PreviewView.tsx`,
+  `onboarding/WelcomePage.tsx`, `preview/PreviewView.tsx`,
   `settings/AcpSessionManagementSection.tsx`, `settings/CliCommandSettingsRow.tsx`,
   `settings/ConnectionsSettings.tsx`, `settings/SettingsPanels.tsx`,
   `settings/StorageSettings.tsx`, `settings/ScheduledTasksSettings.tsx`, `ServerUpdateAction.tsx`, `ChatView.tsx`,
@@ -596,6 +596,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   named "Infinitus SnapShots" (uuid `snap-shot@t3.codes` unchanged), matching
   the setup copy that tells the user to find it; `KdeSnapShot.ts`'s desktop
   entry `Name=` follows `PRODUCT_NAME` the same way (#601).
+- `scripts/fixtures/desktop-launch/statev2.sqlite` — the launch check's seeded database, rebuilt with the fork's migration ledger (through `079`, the fork's number for the upstream schema it was cut from) because the server rejects upstream's numbering. If upstream replaces it, migrate an empty database to the fork's equivalent id and copy the rows across.
 - `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
   and `resolveWebAssetBrandForPackageVersion` mapping every version but an
@@ -884,7 +885,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   what is not published yet) in place of upstream's npm, winget, brew and AUR
   paths (#1192). `docs/user/install.md` (the install sections) and
   `docs/user/background-service.md` (whole) say the same; `updating.md`,
-  `remote-access.md`, `welcome-wizard.md`, `install.md`'s mobile section
+  `remote-access.md`, `install.md`'s mobile section
   (installed from a build, no store), `docs/operations/release.md` (a fork
   note at the top pointing at `infinitus-release.yml` and
   `apps/mac/docs/RELEASING.md`; upstream's text below it is untouched) and

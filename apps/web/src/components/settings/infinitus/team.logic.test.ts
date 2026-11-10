@@ -76,15 +76,25 @@ describe("team.logic (#1592)", () => {
   });
 
   it("shows the relay's reason verbatim and a trace id on a failure", () => {
-    expect(teamErrorMessage(new InfinitusTeamError("refused", "Only a leader can do that."))).toBe(
-      "Only a leader can do that.",
-    );
-    expect(teamErrorMessage(new InfinitusTeamError("failed", "Relay is down.", "trace-1"))).toBe(
-      "Relay is down. Trace ID: trace-1",
-    );
-    expect(teamErrorMessage(new InfinitusTeamError("signedOut", "Sign in first."))).toBe(
-      "Sign in first.",
-    );
+    expect(
+      teamErrorMessage(
+        new InfinitusTeamError({
+          kind: "refused",
+          message: "Only a leader can do that.",
+          traceId: null,
+        }),
+      ),
+    ).toBe("Only a leader can do that.");
+    expect(
+      teamErrorMessage(
+        new InfinitusTeamError({ kind: "failed", message: "Relay is down.", traceId: "trace-1" }),
+      ),
+    ).toBe("Relay is down. Trace ID: trace-1");
+    expect(
+      teamErrorMessage(
+        new InfinitusTeamError({ kind: "signedOut", message: "Sign in first.", traceId: null }),
+      ),
+    ).toBe("Sign in first.");
     expect(teamErrorMessage(new Error("boom"))).toBe("boom");
     expect(teamErrorMessage(undefined)).toBe("Something went wrong.");
   });

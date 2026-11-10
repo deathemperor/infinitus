@@ -145,6 +145,7 @@ export const FILE_RENAMES: ReadonlyArray<readonly [from: string, to: string]> = 
     "apps/mobile/src/features/cloud/T3ConnectProfilePage.tsx",
     "apps/mobile/src/features/cloud/InfinitusConnectProfilePage.tsx",
   ],
+  ["apps/web/src/cloud/useT3ConnectTurnOn.ts", "apps/web/src/cloud/useInfinitusConnectTurnOn.ts"],
 ];
 
 /**

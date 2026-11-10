@@ -65,6 +65,10 @@
             "type": "boolean",
             "description": "When true, the script runs in the thread's worktree each time the thread settles, for example to delete build output. Threads without their own worktree skip it."
           },
+          "stopOnSettle": {
+            "type": "boolean",
+            "description": "When true, Infinitus stops this action's terminal and child processes when its thread settles."
+          },
           "async": {
             "type": "boolean",
             "description": "Only for runOnWorktreeCreate scripts. When true (the default), the agent starts while the script is still running. Set false to hold the agent until the script exits."

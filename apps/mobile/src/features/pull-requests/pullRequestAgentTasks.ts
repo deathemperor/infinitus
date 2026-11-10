@@ -2,6 +2,7 @@ import {
   sourceControlClients,
   type ChangeRequestTerminology,
 } from "@infinitus/client-runtime/source-control-clients";
+import type { MenuAction } from "@react-native-menu/menu";
 import type { PullRequestDetail, PullRequestLinkedThreadsResult } from "@infinitus/contracts";
 import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
@@ -12,7 +13,39 @@ export function pullRequestAgentThread(
   threadId?: string,
 ) {
   if (threadId) return threads.find((thread) => thread.id === threadId);
-  return threads.length === 1 ? threads[0] : undefined;
+  return threads.length === 1 && !threads[0]?.settled && !threads[0]?.archivedAt
+    ? threads[0]
+    : undefined;
+}
+
+export function pullRequestAgentThreadActions(
+  threads: PullRequestLinkedThreadsResult["threads"],
+  task: PullRequestAgentTask,
+  canAsk: boolean,
+): MenuAction[] {
+  const active: MenuAction[] = [];
+  const settled: MenuAction[] = [];
+  for (const thread of threads) {
+    const action = {
+      id: `${task}:${thread.id}`,
+      title: thread.title,
+      subtitle: thread.archivedAt
+        ? "Archived thread"
+        : thread.settled
+          ? "Settled thread"
+          : "Continue thread",
+      image: "bubble.left.and.bubble.right",
+      attributes: { disabled: task !== "ask" && Boolean(thread.archivedAt) },
+    };
+    (thread.settled ? settled : active).push(action);
+  }
+  return [
+    ...(canAsk ? [{ id: `${task}:new`, title: "Start a new thread", image: "plus" }] : []),
+    ...active,
+    ...(settled.length
+      ? [{ id: `${task}:settled`, title: "Settled threads", subactions: settled }]
+      : []),
+  ];
 }
 
 export function pullRequestAgentPrompt(

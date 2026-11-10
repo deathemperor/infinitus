@@ -186,6 +186,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
         ...(Option.isSome(limitStops)
           ? { onUsageLimitRefusal: limitStops.value.reportRefusal }
           : {}),
+        modelCatalog,
       },
     ).pipe(
       Effect.mapError(

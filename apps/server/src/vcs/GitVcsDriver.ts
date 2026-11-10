@@ -45,6 +45,7 @@ import {
   splitNullSeparatedGitStdoutPaths,
 } from "./GitVcsDriverCore.ts";
 import { resolveCheckpointDiffPathspec } from "./checkpointDiffPathspec.ts";
+import * as CheckoutCloner from "./CheckoutCloner.ts";
 import * as VcsDriver from "./VcsDriver.ts";
 import * as VcsProcess from "./VcsProcess.ts";
 
@@ -147,6 +148,8 @@ export interface CreateWorktreeOptions {
   /** Null or omitted defers to the checkout's t3.json. */
   readonly submodules?: WorktreeSubmodules | null;
   readonly worktreesDirectory?: string;
+  /** Clone the checkout from the macOS worktree checkout cache. */
+  readonly fastCheckout?: boolean;
 }
 
 export interface GitCommitProgress {
@@ -304,6 +307,11 @@ export interface GitRemoteStatusOptions {
   readonly refreshUpstream?: boolean;
 }
 
+/** Set by background discovery so its Git commands run in their own small lane, not the user's. */
+export const BackgroundGitWork = Context.Reference<boolean>("t3/vcs/BackgroundGitWork", {
+  defaultValue: () => false,
+});
+
 export class GitVcsDriver extends Context.Service<
   GitVcsDriver,
   {
@@ -371,6 +379,8 @@ export class GitVcsDriver extends Context.Service<
       input: VcsCreateWorktreeInput,
       options?: CreateWorktreeOptions,
     ) => Effect.Effect<VcsCreateWorktreeResult, GitCommandError>;
+    /** Deletes the macOS worktree checkout cache in the background. */
+    readonly clearWorktreeCheckoutCache: Effect.Effect<void>;
     /** Force-updates local `branch` to the primary remote's `ref`. */
     readonly fetchRefIntoBranch: (
       input: GitFetchRefInput & { readonly branch: string },
@@ -916,8 +926,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       const { gitCommonDir, indexPath, headExists } = yield* resolveCaptureRepository(input.cwd);
       const indexId = yield* random.uuidV4();
       const tempIndexPath = path.join(gitCommonDir, `t3-checkpoint-index-${indexId}`);
+      const hostEnv = yield* HostProcess.Environment;
       const commitEnv: NodeJS.ProcessEnv = {
-        ...process.env,
+        ...hostEnv,
         GIT_INDEX_FILE: tempIndexPath,
         GIT_AUTHOR_NAME: PRODUCT_NAME,
         GIT_AUTHOR_EMAIL: "t3code@users.noreply.github.com",
@@ -1210,7 +1221,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
                 );
                 if (candidates.length > CHECKPOINT_RECOVERY_MAX_CANDIDATES) return yield* error;
                 const nestedRepoEnv: NodeJS.ProcessEnv = {
-                  ...process.env,
+                  ...hostEnv,
                   GIT_DIR: undefined,
                   GIT_WORK_TREE: undefined,
                   GIT_COMMON_DIR: undefined,
@@ -1345,13 +1356,52 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             }),
         ),
       );
+      const resetIndex = Effect.gen(function* () {
+        // On Windows clean can remove './' and exit 0.
+        yield* recreateWorkspace;
+        yield* execute({
+          operation,
+          cwd: input.cwd,
+          args: [...longPaths, "reset", "--quiet", "--", "."],
+        });
+      });
       yield* recreateWorkspace;
-      const cleaned = yield* execute({
+      const clean = execute({
         operation,
         cwd: input.cwd,
         args: [...longPaths, "clean", "-fd", "--", "."],
+        env: { LC_ALL: "C" },
         allowNonZeroExit: true,
       });
+      let cleaned = yield* clean;
+      // Removing a new .gitignore exposes the files it hid; clean again until nothing is left.
+      for (
+        let pass = 1;
+        pass < 4 && cleaned.exitCode === 0 && /^Removing /m.test(cleaned.stdout);
+        pass++
+      ) {
+        yield* recreateWorkspace;
+        cleaned = yield* clean;
+      }
+      if (cleaned.exitCode === 0 && /^Removing /m.test(cleaned.stdout)) {
+        yield* recreateWorkspace;
+        const remaining = yield* execute({
+          operation,
+          cwd: input.cwd,
+          args: [...longPaths, "clean", "-dn", "--", "."],
+          env: { LC_ALL: "C" },
+        });
+        if (/^Would remove /m.test(remaining.stdout)) {
+          yield* resetIndex;
+          return yield* new VcsProcessExitError({
+            operation,
+            command: "git clean",
+            cwd: input.cwd,
+            exitCode: 0,
+            detail: "Could not clean the checkpoint workspace: untracked files remain.",
+          });
+        }
+      }
       if (cleaned.exitCode !== 0) {
         // Git can remove every child, then fail trying to remove './' itself.
         const emptiedWorkspace =
@@ -1361,7 +1411,8 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             Effect.map((entries) => entries.length === 0),
             Effect.orElseSucceed(() => false),
           ));
-        if (!emptiedWorkspace)
+        if (!emptiedWorkspace) {
+          yield* resetIndex;
           return yield* new VcsProcessExitError({
             operation,
             command: "git clean",
@@ -1369,15 +1420,9 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
             exitCode: cleaned.exitCode,
             detail: cleaned.stderr.trim() || "Could not clean the checkpoint workspace.",
           });
+        }
       }
-      // On Windows the same clean can remove './' and exit 0.
-      yield* recreateWorkspace;
-
-      yield* execute({
-        operation,
-        cwd: input.cwd,
-        args: [...longPaths, "reset", "--quiet", "--", "."],
-      });
+      yield* resetIndex;
 
       return true;
     }),
@@ -1573,4 +1618,4 @@ export const make = Effect.gen(function* () {
 });
 
 export const layerVcs = Layer.effect(VcsDriver.VcsDriver, makeVcsDriver);
-export const layer = Layer.effect(GitVcsDriver, make);
+export const layer = Layer.effect(GitVcsDriver, make).pipe(Layer.provide(CheckoutCloner.layer));

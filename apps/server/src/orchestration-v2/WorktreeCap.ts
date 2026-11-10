@@ -62,7 +62,7 @@ const make = Effect.gen(function* () {
     );
     if (refusal !== null) {
       yield* release;
-      return yield* Effect.fail(new WorktreeCapRefusalError(refusal));
+      return yield* new WorktreeCapRefusalError({ message: refusal });
     }
     return release;
   });
