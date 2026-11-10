@@ -56,10 +56,12 @@ export class WorktreeCapRefusalError extends Schema.TaggedError<WorktreeCapRefus
   { message: Schema.String },
 ) {}
 
+const isWorktreeCapRefusal = Schema.is(WorktreeCapRefusalError);
+
 /** The refusal text when `error` is a launch failure caused by the cap, else undefined. */
 export function worktreeCapRefusalMessage(error: unknown): string | undefined {
   for (let current: unknown = error, depth = 0; current !== null && depth < 4; depth += 1) {
-    if (Schema.is(WorktreeCapRefusalError)(current)) return current.message;
+    if (isWorktreeCapRefusal(current)) return current.message;
     if (typeof current !== "object" || !("cause" in current)) return undefined;
     current = current.cause;
   }

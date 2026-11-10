@@ -1,7 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import * as HostProcess from "@infinitus/shared/HostProcess";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as NetService from "@infinitus/shared/Net";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";

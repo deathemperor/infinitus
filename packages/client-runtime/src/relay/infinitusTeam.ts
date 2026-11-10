@@ -104,8 +104,10 @@ const signedOut = () =>
     traceId: null,
   });
 
+const isTeamError = Schema.is(InfinitusTeamError);
+
 function toTeamError(error: unknown): InfinitusTeamError {
-  if (Schema.is(InfinitusTeamError)(error)) return error;
+  if (isTeamError(error)) return error;
   const traceId = findErrorTraceId(error);
   if (Predicate.hasProperty(error, "_tag")) {
     if (error._tag === "RelayInfinitusTeamRefusedError" && Predicate.hasProperty(error, "reason")) {

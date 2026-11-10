@@ -1219,7 +1219,9 @@ export const make = Effect.gen(function* () {
           const { startNiriCaptureShortcut } = await import("./NiriCaptureShortcut.ts");
           return startNiriCaptureShortcut(linuxAppId, onCurrentShortcut, () => {
             void runPromise(
-              setShortcutFailure(`The Niri capture endpoint disconnected. Restart ${PRODUCT_NAME}.`),
+              setShortcutFailure(
+                `The Niri capture endpoint disconnected. Restart ${PRODUCT_NAME}.`,
+              ),
             ).catch(() => undefined);
           });
         },

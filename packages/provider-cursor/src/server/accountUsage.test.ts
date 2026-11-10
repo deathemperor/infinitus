@@ -1,6 +1,5 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Layer from "effect/Layer";
 import { assert, describe, it } from "@effect/vitest";
 import * as Context from "effect/Context";

@@ -51,10 +51,12 @@ export function teamRoleLabel(role: string): string {
   return role.length === 0 ? role : role[0]!.toUpperCase() + role.slice(1);
 }
 
+const isTeamError = Schema.is(InfinitusTeamError);
+
 /** What the screen shows for a failed call: the relay's sentence verbatim, a
     trace id on a relay failure, and a plain line for anything else. */
 export function teamErrorMessage(error: unknown): string {
-  if (Schema.is(InfinitusTeamError)(error)) {
+  if (isTeamError(error)) {
     return error.kind === "failed" && error.traceId !== null
       ? `${error.message} Trace ID: ${error.traceId}`
       : error.message;

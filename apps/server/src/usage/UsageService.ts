@@ -534,11 +534,9 @@ export const make = Effect.gen(function* () {
   yield* Effect.addFinalizer(() => awaitPersisted);
 
   /**
-   * Reads run concurrently, and the caller stores updates in walk order rather than completion
-   * order: saved records of deleted transcripts aggregate in cache order, where the first copy of a
+   * Reads run concurrently; the caller stores updates in walk order, where the first copy of a
    * duplicate wins. Fork (#659): with `withStats`, or once a file carries activity, the parse also
-   * folds the Stats activity facts. Untraced: a scan reads
-   * thousands of files, so scanTranscriptDir records the counts instead.
+   * folds the Stats facts. Untraced: scanTranscriptDir records counts for its thousands of files.
    */
   const readFileRecords = Effect.fnUntraced(function* (
     filePath: string,

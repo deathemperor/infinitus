@@ -1,5 +1,4 @@
 import type { UsageRecord } from "@infinitus/provider-core/server/usage";
-import { PRODUCT_NAME } from "@infinitus/shared/productName";
 import * as Digest from "effect/crypto/Digest";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
