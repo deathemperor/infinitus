@@ -356,7 +356,7 @@ const SETTINGS_SCREENS = {
     linking: "settings/waitlist",
     options: { headerShown: false, presentation: "modal" },
   }),
-  ...infinitusSettingsScreens(SETTINGS_PAGE_OPTIONS),
+  ...infinitusSettingsScreens(pageRoute({ itemStyle: "standard" })),
 };
 
 // iOS 26 header morphing requires one UINavigationBar; nested stacks make the whole screen slide.
@@ -562,7 +562,7 @@ const RootStackConfig = createWorkspaceStackNavigator({
       linking: { path: "new", alias: ["new/project"] },
       options: pageRoute({ title: "Choose project" }),
     }),
-    ...infinitusNewTaskScreens(GLASS_HEADER_OPTIONS),
+    ...infinitusNewTaskScreens(pageRoute()),
     NewTaskEnvironment: createNativeStackScreen({
       linking: "new/draft/environment",
       screen: NewTaskEnvironmentPickerRouteScreen,

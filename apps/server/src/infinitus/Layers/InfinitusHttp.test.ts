@@ -1,5 +1,6 @@
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import {
+  EnvironmentVoiceBodyLimit,
   type AuthEnvironmentScope,
   AuthSessionId,
   DEFAULT_SERVER_SETTINGS,
@@ -118,6 +119,7 @@ const withClient = <A, E>(
   setup.pipe(
     Effect.flatMap(body),
     Effect.provide([NodeHttpServer.layerHttpServices, infinitusHttpApiLayer]),
+    Effect.provideService(EnvironmentVoiceBodyLimit, (effect) => effect),
     Effect.provideService(EnvironmentAuthenticatedAuth, authenticatedAuth(scopes)),
     Effect.provide(Layer.mergeAll(services, settingsWith(envDefault))),
     Effect.scoped,

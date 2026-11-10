@@ -1,4 +1,4 @@
-import { CONNECT_NAME } from "@infinitus/shared/productName";
+import { CONNECT_NAME, PRODUCT_NAME } from "@infinitus/shared/productName";
 import { SessionPermissions } from "./SessionPermissions";
 import {
   ChevronRightIcon,
@@ -704,7 +704,7 @@ function ConfiguredCloudLinkRow({
       ) : isElectron ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="Run `t3 connect link` on the host, then restart T3 Code there."
+          description={`Run \`infinitus connect link\` on the host, then restart ${PRODUCT_NAME} there.`}
         />
       ) : null}
       {signedOut && showSwitch ? null : (

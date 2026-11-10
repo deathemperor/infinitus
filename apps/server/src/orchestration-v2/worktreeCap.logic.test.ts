@@ -44,7 +44,7 @@ describe("worktreeCapRefusal (#269 H)", () => {
   });
 
   it("pulls the refusal back out of the launch error that wraps it", () => {
-    const refusal = new WorktreeCapRefusalError("Worktree limit reached.");
+    const refusal = new WorktreeCapRefusalError({ message: "Worktree limit reached." });
     expect(worktreeCapRefusalMessage({ cause: { cause: refusal } })).toBe(
       "Worktree limit reached.",
     );

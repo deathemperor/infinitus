@@ -159,7 +159,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
           reportUpdateFailure(
             cause,
             relayKeptLink
-              ? "Disconnected here, but T3 Connect still lists it. Remove it in Account."
+              ? `Disconnected here, but ${CONNECT_NAME} still lists it. Remove it in Account.`
               : undefined,
           );
         }

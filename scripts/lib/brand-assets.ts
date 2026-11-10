@@ -36,6 +36,8 @@ export const BRAND_ASSET_PATHS = {
   infinitusWebFavicon16Png: "assets/infinitus/infinitus-web-favicon-16x16.png",
   infinitusWebFavicon32Png: "assets/infinitus/infinitus-web-favicon-32x32.png",
   infinitusWebAppleTouchIconPng: "assets/infinitus/infinitus-web-apple-touch-180.png",
+  infinitusWebIcon192Png: "assets/infinitus/infinitus-web-icon-192x192.png",
+  infinitusWebIcon512Png: "assets/infinitus/infinitus-web-icon-512x512.png",
 
   developmentDesktopIconPng: "assets/dev/blueprint-macos-1024.png",
   developmentWindowsIconIco: "assets/dev/blueprint-windows.ico",
@@ -109,6 +111,8 @@ const WEB_ICON_SOURCE_PATHS_BY_BRAND = {
     favicon16Png: BRAND_ASSET_PATHS.infinitusWebFavicon16Png,
     favicon32Png: BRAND_ASSET_PATHS.infinitusWebFavicon32Png,
     appleTouchIconPng: BRAND_ASSET_PATHS.infinitusWebAppleTouchIconPng,
+    icon192Png: BRAND_ASSET_PATHS.infinitusWebIcon192Png,
+    icon512Png: BRAND_ASSET_PATHS.infinitusWebIcon512Png,
   },
 } as const satisfies Record<WebAssetBrand, Record<keyof typeof WEB_ICON_TARGET_FILENAMES, string>>;
 

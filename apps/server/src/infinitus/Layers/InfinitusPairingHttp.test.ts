@@ -2,6 +2,7 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
+  EnvironmentVoiceBodyLimit,
   AuthStandardClientScopes,
   type AuthEnvironmentScope,
   AuthSessionId,
@@ -69,6 +70,7 @@ const withClient = <A, E>(body: (input: Effect.Success<typeof setup>) => Effect.
   setup.pipe(
     Effect.flatMap(body),
     Effect.provide([NodeHttpServer.layerHttpServices, infinitusPairingHttpApiLayer]),
+    Effect.provideService(EnvironmentVoiceBodyLimit, (effect) => effect),
     Effect.provideService(EnvironmentAuthenticatedAuth, authenticatedAuth),
     Effect.provide(pairingLayer),
     Effect.scoped,

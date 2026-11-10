@@ -27,6 +27,7 @@ import { Input } from "../ui/input";
 import { RadioGroup } from "../ui/radio-group";
 import { Spinner } from "../ui/spinner";
 import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 export const accessConfig: Record<
   AuthMcpClientAccess,
@@ -223,7 +224,7 @@ export function ConnectAgentSurface() {
             value={pairingCode}
           />
           <p className="text-xs text-muted-foreground">
-            Get one from Use T3 Code in another app (MCP), Settings → Sharing & access, or{" "}
+            Get one from Use {PRODUCT_NAME} in another app (MCP), Settings → Sharing & access, or{" "}
             <code>t3 auth pairing create</code> on this machine.
           </p>
         </div>

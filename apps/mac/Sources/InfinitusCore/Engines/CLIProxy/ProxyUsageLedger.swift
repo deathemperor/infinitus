@@ -159,6 +159,7 @@ public enum StaticPriceTable {
     static let prices: [String: Rate] = [
         "claude-fable-5": Rate(input: 10.0, output: 50.0, cacheRead: 1.0, cacheWrite: 12.5),
         "claude-fable-5-1": Rate(input: 10.0, output: 50.0, cacheRead: 1.0, cacheWrite: 12.5),
+        "claude-fable-5-2": Rate(input: 8.0, output: 40.0, cacheRead: 0.2, cacheWrite: 10.0),
         "claude-opus-5": Rate(input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25),
         "claude-sonnet-5": Rate(input: 2.0, output: 10.0, cacheRead: 0.2, cacheWrite: 2.5),
         "claude-opus-4-8": Rate(input: 5.0, output: 25.0, cacheRead: 0.5, cacheWrite: 6.25),

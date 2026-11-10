@@ -162,8 +162,8 @@ function formatServiceStatus(
   }
   if (status.otherBaseDir !== undefined) {
     return [
-      "T3 Code service",
-      "  Status: installed for another T3 home",
+      `${PRODUCT_NAME} service`,
+      `  Status: installed for another ${PRODUCT_NAME} home`,
       `  Base dir: ${status.otherBaseDir}`,
       `  Next: Pass \`${BootService.formatBootServiceBaseDirOption(status.otherBaseDir)}\` to manage it.`,
     ].join("\n");

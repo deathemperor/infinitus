@@ -29,7 +29,6 @@ import * as ServerConfig from "../config.ts";
 import { ProcessRunner } from "../processRunner.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as CursorAccountReader from "@infinitus/provider-cursor/server/CursorAccountReader";
-import * as CursorKeychain from "@infinitus/provider-cursor/server/CursorKeychain";
 import * as CursorUsageAccounts from "@infinitus/provider-cursor/server/CursorUsageAccounts";
 import { MuseUsageHome } from "@infinitus/provider-muse/server";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -105,7 +104,7 @@ const layerService = (input: {
   readonly platform?: NodeJS.Platform;
 }) =>
   Layer.fresh(CursorUsageAccounts.layer).pipe(
-    Layer.provide(CursorAccountReader.layer.pipe(Layer.provide(CursorKeychain.layer))),
+    Layer.provide(CursorAccountReader.layer),
     Layer.provideMerge(AntigravityUsage.layer),
     Layer.provideMerge(MuseUsageHome.layer),
     Layer.provideMerge(ProviderHostLive.layer),

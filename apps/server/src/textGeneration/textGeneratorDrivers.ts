@@ -7,6 +7,7 @@ import {
   HttpClientRequest,
   type HttpClientResponse,
 } from "effect/http";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 /** Where a text generator is reached, with its key already read from wherever settings keep it. */
 export interface TextGeneratorConnection {
@@ -95,7 +96,7 @@ const sendJson = Effect.fn("TextGenerator.sendJson")(function* <S extends Schema
     Effect.mapError(
       (cause) =>
         new TextGeneratorRequestError({
-          detail: `${label} returned a reply T3 Code couldn't read.`,
+          detail: `${label} returned a reply ${PRODUCT_NAME} couldn't read.`,
           cause,
         }),
     ),

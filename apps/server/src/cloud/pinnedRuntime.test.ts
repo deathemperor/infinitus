@@ -381,12 +381,22 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
   );
 });
 
-it("isVersionExecutable accepts only <version>/t3, never another drive or program", () => {
+it("isVersionExecutable accepts only <version>/infinitus, never another drive or program", () => {
   const win32 = NodePath.win32 as unknown as Path.Path;
-  assert.isTrue(isVersionExecutable(win32, "C:\\t3\\versions", "C:\\t3\\versions\\1.0.0\\t3.exe"));
-  assert.isFalse(isVersionExecutable(win32, "C:\\t3\\versions", "D:\\t3.exe"));
+  assert.isTrue(
+    isVersionExecutable(
+      win32,
+      "C:\\infinitus\\versions",
+      "C:\\infinitus\\versions\\1.0.0\\infinitus.exe",
+    ),
+  );
+  assert.isFalse(isVersionExecutable(win32, "C:\\infinitus\\versions", "D:\\infinitus.exe"));
   assert.isFalse(
-    isVersionExecutable(win32, "C:\\t3\\versions", "C:\\t3\\versions\\1.0.0\\node.exe"),
+    isVersionExecutable(
+      win32,
+      "C:\\infinitus\\versions",
+      "C:\\infinitus\\versions\\1.0.0\\node.exe",
+    ),
   );
 });
 
@@ -525,7 +535,7 @@ it.layer(NodeServices.layer)("prunePinnedRuntimes", (it) => {
     // An interrupted append cut this record short.
     { name: "an unterminated launcher record", recorded: "/opt/t", cut: "" },
     // Another process's append is cut short after prune reads the records.
-    { name: "a record cut short after the read", recorded: "/opt/t3\n", cut: "/opt/t" },
+    { name: "a record cut short after the read", recorded: "/opt/infinitus\n", cut: "/opt/t" },
   ])("remembers a launcher found on PATH after $name", ({ recorded, cut }) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

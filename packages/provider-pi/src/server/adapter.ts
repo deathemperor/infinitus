@@ -2618,7 +2618,9 @@ export const makePiAdapterV2 = Effect.fn("makePiAdapterV2")(function* (
           // Pi before 0.99 acknowledges a handled extension command without a disposition.
           const disposition = recordString(result, "disposition");
           if (disposition !== undefined && disposition !== "handled") {
-            return yield* protocolError("T3 Code's Pi extension did not apply the service tier");
+            return yield* protocolError(
+              `${PRODUCT_NAME}'s Pi extension did not apply the service tier`,
+            );
           }
           serviceTierMayBeSet = serviceTier !== null;
         }

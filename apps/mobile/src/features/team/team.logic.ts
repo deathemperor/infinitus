@@ -1,3 +1,4 @@
+import * as Schema from "effect/Schema";
 import { InfinitusTeamError } from "@infinitus/client-runtime/relay/infinitusTeam";
 
 /**
@@ -53,7 +54,7 @@ export function teamRoleLabel(role: string): string {
 /** What the screen shows for a failed call: the relay's sentence verbatim, a
     trace id on a relay failure, and a plain line for anything else. */
 export function teamErrorMessage(error: unknown): string {
-  if (error instanceof InfinitusTeamError) {
+  if (Schema.is(InfinitusTeamError)(error)) {
     return error.kind === "failed" && error.traceId !== null
       ? `${error.message} Trace ID: ${error.traceId}`
       : error.message;

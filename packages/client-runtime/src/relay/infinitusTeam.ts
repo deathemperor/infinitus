@@ -19,6 +19,7 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 
@@ -30,18 +31,14 @@ import { findErrorTraceId } from "../errors/errorTrace.ts";
  * `signedOut` rather than a 401 and the relay's refusal travels verbatim as
  * `refused`. Promises, since neither pane runs an Effect runtime.
  */
-export type InfinitusTeamErrorKind = "signedOut" | "refused" | "failed";
-
-export class InfinitusTeamError extends Error {
-  override readonly name = "InfinitusTeamError";
-  readonly kind: InfinitusTeamErrorKind;
-  readonly traceId: string | null;
-  constructor(kind: InfinitusTeamErrorKind, message: string, traceId: string | null = null) {
-    super(message);
-    this.kind = kind;
-    this.traceId = traceId;
-  }
-}
+export class InfinitusTeamError extends Schema.TaggedError<InfinitusTeamError>()(
+  "InfinitusTeamError",
+  {
+    kind: Schema.Literals(["signedOut", "refused", "failed"]),
+    message: Schema.String,
+    traceId: Schema.NullOr(Schema.String),
+  },
+) {}
 
 export interface InfinitusTeamClientOptions {
   readonly relayUrl: string;
@@ -101,24 +98,32 @@ interface Bearer {
 }
 
 const signedOut = () =>
-  new InfinitusTeamError("signedOut", "Sign in to Infinitus Connect to use Team.");
+  new InfinitusTeamError({
+    kind: "signedOut",
+    message: "Sign in to Infinitus Connect to use Team.",
+    traceId: null,
+  });
 
 function toTeamError(error: unknown): InfinitusTeamError {
-  if (error instanceof InfinitusTeamError) return error;
+  if (Schema.is(InfinitusTeamError)(error)) return error;
   const traceId = findErrorTraceId(error);
   if (Predicate.hasProperty(error, "_tag")) {
     if (error._tag === "RelayInfinitusTeamRefusedError" && Predicate.hasProperty(error, "reason")) {
-      return new InfinitusTeamError("refused", String(error.reason), traceId);
+      return new InfinitusTeamError({ kind: "refused", message: String(error.reason), traceId });
     }
     if (error._tag === "RelayAuthInvalidError") {
-      return new InfinitusTeamError("signedOut", "Sign in to Infinitus Connect again.", traceId);
+      return new InfinitusTeamError({
+        kind: "signedOut",
+        message: "Sign in to Infinitus Connect again.",
+        traceId,
+      });
     }
   }
   const message =
     error instanceof Error && error.message.length > 0
       ? error.message
       : "Infinitus Connect did not answer.";
-  return new InfinitusTeamError("failed", message, traceId);
+  return new InfinitusTeamError({ kind: "failed", message, traceId });
 }
 
 export function makeInfinitusTeamClient(options: InfinitusTeamClientOptions): InfinitusTeamClient {

@@ -30,6 +30,7 @@ import {
   voiceSpeechStatusAtom,
 } from "../voice-input/voiceDestination";
 import { SettingsSection } from "./components/SettingsSection";
+import { PRODUCT_NAME } from "@infinitus/shared/productName";
 
 const isDownloading = (model: EnvironmentSpeechModel) =>
   model.state === "downloading" || model.state === "verifying";
@@ -299,7 +300,7 @@ export function VoiceModelSection(props: {
       footer={
         voice.canManage
           ? undefined
-          : `This connection can’t change settings on ${props.label}. Add a transcription model using T3 Code on that machine.`
+          : `This connection can’t change settings on ${props.label}. Add a transcription model using ${PRODUCT_NAME} on that machine.`
       }
     >
       <ListRow
