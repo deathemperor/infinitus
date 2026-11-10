@@ -596,6 +596,7 @@ pages under `docs/internals/` keep taking narratives out of these bullets.
   named "Infinitus SnapShots" (uuid `snap-shot@t3.codes` unchanged), matching
   the setup copy that tells the user to find it; `KdeSnapShot.ts`'s desktop
   entry `Name=` follows `PRODUCT_NAME` the same way (#601).
+- `scripts/fixtures/desktop-launch/statev2.sqlite` — the launch check's seeded database, rebuilt with the fork's migration ledger (through `079`, the fork's number for the upstream schema it was cut from) because the server rejects upstream's numbering. If upstream replaces it, migrate an empty database to the fork's equivalent id and copy the rows across.
 - `scripts/lib/brand-assets.ts` — the `infinitus*` entries in
   `BRAND_ASSET_PATHS`, the `infinitus` `WebAssetBrand` (favicons, apple-touch),
   and `resolveWebAssetBrandForPackageVersion` mapping every version but an
