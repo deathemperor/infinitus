@@ -16,7 +16,7 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
-import { HttpClient, HttpClientResponse } from "effect/http";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import packageJson from "../../package.json" with { type: "json" };
@@ -35,6 +35,7 @@ interface HarnessOptions {
   readonly preflightDuration?: Duration.Input;
   readonly preflightStarted?: Deferred.Deferred<void>;
   readonly beforeDownload?: Effect.Effect<void>;
+  readonly httpClient?: HttpClient.HttpClient;
   readonly requestUpdate?: ServiceLauncherClient.ServiceLauncherClient["Service"]["requestUpdate"];
   readonly desktopAppUpdate?: DesktopAppUpdate.DesktopAppUpdate["Service"];
   readonly policy?: ManagedPolicyDocument;
@@ -152,7 +153,7 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
     ),
     Effect.provideService(
       HttpClient.HttpClient,
-      releaseHttpClient(order, urls, options.beforeDownload),
+      options.httpClient ?? releaseHttpClient(order, urls, options.beforeDownload),
     ),
     Effect.provideService(HostProcess.Platform, "linux"),
     Effect.provideService(HostProcess.Architecture, "x64"),
@@ -163,10 +164,11 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
       ),
     ),
   );
-  return { selfUpdate, order, urls };
+  return { selfUpdate, order, urls, baseDir };
 });
 
 it.layer(NodeServices.layer)("server self update", (it) => {
+<<<<<<< HEAD
   it.effect("refuses an update while a turn runs, naming the turns (#829)", () =>
     Effect.gen(function* () {
       const running = [{ threadId: ThreadId.make("thread-running"), turnId: RunId.make("run-1") }];
@@ -291,6 +293,40 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       yield* Effect.yieldNow;
       expect(committed).toEqual(["token-1"]);
       yield* Fiber.interrupt(fiber);
+=======
+  it.effect.each([
+    { asset: "checksums", status: 504 },
+    { asset: "archive", status: 503 },
+    { asset: "checksums", status: 403 },
+  ])("reports an HTTP $status downloading $asset and allows retry", ({ asset, status }) =>
+    Effect.gen(function* () {
+      let failDownload = true;
+      const { selfUpdate, order, baseDir } = yield* makeHarness({
+        httpClient: releaseHttpClient([], []).pipe(
+          HttpClient.transform((response, request) =>
+            failDownload && request.url.endsWith("/SHA256SUMS") === (asset === "checksums")
+              ? Effect.succeed(
+                  HttpClientResponse.fromWeb(
+                    HttpClientRequest.get("https://user:password@cdn.example/private?token=secret"),
+                    new Response("private response body", { status }),
+                  ),
+                )
+              : response,
+          ),
+        ),
+      });
+      const error = yield* selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip);
+      expect(error.reason).toBe(
+        `Could not prepare t3@1.1.0 while downloading the t3 release ${asset} (HTTP ${status} from cdn.example).`,
+      );
+      expect(order).toEqual([]);
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      expect(yield* fs.readDirectory(path.join(baseDir, "runtime", "versions"))).toEqual([]);
+      failDownload = false;
+      expect((yield* selfUpdate.update({ targetVersion: "1.1.0" })).updateId).toBe("launcher-id");
+      expect(order).toEqual(["extract", "preflight", "accept"]);
+>>>>>>> upstream-sync-4c924ff4e6-upstream-renamed
     }),
   );
 
