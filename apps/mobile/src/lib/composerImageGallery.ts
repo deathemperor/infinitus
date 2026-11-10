@@ -1,6 +1,6 @@
 import { imageMimeType } from "@infinitus/shared/image";
 import type { EnvironmentId } from "@infinitus/contracts";
-import type { FilePreviewItem } from "../components/FilePreviewModal.types";
+import type { FilePreviewItem } from "../components/ui/FilePreviewModal.types";
 import { isFileBackedComposerAttachment, type DraftComposerAttachment } from "./composerImages";
 
 export function composerImageGallery(
