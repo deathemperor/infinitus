@@ -6,18 +6,33 @@ final class SwapdLaunchAgentTests: XCTestCase {
     private actor Launchd {
         var loaded = false
         var commands: [[String]] = []
+        /// launchd's bootout returns before the old job is gone: `print` keeps
+        /// answering and a bootstrap in that window fails with EIO.
+        var lingerAfterBootout = 0
+        private var lingering = 0
+        func setLinger(_ count: Int) { lingerAfterBootout = count }
+        func drop() { loaded = false }
         func run(_ args: [String]) throws -> Data {
             commands.append(args)
             switch args.first {
             case "print":
+                if lingering > 0 { lingering -= 1; return Data("state = running\n pid = 41\n".utf8) }
                 guard loaded else { throw CLIError(message: "not loaded") }
                 return Data("state = running\n pid = 42\n".utf8)
-            case "bootstrap": loaded = true
-            case "bootout": loaded = false
+            case "bootstrap":
+                if lingering > 0 { lingering = 0; throw CLIError(message: "Bootstrap failed: 5: Input/output error") }
+                loaded = true
+            case "bootout": loaded = false; lingering = lingerAfterBootout
             default: break
             }
             return Data()
         }
+    }
+
+    private func agent(_ source: URL, _ location: SwapdLaunchAgent.Location, _ launchd: Launchd) -> SwapdLaunchAgent {
+        SwapdLaunchAgent(binaryPath: source.path, location: location,
+                         run: { try await launchd.run($0) }, pause: { _ in },
+                         onLine: { _ in }, onState: { _ in })
     }
 
     private func fixture() throws -> (URL, URL, SwapdLaunchAgent.Location) {
@@ -116,8 +131,8 @@ final class SwapdLaunchAgentTests: XCTestCase {
     func testAnUpgradeReplacesTheServiceBinaryAndRestartsTheJob() async throws {
         let (_, source, location) = try fixture()
         let launchd = Launchd()
-        let service = SwapdLaunchAgent(binaryPath: source.path, location: location,
-                                      run: { try await launchd.run($0) }, onLine: { _ in }, onState: { _ in })
+        await launchd.setLinger(2)
+        let service = agent(source, location, launchd)
         await service.start()
         let updated = Data("#!/bin/sh\nexit 1\n".utf8)
         try updated.write(to: source)
@@ -126,7 +141,24 @@ final class SwapdLaunchAgentTests: XCTestCase {
         let commands = await launchd.commands
         XCTAssertEqual(commands.filter { $0.first == "bootstrap" }.count, 2)
         XCTAssertEqual(commands.filter { $0.first == "bootout" }.count, 1)
+        let loaded = await launchd.loaded
+        XCTAssertTrue(loaded, "bootstrapping before the old job is gone leaves no engine at all")
         await service.stop()
+    }
+
+    func testAJobThatIsGoneIsBootstrappedAgainUntilStopped() async throws {
+        let (_, source, location) = try fixture()
+        let launchd = Launchd()
+        let service = agent(source, location, launchd)
+        await service.start()
+        await launchd.drop()
+        await service.heal()
+        let healed = await launchd.loaded
+        XCTAssertTrue(healed, "a failed bootstrap must not leave switching off until the app relaunches")
+        await service.stop()
+        await service.heal()
+        let stopped = await launchd.loaded
+        XCTAssertFalse(stopped, "an explicit stop is never undone")
     }
 
     func testServiceEventsArriveWithoutOwningTheDaemonPipe() async throws {

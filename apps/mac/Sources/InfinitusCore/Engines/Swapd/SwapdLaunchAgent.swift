@@ -28,9 +28,11 @@ public actor SwapdLaunchAgent: EngineLifecycle {
     }
 
     public typealias Run = @Sendable ([String]) async throws -> Data
+    public typealias Pause = @Sendable (Duration) async throws -> Void
     private let source: URL
     private let location: Location
     private let run: Run
+    private let pause: Pause
     private let onLine: @Sendable (EventLine) -> Void
     private let onState: @Sendable (EngineSupervisor.State) -> Void
     private var operation: Task<Void, Never>?
@@ -39,13 +41,15 @@ public actor SwapdLaunchAgent: EngineLifecycle {
     private var reader: FileHandle?
     private var buffered = Data()
     private var state: EngineSupervisor.State?
+    private var bootstrapFailing = false
 
     public init(binaryPath: String, location: Location = Location(),
                 run: @escaping Run = { try await SwapdCLI(binaryPath: "/bin/launchctl").run($0) },
+                pause: @escaping Pause = { try await Task.sleep(for: $0) },
                 onLine: @escaping @Sendable (EventLine) -> Void,
                 onState: @escaping @Sendable (EngineSupervisor.State) -> Void) {
         source = URL(fileURLWithPath: binaryPath)
-        self.location = location; self.run = run
+        self.location = location; self.run = run; self.pause = pause
         self.onLine = onLine; self.onState = onState
     }
 
@@ -104,25 +108,61 @@ public actor SwapdLaunchAgent: EngineLifecycle {
         detach()
         do {
             let changed = try install()
-            let loaded = (try? await run(["print", location.service])) != nil
-            if changed && loaded { _ = try await run(["bootout", location.service]) }
+            let loaded = await isLoaded()
+            if changed && loaded {
+                _ = try await run(["bootout", location.service])
+                await waitUntilUnloaded()
+            }
             reader = try FileHandle(forReadingFrom: location.output)
             _ = try reader?.seekToEnd()
-            if changed || !loaded {
-                _ = try await run(["enable", location.service])
-                _ = try await run(["bootstrap", location.domain, location.plist.path])
-            }
-            await poll()
-            monitor = Task { [weak self] in
-                while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(10)) } catch { break }
-                    await self?.poll()
-                }
-            }
+            if changed || !loaded { try await bootstrap() }
+            bootstrapFailing = false
         } catch {
             publish(.stopped)
-            onLine(.garbage("Could not start the background account engine: \(error.localizedDescription)"))
+            reportBootstrapFailure(error)
         }
+        await poll()
+        // Started even after a failed bootstrap: its tick retries it.
+        monitor = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(10)) } catch { break }
+                await self?.heal()
+                await self?.poll()
+            }
+        }
+    }
+
+    /// Bootstraps the job again when launchd no longer has it; a loaded job
+    /// without a pid is KeepAlive's to restart, not ours.
+    func heal() async { await serial { await self.rebootstrapIfGone() } }
+
+    /// No monitor means stopped or disconnected: neither is undone here.
+    private func rebootstrapIfGone() async {
+        guard monitor != nil, !(await isLoaded()),
+              FileManager.default.fileExists(atPath: location.plist.path) else { return }
+        do { try await bootstrap(); bootstrapFailing = false } catch { reportBootstrapFailure(error) }
+    }
+
+    private func isLoaded() async -> Bool { (try? await run(["print", location.service])) != nil }
+
+    private func bootstrap() async throws {
+        _ = try await run(["enable", location.service])
+        _ = try await run(["bootstrap", location.domain, location.plist.path])
+    }
+
+    /// `bootout` returns while the old job is still exiting; a bootstrap in
+    /// that window fails with EIO and launchd then drops the label entirely.
+    private func waitUntilUnloaded() async {
+        for _ in 0..<40 {
+            if !(await isLoaded()) { return }
+            do { try await pause(.milliseconds(250)) } catch { return }
+        }
+    }
+
+    private func reportBootstrapFailure(_ error: Error) {
+        guard !bootstrapFailing else { return }
+        bootstrapFailing = true
+        onLine(.garbage("Could not start the background account engine: \(error.localizedDescription)"))
     }
 
     /// An explicit stop removes the login job too; a future start reinstalls it.
