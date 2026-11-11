@@ -39,7 +39,7 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                 if let note = cells.reportedLimit {
                     Text("· \(note)").font(PopupFont.caption).foregroundStyle(.orange)
                         .fixedSize()
-                        .instantTip("swapd was told this account hit its limit; it will not switch to it until the report lapses")
+                        .instantTip(cells.reportedLimitTip)
                 }
                 Spacer(minLength: 12)
                 cells.cashCell
