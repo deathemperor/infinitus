@@ -84,6 +84,11 @@ public struct SwapdAccountView: Decodable, Sendable {
     /// The store's classified kind of the most recent failed fetch
     /// (`http-429`, `timeout`, `locked`, …); absent once a fetch succeeds.
     public let lastError: String?
+    /// A `swapd limit-hit` report is what the engine decides this account
+    /// on (the account counts as spent whatever `windows` say); both absent
+    /// otherwise, and the reset can be absent while the report is present.
+    public let reportedLimitAt: String?
+    public let reportedLimitResetsAt: String?
 }
 
 public struct SwapdLastGood: Decodable, Sendable {
@@ -252,7 +257,9 @@ public enum SwapdMapping {
                        lastGoodFetchedAt: view.lastGood?.fetchedAt,
                        lastGoodAgeSeconds: view.lastGood?.ageSeconds,
                        stale: failed == nil ? nil : true, staleReason: failed,
-                       resets: view.resets)
+                       resets: view.resets,
+                       reportedLimitAt: view.reportedLimitAt,
+                       reportedLimitResetsAt: view.reportedLimitResetsAt)
     }
 
     /// The contract's window list as today's UI (and the phone's decoder)

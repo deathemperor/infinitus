@@ -36,6 +36,11 @@ struct SoloCard<M: FleetModel, U: UsageSource>: View {
                         .fixedSize()
                         .instantTip(stale.tip)
                 }
+                if let note = cells.reportedLimit {
+                    Text("· \(note)").font(PopupFont.caption).foregroundStyle(.orange)
+                        .fixedSize()
+                        .instantTip(cells.reportedLimitTip)
+                }
                 Spacer(minLength: 12)
                 cells.cashCell
             }

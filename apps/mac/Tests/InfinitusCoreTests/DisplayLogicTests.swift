@@ -103,6 +103,20 @@ final class StaleAgeTests: XCTestCase {
         XCTAssertEqual(StaleAge.label(seconds: 200000), "2 days ago")
     }
 
+    func testReportedLimitNote() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let now = WeeklyRoll.parse("2026-11-11T10:30:00Z")!
+        func note(_ at: String?, _ back: String?) -> String? {
+            Account(number: 1, email: "a@b.c", reportedLimitAt: at, reportedLimitResetsAt: back)
+                .reportedLimitNote(now: now, calendar: cal)
+        }
+        XCTAssertNil(note(nil, nil))
+        XCTAssertEqual(note("2026-11-11T10:00:00Z", "2026-11-11T21:00:00Z"), "Reported limited · back 21:00")
+        XCTAssertEqual(note("2026-11-11T10:00:00Z", nil), "Reported limited")
+        XCTAssertEqual(note("2026-11-11T10:00:00Z", "2026-11-11T09:00:00Z"), "Reported limited")
+    }
+
     func testStaleAgeLabelOnlyForStaleRows() {
         let fresh = Account(number: 1, email: "a@b.c", usageAgeSeconds: 380)
         XCTAssertNil(fresh.staleAgeLabel)

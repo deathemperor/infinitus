@@ -98,6 +98,14 @@ public struct Account: Codable, Sendable {
     /// one. Additive: nil from an engine without the bank, and for an
     /// account with no live grant.
     public let resets: AccountResets?
+    /// When a `swapd limit-hit` report is what the engine decides this
+    /// account on (RFC 3339), and when that report lapses. The engine
+    /// treats the account as spent while it holds, though `windows` still
+    /// show the measured usage; the row only explains it. nil when no
+    /// report holds, and `reportedLimitResetsAt` can be nil while
+    /// `reportedLimitAt` is set.
+    public let reportedLimitAt: String?
+    public let reportedLimitResetsAt: String?
 
     /// Memberwise, for engines that build accounts directly instead of
     /// decoding `cswap list --json` (multi-engine seam, #8).
@@ -111,7 +119,8 @@ public struct Account: Codable, Sendable {
                 usageFetchedAt: String? = nil, usageAgeSeconds: Double? = nil,
                 lastGoodUsage: Usage? = nil, lastGoodFetchedAt: String? = nil,
                 lastGoodAgeSeconds: Double? = nil, stale: Bool? = nil,
-                staleReason: String? = nil, resets: AccountResets? = nil) {
+                staleReason: String? = nil, resets: AccountResets? = nil,
+                reportedLimitAt: String? = nil, reportedLimitResetsAt: String? = nil) {
         self.number = number
         self.email = email
         self.organizationName = organizationName
@@ -135,6 +144,8 @@ public struct Account: Codable, Sendable {
         self.stale = stale
         self.staleReason = staleReason
         self.resets = resets
+        self.reportedLimitAt = reportedLimitAt
+        self.reportedLimitResetsAt = reportedLimitResetsAt
     }
 
     /// The same account with `preferred` stamped — cswap learns it from
@@ -148,7 +159,8 @@ public struct Account: Codable, Sendable {
                 usageFetchedAt: usageFetchedAt, usageAgeSeconds: usageAgeSeconds,
                 lastGoodUsage: lastGoodUsage, lastGoodFetchedAt: lastGoodFetchedAt,
                 lastGoodAgeSeconds: lastGoodAgeSeconds, stale: stale, staleReason: staleReason,
-                resets: resets)
+                resets: resets, reportedLimitAt: reportedLimitAt,
+                reportedLimitResetsAt: reportedLimitResetsAt)
     }
 }
 

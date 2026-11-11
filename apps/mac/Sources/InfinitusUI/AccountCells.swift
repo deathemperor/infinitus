@@ -199,6 +199,11 @@ struct AccountCells<M: FleetModel, U: UsageSource> {
         return (label, tip)
     }
 
+    /// "Reported limited · back 21:00" when the engine holds this account on
+    /// a limit report (the gauges still show measured usage); nil otherwise.
+    var reportedLimit: String? { account.reportedLimitNote() }
+    let reportedLimitTip = "A session was refused on this account, so the engine counts it as spent until the report lapses, whatever the gauges show"
+
     /// Themed account number ("P1", "S3"); the raw number stays in
     /// tooltips and identifies the row for switching.
     var slotText: String {

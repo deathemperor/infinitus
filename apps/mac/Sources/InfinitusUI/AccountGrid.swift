@@ -96,6 +96,7 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                             .font(PopupFont.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize()
+                            .instantTip(cells.staleAge?.tip ?? "Subscription: \(account.plan ?? "?")")
                         if let stale = cells.staleAge {
                             Text("· \(stale.label)")
                                 .font(PopupFont.caption)
@@ -103,8 +104,12 @@ struct AccountGrid<M: FleetModel, U: UsageSource>: View {
                                 .fixedSize()
                                 .instantTip(stale.tip)
                         }
+                        if let note = cells.reportedLimit {
+                            Text("· \(note)").font(PopupFont.caption).foregroundStyle(.orange)
+                                .fixedSize()
+                                .instantTip(cells.reportedLimitTip)
+                        }
                     }
-                    .instantTip(cells.staleAge?.tip ?? "Subscription: \(account.plan ?? "?")")
                     .alignedColumn("plan")
                     .activeBand(account.active)
                     if let note = SentinelNotes.note(for: account.usageStatus) {
@@ -306,6 +311,11 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
             .foregroundStyle((account.disabled ?? false) || cells.dead
                              ? .secondary : .primary)
             .lineLimit(1)
+            if let note = cells.reportedLimit {
+                Text("· \(note)").font(PopupFont.caption).foregroundStyle(.orange)
+                    .fixedSize()
+                    .instantTip(cells.reportedLimitTip)
+            }
             Spacer(minLength: 8)
             if cells.showAsDead {
                 cells.deadCell
@@ -401,6 +411,11 @@ struct AccountStack<M: FleetModel, U: UsageSource>: View {
                             Text(plan).font(PopupFont.caption).foregroundStyle(.secondary)
                                 .instantTip("Subscription: \(account.plan ?? "?")")
                         }
+                            if let note = cells.reportedLimit {
+                                Text("· \(note)").font(PopupFont.caption).foregroundStyle(.orange)
+                                    .fixedSize()
+                                    .instantTip(cells.reportedLimitTip)
+                            }
                         Spacer(minLength: 0)
                         cells.cashCell
                     }

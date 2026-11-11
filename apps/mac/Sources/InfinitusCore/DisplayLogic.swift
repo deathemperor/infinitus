@@ -169,6 +169,19 @@ public extension Account {
         return "Usage from \(age) — the engine could not refresh this account\(why); it retries on its own"
     }
 
+    /// The row's verdict when the engine holds this account as limited on a
+    /// `swapd limit-hit` report: its windows still show measured usage, so
+    /// this says why the engine will not switch to it. Gated on the data
+    /// alone; nil for every row without a report. The back time is dropped
+    /// once it has passed (the report lapses on the engine's next pass).
+    func reportedLimitNote(now: Date = Date(), calendar: Calendar = .current) -> String? {
+        guard reportedLimitAt != nil else { return nil }
+        guard let back = WeeklyRoll.parse(reportedLimitResetsAt), back > now else {
+            return "Reported limited"
+        }
+        return "Reported limited · back \(ResetFormat.clock(back, now: now, calendar: calendar))"
+    }
+
     /// Whether a reset instant carried by this account still says anything
     /// at `now`. A stale row is a FROZEN measurement — its reset is the one
     /// that was true when the last good fetch landed — so once that instant
