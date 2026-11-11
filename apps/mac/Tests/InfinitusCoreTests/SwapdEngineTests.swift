@@ -135,6 +135,29 @@ final class SwapdMappingTests: XCTestCase {
         XCTAssertEqual(fleets[0].accounts[0].autoIgnite, true)
     }
 
+    /// A `limit-hit` report (swapd `reportedLimitAt` / `reportedLimitResetsAt`)
+    /// rides along; the reset can be absent while the report is present.
+    func testReportedLimitFieldsAreCarried() throws {
+        let list = try list("""
+        {"schemaVersion":1,"providers":[
+          {"provider":"claude","installed":true,"activeSlot":1,"accounts":[
+            {"slot":1,"email":"a@example.com","organizationName":"","organizationUuid":"","active":true,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[],
+             "reportedLimitAt":"2026-11-11T10:00:00Z","reportedLimitResetsAt":"2026-11-11T14:00:00Z"},
+            {"slot":2,"email":"b@example.com","organizationName":"","organizationUuid":"","active":false,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[],
+             "reportedLimitAt":"2026-11-11T10:00:00Z"},
+            {"slot":3,"email":"c@example.com","organizationName":"","organizationUuid":"","active":false,
+             "disabled":false,"preferred":false,"usageStatus":"ok","windows":[]}]}]}
+        """)
+        let accounts = SwapdMapping.fleets(from: list, now: now)[0].accounts
+        XCTAssertEqual(accounts[0].reportedLimitAt, "2026-11-11T10:00:00Z")
+        XCTAssertEqual(accounts[0].reportedLimitResetsAt, "2026-11-11T14:00:00Z")
+        XCTAssertEqual(accounts[1].reportedLimitAt, "2026-11-11T10:00:00Z")
+        XCTAssertNil(accounts[1].reportedLimitResetsAt)
+        XCTAssertNil(accounts[2].reportedLimitAt)
+    }
+
     /// swapd's `resets` (#1554) rides along per account, verbatim; a row
     /// without it carries nil, so every host hides the control.
     func testBankedResetsAreCarriedWhenTheEngineReportsThem() throws {

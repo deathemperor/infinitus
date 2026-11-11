@@ -55,6 +55,11 @@ public struct AccountHeaderLine<M: FleetModel, U: UsageSource>: View {
                     .fixedSize()
                     .instantTip(stale.tip)
             }
+            if let note = cells.reportedLimit {
+                Text("· \(note)").font(PopupFont.caption).foregroundStyle(.orange)
+                    .fixedSize()
+                    .instantTip("swapd was told this account hit its limit; it will not switch to it until the report lapses")
+            }
             Spacer(minLength: 4)
             cells.cashCell
         }
